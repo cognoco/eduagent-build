@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,6 +17,8 @@ import {
 import { useApiClient } from '../../../../lib/api-client';
 import { assertOk } from '../../../../lib/assert-ok';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { errorHasCode } from '../../../../components/session/session-types';
+import { platformAlert } from '../../../../lib/platform-alert';
 import {
   setPreviewState,
   type PreviewOnboardingStateV0,
@@ -34,6 +37,7 @@ export function ProfileBasicsStep({
 }): React.ReactElement {
   const client = useApiClient();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { t, i18n } = useTranslation();
   // i18n Phase 1 — Signup-time fix. The owner POST is a self-create, so
   // forward the device UI language for the first LLM call. The child POST
@@ -170,6 +174,32 @@ export function ProfileBasicsStep({
             (old) => (old ? [...old, cachedChild] : [cachedChild]),
           );
         } catch (childErr) {
+          // [WI-824] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a retryable
+          // error. Surface the upgrade CTA via alert + "See plans" → /subscription,
+          // mirroring the pattern in create-profile.tsx (BUG-947). All other errors
+          // keep the existing inline banner + Retry behaviour (AC 9).
+          if (errorHasCode(childErr, 'PROFILE_LIMIT_EXCEEDED')) {
+            const rawMessage =
+              typeof childErr === 'object' &&
+              childErr !== null &&
+              'message' in childErr &&
+              typeof (childErr as { message?: unknown }).message === 'string'
+                ? (childErr as { message: string }).message
+                : '';
+            platformAlert(
+              t('createProfile.upgradeRequiredTitle'),
+              rawMessage || t('createProfile.upgradeRequiredBody'),
+              [
+                { text: t('common.notNow'), style: 'cancel' },
+                {
+                  text: t('createProfile.seePlans'),
+                  onPress: () => router.push('/(app)/subscription'),
+                },
+              ],
+            );
+            setLoading(false);
+            return;
+          }
           // [AC 9] Keep parent. Surface retryable child error inline.
           setChildError(formatApiError(childErr));
           setLoading(false);
@@ -192,6 +222,7 @@ export function ProfileBasicsStep({
   }, [
     client,
     queryClient,
+    router,
     createdParent,
     needsChild,
     parentName,
@@ -203,6 +234,7 @@ export function ProfileBasicsStep({
     // i18n Phase 1 — owner POST reads this; without it in deps, a language
     // change between mount and submit would send the stale locale.
     ownerConversationLanguage,
+    t,
   ]);
 
   return (
