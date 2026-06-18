@@ -9,25 +9,45 @@ const mockUseParentProxy = jest.fn();
 const mockUseProfile = jest.fn();
 const mockUseSubscriptionStatus = jest.fn();
 
-jest.mock('./use-active-profile-role', () => ({
-  useActiveProfileRole: () => mockUseActiveProfileRole(),
-}));
+jest.mock(
+  // gc1-allow: hook needs profile/parent-proxy context absent in this renderHook unit test; full-replace isolates the pure nav-contract logic
+  './use-active-profile-role',
+  () => ({
+    useActiveProfileRole: () => mockUseActiveProfileRole(),
+  }),
+);
 
-jest.mock('./use-parent-proxy', () => ({
-  useParentProxy: () => mockUseParentProxy(),
-}));
+jest.mock(
+  // gc1-allow: hook needs profile context absent in this renderHook unit test; full-replace isolates the pure nav-contract logic
+  './use-parent-proxy',
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
+  }),
+);
 
-jest.mock('./use-subscription', () => ({
-  useSubscriptionStatus: (args: unknown) => mockUseSubscriptionStatus(args),
-}));
+jest.mock(
+  // gc1-allow: hook needs api-client + QueryClient providers absent in this renderHook unit test; full-replace isolates the pure nav-contract logic
+  './use-subscription',
+  () => ({
+    useSubscriptionStatus: (args: unknown) => mockUseSubscriptionStatus(args),
+  }),
+);
 
-jest.mock('../lib/app-context', () => ({
-  useAppContext: () => mockUseAppContext(),
-}));
+jest.mock(
+  // gc1-allow: hook needs QueryClient + profile providers absent in this renderHook unit test; full-replace isolates the pure nav-contract logic
+  '../lib/app-context',
+  () => ({
+    useAppContext: () => mockUseAppContext(),
+  }),
+);
 
-jest.mock('../lib/profile', () => ({
-  useProfile: () => mockUseProfile(),
-}));
+jest.mock(
+  // gc1-allow: hook needs profile context provider absent in this renderHook unit test; full-replace isolates the pure nav-contract logic
+  '../lib/profile',
+  () => ({
+    useProfile: () => mockUseProfile(),
+  }),
+);
 
 function setFlag<K extends keyof typeof FEATURE_FLAGS>(
   key: K,
