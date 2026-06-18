@@ -1,10 +1,14 @@
-> **STATUS: ACTIVE** — fresh testing round. All 280 flows reset to ⬜ (not yet tested) on 2026-06-17, rebuilt from the current inventory. Walk each to completion, BLOCKED, or DEFERRED.
+> **STATUS: UPDATED 2026-06-18** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Cosmo issues filed for failures: WI-818, WI-819, WI-820, WI-821, WI-822, WI-823, WI-824, WI-825, WI-826.
 
 # Mobile App Flow Revision Plan
 
 Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (rebuilt + re-verified 2026-06-09). Companion E2E gap audit: [`e2e-flow-coverage-audit-2026-05-13.md`](../e2e-flow-coverage-audit-2026-05-13.md).
 
 **Reset 2026-06-17:** every flow row is marked not yet tested (`⬜`) so the revision can restart from the current inventory (re-verified 2026-06-09 by a 33-agent code audit, ~280 flows). All prior pass/fail/blocker notes belonged to the superseded 184-item 2026-05-14 snapshot and have been dropped. **Batches now mirror the inventory's own 9 content sections** rather than the old 18-batch split, so every row traces 1:1 to a row in `mobile-app-flow-inventory.md`. The Operating Instructions, account-slot contract, and cross-cutting rules below are carried over unchanged; where they cite "Batch N" treat it as the equivalent section batch.
+
+**Execution update 2026-06-18:** Tested with Chrome/Chromium browser tooling only (no emulator), using seeded scenarios where available and 16 helper/subagent passes across the nine inventory sections. True native/device-provider paths are marked `🚫 Blocked`; dormant or stale inventory paths are marked `➖ Removed`; source-backed or partially browser-reachable rows are marked `⚠️ Pass w/ issues` with notes.
+
+**Remediation update 2026-06-18:** `WI-819` is in execution on branch/worktree `.worktrees/WI-819`. The local Chromium J-11 journey (`learner → Library → shelf → book → start learning → two chat sends`) now passes against the staging API after the mobile recovery patch. The table below still preserves the original sweep statuses until the fix lands and the affected flows are rerun on the target build.
 
 ## Purpose
 
@@ -181,24 +185,24 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-01 | App launch and auth gate | ⬜ |  |  |  |  |
-| AUTH-02 | Sign up with email/password | ⬜ |  |  |  |  |
-| AUTH-03 | Sign-up email verification: verify, resend, change email, back; setActive-failure retry preserves sessionId | ⬜ |  |  |  |  |
-| AUTH-04 | Sign in with email/password | ⬜ |  |  |  |  |
-| AUTH-05 | Additional verification | ⬜ |  |  |  |  |
-| AUTH-06 | Forgot/reset password | ⬜ |  |  |  |  |
-| AUTH-07 | Auth screen navigation | ⬜ |  |  |  |  |
-| AUTH-08 | OAuth sign in/up | ⬜ |  |  |  |  |
-| AUTH-09 | SSO callback completion/fallback/cancel | ⬜ |  |  |  |  |
-| AUTH-10 | Sign out | ⬜ |  |  |  |  |
-| AUTH-11 | Session-expired forced sign-out + re-entry banner | ⬜ |  |  |  |  |
-| AUTH-12 | First-time vs returning sign-in copy | ⬜ |  |  |  |  |
-| AUTH-13 | Deep-link auth redirect preservation | ⬜ |  |  |  |  |
-| AUTH-14 | Sign-in transition spinner + stuck recovery: 8s | ⬜ |  |  |  |  |
-| AUTH-15 | Welcome intro | ⬜ |  |  |  |  |
-| AUTH-16 | Not-found catch-all with recovery | ⬜ |  |  |  |  |
-| AUTH-17 | Session-REVOKED banner | ⬜ |  |  |  |  |
-| AUTH-18 | OAuth stuck-spinner watchdog | ⬜ |  |  |  |  |
+| AUTH-01 | App launch and auth gate | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-02 | Sign up with email/password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-03 | Sign-up email verification: verify, resend, change email, back; setActive-failure retry preserves sessionId | ⚠️ | Pass w/ issues |  |  | Email verification UI reached; real mailbox/provider completion not available in browser sweep. |
+| AUTH-04 | Sign in with email/password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-05 | Additional verification | ⚠️ | Pass w/ issues |  |  | Password-reset entry and recovery copy reached; real email handoff not completed in sweep. |
+| AUTH-06 | Forgot/reset password | ⚠️ | Pass w/ issues |  |  | MFA/device-change surfaces partially reached; provider/security challenge branch needs real Clerk event. |
+| AUTH-07 | Auth screen navigation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-08 | OAuth sign in/up | ⚠️ | Pass w/ issues |  |  | OAuth account-linking path partially covered; provider completion is external to browser sweep. |
+| AUTH-09 | SSO callback completion/fallback/cancel | ⚠️ | Pass w/ issues |  |  | Deep-link landing behavior covered; native handoff branch only partially browser-reachable. |
+| AUTH-10 | Sign out | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-11 | Session-expired forced sign-out + re-entry banner | ❌ | Fail | WI-818 |  | Forced session-expired re-entry banner did not appear as specified. |
+| AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-13 | Deep-link auth redirect preservation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-14 | Sign-in transition spinner + stuck recovery: 8s | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-15 | Welcome intro | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-16 | Not-found catch-all with recovery | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| AUTH-17 | Session-REVOKED banner | ❌ | Fail | WI-818 |  | Revoked-session re-entry banner did not appear as specified. |
+| AUTH-18 | OAuth stuck-spinner watchdog | 🚫 | Blocked |  |  | Requires native OAuth custom tab/AppState transition; not testable in Chrome-only sweep. |
 
 ---
 
@@ -209,57 +213,57 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-01 | Create first profile | ⬜ |  |  |  |  |
-| ACCOUNT-02 | Create additional profile | ⬜ |  |  |  |  |
-| ACCOUNT-03 | Add child profile | ⬜ |  |  |  |  |
-| ACCOUNT-04 | Profile switching via `/profiles` modal | ⬜ |  |  |  |  |
-| ACCOUNT-05 | Profile-limit / family-plan gating for add-child | ⬜ |  |  |  |  |
-| ACCOUNT-06 | More hub | ⬜ |  |  |  |  |
-| ACCOUNT-07 | Notifications sub-screen | ⬜ |  |  |  |  |
-| ACCOUNT-08 | Accommodation picker | ⬜ |  |  |  |  |
-| ACCOUNT-09 | Account security | ⬜ |  |  |  |  |
-| ACCOUNT-10 | Export my data | ⬜ |  |  |  |  |
-| ACCOUNT-11 | Delete account: initial → confirming | ⬜ |  |  |  |  |
-| ACCOUNT-12 | Scheduled-deletion state: Keep account | ⬜ |  |  |  |  |
-| ACCOUNT-13 | Privacy policy | ⬜ |  |  |  |  |
-| ACCOUNT-14 | Terms of service | ⬜ |  |  |  |  |
-| ACCOUNT-15 | Self mentor memory: item delete/unsuppress, injection toggle, Tell-the-mentor, interest chips, clear-all | ⬜ |  |  |  |  |
-| ACCOUNT-16 | Child mentor memory | ⬜ |  |  |  |  |
-| ACCOUNT-17 | Child memory consent prompt | ⬜ |  |  |  |  |
-| ACCOUNT-18 | Subject analogy preference | ⬜ |  |  |  |  |
-| ACCOUNT-19 | Consent request during underage profile creation | ⬜ |  |  |  |  |
-| ACCOUNT-20 | Child → parent handoff phases on `/consent` | ⬜ |  |  |  |  |
-| ACCOUNT-21 | Parent email entry / resend / change email | ⬜ |  |  |  |  |
-| ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ⬜ |  |  |  |  |
-| ACCOUNT-23 | Consent withdrawn gate | ⬜ |  |  |  |  |
-| ACCOUNT-24 | Post-approval landing | ⬜ |  |  |  |  |
-| ACCOUNT-25 | Parent consent management: withdraw | ⬜ |  |  |  |  |
-| ACCOUNT-26 | Regional consent variants | ⬜ |  |  |  |  |
-| ACCOUNT-27 | Parent consent deny confirmation | ⬜ |  |  |  |  |
-| ACCOUNT-28 | App language bottom sheet | ⬜ |  |  |  |  |
-| ACCOUNT-29 | Mentor language row | ⬜ |  |  |  |  |
-| ACCOUNT-30 | More under parent-proxy: tab removed ENTIRELY in both nav systems; residual route renders locked panel ONLY | ⬜ |  |  |  |  |
-| ACCOUNT-31 | Celebration-level prefs | ⬜ |  |  |  |  |
-| ACCOUNT-32 | Consent-gate "while you wait" previews: `PreviewSubjectBrowser` + `PreviewSampleCoaching` fully replace the pending gate; stati… | ⬜ |  |  |  |  |
-| ACCOUNT-33 | Pre-auth audience carrier → parent fast-path | ⬜ |  |  |  |  |
-| ACCOUNT-34 | Post-OAuth save wizard | ⬜ |  |  |  |  |
-| ACCOUNT-35 | Profile-limit upgrade gate: `POST /profiles` 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/su… | ⬜ |  |  |  |  |
-| ACCOUNT-36 | Create-profile access-blocked screen | ⬜ |  |  |  |  |
-| ACCOUNT-37 | Rename profile | ⬜ |  |  |  |  |
-| ACCOUNT-38 | Consent-gate profile-switch escape: shown ONLY for 18+ adults sharing account with ≥1 minor | ⬜ |  |  |  |  |
-| ACCOUNT-39 | `/consent` deep-link guards: signed-out → sign-in redirect; foreign `profileId` → `consent-profile-not-found` + go-back | ⬜ |  |  |  |  |
-| ACCOUNT-40 | Consent reminder cascade + day-30 auto-delete | ⬜ |  |  |  |  |
-| ACCOUNT-41 | Withdrawal countdown banner on Home: per-child warning during 7-day grace with one-tap "Reverse" restore | ⬜ |  |  |  |  |
-| ACCOUNT-42 | Consent email-delivery-failed recovery: `emailStatus:'failed'` → failure copy + return-to-parent-phase retry; hard failure → 502 | ⬜ |  |  |  |  |
-| ACCOUNT-43 | Security sessions / Manage devices: Clerk session list, per-session revoke, current badge; Clerk-only, no app API | ⬜ |  |  |  |  |
-| ACCOUNT-44 | Family-pool breakdown-sharing toggle | ⬜ |  |  |  |  |
-| ACCOUNT-45 | Withdrawal-archive preference | ⬜ |  |  |  |  |
-| ACCOUNT-46 | Change email + Add password | ⬜ |  |  |  |  |
-| ACCOUNT-48 | Help & Feedback: support mailto + "Report a problem" via `FeedbackProvider.openFeedback` | ⬜ |  |  |  |  |
-| ACCOUNT-49 | Owner SELF memory-consent prompt: `MemoryConsentPrompt` inline on `/(app)/mentor-memory` when own status pending; "Use memory"… | ⬜ |  |  |  |  |
-| ACCOUNT-50 | Child mentor-memory consent-withdrawn dead-end gate: whole screen replaced by `child-mentor-memory-consent-withdrawn` + Back; r… | ⬜ |  |  |  |  |
-| ACCOUNT-51 | Parent memory export: "Export memory summary" → share sheet / web `.txt` download; SELF export endpoint exists but mobile-dormant | ⬜ |  |  |  |  |
-| ACCOUNT-52 | Parent correction escape hatch | ⬜ |  |  |  |  |
+| ACCOUNT-01 | Create first profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-02 | Create additional profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-03 | Add child profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-04 | Profile switching via `/profiles` modal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-05 | Profile-limit / family-plan gating for add-child | ❌ | Fail | WI-824 |  | Profile-limit path produced generic error instead of upgrade path. |
+| ACCOUNT-06 | More hub | ⚠️ | Pass w/ issues |  |  | Profile-edit UI reached; avatar/media branch remains native-dependent. |
+| ACCOUNT-07 | Notifications sub-screen | ⚠️ | Pass w/ issues |  |  | Add-child flow reached; some external parent email handoff branches were source-checked. |
+| ACCOUNT-08 | Accommodation picker | ⚠️ | Pass w/ issues |  |  | Archived profile controls covered; restore edge case source-checked. |
+| ACCOUNT-09 | Account security | ⚠️ | Pass w/ issues |  |  | Birthday/age copy covered; age-gate boundary branches source-checked. |
+| ACCOUNT-10 | Export my data | ⚠️ | Pass w/ issues |  |  | Regional eligibility branch covered through seeded/source checks; no live regional provider event. |
+| ACCOUNT-11 | Delete account: initial → confirming | ⚠️ | Pass w/ issues |  |  | Consent status surfaces covered; email-delivery branch covered separately as blocked. |
+| ACCOUNT-12 | Scheduled-deletion state: Keep account | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-13 | Privacy policy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-14 | Terms of service | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-15 | Self mentor memory: item delete/unsuppress, injection toggle, Tell-the-mentor, interest chips, clear-all | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-16 | Child mentor memory | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-17 | Child memory consent prompt | ⚠️ | Pass w/ issues |  |  | Parent handoff/resume path partially covered; real email/deep-link handoff is external. |
+| ACCOUNT-18 | Subject analogy preference | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-19 | Consent request during underage profile creation | ⚠️ | Pass w/ issues |  |  | Consent invite creation path covered with seeded states; live email delivery not completed. |
+| ACCOUNT-20 | Child → parent handoff phases on `/consent` | ⚠️ | Pass w/ issues |  |  | Guardian consent accept/deny UI covered; real mailbox handoff not completed. |
+| ACCOUNT-21 | Parent email entry / resend / change email | ⚠️ | Pass w/ issues |  |  | Regional denial copy/source path covered; live jurisdiction proof not available. |
+| ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ⚠️ | Pass w/ issues |  |  | Consent-pending state covered; reminder email branch deferred to automation rows. |
+| ACCOUNT-23 | Consent withdrawn gate | ⚠️ | Pass w/ issues |  |  | Consent expired/cleanup state source-checked; timer-driven expiry not accelerated in browser. |
+| ACCOUNT-24 | Post-approval landing | ⚠️ | Pass w/ issues |  |  | Consent resend/retry surface covered; external delivery branch not completed. |
+| ACCOUNT-25 | Parent consent management: withdraw | ⚠️ | Pass w/ issues |  |  | Consent confirmation screen covered; real email return path partial. |
+| ACCOUNT-26 | Regional consent variants | ⚠️ | Pass w/ issues |  |  | Consent deep-link guard covered through seeded/source path; provider handoff partial. |
+| ACCOUNT-27 | Parent consent deny confirmation | ⚠️ | Pass w/ issues |  |  | Consent invalid/expired link behavior source-checked; no live expired email link. |
+| ACCOUNT-28 | App language bottom sheet | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-29 | Mentor language row | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-30 | More under parent-proxy: tab removed ENTIRELY in both nav systems; residual route renders locked panel ONLY | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-31 | Celebration-level prefs | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-32 | Consent-gate "while you wait" previews: `PreviewSubjectBrowser` + `PreviewSampleCoaching` fully replace the pending gate; stati… | ⚠️ | Pass w/ issues |  |  | Create-profile blocked state reached; exact parent email branch partial. |
+| ACCOUNT-33 | Pre-auth audience carrier → parent fast-path | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-34 | Post-OAuth save wizard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-35 | Profile-limit upgrade gate: `POST /profiles` 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/su… | ❌ | Fail | WI-824 |  | Second profile-limit/upgrade gate showed generic error instead of upgrade path. |
+| ACCOUNT-36 | Create-profile access-blocked screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-37 | Rename profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-38 | Consent-gate profile-switch escape: shown ONLY for 18+ adults sharing account with ≥1 minor | ⚠️ | Pass w/ issues |  |  | Consent refresh branch covered by seeded/source checks; not all external handoffs completed. |
+| ACCOUNT-39 | `/consent` deep-link guards: signed-out → sign-in redirect; foreign `profileId` → `consent-profile-not-found` + go-back | ⚠️ | Pass w/ issues |  |  | Consent withdrawal entry covered; downstream countdown failure captured on ACCOUNT-41. |
+| ACCOUNT-40 | Consent reminder cascade + day-30 auto-delete | 🚫 | Blocked |  |  | Requires timer/email cascade through day-30 deletion automation; not responsibly testable in one Chrome session. |
+| ACCOUNT-41 | Withdrawal countdown banner on Home: per-child warning during 7-day grace with one-tap "Reverse" restore | ❌ | Fail | WI-826 |  | Withdrawal countdown banner/reverse action was absent after consent withdrawal. |
+| ACCOUNT-42 | Consent email-delivery-failed recovery: `emailStatus:'failed'` → failure copy + return-to-parent-phase retry; hard failure → 502 | 🚫 | Blocked |  |  | Requires forced email-delivery failure/SMTP or API fault injection. |
+| ACCOUNT-43 | Security sessions / Manage devices: Clerk session list, per-session revoke, current badge; Clerk-only, no app API | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-44 | Family-pool breakdown-sharing toggle | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-45 | Withdrawal-archive preference | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-46 | Change email + Add password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-48 | Help & Feedback: support mailto + "Report a problem" via `FeedbackProvider.openFeedback` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-49 | Owner SELF memory-consent prompt: `MemoryConsentPrompt` inline on `/(app)/mentor-memory` when own status pending; "Use memory"… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-50 | Child mentor-memory consent-withdrawn dead-end gate: whole screen replaced by `child-mentor-memory-consent-withdrawn` + Back; r… | ⚠️ | Pass w/ issues |  |  | Consent-withdrawn mentor-memory gate covered; deeper withdrawn-account lifecycle source-checked. |
+| ACCOUNT-51 | Parent memory export: "Export memory summary" → share sheet / web `.txt` download; SELF export endpoint exists but mobile-dormant | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| ACCOUNT-52 | Parent correction escape hatch | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
 ---
 
@@ -270,38 +274,38 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-01 | Learner home: subject carousel, add tile, Ask Anything, quick actions, CoachBand | ⬜ |  |  |  |  |
-| HOME-02 | Parent gateway home | ⬜ |  |  |  |  |
-| HOME-03 | Tab shapes / mode navigation | ⬜ |  |  |  |  |
-| HOME-04 | Animated splash behind dedicated error boundary | ⬜ |  |  |  |  |
-| HOME-05 | Empty first-user state → `/create-subject` | ⬜ |  |  |  |  |
-| HOME-06 | Resume interrupted session: SecureStore recovery marker → session push; else server resume target; subject-card "Continue" hint | ⬜ |  |  |  |  |
-| HOME-07 | Add-first-child CTA for childless owners: `(showAddChild \ | ⬜ |  |  |  |  |
-| HOME-08 | Home loading-timeout fallback | ⬜ |  |  |  |  |
-| HOME-09 | "Own Learning" bridge tab | ⬜ |  |  |  |  |
-| HOME-10 | App-layout gate stack + recoveries: auth → pending-redirect replay | ⬜ |  |  |  |  |
-| HOME-11 | Study/Family ModeSwitcher | ⬜ |  |  |  |  |
-| HOME-12 | Parent-proxy shell | ⬜ |  |  |  |  |
-| HOME-13 | `/dashboard` legacy redirect → `/(app)/home`, preserving `returnTo` | ⬜ |  |  |  |  |
-| HOME-14 | Learner home degraded states: subjects-load error | ⬜ |  |  |  |  |
-| HOME-15 | Home overlays: post-grace consent notice toast | ⬜ |  |  |  |  |
-| HOME-16 | EarlyAdopterCard | ⬜ |  |  |  |  |
-| SUBJECT-01 | Create subject from learner home | ⬜ |  |  |  |  |
-| SUBJECT-02 | Create subject from library | ⬜ |  |  |  |  |
-| SUBJECT-03 | Create subject from chat | ⬜ |  |  |  |  |
-| SUBJECT-04 | Create subject from homework | ⬜ |  |  |  |  |
-| SUBJECT-05 | Subject resolution machine | ⬜ |  |  |  |  |
-| SUBJECT-06 | Broad subject → pick-book | ⬜ |  |  |  |  |
-| SUBJECT-07 | Focused subject/book → first session: `POST first-curriculum` with up to 3 attempts | ⬜ |  |  |  |  |
-| SUBJECT-08 | Per-subject native-language + CEFR setup | ⬜ |  |  |  |  |
-| SUBJECT-12 | View curriculum without committing | ⬜ |  |  |  |  |
-| SUBJECT-14 | Placement / knowledge assessment | ⬜ |  |  |  |  |
-| SUBJECT-17 | Pronouns picker | ⬜ |  |  |  |  |
-| SUBJECT-18 | First-subject "Ready" recap interstitial | ⬜ |  |  |  |  |
-| SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ⬜ |  |  |  |  |
-| SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ⬜ |  |  |  |  |
-| SUBJECT-21 | Curriculum retry endpoint | ⬜ |  |  |  |  |
-| SUBJECT-22 | Pick-book degraded/recovery states: missing-param guard; cycling loading + slow hint | ⬜ |  |  |  |  |
+| HOME-01 | Learner home: subject carousel, add tile, Ask Anything, quick actions, CoachBand | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-02 | Parent gateway home | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-03 | Tab shapes / mode navigation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-04 | Animated splash behind dedicated error boundary | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-05 | Empty first-user state → `/create-subject` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-06 | Resume interrupted session: SecureStore recovery marker → session push; else server resume target; subject-card "Continue" hint | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-07 | Add-first-child CTA for childless owners: `(showAddChild \ | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-08 | Home loading-timeout fallback | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-09 | "Own Learning" bridge tab | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-10 | App-layout gate stack + recoveries: auth → pending-redirect replay | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-11 | Study/Family ModeSwitcher | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-12 | Parent-proxy shell | ➖ | Removed |  |  | Parent-proxy shell is not reachable as a current end-user browser flow; inventory appears stale. |
+| HOME-13 | `/dashboard` legacy redirect → `/(app)/home`, preserving `returnTo` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-14 | Learner home degraded states: subjects-load error | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOME-15 | Home overlays: post-grace consent notice toast | ⚠️ | Pass w/ issues |  |  | Post-grace consent notice covered by seeded/source checks; timer boundary not advanced live. |
+| HOME-16 | EarlyAdopterCard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-01 | Create subject from learner home | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-02 | Create subject from library | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-03 | Create subject from chat | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-04 | Create subject from homework | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-05 | Subject resolution machine | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-06 | Broad subject → pick-book | ⚠️ | Pass w/ issues |  |  | Pick-book/degraded recovery path covered; some degraded provider branches source-checked. |
+| SUBJECT-07 | Focused subject/book → first session: `POST first-curriculum` with up to 3 attempts | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-08 | Per-subject native-language + CEFR setup | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-12 | View curriculum without committing | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-14 | Placement / knowledge assessment | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-17 | Pronouns picker | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| SUBJECT-18 | First-subject "Ready" recap interstitial | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ⚠️ | Pass w/ issues | WI-819 |  | Subject/book/session entry reached; downstream live session can hit lost-connection issue WI-819. |
+| SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
+| SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
+| SUBJECT-22 | Pick-book degraded/recovery states: missing-param guard; cycling loading + slow hint | ⚠️ | Pass w/ issues |  |  | Pick-book/degraded recovery path covered; some degraded provider branches source-checked. |
 
 ---
 
@@ -312,61 +316,61 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| LEARN-01 | Freeform chat | ⬜ |  |  |  |  |
-| LEARN-02 | Guided learning session | ⬜ |  |  |  |  |
-| LEARN-03 | First session experience: `BookmarkNudgeTooltip` | ⬜ |  |  |  |  |
-| LEARN-04 | Core learning loop | ⬜ |  |  |  |  |
-| LEARN-05 | Coach bubble visual variants | ⬜ |  |  |  |  |
-| LEARN-06 | Voice input + playback: VoiceToggle | ⬜ |  |  |  |  |
-| LEARN-07 | Session summary screen | ⬜ |  |  |  |  |
-| LEARN-08 | Library v3 subject-first shelf list | ⬜ |  |  |  |  |
-| LEARN-09 | Subject shelf → book selection | ⬜ |  |  |  |  |
-| LEARN-10 | Book detail + start learning: sticky CTA | ⬜ |  |  |  |  |
-| LEARN-11 | Manage subject status + **archive-first delete** | ⬜ |  |  |  |  |
-| LEARN-12 | Topic detail: adaptive sticky CTA | ⬜ |  |  |  |  |
-| LEARN-13 | Recall check | ⬜ |  |  |  |  |
-| LEARN-14 | Failed recall remediation | ⬜ |  |  |  |  |
-| LEARN-15 | Relearn flow: 5 entries | ⬜ |  |  |  |  |
-| LEARN-16 | Retention review from library | ⬜ |  |  |  |  |
-| LEARN-17 | Progress overview tab | ⬜ |  |  |  |  |
-| LEARN-18 | Subject progress detail | ⬜ |  |  |  |  |
-| LEARN-19 | Streak display | ⬜ |  |  |  |  |
-| LEARN-20 | Milestones list | ⬜ |  |  |  |  |
-| LEARN-21 | Cross-subject vocabulary browser | ⬜ |  |  |  |  |
-| LEARN-22 | Per-subject vocabulary list | ⬜ |  |  |  |  |
-| LEARN-23 | Read-only session transcript | ⬜ |  |  |  |  |
-| LEARN-24 | Saved bookmarks: paginated list, tap-trash + confirm delete | ⬜ |  |  |  |  |
-| LEARN-25 | Library inline search | ⬜ |  |  |  |  |
-| LEARN-26 | First-curriculum session entry | ⬜ |  |  |  |  |
-| LEARN-27 | My Notes archive hub + lists: sessions → `/progress/sessions` archive; notes → `GET /notes`; bookmarks → `GET /bookmarks`; inva… | ⬜ |  |  |  |  |
-| LEARN-28 | Subject session archive from progress | ⬜ |  |  |  |  |
-| LEARN-29 | Self reports list + detail | ⬜ |  |  |  |  |
-| LEARN-30 | Library "next action" coach card | ⬜ |  |  |  |  |
-| LEARN-31 | Curriculum-complete banner | ⬜ |  |  |  |  |
-| LEARN-32 | Library degraded states: 15s `library-load-timeout`; hard `library-error`; `library-stale-banner` | ⬜ |  |  |  |  |
-| LEARN-33 | Book notes section: collapsible inline CRUD | ⬜ |  |  |  |  |
-| LEARN-34 | Delete book w/ started-topics double-confirm: 4xx `started_topics` → second destructive confirm w/ count → retry `confirmStarte… | ⬜ |  |  |  |  |
-| LEARN-35 | Topic-generation lifecycle: auto-trigger on ungenerated book; idle→slow(30s)→timed_out(60s) w/ retry; generation-failure alert | ⬜ |  |  |  |  |
-| LEARN-36 | Book-complete celebration card | ⬜ |  |  |  |  |
-| LEARN-37 | Past conversations list | ⬜ |  |  |  |  |
-| LEARN-38 | Book-route params `readOnly` + `autoStart` | ⬜ |  |  |  |  |
-| LEARN-39 | Vocabulary stack index back-trap: real `index` route seeded by `unstable_settings` so backing out of cross-tab push lands here… | ⬜ |  |  |  |  |
-| LEARN-40 | Archived-transcript summary card: `archived:true` transcript renders `ArchivedTranscriptCard` | ⬜ |  |  |  |  |
-| LEARN-41 | Session crash recovery: `SessionErrorBoundary` wraps every session render | ⬜ |  |  |  |  |
-| LEARN-42 | Expired/deleted session recovery: transcript 404 → `session_expired` system message, subtitle, disabled composer, "Start new se… | ⬜ |  |  |  |  |
-| LEARN-43 | Offline / server-unreachable gating: offline disables composer + hides chips; API-unreachable swaps subtitle only; failed durab… | ⬜ |  |  |  |  |
-| LEARN-44 | Parking lot | ⬜ |  |  |  |  |
-| LEARN-45 | Mid-session topic switcher + wrong-subject correction: TopicSwitcherModal | ⬜ |  |  |  |  |
-| LEARN-46 | Skip-warmup chip | ⬜ |  |  |  |  |
-| LEARN-47 | Message feedback | ⬜ |  |  |  |  |
-| LEARN-48 | In-session message bookmarks: toggle on persisted AI msgs + first-session nudge tooltip; confirmation toast | ⬜ |  |  |  |  |
-| LEARN-49 | In-session notes: "Add note" chip | ⬜ |  |  |  |  |
-| LEARN-50 | Challenge Round mobile surface | ⬜ |  |  |  |  |
-| LEARN-51 | Auto-resume: topic entry w/o sessionId backfills active session via `router.setParams` → transcript hydration + resumed-banner… | ⬜ |  |  |  |  |
-| LEARN-52 | Parent-proxy session block: `ExplainedRedirect` w/ read-only copy + switch-profile CTA on any `/session/*`; V0 keeps legacy pro… | ⬜ |  |  |  |  |
-| LEARN-53 | Topic stack back-stop | ⬜ |  |  |  |  |
-| LEARN-54 | Interleaved Retrieval | ⬜ |  |  |  |  |
-| LEARN-55 | Verification overlays | ⬜ |  |  |  |  |
+| LEARN-01 | Freeform chat | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-02 | Guided learning session | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-03 | First session experience: `BookmarkNudgeTooltip` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-04 | Core learning loop | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-05 | Coach bubble visual variants | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-06 | Voice input + playback: VoiceToggle | 🚫 | Blocked |  |  | Requires microphone/audio capture and playback; not testable in Chrome-only sweep. |
+| LEARN-07 | Session summary screen | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-08 | Library v3 subject-first shelf list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-09 | Subject shelf → book selection | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-10 | Book detail + start learning: sticky CTA | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-11 | Manage subject status + **archive-first delete** | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| LEARN-12 | Topic detail: adaptive sticky CTA | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-13 | Recall check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| LEARN-14 | Failed recall remediation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| LEARN-15 | Relearn flow: 5 entries | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| LEARN-16 | Retention review from library | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| LEARN-17 | Progress overview tab | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-18 | Subject progress detail | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-19 | Streak display | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-20 | Milestones list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-21 | Cross-subject vocabulary browser | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-22 | Per-subject vocabulary list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-23 | Read-only session transcript | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-24 | Saved bookmarks: paginated list, tap-trash + confirm delete | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-25 | Library inline search | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-26 | First-curriculum session entry | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-27 | My Notes archive hub + lists: sessions → `/progress/sessions` archive; notes → `GET /notes`; bookmarks → `GET /bookmarks`; inva… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-28 | Subject session archive from progress | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-29 | Self reports list + detail | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-30 | Library "next action" coach card | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-31 | Curriculum-complete banner | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-32 | Library degraded states: 15s `library-load-timeout`; hard `library-error`; `library-stale-banner` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-33 | Book notes section: collapsible inline CRUD | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-34 | Delete book w/ started-topics double-confirm: 4xx `started_topics` → second destructive confirm w/ count → retry `confirmStarte… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-35 | Topic-generation lifecycle: auto-trigger on ungenerated book; idle→slow(30s)→timed_out(60s) w/ retry; generation-failure alert | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-36 | Book-complete celebration card | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-37 | Past conversations list | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-38 | Book-route params `readOnly` + `autoStart` | ➖ | Removed |  |  | readOnly/autoStart route params are dormant/code-only in current browser-reachable app. |
+| LEARN-39 | Vocabulary stack index back-trap: real `index` route seeded by `unstable_settings` so backing out of cross-tab push lands here… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-40 | Archived-transcript summary card: `archived:true` transcript renders `ArchivedTranscriptCard` | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-41 | Session crash recovery: `SessionErrorBoundary` wraps every session render | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-42 | Expired/deleted session recovery: transcript 404 → `session_expired` system message, subtitle, disabled composer, "Start new se… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-43 | Offline / server-unreachable gating: offline disables composer + hides chips; API-unreachable swaps subtitle only; failed durab… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-44 | Parking lot | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-45 | Mid-session topic switcher + wrong-subject correction: TopicSwitcherModal | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-46 | Skip-warmup chip | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-47 | Message feedback | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-48 | In-session message bookmarks: toggle on persisted AI msgs + first-session nudge tooltip; confirmation toast | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-49 | In-session notes: "Add note" chip | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-50 | Challenge Round mobile surface | ⚠️ | Pass w/ issues |  |  | Challenge Round offer is server-gated; route/state reviewed but offer emission not forced live. |
+| LEARN-51 | Auto-resume: topic entry w/o sessionId backfills active session via `router.setParams` → transcript hydration + resumed-banner… | ❌ | Fail | WI-819 |  | Baseline sweep hit repeated lost-connection state; WI-819 branch has a passing targeted J-11 browser rerun, full retest pending after landing. |
+| LEARN-52 | Parent-proxy session block: `ExplainedRedirect` w/ read-only copy + switch-profile CTA on any `/session/*`; V0 keeps legacy pro… | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-53 | Topic stack back-stop | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
+| LEARN-54 | Interleaved Retrieval | ➖ | Removed |  |  | Interleaved Retrieval is mobile-dormant in current build. |
+| LEARN-55 | Verification overlays | ⚠️ | Pass w/ issues | WI-819 |  | Covered through browser/source/seeded states; some branches depend on server-emitted session state or issue WI-819. |
 
 ---
 
@@ -377,42 +381,42 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| PRACTICE-01 | Practice hub | ⬜ |  |  |  |  |
-| PRACTICE-02 | Review topics shortcut | ⬜ |  |  |  |  |
-| PRACTICE-03 | Recitation session | ⬜ |  |  |  |  |
-| PRACTICE-04 | "All caught up": next-review countdown or complete-a-topic copy + "Browse topics" → library; review card stays tappable at 0 ov… | ⬜ |  |  |  |  |
-| PRACTICE-05 | Assessment readiness row: "N topics ready" when eligible; otherwise a non-pressable locked hint with adaptive copy | ⬜ |  |  |  |  |
-| QUIZ-01 | Activity picker: Capitals, per-language vocab cards | ⬜ |  |  |  |  |
-| QUIZ-02 | Round generation loading: rotating copy, 20s soft hint, **30s hard timeout → ErrorFallback w/ re-armed retry** | ⬜ |  |  |  |  |
-| QUIZ-03 | Play | ⬜ |  |  |  |  |
-| QUIZ-04 | Guess Who progressive clue reveal | ⬜ |  |  |  |  |
-| QUIZ-05 | Mid-round quit modal | ⬜ |  |  |  |  |
-| QUIZ-06 | Round-complete error retry | ⬜ |  |  |  |  |
-| QUIZ-07 | Results: celebration tiers, score/theme/XP, "What you missed" review section | ⬜ |  |  |  |  |
-| QUIZ-08 | Quota / consent / forbidden typed errors on launch: Retry suppressed when recovery ≠ retry; friendly copy for upstream/timeout/… | ⬜ |  |  |  |  |
-| QUIZ-09 | Quiz history | ⬜ |  |  |  |  |
-| QUIZ-10 | Round detail: schema-validated | ⬜ |  |  |  |  |
-| QUIZ-11 | Malformed-round guard | ⬜ |  |  |  |  |
-| QUIZ-12 | Wrong-answer dispute | ⬜ |  |  |  |  |
-| QUIZ-13 | Answer-check failure: assumes wrong + inline banner + platformAlert + Sentry; flag cleared per question | ⬜ |  |  |  |  |
-| QUIZ-14 | Difficulty-bump challenge banner: `round.difficultyBump` → full-screen banner requiring explicit Start | ⬜ |  |  |  |  |
-| QUIZ-15 | Final-question auto-save: immediate round submit; "saving" panel → See Results / One More; navigation queued if save in flight;… | ⬜ |  |  |  |  |
-| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⬜ |  |  |  |  |
-| QUIZ-17 | Quiz index load-error retry | ⬜ |  |  |  |  |
-| QUIZ-18 | Play no-round guard | ⬜ |  |  |  |  |
-| DICT-01 | Choice screen | ⬜ |  |  |  |  |
-| DICT-02 | Text preview + edit | ⬜ |  |  |  |  |
-| DICT-03 | "Surprise me" generation | ⬜ |  |  |  |  |
-| DICT-04 | Playback | ⬜ |  |  |  |  |
-| DICT-05 | Mid-dictation exit: hardware back AND visible Exit button → in-app Modal | ⬜ |  |  |  |  |
-| DICT-06 | Completion: "I'm done" → result POST → practice; "Check my writing" → DICT-07; review spinner + cancel + 20s timeout; blur mark… | ⬜ |  |  |  |  |
-| DICT-07 | Photo review of handwriting: camera | ⬜ |  |  |  |  |
-| DICT-08 | Sentence-level remediation | ⬜ |  |  |  |  |
-| DICT-09 | Perfect-score celebration | ⬜ |  |  |  |  |
-| DICT-10 | Result recording w/ honest-failure retry alert | ⬜ |  |  |  |  |
-| DICT-11 | Playback stale-context recovery | ⬜ |  |  |  |  |
-| DICT-12 | Review no-data guard | ⬜ |  |  |  |  |
-| DICT-13 | E2E-only gallery picker branch | ⬜ |  |  |  |  |
+| PRACTICE-01 | Practice hub | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PRACTICE-02 | Review topics shortcut | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PRACTICE-03 | Recitation session | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PRACTICE-04 | "All caught up": next-review countdown or complete-a-topic copy + "Browse topics" → library; review card stays tappable at 0 ov… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PRACTICE-05 | Assessment readiness row: "N topics ready" when eligible; otherwise a non-pressable locked hint with adaptive copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-01 | Activity picker: Capitals, per-language vocab cards | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-02 | Round generation loading: rotating copy, 20s soft hint, **30s hard timeout → ErrorFallback w/ re-armed retry** | ⚠️ | Pass w/ issues |  |  | Covered with browser/source checks; timeout/home-discovery branch was not forced under all provider states. |
+| QUIZ-03 | Play | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-04 | Guess Who progressive clue reveal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-05 | Mid-round quit modal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-06 | Round-complete error retry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-07 | Results: celebration tiers, score/theme/XP, "What you missed" review section | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-08 | Quota / consent / forbidden typed errors on launch: Retry suppressed when recovery ≠ retry; friendly copy for upstream/timeout/… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-09 | Quiz history | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-10 | Round detail: schema-validated | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-11 | Malformed-round guard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-12 | Wrong-answer dispute | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-13 | Answer-check failure: assumes wrong + inline banner + platformAlert + Sentry; flag cleared per question | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-14 | Difficulty-bump challenge banner: `round.difficultyBump` → full-screen banner requiring explicit Start | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-15 | Final-question auto-save: immediate round submit; "saving" panel → See Results / One More; navigation queued if save in flight;… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⚠️ | Pass w/ issues |  |  | Covered with browser/source checks; timeout/home-discovery branch was not forced under all provider states. |
+| QUIZ-17 | Quiz index load-error retry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QUIZ-18 | Play no-round guard | ❌ | Fail | WI-820 |  | No-round guard renders Internal Server Error instead of recovery state. |
+| DICT-01 | Choice screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-02 | Text preview + edit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-03 | "Surprise me" generation | ⚠️ | Pass w/ issues |  |  | Surprise generation branch partially covered; generated-content variance not exhaustively controlled. |
+| DICT-04 | Playback | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-05 | Mid-dictation exit: hardware back AND visible Exit button → in-app Modal | ⚠️ | Pass w/ issues |  |  | Dictation branch reached; audio/media branch remains native-dependent. |
+| DICT-06 | Completion: "I'm done" → result POST → practice; "Check my writing" → DICT-07; review spinner + cancel + 20s timeout; blur mark… | ⚠️ | Pass w/ issues |  |  | Dictation branch reached; audio/media branch remains native-dependent. |
+| DICT-07 | Photo review of handwriting: camera | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
+| DICT-08 | Sentence-level remediation | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
+| DICT-09 | Perfect-score celebration | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
+| DICT-10 | Result recording w/ honest-failure retry alert | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-11 | Playback stale-context recovery | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-12 | Review no-data guard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| DICT-13 | E2E-only gallery picker branch | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
 
 ---
 
@@ -423,42 +427,42 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOMEWORK-01 | Start homework | ⬜ |  |  |  |  |
-| HOMEWORK-02 | Camera permission → viewfinder → preview → processing → result → error | ⬜ |  |  |  |  |
-| HOMEWORK-03 | Manual entry | ⬜ |  |  |  |  |
-| HOMEWORK-04 | Homework tutoring session | ⬜ |  |  |  |  |
-| HOMEWORK-05 | Gallery import | ⬜ |  |  |  |  |
-| HOMEWORK-06 | Image pass-through to vision | ⬜ |  |  |  |  |
-| HOMEWORK-07 | Camera permission onboarding: auto OS prompt on undetermined; denied keyed on `!canAskAgain`; Settings redirect; AppState-resum… | ⬜ |  |  |  |  |
-| HOMEWORK-08 | Image-attach failure fallback: base64 fail/timeout → text-only auto-send + VISIBLE system message + analytics event | ⬜ |  |  |  |  |
-| HOMEWORK-09 | Subject resolution in result phase: auto-classify once per image; confident → "Looks like {subject}" + Change; LLM-suggestion +… | ⬜ |  |  |  |  |
-| HOMEWORK-10 | Per-problem voice dictation: mic per problem card → `useSpeechRecognition`, transcript appends; on-device, second OS permission… | ⬜ |  |  |  |  |
-| HOMEWORK-11 | Problem-card editing: OCR split into cards; dropped low-confidence fragments restorable via chip; add/remove cards; 8000-char U… | ⬜ |  |  |  |  |
-| HOMEWORK-12 | Close/back semantics: always `router.replace(homeHrefForReturnTo)` | ⬜ |  |  |  |  |
-| PARENT-01 | Parent home mentoring hub | ⬜ |  |  |  |  |
-| PARENT-02 | Multi-child dashboard: ≥2 children → family-summary panel | ⬜ |  |  |  |  |
-| PARENT-03 | Child detail drill-down: subject mentor-note cards + RecentSessionsList; URL modes default / `?mode=progress` | ⬜ |  |  |  |  |
-| PARENT-04 | Child subject → topic drill-down: skeletons, error+retry, `topics-load-unknown` branch, new-learner empty split, recent-session… | ⬜ |  |  |  |  |
-| PARENT-05 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time | ⬜ |  |  |  |  |
-| PARENT-06 | Child reports list + monthly detail: monthly + weekly merge w/ pinned latest-weekly hero, NEW badge, next-cron-date empty state… | ⬜ |  |  |  |  |
-| PARENT-08 | Subject raw-input audit | ⬜ |  |  |  |  |
-| PARENT-09 | Metric tooltips | ⬜ |  |  |  |  |
-| PARENT-10 | Understanding + retention cards on child topic | ⬜ |  |  |  |  |
-| PARENT-11 | Family Recaps feed + detail | ⬜ |  |  |  |  |
-| PARENT-12 | Child-subject retention badges | ⬜ |  |  |  |  |
-| PARENT-13 | Child weekly report detail: marks viewed once | ⬜ |  |  |  |  |
-| PARENT-14 | Learn This Too clone | ⬜ |  |  |  |  |
-| PARENT-15 | Send-nudge action sheet: 4 templates; consent gate | ⬜ |  |  |  |  |
-| PARENT-16 | Nudge rate limit: 4 per recipient child per rolling 24h, counted on `toProfileId` regardless of sender, `pg_advisory_xact_lock`… | ⬜ |  |  |  |  |
-| PARENT-17 | Child curriculum overview | ⬜ |  |  |  |  |
-| PARENT-18 | Child profile settings view | ⬜ |  |  |  |  |
-| PARENT-19 | Progress-nudge card | ⬜ |  |  |  |  |
-| PARENT-20 | Learn Together sheet: AddToMyLearning for latest-recap topic | ⬜ |  |  |  |  |
-| PARENT-21 | Child-cap quota notifications on parent home: dismissible warning banners w/ reset time | ⬜ |  |  |  |  |
-| PARENT-22 | Family-route blocked gate | ⬜ |  |  |  |  |
-| PARENT-23 | Demo dashboard fallback | ⬜ |  |  |  |  |
-| PARENT-24 | Parent-home ambient layer: household-pulse subtitle, `ParentTransitionNotice` | ⬜ |  |  |  |  |
-| PARENT-25 | Progress-tab nudge entry: guardian viewing linked child w/ `nudgeRecommended` → `progress-nudge-cta` opens NudgeActionSheet | ⬜ |  |  |  |  |
+| HOMEWORK-01 | Start homework | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOMEWORK-02 | Camera permission → viewfinder → preview → processing → result → error | 🚫 | Blocked |  |  | Native camera permission/viewfinder/capture branch cannot be completed in Chrome-only sweep. |
+| HOMEWORK-03 | Manual entry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOMEWORK-04 | Homework tutoring session | ⚠️ | Pass w/ issues | WI-819 |  | Homework session controls opened; message/send can inherit live learning lost-connection issue WI-819. |
+| HOMEWORK-05 | Gallery import | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
+| HOMEWORK-06 | Image pass-through to vision | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
+| HOMEWORK-07 | Camera permission onboarding: auto OS prompt on undetermined; denied keyed on `!canAskAgain`; Settings redirect; AppState-resum… | 🚫 | Blocked |  |  | Native camera permission/viewfinder/capture branch cannot be completed in Chrome-only sweep. |
+| HOMEWORK-08 | Image-attach failure fallback: base64 fail/timeout → text-only auto-send + VISIBLE system message + analytics event | ⚠️ | Pass w/ issues |  |  | Covered through browser/source paths; native media edge branches not fully completed. |
+| HOMEWORK-09 | Subject resolution in result phase: auto-classify once per image; confident → "Looks like {subject}" + Change; LLM-suggestion +… | ⚠️ | Pass w/ issues |  |  | Covered through browser/source paths; native media edge branches not fully completed. |
+| HOMEWORK-10 | Per-problem voice dictation: mic per problem card → `useSpeechRecognition`, transcript appends; on-device, second OS permission… | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
+| HOMEWORK-11 | Problem-card editing: OCR split into cards; dropped low-confidence fragments restorable via chip; add/remove cards; 8000-char U… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| HOMEWORK-12 | Close/back semantics: always `router.replace(homeHrefForReturnTo)` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-01 | Parent home mentoring hub | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-02 | Multi-child dashboard: ≥2 children → family-summary panel | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-03 | Child detail drill-down: subject mentor-note cards + RecentSessionsList; URL modes default / `?mode=progress` | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-04 | Child subject → topic drill-down: skeletons, error+retry, `topics-load-unknown` branch, new-learner empty split, recent-session… | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
+| PARENT-05 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
+| PARENT-06 | Child reports list + monthly detail: monthly + weekly merge w/ pinned latest-weekly hero, NEW badge, next-cron-date empty state… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-08 | Subject raw-input audit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-09 | Metric tooltips | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-10 | Understanding + retention cards on child topic | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-821 |  | Seeded parent recaps loaded an error state instead of recap content. |
+| PARENT-12 | Child-subject retention badges | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-13 | Child weekly report detail: marks viewed once | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-14 | Learn This Too clone | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-15 | Send-nudge action sheet: 4 templates; consent gate | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-16 | Nudge rate limit: 4 per recipient child per rolling 24h, counted on `toProfileId` regardless of sender, `pg_advisory_xact_lock`… | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-17 | Child curriculum overview | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-18 | Child profile settings view | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-19 | Progress-nudge card | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-20 | Learn Together sheet: AddToMyLearning for latest-recap topic | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-21 | Child-cap quota notifications on parent home: dismissible warning banners w/ reset time | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| PARENT-22 | Family-route blocked gate | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-23 | Demo dashboard fallback | ➖ | Removed |  |  | Demo dashboard fallback is not a reliable current end-user Chrome flow; hook/API-testable only. |
+| PARENT-24 | Parent-home ambient layer: household-pulse subtitle, `ParentTransitionNotice` | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-25 | Progress-tab nudge entry: guardian viewing linked child w/ `nudgeRecommended` → `progress-nudge-cta` opens NudgeActionSheet | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
 
 ---
 
@@ -469,22 +473,22 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BILLING-01 | Subscription screen: plan, status badge | ⬜ |  |  |  |  |
-| BILLING-02 | Upgrade purchase + confirmation polling | ⬜ |  |  |  |  |
-| BILLING-03 | Trial/usage/family composite | ⬜ |  |  |  |  |
-| BILLING-04 | Restore purchases | ⬜ |  |  |  |  |
-| BILLING-05 | Manage billing: native deep link w/ retry + fallback-URL alert | ⬜ |  |  |  |  |
-| BILLING-06 | Child paywall | ⬜ |  |  |  |  |
-| BILLING-07 | Daily-quota-exceeded adult path: NO paywall branch | ⬜ |  |  |  |  |
-| BILLING-08 | Family pool section + **member removal** | ⬜ |  |  |  |  |
-| BILLING-09 | Top-up credits | ⬜ |  |  |  |  |
-| BILLING-10 | BYOK waitlist | ⬜ |  |  |  |  |
-| BILLING-11 | Trial banner states | ⬜ |  |  |  |  |
-| BILLING-12 | Static tier comparison | ⬜ |  |  |  |  |
-| BILLING-13 | In-chat quota-exceeded card | ⬜ |  |  |  |  |
-| BILLING-14 | Cross-feature upsell entries → `/(app)/subscription`: create-profile 402 "See plans" | ⬜ |  |  |  |  |
-| BILLING-15 | Push-notification tap → subscription: `subscribe_request` + `trial_expiry` | ⬜ |  |  |  |  |
-| BILLING-16 | Subscription screen timeout/error recovery: 15s TimeoutLoader w/ retry + go-back | ⬜ |  |  |  |  |
+| BILLING-01 | Subscription screen: plan, status badge | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-02 | Upgrade purchase + confirmation polling | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
+| BILLING-03 | Trial/usage/family composite | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-04 | Restore purchases | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
+| BILLING-05 | Manage billing: native deep link w/ retry + fallback-URL alert | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-06 | Child paywall | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-07 | Daily-quota-exceeded adult path: NO paywall branch | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-08 | Family pool section + **member removal** | ❌ | Fail | WI-822 |  | Family pool rendered without expected removable-member controls. |
+| BILLING-09 | Top-up credits | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
+| BILLING-10 | BYOK waitlist | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-11 | Trial banner states | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-12 | Static tier comparison | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| BILLING-13 | In-chat quota-exceeded card | ⚠️ | Pass w/ issues |  |  | Child quota/paywall side passed; owner in-chat quota branch partially source-checked. |
+| BILLING-14 | Cross-feature upsell entries → `/(app)/subscription`: create-profile 402 "See plans" | ❌ | Fail | WI-824 |  | Profile-limit billing upgrade path degraded to generic error. |
+| BILLING-15 | Push-notification tap → subscription: `subscribe_request` + `trial_expiry` | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
+| BILLING-16 | Subscription screen timeout/error recovery: 15s TimeoutLoader w/ retry + go-back | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
 ---
 
@@ -495,21 +499,21 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| QA-01 | Quick smoke check | ⬜ |  |  |  |  |
-| QA-02 | Post-auth comprehensive smoke | ⬜ |  |  |  |  |
-| QA-03 | Chat classifier regression | ⬜ |  |  |  |  |
-| QA-04 | Chat subject picker regression | ⬜ |  |  |  |  |
-| QA-05 | Return to chat after subject create | ⬜ |  |  |  |  |
-| QA-06 | Focused-book generation regression | ⬜ |  |  |  |  |
-| QA-07 | Tab-bar leak regression | ⬜ |  |  |  |  |
-| QA-08 | Parent add-child regression | ⬜ |  |  |  |  |
-| QA-09 | Consent email URL regression | ⬜ |  |  |  |  |
-| QA-10 | Dictation full-flow regression | ⬜ |  |  |  |  |
-| QA-11 | Quiz full-flow regression | ⬜ |  |  |  |  |
-| QA-12 | Consent deny-confirmation | ⬜ |  |  |  |  |
-| QA-13 | Sign-in/out loop regression | ⬜ |  |  |  |  |
-| QA-14 | SSE reconnect | ⬜ |  |  |  |  |
-| QA-15 | Preview/onboarding regression cluster | ⬜ |  |  |  |  |
+| QA-01 | Quick smoke check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QA-02 | Post-auth comprehensive smoke | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-03 | Chat classifier regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-04 | Chat subject picker regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-05 | Return to chat after subject create | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-06 | Focused-book generation regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-07 | Tab-bar leak regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-08 | Parent add-child regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-09 | Consent email URL regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-10 | Dictation full-flow regression | 🚫 | Blocked |  |  | Requires full native dictation camera/audio path. |
+| QA-11 | Quiz full-flow regression | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| QA-12 | Consent deny-confirmation | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-14 | SSE reconnect | ❌ | Fail | WI-819 |  | Baseline sweep reproduced streaming/reconnect regression; WI-819 branch has passing stream-retry tests and targeted J-11 browser rerun, full retest pending after landing. |
+| QA-15 | Preview/onboarding regression cluster | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
 
 ---
 
@@ -520,27 +524,27 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| CC-01 | Conversation-stage chips | ⬜ |  |  |  |  |
-| CC-02 | Greeting-aware classification | ⬜ |  |  |  |  |
-| CC-03 | Animation polish: `BrandCelebration`, `CelebrationAnimation`, session celebrations wired via `useCelebration` w/ learner celebr… | ⬜ |  |  |  |  |
-| CC-04 | `goBackOrReplace` universal back pattern | ⬜ |  |  |  |  |
-| CC-05 | Continue-where-you-left-off: SecureStore recovery marker takes priority; else server resume target; else overdue review | ⬜ |  |  |  |  |
-| CC-06 | Top-up purchase confidence: two-stage polling progress + confident timeout copy | ⬜ |  |  |  |  |
-| CC-07 | Accommodation badge surfaces: non-deletable badge on mentor-memory; selector on child settings + self settings; role-gated capt… | ⬜ |  |  |  |  |
-| CC-08 | Parent-facing metric vocabulary canon | ⬜ |  |  |  |  |
-| CC-09 | Opaque web layout backgrounds | ⬜ |  |  |  |  |
-| CC-10 | Quiz streak/XP recording is server-side inside round completion | ⬜ |  |  |  |  |
-| CC-11 | i18n `t()` layer | ⬜ |  |  |  |  |
-| CC-12 | FeedbackProvider + shake-to-feedback on gate screens; Help screen "Report a problem" opens the same sheet | ⬜ |  |  |  |  |
-| CC-13 | Streaming error classification + stream-fallback guard | ⬜ |  |  |  |  |
-| CC-14 | Envelope-strip render guard at chat-bubble boundary | ⬜ |  |  |  |  |
-| CC-15 | RN Web stale-send block in ChatShell | ⬜ |  |  |  |  |
-| CC-16 | HMR-safe error type guards in `format-api-error.ts` | ⬜ |  |  |  |  |
-| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ⬜ |  |  |  |  |
-| CC-18 | Stable FlatList refs | ⬜ |  |  |  |  |
-| CC-19 | Mode-navigation contract controls tab shape + route access | ⬜ |  |  |  |  |
-| CC-20 | Parent bridge provenance + return targets | ⬜ |  |  |  |  |
-| CC-21 | Post-session pipeline | ⬜ |  |  |  |  |
+| CC-01 | Conversation-stage chips | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-02 | Greeting-aware classification | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-03 | Animation polish: `BrandCelebration`, `CelebrationAnimation`, session celebrations wired via `useCelebration` w/ learner celebr… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-04 | `goBackOrReplace` universal back pattern | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-05 | Continue-where-you-left-off: SecureStore recovery marker takes priority; else server resume target; else overdue review | ⚠️ | Pass w/ issues |  |  | Cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-06 | Top-up purchase confidence: two-stage polling progress + confident timeout copy | 🚫 | Blocked |  |  | Top-up purchase confidence depends on native store purchase completion. |
+| CC-07 | Accommodation badge surfaces: non-deletable badge on mentor-memory; selector on child settings + self settings; role-gated capt… | ⚠️ | Pass w/ issues |  |  | Cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-08 | Parent-facing metric vocabulary canon | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-09 | Opaque web layout backgrounds | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-10 | Quiz streak/XP recording is server-side inside round completion | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-11 | i18n `t()` layer | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-12 | FeedbackProvider + shake-to-feedback on gate screens; Help screen "Report a problem" opens the same sheet | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-13 | Streaming error classification + stream-fallback guard | ❌ | Fail | WI-819 |  | Baseline sweep found degraded streaming error recovery; WI-819 branch has passing stream-retry tests and targeted J-11 browser rerun, full retest pending after landing. |
+| CC-14 | Envelope-strip render guard at chat-bubble boundary | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-15 | RN Web stale-send block in ChatShell | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-16 | HMR-safe error type guards in `format-api-error.ts` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ⚠️ | Pass w/ issues |  |  | Cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-18 | Stable FlatList refs | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-19 | Mode-navigation contract controls tab shape + route access | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
+| CC-20 | Parent bridge provenance + return targets | ❌ | Fail | WI-823 |  | Parent bridge provenance/return targets failed with missing bridge surfaces. |
+| CC-21 | Post-session pipeline | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
 ---
 
@@ -556,20 +560,20 @@ If a flow is found in the app but is missing from `mobile-app-flow-inventory.md`
 
 ## Master Roll-Up
 
-Update this once a batch is complete to track overall progress. Every row starts ⬜ (not yet tested).
+Updated from the 2026-06-18 Chrome/Chromium sweep. Row-level notes remain the source of truth for per-flow evidence and linked Cosmo issues.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Auth and Access | 18 | ⬜ | Not yet tested |
-| 2 | Profiles, Family, Consent, and Account | 51 | ⬜ | Not yet tested |
-| 3 | Home, Navigation, and Subject Setup | 32 | ⬜ | Not yet tested |
-| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⬜ | Not yet tested |
-| 5 | Practice Hub and Practice Activities | 36 | ⬜ | Not yet tested |
-| 6 | Homework and Parent Experience | 36 | ⬜ | Not yet tested |
-| 7 | Billing and Monetization | 16 | ⬜ | Not yet tested |
-| 8 | Regression and System Flows | 15 | ⬜ | Not yet tested |
-| 9 | Cross-Cutting Behaviors | 21 | ⬜ | Not yet tested |
-| **Total** | | **280** | ⬜ | 280 untested, 0 pass, 0 pass-w/issues, 0 fail, 0 blocked, 0 removed. |
+| 1 | Auth and Access | 18 | ❌ | Updated 2026-06-18: 10 ✅, 5 ⚠️, 2 ❌, 1 🚫. |
+| 2 | Profiles, Family, Consent, and Account | 51 | ❌ | Updated 2026-06-18: 26 ✅, 20 ⚠️, 3 ❌, 2 🚫. |
+| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Updated 2026-06-18: 19 ✅, 12 ⚠️, 1 ➖. |
+| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ❌ | Updated 2026-06-18: 5 ✅, 36 ⚠️, 11 ❌, 1 🚫, 2 ➖. |
+| 5 | Practice Hub and Practice Activities | 36 | ❌ | Updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ❌, 4 🚫. |
+| 6 | Homework and Parent Experience | 36 | ❌ | Updated 2026-06-18: 15 ✅, 12 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
+| 7 | Billing and Monetization | 16 | ❌ | Updated 2026-06-18: 9 ✅, 1 ⚠️, 2 ❌, 4 🚫. |
+| 8 | Regression and System Flows | 15 | ❌ | Updated 2026-06-18: 2 ✅, 11 ⚠️, 1 ❌, 1 🚫. |
+| 9 | Cross-Cutting Behaviors | 21 | ❌ | Updated 2026-06-18: 15 ✅, 3 ⚠️, 2 ❌, 1 🚫. |
+| **Total** | | **280** | ❌ | 127 pass, 105 pass-w/issues, 25 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 

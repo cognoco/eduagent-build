@@ -120,6 +120,8 @@ jest.mock(
 
 import { consentRevocation } from './consent-revocation';
 
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
+
 function extractSqlTextAndValues(
   node: unknown,
   visited = new WeakSet<object>(),
@@ -188,6 +190,7 @@ beforeEach(() => {
   jest.useFakeTimers({ now: new Date('2026-01-15T00:00:00.000Z') });
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  delete process.env['IDENTITY_V2_ENABLED'];
   (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValue({
     rowCount: 1,
   });
@@ -206,6 +209,11 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers();
   delete process.env['DATABASE_URL'];
+  if (ORIGINAL_IDENTITY_V2_ENABLED === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = ORIGINAL_IDENTITY_V2_ENABLED;
+  }
 });
 
 describe('consentRevocation', () => {

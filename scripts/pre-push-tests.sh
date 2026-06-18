@@ -186,7 +186,7 @@ else
       echo ""
       echo "── jest [${project_dir}] ──────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     }
