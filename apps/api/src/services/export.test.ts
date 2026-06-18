@@ -701,13 +701,14 @@ describe('generateExport', () => {
 // [WI-809] generateExport(learningOnlyProfileIds) branch — NO-DB unit coverage.
 // generateExportV2 calls generateExport with this opt so the legacy export half
 // skips the four identity tables dropped at M-DROP (accounts/profiles/
-// consent_states/family_links) — they 500 post-drop. This is the only changed
-// prod path whose integration test is blocked by staging drift (subscriptions
-// dropped early), so cover the branching here against the existing mock db.
+// consent_states/family_links) — they 500 post-drop. [WI-805] The legacy
+// billing chain (subscriptions → quota/top-ups) is now skipped on this path too
+// (dropped by 0119); the CI-lane red-green for that skip lives in
+// export.integration.test.ts. These fast mock-db assertions pin the branching.
 // ---------------------------------------------------------------------------
 
 describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
-  it('skips the four dropped-identity reads; keeps learning + billing reads keyed on the passed ids', async () => {
+  it('skips the four dropped-identity reads AND the legacy billing chain; keeps learning reads keyed on the passed ids', async () => {
     // Seed the identity tables too — a correct learningOnly path must NOT touch them.
     const db = createMockDb({
       account: mockAccountRow(),
@@ -754,8 +755,14 @@ describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
     // The learning-data half STILL runs, keyed on the passed ids.
     expect(q.subjects!.findMany!).toHaveBeenCalled();
     expect(result.subjects).toHaveLength(1);
-    // The billing chain (subscriptions → quota/top-ups) is RETAINED (WI-805 scope).
-    expect(q.subscriptions!.findMany!).toHaveBeenCalled();
+    // [WI-805] The legacy billing chain (subscriptions → quota/top-ups) is now
+    // ALSO skipped on the learning-only path: the v2 export twin overrides
+    // billing from the v2 `subscription` chain, so the legacy `subscriptions`
+    // read (dropped by 0119) must not run — it would 500 post-drop.
+    expect(q.subscriptions!.findMany!).not.toHaveBeenCalled();
+    expect(result.subscriptions).toEqual([]);
+    expect(result.quotaPools).toEqual([]);
+    expect(result.topUpCredits).toEqual([]);
   });
 
   it('[non-vacuous] WITHOUT learningOnlyProfileIds the four dropped-identity reads DO run', async () => {

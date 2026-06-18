@@ -18,19 +18,18 @@
 // No internal jest.mock (GC1/GC6): every row is seeded into the real v2 tables
 // and a real learning-data row (subjects) proves the learning half still runs.
 //
-// ⚠️ BLOCKED on this `-c stg` DB (2026-06-16). The reused legacy generateExport
-// reads the legacy `subscriptions` table UNCONDITIONALLY (export.ts:394 — NOT
-// behind learningOnly), and the WI-809 fix deliberately does not gate it: the
-// fix comment (export-v2.ts:62-63) records that the legacy `subscriptions` drop
-// is WI-805's scope, and the #8 M-DROP migration (0118_m_drop.sql) RETAINS
-// `subscriptions` by design. But the current stg DB has DRIFTED ahead — its
-// `subscriptions` table is already gone (only the v2 singular `subscription`
-// remains) — so the export 500s here with `relation "subscriptions" does not
-// exist`. That is environment drift (a DB that migration 0118 would never
-// produce), not a WI-809 defect: there is no GREEN baseline to red-green
-// against on this DB. Restore `subscriptions` to the stg DB (re-align it to the
-// 0118 target) OR land the WI-805 billing-export cutover, then this test is
-// runnable. See the deliverable writeup for full detail.
+// [WI-805] RESOLVED — this suite was previously blocked. The reused legacy
+// generateExport read the legacy `subscriptions` table UNCONDITIONALLY
+// (export.ts:394 — not behind learningOnly), so on a post-drop DB (legacy
+// `subscriptions` gone) the export 500'd with `relation "subscriptions" does
+// not exist`. WI-805 gates that read behind learningOnly AND overrides the
+// billing sections (subscriptions / quotaPools / topUpCredits) from the v2
+// `subscription` chain, so generateExportV2 no longer touches the legacy
+// `subscriptions` table at all. It now runs on any post-drop DB. The legacy
+// billing-skip itself has a CI-lane red-green in export.integration.test.ts;
+// this suite is the post-drop operator-rehearsal that the v2 billing path
+// surfaces (only validatable on a post-repoint DB — the quota satellites' FK
+// points at v2 `subscription` there).
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
@@ -44,6 +43,7 @@ import {
   organization,
   person,
   subjects,
+  subscription,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -51,21 +51,15 @@ import { generateExportV2 } from './export-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
-// Gate: requires the EXACT post-M-DROP (0118) target state — the 4 identity
-// tables dropped AND `subscriptions` still PRESENT. The reused legacy
-// generateExport reads `subscriptions` unconditionally (export.ts; that read
-// stays WI-805 scope), so on the current drifted stg DB (subscriptions dropped
-// ahead of WI-805) `IDENTITY_POST_DROP=1` alone would activate the suite and
-// fail with a MISLEADING `relation "subscriptions" does not exist` 500 that looks
-// like a test regression. A dedicated EXPORT_V2_INTEGRATION_READY=1 gate makes the
-// blockage machine-detectable: the suite skips cleanly unless the operator has
-// confirmed a subscriptions-present post-drop DB (true post-#8, or post-WI-805
-// re-seed). [WI-809 review CONSIDER: claude-review L44-45 / Codex.]
+// Gate: requires a post-M-DROP (0118) DB — the 4 legacy identity tables dropped.
+// [WI-805] The old EXPORT_V2_INTEGRATION_READY gate (which required legacy
+// `subscriptions` to still be PRESENT, because the reused legacy generateExport
+// read it unconditionally) is removed: generateExportV2 no longer touches the
+// legacy `subscriptions` table (the read is learningOnly-gated and billing is
+// overridden from the v2 `subscription` chain), so it runs on any post-drop DB.
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfPostDrop =
-  hasDatabaseUrl &&
-  process.env.IDENTITY_POST_DROP === '1' &&
-  process.env.EXPORT_V2_INTEGRATION_READY === '1'
+  hasDatabaseUrl && process.env.IDENTITY_POST_DROP === '1'
     ? describe
     : describe.skip;
 
@@ -79,7 +73,11 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
   });
 
   afterAll(async () => {
-    // FK-safe order: leaves/edges → person → organization.
+    // FK-safe order: v2 subscription (refs org + payer person) → leaves/edges →
+    // person → organization.
+    for (const oid of orgIds) {
+      await db.delete(subscription).where(eq(subscription.organizationId, oid));
+    }
     for (const pid of personIds) {
       await db.delete(subjects).where(eq(subjects.profileId, pid));
       await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
@@ -166,6 +164,17 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
       name: 'Math',
     });
 
+    // [WI-805] A v2 subscription for the org — proves the billing sections now
+    // surface from the v2 `subscription` chain, read WITHOUT touching the
+    // dropped legacy `subscriptions` table. (quotaPools / topUpCredits follow
+    // the same v2-sub-id read; their FK points at v2 `subscription` post-0117.)
+    await db.insert(subscription).values({
+      organizationId: org!.id,
+      planTier: 'free',
+      status: 'active',
+      payerPersonId: owner!.id,
+    });
+
     // The point of the fix: this RESOLVES post-M-DROP instead of 500-ing on the
     // dropped accounts/profiles/consent_states/family_links tables.
     const result = await generateExportV2(db, org!.id);
@@ -182,5 +191,11 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
           (s as { name?: string }).name === 'Math',
       ),
     ).toBe(true);
+    // (e) [WI-805] billing surfaces from the v2 `subscription`, not the dropped
+    // legacy `subscriptions` table.
+    expect(result.subscriptions).toHaveLength(1);
+    expect(
+      (result.subscriptions[0] as { organizationId?: string }).organizationId,
+    ).toBe(org!.id);
   });
 });
