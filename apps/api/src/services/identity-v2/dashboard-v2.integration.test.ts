@@ -33,6 +33,7 @@ import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   // [WI-586] drop-4: accounts/profiles removed; v2 path only needs person/org.
+  consentGrant,
   createDatabase,
   generateUUIDv7,
   guardianship,
@@ -312,6 +313,67 @@ const RUN = !!process.env.DATABASE_URL;
         );
 
         expect(result.reason).not.toBe('no_parent_link');
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON / RED→GREEN] WI-826 — WithdrawalCountdownBanner fix.
+    //
+    // After a guardian withdraws child consent, getChildrenForParent must return
+    // a non-null respondedAt (= consent_grant.withdrawn_at) so the mobile gate
+    // `child.respondedAt != null` renders the banner.
+    //
+    // RED (before WI-826): respondedAt was hardcoded null on the v2 path in
+    //   dashboard.ts ~line 921. This test fails with respondedAt === null.
+    // GREEN (after WI-826): withdrawnAt is threaded from BasisReduction through
+    //   resolveConsentStatusesForBasis → getChildrenGdprConsentStatusesV2 →
+    //   dashboard.ts, so respondedAt matches the seeded withdrawn_at.
+    //
+    // Cleanup: consentGrant is deleted before person (FK constraint).
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON / RED→GREEN] getChildrenForParent returns non-null respondedAt ' +
+        'when child consent is WITHDRAWN (WI-826 banner fix)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentWI826',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildWI826',
+          roles: ['learner'],
+        });
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        // Seed a WITHDRAWN consent_grant (withdrawn_at ~2 days ago, within the
+        // 30-day grace window the banner displays for).
+        const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values({
+          chargePersonId,
+          organizationId: orgId,
+          purpose: 'mentomate_tutoring',
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          withdrawnAt,
+        });
+
+        const children = await getChildrenForParent(db, guardianPersonId, {
+          identityV2Enabled: true,
+        });
+
+        const child = children.find((c) => c.profileId === chargePersonId);
+        expect(child).toBeDefined();
+        // The critical assertion: respondedAt must reflect withdrawn_at.
+        expect(child!.respondedAt).not.toBeNull();
+        expect(child!.respondedAt).toBe(withdrawnAt.toISOString());
+
+        // Cleanup: delete consentGrant before the afterEach deletes the person
+        // (FK: consent_grant.charge_person_id → person.id RESTRICT).
+        await db
+          .delete(consentGrant)
+          .where(eq(consentGrant.chargePersonId, chargePersonId));
       },
     );
   },

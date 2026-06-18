@@ -320,14 +320,15 @@ const COPPA = 'coppa_parental_consent';
       it('GREEN: the basis-explicit family/dashboard seam reports the GDPR status (CONSENTED), unmasked', async () => {
         const { orgId, childId } = await seedDualBasisNewerCoppa();
         // Single-child seam (dashboard getLatestConsentStatus re-point).
-        expect(await getChildGdprConsentStatusV2(db, childId)).toBe(
+        // [WI-826] getChildGdprConsentStatusV2 now returns { status, withdrawnAt }.
+        expect((await getChildGdprConsentStatusV2(db, childId))?.status).toBe(
           'CONSENTED',
         );
         // Batched seam (dashboard getChildrenForParent re-point).
         const batch = await getChildrenGdprConsentStatusesV2(db, orgId, [
           childId,
         ]);
-        expect(batch.get(childId)).toBe('CONSENTED');
+        expect(batch.get(childId)?.status).toBe('CONSENTED');
       });
     });
 
