@@ -157,8 +157,10 @@ const RUN = !!process.env.DATABASE_URL;
       const accountId = generateUUIDv7();
       await db.insert(accounts).values({
         id: accountId,
-        clerkUserId: `wi826-acct-${accountId.slice(0, 8)}`,
-        email: `wi826-acct-${accountId.slice(0, 8)}@integration.test`,
+        // Full accountId (not slice) — UUIDv7's leading bytes are a ms-timestamp,
+        // so two twins seeded in the same ms would collide on accounts_clerk_user_id_unique.
+        clerkUserId: `wi826-acct-${accountId}`,
+        email: `wi826-acct-${accountId}@integration.test`,
       });
       await db.insert(profiles).values({
         id: personId,
