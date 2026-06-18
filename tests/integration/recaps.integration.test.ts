@@ -46,16 +46,41 @@ const RUN = !!process.env.DATABASE_URL;
 const CLERK_USER_ID = 'wi-821-repro-guardian';
 const EMAIL = 'wi-821-repro@integration.test';
 
-// Force v2 on for this repro regardless of CI lane. buildIntegrationEnv()
-// propagates process.env.IDENTITY_V2_ENABLED when set; set it before the call.
-process.env.IDENTITY_V2_ENABLED = 'true';
-const ENV = buildIntegrationEnv();
-
 // ---------------------------------------------------------------------------
 // Seed + teardown helpers
 // ---------------------------------------------------------------------------
 
 type Db = ReturnType<typeof createDatabase>;
+
+// FK-safe teardown of a child's learning tree (sessions → topics → books →
+// curricula → subjects). Must run before deleting the owning person rows.
+async function deleteLearningTree(db: Db, profileIds: string[]): Promise<void> {
+  if (profileIds.length === 0) return;
+  const subs = await db.query.subjects.findMany({
+    where: inArray(subjects.profileId, profileIds),
+    columns: { id: true },
+  });
+  const subjectIds = subs.map((s) => s.id);
+  await db
+    .delete(learningSessions)
+    .where(inArray(learningSessions.profileId, profileIds));
+  if (subjectIds.length === 0) return;
+  const curr = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, subjectIds),
+    columns: { id: true },
+  });
+  const curriculumIds = curr.map((c) => c.id);
+  if (curriculumIds.length > 0) {
+    await db
+      .delete(curriculumTopics)
+      .where(inArray(curriculumTopics.curriculumId, curriculumIds));
+  }
+  await db
+    .delete(curriculumBooks)
+    .where(inArray(curriculumBooks.subjectId, subjectIds));
+  await db.delete(curricula).where(inArray(curricula.subjectId, subjectIds));
+  await db.delete(subjects).where(inArray(subjects.id, subjectIds));
+}
 
 async function cleanupStaleFixture(db: Db): Promise<void> {
   // Remove any stale row from a failed previous run.
@@ -77,6 +102,7 @@ async function cleanupStaleFixture(db: Db): Promise<void> {
       columns: { personId: true },
     });
     const personIds = orgMembers.map((m) => m.personId);
+    await deleteLearningTree(db, personIds);
     await db
       .delete(guardianship)
       .where(inArray(guardianship.guardianPersonId, personIds));
@@ -86,6 +112,7 @@ async function cleanupStaleFixture(db: Db): Promise<void> {
     await db.delete(person).where(inArray(person.id, personIds));
     await db.delete(organization).where(eq(organization.id, orgId));
   } else {
+    await deleteLearningTree(db, [stale.personId]);
     await db.delete(person).where(eq(person.id, stale.personId));
   }
 }
@@ -211,7 +238,8 @@ async function teardownV2Family(
   childId: string,
 ): Promise<void> {
   // FK-safe teardown (v2 / M-DROP applied — accounts/profiles gone):
-  // guardianship → person (cascades login, membership) → organization
+  // learning tree → guardianship → person (cascades login, membership) → organization
+  await deleteLearningTree(db, [childId]);
   await db
     .delete(guardianship)
     .where(eq(guardianship.guardianPersonId, guardianId));
@@ -229,8 +257,15 @@ async function teardownV2Family(
   () => {
     let db: Db;
     let fixture: Awaited<ReturnType<typeof seedV2Family>>;
+    let ENV: ReturnType<typeof buildIntegrationEnv>;
 
     beforeAll(async () => {
+      // Force v2 on for this repro regardless of CI lane. buildIntegrationEnv()
+      // propagates process.env.IDENTITY_V2_ENABLED when set; set it before the
+      // call. Scoped to this suite (deleted in afterAll) so it cannot leak into
+      // sibling suites sharing the worker.
+      process.env['IDENTITY_V2_ENABLED'] = 'true';
+      ENV = buildIntegrationEnv();
       db = createDatabase(process.env.DATABASE_URL!);
       await cleanupStaleFixture(db);
       fixture = await seedV2Family(db);
@@ -245,6 +280,7 @@ async function teardownV2Family(
           fixture.childId,
         );
       }
+      delete process.env['IDENTITY_V2_ENABLED'];
     });
 
     it('[WI-821] correctly-seeded v2 guardian gets 200 + ≥1 recap', async () => {
@@ -258,10 +294,6 @@ async function teardownV2Family(
       );
 
       const body = await res.json().catch(() => null);
-
-      // Log for verdict evidence
-      console.log('[WI-821] HTTP status:', res.status);
-      console.log('[WI-821] Body:', JSON.stringify(body));
 
       // VERDICT: 200 = STAGING-SEED ARTIFACT; 401/403 = REAL GATE DEFECT
       expect(res.status).toBe(200);
@@ -285,7 +317,6 @@ async function teardownV2Family(
         },
         ENV,
       );
-      console.log('[WI-821][BREAK-A] status:', res.status);
       expect(res.status).toBe(401);
     });
   },
