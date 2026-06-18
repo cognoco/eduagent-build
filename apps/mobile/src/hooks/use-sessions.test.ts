@@ -4,7 +4,11 @@ import {
   createHookWrapper,
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
-import { setActiveProfileId, setProxyMode } from '../lib/api-client';
+import {
+  NetworkError,
+  setActiveProfileId,
+  setProxyMode,
+} from '../lib/api-client';
 import {
   useStartSession,
   useStartFirstCurriculumSession,
@@ -692,6 +696,100 @@ describe('useSkipSummary', () => {
 });
 
 describe('useStreamMessage', () => {
+  it('does not abort the XHR after app-level done completes normally', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    const abort = jest.fn();
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Hello' };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort,
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.stream('Hello', jest.fn(), jest.fn(), 'session-1');
+    });
+
+    expect(abort).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Error]>([
+    ['network failure', new NetworkError()],
+    [
+      'idle timeout',
+      Object.assign(
+        new Error('The connection timed out while waiting for a reply'),
+        { isTimeout: true },
+      ),
+    ],
+    [
+      'server 5xx',
+      Object.assign(new Error('API error 502: request failed'), {
+        status: 502,
+      }),
+    ],
+  ])(
+    'retries one pre-stream %s when the request is idempotent',
+    async (_label, error) => {
+      const { streamSSEViaXHR } = require('../lib/sse') as {
+        streamSSEViaXHR: jest.Mock;
+      };
+      const firstAbort = jest.fn();
+      const secondAbort = jest.fn();
+      const preStreamFailure: AsyncIterable<never> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => {
+              throw error;
+            },
+          };
+        },
+      };
+
+      streamSSEViaXHR
+        .mockReturnValueOnce({
+          events: preStreamFailure,
+          abort: firstAbort,
+        })
+        .mockReturnValueOnce({
+          events: (async function* () {
+            yield { type: 'chunk', content: 'Recovered' };
+            yield { type: 'done', exchangeCount: 2, escalationRung: 1 };
+          })(),
+          abort: secondAbort,
+        });
+
+      const { result } = renderHook(() => useStreamMessage('session-1'), {
+        wrapper: createWrapper(),
+      });
+      const onChunk = jest.fn();
+      const onDone = jest.fn();
+
+      await act(async () => {
+        await result.current.stream('Hello', onChunk, onDone, 'session-1', {
+          idempotencyKey: 'outbox-entry-1',
+        });
+      });
+
+      expect(streamSSEViaXHR).toHaveBeenCalledTimes(2);
+      expect(firstAbort).toHaveBeenCalledTimes(1);
+      expect(secondAbort).not.toHaveBeenCalled();
+      expect(onChunk).toHaveBeenCalledWith('Recovered');
+      expect(onDone).toHaveBeenCalledWith({
+        exchangeCount: 2,
+        escalationRung: 1,
+      });
+    },
+  );
+
   it('uses overrideSessionId when provided, ignoring hook sessionId', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const { mergeConfig } = require('metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
@@ -20,6 +21,10 @@ const defaultConfig = getSentryExpoConfig(__dirname, {
 const { assetExts, sourceExts } = defaultConfig.resolver;
 
 const monorepoRoot = path.resolve(__dirname, '../..');
+const monorepoRealRoot = fs.realpathSync.native(monorepoRoot);
+const currentCheckoutIsWorktree = /[/\\]\.worktrees[/\\]/.test(
+  monorepoRealRoot,
+);
 
 // [BUG-725] Exclude the `apps/mobile/src/app/dev-only/` Expo Router segment
 // from non-E2E bundles. The directory contains seed routes
@@ -62,7 +67,7 @@ const customConfig = {
       /\.stories\.[jt]sx?$/,
       /[/\\]__mocks__[/\\].*/,
       /[/\\]test-utils[/\\].*/,
-      /[/\\]\.worktrees[/\\].*/,
+      ...(currentCheckoutIsWorktree ? [] : [/[/\\]\.worktrees[/\\].*/]),
       ...devOnlyBlockList,
     ],
     nodeModulesPaths: [
