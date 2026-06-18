@@ -1,4 +1,14 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import type {
+  BookSuggestionsResponse,
+  CreateSubjectWithStructureResponse,
+  LearningSession,
+  PedagogyMode,
+  Subject,
+  SubjectResolveResult,
+  SubjectResponse,
+  SubjectStructureType,
+} from '@eduagent/schemas';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { pressableClick } from '../../helpers/pressable';
 import { fillTextInput } from '../../helpers/text-input';
@@ -28,9 +38,9 @@ function subjectFixture({
   id: string;
   profileId: string;
   name: string;
-  pedagogyMode?: 'socratic' | 'four_strands';
+  pedagogyMode?: PedagogyMode;
   languageCode?: string | null;
-}) {
+}): Subject {
   return {
     id,
     profileId,
@@ -53,7 +63,7 @@ function learningSessionFixture({
   id: string;
   subjectId: string;
   topicId: string;
-}) {
+}): LearningSession {
   return {
     id,
     subjectId,
@@ -116,8 +126,8 @@ async function mockDirectSubjectCreation({
   profileId: string;
   subjectId: string;
   subjectName: string;
-  structureType: 'broad' | 'focused_book' | 'narrow';
-  pedagogyMode?: 'socratic' | 'four_strands';
+  structureType: SubjectStructureType;
+  pedagogyMode?: PedagogyMode;
   languageCode?: string | null;
   bookId?: string;
   bookTitle?: string;
@@ -130,7 +140,7 @@ async function mockDirectSubjectCreation({
       return;
     }
 
-    await fulfillJson(route, {
+    const response: SubjectResolveResult = {
       status: 'direct_match',
       resolvedName: subjectName,
       suggestions: [],
@@ -139,7 +149,9 @@ async function mockDirectSubjectCreation({
       detectedLanguageCode: languageCode,
       detectedLanguageName:
         pedagogyMode === 'four_strands' ? subjectName : null,
-    });
+    };
+
+    await fulfillJson(route, response);
   });
 
   await page.route('**/v1/subjects', async (route) => {
@@ -152,25 +164,23 @@ async function mockDirectSubjectCreation({
       return;
     }
 
-    await fulfillJson(
-      route,
-      {
-        subject: subjectFixture({
-          id: subjectId,
-          profileId,
-          name: subjectName,
-          pedagogyMode,
-          languageCode,
-        }),
-        structureType,
-        ...(bookId ? { bookId } : {}),
-        ...(bookTitle ? { bookTitle } : {}),
-        bookCount: structureType === 'broad' ? 6 : 1,
-        topicCount: structureType === 'focused_book' ? 1 : undefined,
-        suggestionCount: structureType === 'broad' ? 1 : undefined,
-      },
-      201,
-    );
+    const response: CreateSubjectWithStructureResponse = {
+      subject: subjectFixture({
+        id: subjectId,
+        profileId,
+        name: subjectName,
+        pedagogyMode,
+        languageCode,
+      }),
+      structureType,
+      ...(bookId ? { bookId } : {}),
+      ...(bookTitle ? { bookTitle } : {}),
+      bookCount: structureType === 'broad' ? 6 : 1,
+      ...(structureType === 'focused_book' ? { topicCount: 1 } : {}),
+      ...(structureType === 'broad' ? { suggestionCount: 1 } : {}),
+    };
+
+    await fulfillJson(route, response, 201);
   });
 
   if (pedagogyMode === 'four_strands') {
@@ -180,7 +190,7 @@ async function mockDirectSubjectCreation({
         return;
       }
 
-      await fulfillJson(route, {
+      const response: SubjectResponse = {
         subject: subjectFixture({
           id: subjectId,
           profileId,
@@ -188,14 +198,16 @@ async function mockDirectSubjectCreation({
           pedagogyMode,
           languageCode,
         }),
-      });
+      };
+
+      await fulfillJson(route, response);
     });
   }
 
   await page.route(
     '**/v1/subjects/*/book-suggestions/topup**',
     async (route) => {
-      await fulfillJson(route, {
+      const response: BookSuggestionsResponse = {
         suggestions: [
           {
             id: '55555555-5555-4555-8555-555555555555',
@@ -210,7 +222,9 @@ async function mockDirectSubjectCreation({
         ],
         curriculumBookCount: 0,
         topupOutcome: 'success',
-      });
+      };
+
+      await fulfillJson(route, response);
     },
   );
 
@@ -218,17 +232,15 @@ async function mockDirectSubjectCreation({
     await page.route(
       '**/v1/subjects/*/sessions/first-curriculum',
       async (route) => {
-        await fulfillJson(
-          route,
-          {
-            session: learningSessionFixture({
-              id: sessionId,
-              subjectId,
-              topicId,
-            }),
-          },
-          201,
-        );
+        const response: { session: LearningSession } = {
+          session: learningSessionFixture({
+            id: sessionId,
+            subjectId,
+            topicId,
+          }),
+        };
+
+        await fulfillJson(route, response, 201);
       },
     );
   }
