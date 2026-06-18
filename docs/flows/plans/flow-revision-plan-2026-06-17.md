@@ -1,4 +1,4 @@
-> **STATUS: RERUN UPDATED 2026-06-18** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. The targeted rerun cleared the rows tied to WI-819, WI-824, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-820, WI-821, WI-822, WI-823, WI-825.
+> **STATUS: RERUN UPDATED 2026-06-18** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. The targeted rerun cleared the rows tied to WI-819, WI-824, WI-825, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-820, WI-821, WI-822, WI-823.
 
 # Mobile App Flow Revision Plan
 
@@ -9,6 +9,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **Execution update 2026-06-18:** Tested with Chrome/Chromium browser tooling only (no emulator), using seeded scenarios where available and 16 helper/subagent passes across the nine inventory sections. True native/device-provider paths are marked `🚫 Blocked`; dormant or stale inventory paths are marked `➖ Removed`; source-backed or partially browser-reachable rows are marked `⚠️ Pass w/ issues` with notes.
 
 **Rerun update 2026-06-18:** Targeted staging Chrome/Chromium reruns were completed for rows tied to `WI-819`, `WI-821`, `WI-824`, and `WI-826`. `WI-819` rows passed through J-08 and J-11 live-session journeys; `WI-824` rows passed through the profile-limit upgrade path; `WI-826` rows passed through the withdrawal countdown banner path. `WI-821` partially improved because the Recaps list loads rows, but recap detail still renders the error state and remains failed. `WI-808` / `ic-116` were test-fixture-only commits with no direct manual/browser flow row in this plan.
+
+**Remediation update 2026-06-18 (WI-825):** subject-onboarding drift resolved in the inventory and J-09 browser expectations. SUBJECT-05/07/08/18 now distinguish broad topic-interest picker, language setup, and first-focused-subject `/ready` behavior.
 
 ## Purpose
 
@@ -294,14 +296,14 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-02 | Create subject from library | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-03 | Create subject from chat | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-04 | Create subject from homework | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| SUBJECT-05 | Subject resolution machine | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-05 | Subject resolution machine | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: inventory + J-09 browser expectations now document broad topic-interest, language setup, and first-focused-subject `/ready` branches. |
 | SUBJECT-06 | Broad subject → pick-book | ⚠️ | Pass w/ issues |  |  | Pick-book/degraded recovery path covered; some degraded provider branches source-checked. |
-| SUBJECT-07 | Focused subject/book → first session: `POST first-curriculum` with up to 3 attempts | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
-| SUBJECT-08 | Per-subject native-language + CEFR setup | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-07 | Focused subject/book → first session: `POST first-curriculum` with up to 3 attempts | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: focused first subject reaches `/ready`; broad subjects are explicitly separated into SUBJECT-06. |
+| SUBJECT-08 | Per-subject native-language + CEFR setup | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: language branch remains covered by J-09 and is no longer conflated with topic-interest picker behavior. |
 | SUBJECT-12 | View curriculum without committing | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-14 | Placement / knowledge assessment | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-17 | Pronouns picker | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| SUBJECT-18 | First-subject "Ready" recap interstitial | ⚠️ | Pass w/ issues | WI-825 |  | Subject onboarding works but inventory/tests drifted around the topic-interest step. |
+| SUBJECT-18 | First-subject "Ready" recap interstitial | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: J-09 now asserts first focused subject lands on `/ready` before session. |
 | SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
 | SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
@@ -566,14 +568,14 @@ Updated from the 2026-06-18 Chrome/Chromium sweep. Row-level notes remain the so
 | --- | --- | --- | --- | --- |
 | 1 | Auth and Access | 18 | ❌ | Updated 2026-06-18: 10 ✅, 5 ⚠️, 2 ❌, 1 🚫. |
 | 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-18: 30 ✅, 19 ⚠️, 0 ❌, 2 🚫. |
-| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 22 ✅, 9 ⚠️, 1 ➖. |
+| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ➖. |
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
 | 5 | Practice Hub and Practice Activities | 36 | ❌ | Updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
 | 7 | Billing and Monetization | 16 | ❌ | Rerun updated 2026-06-18: 10 ✅, 1 ⚠️, 1 ❌, 4 🚫. |
 | 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 184 pass, 65 pass-w/issues, 8 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 188 pass, 61 pass-w/issues, 8 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 
