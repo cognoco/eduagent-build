@@ -307,7 +307,8 @@ async function getLatestConsentStatus(
   // [WI-586] v2 path: resolve GDPR consent from the canonical consent graph
   // (consent_grant via the child's org), flag-off reads legacy consent_states.
   if (opts?.identityV2Enabled) {
-    return getChildGdprConsentStatusV2(db, childProfileId);
+    const row = await getChildGdprConsentStatusV2(db, childProfileId);
+    return row?.status ?? null;
   }
 
   const consentState = await db.query.consentStates.findFirst({
@@ -903,9 +904,8 @@ export async function getChildrenForParent(
   //
   // [WI-802] v2 seam: flag-on resolves consent via the canonical consent graph
   // (consentGrant + basis-explicit resolver), flag-off reads legacy consentStates.
-  // respondedAt is set to null on the v2 path (basis-explicit resolution does not
-  // batch respondedAt without N queries per child — the dashboard countdown reads
-  // it but degrades gracefully to null, matching the pre-consent-grant state).
+  // [WI-826] respondedAt is now threaded from consent_grant.withdrawn_at on the
+  // v2 path so the WithdrawalCountdownBanner renders when a guardian withdraws.
   const consentByProfile = new Map<
     string,
     { status: ConsentStatus; respondedAt: Date | null }
@@ -917,8 +917,8 @@ export async function getChildrenForParent(
         guardianOrgId,
         childProfileIds,
       );
-      for (const [childId, status] of v2Statuses) {
-        consentByProfile.set(childId, { status, respondedAt: null });
+      for (const [childId, { status, withdrawnAt }] of v2Statuses) {
+        consentByProfile.set(childId, { status, respondedAt: withdrawnAt });
       }
     }
   } else {
@@ -1166,8 +1166,11 @@ export async function getChildDetail(
     // masking the flag-off branch below guards against (and the sibling
     // getLatestConsentStatus already avoids). getChildGdprConsentStatusV2
     // resolves the child's org internally and pins lawful_basis = GDPR.
-    consentStatus = await getChildGdprConsentStatusV2(db, childProfileId);
-    consentRespondedAt = null;
+    // [WI-826] withdrawnAt is now surfaced from the consent grant so the
+    // WithdrawalCountdownBanner renders on the per-child detail path too.
+    const v2ConsentRow = await getChildGdprConsentStatusV2(db, childProfileId);
+    consentStatus = v2ConsentRow?.status ?? null;
+    consentRespondedAt = v2ConsentRow?.withdrawnAt?.toISOString() ?? null;
   } else {
     const profile = await db.query.profiles.findFirst({
       where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),

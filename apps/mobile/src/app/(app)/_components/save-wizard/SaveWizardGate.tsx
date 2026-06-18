@@ -191,6 +191,7 @@ export function SaveWizardGate({
             setCreated(c);
             setStep(3);
           }}
+          onExitWizard={onComplete} // [WI-824] layout markWizardDone — unmounts the inline gate so the upgrade CTA's /subscription push renders
         />
       )}
 

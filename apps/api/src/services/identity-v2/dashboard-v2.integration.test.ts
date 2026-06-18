@@ -21,8 +21,12 @@
 //      family_links row is NOT returned for an unrelated parent under flag-on
 //      (IDOR guard holds via guardianship scope).
 //
-// Seeding: only `person`, `membership`, `organization`, `guardianship` — no
-// `family_links`, `accounts`, or `profiles`. The v2 path never touches those.
+// Seeding: the v2 READ path (getChildrenForParent / getChildDetail) needs only
+// `person`, `membership`, `organization`, `guardianship` — no `family_links`.
+// EXCEPTION (WI-826): the notifyParentToSubscribe WRITE path inserts
+// notification_log.profile_id, which still FKs the legacy `profiles` table on the
+// PRE-REPOINT CI flag-on DB, so that one test dual-writes a legacy account+profile
+// twin (seedLegacyProfileTwin). Removed at M-REPOINT (WI-789).
 //
 // Pattern: `(RUN ? describe : describe.skip)` — skips silently when DATABASE_URL
 // is absent (unit/local runs without a DB).
@@ -32,16 +36,23 @@ import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  // [WI-586] drop-4: accounts/profiles removed; v2 path only needs person/org.
+  // [WI-586] drop-4: the v2 READ path needs only person/org. accounts/profiles
+  // are re-imported for the WI-826 dual-write: the notifyParentToSubscribe WRITE
+  // path inserts notification_log.profile_id, which still FKs the legacy profiles
+  // table on the PRE-REPOINT CI flag-on DB (removed at M-REPOINT / WI-789).
+  accounts,
+  consentGrant,
   createDatabase,
   generateUUIDv7,
   guardianship,
   membership,
   organization,
   person,
+  profiles,
   type Database,
 } from '@eduagent/database';
-import { getChildrenForParent } from '../dashboard';
+import { getChildDetail, getChildrenForParent } from '../dashboard';
+import { DEFAULT_CONSENT_PURPOSE } from './consent-status-v2';
 import {
   notifyParentToSubscribe,
   sendStruggleNotification,
@@ -56,12 +67,20 @@ const RUN = !!process.env.DATABASE_URL;
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
+    // [WI-826] legacy account ids dual-written for the pre-repoint notification_log FK.
+    const accountIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
     });
 
     afterEach(async () => {
+      // [WI-826] remove dual-written legacy accounts first — accounts -> profiles
+      // (cascade) -> notification_log (cascade) clears the whole legacy twin chain.
+      for (const aid of accountIds) {
+        await db.delete(accounts).where(eq(accounts.id, aid));
+      }
+      accountIds.length = 0;
       // [WI-586] drop-4: v2-only cleanup — guardianship RESTRICT → delete before person.
       // person ON DELETE CASCADE removes membership rows.
       for (const pid of personIds) {
@@ -125,6 +144,32 @@ const RUN = !!process.env.DATABASE_URL;
       await db
         .insert(guardianship)
         .values({ guardianPersonId: guardianId, chargePersonId: chargeId });
+    }
+
+    // [WI-826] Dual-write a legacy account + profile twin for `personId` (WI-808
+    // pattern). The READ path is v2-only, but notifyParentToSubscribe's WRITE path
+    // inserts notification_log.profile_id, which FKs the legacy `profiles` table on
+    // the PRE-REPOINT CI flag-on DB. profiles.id = personId so the insert resolves;
+    // random clerk/email keep it collision-free on the shared CI DB. Cleaned in
+    // afterEach via accountIds (account -> profiles -> notification_log cascade).
+    // Removed at M-REPOINT (WI-789) when notification_log repoints off profiles.
+    async function seedLegacyProfileTwin(personId: string): Promise<void> {
+      const accountId = generateUUIDv7();
+      await db.insert(accounts).values({
+        id: accountId,
+        // Full accountId (not slice) — UUIDv7's leading bytes are a ms-timestamp,
+        // so two twins seeded in the same ms would collide on accounts_clerk_user_id_unique.
+        clerkUserId: `wi826-acct-${accountId}`,
+        email: `wi826-acct-${accountId}@integration.test`,
+      });
+      await db.insert(profiles).values({
+        id: personId,
+        accountId,
+        displayName: 'WI826-Twin',
+        birthYear: 1990,
+        isOwner: true,
+      });
+      accountIds.push(accountId);
     }
 
     // -------------------------------------------------------------------------
@@ -299,6 +344,15 @@ const RUN = !!process.env.DATABASE_URL;
           roles: ['learner'],
         });
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+        // [WI-826] notifyParentToSubscribe's rate-limit log
+        // (checkAndLogRateLimitInternal) inserts notification_log.profile_id =
+        // the CHILD profile id passed in (= chargePersonId), which FKs legacy
+        // profiles on the pre-repoint CI flag-on DB. Dual-write legacy twins for
+        // both the charge (the failing insert) and the guardian (covers any later
+        // guardian-targeted insert); the READ resolution still goes through the
+        // v2 guardianship graph.
+        await seedLegacyProfileTwin(chargePersonId);
+        await seedLegacyProfileTwin(guardianPersonId);
 
         // Must NOT throw `relation "family_links" does not exist` and must NOT
         // report `no_parent_link` — both would mean the v2 branch failed to
@@ -312,6 +366,128 @@ const RUN = !!process.env.DATABASE_URL;
         );
 
         expect(result.reason).not.toBe('no_parent_link');
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON / RED→GREEN] WI-826 — WithdrawalCountdownBanner fix.
+    //
+    // After a guardian withdraws child consent, getChildrenForParent must return
+    // a non-null respondedAt (= consent_grant.withdrawn_at) so the mobile gate
+    // `child.respondedAt != null` renders the banner.
+    //
+    // RED (before WI-826): respondedAt was hardcoded null on the v2 path in
+    //   dashboard.ts ~line 921. This test fails with respondedAt === null.
+    // GREEN (after WI-826): withdrawnAt is threaded from BasisReduction through
+    //   resolveConsentStatusesForBasis → getChildrenGdprConsentStatusesV2 →
+    //   dashboard.ts, so respondedAt matches the seeded withdrawn_at.
+    //
+    // Cleanup: consentGrant is deleted before person (FK constraint).
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON / RED→GREEN] getChildrenForParent returns non-null respondedAt ' +
+        'when child consent is WITHDRAWN (WI-826 banner fix)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentWI826',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildWI826',
+          roles: ['learner'],
+        });
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        // Seed a WITHDRAWN consent_grant (withdrawn_at ~2 days ago, within the
+        // 30-day grace window the banner displays for).
+        const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values({
+          chargePersonId,
+          organizationId: orgId,
+          purpose: DEFAULT_CONSENT_PURPOSE,
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          withdrawnAt,
+        });
+
+        const children = await getChildrenForParent(db, guardianPersonId, {
+          identityV2Enabled: true,
+        });
+
+        const child = children.find((c) => c.profileId === chargePersonId);
+        expect(child).toBeDefined();
+        // The critical assertion: respondedAt must reflect withdrawn_at.
+        expect(child!.respondedAt).not.toBeNull();
+        expect(child!.respondedAt).toBe(withdrawnAt.toISOString());
+
+        // Cleanup: delete consentGrant before the afterEach deletes the person
+        // (FK: consent_grant.charge_person_id → person.id RESTRICT).
+        await db
+          .delete(consentGrant)
+          .where(eq(consentGrant.chargePersonId, chargePersonId));
+      },
+    );
+
+    // -------------------------------------------------------------------------
+    // [FLAG-ON / RED→GREEN] WI-826 — second swept site: getChildDetail (:1188).
+    //
+    // The per-child detail path (GET /v1/dashboard/children/:id) computes
+    // consentRespondedAt independently of getChildrenForParent. The WI-826 fix
+    // threads withdrawnAt through getChildGdprConsentStatusV2 here too
+    // (dashboard.ts:1173: consentRespondedAt = v2ConsentRow?.withdrawnAt?...).
+    //
+    // RED (pre-fix / hardcoded null at :1188): respondedAt === null → banner
+    //   never renders on the detail screen.
+    // GREEN (after WI-826): respondedAt === the seeded withdrawn_at.
+    //
+    // This is the coverage the #1226 review flagged: the :921 site had a test,
+    // the :1188 site did not. Parallel seed + assertion closes that gap.
+    // -------------------------------------------------------------------------
+    it(
+      '[FLAG-ON / RED→GREEN] getChildDetail returns non-null respondedAt ' +
+        'when child consent is WITHDRAWN (WI-826 banner fix — :1188 swept site)',
+      async () => {
+        const orgId = await seedOrg();
+        const guardianPersonId = await seedPerson(orgId, {
+          displayName: 'ParentWI826Detail',
+          roles: ['admin'],
+        });
+        const chargePersonId = await seedPerson(orgId, {
+          displayName: 'ChildWI826Detail',
+          roles: ['learner'],
+        });
+        await grantGuardianshipEdge(guardianPersonId, chargePersonId);
+
+        const withdrawnAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        await db.insert(consentGrant).values({
+          chargePersonId,
+          organizationId: orgId,
+          purpose: DEFAULT_CONSENT_PURPOSE,
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+          grantedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          withdrawnAt,
+        });
+
+        const child = await getChildDetail(
+          db,
+          guardianPersonId,
+          chargePersonId,
+          { identityV2Enabled: true },
+        );
+
+        expect(child).not.toBeNull();
+        // The critical assertion: respondedAt must reflect withdrawn_at.
+        expect(child!.respondedAt).not.toBeNull();
+        expect(child!.respondedAt).toBe(withdrawnAt.toISOString());
+
+        // Cleanup: delete consentGrant before the afterEach deletes the person
+        // (FK: consent_grant.charge_person_id → person.id RESTRICT).
+        await db
+          .delete(consentGrant)
+          .where(eq(consentGrant.chargePersonId, chargePersonId));
       },
     );
   },

@@ -80,6 +80,12 @@ interface BasisReduction {
    * must not outrank a newer-requested one. Millisecond epoch; null = no rows.
    */
   orderingKey: number | null;
+  /**
+   * The current grant's withdrawn_at timestamp — non-null when status is
+   * WITHDRAWN. Surfaced here so dashboard callers can populate respondedAt
+   * without an extra query (the grant row is already in hand). [WI-826]
+   */
+  withdrawnAt: Date | null;
 }
 
 /**
@@ -139,7 +145,11 @@ function reduceBasisFromRows(rows: BasisRows): BasisReduction {
     status = null;
   }
 
-  return { status, orderingKey };
+  return {
+    status,
+    orderingKey,
+    withdrawnAt: currentGrant?.withdrawnAt ?? null,
+  };
 }
 
 /**
@@ -281,6 +291,29 @@ export async function resolveConsentStatus(
     basis,
   );
   return status;
+}
+
+/**
+ * Like resolveConsentStatus but also surfaces the current grant's withdrawn_at
+ * so dashboard callers can populate respondedAt without an extra DB query.
+ * Returns null when there are no consent rows for the basis. [WI-826]
+ */
+export async function resolveConsentStatusAndWithdrawnAt(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  purpose: string,
+  basis: ConsentBasis,
+): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
+  const { status, withdrawnAt } = await reduceBasisState(
+    db,
+    chargePersonId,
+    purpose,
+    organizationId,
+    basis,
+  );
+  if (status === null) return null;
+  return { status, withdrawnAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -534,18 +567,21 @@ export async function resolveConsentStatusesForBasis(
   organizationId: string,
   purpose: string,
   basis: ConsentBasis,
-): Promise<Map<string, ConsentStatus>> {
-  const result = new Map<string, ConsentStatus>();
+): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
+  const result = new Map<
+    string,
+    { status: ConsentStatus; withdrawnAt: Date | null }
+  >();
   await Promise.all(
     chargePersonIds.map(async (personId) => {
-      const status = await resolveConsentStatus(
+      const row = await resolveConsentStatusAndWithdrawnAt(
         db,
         personId,
         organizationId,
         purpose,
         basis,
       );
-      if (status !== null) result.set(personId, status);
+      if (row !== null) result.set(personId, row);
     }),
   );
   return result;

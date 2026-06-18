@@ -606,6 +606,56 @@ describe('CreateProfileScreen', () => {
     expect(screen.queryByTestId('create-profile-error')).toBeNull();
   });
 
+  // [WI-824] ACCOUNT-05/35 coverage gap: the existing BUG-947 test exercises the
+  // default (isAddingChild=false / solo first-profile) path. This test covers the
+  // isAddingChild=true path (?for=child param) so the same upgrade-alert branch is
+  // verified for parent-adds-child flows opened via create-profile.tsx.
+  // The catch block is shared, so this is defense-in-depth rather than a new code
+  // path, but it anchors the ?for=child entry point explicitly.
+  it('[WI-824] surfaces upgrade alert on PROFILE_LIMIT_EXCEEDED when opened with ?for=child', async () => {
+    mockSearchParams = { for: 'child' };
+    const upgradeMessage =
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.';
+    const { UpstreamError } = require('../lib/api-errors');
+    mockFetch.mockImplementationOnce(() => {
+      throw new UpstreamError(upgradeMessage, 'PROFILE_LIMIT_EXCEEDED', 402);
+    });
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('create-profile-name'),
+      'Test Child',
+    );
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2013, 4, 1));
+    });
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(alertCall[0]).toBe('Upgrade required');
+    expect(alertCall[1]).toBe(upgradeMessage);
+    const buttons = alertCall[2] as Array<{
+      text?: string;
+      style?: string;
+      onPress?: () => void;
+    }>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]?.text).toBe('Not now');
+    expect(buttons[0]?.style).toBe('cancel');
+    expect(buttons[1]?.text).toBe('See plans');
+
+    buttons[1]?.onPress?.();
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+
+    expect(screen.queryByTestId('create-profile-error')).toBeNull();
+  });
+
   it('navigates back on cancel', () => {
     render(<CreateProfileScreen />, { wrapper: Wrapper });
 

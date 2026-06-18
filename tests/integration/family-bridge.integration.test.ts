@@ -80,6 +80,31 @@ async function seedFamily() {
       guardianPersonId: adultId,
       chargePersonId: childId,
     });
+    // [WI-808] Dual-write: subjects.profile_id and profiles.account_id still FK
+    // to profiles and accounts respectively (M-DROP/M-REPOINT not yet committed).
+    // Insert stub accounts + profiles rows so seedLearningTree's subjects insert
+    // and the profiles FK chain are satisfied.
+    await db.insert(accounts).values({
+      id: accountId,
+      clerkUserId: CLERK_USER_ID,
+      email: EMAIL,
+    });
+    await db.insert(profiles).values([
+      {
+        id: adultId,
+        accountId,
+        displayName: 'Parent',
+        birthYear: 1985,
+        isOwner: true,
+      },
+      {
+        id: childId,
+        accountId,
+        displayName: 'Ada',
+        birthYear: 2013,
+        isOwner: false,
+      },
+    ]);
 
     const account = { id: accountId, clerkUserId: CLERK_USER_ID, email: EMAIL };
     const adult = { id: adultId, accountId, displayName: 'Parent' };

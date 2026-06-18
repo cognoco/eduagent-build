@@ -45,6 +45,9 @@ export async function setupTestDb(): Promise<{
             await db.delete(person).where(eq(person.id, row.personId));
           }
           await db.delete(organization).where(eq(organization.id, accountId));
+          // [WI-808] Also clean up the dual-write legacy rows (accounts + profiles
+          // cascade). accounts.id == accountId by the reseed invariant.
+          await db.delete(accounts).where(eq(accounts.id, accountId));
         } else {
           await db.delete(accounts).where(eq(accounts.id, accountId));
         }
@@ -72,11 +75,10 @@ export async function seedLearningProfile(
   const profileId = generateUUIDv7();
   const accountId = generateUUIDv7();
 
-  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP
-  // applied): legacy accounts/profiles are gone and learning_profiles.profile_id
-  // FKs `person` (repointed by M-REPOINT). Seed the v2 graph instead, with the
-  // reseed alignment organization.id == accountId, person.id == profileId, so
-  // learning_profiles(profileId) resolves against person.
+  // [WI-586] Flag-ON seed the v2 graph (organization.id == accountId,
+  // person.id == profileId). Also insert the legacy profiles row because
+  // M-REPOINT has not yet been applied — learning_profiles.profile_id still
+  // FKs to profiles.id in the committed-migration set (WI-808).
   if (isIdentityV2Enabled()) {
     await db.insert(organization).values({
       id: accountId,
@@ -97,6 +99,22 @@ export async function seedLearningProfile(
       personId: profileId,
       organizationId: accountId,
       roles: ['learner'],
+    });
+    // [WI-808] Dual-write: learning_profiles.profile_id still FKs to profiles
+    // (M-REPOINT not yet committed). profiles.account_id FKs to accounts
+    // (M-DROP not yet committed). Insert stub accounts + profiles rows so the
+    // FK chain is satisfied without touching production code.
+    await db.insert(accounts).values({
+      id: accountId,
+      clerkUserId: `integration-memory-${accountId}`,
+      email: `memory-${accountId}@integration.test`,
+    });
+    await db.insert(profiles).values({
+      id: profileId,
+      accountId,
+      displayName: 'Memory Fixture',
+      birthYear: 2012,
+      isOwner: false,
     });
     seededAccountIds.add(accountId);
   } else {
@@ -149,6 +167,9 @@ export async function cleanupSeededAccount(
       await db.delete(person).where(eq(person.id, row.personId));
     }
     await db.delete(organization).where(eq(organization.id, accountId));
+    // [WI-808] Also clean up the dual-write legacy rows. accounts cascade-deletes
+    // profiles; accounts.id == accountId by the reseed invariant.
+    await db.delete(accounts).where(eq(accounts.id, accountId));
     return;
   }
   await db.delete(accounts).where(eq(accounts.id, accountId));

@@ -204,6 +204,9 @@ export async function listRecapsForParent(
           db,
           parentProfileId,
           child.profileId,
+          // [WI-821] Forward identityV2Enabled so assertParentAccess reads
+          // guardianship (not family_links) and person (not profiles) under v2.
+          { identityV2Enabled: options.identityV2Enabled },
         );
         return { child, sessions };
       } catch (err) {

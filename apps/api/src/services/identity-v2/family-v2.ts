@@ -28,7 +28,7 @@ import {
 import type { ConsentStatus } from '@eduagent/schemas';
 import {
   DEFAULT_CONSENT_PURPOSE,
-  resolveConsentStatus,
+  resolveConsentStatusAndWithdrawnAt,
   resolveConsentStatusesForBasis,
 } from './consent-status-v2';
 import { getChargePersonIds, isGuardianOf } from './guardianship';
@@ -72,10 +72,10 @@ export async function getChildPersonIdsForParentV2(
 export async function getChildGdprConsentStatusV2(
   db: Database,
   childPersonId: string,
-): Promise<ConsentStatus | null> {
+): Promise<{ status: ConsentStatus; withdrawnAt: Date | null } | null> {
   const organizationId = await resolveOrgId(db, childPersonId);
   if (!organizationId) return null;
-  return resolveConsentStatus(
+  return resolveConsentStatusAndWithdrawnAt(
     db,
     childPersonId,
     organizationId,
@@ -96,7 +96,7 @@ export async function getChildrenGdprConsentStatusesV2(
   db: Database,
   organizationId: string,
   childPersonIds: readonly string[],
-): Promise<Map<string, ConsentStatus>> {
+): Promise<Map<string, { status: ConsentStatus; withdrawnAt: Date | null }>> {
   return resolveConsentStatusesForBasis(
     db,
     childPersonIds,
@@ -125,8 +125,9 @@ export async function getChildConsentForParentV2(
   if (!(await isGuardianOf(db, guardianPersonId, childPersonId))) {
     throw new ConsentNotAuthorizedError('view');
   }
-  const status = await getChildGdprConsentStatusV2(db, childPersonId);
-  if (status === null) return null;
+  const consentRow = await getChildGdprConsentStatusV2(db, childPersonId);
+  if (consentRow === null) return null;
+  const { status } = consentRow;
 
   // respondedAt: the current GDPR grant's withdrawn_at (if withdrawn) or
   // granted_at, mirroring the legacy responded_at the dashboard countdown reads.
