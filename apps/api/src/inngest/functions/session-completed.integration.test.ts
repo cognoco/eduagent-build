@@ -39,6 +39,7 @@ import {
   sessionEvents,
   streaks,
   subjects,
+  subscription,
   vocabulary,
   xpLedger,
   sessionSummaries,
@@ -51,6 +52,10 @@ import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
 import { loadTopicTitle, sessionCompleted } from './session-completed';
+import {
+  deleteLegacyAccountsForTest,
+  ensureLegacyProfileAnchorForTest,
+} from '../../test-utils/legacy-identity-anchors';
 
 // ── Database env bootstrap ────────────────────────────────────────────────────
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -120,6 +125,29 @@ async function seedAccount(): Promise<{ accountId: string }> {
     .values({ name: `SC Test Org ${++seedCounter}` })
     .returning({ id: organization.id });
   seededOrgIds.push(org!.id);
+
+  const [owner] = await db
+    .insert(person)
+    .values({
+      displayName: 'Test Owner',
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning({ id: person.id });
+  seededPersonIds.push(owner!.id);
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: owner!.id,
+    accountId: org!.id,
+    displayName: 'Test Owner',
+    birthYear: 1985,
+    isOwner: true,
+  });
+  await db.insert(membership).values({
+    personId: owner!.id,
+    organizationId: org!.id,
+    roles: ['admin'],
+  });
+
   return { accountId: org!.id };
 }
 
@@ -135,6 +163,12 @@ async function seedProfile(orgId: string): Promise<{ profileId: string }> {
     })
     .returning({ id: person.id });
   seededPersonIds.push(p!.id);
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: p!.id,
+    accountId: orgId,
+    displayName: 'Test Learner',
+    birthYear: 2005,
+  });
   await db.insert(membership).values({
     personId: p!.id,
     organizationId: orgId,
@@ -335,6 +369,12 @@ afterAll(async () => {
     await db
       .delete(guardianship)
       .where(inArray(guardianship.guardianPersonId, seededPersonIds));
+    await deleteLegacyAccountsForTest(db, seededOrgIds);
+    if (seededOrgIds.length > 0) {
+      await db
+        .delete(subscription)
+        .where(inArray(subscription.organizationId, seededOrgIds));
+    }
     await db.delete(person).where(inArray(person.id, seededPersonIds));
   }
   if (seededOrgIds.length > 0) {
@@ -695,7 +735,9 @@ describe('session-completed integration', () => {
     await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
     await seedLearningProfile(profileId);
 
-    // Pre-seed a retention card at advanced state
+    // Pre-seed a retention card at advanced state. Use a JS timestamp so the
+    // strict optimistic-lock comparison round-trips exactly through Drizzle.
+    const retentionUpdatedAt = new Date(Date.now() - 60_000);
     await db.insert(retentionCards).values({
       profileId,
       topicId,
@@ -704,6 +746,7 @@ describe('session-completed integration', () => {
       easeFactor: 2.6,
       failureCount: 0,
       consecutiveSuccesses: 3,
+      updatedAt: retentionUpdatedAt,
     });
 
     const now = new Date(Date.now() + 60_000);

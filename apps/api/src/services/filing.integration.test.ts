@@ -29,6 +29,10 @@ import {
   fileToLibrary,
   resolveFilingResult,
 } from './filing';
+import {
+  deleteLegacyAccountsForTest,
+  ensureLegacyProfileAnchorForTest,
+} from '../test-utils/legacy-identity-anchors';
 import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -82,6 +86,11 @@ async function seedAccountAndProfile() {
     .returning();
 
   seededPersonIds.push(p!.id);
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: p!.id,
+    displayName: 'Filing Test User',
+    birthYear: 2000,
+  });
 
   // Return shape mirrors the legacy shape so all call sites continue to use
   // `profile.id` as the profileId (person.id == former profile.id role).
@@ -91,6 +100,7 @@ async function seedAccountAndProfile() {
 async function cleanup() {
   const db = createIntegrationDb();
   if (seededPersonIds.length > 0) {
+    await deleteLegacyAccountsForTest(db, seededPersonIds);
     // CASCADE on person removes membership, subjects → curricula → books → topics.
     await db.delete(person).where(inArray(person.id, seededPersonIds));
     seededPersonIds.length = 0;

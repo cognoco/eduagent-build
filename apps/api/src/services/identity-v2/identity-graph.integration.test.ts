@@ -31,6 +31,7 @@ import {
   organization,
   person,
   profiles,
+  profileQuotaUsage,
   subscription,
   subscriptionPayers,
   quotaPools,
@@ -50,7 +51,7 @@ const RUN = !!process.env.DATABASE_URL;
 
 async function tableExists(
   db: Database,
-  table: 'accounts' | 'profiles' | 'subscriptions',
+  table: 'accounts' | 'profiles' | 'subscriptions' | 'profile_quota_usage',
 ): Promise<boolean> {
   const raw = (await db.execute(
     sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
@@ -82,6 +83,11 @@ async function cleanupByClerk(
       where: eq(subscription.organizationId, orgId),
     });
     for (const sub of subs) {
+      if (await tableExists(db, 'profile_quota_usage')) {
+        await db
+          .delete(profileQuotaUsage)
+          .where(eq(profileQuotaUsage.subscriptionId, sub.id));
+      }
       await db.delete(quotaPools).where(eq(quotaPools.subscriptionId, sub.id));
       await db
         .delete(subscriptionPayers)
@@ -234,6 +240,19 @@ async function cleanupByClerk(
         where: eq(legacySubscriptions.id, subRow!.id),
       });
       expect(legacySubscription?.accountId).toBe(graph.organizationId);
+    }
+
+    if (
+      (await tableExists(db, 'profiles')) &&
+      (await tableExists(db, 'profile_quota_usage'))
+    ) {
+      const ownerUsage = await db.query.profileQuotaUsage.findFirst({
+        where: eq(profileQuotaUsage.subscriptionId, subRow!.id),
+      });
+      expect(ownerUsage?.profileId).toBe(graph.personId);
+      expect(ownerUsage?.role).toBe('owner');
+      expect(ownerUsage?.usedThisMonth).toBe(0);
+      expect(ownerUsage?.usedToday).toBe(0);
     }
   });
 

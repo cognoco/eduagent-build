@@ -88,6 +88,7 @@ export async function createProfileViaRoute(input: {
   user: AuthFixtureUser;
   displayName: string;
   birthYear: number;
+  kind?: 'owner' | 'child';
 }): Promise<{
   id: string;
   accountId: string;
@@ -105,6 +106,7 @@ export async function createProfileViaRoute(input: {
         email: input.user.email,
       }),
       body: JSON.stringify({
+        ...(input.kind ? { kind: input.kind } : {}),
         displayName: input.displayName,
         birthYear: input.birthYear,
       }),

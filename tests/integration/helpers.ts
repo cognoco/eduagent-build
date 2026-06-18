@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import {
   accounts,
   consentGrant,
@@ -14,6 +14,26 @@ import {
 
 function isIdentityV2Enabled(): boolean {
   return process.env.IDENTITY_V2_ENABLED === 'true';
+}
+
+const tableExistsCache = new Map<string, boolean>();
+
+async function tableExists(
+  db: ReturnType<typeof createIntegrationDb>,
+  table: string,
+): Promise<boolean> {
+  const cached = tableExistsCache.get(table);
+  if (cached !== undefined) return cached;
+
+  const raw = (await db.execute(
+    sql`SELECT to_regclass(${`public.${table}`}) AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  const exists = rows[0]?.reg != null;
+  tableExistsCache.set(table, exists);
+  return exists;
 }
 
 type IntegrationEnvOverrides = Partial<{
@@ -101,6 +121,9 @@ export async function cleanupAccounts(input: {
       // [WI-808] Even when the v2 login lookup finds nothing, there may be
       // legacy `accounts` rows (direct-insert seeds without a login row). Clean
       // them up so duplicate-key errors don't bleed across tests.
+      if (!(await tableExists(db, 'accounts'))) {
+        return;
+      }
       const legacyIds = new Set<string>();
       if (input.emails && input.emails.length > 0) {
         const rows = await db.query.accounts.findMany({
@@ -192,23 +215,25 @@ export async function cleanupAccounts(input: {
     // tests, causing duplicate-key failures on re-seed. Always attempt legacy
     // cleanup after the v2 pass so those rows are swept regardless of whether
     // the seed created v2 rows.
-    const legacyAccountIds = new Set<string>();
-    if (input.emails && input.emails.length > 0) {
-      const rows = await db.query.accounts.findMany({
-        where: inArray(accounts.email, input.emails),
-      });
-      rows.forEach((row) => legacyAccountIds.add(row.id));
-    }
-    if (input.clerkUserIds && input.clerkUserIds.length > 0) {
-      const rows = await db.query.accounts.findMany({
-        where: inArray(accounts.clerkUserId, input.clerkUserIds),
-      });
-      rows.forEach((row) => legacyAccountIds.add(row.id));
-    }
-    if (legacyAccountIds.size > 0) {
-      await db
-        .delete(accounts)
-        .where(inArray(accounts.id, [...legacyAccountIds]));
+    if (await tableExists(db, 'accounts')) {
+      const legacyAccountIds = new Set<string>();
+      if (input.emails && input.emails.length > 0) {
+        const rows = await db.query.accounts.findMany({
+          where: inArray(accounts.email, input.emails),
+        });
+        rows.forEach((row) => legacyAccountIds.add(row.id));
+      }
+      if (input.clerkUserIds && input.clerkUserIds.length > 0) {
+        const rows = await db.query.accounts.findMany({
+          where: inArray(accounts.clerkUserId, input.clerkUserIds),
+        });
+        rows.forEach((row) => legacyAccountIds.add(row.id));
+      }
+      if (legacyAccountIds.size > 0) {
+        await db
+          .delete(accounts)
+          .where(inArray(accounts.id, [...legacyAccountIds]));
+      }
     }
     return;
   }

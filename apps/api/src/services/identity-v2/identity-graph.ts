@@ -15,8 +15,9 @@
 //   7. pre-repoint legacy anchors (accounts/profiles) for retained FKs
 //   8. subscription (plus trial, trial_ends_at = computeTrialEndDate, payer)
 //   9. subscription_payers (primary)
-//   10. pre-repoint legacy subscription anchor for quota_pools FK
-//   11. quota_pools
+//   10. pre-repoint legacy subscription anchor for quota satellites
+//   11. pre-repoint owner profile_quota_usage row
+//   12. quota_pools
 //
 // Idempotency is fenced by login.clerk_user_id UNIQUE; the 23505 catch
 // DISCRIMINATES by constraint name (pinned from the 0108 migration):
@@ -33,6 +34,7 @@ import {
   membership,
   organization,
   person,
+  profileQuotaUsage,
   profiles,
   quotaPools,
   subscription,
@@ -133,7 +135,7 @@ function uniqueViolationConstraint(error: unknown): string | null {
 /** True iff `public.<table>` exists. Used only for pre-repoint legacy FK anchors. */
 async function tableExists(
   db: Database,
-  table: 'accounts' | 'profiles' | 'subscriptions',
+  table: 'accounts' | 'profiles' | 'subscriptions' | 'profile_quota_usage',
 ): Promise<boolean> {
   const cached = legacyTableExistsCache.get(table);
   if (cached !== undefined) return cached;
@@ -382,6 +384,14 @@ export async function createIdentityGraph(
       // (10) Pre-M-REPOINT bridge for quota_pools.subscription_id, whose FK
       // still targets legacy subscriptions(id) until WI-586 re-points it. The
       // v2 subscription remains authoritative; this row is only the FK parent.
+      //
+      // Deployment sequencing: this table-existence probe is process-local
+      // cached. Remove/redeploy the bridge before applying M-DROP in any
+      // long-lived process so stale "present" cache entries cannot write after
+      // the table has been dropped.
+      const plusTier = getTierConfig('plus');
+      const cycleResetAt = new Date();
+      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
       if (legacyAccountsPresent && (await tableExists(txDb, 'subscriptions'))) {
         await txDb.insert(legacySubscriptions).values({
           id: subRow.id,
@@ -390,14 +400,32 @@ export async function createIdentityGraph(
           status: 'trial',
           trialEndsAt,
         });
+
+        // (11) Pre-M-REPOINT owner quota-usage bridge. The metering v2 path
+        // lazily creates this satellite when it is absent; during integration
+        // tests that emits an operational lazy-provisioned event and leaves
+        // first-request quota snapshots undefined. Owner bootstrap should leave
+        // the plus-trial quota graph complete up front.
+        if (
+          (await tableExists(txDb, 'profiles')) &&
+          (await tableExists(txDb, 'profile_quota_usage'))
+        ) {
+          await txDb.insert(profileQuotaUsage).values({
+            subscriptionId: subRow.id,
+            profileId: personRow.id,
+            role: 'owner',
+            monthlyLimit: plusTier.ownerMonthlyQuota ?? plusTier.monthlyQuota,
+            usedThisMonth: 0,
+            dailyLimit: plusTier.ownerDailyQuota ?? plusTier.dailyLimit,
+            usedToday: 0,
+            cycleResetAt,
+          });
+        }
       }
 
-      // (11) quota_pools — same cycle-reset convention as legacy
+      // (12) quota_pools — same cycle-reset convention as legacy
       // createSubscription. This row keys on subRow.id and is store-agnostic
       // once the pre-repoint legacy parent above exists.
-      const plusTier = getTierConfig('plus');
-      const cycleResetAt = new Date();
-      cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
       await txDb.insert(quotaPools).values({
         subscriptionId: subRow.id,
         monthlyLimit: plusTier.monthlyQuota,

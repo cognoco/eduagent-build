@@ -11,13 +11,12 @@
  * No internal mocks — real DB connections only.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumTopics,
-  profiles,
+  generateUUIDv7,
   subjects,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -26,6 +25,12 @@ import {
   generateLanguageCurriculum,
   regenerateLanguageCurriculum,
 } from './language-curriculum';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -43,47 +48,55 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-const PREFIX = 'integration-language-curriculum';
+const RUN_ID = generateUUIDv7();
+const PREFIX = `integration-language-curriculum-${RUN_ID}`;
 const ACCOUNT = {
   clerkUserId: `${PREFIX}-01`,
   email: `${PREFIX}-user1@integration.test`,
 };
 
+let accountId = '';
+let profileId = '';
+
 async function cleanupTestAccounts() {
+  if (!accountId && !profileId) return;
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [ACCOUNT.email]),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: accountId ? [accountId] : [],
+    profileIds: profileId ? [profileId] : [],
   });
-  if (rows.length > 0) {
-    await db.delete(accounts).where(
-      inArray(
-        accounts.id,
-        rows.map((r) => r.id),
-      ),
-    );
-  }
+  await deleteLegacyAccountsForTest(db, accountId ? [accountId] : []);
+  accountId = '';
+  profileId = '';
 }
 
-let profileId: string;
 let subjectId: string;
+let subjectCounter = 0;
 
 beforeAll(async () => {
   await cleanupTestAccounts();
   const db = createIntegrationDb();
-  const [acct] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [prof] = await db
-    .insert(profiles)
-    .values({
-      accountId: acct!.id,
-      displayName: 'Language Learner',
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
-  profileId = prof!.id;
+  accountId = generateUUIDv7();
+  profileId = generateUUIDv7();
+
+  await ensureLegacyProfileAnchorForTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    displayName: 'Language Learner',
+    birthYear: 2010,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    displayName: 'Language Learner',
+    birthYear: 2010,
+    isOwner: true,
+  });
 });
 
 beforeEach(async () => {
@@ -93,7 +106,7 @@ beforeEach(async () => {
     .insert(subjects)
     .values({
       profileId,
-      name: 'Spanish',
+      name: `Spanish ${++subjectCounter}`,
       pedagogyMode: 'four_strands',
       languageCode: 'es',
     })

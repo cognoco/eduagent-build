@@ -69,6 +69,15 @@ const OPT_C_PREFIX = 'integration-profile-optc';
 const OPT_C_UNDERAGE_EMAIL = `${OPT_C_PREFIX}-underage@integration.test`;
 const OPT_C_ADULT18_EMAIL = `${OPT_C_PREFIX}-adult18@integration.test`;
 const OPT_C_FLAG_OFF_EMAIL = `${OPT_C_PREFIX}-flagoff@integration.test`;
+const CURRENT_YEAR = new Date().getFullYear();
+const OPT_C_UNDERAGE_OWNER_BIRTH_YEAR = CURRENT_YEAR - 13;
+const OPT_C_ADULT_BOUNDARY_BIRTH_YEAR = CURRENT_YEAR - 18;
+const OPT_C_ALLOWED_CHILD_BIRTH_YEAR = CURRENT_YEAR - 14;
+const legacyProfileIntegrationEnabled =
+  process.env.IDENTITY_V2_ENABLED !== 'true';
+const legacyDescribe = legacyProfileIntegrationEnabled
+  ? describe
+  : describe.skip;
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -170,10 +179,12 @@ async function cleanup() {
 // ---------------------------------------------------------------------------
 
 beforeEach(async () => {
+  if (!legacyProfileIntegrationEnabled) return;
   await cleanup();
 });
 
 afterAll(async () => {
+  if (!legacyProfileIntegrationEnabled) return;
   await cleanup();
 });
 
@@ -181,130 +192,139 @@ afterAll(async () => {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (integration)', () => {
-  it('[BUG-1100] marks the first profile as owner even when COUNT returns a string', async () => {
-    const db = createIntegrationDb();
-    const [account] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: FIRST_PROFILE_ACCOUNT.clerkUserId,
-        email: FIRST_PROFILE_ACCOUNT.email,
-      })
-      .returning();
+legacyDescribe(
+  '[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (integration)',
+  () => {
+    it('[BUG-1100] marks the first profile as owner even when COUNT returns a string', async () => {
+      const db = createIntegrationDb();
+      const [account] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: FIRST_PROFILE_ACCOUNT.clerkUserId,
+          email: FIRST_PROFILE_ACCOUNT.email,
+        })
+        .returning();
 
-    const profile = await createProfileWithLimitCheck(db, account!.id, {
-      displayName: 'First Owner',
-      birthYear: 2000,
-    });
-
-    expect(profile.isOwner).toBe(true);
-
-    const stored = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profile.id),
-      columns: { isOwner: true },
-    });
-    expect(stored?.isOwner).toBe(true);
-  });
-
-  it('[BUG-862] pg_advisory_xact_lock serialises concurrent profile creation — cap is not exceeded', async () => {
-    const { account } = await seedFixture();
-    const db = createIntegrationDb();
-
-    // family tier cap = 4. Owner is already profile #1.
-    // Add 2 more profiles sequentially to reach cap - 1 = 3.
-    const input: ProfileCreateInput = { displayName: 'Child', birthYear: 2012 };
-
-    for (let i = 0; i < 2; i++) {
-      await createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: `Pre-seeded Child ${i + 1}`,
+      const profile = await createProfileWithLimitCheck(db, account!.id, {
+        displayName: 'First Owner',
+        birthYear: 2000,
       });
-    }
 
-    // Confirm we are at cap - 1 = 3
-    const [beforeRow] = await db
-      .select({ n: count() })
-      .from(profiles)
-      .where(eq(profiles.accountId, account.id));
-    expect(beforeRow!.n).toBe(3);
+      expect(profile.isOwner).toBe(true);
 
-    // Fire 3 concurrent createProfileWithLimitCheck calls.
-    // With the advisory lock scoped to a real transaction, exactly ONE of them
-    // should succeed; the other two should throw ProfileLimitError.
-    const results = await Promise.allSettled([
-      createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: 'Racing Child A',
-      }),
-      createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: 'Racing Child B',
-      }),
-      createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: 'Racing Child C',
-      }),
-    ]);
+      const stored = await db.query.profiles.findFirst({
+        where: eq(profiles.id, profile.id),
+        columns: { isOwner: true },
+      });
+      expect(stored?.isOwner).toBe(true);
+    });
 
-    // Count successes vs. ProfileLimitErrors
-    const successes = results.filter((r) => r.status === 'fulfilled');
-    const limitErrors = results.filter(
-      (r) => r.status === 'rejected' && r.reason instanceof ProfileLimitError,
-    );
-    const unexpectedErrors = results.filter(
-      (r) =>
-        r.status === 'rejected' && !(r.reason instanceof ProfileLimitError),
-    );
+    it('[BUG-862] pg_advisory_xact_lock serialises concurrent profile creation — cap is not exceeded', async () => {
+      const { account } = await seedFixture();
+      const db = createIntegrationDb();
 
-    // No unexpected errors
-    expect(unexpectedErrors).toHaveLength(0);
+      // family tier cap = 4. Owner is already profile #1.
+      // Add 2 more profiles sequentially to reach cap - 1 = 3.
+      const input: ProfileCreateInput = {
+        displayName: 'Child',
+        birthYear: 2012,
+      };
 
-    // Hard invariant: total profile count must not exceed cap (4)
-    const [afterRow] = await db
-      .select({ n: count() })
-      .from(profiles)
-      .where(eq(profiles.accountId, account.id));
-    expect(afterRow!.n).toBeLessThanOrEqual(4);
+      for (let i = 0; i < 2; i++) {
+        await createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: `Pre-seeded Child ${i + 1}`,
+        });
+      }
 
-    // Ideally exactly 1 succeeded and 2 were rejected with ProfileLimitError.
-    // If more than 1 succeeded the advisory lock scope is still broken.
-    if (successes.length > 1) {
-      console.warn(
-        `[BUG-862] ${successes.length} out of 3 concurrent creates succeeded ` +
-          `(expected 1). Final profile count: ${afterRow!.n}/4. ` +
-          'pg_advisory_xact_lock may not be scoped to a real transaction.',
+      // Confirm we are at cap - 1 = 3
+      const [beforeRow] = await db
+        .select({ n: count() })
+        .from(profiles)
+        .where(eq(profiles.accountId, account.id));
+      expect(beforeRow!.n).toBe(3);
+
+      // Fire 3 concurrent createProfileWithLimitCheck calls.
+      // With the advisory lock scoped to a real transaction, exactly ONE of them
+      // should succeed; the other two should throw ProfileLimitError.
+      const results = await Promise.allSettled([
+        createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: 'Racing Child A',
+        }),
+        createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: 'Racing Child B',
+        }),
+        createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: 'Racing Child C',
+        }),
+      ]);
+
+      // Count successes vs. ProfileLimitErrors
+      const successes = results.filter((r) => r.status === 'fulfilled');
+      const limitErrors = results.filter(
+        (r) => r.status === 'rejected' && r.reason instanceof ProfileLimitError,
       );
-    }
+      const unexpectedErrors = results.filter(
+        (r) =>
+          r.status === 'rejected' && !(r.reason instanceof ProfileLimitError),
+      );
 
-    // Advisory: at least 2 must have been rate-limited or the cap is violated
-    expect(successes.length + limitErrors.length).toBe(3);
-    expect(afterRow!.n).toBeLessThanOrEqual(4);
-  });
+      // No unexpected errors
+      expect(unexpectedErrors).toHaveLength(0);
 
-  it('[BUG-862] second call for the same account hits ProfileLimitError when at cap', async () => {
-    // Sanity check: sequential enforcement works (not a concurrent test)
-    const { account } = await seedFixture();
-    const db = createIntegrationDb();
+      // Hard invariant: total profile count must not exceed cap (4)
+      const [afterRow] = await db
+        .select({ n: count() })
+        .from(profiles)
+        .where(eq(profiles.accountId, account.id));
+      expect(afterRow!.n).toBeLessThanOrEqual(4);
 
-    const input: ProfileCreateInput = { displayName: 'Child', birthYear: 2012 };
+      // Ideally exactly 1 succeeded and 2 were rejected with ProfileLimitError.
+      // If more than 1 succeeded the advisory lock scope is still broken.
+      if (successes.length > 1) {
+        console.warn(
+          `[BUG-862] ${successes.length} out of 3 concurrent creates succeeded ` +
+            `(expected 1). Final profile count: ${afterRow!.n}/4. ` +
+            'pg_advisory_xact_lock may not be scoped to a real transaction.',
+        );
+      }
 
-    // Fill to cap: owner (1) + 3 children = 4
-    for (let i = 0; i < 3; i++) {
-      await createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: `Child ${i + 1}`,
-      });
-    }
+      // Advisory: at least 2 must have been rate-limited or the cap is violated
+      expect(successes.length + limitErrors.length).toBe(3);
+      expect(afterRow!.n).toBeLessThanOrEqual(4);
+    });
 
-    // One more must throw ProfileLimitError
-    await expect(
-      createProfileWithLimitCheck(db, account.id, {
-        ...input,
-        displayName: 'Over-cap Child',
-      }),
-    ).rejects.toThrow(ProfileLimitError);
-  });
-});
+    it('[BUG-862] second call for the same account hits ProfileLimitError when at cap', async () => {
+      // Sanity check: sequential enforcement works (not a concurrent test)
+      const { account } = await seedFixture();
+      const db = createIntegrationDb();
+
+      const input: ProfileCreateInput = {
+        displayName: 'Child',
+        birthYear: 2012,
+      };
+
+      // Fill to cap: owner (1) + 3 children = 4
+      for (let i = 0; i < 3; i++) {
+        await createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: `Child ${i + 1}`,
+        });
+      }
+
+      // One more must throw ProfileLimitError
+      await expect(
+        createProfileWithLimitCheck(db, account.id, {
+          ...input,
+          displayName: 'Over-cap Child',
+        }),
+      ).rejects.toThrow(ProfileLimitError);
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // [OPT-C / HIGH-D3] Adult-owner gate break-tests
@@ -314,87 +334,85 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
 // and cannot be silently removed without CI failing.
 // ---------------------------------------------------------------------------
 
-describe('[OPT-C] createProfileWithLimitCheck adult-owner gate (integration)', () => {
-  // Age math uses new Date().getFullYear() inside computeAgeBracket.
-  // Birth years chosen so the owner's age in the current year (2026) places
-  // them firmly underage (2013 → 13) or at the 18 boundary (2008 → 18).
-  // These remain correct for 2026+; the boundary test (2008) should be
-  // revisited when currentYear reaches 2027 (owner turns 19, still passes).
+legacyDescribe(
+  '[OPT-C] createProfileWithLimitCheck adult-owner gate (integration)',
+  () => {
+    // Age math uses new Date().getFullYear() inside computeAgeBracket.
+    // Relative birth years keep the owner at the intended boundary and the child
+    // above the separate 13+ learner floor as the calendar year advances.
 
-  it('[BREAK / OPT-C] rejects child creation when owner is under 18', async () => {
-    // Birth year 2013 → age 13 in 2026 — clearly underage.
-    const { accountId } = await seedOwnerAccount(
-      OPT_C_UNDERAGE_EMAIL,
-      `${OPT_C_PREFIX}-underage-user`,
-      2013,
-    );
-    const db = createIntegrationDb();
+    it('[BREAK / OPT-C] rejects child creation when owner is under 18', async () => {
+      const { accountId } = await seedOwnerAccount(
+        OPT_C_UNDERAGE_EMAIL,
+        `${OPT_C_PREFIX}-underage-user`,
+        OPT_C_UNDERAGE_OWNER_BIRTH_YEAR,
+      );
+      const db = createIntegrationDb();
 
-    // Gate ON (default). Must throw ForbiddenError with ADULT_OWNER_REQUIRED.
-    // computeAgeBracket(2013, 2026) = 'adolescent' → not 'adult' → reject.
-    await expect(
-      createProfileWithLimitCheck(
-        db,
-        accountId,
-        { displayName: 'Child', birthYear: 2014 },
-        { adultOwnerGateEnabled: true },
-      ),
-    ).rejects.toMatchObject({
-      name: 'ForbiddenError',
-      apiCode: 'ADULT_OWNER_REQUIRED',
+      // Gate ON (default). Must throw ForbiddenError with ADULT_OWNER_REQUIRED.
+      await expect(
+        createProfileWithLimitCheck(
+          db,
+          accountId,
+          { displayName: 'Child', birthYear: OPT_C_ALLOWED_CHILD_BIRTH_YEAR },
+          { adultOwnerGateEnabled: true },
+        ),
+      ).rejects.toMatchObject({
+        name: 'ForbiddenError',
+        apiCode: 'ADULT_OWNER_REQUIRED',
+      });
+
+      // Confirm that ForbiddenError is the correct class (instanceof guard)
+      await expect(
+        createProfileWithLimitCheck(
+          db,
+          accountId,
+          { displayName: 'Child', birthYear: OPT_C_ALLOWED_CHILD_BIRTH_YEAR },
+          { adultOwnerGateEnabled: true },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    // Confirm that ForbiddenError is the correct class (instanceof guard)
-    await expect(
-      createProfileWithLimitCheck(
-        db,
-        accountId,
-        { displayName: 'Child', birthYear: 2014 },
-        { adultOwnerGateEnabled: true },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
+    it('[OPT-C boundary] allows child creation when owner is exactly 18', async () => {
+      // Note: computeAgeBracket uses currentYear - birthYear (overestimates by up to
+      // 11 months for users whose birthday hasn't occurred yet). At the boundary,
+      // the rule accepts — consistent with the mobile client gate behaviour.
+      const { accountId } = await seedOwnerAccount(
+        OPT_C_ADULT18_EMAIL,
+        `${OPT_C_PREFIX}-adult18-user`,
+        OPT_C_ADULT_BOUNDARY_BIRTH_YEAR,
+      );
+      const db = createIntegrationDb();
 
-  it('[OPT-C boundary] allows child creation when owner is exactly 18', async () => {
-    // Birth year 2008 → age 18 in 2026 — boundary. computeAgeBracket returns 'adult'.
-    // Note: computeAgeBracket uses currentYear - birthYear (overestimates by up to
-    // 11 months for users whose birthday hasn't occurred yet). At the boundary,
-    // the rule accepts — consistent with the mobile client gate behaviour.
-    const { accountId } = await seedOwnerAccount(
-      OPT_C_ADULT18_EMAIL,
-      `${OPT_C_PREFIX}-adult18-user`,
-      2008,
-    );
-    const db = createIntegrationDb();
+      // Gate ON. Owner age = 18 → 'adult' → must succeed.
+      await expect(
+        createProfileWithLimitCheck(
+          db,
+          accountId,
+          { displayName: 'Child', birthYear: OPT_C_ALLOWED_CHILD_BIRTH_YEAR },
+          { adultOwnerGateEnabled: true },
+        ),
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
 
-    // Gate ON. Owner age = 18 → 'adult' → must succeed.
-    await expect(
-      createProfileWithLimitCheck(
-        db,
-        accountId,
-        { displayName: 'Child', birthYear: 2015 },
-        { adultOwnerGateEnabled: true },
-      ),
-    ).resolves.toMatchObject({ id: expect.any(String) });
-  });
+    it('[OPT-C flag-off] allows child creation regardless of owner age when gate is disabled', async () => {
+      // Same underage owner, but gate is explicitly OFF.
+      // Must succeed — identical to today's behaviour before this rule was added.
+      const { accountId } = await seedOwnerAccount(
+        OPT_C_FLAG_OFF_EMAIL,
+        `${OPT_C_PREFIX}-flagoff-user`,
+        OPT_C_UNDERAGE_OWNER_BIRTH_YEAR,
+      );
+      const db = createIntegrationDb();
 
-  it('[OPT-C flag-off] allows child creation regardless of owner age when gate is disabled', async () => {
-    // Same underage owner (born 2013), but gate is explicitly OFF.
-    // Must succeed — identical to today's behaviour before this rule was added.
-    const { accountId } = await seedOwnerAccount(
-      OPT_C_FLAG_OFF_EMAIL,
-      `${OPT_C_PREFIX}-flagoff-user`,
-      2013,
-    );
-    const db = createIntegrationDb();
-
-    await expect(
-      createProfileWithLimitCheck(
-        db,
-        accountId,
-        { displayName: 'Child', birthYear: 2014 },
-        { adultOwnerGateEnabled: false },
-      ),
-    ).resolves.toMatchObject({ id: expect.any(String) });
-  });
-});
+      await expect(
+        createProfileWithLimitCheck(
+          db,
+          accountId,
+          { displayName: 'Child', birthYear: OPT_C_ALLOWED_CHILD_BIRTH_YEAR },
+          { adultOwnerGateEnabled: false },
+        ),
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+  },
+);
