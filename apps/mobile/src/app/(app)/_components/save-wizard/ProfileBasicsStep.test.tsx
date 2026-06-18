@@ -61,6 +61,7 @@ jest.mock(
     ...jest.requireActual('../../../../lib/preview-onboarding-state'),
     setPreviewState: jest.fn().mockResolvedValue(undefined),
     getPreviewState: jest.fn().mockResolvedValue(null),
+    clearPreviewState: jest.fn().mockResolvedValue(undefined),
   }),
 );
 
@@ -111,6 +112,7 @@ describe('ProfileBasicsStep', () => {
     // call 2 (child POST): mockFetch throws UpstreamError with PROFILE_LIMIT_EXCEEDED.
     async function renderAndSubmitChildSave() {
       const onComplete = jest.fn();
+      const onExitWizard = jest.fn();
       const upgradeMessage =
         'Your subscription does not support additional profiles. Please upgrade to Family or Pro.';
 
@@ -134,6 +136,7 @@ describe('ProfileBasicsStep', () => {
           target="child"
           previewState={basePreviewState}
           onComplete={onComplete}
+          onExitWizard={onExitWizard}
         />,
         { wrapper: Wrapper },
       );
@@ -157,11 +160,11 @@ describe('ProfileBasicsStep', () => {
 
       fireEvent.press(screen.getByTestId('save-basics-continue'));
 
-      return { onComplete, upgradeMessage };
+      return { onComplete, onExitWizard, upgradeMessage };
     }
 
     it('[WI-824] fires upgrade alert and NOT inline child error on PROFILE_LIMIT_EXCEEDED', async () => {
-      const { upgradeMessage } = await renderAndSubmitChildSave();
+      const { onExitWizard, upgradeMessage } = await renderAndSubmitChildSave();
 
       // (a) platformAlert (Alert.alert) called with upgrade copy and "See plans" button.
       await waitFor(() => {
@@ -182,8 +185,11 @@ describe('ProfileBasicsStep', () => {
       expect(buttons[0]?.style).toBe('cancel');
       expect(buttons[1]?.text).toBe('See plans');
 
-      // Pressing "See plans" routes to the subscription screen.
+      // Pressing "See plans" must EXIT the wizard (markWizardDone) AND route to
+      // subscription. [WI-824 Gate-2] Without the exit the inline SaveWizardGate
+      // stays mounted and masks the pushed route — this is the regression guard.
       buttons[1]?.onPress?.();
+      expect(onExitWizard).toHaveBeenCalledTimes(1);
       expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
 
       // (b) The inline child-error banner must NOT be shown.
@@ -210,6 +216,7 @@ describe('ProfileBasicsStep', () => {
           target="child"
           previewState={basePreviewState}
           onComplete={onComplete}
+          onExitWizard={jest.fn()}
         />,
         { wrapper: Wrapper },
       );
