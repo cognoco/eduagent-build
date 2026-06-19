@@ -426,7 +426,12 @@
       "weeklyEmailDigestTitle": "Tygodniowy e-mail z postępami",
       "monthlyEmailDigestTitle": "Miesięczny e-mail z postępami",
       "emailDigestDescription": "Wysyłane na adres e-mail Twojego konta.",
-      "updateErrorTitle": "Nie można zaktualizować ustawień powiadomień"
+      "updateErrorTitle": "Nie można zaktualizować ustawień powiadomień",
+      "pushMissingPermission": "Zezwól na powiadomienia z tego urządzenia.",
+      "pushMissingServer": "Włącz tutaj powiadomienia push.",
+      "pushMissingToken": "Zarejestruj urządzenie dla powiadomień push.",
+      "openSettingsTitle": "Otwórz Ustawienia",
+      "openSettingsDescription": "Powiadomienia dla tej aplikacji są zablokowane. Włącz je w ustawieniach systemowych."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -3406,6 +3411,12 @@
       "crossContextPromptMessage": "Jesteś w trakcie sesji. Najpierw ją ukończ lub otwórz aktualizację i opuść bieżącą aktywność.",
       "stayHere": "Zostań tutaj",
       "openUpdate": "Otwórz aktualizację"
+    },
+    "guardianPrimer": {
+      "title": "Chcesz być na bieżąco?",
+      "message": "Możemy wysłać delikatne przypomnienie, gdy dziecko będzie potrzebować Twojej uwagi. Możesz to zmienić w dowolnym momencie w Ustawieniach.",
+      "allow": "Zezwól",
+      "notNow": "Nie teraz"
     }
   },
   "myNotes": {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { AppState, Platform } from 'react-native';
@@ -17,6 +17,10 @@ export type PushRegistrationState =
   | { status: 'idle' }
   | { status: 'registered' }
   | { status: 'failed'; reason: PushRegistrationFailure };
+
+export type PushRegistrationHandle = PushRegistrationState & {
+  registerIfAllowed: () => Promise<void>;
+};
 
 function capturePushRegistrationFailure(
   err: unknown,
@@ -47,7 +51,7 @@ function isMissingAndroidFirebaseAppError(err: unknown): boolean {
  * is already granted. Does NOT prompt for permission — notification consent
  * is requested just-in-time by the post-session primer.
  */
-export function usePushTokenRegistration(): PushRegistrationState {
+export function usePushTokenRegistration(): PushRegistrationHandle {
   const registeredProfileToken = useRef<{
     profileId: string;
     token: string;
@@ -173,7 +177,7 @@ export function usePushTokenRegistration(): PushRegistrationState {
       setState({ status: 'failed', reason: 'unsupported_device' });
       capturePushRegistrationFailure(err, 'unsupported_device');
     }
-  }, [activeProfile?.id, isParentProxy, registerPushToken]);
+  }, [activeProfile?.id, registerPushToken]);
 
   useEffect(() => {
     void registerIfAllowed();
@@ -188,5 +192,12 @@ export function usePushTokenRegistration(): PushRegistrationState {
     return () => sub.remove();
   }, [registerIfAllowed]);
 
-  return state;
+  return useMemo(() => {
+    const handle = { ...state } as PushRegistrationHandle;
+    Object.defineProperty(handle, 'registerIfAllowed', {
+      value: registerIfAllowed,
+      enumerable: false,
+    });
+    return handle;
+  }, [registerIfAllowed, state]);
 }

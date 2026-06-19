@@ -420,7 +420,12 @@
       "weeklyEmailDigestTitle": "Email semanal de progresso",
       "monthlyEmailDigestTitle": "Email mensal de progresso",
       "emailDigestDescription": "Enviado para o email da tua conta.",
-      "updateErrorTitle": "Não foi possível atualizar as configurações de notificação"
+      "updateErrorTitle": "Não foi possível atualizar as configurações de notificação",
+      "pushMissingPermission": "Permitir notificações do seu dispositivo.",
+      "pushMissingServer": "Ative as notificações push aqui.",
+      "pushMissingToken": "Registe este dispositivo para notificações push.",
+      "openSettingsTitle": "Abrir Definições",
+      "openSettingsDescription": "As notificações estão bloqueadas para esta aplicação. Ative-as nas definições do sistema."
     },
     "account": {
       "sectionHeader": "Conta",
@@ -3266,6 +3271,12 @@
       "crossContextPromptMessage": "Você está em uma sessão. Termine-a primeiro ou abra a atualização e saia do fluxo atual.",
       "stayHere": "Ficar aqui",
       "openUpdate": "Abrir atualização"
+    },
+    "guardianPrimer": {
+      "title": "Quer ficar a par?",
+      "message": "Podemos enviar um lembrete quando uma criança precisar da sua atenção. Pode alterar isto a qualquer momento nas Definições.",
+      "allow": "Permitir",
+      "notNow": "Agora não"
     }
   },
   "myNotes": {

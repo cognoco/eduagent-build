@@ -61,6 +61,7 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
           `child-paywall-notified-at-${id}`,
           `permissionSetupSeen_${id}`,
           `notificationFirstAskShown_${id}`,
+          `guardianNotificationAskShown_${id}`,
           `voice-input-mode-${id}`,
           `accentPreset_${id}`,
           `mentomate_parent_home_seen_${id}`,
