@@ -1335,6 +1335,44 @@ describe('SignInScreen', () => {
       expect(screen.queryByTestId('sign-in-oauth-retry')).toBeNull();
       expect(screen.queryByTestId('sign-in-oauth-cancel')).toBeNull();
     });
+
+    // [AUTH-08] Retry path: after a transient setActive failure on the OAuth
+    // account-linking path, pressing "Try Again" must re-call setActive with
+    // the SAME preserved sessionId (not null, not a re-issued one). Closure
+    // proof for WI-870 — the browser sweep can reach the failure banner but
+    // cannot drive a deterministic success-on-retry.
+    it('[AUTH-08] OAuth retry re-calls setActive with the same sessionId after a transient failure', async () => {
+      Object.defineProperty(Platform, 'OS', {
+        value: 'android',
+        configurable: true,
+        writable: true,
+      });
+      mockStartSSOFlow.mockResolvedValue({
+        createdSessionId: 'sess_google_retry_88',
+      });
+      // First setActive throws; the retry press succeeds.
+      mockSetActive
+        .mockRejectedValueOnce(new Error('clerk activation boom'))
+        .mockResolvedValueOnce(undefined);
+
+      render(<SignInScreen />);
+      fireEvent.press(screen.getByTestId('google-sso-button'));
+
+      await waitFor(() => {
+        screen.getByTestId('sign-in-oauth-retry');
+      });
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('sign-in-oauth-retry'));
+      });
+
+      await waitFor(() => {
+        expect(mockSetActive).toHaveBeenCalledTimes(2);
+        expect(mockSetActive).toHaveBeenNthCalledWith(2, {
+          session: 'sess_google_retry_88',
+        });
+      });
+    });
   });
 });
 
