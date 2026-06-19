@@ -352,8 +352,8 @@ Quota model (verified `apps/api/src/services/subscription.ts:43-118`): free 100/
 | --- | --- | --- | --- | --- | --- |
 | QA-01 | Quick smoke check | launch / sign-in / home | — | — | `e2e/flows/quick-check.yaml` |
 | QA-02 | Post-auth comprehensive smoke | broad post-login sweep | — | — | `e2e/flows/post-auth-comprehensive-devclient.yaml` |
-| QA-03 | Chat classifier regression (easter/suggestion) | chat → create-subject | — | — | `regression/bug-233-chat-classifier-easter.yaml` |
-| QA-04 | Chat subject picker regression | chat → picker handoff | — | — | `regression/bug-234-chat-subject-picker.yaml` |
+| QA-03 | Chat classifier regression (easter/suggestion) | chat → create-subject | — | — | **Closure proof (WI-859, deterministic):** `apps/api/src/services/subject-classify.test.ts`, `apps/api/src/routes/subjects.test.ts`. Smoke/historical only: `regression/bug-233-chat-classifier-easter.yaml`. |
+| QA-04 | Chat subject picker regression | chat → picker handoff | — | — | **Closure proof (WI-859, deterministic):** `apps/mobile/src/components/session/use-subject-classification.test.ts`, `apps/mobile/src/app/(app)/session/index.test.tsx`. Smoke/historical only: `regression/bug-234-chat-subject-picker.yaml`. |
 | QA-05 | Return to chat after subject create | `returnTo=chat` | — | — | `regression/bug-236-subject-returns-to-chat.yaml` |
 | QA-06 | Focused-book generation regression | create-subject focused branch | — | — | `regression/bug-237-focused-book-generation.yaml` |
 | QA-07 | Tab-bar leak regression | app tab shell | — | — | `regression/bug-238-tab-bar-no-leak.yaml` |
