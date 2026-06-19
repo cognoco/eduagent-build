@@ -121,7 +121,6 @@ jest.mock(
 // We use jest.spyOn in beforeEach (after RN is loaded) rather than a
 // jest.mock factory so we can capture the registered listener into a local
 // variable that the test can call.
-// gc1-allow: native-boundary: BackHandler is a platform-specific native module not available in JSDOM
 
 const PlaybackScreen = require('./playback').default as React.ComponentType;
 
@@ -136,9 +135,10 @@ describe('PlaybackScreen', () => {
     jest.clearAllMocks();
     capturedBackHandler = null;
 
-    // Spy on BackHandler.addEventListener to capture the registered callback.
-    // This runs after RN is loaded so the spy targets the actual exported
-    // object rather than relying on a module factory that runs pre-load.
+    // gc1-allow: native-boundary: BackHandler is a platform-specific native
+    // module not available in JSDOM. Spy-based stub (not jest.mock factory)
+    // so we can capture the registered callback into the describe-scoped
+    // variable and fire it from tests.
     const { BackHandler } = jest.requireActual(
       'react-native',
     ) as typeof import('react-native');
