@@ -71,16 +71,11 @@ once per round.
 
 Never call a PR with a red required check "green."
 
-**Phase 7 — Stop at the green PR; hand off.** Once the PR is green by Phase 6, **STOP.**
-**Do NOT merge the PR, and do NOT run `/cosmo:execute complete`.** At this rung those two acts —
-merging to `main` and finalizing the item to `Stage=Reviewing` — are done by the program (us), not
-by you. Report the green PR up: its number, the head commit, and a one-line "ready" note. Then move
-to Phase 8. (Why the hard stop: merging and finalizing are the privileges of the *next* rung; for
-now you hand a clean, green PR to the program and we take it from there.)
+**Phase 7 — Stop at the green PR; hand off.** Once the PR is green by Phase 6, **MERGE.**
+**Do merge the PR, and run `/cosmo:execute complete`.** At this rung those two acts —
+merging to `main` and finalizing the item to `Stage=Reviewing` — are done by you.
 
-**Phase 8 — Arm the review monitor and shepherd the verdict.** After you hand off, the program
-merges your PR and moves the item to `Stage=Reviewing`; the separate automated reviewer then checks
-it. Arm a monitor (next two sections) so the verdict wakes you, and react to it. Do **not** consider
+**Phase 8 — Arm the review monitor and shepherd the verdict.**  Arm a monitor (next two sections) so the verdict wakes you, and react to it. Do **not** consider
 the WI done at hand-off — a green PR earns the review, it does not close the item.
 
 ---

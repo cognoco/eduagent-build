@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-811a-b4d9-efc8e9376dac",
+  "id": "WI-864",
+  "name": "[LEARN-50] Align Challenge Round docs/status and add deterministic mobile surface proof",
+  "description": "LEARN-50 needs current Challenge Round docs/status alignment plus deterministic proof of the mobile typed-state surface under the existing runtime flag.",
+  "acceptanceCriteria": "Align LEARN-50 docs/status with current code and add/cite deterministic mobile-surface proof. Docs must state that Challenge Round is API-flag-gated by CHALLENGE_ROUND_RUNTIME_ENABLED=false, mobile renders only typed server fields, and no flag flip is in scope. Correct stale drafted-note wording: current server finalization calls validateNoteDraft() before emitting a drafted note and falls back when grounding fails. Evidence must cover offer accept/decline/don't-ask, active banner, drafted-note review/save/skip, typed SSE/done payload handling, schema grounding requirements, answer-event validation, conservative mastery decision, needs-deepening persistence, and concept-capture remaining parked/gated off. Variants: flag off vs server-emitted typed fields; offered/active/drafting/complete/declined; all-solid vs partial/missing/misconception; invalid answerEventId; grounded vs ungrounded note draft; concept-capture disabled. Expected files include flow docs, mobile session/SSE tests, challenge component tests, session-exchange tests, challenge-round service tests, and schemas tests. This is current-state proof/docs only, not the learner-pull Challenge Round redesign.",
+  "riskImpact": "P0 V2 learning status gap: Challenge Round readiness cannot be judged cleanly while docs/status and runtime gating are out of sync.",
+  "type": "Documentation",
+  "altitude": "Item",
+  "priority": "P0",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Auto",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
