@@ -93,6 +93,9 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.account.profile')}
         value={displayName}
+        // '/profiles' is a TOP-LEVEL route (app/profiles.tsx), NOT under the
+        // (app) group — so '/(app)/profiles' would be a dead route. The cast
+        // types the correct top-level path.
         onPress={() => router.push('/profiles' as Href)}
         testID="account-admin-profile"
       />

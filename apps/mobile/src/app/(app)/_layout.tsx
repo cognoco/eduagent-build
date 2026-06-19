@@ -94,6 +94,7 @@ const HIDDEN_TAB_ROUTES = [
   'practice',
   'shelf',
   'subject',
+  'subject-hub',
   'pick-book',
   'child',
   'my-notes',
