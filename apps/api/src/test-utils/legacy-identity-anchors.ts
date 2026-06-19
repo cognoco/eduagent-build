@@ -8,12 +8,17 @@ import {
   organization,
   person,
   profiles,
+  subscriptions,
   type Database,
 } from '@eduagent/database';
 
 const tableExistsCache = new Map<string, boolean>();
 
-type LegacyIdentityTableName = 'accounts' | 'profiles' | 'family_links';
+type LegacyIdentityTableName =
+  | 'accounts'
+  | 'profiles'
+  | 'family_links'
+  | 'subscriptions';
 
 async function tableExists(db: Database, table: LegacyIdentityTableName) {
   const cached = tableExistsCache.get(table);
@@ -74,6 +79,36 @@ export async function ensureLegacyProfileAnchorForTest(
       })
       .onConflictDoNothing();
   }
+}
+
+export async function ensureLegacySubscriptionAnchorForTest(
+  db: Database,
+  input: {
+    subscriptionId: string;
+    accountId: string;
+    tier?: 'free' | 'plus' | 'family' | 'pro';
+    status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+    stripeSubscriptionId?: string | null;
+    stripeCustomerId?: string | null;
+    currentPeriodStart?: Date | null;
+    currentPeriodEnd?: Date | null;
+  },
+): Promise<void> {
+  if (!(await tableExists(db, 'subscriptions'))) return;
+
+  await db
+    .insert(subscriptions)
+    .values({
+      id: input.subscriptionId,
+      accountId: input.accountId,
+      stripeCustomerId: input.stripeCustomerId ?? null,
+      stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+      tier: input.tier ?? 'free',
+      status: input.status ?? 'active',
+      currentPeriodStart: input.currentPeriodStart ?? null,
+      currentPeriodEnd: input.currentPeriodEnd ?? null,
+    })
+    .onConflictDoNothing();
 }
 
 export async function deleteLegacyAccountsForTest(

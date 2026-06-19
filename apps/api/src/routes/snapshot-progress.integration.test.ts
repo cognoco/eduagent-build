@@ -28,9 +28,15 @@ import {
 import { mockClerkJWKS } from '../../../../tests/integration/external-mocks';
 import { ERROR_CODES } from '@eduagent/schemas';
 import {
+  accounts,
+  generateUUIDv7,
+  guardianship,
+  membership,
   milestones,
   notificationLog,
+  person,
   progressSnapshots,
+  profiles,
 } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 
@@ -45,6 +51,10 @@ const TEST_ENV = buildIntegrationEnv();
 
 const AUTH_USER_ID = 'integration-snapshot-progress-user';
 const AUTH_EMAIL = 'integration-snapshot-progress@integration.test';
+
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
 
 const nativeFetch = globalThis.fetch;
 installFetchInterceptor();
@@ -98,7 +108,48 @@ async function clearProgressSnapshots(profileId: string): Promise<void> {
 // [F-144] Creates a second profile on the SAME account — the first profile is
 // the owner, so the second is a non-owner child. Used to exercise the proxy
 // (X-Profile-Id = child, authed as owner) path on GET /progress/milestones.
-async function createChildProfile(): Promise<{ id: string }> {
+async function createChildProfile(owner: {
+  id: string;
+  accountId: string;
+}): Promise<{ id: string }> {
+  if (isIdentityV2Enabled()) {
+    const db = createIntegrationDb();
+    const childId = generateUUIDv7();
+    const birthYear = new Date().getFullYear() - 14;
+
+    await db
+      .insert(accounts)
+      .values({
+        id: owner.accountId,
+        clerkUserId: AUTH_USER_ID,
+        email: AUTH_EMAIL,
+      })
+      .onConflictDoNothing();
+    await db.insert(person).values({
+      id: childId,
+      displayName: 'Snapshot Progress Child',
+      birthDate: `${birthYear}-01-01`,
+      residenceJurisdiction: 'US',
+    });
+    await db.insert(membership).values({
+      personId: childId,
+      organizationId: owner.accountId,
+      roles: ['learner'],
+    });
+    await db.insert(guardianship).values({
+      guardianPersonId: owner.id,
+      chargePersonId: childId,
+    });
+    await db.insert(profiles).values({
+      id: childId,
+      accountId: owner.accountId,
+      displayName: 'Snapshot Progress Child',
+      birthYear,
+      isOwner: false,
+    });
+    return { id: childId };
+  }
+
   const profile = await createProfileViaRoute({
     app,
     env: TEST_ENV,
@@ -526,8 +577,8 @@ describe('Integration: snapshot-progress routes', () => {
   // covered in snapshot-aggregation.integration.test.ts).
   // -------------------------------------------------------------------------
   it('[F-144] proxy read of child milestones does NOT backfill (mutate) the child rows', async () => {
-    await createOwnerProfile();
-    const { id: childId } = await createChildProfile();
+    const owner = await createOwnerProfile();
+    const { id: childId } = await createChildProfile(owner);
 
     // Child is behind on milestones: 5 sessions, zero milestone rows.
     await seedSnapshotWithSessions(childId, 5);

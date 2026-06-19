@@ -189,7 +189,6 @@ describe('Integration: GET /v1/dashboard', () => {
       'Test Child',
       2004,
     );
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     // Create a subject for the child so dashboard has data
     const subjectId = await createSubjectForProfile(
@@ -201,6 +200,7 @@ describe('Integration: GET /v1/dashboard', () => {
 
     // Seed a session so session counts are non-zero
     await seedSession(childProfileId, subjectId);
+    await seedFamilyLink(parentProfileId, childProfileId);
 
     // Now request dashboard as parent
     const res = await app.request(
@@ -339,7 +339,6 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       'Test Child',
       2004,
     );
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const subjectId = await createSubjectForProfile(
       CHILD_USER_ID,
@@ -352,6 +351,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       exchangeCount: 8,
       wallClockSeconds: 1800,
     });
+    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions`,
@@ -433,7 +433,6 @@ describe('Parent Visibility break tests', () => {
       'Test Child',
       2004,
     );
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const subjectId = await createSubjectForProfile(
       CHILD_USER_ID,
@@ -445,6 +444,7 @@ describe('Parent Visibility break tests', () => {
     const sessionId = await seedSession(childProfileId, subjectId, {
       exchangeCount: 2,
     });
+    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}/transcript`,
@@ -539,7 +539,6 @@ describe('Parent Visibility functional tests', () => {
       'Test Child',
       2004,
     );
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const subjectId = await createSubjectForProfile(
       CHILD_USER_ID,
@@ -548,6 +547,7 @@ describe('Parent Visibility functional tests', () => {
       'Mathematics',
     );
     await seedSession(childProfileId, subjectId);
+    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       '/v1/dashboard',
@@ -582,7 +582,6 @@ describe('Parent Visibility functional tests', () => {
       'Test Child',
       2004,
     );
-    await seedFamilyLink(parentProfileId, childProfileId);
 
     const subjectId = await createSubjectForProfile(
       CHILD_USER_ID,
@@ -593,6 +592,7 @@ describe('Parent Visibility functional tests', () => {
     const sessionId = await seedSession(childProfileId, subjectId, {
       exchangeCount: 5,
     });
+    await seedFamilyLink(parentProfileId, childProfileId);
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/sessions/${sessionId}`,
