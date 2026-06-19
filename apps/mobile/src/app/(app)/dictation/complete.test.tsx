@@ -105,21 +105,25 @@ jest.mock('expo-file-system/legacy', () => ({
   EncodingType: { Base64: 'base64' },
 }));
 
-// DictationData context — valid session
+// DictationData context — configurable per-test
 const mockSetData = jest.fn();
 const COMPLETION_KEY = '00000000-0000-4000-8000-000000000001';
-const mockValidSession = {
+const defaultSession = {
   completionKey: COMPLETION_KEY,
   sentences: [{ text: 'The quick brown fox.' }],
   language: 'en',
   mode: 'surprise' as const,
 };
+// mutable so individual tests can override to null (missing-context state)
+let mockSessionData: typeof defaultSession | null = defaultSession;
 
 jest.mock(
   './_layout' /* gc1-allow: layout depends on expo-router Stack and native theme — cannot render in JSDOM */,
   () => ({
     useDictationData: () => ({
-      data: mockValidSession,
+      get data() {
+        return mockSessionData;
+      },
       setData: mockSetData,
       clear: jest.fn(),
     }),
@@ -147,6 +151,7 @@ describe('DictationCompleteScreen', () => {
     mockReviewIsPending = false;
     mockRecordIsPending = false;
     mockReviewReset.mockReset();
+    mockSessionData = defaultSession;
     mockLaunchCameraResult = { canceled: true };
     delete (global as any).__focusEffectCleanup;
     // Restore default implementations that jest.clearAllMocks() wipes.
@@ -168,6 +173,88 @@ describe('DictationCompleteScreen', () => {
     getByTestId('dictation-complete-screen');
     getByTestId('complete-check-writing');
     getByTestId('complete-done');
+  });
+
+  // -----------------------------------------------------------------------
+  // [DICT-06] Missing-context guard: data=null must NOT POST /dictation/result
+  // -----------------------------------------------------------------------
+
+  it('[DICT-06 F-020] missing-context renders dictation-complete-missing-data without POSTing result', () => {
+    // Simulate landing on /dictation/complete via deep-link or back gesture
+    // with no active session (data=null). The screen must show the recovery
+    // state and must NOT call recordResult.mutateAsync (which would POST a
+    // fake 0-sentence entry to the user's history).
+    mockSessionData = null;
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    getByTestId('dictation-complete-missing-data');
+    expect(mockRecordMutateAsync).not.toHaveBeenCalled();
+  });
+
+  // -----------------------------------------------------------------------
+  // [DICT-06] complete-done POST payload: sentenceCount must be included
+  // -----------------------------------------------------------------------
+
+  it('[DICT-06] complete-done posts sentenceCount matching the session sentences', async () => {
+    mockRecordMutateAsync.mockResolvedValueOnce(undefined);
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-done'));
+      await Promise.resolve();
+    });
+
+    expect(mockRecordMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completionKey: COMPLETION_KEY,
+        reviewed: false,
+        sentenceCount: 1, // defaultSession has 1 sentence
+      }),
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // [DICT-06] Review spinner visible and cancel navigates away
+  // -----------------------------------------------------------------------
+
+  it('[DICT-06] shows review spinner (ActivityIndicator) while isReviewing=true', () => {
+    // The check-writing overlay renders while the review mutation is in flight.
+    // We confirm the cancel button is visible (overlaid on the spinner state).
+    mockReviewIsPending = true;
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    // The cancel button is inside the reviewing overlay — its presence
+    // confirms the spinner UI is rendered.
+    getByTestId('review-cancel');
+    // The primary "done" / "check writing" buttons must NOT be visible.
+    expect(
+      (() => {
+        try {
+          getByTestId('complete-done');
+          return true;
+        } catch {
+          return false;
+        }
+      })(),
+    ).toBe(false);
+  });
+
+  it('[DICT-06] review-cancel navigates to practice via goBackOrReplace', () => {
+    // Cancel during the check-writing spinner must call goBackOrReplace so
+    // the back stack is preserved (not hard-replaced) when the user has a
+    // navigation history above practice.
+    mockReviewIsPending = true;
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    fireEvent.press(getByTestId('review-cancel'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/practice',
+    );
   });
 
   it('[WI-84 DS-115] reuses the session completionKey when recording unreviewed results', async () => {
