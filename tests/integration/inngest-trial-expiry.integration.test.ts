@@ -22,7 +22,11 @@ import {
   subscriptions,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
 import { mockExpoPush } from './external-mocks';
 import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
@@ -64,7 +68,7 @@ async function seedAccountWithOwnerProfile(input: {
   // @> '{admin}') and findExpiredTrialsV2 (subscription v2 table) under flag-ON.
   // Deterministic reseed: organization.id = account.id, person.id = profile.id.
   // Self-inerting under flag-OFF (the v2 reads are never reached).
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+  if (isIdentityV2Enabled()) {
     await db.insert(organization).values({
       id: account!.id,
       name: `Seed org ${account!.id.slice(0, 8)}`,
@@ -128,7 +132,7 @@ async function seedSubscriptionWithQuota(input: {
   // billing-v2 reads under flag-ON. REUSES subscription.id so quota_pools
   // (quota_pools.subscription_id → subscriptions) still resolves against the
   // legacy row; the v2 row shares the same PK. Self-inerting under flag-OFF.
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+  if (isIdentityV2Enabled()) {
     await db.insert(subscriptionV2).values({
       id: subscription!.id,
       organizationId: input.accountId,
@@ -167,7 +171,7 @@ async function loadSubscription(
   // `subscription` row (status→expired / planTier→free); the legacy
   // `subscriptions` row is only an FK-parent anchor (WI-788) and is NOT updated
   // by the v2 path. Read back the store the function actually wrote.
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
+  if (isIdentityV2Enabled()) {
     const row = await db.query.subscription.findFirst({
       where: eq(subscriptionV2.id, id),
     });
@@ -233,10 +237,7 @@ function dateAtUtcNoon(offsetDays: number): Date {
 //   from membership (the v2 person↔org link) before the organization delete
 //   removes those membership rows.
 async function cleanupV2Rows(accountIds: string[]): Promise<void> {
-  if (
-    process.env['IDENTITY_V2_ENABLED'] !== 'true' ||
-    accountIds.length === 0
-  ) {
+  if (!isIdentityV2Enabled() || accountIds.length === 0) {
     return;
   }
   const db = createIntegrationDb();

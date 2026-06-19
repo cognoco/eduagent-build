@@ -18,11 +18,11 @@ import {
   subjects,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import {
   cloneTopicFromChild,
   undoCloneFromChild,

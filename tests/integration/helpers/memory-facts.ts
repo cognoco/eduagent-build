@@ -14,10 +14,7 @@ import {
 } from '@eduagent/database';
 
 import { buildBackfillRowsForProfile } from '../../../apps/api/src/services/memory/backfill-mapping';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
+import { isIdentityV2Enabled } from '../helpers';
 
 const seededAccountIds = new Set<string>();
 

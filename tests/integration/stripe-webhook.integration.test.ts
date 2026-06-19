@@ -26,6 +26,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
@@ -96,10 +97,6 @@ function nextSeed(prefix: string) {
     clerkUserId,
     stripeSubscriptionId: `sub_${suffix}`,
   };
-}
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
 }
 
 async function cleanupSeededAccounts(): Promise<void> {

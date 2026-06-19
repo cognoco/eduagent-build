@@ -31,7 +31,11 @@ import {
   xpLedger,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import {
   clearFetchCalls,
   getFetchCalls,
@@ -148,7 +152,7 @@ async function seedScenario(options?: {
     })
     .returning();
 
-  if (process.env.IDENTITY_V2_ENABLED === 'true') {
+  if (isIdentityV2Enabled()) {
     await ensureV2IdentityForLegacyProfileTest(db, {
       accountId: account!.id,
       profileId: profile!.id,

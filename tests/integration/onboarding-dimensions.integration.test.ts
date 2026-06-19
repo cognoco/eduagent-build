@@ -19,6 +19,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import {
@@ -34,10 +35,6 @@ const USER_A_CLERK_ID = 'integration-onb-dim-user-a';
 const USER_A_EMAIL = 'integration-onb-dim-a@integration.test';
 const USER_B_CLERK_ID = 'integration-onb-dim-user-b';
 const USER_B_EMAIL = 'integration-onb-dim-b@integration.test';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 async function createProfileForUser(
   userId: string,
