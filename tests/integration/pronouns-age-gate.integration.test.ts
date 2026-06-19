@@ -18,13 +18,19 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { consentStates, profiles, familyLinks } from '@eduagent/database';
+import { profiles } from '@eduagent/database';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
+import {
+  buildAuthHeaders,
+  createProfileViaRoute,
+  seedDirectChildProfileForTest,
+  seedFamilyLinkForTest,
+  setProfileConsentStatusForTest,
+} from './route-fixtures';
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
@@ -45,15 +51,17 @@ function birthYearAge(age: number): number {
  */
 async function forceConsented(profileId: string): Promise<void> {
   const db = createIntegrationDb();
-  await db.delete(consentStates).where(eq(consentStates.profileId, profileId));
-  await db.insert(consentStates).values({
+  const [profile] = await db
+    .select({ accountId: profiles.accountId })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
+  if (!profile) throw new Error(`Profile ${profileId} not found`);
+
+  await setProfileConsentStatusForTest({
     profileId,
-    consentType: 'GDPR',
+    accountId: profile.accountId,
     status: 'CONSENTED',
     parentEmail: 'parent@wi278.test.invalid',
-    consentToken: `wi278-consented-${profileId}`,
-    respondedAt: new Date(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 }
 
@@ -85,18 +93,13 @@ describe('Integration: WI-278 — pronouns SELF route age gate', () => {
     // Insert a child profile directly (age 12 — below PRONOUNS_PROMPT_MIN_AGE=13).
     // birthYearAge(12) = currentYear - 12, which gives year-only age 12.
     const db = createIntegrationDb();
-    const [childRow] = await db
-      .insert(profiles)
-      .values({
-        accountId: ownerProfile.accountId,
-        displayName: 'WI278 Child Under13',
-        birthYear: birthYearAge(12),
-        isOwner: false,
-      })
-      .returning({ id: profiles.id, accountId: profiles.accountId });
-
-    if (!childRow) throw new Error('Child profile insert failed');
-    const childId = childRow.id;
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId: ownerProfile.id,
+      accountId: ownerProfile.accountId,
+      displayName: 'WI278 Child Under13',
+      birthYear: birthYearAge(12),
+    });
+    const childId = child.id;
 
     // Set child consent to CONSENTED so the consent middleware passes —
     // we want to isolate the AGE gate specifically.
@@ -163,22 +166,16 @@ describe('Integration: WI-278 — pronouns SELF route age gate', () => {
     });
 
     // Insert child under-13 on same account.
-    const db = createIntegrationDb();
-    const [childRow] = await db
-      .insert(profiles)
-      .values({
-        accountId: parentProfile.accountId,
-        displayName: 'WI278 Child for Parent Route',
-        birthYear: birthYearAge(10),
-        isOwner: false,
-      })
-      .returning({ id: profiles.id });
-
-    if (!childRow) throw new Error('Child profile insert failed');
-    const childId = childRow.id;
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId: parentProfile.id,
+      accountId: parentProfile.accountId,
+      displayName: 'WI278 Child for Parent Route',
+      birthYear: birthYearAge(10),
+    });
+    const childId = child.id;
 
     // Create family link so assertOwnerAndParentAccess passes.
-    await db.insert(familyLinks).values({
+    await seedFamilyLinkForTest({
       parentProfileId: parentProfile.id,
       childProfileId: childId,
     });

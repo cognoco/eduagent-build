@@ -212,6 +212,23 @@ export async function generateCategorizedBookSuggestions(
         return { kind: 'short_circuit', outcome: 'lock_loser' };
       }
 
+      const [freshSubject] = await tx
+        .select({
+          lastAttemptedAt: subjects.bookSuggestionsLastGenerationAttemptedAt,
+        })
+        .from(subjects)
+        .where(
+          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+        )
+        .limit(1);
+      if (!freshSubject) {
+        return { kind: 'short_circuit', outcome: 'no_subject' };
+      }
+      const freshLast = freshSubject.lastAttemptedAt;
+      if (freshLast && Date.now() - freshLast.getTime() < COOLDOWN_MS) {
+        return { kind: 'short_circuit', outcome: 'cooldown' };
+      }
+
       const unpickedNow = await tx
         .select({ id: bookSuggestions.id })
         .from(bookSuggestions)
@@ -285,8 +302,8 @@ export async function generateCategorizedBookSuggestions(
   );
 
   if (phase1.kind === 'short_circuit') {
-    if (phase1.outcome === 'lock_loser') {
-      emitFailureMetric(profileId, subjectId, 'lock_loser');
+    if (phase1.outcome !== 'success') {
+      emitFailureMetric(profileId, subjectId, phase1.outcome);
     }
     return phase1.outcome;
   }

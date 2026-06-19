@@ -18,12 +18,15 @@
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
+import { createProfileViaRoute } from './route-fixtures';
 import { buildAuthHeaders, signExpiredJWT } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
 
 const AUTH_CLERK_USER_ID = 'integration-auth-user';
 const AUTH_EMAIL = 'integration-auth@integration.test';
+const AUTH_STUB_USER_ID = 'auth-stub-test-user';
+const AUTH_STUB_EMAIL = 'stub@test.test';
 const TEST_ENV = buildIntegrationEnv();
 
 // ---------------------------------------------------------------------------
@@ -76,18 +79,38 @@ describe('Integration: Auth chain — public paths', () => {
   });
 
   it('POST /v1/auth/register returns 404 with valid token (route deleted)', async () => {
-    const res = await app.request(
-      '/v1/auth/register',
-      {
-        method: 'POST',
-        headers: buildAuthHeaders({
-          sub: 'auth-stub-test-user',
-          email: 'stub@test.test',
-        }),
-      },
-      TEST_ENV,
-    );
-    expect(res.status).toBe(404);
+    await cleanupAccounts({
+      emails: [AUTH_STUB_EMAIL],
+      clerkUserIds: [AUTH_STUB_USER_ID],
+    });
+
+    try {
+      await createProfileViaRoute({
+        app,
+        env: TEST_ENV,
+        user: { userId: AUTH_STUB_USER_ID, email: AUTH_STUB_EMAIL },
+        displayName: 'Auth Stub',
+        birthYear: 2000,
+      });
+
+      const res = await app.request(
+        '/v1/auth/register',
+        {
+          method: 'POST',
+          headers: buildAuthHeaders({
+            sub: AUTH_STUB_USER_ID,
+            email: AUTH_STUB_EMAIL,
+          }),
+        },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(404);
+    } finally {
+      await cleanupAccounts({
+        emails: [AUTH_STUB_EMAIL],
+        clerkUserIds: [AUTH_STUB_USER_ID],
+      });
+    }
   });
 
   it('/v1/consent/respond skips authentication', async () => {

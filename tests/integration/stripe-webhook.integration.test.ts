@@ -50,6 +50,7 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
+import { ensureLegacyProfileAnchorForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const mockKvPut = jest.fn().mockResolvedValue(undefined);
@@ -158,6 +159,15 @@ async function seedAccount(prefix: string) {
         email: identity.email,
       })
       .onConflictDoNothing();
+    await ensureLegacyProfileAnchorForTest(db, {
+      profileId: personId,
+      accountId,
+      displayName: 'Stripe Webhook Owner',
+      birthYear: 1985,
+      isOwner: true,
+      email: identity.email,
+      clerkUserId: identity.clerkUserId,
+    });
 
     return {
       db,

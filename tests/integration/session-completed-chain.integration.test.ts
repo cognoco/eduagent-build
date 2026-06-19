@@ -68,6 +68,7 @@ jest.mock('@sentry/cloudflare', () => ({
 }));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const AUTH_USER_ID = 'integration-session-completed-user';
 const AUTH_EMAIL = 'integration-session-completed@integration.test';
@@ -146,6 +147,18 @@ async function seedScenario(options?: {
       isOwner: true,
     })
     .returning();
+
+  if (process.env.IDENTITY_V2_ENABLED === 'true') {
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId: account!.id,
+      profileId: profile!.id,
+      displayName: 'Integration Learner',
+      birthYear: 2000,
+      clerkUserId,
+      email,
+      isOwner: true,
+    });
+  }
 
   const [subject] = await db
     .insert(subjects)

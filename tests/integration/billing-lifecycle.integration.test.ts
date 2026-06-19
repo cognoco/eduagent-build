@@ -12,9 +12,11 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   accounts,
+  generateUUIDv7,
   profileQuotaUsage,
   profiles,
   quotaPools,
+  subscription as subscriptionV2,
   subscriptions,
 } from '@eduagent/database';
 
@@ -72,6 +74,7 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const TEST_ENV = {
@@ -90,22 +93,42 @@ const AUTH_USER_ID = 'integration-billing-user';
 const AUTH_EMAIL = 'integration-billing@integration.test';
 const STRIPE_CURRENT_PERIOD_END = 1_777_680_000;
 
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
+
 async function seedAccount() {
   const db = createIntegrationDb();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
   const [account] = await db
     .insert(accounts)
     .values({
+      id: accountId,
       clerkUserId: AUTH_USER_ID,
       email: AUTH_EMAIL,
     })
     .returning();
 
   await db.insert(profiles).values({
+    id: profileId,
     accountId: account!.id,
     displayName: 'Billing Owner',
     birthYear: 1990,
     isOwner: true,
   });
+
+  if (isIdentityV2Enabled()) {
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId: account!.id,
+      profileId,
+      displayName: 'Billing Owner',
+      birthYear: 1990,
+      clerkUserId: AUTH_USER_ID,
+      email: AUTH_EMAIL,
+      isOwner: true,
+    });
+  }
 
   return account!;
 }
@@ -140,6 +163,36 @@ async function seedSubscription(
         overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z'),
     })
     .returning();
+
+  if (isIdentityV2Enabled()) {
+    const [ownerProfile] = await db
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(
+        and(
+          eq(profiles.accountId, accountId),
+          eq(profiles.isOwner, true),
+          isNull(profiles.archivedAt),
+        ),
+      )
+      .limit(1);
+    if (!ownerProfile) {
+      throw new Error('Owner profile not found for v2 subscription seed');
+    }
+
+    await db.insert(subscriptionV2).values({
+      id: subscription!.id,
+      organizationId: accountId,
+      planTier: tier,
+      status: overrides?.status ?? 'active',
+      payerPersonId: ownerProfile.id,
+      stripeCustomerId: overrides?.stripeCustomerId ?? 'cus_existing',
+      stripeSubscriptionId: overrides?.stripeSubscriptionId ?? 'sub_existing',
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt:
+        overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z'),
+    });
+  }
 
   const [quotaPool] = await db
     .insert(quotaPools)
@@ -205,6 +258,25 @@ async function loadAccount() {
 
 async function loadSubscription(accountId: string) {
   const db = createIntegrationDb();
+  if (isIdentityV2Enabled()) {
+    const row = await db.query.subscription.findFirst({
+      where: eq(subscriptionV2.organizationId, accountId),
+    });
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      accountId: row.organizationId,
+      tier: row.planTier,
+      status: row.status,
+      stripeCustomerId: row.stripeCustomerId,
+      stripeSubscriptionId: row.stripeSubscriptionId,
+      trialEndsAt: row.trialEndsAt,
+      currentPeriodStart: row.periodStartAt,
+      currentPeriodEnd: row.periodEndAt,
+      cancelledAt: row.cancelledAt,
+    };
+  }
+
   return db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, accountId),
   });

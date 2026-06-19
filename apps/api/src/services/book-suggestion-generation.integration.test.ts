@@ -66,6 +66,22 @@ async function seedSubject(profileId: string, name: string) {
   return subject!;
 }
 
+async function waitForCooldownReservation(subjectId: string) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const [row] = await db
+      .select({
+        lastAttemptedAt: subjects.bookSuggestionsLastGenerationAttemptedAt,
+      })
+      .from(subjects)
+      .where(eq(subjects.id, subjectId))
+      .limit(1);
+    if (row?.lastAttemptedAt) return;
+    await new Promise((res) => setTimeout(res, 25));
+  }
+  throw new Error('Timed out waiting for cooldown reservation to commit.');
+}
+
 async function cleanup() {
   const rows = await db
     .select({ id: accounts.id })
@@ -209,18 +225,19 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     };
     llmFixture.setChatResponse(JSON.parse(slowResponse));
 
+    let firstPromise:
+      | ReturnType<typeof generateCategorizedBookSuggestions>
+      | undefined;
     try {
       // Start first call — it enters Phase 1 (commits cooldown reservation),
       // then awaits the 250ms LLM call.
-      const firstPromise = generateCategorizedBookSuggestions(
+      firstPromise = generateCategorizedBookSuggestions(
         db,
         profile.id,
         subject.id,
       );
 
-      // Give Phase 1 time to commit before firing the second call. 50ms is
-      // generous for a local DB.
-      await new Promise((res) => setTimeout(res, 50));
+      await waitForCooldownReservation(subject.id);
 
       // Second call: should observe the committed cooldown reservation row
       // and exit early ('cooldown') without entering Phase 1.
@@ -240,6 +257,7 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     } finally {
       // Restore the original chat to avoid leaking the delay into other tests.
       baseProvider.chat = originalChat;
+      await firstPromise?.catch(() => undefined);
     }
   }, 30_000);
 });
