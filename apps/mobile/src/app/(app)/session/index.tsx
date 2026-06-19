@@ -797,12 +797,11 @@ function SessionScreenInner() {
   );
 
   // T25: V2 "mentor-is-the-app" turn-1 subject resolution — flag-gated and
-  // scoped to the mentor freeform entry. Drives non-blocking, no-grid subject
+  // scoped to the mentor entry (both freeform questions and homework/camera
+  // launched from the mentor bar). Drives non-blocking, no-grid subject
   // resolution in useSubjectClassification and relaxes the composer gate below.
   const isV2MentorEntry =
-    FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
-    entrySource === 'mentor' &&
-    effectiveMode === 'freeform';
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
 
   const {
     handleResolveSubject,

@@ -37,11 +37,13 @@ export interface UseSubjectClassificationOptions {
   subjectId: string | undefined;
   effectiveMode: string;
 
-  // T25: V2 "mentor-is-the-app" entry. When true (flag on + mentor freeform
-  // entry), turn-1 subject resolution never opens the full subject-library
-  // grid and never blocks: confident picks keep the override chip visible,
-  // ambiguous picks show narrow inline disambiguation, and a classifier
-  // suggestion is created silently.
+  // T25: V2 "mentor-is-the-app" entry. When true (flag on + mentor entry,
+  // freeform OR homework/camera), turn-1 subject resolution never opens the
+  // full subject-library grid and never blocks: confident picks keep the
+  // override chip visible, ambiguous picks show narrow inline disambiguation.
+  // Freeform creates a classifier suggestion silently; homework (durable
+  // evidence + OCR-misread risk) instead offers a tap-to-create card and only
+  // falls back to enrolled quick-picks + type-to-create as a last resort.
   isV2MentorEntry: boolean;
 
   // Data
@@ -707,6 +709,107 @@ export function useSubjectClassification(
               } catch {
                 // Fall through to no-subject chat only when both classifiers fail.
               }
+            }
+          } else if (isV2MentorEntry) {
+            // T25 (homework/camera): a mentor-entry homework turn never opens
+            // the full subject-library grid and never blocks. Homework writes
+            // durable evidence and OCR can misread, so — unlike freeform — we
+            // never create a subject silently: a zero-match suggestion is a
+            // tap-to-create card, and the genuine no-signal floor offers the
+            // learner's own subjects plus type-to-create.
+            const suggested = result.suggestedSubjectName ?? null;
+
+            if (result.candidates.length > 1) {
+              // Several subjects are an equally good bet — narrow chips.
+              const narrowCandidates = result.candidates
+                .slice(0, 3)
+                .map((candidate) => ({
+                  subjectId: candidate.subjectId,
+                  subjectName: candidate.subjectName,
+                }));
+              setShowWrongSubjectChip(false);
+              openSubjectResolutionForTurn(
+                text,
+                `This sounds like it could be ${narrowCandidates
+                  .map((candidate) => candidate.subjectName)
+                  .join(' or ')}. Which one are we working on?`,
+                narrowCandidates,
+              );
+              return;
+            }
+
+            const best = result.candidates[0];
+            if (best) {
+              // A single enrolled-subject match — auto-pick, keep the override
+              // chip so a mis-match is one tap to fix.
+              setClassifiedSubject({
+                subjectId: best.subjectId,
+                subjectName: best.subjectName,
+              });
+              setShowWrongSubjectChip(true);
+              sessionSubjectId = best.subjectId;
+              sessionSubjectName = best.subjectName;
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: createLocalMessageId('ai'),
+                  role: 'assistant',
+                  content: `Looks like ${best.subjectName}.`,
+                  isSystemPrompt: true,
+                },
+              ]);
+              // Fall through to continueWithMessage below.
+            } else {
+              setShowWrongSubjectChip(false);
+              if (suggested) {
+                // Zero match but a concrete name — narrow tap-to-create card
+                // (no grid, no silent create).
+                openSubjectResolutionForTurn(
+                  text,
+                  `This looks like ${suggested}. Tap "+ ${suggested}" to add it, or pick one of yours.`,
+                  [],
+                  suggested,
+                );
+                return;
+              }
+              // Zero match and no name — ask the richer resolver for
+              // new-subject cards before falling to the floor.
+              try {
+                const resolveResult = await resolveSubject.mutateAsync({
+                  rawInput: text,
+                });
+                if (
+                  resolveResult.resolvedName ||
+                  resolveResult.suggestions.length > 0
+                ) {
+                  openSubjectResolutionForTurn(
+                    text,
+                    resolveResult.displayMessage ||
+                      'Pick a subject that fits, or create your own.',
+                    [],
+                    resolveResult.resolvedName,
+                    resolveResult.suggestions ?? [],
+                  );
+                  return;
+                }
+              } catch {
+                // Fall through to the floor when the resolver also fails.
+              }
+              // Tier-5 floor: no signal at all. Offer the learner's own
+              // subjects as quick-picks plus type-to-create — non-blocking,
+              // and only as a last resort, never the turn-1 default. With no
+              // enrolled subjects this collapses to type-to-create only.
+              openSubjectResolutionForTurn(
+                text,
+                availableSubjects.length > 0
+                  ? 'Which subject is this? Pick one of yours, or type a new one.'
+                  : "Which subject is this? Type it and I'll set it up.",
+                availableSubjects.map((candidate) => ({
+                  subjectId: candidate.id,
+                  subjectName: candidate.name,
+                })),
+              );
+              return;
             }
           } else {
             const subjectCandidates =
