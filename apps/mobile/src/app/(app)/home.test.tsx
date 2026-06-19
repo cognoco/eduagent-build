@@ -449,21 +449,30 @@ describe('HomeScreen WI-270: proxy mode — notice ack write is suppressed', () 
     mockNavigationHomeScreen = 'LearnerHome';
     mockNavigationIsParentProxy = true;
     mockNavigationSessionIsOwner = true;
-    // Wire a dashboard response with a pending notice so the 5s ack timer fires.
-    mockFetch.setRoute('/dashboard', () => ({
-      data: {
-        children: [],
-        pendingNotices: [
-          {
-            id: 'notice-001',
-            type: 'consent_archived',
-            childName: 'Emma',
-            archivedAt: '2026-01-01T00:00:00.000Z',
+    // Wire a real dashboard response (empty children + a pending notice) so the
+    // 5s ack timer path is reached. Shape must match DashboardData exactly —
+    // the API returns the object unwrapped, and pendingNotices uses
+    // { id, type, payload: { childName }, createdAt } (see schemas/progress.ts).
+    // The handler is URL-aware: /dashboard/demo returns notice-free demo data,
+    // so if the empty-children demo-fallback bug regressed the notice would be
+    // dropped (single route matcher uses url.includes — /dashboard/demo also
+    // matches '/dashboard', so demo MUST be handled here explicitly [WI-854]).
+    mockFetch.setRoute('/dashboard', (url: string) =>
+      url.includes('/dashboard/demo')
+        ? { children: [], pendingNotices: [], demoMode: true }
+        : {
+            children: [],
+            pendingNotices: [
+              {
+                id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+                type: 'consent_archived',
+                payload: { childName: 'Emma' },
+                createdAt: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+            demoMode: false,
           },
-        ],
-        demoMode: false,
-      },
-    }));
+    );
   });
 
   afterEach(() => {
@@ -494,6 +503,81 @@ describe('HomeScreen WI-270: proxy mode — notice ack write is suppressed', () 
       expect.objectContaining({ method: 'POST' }),
     );
   });
+});
+
+describe('HomeScreen WI-854 [HOME-15]: empty-child dashboard with a pending consent notice', () => {
+  const NOTICE_ID = '11111111-1111-4111-8111-111111111111';
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockOnAllComplete = null;
+    mockNavigationHomeScreen = 'LearnerHome';
+    mockNavigationIsParentProxy = false;
+    mockNavigationSessionIsOwner = true;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it.each([['consent_archived' as const], ['consent_deleted' as const]])(
+    'non-proxy owner sees the post-grace toast and acks via POST /notices/:id/seen after 5s — %s',
+    async (noticeType) => {
+      // Real dashboard: last child archived/deleted → empty children but a
+      // pending consent notice. The hook must preserve it (no demo fallback) so
+      // the owner toast renders. URL-aware: /dashboard/demo returns notice-free
+      // demo data — if the empty-children demo-fallback bug regressed, the hook
+      // would fetch demo and the notice (hence the toast and the ack POST) would
+      // disappear, failing this test. The single route matcher uses
+      // url.includes, so /dashboard/demo must be handled here explicitly.
+      mockFetch.setRoute('/dashboard', (url: string) =>
+        url.includes('/dashboard/demo')
+          ? { children: [], pendingNotices: [], demoMode: true }
+          : {
+              children: [],
+              pendingNotices: [
+                {
+                  id: NOTICE_ID,
+                  type: noticeType,
+                  payload: { childName: 'Emma' },
+                  createdAt: '2026-01-01T00:00:00.000Z',
+                },
+              ],
+              demoMode: false,
+            },
+      );
+
+      const owner = createTestProfile({
+        id: 'p1',
+        displayName: 'Alex',
+        isOwner: true,
+      });
+      const { wrapper } = createScreenWrapper({
+        activeProfile: owner,
+        profiles: [owner],
+      });
+
+      render(<HomeScreen />, { wrapper });
+
+      // The owner sees the post-grace consent notice toast.
+      await waitFor(() => {
+        expect(screen.getByTestId('post-grace-notice-toast')).toBeTruthy();
+      });
+
+      // After the 5s dwell, the non-proxy owner acknowledgement fires.
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining(`/notices/${NOTICE_ID}/seen`),
+          expect.objectContaining({ method: 'POST' }),
+        );
+      });
+    },
+  );
 });
 
 describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {

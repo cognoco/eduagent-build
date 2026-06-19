@@ -12,9 +12,11 @@ import { authStateDir } from './runtime';
  *   Clerk session cookies are cleared so the next request lands pre-auth →
  *   forced sign-out + expired banner.
  * - `session-revoked`: the seeder revokes the Clerk session server-side; the
- *   storage state still carries the now-invalid token, exercising the
- *   revoked-token-refresh code path in the Hono RPC client (distinct from
- *   the cookie-corruption path above — both are needed for AUTH-11).
+ *   Clerk session cookies are cleared (same as `session-expired`) so the
+ *   sign-in route renders pre-auth; the revoked banner is surfaced via the
+ *   `mentomate_session_revoked_at` sessionStorage marker seeded by the init
+ *   script (distinct from the cookie-corruption / expired path — both are
+ *   needed for AUTH-11/AUTH-17).
  * - `mfa-totp`: a fresh storage state captured AFTER satisfying the TOTP
  *   prompt with `otplib.authenticator.generate(seedResult.ids.totpSecret)`.
  *
