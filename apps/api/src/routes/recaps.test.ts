@@ -9,20 +9,20 @@
  * Pattern: follows profiles.test.ts and notes.test.ts.
  */
 
-jest.mock(
-  '../services/recaps' /* gc1-allow: unit-route isolation; real service covered by integration tests */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/recaps',
-    ) as typeof import('../services/recaps');
-    return {
-      ...actual,
-      listRecapsForParent: jest.fn(),
-      listRecapsForProfile: jest.fn(),
-      getRecapForParent: jest.fn(),
-    };
-  },
-);
+// GC6 canonical pattern: spread jest.requireActual and override only the
+// service functions that hit the DB, keeping the route-layer test isolated
+// without a full-replace internal mock (no gc1-allow escape needed).
+jest.mock('../services/recaps', () => {
+  const actual = jest.requireActual(
+    '../services/recaps',
+  ) as typeof import('../services/recaps');
+  return {
+    ...actual,
+    listRecapsForParent: jest.fn(),
+    listRecapsForProfile: jest.fn(),
+    getRecapForParent: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 
