@@ -27,13 +27,13 @@ const STATE_GLYPH: Record<TopicStatusRowProps['state'], string> = {
   later: '○',
 };
 
-const STATE_I18N_KEY: Record<TopicStatusRowProps['state'], string> = {
+const STATE_I18N_KEY = {
   'continue-now': 'library.topicStatusRow.stateContinueNow',
   started: 'library.topicStatusRow.stateStarted',
   'up-next': 'library.topicStatusRow.stateUpNext',
   done: 'library.topicStatusRow.stateDone',
   later: 'library.topicStatusRow.stateLater',
-};
+} as const;
 
 export function TopicStatusRow({
   state,

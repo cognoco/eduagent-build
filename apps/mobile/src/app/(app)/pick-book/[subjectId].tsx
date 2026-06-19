@@ -34,7 +34,7 @@ const LOADING_MESSAGE_KEYS = [
   'library.pickBook.loadingFinding',
   'library.pickBook.loadingPicking',
   'library.pickBook.loadingAlmost',
-];
+] as const;
 
 const SLOW_LOADING_HINT_MS = 5_000;
 
@@ -342,7 +342,7 @@ export default function PickBookScreen(): React.ReactElement {
           testID="pick-book-loading-animation"
         />
         <Text className="text-body text-text-secondary mt-4">
-          {t(LOADING_MESSAGE_KEYS[loadingMessageIndex])}
+          {t(LOADING_MESSAGE_KEYS[loadingMessageIndex]!)}
         </Text>
         {loadingSlow ? (
           <Text

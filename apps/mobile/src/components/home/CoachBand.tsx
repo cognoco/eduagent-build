@@ -28,9 +28,9 @@ export function CoachBand({
   onDismiss,
   now,
 }: CoachBandProps) {
+  const { t } = useTranslation();
   const resolvedEyebrow = eyebrow ?? getTimeAwareEyebrow(t, now);
   const colors = useThemeColors();
-  const { t } = useTranslation();
   if (!headline) return null;
 
   return (

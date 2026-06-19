@@ -14,6 +14,7 @@ import {
 import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -180,10 +181,7 @@ function hasSSOProviders(factors: unknown[] | null | undefined): boolean {
   );
 }
 
-function describeVerificationStrategy(
-  strategy: string,
-  t: (key: string) => string,
-): string {
+function describeVerificationStrategy(strategy: string, t: TFunction): string {
   switch (strategy) {
     case 'webauthn':
       return t('auth.signIn.strategyWebauthn');
@@ -200,7 +198,7 @@ function describeVerificationStrategy(
 
 function formatUnsupportedVerificationMessage(
   strategies: string[],
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: TFunction,
 ): string {
   if (strategies.length === 0) {
     return t('auth.signIn.unsupportedMethodGeneric');
