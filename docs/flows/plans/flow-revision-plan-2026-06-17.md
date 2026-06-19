@@ -24,6 +24,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 
 **P0 issue-map update 2026-06-19:** BILLING-13 is resolved by `WI-853`; the remaining 22 P0 pass-with-issues rows are grouped into 12 Cosmo issue clusters so shared blockers are visible before further implementation: `WI-854` HOME-15, `WI-855` SUBJECT-20, `WI-856` ACCOUNT-32/38, `WI-857` QA-02/15, `WI-858` SUBJECT-06/22, `WI-859` QA-03/04, `WI-860` QA-05/06/07, `WI-861` HOMEWORK-08/09, `WI-862` QUIZ-02/16, `WI-863` DICT-03/05/06, `WI-864` LEARN-50, and `WI-865` CC-05.
 
+**P1 issue-map update 2026-06-19:** Remaining V2-primary P1 pass-with-issues rows are grouped into three Cosmo issue clusters under Flow Remediation: `WI-870` AUTH-03/05/06/08/09 auth-provider handoffs, `WI-871` ACCOUNT-17/19/20/21/22/24/25/26/27 + QA-09/12 consent handoffs, and `WI-872` PARENT-01/02/03/14/16/17/22/24/25 + QA-08 parent/family branch coverage.
+
 ## Purpose
 
 Walk every flow in the inventory, log normal defects as Cosmo issues (fixing only truly big blocking items — see Section 1), and update the inventory document where descriptions have drifted. **Total scope: 280 numbered flows across the inventory's 9 content sections + an open-ended discovery register for flows missing from the inventory.**
@@ -201,13 +203,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | AUTH-01 | App launch and auth gate | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-02 | Sign up with email/password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-03 | Sign-up email verification: verify, resend, change email, back; setActive-failure retry preserves sessionId | ⚠️ | Pass w/ issues |  |  | Email verification UI reached; real mailbox/provider completion not available in browser sweep. |
+| AUTH-03 | Sign-up email verification: verify, resend, change email, back; setActive-failure retry preserves sessionId | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-19 | P1 issue mapped: add deterministic auth-provider handoff coverage for email verification, resend/change-email, and setActive retry beyond browser smoke. |
 | AUTH-04 | Sign in with email/password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-05 | Additional verification | ⚠️ | Pass w/ issues |  |  | Password-reset entry and recovery copy reached; real email handoff not completed in sweep. |
-| AUTH-06 | Forgot/reset password | ⚠️ | Pass w/ issues |  |  | MFA/device-change surfaces partially reached; provider/security challenge branch needs real Clerk event. |
+| AUTH-05 | Additional verification | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-19 | P1 issue mapped with AUTH-03/06/08/09: provider verification/recovery handoff coverage needed beyond browser smoke. |
+| AUTH-06 | Forgot/reset password | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-19 | P1 issue mapped with AUTH-03/05/08/09: deterministic coverage needed for provider/security challenge branches. |
 | AUTH-07 | Auth screen navigation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-08 | OAuth sign in/up | ⚠️ | Pass w/ issues |  |  | OAuth account-linking path partially covered; provider completion is external to browser sweep. |
-| AUTH-09 | SSO callback completion/fallback/cancel | ⚠️ | Pass w/ issues |  |  | Deep-link landing behavior covered; native handoff branch only partially browser-reachable. |
+| AUTH-08 | OAuth sign in/up | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-19 | P1 issue mapped with AUTH-03/05/06/09: deterministic provider-completion/account-link coverage needed beyond browser smoke. |
+| AUTH-09 | SSO callback completion/fallback/cancel | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-19 | P1 issue mapped with AUTH-03/05/06/08: deterministic callback/fallback/cancel coverage needed for native handoff branches. |
 | AUTH-10 | Sign out | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-11 | Session-expired forced sign-out + re-entry banner | ✅ | Pass | WI-818 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: `mentor-audit-session-expired` lands on `/sign-in` with `session-expired-banner` visible after clearing Clerk session cookie variants. |
 | AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -243,17 +245,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-14 | Terms of service | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-15 | Self mentor memory: item delete/unsuppress, injection toggle, Tell-the-mentor, interest chips, clear-all | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-16 | Child mentor memory | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-17 | Child memory consent prompt | ⚠️ | Pass w/ issues |  |  | Parent handoff/resume path partially covered; real email/deep-link handoff is external. |
+| ACCOUNT-17 | Child memory consent prompt | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped: add deterministic consent handoff/resume coverage for paths still dependent on email/deep-link provider behavior. |
 | ACCOUNT-18 | Subject analogy preference | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-19 | Consent request during underage profile creation | ⚠️ | Pass w/ issues |  |  | Consent invite creation path covered with seeded states; live email delivery not completed. |
-| ACCOUNT-20 | Child → parent handoff phases on `/consent` | ⚠️ | Pass w/ issues |  |  | Guardian consent accept/deny UI covered; real mailbox handoff not completed. |
-| ACCOUNT-21 | Parent email entry / resend / change email | ⚠️ | Pass w/ issues |  |  | Regional denial copy/source path covered; live jurisdiction proof not available. |
-| ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ⚠️ | Pass w/ issues |  |  | Consent-pending state covered; reminder email branch deferred to automation rows. |
+| ACCOUNT-19 | Consent request during underage profile creation | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: seeded invite creation passes, but delivery/return coverage needs deterministic proof. |
+| ACCOUNT-20 | Child → parent handoff phases on `/consent` | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: accept/deny UI is reachable, but mailbox/deep-link handoff coverage remains partial. |
+| ACCOUNT-21 | Parent email entry / resend / change email | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: resend/change-email and regional provider branches need deterministic coverage. |
+| ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: pending state passes, but reminder/delivery branch coverage remains deferred. |
 | ACCOUNT-23 | Consent withdrawn gate | ⚠️ | Pass w/ issues |  |  | Consent expired/cleanup state source-checked; timer-driven expiry not accelerated in browser. |
-| ACCOUNT-24 | Post-approval landing | ⚠️ | Pass w/ issues |  |  | Consent resend/retry surface covered; external delivery branch not completed. |
-| ACCOUNT-25 | Parent consent management: withdraw | ⚠️ | Pass w/ issues |  |  | Consent confirmation screen covered; real email return path partial. |
-| ACCOUNT-26 | Regional consent variants | ⚠️ | Pass w/ issues |  |  | Consent deep-link guard covered through seeded/source path; provider handoff partial. |
-| ACCOUNT-27 | Parent consent deny confirmation | ⚠️ | Pass w/ issues |  |  | Consent invalid/expired link behavior source-checked; no live expired email link. |
+| ACCOUNT-24 | Post-approval landing | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: resend/retry surface is covered, but external delivery/landing proof remains partial. |
+| ACCOUNT-25 | Parent consent management: withdraw | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: withdrawal confirmation passes, but return-link/provider proof remains partial. |
+| ACCOUNT-26 | Regional consent variants | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: seeded/source guard covered; provider handoff variants need deterministic coverage. |
+| ACCOUNT-27 | Parent consent deny confirmation | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: invalid/expired-link source check exists; live expired-link proof remains missing. |
 | ACCOUNT-28 | App language bottom sheet | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-29 | Mentor language row | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-30 | More under parent-proxy: tab removed ENTIRELY in both nav systems; residual route renders locked panel ONLY | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -453,9 +455,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOMEWORK-10 | Per-problem voice dictation: mic per problem card → `useSpeechRecognition`, transcript appends; on-device, second OS permission… | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-11 | Problem-card editing: OCR split into cards; dropped low-confidence fragments restorable via chip; add/remove cards; 8000-char U… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | HOMEWORK-12 | Close/back semantics: always `router.replace(homeHrefForReturnTo)` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-01 | Parent home mentoring hub | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
-| PARENT-02 | Multi-child dashboard: ≥2 children → family-summary panel | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
-| PARENT-03 | Child detail drill-down: subject mentor-note cards + RecentSessionsList; URL modes default / `?mode=progress` | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-01 | Parent home mentoring hub | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped: complete deterministic parent/family branch coverage for child, notification, and rate-limit paths not force-triggered live. |
+| PARENT-02 | Multi-child dashboard: ≥2 children → family-summary panel | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: multi-child seeded coverage exists, but notification/rate-limit branches need deterministic proof. |
+| PARENT-03 | Child detail drill-down: subject mentor-note cards + RecentSessionsList; URL modes default / `?mode=progress` | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: child detail browser/source coverage exists; edge branches need deterministic proof. |
 | PARENT-04 | Child subject → topic drill-down: skeletons, error+retry, `topics-load-unknown` branch, new-learner empty split, recent-session… | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
 | PARENT-05 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
 | PARENT-06 | Child reports list + monthly detail: monthly + weekly merge w/ pinned latest-weekly hero, NEW badge, next-cron-date empty state… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -465,18 +467,18 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-821 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome partially improved: Recaps list loads rows, but opening a recap still shows We could not load this recap; detail branch remains failing. |
 | PARENT-12 | Child-subject retention badges | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-13 | Child weekly report detail: marks viewed once | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-14 | Learn This Too clone | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-14 | Learn This Too clone | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: seeded/browser coverage exists; child/notification edge branches need deterministic proof. |
 | PARENT-15 | Send-nudge action sheet: 4 templates; consent gate | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-16 | Nudge rate limit: 4 per recipient child per rolling 24h, counted on `toProfileId` regardless of sender, `pg_advisory_xact_lock`… | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
-| PARENT-17 | Child curriculum overview | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-16 | Nudge rate limit: 4 per recipient child per rolling 24h, counted on `toProfileId` regardless of sender, `pg_advisory_xact_lock`… | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: nudge rate-limit branch needs deterministic proof beyond seeded/source coverage. |
+| PARENT-17 | Child curriculum overview | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: child curriculum coverage exists; edge branches need deterministic proof. |
 | PARENT-18 | Child profile settings view | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-19 | Progress-nudge card | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-20 | Learn Together sheet: AddToMyLearning for latest-recap topic | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-21 | Child-cap quota notifications on parent home: dismissible warning banners w/ reset time | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-22 | Family-route blocked gate | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-22 | Family-route blocked gate | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: seeded/source coverage exists; blocked-gate edge branches need deterministic proof. |
 | PARENT-23 | Demo dashboard fallback | ➖ | Removed |  |  | Demo dashboard fallback is not a reliable current end-user Chrome flow; hook/API-testable only. |
-| PARENT-24 | Parent-home ambient layer: household-pulse subtitle, `ParentTransitionNotice` | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
-| PARENT-25 | Progress-tab nudge entry: guardian viewing linked child w/ `nudgeRecommended` → `progress-nudge-cta` opens NudgeActionSheet | ⚠️ | Pass w/ issues |  |  | Covered with seeded browser/source paths; some child/notification/rate-limit branches were not force-triggered live. |
+| PARENT-24 | Parent-home ambient layer: household-pulse subtitle, `ParentTransitionNotice` | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: parent-home ambient coverage exists; notification/transition edge proof remains partial. |
+| PARENT-25 | Progress-tab nudge entry: guardian viewing linked child w/ `nudgeRecommended` → `progress-nudge-cta` opens NudgeActionSheet | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: progress-tab nudge entry needs deterministic child/rate-limit proof. |
 
 ---
 
@@ -520,11 +522,11 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-05 | Return to chat after subject create | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped: reconcile existing evidence and update final status if coverage is current. |
 | QA-06 | Focused-book generation regression | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped with QA-05/07: reconcile evidence-backed status. |
 | QA-07 | Tab-bar leak regression | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped with QA-05/06: reconcile evidence-backed status. |
-| QA-08 | Parent add-child regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
-| QA-09 | Consent email URL regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-08 | Parent add-child regression | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-19 | P1 issue mapped with parent/family branch cluster: browser/source checks exist; native/automation branches need deterministic proof. |
+| QA-09 | Consent email URL regression | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: browser/source checks exist; email/deep-link branch proof remains partial. |
 | QA-10 | Dictation full-flow regression | 🚫 | Blocked |  |  | Requires full native dictation camera/audio path. |
 | QA-11 | Quiz full-flow regression | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QA-12 | Consent deny-confirmation | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-12 | Consent deny-confirmation | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-19 | P1 issue mapped with consent handoff cluster: browser/source checks exist; denial/deep-link branch proof remains partial. |
 | QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
 | QA-14 | SSE reconnect | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | QA-15 | Preview/onboarding regression cluster | ⚠️ | Pass w/ issues | WI-857 | ✅ 2026-06-19 | Issue mapped with QA-02: update preview/onboarding coverage away from hidden CTA assumptions. |
