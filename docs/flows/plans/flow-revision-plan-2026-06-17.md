@@ -1,4 +1,4 @@
-> **STATUS: RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-819, WI-820, WI-824, WI-825, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-821, WI-822, WI-823.
+> **STATUS: RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-819, WI-820, WI-822, WI-824, WI-825, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-821, WI-823.
 
 # Mobile App Flow Revision Plan
 
@@ -13,6 +13,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **Remediation update 2026-06-18 (WI-825):** subject-onboarding drift resolved in the inventory and J-09 browser expectations. SUBJECT-05/07/08/18 now distinguish broad topic-interest picker, language setup, and first-focused-subject `/ready` behavior.
 
 **Remediation update 2026-06-19 (WI-820):** QUIZ-18 no-round guard fixed and rerun in Chrome/Playwright. Cold navigation to `/quiz/play` without a round now renders `quiz-play-no-round` recovery controls instead of redirecting into an Internal Server Error.
+
+**Remediation update 2026-06-19 (WI-822):** BILLING-08 family-pool removal path fixed and rerun in Chrome/Playwright. The `mentor-audit-family-pool-members` seed now lands the owner in family context, the family-pool flow exercises a removable child row, and the browser regression confirms confirm/remove/list-refresh behavior.
 
 ## Purpose
 
@@ -484,7 +486,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-05 | Manage billing: native deep link w/ retry + fallback-URL alert | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-06 | Child paywall | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-07 | Daily-quota-exceeded adult path: NO paywall branch | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| BILLING-08 | Family pool section + **member removal** | ❌ | Fail | WI-822 |  | Family pool rendered without expected removable-member controls. |
+| BILLING-08 | Family pool section + **member removal** | ✅ | Pass | WI-822 | ✅ 06-19 | Rerun 2026-06-19 in Chrome/Playwright passed: seeded family owner saw removable child controls, confirmed removal, and the list refreshed with the removed child hidden and the remaining child still visible. |
 | BILLING-09 | Top-up credits | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
 | BILLING-10 | BYOK waitlist | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-11 | Trial banner states | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -574,10 +576,10 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
 | 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 27 ✅, 5 ⚠️, 0 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
-| 7 | Billing and Monetization | 16 | ❌ | Rerun updated 2026-06-18: 10 ✅, 1 ⚠️, 1 ❌, 4 🚫. |
+| 7 | Billing and Monetization | 16 | ⚠️ | Rerun updated 2026-06-19: 11 ✅, 1 ⚠️, 0 ❌, 4 🚫. |
 | 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 189 pass, 61 pass-w/issues, 7 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 190 pass, 61 pass-w/issues, 6 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 
