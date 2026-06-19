@@ -98,9 +98,10 @@ for (const [registryName, scenario] of entries) {
       ).toBeVisible();
       await newContext.close();
       // Verify the seed result is still available for downstream debugging.
-      expect(baseSeeded.email).toBe(
-        scenario.email.replace(/-base-[a-f0-9]+/, ''),
-      );
+      // `seedAndSignIn` appends a random suffix and `buildSeedEmail` hashes
+      // long aliases, so exact email equality is intentionally not stable.
+      expect(baseSeeded.scenario).toBe(scenario.seedScenario);
+      expect(baseSeeded.email).toContain('@example.com');
       return;
     }
 

@@ -1,4 +1,4 @@
-> **STATUS: RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-819, WI-820, WI-824, WI-825, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-821, WI-822, WI-823.
+> **STATUS: RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-824, WI-825, and WI-826; WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-822, WI-823.
 
 # Mobile App Flow Revision Plan
 
@@ -13,6 +13,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **Remediation update 2026-06-18 (WI-825):** subject-onboarding drift resolved in the inventory and J-09 browser expectations. SUBJECT-05/07/08/18 now distinguish broad topic-interest picker, language setup, and first-focused-subject `/ready` behavior.
 
 **Remediation update 2026-06-19 (WI-820):** QUIZ-18 no-round guard fixed and rerun in Chrome/Playwright. Cold navigation to `/quiz/play` without a round now renders `quiz-play-no-round` recovery controls instead of redirecting into an Internal Server Error.
+
+**Remediation update 2026-06-19 (WI-818):** AUTH-11/AUTH-17 forced re-entry banners rerun in staging Chrome/Playwright. The mentor-audit pre-shell storage-state mutator now clears Clerk's unsuffixed and instance-suffixed session cookies before seeding the expired/revoked banner markers, so both `/sign-in` banner rows render instead of falling through to Home.
 
 ## Purpose
 
@@ -199,13 +201,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-08 | OAuth sign in/up | ⚠️ | Pass w/ issues |  |  | OAuth account-linking path partially covered; provider completion is external to browser sweep. |
 | AUTH-09 | SSO callback completion/fallback/cancel | ⚠️ | Pass w/ issues |  |  | Deep-link landing behavior covered; native handoff branch only partially browser-reachable. |
 | AUTH-10 | Sign out | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-11 | Session-expired forced sign-out + re-entry banner | ❌ | Fail | WI-818 |  | Forced session-expired re-entry banner did not appear as specified. |
+| AUTH-11 | Session-expired forced sign-out + re-entry banner | ✅ | Pass | WI-818 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: `mentor-audit-session-expired` lands on `/sign-in` with `session-expired-banner` visible after clearing Clerk session cookie variants. |
 | AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-13 | Deep-link auth redirect preservation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-14 | Sign-in transition spinner + stuck recovery: 8s | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-15 | Welcome intro | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-16 | Not-found catch-all with recovery | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-17 | Session-REVOKED banner | ❌ | Fail | WI-818 |  | Revoked-session re-entry banner did not appear as specified. |
+| AUTH-17 | Session-REVOKED banner | ✅ | Pass | WI-818 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: `mentor-audit-session-revoked` lands on `/sign-in` with `session-revoked-banner` visible after clearing Clerk session cookie variants. |
 | AUTH-18 | OAuth stuck-spinner watchdog | 🚫 | Blocked |  |  | Requires native OAuth custom tab/AppState transition; not testable in Chrome-only sweep. |
 
 ---
@@ -568,7 +570,7 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Auth and Access | 18 | ❌ | Updated 2026-06-18: 10 ✅, 5 ⚠️, 2 ❌, 1 🚫. |
+| 1 | Auth and Access | 18 | ⚠️ | Rerun updated 2026-06-19: 12 ✅, 5 ⚠️, 0 ❌, 1 🚫. |
 | 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-18: 30 ✅, 19 ⚠️, 0 ❌, 2 🚫. |
 | 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ➖. |
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
@@ -577,7 +579,7 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 | 7 | Billing and Monetization | 16 | ❌ | Rerun updated 2026-06-18: 10 ✅, 1 ⚠️, 1 ❌, 4 🚫. |
 | 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 189 pass, 61 pass-w/issues, 7 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 191 pass, 61 pass-w/issues, 5 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 
