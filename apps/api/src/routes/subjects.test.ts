@@ -82,6 +82,7 @@ import {
   getSubject,
   updateSubject,
   retryCurriculumForSubject,
+  SubjectLimitError,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
@@ -284,6 +285,19 @@ describe('POST /v1/subjects', () => {
     const res = await makeApp().request('/v1/subjects', validCreateBody());
 
     expect(res.status).toBe(500);
+  });
+
+  it('[WI-855] returns 409 SUBJECT_LIMIT_EXCEEDED when the service throws SubjectLimitError', async () => {
+    createSubjectWithStructureMock.mockRejectedValue(new SubjectLimitError());
+
+    const res = await makeApp().request('/v1/subjects', validCreateBody());
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: ERROR_CODES.SUBJECT_LIMIT_EXCEEDED,
+      message: expect.any(String),
+    });
   });
 });
 

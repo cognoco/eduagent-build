@@ -424,6 +424,12 @@ export const ERROR_CODES = {
   LLM_UNAVAILABLE: 'LLM_UNAVAILABLE',
   RATE_LIMITED: 'RATE_LIMITED',
   PROFILE_LIMIT_EXCEEDED: 'PROFILE_LIMIT_EXCEEDED',
+  // [WI-855 / SUBJECT-20] Blocking hard-limit gate on total subjects per profile
+  // (PRD: 25 total active+paused+archived). Routed as HTTP 409 Conflict — a flat
+  // per-profile cap, NOT subscription-owned (subjects are not tier-gated, unlike
+  // PROFILE_LIMIT_EXCEEDED which is 402). Mobile branches on this stable code
+  // instead of regexing the English error message.
+  SUBJECT_LIMIT_EXCEEDED: 'SUBJECT_LIMIT_EXCEEDED',
   INVALID_IDEMPOTENCY_KEY: 'INVALID_IDEMPOTENCY_KEY',
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
