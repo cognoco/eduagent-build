@@ -110,6 +110,22 @@ afterEach(() => {
   nextScopedRepoSetup = {};
 });
 
+// [WI-855] createSubject now opens a cap-locked transaction on the broad/narrow/
+// language paths. Attach a no-op `execute` (advisory lock SQL) and a
+// `transaction` that runs the callback against the SAME db so the in-lock
+// recount reads the configured rows. Returns the db typed as Database.
+function withCapTransaction<T extends object>(db: T): Database {
+  const withTx = db as T & {
+    execute?: jest.Mock;
+    transaction?: jest.Mock;
+  };
+  if (!withTx.execute) withTx.execute = jest.fn().mockResolvedValue(undefined);
+  withTx.transaction = jest.fn(
+    async (fn: (tx: unknown) => unknown): Promise<unknown> => fn(withTx),
+  );
+  return withTx as unknown as Database;
+}
+
 function createMockDb({
   insertReturning = [] as ReturnType<typeof mockSubjectRow>[],
   updateReturning = [] as ReturnType<typeof mockSubjectRow>[],
@@ -118,7 +134,7 @@ function createMockDb({
   bookSuggestion = null as { id: string } | null,
   bookSuggestions = [] as Array<{ subjectId: string }>,
 } = {}): Database {
-  return {
+  const db: Record<string, unknown> = {
     query: {
       subjects: createSubjectQueryMocks(),
       curriculumBooks: {
@@ -142,7 +158,15 @@ function createMockDb({
         }),
       }),
     }),
-  } as unknown as Database;
+    // [WI-855] createSubject now wraps its insert in a cap-locked transaction;
+    // the mock runs the callback against the SAME db (so the in-lock recount
+    // reads the configured subject rows) and no-ops the advisory-lock SQL.
+    execute: jest.fn().mockResolvedValue(undefined),
+  };
+  // Assigned after construction so `db` is not referenced in its own initializer
+  // (avoids the implicit-any self-reference TS error).
+  db['transaction'] = jest.fn(async (fn: (tx: unknown) => unknown) => fn(db));
+  return db as unknown as Database;
 }
 
 function extractSqlTextAndValues(
@@ -694,7 +718,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
         .fn()
         .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
     }));
-    const db = {
+    const db = withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
         subjects: createSubjectQueryMocks(),
@@ -705,7 +729,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       insert: jest.fn(() => ({
         values: insertValues,
       })),
-    } as unknown as Database;
+    });
 
     const result = await createSubjectWithStructure(db, uuidProfileId, {
       name: 'History',
@@ -771,7 +795,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
         .fn()
         .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
     }));
-    const db = {
+    const db = withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
         subjects: createSubjectQueryMocks(),
@@ -782,7 +806,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       insert: jest.fn(() => ({
         values: insertValues,
       })),
-    } as unknown as Database;
+    });
 
     const result = await createSubjectWithStructure(db, uuidProfileId, {
       name: 'History',
@@ -933,7 +957,7 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
         .fn()
         .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
     }));
-    const db = {
+    const db = withCapTransaction({
       query: {
         subjects: createSubjectQueryMocks(),
         curricula: {
@@ -941,13 +965,53 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
         },
       },
       insert: jest.fn(() => ({ values: insertValues })),
-    } as unknown as Database;
+    });
 
     await expect(
       createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
     ).resolves.toEqual(
       expect.objectContaining({ structureType: expect.any(String) }),
     );
+
+    detectSpy.mockRestore();
+    ageSpy.mockRestore();
+  });
+
+  it('closes the TOCTOU: throws at the in-lock recount even when the pre-check passed', async () => {
+    // Pre-check sees 24 (under cap → passes), but by the time the cap lock is
+    // held a concurrent insert has landed, so the in-lock recount sees 25 and
+    // must throw. Simulate by returning 24 on the first findMany (pre-check)
+    // and 25 on the second (in-lock recount).
+    const under = manySubjectRows(MAX_TOTAL_SUBJECTS - 1);
+    const atCap = manySubjectRows(MAX_TOTAL_SUBJECTS);
+    const findMany = jest
+      .fn()
+      .mockResolvedValueOnce(under) // cheap pre-check
+      .mockResolvedValue(atCap); // authoritative in-lock recount
+    setupScopedRepo({ findManyMock: findMany });
+    const detectSpy = jest
+      .spyOn(bookGeneration, 'detectSubjectType')
+      .mockRejectedValue(new Error('LLM unavailable'));
+    const ageSpy = jest
+      .spyOn(profileService, 'getProfileAge')
+      .mockResolvedValue(11);
+    const db = withCapTransaction({
+      query: {
+        subjects: createSubjectQueryMocks(),
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+      },
+      insert: jest.fn(() => {
+        throw new Error('insert must not run once the in-lock recount throws');
+      }),
+    });
+
+    await expect(
+      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+    ).rejects.toBeInstanceOf(SubjectLimitError);
+    // The pre-check + the in-lock recount were both consulted.
+    expect(findMany.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     detectSpy.mockRestore();
     ageSpy.mockRestore();
@@ -979,7 +1043,7 @@ describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
         .fn()
         .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
     }));
-    return {
+    return withCapTransaction({
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap.
         subjects: createSubjectQueryMocks(),
@@ -988,7 +1052,7 @@ describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
         },
       },
       insert: jest.fn(() => ({ values: insertValues })),
-    } as unknown as Database;
+    });
   }
 
   beforeEach(() => {
