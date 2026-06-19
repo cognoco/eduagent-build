@@ -1097,6 +1097,8 @@ describe('processRecallTest', () => {
       ([table]) => table,
     );
     expect(updateTables).toContain(xpLedger);
+    // book rows must not be mutated on the decay path (regression guard)
+    expect(updateTables).not.toContain(curriculumBooks);
     const xpLedgerUpdateIdx = updateTables.indexOf(xpLedger);
     const xpLedgerSetCalls = (db.update as jest.Mock).mock.results[
       xpLedgerUpdateIdx

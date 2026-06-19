@@ -2,8 +2,10 @@ import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { handleReviewCalibrationGrade } from './review-calibration-grade';
 import { xpLedger } from '@eduagent/database';
 
-// gc1-allow: step DB boundary — getStepDatabase() calls neon-serverless which
-// requires a real DATABASE_URL; not exercisable in Jest's Node env.
+// Pattern A (jest.requireActual spread): only getStepDatabase is overridden —
+// it calls neon-serverless which needs a real DATABASE_URL, not exercisable in
+// Jest's Node env. The spread keeps every other helper export real, so no GC1
+// escape is needed.
 const mockGetStepDatabase = jest.fn();
 jest.mock('../helpers', () => {
   const actual = jest.requireActual(
