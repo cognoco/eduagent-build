@@ -11,11 +11,11 @@ Do not use `octopus_3d_animation_rig.svg` as a style reference. It is a hand-red
 
 ## Source Findings
 
-- Canvas/viewBox: `0 0 1042 1024`.
-- `octo-mate.svg` has `1585` paths.
+- Canvas/viewBox: `0 0 1042 1068`.
+- `octo-mate.svg` has `1587` paths after the lower-arm tip repair.
 - `octo-mate.svg` includes the gray/white checkerboard as real SVG paths.
-- `octo-mate-animation-source.svg` keeps `105` colored/dark mascot paths and removes the checkerboard paths.
-- Mascot occupied bounds from `octo-mate.png`: `x=32..1021`, `y=12..1023`, about `990x1012`.
+- `octo-mate-animation-source.svg` keeps `105` colored/dark mascot paths, adds `2` lower-arm tip repair paths, and removes the checkerboard paths.
+- Mascot occupied bounds from `octo-mate.png` plus the repair overlay: `x=32..1021`, `y=12..1060`, about `990x1048`.
 
 ## Visual Invariants
 

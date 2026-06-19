@@ -3307,13 +3307,17 @@
   },
   "createProfile": {
     "titleChild": "Fortell oss om barnet ditt",
+    "titleParent": "Fortell oss om deg",
     "titleSelf": "Hvem er det som skal lære?",
     "displayNameLabel": "Visningsnavn",
+    "parentDisplayNameLabel": "Ditt visningsnavn",
     "childDisplayNameLabel": "Barnets visningsnavn",
     "birthDateLabel": "Fødselsdato",
+    "parentBirthDateLabel": "Din fødselsdato",
     "childBirthDateLabel": "Barnets fødselsdato",
-    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er 11 år.",
-    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er 11 år.",
+    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er {{age}} år.",
+    "parentBirthDateHint": "Dette er for den voksne som setter opp kontoen. Du kan legge til barnet ditt etterpå. Aldersgrensen er {{age}} år.",
+    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er {{age}} år.",
     "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
     "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
     "selectDob": "Velg fødselsdato",
@@ -3324,6 +3328,8 @@
     "upgradeRequiredTitle": "Oppgradering kreves",
     "upgradeRequiredBody": "Abonnementet ditt støtter ikke flere profiler. Oppgrader til Familie eller Pro.",
     "seePlans": "Se planer",
+    "minimumAgeError": "Elever må være minst {{age}} år gamle. Velg en tidligere fødselsdato.",
+    "parentAdultAgeError": "Foreldrekontoer trenger en voksen fødselsdato. Skriv inn dine egne detaljer først, og legg deretter til barnet ditt.",
     "a11yCloseDatePicker": "Lukk datovelger"
   },
   "clerkGate": {

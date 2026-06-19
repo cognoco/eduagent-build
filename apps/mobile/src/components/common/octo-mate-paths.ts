@@ -6,7 +6,7 @@
 
 export type OctoMatePathPart = 'body' | 'limbs' | 'suckers' | 'face' | 'beanie';
 
-export const OCTO_MATE_SOURCE_VIEWBOX = { width: 1042, height: 1024 } as const;
+export const OCTO_MATE_SOURCE_VIEWBOX = { width: 1042, height: 1068 } as const;
 export const OCTO_MATE_BIRTH_TRANSFORM = 'translate(11 -3) scale(0.19)';
 export const OCTO_MATE_BIRTH_CENTER = { cx: 110, cy: 88, r: 46 } as const;
 
@@ -644,3 +644,21 @@ export const OCTO_MATE_PATHS = [
 ] as const;
 
 export const OCTO_MATE_PATH_COUNT = 105 as const;
+
+// Source repair: the lower viewer-right tentacle in octo-mate.svg reaches the
+// 1024px source canvas edge, so its rounded tip is clipped in the final pose.
+// Keep this as a small overlay instead of mutating the generated extraction.
+export const OCTO_MATE_REPAIR_PATHS = [
+  {
+    id: 'lower-arm-tip-outline',
+    part: 'limbs' as const,
+    fill: '#1E565A',
+    d: '\nM677.410950,1024.616943 \n\tC676.600000,1035.800000 680.800000,1048.300000 689.900000,1055.000000 \n\tC697.800000,1060.800000 709.500000,1059.200000 715.600000,1050.900000 \n\tC720.300000,1044.500000 721.200000,1033.800000 716.000000,1025.000000 \n\tC711.200000,1033.800000 707.400000,1040.000000 702.100000,1042.700000 \n\tC695.500000,1046.100000 688.500000,1042.600000 685.300000,1035.400000 \n\tC683.700000,1031.900000 683.200000,1028.000000 683.957703,1025.000000 \n\tC681.900000,1024.900000 679.800000,1024.800000 677.410950,1024.616943 \nz',
+  },
+  {
+    id: 'lower-arm-tip-fill',
+    part: 'body' as const,
+    fill: '#40A094',
+    d: '\nM686.800000,1025.000000 \n\tC686.900000,1032.800000 690.100000,1040.200000 695.700000,1043.100000 \n\tC700.900000,1045.800000 707.000000,1042.800000 709.700000,1037.100000 \n\tC711.300000,1033.700000 711.000000,1029.200000 709.645569,1025.000000 \n\tC702.400000,1025.000000 694.800000,1025.000000 686.800000,1025.000000 \nz',
+  },
+] as const;

@@ -6,6 +6,8 @@
 // transitively depend on the consent→notifications edge.
 // ---------------------------------------------------------------------------
 
+import { PROFILE_MINIMUM_AGE } from '@eduagent/schemas';
+
 /**
  * Approximate age from birth year using the current UTC calendar year.
  *
@@ -23,7 +25,7 @@ export function calculateAge(birthYear: number): number {
  * WI-570 (data-model.md §2A.5): v1 launch floor is 13+ (was 11+, per "Ages 6-10 Out of Scope"
  * from PRD line 386). Updated in lockstep with birthYearSchema floor in @eduagent/schemas.
  */
-export const MINIMUM_AGE = 13;
+export const MINIMUM_AGE = PROFILE_MINIMUM_AGE;
 
 /**
  * Calculates exact age from a full birth date (year, month 1-based, day) and

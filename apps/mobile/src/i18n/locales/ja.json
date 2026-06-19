@@ -3307,13 +3307,17 @@
   },
   "createProfile": {
     "titleChild": "お子様について教えてください",
+    "titleParent": "あなたについて教えてください",
     "titleSelf": "学習するのはどなたですか？",
     "displayNameLabel": "表示名",
+    "parentDisplayNameLabel": "あなたの表示名",
     "childDisplayNameLabel": "お子様の表示名",
     "birthDateLabel": "生年月日",
+    "parentBirthDateLabel": "あなたの生年月日",
     "childBirthDateLabel": "お子様の生年月日",
-    "birthDateHint": "チューターがあなたに合った話し方をするために必要です。対象年齢は11歳以上です。",
-    "childBirthDateHint": "チューターがお子様に合った話し方をするために必要です。対象年齢は11歳以上です。",
+    "birthDateHint": "チューターがあなたに合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
+    "parentBirthDateHint": "これはアカウントを設定する大人の情報です。次にお子様を追加できます。対象年齢は{{age}}歳以上です。",
+    "childBirthDateHint": "チューターがお子様に合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
     "webDateFormatHint": "生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "childWebDateFormatHint": "お子様の生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "selectDob": "生年月日を選択",
@@ -3324,6 +3328,8 @@
     "upgradeRequiredTitle": "アップグレードが必要です",
     "upgradeRequiredBody": "ご契約のサブスクリプションでは、追加のプロフィールを作成できません。ファミリープランまたはプロプランにアップグレードしてください。",
     "seePlans": "プランを見る",
+    "minimumAgeError": "学習者は{{age}}歳以上である必要があります。より前の生年月日を選択してください。",
+    "parentAdultAgeError": "保護者アカウントには大人の生年月日が必要です。まずご自身の情報を入力し、その後でお子様を追加してください。",
     "a11yCloseDatePicker": "日付ピッカーを閉じる"
   },
   "clerkGate": {

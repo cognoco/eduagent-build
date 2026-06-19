@@ -27,6 +27,7 @@ import {
   OCTO_MATE_BIRTH_CENTER,
   OCTO_MATE_BIRTH_TRANSFORM,
   OCTO_MATE_PATHS,
+  OCTO_MATE_REPAIR_PATHS,
 } from './octo-mate-paths';
 
 let AnimatedCircle: ComponentType<Record<string, unknown>>;
@@ -55,9 +56,39 @@ type MentorBirthAnimationProps = {
 
 const LOGO_PATH = 'M26,166 C26,96 156,92 184,28';
 const LOGO_PATH_LEN = 190;
+const LOGO_MENTOR_NODE = { cx: 184, cy: 28 } as const;
 const VIEWBOX = '-12 -18 254 224';
 const R_FLOOR = 0.1;
 const OP_FLOOR = 0.001;
+
+export const MENTOR_BIRTH_TIMINGS = {
+  timeScale: 1.2,
+  pokeStart: 4540,
+  pokeDrawDuration: 260,
+  pokeRetractDuration: 420,
+  bounceStart: 4880,
+  bounceDuration: 1100,
+  copyStart: 4320,
+  fadeDelay: 6400,
+  touchReleaseDelay: 4200,
+  completionDelay: 7100,
+} as const;
+
+const ANIMATION_TIME_SCALE = MENTOR_BIRTH_TIMINGS.timeScale;
+
+export const MENTOR_BIRTH_POKE_TENTACLE_SOURCE_INDICES = [
+  532, 536, 543, 602, 624, 1006, 1011,
+] as const;
+
+const POKE_TENTACLE_SOURCE_INDEX_SET = new Set<number>(
+  MENTOR_BIRTH_POKE_TENTACLE_SOURCE_INDICES,
+);
+const OCTO_MATE_STATIC_PATHS = OCTO_MATE_PATHS.filter(
+  (path) => !POKE_TENTACLE_SOURCE_INDEX_SET.has(path.sourceIndex),
+);
+const OCTO_MATE_POKE_TENTACLE_PATHS = OCTO_MATE_PATHS.filter((path) =>
+  POKE_TENTACLE_SOURCE_INDEX_SET.has(path.sourceIndex),
+);
 
 const LOGO_DOTS = [
   {
@@ -80,12 +111,91 @@ const LOGO_DOTS = [
   },
 ] as const;
 
+type BirthDotIndex = 0 | 1 | 2;
+
+const DOT_MOTION: Record<
+  BirthDotIndex,
+  {
+    spec: (typeof LOGO_DOTS)[BirthDotIndex];
+    gatherAngle: number;
+    gatherTurns: number;
+    gatherRx: number;
+    gatherRy: number;
+  }
+> = {
+  0: {
+    spec: LOGO_DOTS[0],
+    gatherAngle: -2.6,
+    gatherTurns: 7.1,
+    gatherRx: 64,
+    gatherRy: 34,
+  },
+  1: {
+    spec: LOGO_DOTS[1],
+    gatherAngle: -1.5,
+    gatherTurns: 7.6,
+    gatherRx: 54,
+    gatherRy: 42,
+  },
+  2: {
+    spec: LOGO_DOTS[2],
+    gatherAngle: -0.35,
+    gatherTurns: 8.2,
+    gatherRx: 62,
+    gatherRy: 36,
+  },
+};
+
 const BIRTH_MASCOT = OCTO_MATE_BIRTH_CENTER;
 const C = MASCOT_COLORS;
 
 function lerp(from: number, to: number, t: number) {
   'worklet';
   return from + (to - from) * t;
+}
+
+function time(ms: number) {
+  return Math.round(ms * ANIMATION_TIME_SCALE);
+}
+
+function bounceEnvelope(progress: number) {
+  'worklet';
+  return Math.sin(Math.min(Math.max(progress, 0), 1) * Math.PI);
+}
+
+export function resolveBirthDotPosition(
+  index: BirthDotIndex,
+  gather: number,
+  orbit: number,
+  catchAmount: number,
+  bounce: number,
+  poke: number,
+) {
+  'worklet';
+  const motion = DOT_MOTION[index];
+  const { spec } = motion;
+  const gatherAngle = motion.gatherAngle + orbit * motion.gatherTurns;
+  const gatherCx = BIRTH_MASCOT.cx + Math.cos(gatherAngle) * motion.gatherRx;
+  const gatherCy = BIRTH_MASCOT.cy + Math.sin(gatherAngle) * motion.gatherRy;
+  const settledCx = lerp(
+    lerp(spec.start.cx, gatherCx, gather),
+    spec.final.cx,
+    catchAmount,
+  );
+  const settledCy = lerp(
+    lerp(spec.start.cy, gatherCy, gather),
+    spec.final.cy,
+    catchAmount,
+  );
+  const bounceAmount = index === 2 ? bounceEnvelope(bounce) : 0;
+  const bounceSide = index === 2 ? Math.sin(bounce * Math.PI * 2) * 5 : 0;
+  const pokeAmount = index === 2 ? poke : 0;
+
+  return {
+    cx: settledCx + bounceSide - pokeAmount * 7,
+    cy: settledCy - bounceAmount * 24 + pokeAmount * 2,
+    rScale: 1 + bounceAmount * 0.05 + pokeAmount * 0.12,
+  };
 }
 
 /**
@@ -117,10 +227,12 @@ export function MentorBirthAnimation({
   const studentR = useSharedValue(0);
   const studentOp = useSharedValue(1);
   const mentorNodeR = useSharedValue(0);
+  const mentorNodeTravel = useSharedValue(0);
   const mentorNodeWobble = useSharedValue(1);
   const dot1 = useSharedValue(0);
   const dot2 = useSharedValue(0);
   const dot3 = useSharedValue(0);
+  const dotGather = useSharedValue(0);
   const orbit = useSharedValue(0);
   const bodyR = useSharedValue(0);
   const armsOp = useSharedValue(0);
@@ -128,6 +240,8 @@ export function MentorBirthAnimation({
   const faceOp = useSharedValue(0);
   const beanieP = useSharedValue(0);
   const catchP = useSharedValue(0);
+  const pokeP = useSharedValue(0);
+  const bounceP = useSharedValue(0);
   const copyOp = useSharedValue(0);
   const fade = useSharedValue(1);
 
@@ -148,10 +262,12 @@ export function MentorBirthAnimation({
     studentR.value = 13;
     studentOp.value = 0.2;
     mentorNodeR.value = 0.1;
+    mentorNodeTravel.value = 1;
     mentorNodeWobble.value = 1;
     dot1.value = 1;
     dot2.value = 1;
     dot3.value = 1;
+    dotGather.value = 1;
     orbit.value = 1;
     bodyR.value = BIRTH_MASCOT.r;
     armsOp.value = 1;
@@ -159,6 +275,8 @@ export function MentorBirthAnimation({
     faceOp.value = 1;
     beanieP.value = 1;
     catchP.value = 1;
+    pokeP.value = 0;
+    bounceP.value = 1;
     copyOp.value = 1;
     fade.value = 1;
   }, [
@@ -167,10 +285,12 @@ export function MentorBirthAnimation({
     studentR,
     studentOp,
     mentorNodeR,
+    mentorNodeTravel,
     mentorNodeWobble,
     dot1,
     dot2,
     dot3,
+    dotGather,
     orbit,
     bodyR,
     armsOp,
@@ -178,6 +298,8 @@ export function MentorBirthAnimation({
     faceOp,
     beanieP,
     catchP,
+    pokeP,
+    bounceP,
     copyOp,
     fade,
   ]);
@@ -215,54 +337,100 @@ export function MentorBirthAnimation({
     const pop = { damping: 5, stiffness: 190 };
 
     pathDraw.value = withDelay(
-      120,
-      withTiming(1, { duration: 900, easing: ease }),
+      time(120),
+      withTiming(1, { duration: time(900), easing: ease }),
     );
-    studentR.value = withDelay(220, withSpring(15, spring));
-    mentorNodeR.value = withDelay(920, withSpring(18, spring));
+    studentR.value = withDelay(time(220), withSpring(15, spring));
+    mentorNodeR.value = withDelay(time(920), withSpring(18, spring));
 
     pathDust.value = withDelay(
-      1350,
-      withTiming(1, { duration: 420, easing: sparkEase }),
+      time(1780),
+      withTiming(1, { duration: time(420), easing: sparkEase }),
     );
-    studentOp.value = withDelay(1450, withTiming(0.2, { duration: 360 }));
+    studentOp.value = withDelay(
+      time(1880),
+      withTiming(0.2, { duration: time(360) }),
+    );
 
-    dot1.value = withDelay(1560, withSpring(0.55, pop));
-    dot2.value = withDelay(1660, withSpring(0.55, pop));
-    dot3.value = withDelay(1760, withSpring(0.55, pop));
-    orbit.value = withDelay(1880, withTiming(1, { duration: 760 }));
+    dot1.value = withDelay(time(1120), withSpring(1, pop));
+    dot2.value = withDelay(time(1220), withSpring(1, pop));
+    dot3.value = withDelay(time(1320), withSpring(1, pop));
+    dotGather.value = withDelay(
+      time(1840),
+      withTiming(1, { duration: time(620) }),
+    );
+    orbit.value = withDelay(time(1960), withTiming(1, { duration: time(760) }));
+    mentorNodeTravel.value = withDelay(
+      time(1840),
+      withTiming(1, { duration: time(560), easing: ease }),
+    );
 
     mentorNodeWobble.value = withDelay(
-      2040,
+      time(2260),
       withSequence(
-        withTiming(1.12, { duration: 140 }),
-        withTiming(0.94, { duration: 120 }),
+        withTiming(1.12, { duration: time(140) }),
+        withTiming(0.94, { duration: time(120) }),
         withSpring(1, pop),
       ),
     );
-    bodyR.value = withDelay(2380, withSpring(BIRTH_MASCOT.r, pop));
-    armsOp.value = withDelay(2680, withTiming(1, { duration: 480 }));
-    suckersOp.value = withDelay(3100, withTiming(1, { duration: 280 }));
+    bodyR.value = withDelay(time(2500), withSpring(BIRTH_MASCOT.r, pop));
+    armsOp.value = withDelay(
+      time(2800),
+      withTiming(1, { duration: time(480) }),
+    );
+    suckersOp.value = withDelay(
+      time(3220),
+      withTiming(1, { duration: time(280) }),
+    );
     faceOp.value = withDelay(
-      3360,
+      time(3480),
       withSequence(
-        withTiming(1, { duration: 70 }),
-        withTiming(0.1, { duration: 80 }),
-        withTiming(1, { duration: 130 }),
+        withTiming(1, { duration: time(70) }),
+        withTiming(0.1, { duration: time(80) }),
+        withTiming(1, { duration: time(130) }),
       ),
     );
-    beanieP.value = withDelay(3620, withSpring(1, pop));
-    catchP.value = withDelay(3900, withSpring(1, pop));
-    copyOp.value = withDelay(4200, withTiming(1, { duration: 260 }));
+    beanieP.value = withDelay(time(3740), withSpring(1, pop));
+    catchP.value = withDelay(time(4020), withSpring(1, pop));
+    pokeP.value = withDelay(
+      time(MENTOR_BIRTH_TIMINGS.pokeStart),
+      withSequence(
+        withTiming(1, {
+          duration: time(MENTOR_BIRTH_TIMINGS.pokeDrawDuration),
+          easing: sparkEase,
+        }),
+        withTiming(0, {
+          duration: time(MENTOR_BIRTH_TIMINGS.pokeRetractDuration),
+          easing: ease,
+        }),
+      ),
+    );
+    bounceP.value = withDelay(
+      time(MENTOR_BIRTH_TIMINGS.bounceStart),
+      withTiming(1, {
+        duration: time(MENTOR_BIRTH_TIMINGS.bounceDuration),
+        easing: ease,
+      }),
+    );
+    copyOp.value = withDelay(
+      time(MENTOR_BIRTH_TIMINGS.copyStart),
+      withTiming(1, { duration: time(260) }),
+    );
     fade.value = withDelay(
-      4720,
-      withTiming(1, { duration: 1 }, (finished) => {
+      time(MENTOR_BIRTH_TIMINGS.fadeDelay),
+      withTiming(1, { duration: time(1) }, (finished) => {
         if (finished) runOnJS(done)();
       }),
     );
 
-    const touchRelease = setTimeout(() => setAcceptsTouches(false), 4200);
-    const completionWatchdog = setTimeout(() => done(), 5400);
+    const touchRelease = setTimeout(
+      () => setAcceptsTouches(false),
+      time(MENTOR_BIRTH_TIMINGS.touchReleaseDelay),
+    );
+    const completionWatchdog = setTimeout(
+      () => done(),
+      time(MENTOR_BIRTH_TIMINGS.completionDelay),
+    );
 
     return () => {
       clearTimeout(touchRelease);
@@ -277,10 +445,12 @@ export function MentorBirthAnimation({
     studentR,
     studentOp,
     mentorNodeR,
+    mentorNodeTravel,
     mentorNodeWobble,
     dot1,
     dot2,
     dot3,
+    dotGather,
     orbit,
     bodyR,
     armsOp,
@@ -288,6 +458,8 @@ export function MentorBirthAnimation({
     faceOp,
     beanieP,
     catchP,
+    pokeP,
+    bounceP,
     copyOp,
     fade,
   ]);
@@ -309,10 +481,12 @@ export function MentorBirthAnimation({
       cancelAnimation(studentR);
       cancelAnimation(studentOp);
       cancelAnimation(mentorNodeR);
+      cancelAnimation(mentorNodeTravel);
       cancelAnimation(mentorNodeWobble);
       cancelAnimation(dot1);
       cancelAnimation(dot2);
       cancelAnimation(dot3);
+      cancelAnimation(dotGather);
       cancelAnimation(orbit);
       cancelAnimation(bodyR);
       cancelAnimation(armsOp);
@@ -320,6 +494,8 @@ export function MentorBirthAnimation({
       cancelAnimation(faceOp);
       cancelAnimation(beanieP);
       cancelAnimation(catchP);
+      cancelAnimation(pokeP);
+      cancelAnimation(bounceP);
       cancelAnimation(copyOp);
       cancelAnimation(fade);
     };
@@ -329,10 +505,12 @@ export function MentorBirthAnimation({
     studentR,
     studentOp,
     mentorNodeR,
+    mentorNodeTravel,
     mentorNodeWobble,
     dot1,
     dot2,
     dot3,
+    dotGather,
     orbit,
     bodyR,
     armsOp,
@@ -340,6 +518,8 @@ export function MentorBirthAnimation({
     faceOp,
     beanieP,
     catchP,
+    pokeP,
+    bounceP,
     copyOp,
     fade,
   ]);
@@ -359,7 +539,16 @@ export function MentorBirthAnimation({
   }));
 
   const mentorNodeProps = useAnimatedProps(() => ({
+    cx: lerp(LOGO_MENTOR_NODE.cx, BIRTH_MASCOT.cx, mentorNodeTravel.value),
+    cy: lerp(LOGO_MENTOR_NODE.cy, BIRTH_MASCOT.cy, mentorNodeTravel.value),
     r: Math.max(R_FLOOR, mentorNodeR.value * mentorNodeWobble.value),
+    opacity: Math.max(OP_FLOOR, 1 - Math.min(bodyR.value / 8, 1)),
+  }));
+
+  const mentorNodeCoreProps = useAnimatedProps(() => ({
+    cx: lerp(LOGO_MENTOR_NODE.cx, BIRTH_MASCOT.cx, mentorNodeTravel.value),
+    cy: lerp(LOGO_MENTOR_NODE.cy, BIRTH_MASCOT.cy, mentorNodeTravel.value),
+    r: Math.max(R_FLOOR, mentorNodeR.value * mentorNodeWobble.value * 0.4),
     opacity: Math.max(OP_FLOOR, 1 - Math.min(bodyR.value / 8, 1)),
   }));
 
@@ -395,70 +584,68 @@ export function MentorBirthAnimation({
   } as const;
 
   const dot1Props = useAnimatedProps(() => {
-    const gather = Math.min(dot1.value / 0.55, 1);
-    const catchAmount = catchP.value;
-    const angle = -2.6 + orbit.value * 7.1;
-    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 64;
-    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 34;
+    const dot = resolveBirthDotPosition(
+      0,
+      dotGather.value,
+      orbit.value,
+      catchP.value,
+      bounceP.value,
+      pokeP.value,
+    );
     return {
-      cx: lerp(
-        lerp(LOGO_DOTS[0].start.cx, orbitCx, gather),
-        LOGO_DOTS[0].final.cx,
-        catchAmount,
+      cx: dot.cx,
+      cy: dot.cy,
+      r: Math.max(
+        R_FLOOR,
+        LOGO_DOTS[0].r * Math.min(dot1.value, 1) * dot.rScale,
       ),
-      cy: lerp(
-        lerp(LOGO_DOTS[0].start.cy, orbitCy, gather),
-        LOGO_DOTS[0].final.cy,
-        catchAmount,
-      ),
-      r: Math.max(R_FLOOR, LOGO_DOTS[0].r * Math.min(dot1.value * 1.8, 1)),
       opacity: Math.max(OP_FLOOR, Math.min(dot1.value * 2, 1)),
     };
   });
 
   const dot2Props = useAnimatedProps(() => {
-    const gather = Math.min(dot2.value / 0.55, 1);
-    const catchAmount = catchP.value;
-    const angle = -1.5 + orbit.value * 7.6;
-    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 54;
-    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 42;
+    const dot = resolveBirthDotPosition(
+      1,
+      dotGather.value,
+      orbit.value,
+      catchP.value,
+      bounceP.value,
+      pokeP.value,
+    );
     return {
-      cx: lerp(
-        lerp(LOGO_DOTS[1].start.cx, orbitCx, gather),
-        LOGO_DOTS[1].final.cx,
-        catchAmount,
+      cx: dot.cx,
+      cy: dot.cy,
+      r: Math.max(
+        R_FLOOR,
+        LOGO_DOTS[1].r * Math.min(dot2.value, 1) * dot.rScale,
       ),
-      cy: lerp(
-        lerp(LOGO_DOTS[1].start.cy, orbitCy, gather),
-        LOGO_DOTS[1].final.cy,
-        catchAmount,
-      ),
-      r: Math.max(R_FLOOR, LOGO_DOTS[1].r * Math.min(dot2.value * 1.8, 1)),
       opacity: Math.max(OP_FLOOR, Math.min(dot2.value * 2, 1)),
     };
   });
 
   const dot3Props = useAnimatedProps(() => {
-    const gather = Math.min(dot3.value / 0.55, 1);
-    const catchAmount = catchP.value;
-    const angle = -0.35 + orbit.value * 8.2;
-    const orbitCx = BIRTH_MASCOT.cx + Math.cos(angle) * 62;
-    const orbitCy = BIRTH_MASCOT.cy + Math.sin(angle) * 36;
+    const dot = resolveBirthDotPosition(
+      2,
+      dotGather.value,
+      orbit.value,
+      catchP.value,
+      bounceP.value,
+      pokeP.value,
+    );
     return {
-      cx: lerp(
-        lerp(LOGO_DOTS[2].start.cx, orbitCx, gather),
-        LOGO_DOTS[2].final.cx,
-        catchAmount,
+      cx: dot.cx,
+      cy: dot.cy,
+      r: Math.max(
+        R_FLOOR,
+        LOGO_DOTS[2].r * Math.min(dot3.value, 1) * dot.rScale,
       ),
-      cy: lerp(
-        lerp(LOGO_DOTS[2].start.cy, orbitCy, gather),
-        LOGO_DOTS[2].final.cy,
-        catchAmount,
-      ),
-      r: Math.max(R_FLOOR, LOGO_DOTS[2].r * Math.min(dot3.value * 1.8, 1)),
       opacity: Math.max(OP_FLOOR, Math.min(dot3.value * 2, 1)),
     };
   });
+
+  const pokeTentacleProps = useAnimatedProps(() => ({
+    transform: `translate(${pokeP.value * 92} ${pokeP.value * -30})`,
+  }));
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: fade.value,
@@ -524,31 +711,25 @@ export function MentorBirthAnimation({
               animatedProps={studentProps}
             />
             <AnimatedCircle
-              cx={BIRTH_MASCOT.cx}
-              cy={BIRTH_MASCOT.cy}
+              cx={LOGO_MENTOR_NODE.cx}
+              cy={LOGO_MENTOR_NODE.cy}
               fill={C.tealBright}
               animatedProps={mentorNodeProps}
               testID="mentor-birth-mentor-node"
             />
-
             <AnimatedCircle
-              fill={LOGO_DOTS[0].fill}
-              animatedProps={dot1Props}
-            />
-            <AnimatedCircle
-              fill={LOGO_DOTS[1].fill}
-              animatedProps={dot2Props}
-            />
-            <AnimatedCircle
-              fill={LOGO_DOTS[2].fill}
-              animatedProps={dot3Props}
+              cx={LOGO_MENTOR_NODE.cx}
+              cy={LOGO_MENTOR_NODE.cy}
+              fill={C.mint}
+              animatedProps={mentorNodeCoreProps}
+              testID="mentor-birth-logo-mentor-node"
             />
 
             <AnimatedG
               testID="mentor-birth-mascot"
               transform={OCTO_MATE_BIRTH_TRANSFORM}
             >
-              {OCTO_MATE_PATHS.map((path) => (
+              {OCTO_MATE_STATIC_PATHS.map((path) => (
                 <AnimatedPath
                   key={path.sourceIndex}
                   d={path.d}
@@ -557,7 +738,46 @@ export function MentorBirthAnimation({
                   testID="mentor-birth-canonical-path"
                 />
               ))}
+              <AnimatedG
+                animatedProps={pokeTentacleProps}
+                testID="mentor-birth-poke-tentacle"
+              >
+                {OCTO_MATE_POKE_TENTACLE_PATHS.map((path) => (
+                  <AnimatedPath
+                    key={path.sourceIndex}
+                    d={path.d}
+                    fill={path.fill}
+                    animatedProps={pathPropsByPart[path.part]}
+                    testID="mentor-birth-poke-tentacle-path"
+                  />
+                ))}
+              </AnimatedG>
+              {OCTO_MATE_REPAIR_PATHS.map((path) => (
+                <AnimatedPath
+                  key={path.id}
+                  d={path.d}
+                  fill={path.fill}
+                  animatedProps={pathPropsByPart[path.part]}
+                  testID="mentor-birth-arm-tip-repair"
+                />
+              ))}
             </AnimatedG>
+
+            <AnimatedCircle
+              fill={LOGO_DOTS[0].fill}
+              animatedProps={dot1Props}
+              testID="mentor-birth-dot-pink"
+            />
+            <AnimatedCircle
+              fill={LOGO_DOTS[1].fill}
+              animatedProps={dot2Props}
+              testID="mentor-birth-dot-violet"
+            />
+            <AnimatedCircle
+              fill={LOGO_DOTS[2].fill}
+              animatedProps={dot3Props}
+              testID="mentor-birth-dot-mint"
+            />
           </Svg>
         </View>
 

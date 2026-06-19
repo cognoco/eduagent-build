@@ -127,6 +127,16 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
 
+function birthDateOneDayYoungerThanMinimumAge(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear() - 13, now.getMonth(), now.getDate() + 1);
+}
+
+function birthDateAtMinimumAge(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear() - 13, now.getMonth(), now.getDate());
+}
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -220,9 +230,9 @@ describe('CreateProfileScreen', () => {
       ).toBeNull();
     });
 
-    it('shows minimum age 11 hint up front', () => {
+    it('shows minimum age 13 hint up front', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      screen.getByText(/Minimum age is 11/);
+      screen.getByText(/Minimum age is 13/);
     });
 
     it('uses "Tell us about your child" as the page title', () => {
@@ -411,7 +421,7 @@ describe('CreateProfileScreen', () => {
       accountId: 'a1',
       displayName: 'Kid',
       avatarUrl: null,
-      birthYear: 2014,
+      birthYear: birthDateAtMinimumAge().getFullYear(),
       location: null,
       isOwner: false,
       hasPremiumLlm: false,
@@ -428,10 +438,10 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
 
-    // Open date picker and select a date (12-year-old → consent required)
+    // Open date picker and select a 13-year-old date → consent required.
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
-      datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
     });
 
     fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -493,6 +503,27 @@ describe('CreateProfileScreen', () => {
     await waitFor(() => {
       screen.getByTestId('create-profile-error');
     });
+  });
+
+  it('[age-floor] shows specific error and does not POST when the learner is under 13 by exact birth date', async () => {
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Zuzka');
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.(
+        { type: 'set' },
+        birthDateOneDayYoungerThanMinimumAge(),
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    screen.getByText(
+      'Learners must be at least 13 years old. Please choose an earlier birth date.',
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
   });
 
   // [BUG-947] 402 PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
@@ -1168,7 +1199,7 @@ describe('CreateProfileScreen', () => {
       accountId: 'a1',
       displayName: 'Lily',
       avatarUrl: null,
-      birthYear: 2014,
+      birthYear: birthDateAtMinimumAge().getFullYear(),
       location: null,
       isOwner: false,
       hasPremiumLlm: false,
@@ -1197,7 +1228,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1234,7 +1265,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1258,7 +1289,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1474,6 +1505,18 @@ describe('CreateProfileScreen', () => {
       expect(screen.queryByTestId('create-profile-intent-picker')).toBeNull();
     });
 
+    it('parent audience asks for the adult account holder, not the learner', () => {
+      mockAudience = 'parent';
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByText('Tell us about you');
+      screen.getByText('Your display name');
+      screen.getByText('Your birth date');
+      screen.getByText(/You can add your child next/);
+      expect(screen.queryByText("Who's the learner?")).toBeNull();
+    });
+
     it('enables submit for an adult first-profile with no intent tap', async () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
@@ -1563,16 +1606,8 @@ describe('CreateProfileScreen', () => {
       });
     });
 
-    it('parent audience with a minor birth date: falls back to solo (no PATCH, no redirect)', async () => {
+    it('parent audience with a minor birth date: shows adult-account error and does not create a solo learner', async () => {
       mockAudience = 'parent';
-      const minorOwner = {
-        ...adultOwner,
-        id: 'minor-id',
-        birthYear: 2014,
-      };
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: minorOwner }), { status: 200 }),
-      );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
@@ -1582,11 +1617,11 @@ describe('CreateProfileScreen', () => {
       });
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalled();
-      });
-      // A minor cannot guardian — no family PATCH, no add-child redirect.
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      screen.getByText(
+        'Parent accounts need an adult birth date. Enter your own details first, then add your child next.',
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
         params: { for: 'child' },

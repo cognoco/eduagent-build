@@ -20,8 +20,9 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  computeAgeBracket,
   conversationLanguageSchema,
+  PARENT_ACCOUNT_MINIMUM_AGE,
+  PROFILE_MINIMUM_AGE,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
@@ -82,6 +83,16 @@ function parseWebBirthDate(value: string): Date | null {
   if (parsed < MIN_DATE || parsed > MAX_DATE) return null;
 
   return parsed;
+}
+
+function calculateAgeFromDate(birthDate: Date, now = new Date()): number {
+  const yearDiff = now.getFullYear() - birthDate.getFullYear();
+  const hasHadBirthdayThisYear =
+    now.getMonth() > birthDate.getMonth() ||
+    (now.getMonth() === birthDate.getMonth() &&
+      now.getDate() >= birthDate.getDate());
+
+  return hasHadBirthdayThisYear ? yearDiff : yearDiff - 1;
 }
 
 export default function CreateProfileScreen() {
@@ -182,6 +193,7 @@ export default function CreateProfileScreen() {
       }
       if (selectedDate) {
         setBirthDate(selectedDate);
+        setError('');
       }
     },
     [],
@@ -197,23 +209,47 @@ export default function CreateProfileScreen() {
   );
 
   const isFirstProfileSetup = !isAddingChild && profiles.length === 0;
+  const isParentFirstProfileSetup =
+    isFirstProfileSetup && audience === 'parent';
   // Only adult owners can be guardians — `familyCapable` in app-context.tsx
-  // requires `computeAgeBracket === 'adult'`, and add-child is 18+.
+  // requires an adult owner, and add-child is 18+.
   const isAdultBirthDate =
     birthDate !== null &&
-    computeAgeBracket(birthDate.getFullYear()) === 'adult';
+    calculateAgeFromDate(birthDate) >= PARENT_ACCOUNT_MINIMUM_AGE;
   // A parent (chosen at the chooser) old enough to be a guardian: set family
   // context and route to the add-a-child screen after creating their own
-  // profile. A minor who tapped the parent option, or a 'learner'/absent
-  // audience, falls back to the clean solo learner path.
-  const wantsFamily =
-    isFirstProfileSetup && audience === 'parent' && isAdultBirthDate;
+  // profile. A parent-intent minor birth date is blocked explicitly in submit
+  // so we never silently create a solo learner instead.
+  const wantsFamily = isParentFirstProfileSetup && isAdultBirthDate;
 
   const canSubmit =
     displayName.trim().length >= 1 &&
     displayName.trim().length <= 50 &&
     birthDate !== null &&
     !loading;
+
+  const title = isAddingChild
+    ? t('createProfile.titleChild')
+    : isParentFirstProfileSetup
+      ? t('createProfile.titleParent')
+      : t('createProfile.titleSelf');
+  const displayNameLabel = isAddingChild
+    ? t('createProfile.childDisplayNameLabel')
+    : isParentFirstProfileSetup
+      ? t('createProfile.parentDisplayNameLabel')
+      : t('createProfile.displayNameLabel');
+  const birthDateLabel = isAddingChild
+    ? t('createProfile.childBirthDateLabel')
+    : isParentFirstProfileSetup
+      ? t('createProfile.parentBirthDateLabel')
+      : t('createProfile.birthDateLabel');
+  const birthDateHint = isAddingChild
+    ? t('createProfile.childBirthDateHint', { age: PROFILE_MINIMUM_AGE })
+    : isParentFirstProfileSetup
+      ? t('createProfile.parentBirthDateHint', {
+          age: PARENT_ACCOUNT_MINIMUM_AGE,
+        })
+      : t('createProfile.birthDateHint', { age: PROFILE_MINIMUM_AGE });
 
   const onSubmit = useCallback(async () => {
     if (
@@ -228,6 +264,20 @@ export default function CreateProfileScreen() {
     const trimmedName = displayName.trim();
     if (trimmedName.length > 50) {
       setError('Display name must be 50 characters or fewer.');
+      return;
+    }
+
+    if (isParentFirstProfileSetup && !isAdultBirthDate) {
+      setError(t('createProfile.parentAdultAgeError'));
+      return;
+    }
+
+    if (calculateAgeFromDate(birthDate) < PROFILE_MINIMUM_AGE) {
+      setError(
+        t('createProfile.minimumAgeError', {
+          age: PROFILE_MINIMUM_AGE,
+        }),
+      );
       return;
     }
 
@@ -459,6 +509,8 @@ export default function CreateProfileScreen() {
     switchProfile,
     router,
     handleClose,
+    isAdultBirthDate,
+    isParentFirstProfileSetup,
     wantsFamily,
     updateAppContext,
     t,
@@ -550,11 +602,7 @@ export default function CreateProfileScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-row items-center justify-between mb-8">
-          <Text className="text-h1 font-bold text-text-primary">
-            {isAddingChild
-              ? t('createProfile.titleChild')
-              : t('createProfile.titleSelf')}
-          </Text>
+          <Text className="text-h1 font-bold text-text-primary">{title}</Text>
           <Button
             variant="tertiary"
             size="small"
@@ -580,9 +628,7 @@ export default function CreateProfileScreen() {
 
         <View onLayout={onFieldLayout('name')}>
           <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            {isAddingChild
-              ? t('createProfile.childDisplayNameLabel')
-              : t('createProfile.displayNameLabel')}
+            {displayNameLabel}
           </Text>
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
@@ -599,23 +645,15 @@ export default function CreateProfileScreen() {
             editable={!loading}
             testID="create-profile-name"
             onFocus={onFieldFocus('name')}
-            accessibilityLabel={
-              isAddingChild
-                ? t('createProfile.childDisplayNameLabel')
-                : t('createProfile.displayNameLabel')
-            }
+            accessibilityLabel={displayNameLabel}
           />
         </View>
 
         <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-          {isAddingChild
-            ? t('createProfile.childBirthDateLabel')
-            : t('createProfile.birthDateLabel')}
+          {birthDateLabel}
         </Text>
         <Text className="text-body-sm text-text-secondary mb-2">
-          {isAddingChild
-            ? t('createProfile.childBirthDateHint')
-            : t('createProfile.birthDateHint')}
+          {birthDateHint}
         </Text>
         {Platform.OS === 'web' ? (
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
