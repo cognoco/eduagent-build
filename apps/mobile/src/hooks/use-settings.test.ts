@@ -56,6 +56,7 @@ describe('useNotificationSettings', () => {
             weeklyProgressEmail: false,
             monthlyProgressEmail: true,
             pushEnabled: true,
+            pushTokenRegistered: true,
             maxDailyPush: 5,
           },
         }),
@@ -79,6 +80,7 @@ describe('useNotificationSettings', () => {
       weeklyProgressEmail: false,
       monthlyProgressEmail: true,
       pushEnabled: true,
+      pushTokenRegistered: true,
       maxDailyPush: 5,
     });
   });
@@ -150,6 +152,7 @@ describe('useUpdateNotificationSettings', () => {
             weeklyProgressEmail: false,
             monthlyProgressEmail: true,
             pushEnabled: true,
+            pushTokenRegistered: false,
             maxDailyPush: 3,
           },
         }),
