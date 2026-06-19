@@ -363,24 +363,12 @@ export async function generateCategorizedBookSuggestions(
   // claimed the cooldown after we released the lock).
   // ---------------------------------------------------------------------
   return db.transaction(async (tx): Promise<GenerationOutcome> => {
-    const lockResult = await tx.execute(
-      sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
+    // Phase 3 has no external work, so it can wait for the short lock. A
+    // try-lock loser here may only be racing a cooldown-only caller, not an
+    // inserter, and returning success would drop all generated suggestions.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
     );
-    const rows =
-      (lockResult as unknown as { rows?: Array<{ got: boolean }> }).rows ??
-      (lockResult as unknown as Array<{ got: boolean }>);
-    if (!Array.isArray(rows) || typeof rows[0]?.got !== 'boolean') {
-      throw new Error(
-        'pg_try_advisory_xact_lock returned an unexpected Drizzle result shape — ' +
-          'driver may have been upgraded. Inspect the shape and update the cast in ' +
-          'book-suggestion-generation.ts.',
-      );
-    }
-    if (!rows[0].got) {
-      // Another writer is mid-insert with the same lock. The unique index on
-      // (subject_id, lower(title)) will dedupe; treat as success.
-      return 'success';
-    }
 
     const unpickedNow = await tx
       .select({ id: bookSuggestions.id })

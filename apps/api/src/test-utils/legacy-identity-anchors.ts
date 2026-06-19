@@ -8,6 +8,8 @@ import {
   organization,
   person,
   profiles,
+  subscription as subscriptionTable,
+  subscriptionPayers,
   subscriptions,
   type Database,
 } from '@eduagent/database';
@@ -198,7 +200,19 @@ export async function deleteV2IdentitiesForTest(
   const profileIds = input.profileIds ?? [];
   const accountIds = input.accountIds ?? [];
 
+  if (accountIds.length > 0) {
+    await db
+      .delete(subscriptionTable)
+      .where(inArray(subscriptionTable.organizationId, accountIds));
+  }
+
   if (profileIds.length > 0) {
+    await db
+      .delete(subscriptionTable)
+      .where(inArray(subscriptionTable.payerPersonId, profileIds));
+    await db
+      .delete(subscriptionPayers)
+      .where(inArray(subscriptionPayers.personId, profileIds));
     await db
       .delete(guardianship)
       .where(

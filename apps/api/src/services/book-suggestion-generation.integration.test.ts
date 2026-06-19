@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 
-import { eq, and, isNull, like } from 'drizzle-orm';
+import { eq, and, isNull, like, sql } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -82,6 +82,20 @@ async function waitForCooldownReservation(subjectId: string) {
   throw new Error('Timed out waiting for cooldown reservation to commit.');
 }
 
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: () => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 async function cleanup() {
   const rows = await db
     .select({ id: accounts.id })
@@ -159,6 +173,79 @@ describe('generateCategorizedBookSuggestions — integration', () => {
         ),
       );
     expect(rows).toHaveLength(4);
+  });
+
+  it('continues final insert after a non-writer briefly holds the advisory lock', async () => {
+    const profile = await seedProfile();
+    const subject = await seedSubject(profile.id, 'Civics');
+    const lockKey = `book_suggestions:${profile.id}:${subject.id}`;
+
+    const baseProvider = (
+      llmFixture as unknown as {
+        provider: { chat: (...args: unknown[]) => Promise<unknown> };
+      }
+    ).provider;
+    const originalChat = baseProvider.chat.bind(baseProvider);
+    const releaseChat = deferred();
+    const releaseBlocker = deferred();
+    const blockerReady = deferred();
+
+    let firstPromise:
+      | ReturnType<typeof generateCategorizedBookSuggestions>
+      | undefined;
+    let blockerPromise: Promise<void> | undefined;
+
+    baseProvider.chat = async (...args: unknown[]) => {
+      await releaseChat.promise;
+      return originalChat(...args);
+    };
+
+    try {
+      firstPromise = generateCategorizedBookSuggestions(
+        db,
+        profile.id,
+        subject.id,
+      );
+      await waitForCooldownReservation(subject.id);
+
+      blockerPromise = db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+        );
+        blockerReady.resolve();
+        await releaseBlocker.promise;
+      });
+      await blockerReady.promise;
+
+      releaseChat.resolve();
+      await new Promise((res) => setTimeout(res, 75));
+      releaseBlocker.resolve();
+
+      const outcome = await firstPromise;
+      await blockerPromise;
+
+      expect(outcome).toBe('success');
+      expect(llmFixture.chatCalls).toHaveLength(1);
+
+      const rows = await db
+        .select()
+        .from(bookSuggestions)
+        .where(
+          and(
+            eq(bookSuggestions.subjectId, subject.id),
+            isNull(bookSuggestions.pickedAt),
+          ),
+        );
+      expect(rows).toHaveLength(4);
+    } finally {
+      baseProvider.chat = originalChat;
+      releaseChat.resolve();
+      releaseBlocker.resolve();
+      await Promise.allSettled([
+        firstPromise ?? Promise.resolve(),
+        blockerPromise ?? Promise.resolve(),
+      ]);
+    }
   });
 
   it('cool-down blocks a second call within 5 minutes', async () => {
