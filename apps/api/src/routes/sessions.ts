@@ -81,7 +81,6 @@ import {
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
-import { getProfileAgeBracket } from '../services/profile';
 import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import {
   markPersisted,
@@ -639,11 +638,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
       }
 
-      // [WI-586 flip-safety] v2 reads the age bracket from `person`; flag-off
-      // legacy reads `profiles` (dropped post-#8). Route-context flag mechanism.
-      const ageBracket = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await getPersonAgeBracket(db, profileId)
-        : await getProfileAgeBracket(db, profileId);
+      const ageBracket = await getPersonAgeBracket(db, profileId);
       const result = await evaluateSessionDepth(transcript, { ageBracket });
       const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
         if (exchange.role !== 'user') return sum;

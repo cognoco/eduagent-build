@@ -2,18 +2,14 @@ import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { Nudge, NudgeTemplate } from '@eduagent/schemas';
 import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 import {
-  accounts,
-  familyLinks,
   membership,
   nudges,
   organization,
   person,
-  profiles,
   type Database,
 } from '@eduagent/database';
 
 import { assertParentAccess } from './family-access';
-import { getConsentStatus } from './consent';
 import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { createLogger } from './logger';
 import { sendPushNotification } from './notifications';
@@ -106,13 +102,7 @@ export async function createNudge(
   // the legacy null-or-CONSENTED allow rule above, pinned to GDPR (BUG-465: a
   // newer COPPA row must not mask a withdrawn GDPR consent). flag-off path is
   // unchanged (legacy AnyBasis getConsentStatus).
-  let consentBlocked: boolean;
-  if (opts?.identityV2Enabled) {
-    consentBlocked = !(await isGdprProcessingAllowedV2(db, params.toProfileId));
-  } else {
-    const consentStatus = await getConsentStatus(db, params.toProfileId);
-    consentBlocked = consentStatus !== null && consentStatus !== 'CONSENTED';
-  }
+  const consentBlocked = !(await isGdprProcessingAllowedV2(db, params.toProfileId));
   if (consentBlocked) {
     throw new ConsentRequiredError(
       "This child can't receive nudges until consent is active.",
@@ -159,51 +149,24 @@ export async function createNudge(
     return row;
   });
 
-  let parentName: string;
-  let childTimezone: string | null | undefined;
-  if (opts?.identityV2Enabled) {
-    // [WI-586] v2 path: read displayName from person; timezone from the child's
-    // org (via membership join) — scoped to params.toProfileId so we never read
-    // an arbitrary org's timezone.
-    const [fromPersonRows, toOrgRows] = await Promise.all([
-      db
-        .select({ displayName: person.displayName })
-        .from(person)
-        .where(eq(person.id, params.fromProfileId))
-        .limit(1),
-      db
-        .select({ timezone: organization.timezone })
-        .from(membership)
-        .innerJoin(organization, eq(organization.id, membership.organizationId))
-        .where(eq(membership.personId, params.toProfileId))
-        .limit(1),
-    ]);
-    parentName = fromPersonRows[0]?.displayName ?? 'Your parent';
-    childTimezone = toOrgRows[0]?.timezone;
-  } else {
-    const [fromProfile, toProfile] = await Promise.all([
-      db.query.profiles.findFirst({
-        where: eq(profiles.id, params.fromProfileId),
-        columns: { displayName: true, accountId: true },
-      }),
-      db.query.profiles.findFirst({
-        where: eq(profiles.id, params.toProfileId),
-        columns: { displayName: true, accountId: true },
-      }),
-    ]);
-    parentName = fromProfile?.displayName ?? 'Your parent';
-    // Quiet hours follow the recipient's (child's) local time only — sending
-    // parents may be in a different zone, but it's the recipient we don't want
-    // to ping at 23:00. If the child has no timezone on file, isQuietHours
-    // defaults to UTC.
-    const childAccount = toProfile?.accountId
-      ? await db.query.accounts.findFirst({
-          where: eq(accounts.id, toProfile.accountId),
-          columns: { timezone: true },
-        })
-      : null;
-    childTimezone = childAccount?.timezone;
-  }
+  // [WI-586] v2 path: read displayName from person; timezone from the child's
+  // org (via membership join) — scoped to params.toProfileId so we never read
+  // an arbitrary org's timezone.
+  const [fromPersonRows, toOrgRows] = await Promise.all([
+    db
+      .select({ displayName: person.displayName })
+      .from(person)
+      .where(eq(person.id, params.fromProfileId))
+      .limit(1),
+    db
+      .select({ timezone: organization.timezone })
+      .from(membership)
+      .innerJoin(organization, eq(organization.id, membership.organizationId))
+      .where(eq(membership.personId, params.toProfileId))
+      .limit(1),
+  ]);
+  const parentName = fromPersonRows[0]?.displayName ?? 'Your parent';
+  const childTimezone = toOrgRows[0]?.timezone;
 
   let pushSent = false;
   if (isQuietHours(now, childTimezone)) {
@@ -251,57 +214,30 @@ export async function listUnreadNudges(
   profileId: string,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<Nudge[]> {
-  if (opts?.identityV2Enabled) {
-    // [WI-803/WI-586] v2 path: resolve guardian person IDs via guardianship table
-    // and join person for displayName — safe post-M-DROP (no profiles/family_links join).
-    const guardianPersonIds = await getGuardianPersonIds(db, profileId);
-    if (guardianPersonIds.length === 0) return [];
-    const rows = await db
-      .select({
-        id: nudges.id,
-        fromProfileId: nudges.fromProfileId,
-        toProfileId: nudges.toProfileId,
-        fromDisplayName: person.displayName,
-        template: nudges.template,
-        createdAt: nudges.createdAt,
-        readAt: nudges.readAt,
-      })
-      .from(nudges)
-      .innerJoin(person, eq(person.id, nudges.fromProfileId))
-      .where(
-        and(
-          eq(nudges.toProfileId, profileId),
-          isNull(nudges.readAt),
-          inArray(nudges.fromProfileId, guardianPersonIds),
-        ),
-      )
-      .orderBy(desc(nudges.createdAt));
-    return rows.map(mapNudgeRow);
-  }
-
-  // Legacy path — byte-identical to pre-WI-803.
+  // [WI-803/WI-586] v2 path: resolve guardian person IDs via guardianship table
+  // and join person for displayName — safe post-M-DROP (no profiles/family_links join).
+  const guardianPersonIds = await getGuardianPersonIds(db, profileId);
+  if (guardianPersonIds.length === 0) return [];
   const rows = await db
     .select({
       id: nudges.id,
       fromProfileId: nudges.fromProfileId,
       toProfileId: nudges.toProfileId,
-      fromDisplayName: profiles.displayName,
+      fromDisplayName: person.displayName,
       template: nudges.template,
       createdAt: nudges.createdAt,
       readAt: nudges.readAt,
     })
     .from(nudges)
-    .innerJoin(profiles, eq(profiles.id, nudges.fromProfileId))
-    .innerJoin(
-      familyLinks,
+    .innerJoin(person, eq(person.id, nudges.fromProfileId))
+    .where(
       and(
-        eq(familyLinks.parentProfileId, nudges.fromProfileId),
-        eq(familyLinks.childProfileId, nudges.toProfileId),
+        eq(nudges.toProfileId, profileId),
+        isNull(nudges.readAt),
+        inArray(nudges.fromProfileId, guardianPersonIds),
       ),
     )
-    .where(and(eq(nudges.toProfileId, profileId), isNull(nudges.readAt)))
     .orderBy(desc(nudges.createdAt));
-
   return rows.map(mapNudgeRow);
 }
 

@@ -850,7 +850,7 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
     persistBookTopicsSpy.mockRestore();
   });
 
-  it('flag-off (omitted): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
+  it('always resolves learner age via v2 getPersonAge (legacy path removed)', async () => {
     await startFirstCurriculumSession(
       makeDb(),
       PROFILE_ID,
@@ -858,26 +858,8 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
       { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
       { matcherEnabled: false },
     );
-    expect(getProfileAgeSpy).toHaveBeenCalledWith(
-      expect.anything(),
-      PROFILE_ID,
-    );
-    expect(getPersonAgeSpy).not.toHaveBeenCalled();
-  });
-
-  it('flag-off (explicit false): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
-    await startFirstCurriculumSession(
-      makeDb(),
-      PROFILE_ID,
-      SUBJECT_ID,
-      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
-      { matcherEnabled: false, identityV2Enabled: false },
-    );
-    expect(getProfileAgeSpy).toHaveBeenCalledWith(
-      expect.anything(),
-      PROFILE_ID,
-    );
-    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+    expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
+    expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
 
   it('flag-on: resolves learner age via v2 getPersonAge, never legacy getProfileAge', async () => {

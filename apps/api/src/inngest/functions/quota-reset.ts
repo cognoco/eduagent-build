@@ -16,9 +16,8 @@
 import type { Database } from '@eduagent/database';
 
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import {
-  resetExpiredQuotaCycles,
   resetDailyQuotas,
 } from '../../services/billing';
 import { resetExpiredQuotaCyclesV2 } from '../../services/billing/billing-v2';
@@ -54,9 +53,7 @@ export const quotaReset = inngest.createFunction(
           // FK/500 at the #8 atomic IDENTITY_V2_ENABLED flag-flip. flag-off is
           // byte-identical. resetDailyQuotas (above) only touches quota_pools /
           // profile_quota_usage — no subscriptions read — so it needs no v2 twin.
-          const monthlyCount = isIdentityV2EnabledInStep()
-            ? await resetExpiredQuotaCyclesV2(tx as unknown as Database, now)
-            : await resetExpiredQuotaCycles(tx as unknown as Database, now);
+          const monthlyCount = await resetExpiredQuotaCyclesV2(tx as unknown as Database, now);
           return {
             dailyResetCount: dailyCount,
             monthlyResetCount: monthlyCount,

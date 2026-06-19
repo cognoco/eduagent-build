@@ -5,8 +5,7 @@
 // that expose parent-scoped endpoints (e.g., learner-profile child routes).
 // Route files must not import ORM primitives or schema tables directly.
 
-import { and, eq } from 'drizzle-orm';
-import { familyLinks, type Database } from '@eduagent/database';
+import { type Database } from '@eduagent/database';
 import { ForbiddenError } from '../errors';
 import { calculateAge } from './age-utils';
 import type { Context, Env, Input } from 'hono';
@@ -36,16 +35,7 @@ export async function hasParentAccess(
   childProfileId: string,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<boolean> {
-  if (opts?.identityV2Enabled) {
-    return validateGuardianshipEdgeV2(db, parentProfileId, childProfileId);
-  }
-  const link = await db.query.familyLinks.findFirst({
-    where: and(
-      eq(familyLinks.parentProfileId, parentProfileId),
-      eq(familyLinks.childProfileId, childProfileId),
-    ),
-  });
-  return Boolean(link);
+  return validateGuardianshipEdgeV2(db, parentProfileId, childProfileId);
 }
 
 /**
@@ -63,16 +53,11 @@ export async function assertParentAccess(
   childProfileId: string,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
-  if (opts?.identityV2Enabled) {
-    return validateGuardianChargeRelationshipV2(
-      db,
-      parentProfileId,
-      childProfileId,
-    );
-  }
-  if (!(await hasParentAccess(db, parentProfileId, childProfileId))) {
-    throw new ForbiddenError('You do not have access to this child profile.');
-  }
+  return validateGuardianChargeRelationshipV2(
+    db,
+    parentProfileId,
+    childProfileId,
+  );
 }
 
 /**

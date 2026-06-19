@@ -3,7 +3,6 @@ import { NonRetriableError } from 'inngest';
 import { eq, and } from 'drizzle-orm';
 import {
   curriculumBooks,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -12,12 +11,10 @@ import {
   type ConversationLanguage,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { persistBookTopics } from '../../services/curriculum';
-import { getProfileAge } from '../../services/profile';
-import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
 import {
   getPersonAge,
@@ -108,29 +105,15 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         // age data, call the LLM, or persist derived topics for a profile whose
         // consent is no longer granted.
         // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver; legacy via consent_states.
-        const v2 = isIdentityV2EnabledInStep();
-        const gdprAllowed = v2
-          ? await isGdprProcessingAllowedV2(db, profileId)
-          : await isGdprProcessingAllowed(db, profileId);
+        const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
         if (!gdprAllowed) {
           return { status: 'consent-blocked' as const };
         }
 
-        // [CUT-B1 §2.5(iii)] v2 seam: age + conversation_language from person.
-        let rawConversationLanguage: string | null | undefined;
-        let learnerAge: number;
-        if (v2) {
-          const ctx = await getPersonLlmContext(db, profileId);
-          rawConversationLanguage = ctx?.conversationLanguage;
-          learnerAge = await getPersonAge(db, profileId);
-        } else {
-          const langRow = await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
-            columns: { conversationLanguage: true },
-          });
-          rawConversationLanguage = langRow?.conversationLanguage;
-          learnerAge = await getProfileAge(db, profileId);
-        }
+        // [CUT-B1 §2.5(iii)] age + conversation_language from person (v2 always-on).
+        const ctx = await getPersonLlmContext(db, profileId);
+        const rawConversationLanguage: string | null | undefined = ctx?.conversationLanguage;
+        const learnerAge = await getPersonAge(db, profileId);
         return {
           status: 'pending',
           profileId,
@@ -171,9 +154,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
         // the LLM. Re-evaluating here closes the cross-step memoization gap.
         // [CUT-B1 §2.5(i)] v2 seam — must mirror the first gate, else an
         // Identity-V2 run would fall back to the legacy consent source here.
-        const stepGdprAllowed = isIdentityV2EnabledInStep()
-          ? await isGdprProcessingAllowedV2(db, profileId)
-          : await isGdprProcessingAllowed(db, profileId);
+        const stepGdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
         if (!stepGdprAllowed) {
           return false;
         }

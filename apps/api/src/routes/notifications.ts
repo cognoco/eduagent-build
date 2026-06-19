@@ -21,17 +21,11 @@ import { notFound } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
 import {
   dismissChildCapNotification,
-  listActiveChildCapNotifications,
-  recordChildCapNotificationForAccount,
 } from '../services/child-cap-notifications';
-// [CUT-B3 / WI-693] v2 owner/child resolution (person × membership) selected by
-// the cutover flag. dismissChildCapNotification reads only the satellite, so it
-// is store-agnostic and is not dispatched.
 import {
   listActiveChildCapNotificationsV2,
   recordChildCapNotificationForAccountV2,
 } from '../services/billing/billing-v2';
-import { isIdentityV2Enabled } from '../config';
 
 type NotificationsRouteEnv = {
   Bindings: {
@@ -58,9 +52,7 @@ export const notificationsRoutes = new Hono<NotificationsRouteEnv>()
     assertOwnerProfile(c);
 
     const ownerProfileId = requireProfileId(c.get('profileId'));
-    const notifications = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-      ? await listActiveChildCapNotificationsV2(c.get('db'), ownerProfileId)
-      : await listActiveChildCapNotifications(c.get('db'), ownerProfileId);
+    const notifications = await listActiveChildCapNotificationsV2(c.get('db'), ownerProfileId);
     return c.json(childCapNotificationsResponseSchema.parse({ notifications }));
   })
   .post(
@@ -101,14 +93,10 @@ export const notificationsRoutes = new Hono<NotificationsRouteEnv>()
         resetsAt: input.resetsAt,
         occurredAt: new Date().toISOString(),
       };
-      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        await recordChildCapNotificationForAccountV2(
-          c.get('db'),
-          recordPayload,
-        );
-      } else {
-        await recordChildCapNotificationForAccount(c.get('db'), recordPayload);
-      }
+      await recordChildCapNotificationForAccountV2(
+        c.get('db'),
+        recordPayload,
+      );
 
       return c.json(childCapNotifyParentResponseSchema.parse({ sent: true }));
     },

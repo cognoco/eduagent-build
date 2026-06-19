@@ -367,23 +367,23 @@ describe('[WI-586] getSessionStaticContext — identity-v2 profile reader select
     expect(entry.profile).toBe(v2Row);
   });
 
-  it('flag OFF → reads the legacy profiles table, not the v2 twin', async () => {
+  it('always reads via the v2 twin regardless of flag arg (legacy path removed)', async () => {
     const entry = await read('profile-off', false);
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(mockLoadProfileRowById).toHaveBeenCalledWith(
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledWith(
       {} as never,
       'profile-off',
     );
-    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(legacyRow);
+    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(v2Row);
   });
 
-  it('defaults to the legacy reader when the flag arg is omitted', async () => {
+  it('always reads via v2 twin when flag arg is omitted', async () => {
     const entry = await read('profile-default');
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(legacyRow);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(v2Row);
   });
 });

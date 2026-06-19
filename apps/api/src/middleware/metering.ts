@@ -4,7 +4,7 @@
 // Reads from KV cache first, falls back to DB, backfills KV on miss.
 //
 // Fixes applied:
-//   CR1 — Free-tier users auto-provisioned (ensureFreeSubscription)
+//   CR1 — Free-tier users auto-provisioned (ensureFreeSubscriptionV2)
 //   CR3 — KV cache stores subscriptionId (no DB hit on cache hit)
 //   I4  — KV operations wrapped in try/catch
 //   I6  — Trailing slash tolerated in route matching
@@ -28,25 +28,17 @@ import type { LLMTier } from '../services/subscription';
 import type { ProfileMeta } from './profile-scope';
 import { assertNotProxyMode } from './proxy-guard';
 import {
-  ensureFreeSubscription,
-  getQuotaPool,
   decrementQuota,
   getTopUpCreditsRemaining,
   safeRefundQuota,
-  getEffectiveAccessForSubscription,
-  getOrProvisionProfileQuotaUsage,
   MeteringError,
 } from '../services/billing';
-// [CUT-B3 / WI-693] v2 store reads for the DB-fallback path, selected by the
-// flag. The quota-satellite hot-path ops (decrementQuota, getTopUpCreditsRemaining,
-// safeRefundQuota) are store-agnostic and unchanged.
 import {
   ensureFreeSubscriptionV2,
   getQuotaPoolV2,
   getEffectiveAccessForSubscriptionV2,
   getOrProvisionProfileQuotaUsageV2,
 } from '../services/billing/billing-v2';
-import { isIdentityV2Enabled } from '../config';
 import { getTierConfig } from '../services/subscription';
 import { checkQuota } from '../services/metering';
 import {
@@ -567,12 +559,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const profileId = c.get('profileId');
     const proxyModeHeader = c.req.header('X-Proxy-Mode') === 'true';
     // [WI-776 / WP-7] Single read of the cutover flag for the whole metering
-    // lifecycle. The quota decrement/increment ownership cross-check selects the
-    // v2 twin (person × membership × subscription) under the flag; the legacy
-    // path (flag-off) is byte-identical. Metering is a synchronous request-path
-    // check — no scheduled/persisted decision spans the flag flip (atomic per
-    // request), so no schedule-time mode-pinning is needed here (ic-orch-005).
-    const identityV2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
+    const identityV2 = true;
 
     if (
       (!profileId || !profileMeta) &&
@@ -669,38 +656,23 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       subscriptionStatus = cached.status;
     } else {
       // KV miss — fall back to DB
-      // [CUT-B3 / WI-693] Select the v2 subscription store under the flag. The
-      // request-context account.id equals organization.id under the flag, so the
-      // same id keys both stores. Legacy path (flag-off) is byte-identical.
-      // (identityV2 is hoisted to the metering body — see [WI-776 / WP-7].)
       // CR1: Auto-provision free-tier subscription if none exists
-      const subscription = identityV2
-        ? await ensureFreeSubscriptionV2(db, account.id)
-        : await ensureFreeSubscription(db, account.id);
+      const subscription = await ensureFreeSubscriptionV2(db, account.id);
       subscriptionId = subscription.id;
       tier = subscription.tier;
       subscriptionStatus = subscription.status;
-      const access = identityV2
-        ? await getEffectiveAccessForSubscriptionV2(db, subscriptionId)
-        : await getEffectiveAccessForSubscription(db, subscriptionId);
+      const access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
       effectiveAccessTier = access?.effectiveAccessTier ?? subscription.tier;
       billingAccess = access?.billingAccess ?? 'current';
       quotaModel = getTierConfig(effectiveAccessTier).quotaModel;
 
       if (quotaModel === 'per-profile') {
-        const profileQuota = identityV2
-          ? await getOrProvisionProfileQuotaUsageV2(
-              db,
-              subscriptionId,
-              profileId,
-              { tier: effectiveAccessTier },
-            )
-          : await getOrProvisionProfileQuotaUsage(
-              db,
-              subscriptionId,
-              profileId,
-              { tier: effectiveAccessTier },
-            );
+        const profileQuota = await getOrProvisionProfileQuotaUsageV2(
+          db,
+          subscriptionId,
+          profileId,
+          { tier: effectiveAccessTier },
+        );
         if (!profileQuota) {
           return c.json(
             {
@@ -717,9 +689,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         usedToday = profileQuota.usedToday;
         cycleResetAt = profileQuota.cycleResetAt;
       } else {
-        const quota = identityV2
-          ? await getQuotaPoolV2(db, subscriptionId)
-          : await getQuotaPool(db, subscriptionId);
+        const quota = await getQuotaPoolV2(db, subscriptionId);
         monthlyLimit = quota?.monthlyLimit ?? freeTier.monthlyQuota;
         usedThisMonth = quota?.usedThisMonth ?? 0;
         dailyLimit = quota?.dailyLimit ?? null;
@@ -903,19 +873,10 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // premium flags unlock the same rung-gated behavior for Pro seats and AI
     // upgrade add-ons.
     const baseLlmTier = getTierConfig(effectiveAccessTier).llmTier;
-    // [CUT-B3 / WI-693] `has_premium_llm` is derived, not stored (§1.3) — no
-    // application code ever wrote `profiles.has_premium_llm` (verified). Under v2
-    // the field is always the derived `false`, so the override is dead. Drop it
-    // on the v2 path (llmTier := base, derived from the subscription tier);
-    // keep the legacy override branch byte-identical.
-    c.set(
-      'llmTier',
-      isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? baseLlmTier
-        : profileMeta?.hasPremiumLlm
-          ? 'premium'
-          : baseLlmTier,
-    );
+    // [CUT-B3 / WI-693] `has_premium_llm` is derived, not stored (§1.3) — under
+    // v2 the field is always the derived `false`, so the legacy override is dead.
+    // llmTier is derived from the subscription tier.
+    c.set('llmTier', baseLlmTier);
 
     // [WI-133] Wrap handler invocation in try/catch so a thrown error refunds
     // quota before propagating. Without this, any uncaught handler exception

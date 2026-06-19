@@ -3,7 +3,6 @@ import {
   createScopedRepository,
   learningProfiles,
   memoryFacts,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -37,7 +36,6 @@ import { extractFirstJsonObject } from './llm/extract-json';
 import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
-import { isGdprProcessingAllowed } from './consent';
 import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { verifyPersonOwnershipV2 } from './identity-v2/ownership-v2';
 import {
@@ -1134,26 +1132,17 @@ async function verifyProfileOwnership(
   opts?: IdentityV2Opts,
 ): Promise<void> {
   if (!accountId) return; // skipped when caller has verified via parent chain (assertParentAccess)
-  if (opts?.identityV2Enabled) {
-    // v2: account.id = organization.id; write authority = self OR guardian edge
-    // (membership alone is existence-visibility, not write authority).
-    // callerPersonId is the authenticated caller, never request-supplied.
-    // v2: profileId === personId on the cutover path (see CUT-B migration notes).
-    await verifyPersonOwnershipV2(
-      db,
-      profileId,
-      accountId,
-      requireCallerPersonId(opts),
-    );
-    return;
-  }
-  const [owner] = await db
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
-  if (!owner) {
-    throw new Error(`Profile ${profileId} not found for account`);
-  }
+  // v2: account.id = organization.id; write authority = self OR guardian edge
+  // (membership alone is existence-visibility, not write authority).
+  // callerPersonId is the authenticated caller, never request-supplied.
+  // v2: profileId === personId on the cutover path (see CUT-B migration notes).
+  await verifyPersonOwnershipV2(
+    db,
+    profileId,
+    accountId,
+    requireCallerPersonId(opts!),
+  );
+  return;
 }
 
 export async function getLearningProfile(
@@ -1347,9 +1336,7 @@ export async function applyAnalysis(
   // opening a transaction. revokeConsent sets GDPR status to WITHDRAWN without
   // clearing memoryConsentStatus, so the existing memory gate alone is
   // insufficient.
-  const gdprAllowed = opts?.identityV2Enabled
-    ? await isGdprProcessingAllowedV2(db, profileId)
-    : await isGdprProcessingAllowed(db, profileId);
+  const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
   if (!gdprAllowed) {
     return { fieldsUpdated: [], notifications: [] };
   }
@@ -1364,9 +1351,7 @@ export async function applyAnalysis(
       // [WI-221] Re-check GDPR consent INSIDE the transaction to close the
       // TOCTOU window between the outer gate (above) and this write — consent
       // could be withdrawn in the interval.
-      const gdprAllowedTx = opts?.identityV2Enabled
-        ? await isGdprProcessingAllowedV2(tx as unknown as Database, profileId)
-        : await isGdprProcessingAllowed(tx as unknown as Database, profileId);
+      const gdprAllowedTx = await isGdprProcessingAllowedV2(tx as unknown as Database, profileId);
       if (!gdprAllowedTx) {
         return { finalFieldsUpdated: [], finalNotifications: [] };
       }

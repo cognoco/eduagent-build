@@ -1,9 +1,5 @@
 import { inngest } from '../client';
-import {
-  getStepDatabase,
-  getStepClerkSecretKey,
-  isIdentityV2EnabledInStep,
-} from '../helpers';
+import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
   accountExists,
   isDeletionCancelled,
@@ -106,7 +102,7 @@ export const scheduledDeletion = inngest.createFunction(
         ? true
         : identityVersion === 'v1'
           ? false
-          : isIdentityV2EnabledInStep();
+          : true; // flag always-on post-cutover; absent-field events drain as v2
 
     // Wait 7-day grace period
     await step.sleep('grace-period', '7d');

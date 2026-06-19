@@ -1,13 +1,11 @@
 // @inngest-admin: parent-chain (learningSessions and familyLinks queried with profileId enforced)
 import { and, desc, eq } from 'drizzle-orm';
 import {
-  familyLinks,
   learningSessions,
   person,
-  profiles,
 } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { buildKnowledgeInventory } from '../../services/snapshot-aggregation';
 import {
@@ -16,7 +14,6 @@ import {
   generateProgressSummary,
   upsertProgressSummary,
 } from '../../services/progress-summary';
-import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
 import { getGuardianPersonIds } from '../../services/identity-v2/guardianship';
 import { captureException } from '../../services/sentry';
@@ -41,20 +38,13 @@ export const progressSummaryGeneration = inngest.createFunction(
 
     // [CUT-B2] GDPR gate + parent-link + person reads dispatch by the flag.
     const gdprAllowed = (db: ReturnType<typeof getStepDatabase>) =>
-      isIdentityV2EnabledInStep()
-        ? isGdprProcessingAllowedV2(db, profileId)
-        : isGdprProcessingAllowed(db, profileId);
+      isGdprProcessingAllowedV2(db, profileId);
 
     const context = await step.run('gather-context', async () => {
       const db = getStepDatabase();
       // Parent-link existence: v2 reads an active guardianship edge (any
       // guardian over this person), legacy reads family_links.
-      const hasParent = isIdentityV2EnabledInStep()
-        ? (await getGuardianPersonIds(db, profileId)).length > 0
-        : (await db.query.familyLinks.findFirst({
-            where: eq(familyLinks.childProfileId, profileId),
-            columns: { id: true },
-          })) != null;
+      const hasParent = (await getGuardianPersonIds(db, profileId)).length > 0;
       if (!hasParent) return null;
 
       // [WI-82] Re-check current GDPR consent at execution time. This job runs
@@ -65,14 +55,8 @@ export const progressSummaryGeneration = inngest.createFunction(
         return { status: 'consent-blocked' as const };
       }
 
-      const profile = isIdentityV2EnabledInStep()
-        ? await db.query.person.findFirst({
+      const profile = await db.query.person.findFirst({
             where: eq(person.id, profileId),
-            columns: { displayName: true, conversationLanguage: true },
-          })
-        : await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
-            // i18n Phase 1 — read conversation_language for the summary LLM.
             columns: { displayName: true, conversationLanguage: true },
           });
       if (!profile) return null;
@@ -139,13 +123,8 @@ export const progressSummaryGeneration = inngest.createFunction(
       if (!(await gdprAllowed(db))) {
         return { status: 'skipped' as const, reason: 'consent_not_granted' };
       }
-      const profile = isIdentityV2EnabledInStep()
-        ? await db.query.person.findFirst({
+      const profile = await db.query.person.findFirst({
             where: eq(person.id, profileId),
-            columns: { displayName: true },
-          })
-        : await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
             columns: { displayName: true },
           });
       if (!profile) {
