@@ -250,7 +250,7 @@ describe('CreateProfileScreen', () => {
     });
   });
 
-  it('uses child-referent copy when opened with ?for=child even before parent state resolves', () => {
+  it('[QA-08] uses child-referent copy when opened with ?for=child even before parent state resolves', () => {
     mockSearchParams = { for: 'child' };
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -1216,7 +1216,7 @@ describe('CreateProfileScreen', () => {
       });
     });
 
-    it('shows confirmation alert and does NOT switch profile when parent adds child', async () => {
+    it('[QA-08] shows confirmation alert and does NOT switch profile when parent adds child', async () => {
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ profile: childProfile }), {
           status: 200,
