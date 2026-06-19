@@ -120,8 +120,8 @@ function withCapTransaction<T extends object>(db: T): Database {
     transaction?: jest.Mock;
   };
   if (!withTx.execute) withTx.execute = jest.fn().mockResolvedValue(undefined);
-  withTx.transaction = jest.fn(async (fn: (tx: unknown) => unknown) =>
-    fn(withTx),
+  withTx.transaction = jest.fn(
+    async (fn: (tx: unknown) => unknown): Promise<unknown> => fn(withTx),
   );
   return withTx as unknown as Database;
 }
@@ -134,7 +134,7 @@ function createMockDb({
   bookSuggestion = null as { id: string } | null,
   bookSuggestions = [] as Array<{ subjectId: string }>,
 } = {}): Database {
-  const db = {
+  const db: Record<string, unknown> = {
     query: {
       subjects: createSubjectQueryMocks(),
       curriculumBooks: {
@@ -162,8 +162,10 @@ function createMockDb({
     // the mock runs the callback against the SAME db (so the in-lock recount
     // reads the configured subject rows) and no-ops the advisory-lock SQL.
     execute: jest.fn().mockResolvedValue(undefined),
-    transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
   };
+  // Assigned after construction so `db` is not referenced in its own initializer
+  // (avoids the implicit-any self-reference TS error).
+  db['transaction'] = jest.fn(async (fn: (tx: unknown) => unknown) => fn(db));
   return db as unknown as Database;
 }
 
