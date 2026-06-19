@@ -5259,6 +5259,7 @@ async function seedMentorAuditFamilyPoolMembers(
     isOwner: true,
     email,
     clerkUserId,
+    defaultAppContext: 'family',
   });
 
   await db.insert(consentGrant).values({

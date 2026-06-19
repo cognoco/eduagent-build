@@ -237,7 +237,7 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-family-pool-members',
     email: buildSeedEmail('mentor-audit-family-pool-members'),
     landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingTestId: 'parent-home-screen',
   },
   familyOwnerDailyQuotaWithChild: {
     key: 'mentor-audit-family-owner-daily-quota-with-child',
