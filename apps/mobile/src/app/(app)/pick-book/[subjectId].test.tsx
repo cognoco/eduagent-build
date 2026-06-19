@@ -733,17 +733,20 @@ describe('PickBookScreen', () => {
   });
 
   describe('[BUG-539] slow-loading hint', () => {
+    // Restore real timers even if an assertion throws mid-test, so fake timers
+    // never leak into a sibling test.
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('reveals the slow-loading hint only after the slow timer elapses', async () => {
       jest.useFakeTimers();
 
       // Never-resolving suggestions keep the query in its loading state so the
       // slow-hint timer (SLOW_LOADING_HINT_MS = 5000ms) can fire deterministically.
-      // The resolver is retained but never called, so the promise never settles.
-      let neverResolve!: (r: Response) => void;
-      const pendingForever = new Promise<Response>((resolve) => {
-        neverResolve = resolve;
-      });
-      void neverResolve;
+      // The executor intentionally never calls resolve/reject, so the promise
+      // never settles.
+      const pendingForever = new Promise<Response>(() => undefined);
       mockFetch.setRoute('/book-suggestions', () => pendingForever);
 
       const { result } = renderPickBook();
@@ -765,8 +768,6 @@ describe('PickBookScreen', () => {
       });
       result.rerender(<PickBookScreen />);
       result.getByTestId('pick-book-loading-slow');
-
-      jest.useRealTimers();
     });
   });
 });
