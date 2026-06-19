@@ -14,6 +14,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 
 **Remediation update 2026-06-19 (WI-820):** QUIZ-18 no-round guard fixed and rerun in Chrome/Playwright. Cold navigation to `/quiz/play` without a round now renders `quiz-play-no-round` recovery controls instead of redirecting into an Internal Server Error.
 
+**Remediation update 2026-06-19 (WI-853):** BILLING-13 owner in-chat daily quota card now has Chrome/Playwright coverage through J-26. The seeded exhausted-owner session reaches `quota-exceeded-card`, shows owner daily usage copy and disabled input, and the upgrade CTA opens Subscription.
+
 **Remediation update 2026-06-19 (WI-818):** AUTH-11/AUTH-17 forced re-entry banners rerun in staging Chrome/Playwright. The mentor-audit pre-shell storage-state mutator now clears Clerk's unsuffixed and instance-suffixed session cookies before seeding the expired/revoked banner markers, so both `/sign-in` banner rows render instead of falling through to Home.
 
 **Remediation update 2026-06-19 (WI-822):** BILLING-08 family-pool removal path fixed and rerun in Chrome/Playwright. The `mentor-audit-family-pool-members` seed now lands the owner in family context, the family-pool flow exercises a removable child row, and the browser regression confirms confirm/remove/list-refresh behavior.
@@ -495,7 +497,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-10 | BYOK waitlist | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-11 | Trial banner states | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-12 | Static tier comparison | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| BILLING-13 | In-chat quota-exceeded card | ✅ | Pass | WI-853 | ✅ 2026-06-19 | WI-853 resolved: Chrome/Playwright J-26 covers owner daily in-chat quota card, disabled composer, and upgrade CTA to subscription. |
+| BILLING-13 | In-chat quota-exceeded card | ✅ | Pass | WI-853 | ✅ 2026-06-19 | Chrome/Playwright J-26 covers seeded owner daily quota in an active session: send shows `quota-exceeded-card`, owner usage copy, disabled input, and upgrade routes to Subscription. |
 | BILLING-14 | Cross-feature upsell entries → `/(app)/subscription`: create-profile 402 "See plans" | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
 | BILLING-15 | Push-notification tap → subscription: `subscribe_request` + `trial_expiry` | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
 | BILLING-16 | Subscription screen timeout/error recovery: 15s TimeoutLoader w/ retry + go-back | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -580,10 +582,10 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
 | 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 27 ✅, 5 ⚠️, 0 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
-| 7 | Billing and Monetization | 16 | ⚠️ | Rerun updated 2026-06-19: 11 ✅, 1 ⚠️, 0 ❌, 4 🚫. |
+| 7 | Billing and Monetization | 16 | ✅ | Rerun updated 2026-06-19: 12 ✅, 0 ⚠️, 0 ❌, 4 🚫. |
 | 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 192 pass, 61 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 193 pass, 60 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 
