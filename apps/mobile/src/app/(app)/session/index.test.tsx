@@ -19,6 +19,12 @@ import SessionScreen from './index';
 // needed via jest.spyOn().
 import * as sessionRecoveryModule from '../../../lib/session-recovery';
 
+// Real analytics module; the homework-image-attach-dropped tests spy on the
+// real `track` export via jest.spyOn (NOT a jest.mock of an internal module —
+// GC1/GC6-clean). `track` calls Sentry.addBreadcrumb, which is globally mocked
+// in test-setup.ts, so the real implementation runs without side effects.
+import * as analyticsModule from '../../../lib/analytics';
+
 // ---------------------------------------------------------------------------
 // Boundary mocks (external / native runtime only)
 // ---------------------------------------------------------------------------
@@ -812,7 +818,12 @@ describe('SessionScreen homework flow', () => {
   // degrade to text-only. The learner sees a system message explaining the
   // photo was dropped, and the auto-send proceeds with attachImage=false.
   it('surfaces a system message and sends text-only when image conversion fails', async () => {
-    jest.useRealTimers();
+    // Fake timers + explicit advance past the 500ms auto-send debounce. Under
+    // real timers this test relied on the 500ms setTimeout firing inside
+    // waitFor's 1000ms budget, which races (and intermittently fails) under
+    // full-suite CPU load. Driving the debounce deterministically — mirroring
+    // the timeout-branch test below and the [BUG-689] block — removes the flake.
+    jest.useFakeTimers();
     mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
@@ -831,6 +842,13 @@ describe('SessionScreen homework flow', () => {
     });
 
     const testScreen = renderSessionScreen();
+
+    // Flush the rejected-read microtask so imageAttachmentStatus -> 'failed',
+    // then advance past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      await Promise.resolve();
+      jest.advanceTimersByTime(600);
+    });
 
     // System message tells the learner the photo was dropped.
     await waitFor(() => {
@@ -854,6 +872,108 @@ describe('SessionScreen homework flow', () => {
       | undefined;
     expect(streamOpts?.imageBase64).toBeUndefined();
     expect(streamOpts?.imageMimeType).toBeUndefined();
+  });
+
+  // [HOMEWORK-08] On image-read failure the screen MUST emit a structured
+  // `homework_image_attach_dropped` analytics event with reason='failed',
+  // the capture source, and whether OCR text was present. Silent fallback is
+  // banned by AGENTS.md "Fix Development Rules"; this pins the emission and
+  // every field so a refactor can't drop the telemetry or a field.
+  it('[HOMEWORK-08] emits homework_image_attach_dropped with reason/captureSource/hasOcrText when the image read fails', async () => {
+    // Fake timers (the suite default) + explicit advance past the 500ms
+    // auto-send debounce, mirroring the failed-case copy test above. Under
+    // real timers this raced waitFor's 1000ms budget and failed intermittently
+    // under full-suite CPU load.
+    const trackSpy = jest.spyOn(analyticsModule, 'track');
+    mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      captureSource: 'camera',
+      ocrText: 'Solve 2x + 5 = 17',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+
+    renderSessionScreen();
+
+    // Flush the rejected-read microtask so imageAttachmentStatus -> 'failed',
+    // then advance past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      await Promise.resolve();
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(trackSpy).toHaveBeenCalledWith('homework_image_attach_dropped', {
+        reason: 'failed',
+        captureSource: 'camera',
+        hasOcrText: true,
+      });
+    });
+
+    trackSpy.mockRestore();
+  });
+
+  // [HOMEWORK-08] The 2.5s image-read timeout is a DISTINCT branch from a read
+  // rejection: it surfaces timeout-specific copy ("took too long to load") and
+  // emits the analytics event with reason='timeout'. Without this test the
+  // timeout path (useImageBase64 IMAGE_READ_TIMEOUT_MS) is uncovered and could
+  // silently regress to the failed copy or drop the distinct reason.
+  it('[HOMEWORK-08] surfaces timeout-specific copy and emits reason=timeout when the image read exceeds the 2.5s budget', async () => {
+    jest.useFakeTimers();
+    const trackSpy = jest.spyOn(analyticsModule, 'track');
+    // Never resolves — forces useImageBase64 into the 2.5s timeout branch.
+    mockReadAsStringAsync.mockImplementationOnce(
+      () => new Promise(() => undefined),
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      captureSource: 'gallery',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+
+    const testScreen = renderSessionScreen();
+
+    // Advance past the 2.5s read budget so imageAttachmentStatus -> 'timeout',
+    // then past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      jest.advanceTimersByTime(2_600);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(
+        testScreen.getByText(
+          /took too long to load, so I'm starting with the text only/i,
+        ),
+      ).toBeTruthy();
+    });
+    expect(trackSpy).toHaveBeenCalledWith('homework_image_attach_dropped', {
+      reason: 'timeout',
+      captureSource: 'gallery',
+      hasOcrText: false,
+    });
+
+    trackSpy.mockRestore();
+    // The mocked read never resolves; clear any queued fake-timer callbacks
+    // before the suite afterEach swaps back to real timers, so no pending
+    // debounce bleeds into the next test (e.g. the WI-859 resolution flow).
+    jest.clearAllTimers();
   });
 
   // ---------------------------------------------------------------------
