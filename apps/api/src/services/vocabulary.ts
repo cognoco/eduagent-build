@@ -3,6 +3,8 @@ import {
   vocabulary,
   vocabularyRetentionCards,
   subjects,
+  curriculumTopics,
+  curriculumBooks,
   type Database,
 } from '@eduagent/database';
 import { sm2 } from '@eduagent/retention';
@@ -74,6 +76,39 @@ async function ensureLanguageSubject(
   }
 }
 
+/**
+ * Verifies that a milestoneId (curriculumTopic) belongs to the given subject
+ * via the parent chain: curriculum_topics.book_id → curriculum_books.subject_id.
+ * Throws SubjectNotFoundError if the milestone does not belong to subjectId.
+ * No-op when milestoneId is null/undefined.
+ *
+ * [BUG-862] IDOR guard: prevents attaching vocabulary to milestones owned by
+ * another subject or profile.
+ */
+async function verifyMilestoneOwnership(
+  db: Database,
+  milestoneId: string | null | undefined,
+  subjectId: string,
+): Promise<void> {
+  if (milestoneId == null) return;
+
+  const [owned] = await db
+    .select({ id: curriculumTopics.id })
+    .from(curriculumTopics)
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .where(
+      and(
+        eq(curriculumTopics.id, milestoneId),
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
+    )
+    .limit(1);
+
+  if (!owned) {
+    throw new SubjectNotFoundError();
+  }
+}
+
 export async function listVocabulary(
   db: Database,
   profileId: string,
@@ -102,6 +137,8 @@ export async function createVocabulary(
   input: VocabularyCreateInput,
 ): Promise<Vocabulary> {
   await ensureLanguageSubject(db, profileId, subjectId);
+  // [BUG-862] Verify the milestone belongs to this subject before writing.
+  await verifyMilestoneOwnership(db, input.milestoneId, subjectId);
 
   const [row] = await db
     .insert(vocabulary)
@@ -149,6 +186,20 @@ export async function updateVocabulary(
   vocabularyId: string,
   input: VocabularyUpdateInput,
 ): Promise<Vocabulary | null> {
+  // [BUG-862] When a non-null milestoneId is being set, verify it belongs to
+  // this vocabulary's subject via the parent chain before writing.
+  if (input.milestoneId != null) {
+    const existing = await db.query.vocabulary.findFirst({
+      where: and(
+        eq(vocabulary.id, vocabularyId),
+        eq(vocabulary.profileId, profileId),
+      ),
+    });
+    if (existing) {
+      await verifyMilestoneOwnership(db, input.milestoneId, existing.subjectId);
+    }
+  }
+
   const updates: Partial<typeof vocabulary.$inferInsert> & { updatedAt: Date } =
     {
       updatedAt: new Date(),

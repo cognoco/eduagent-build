@@ -99,6 +99,11 @@ function createMockDb({
   insertReturning = [] as unknown[],
   updateReturning = [] as unknown[],
   onConflictBehavior = 'update' as 'update' | 'nothing',
+  // [BUG-862] milestoneOwnedResult controls what verifyMilestoneOwnership returns.
+  // Default to a matching row so existing tests (which don't exercise the IDOR
+  // path) continue to pass. Pass [] to simulate "milestone not owned" in
+  // negative-path break tests.
+  milestoneOwnedResult = [{ id: 'milestone-1' }] as unknown[],
 } = {}): Database {
   const selectFromChain = {
     from: jest.fn().mockReturnValue({
@@ -112,6 +117,12 @@ function createMockDb({
           .mockResolvedValue(
             retentionCardFindFirst ? [retentionCardFindFirst] : [],
           ),
+      }),
+      innerJoin: jest.fn().mockReturnValue({
+        // [BUG-862] verifyMilestoneOwnership uses .from().innerJoin().where().limit(1)
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(milestoneOwnedResult),
+        }),
       }),
       leftJoin: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
@@ -293,6 +304,25 @@ describe('createVocabulary', () => {
     expect(result.cefrLevel).toBe('A1');
     expect(result.milestoneId).toBe('milestone-1');
   });
+
+  // [BUG-862] IDOR negative-path break test: milestoneId from a different subject
+  // must be rejected before any INSERT is attempted.
+  it('throws when milestoneId belongs to a different subject (IDOR)', async () => {
+    // milestoneOwnedResult=[] simulates "not found in this subject's ownership chain"
+    const db = createMockDb({ milestoneOwnedResult: [] });
+
+    await expect(
+      createVocabulary(db, PROFILE_ID, SUBJECT_ID, {
+        term: 'hola',
+        translation: 'hello',
+        type: 'word',
+        milestoneId: 'milestone-other-subject',
+      }),
+    ).rejects.toThrow('Subject not found');
+
+    // The INSERT must not have been called — the check must gate the write
+    expect(db.insert).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -343,6 +373,27 @@ describe('updateVocabulary', () => {
     });
 
     expect(result!.type).toBe('chunk');
+  });
+
+  // [BUG-862] IDOR negative-path break test: milestoneId from a different
+  // subject must be rejected before the UPDATE is applied.
+  it('throws when milestoneId belongs to a different subject (IDOR)', async () => {
+    // vocabFindFirst must return a row so the ownership check can read the subjectId
+    const existingVocab = mockVocabRow();
+    // milestoneOwnedResult=[] simulates "not found in this subject's ownership chain"
+    const db = createMockDb({
+      vocabFindFirst: existingVocab,
+      milestoneOwnedResult: [],
+    });
+
+    await expect(
+      updateVocabulary(db, PROFILE_ID, VOCAB_ID, {
+        milestoneId: 'milestone-other-subject',
+      }),
+    ).rejects.toThrow('Subject not found');
+
+    // The UPDATE must not have been called — the check must gate the write
+    expect(db.update).not.toHaveBeenCalled();
   });
 });
 
