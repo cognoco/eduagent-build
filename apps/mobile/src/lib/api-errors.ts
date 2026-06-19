@@ -26,6 +26,7 @@ import {
 } from '@eduagent/schemas';
 import { CancelledError } from '@tanstack/react-query';
 import { isQueryCancellationAbort } from './query-timeout';
+import { i18next } from '../i18n';
 
 export {
   BadRequestError,
@@ -49,10 +50,7 @@ export class NetworkError extends Error {
   readonly errorCode = 'NETWORK_ERROR' as const;
   override readonly cause: unknown;
 
-  constructor(
-    message = "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
-    cause?: unknown,
-  ) {
+  constructor(message = i18next.t('errors.networkError'), cause?: unknown) {
     super(message);
     this.name = 'NetworkError';
     this.cause = cause;

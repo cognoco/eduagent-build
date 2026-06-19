@@ -166,9 +166,7 @@ export default function CreateProfileScreen() {
       }
       setCreatePostPending(false);
       setLoading(false);
-      setError(
-        'Creating your profile is taking too long. Check your connection and try again.',
-      );
+      setError(t('onboarding.createProfile.timeoutError'));
     }, PROFILE_CREATE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [createPostPending]);
@@ -263,7 +261,7 @@ export default function CreateProfileScreen() {
 
     const trimmedName = displayName.trim();
     if (trimmedName.length > 50) {
-      setError('Display name must be 50 characters or fewer.');
+      setError(t('onboarding.createProfile.displayNameTooLong'));
       return;
     }
 
@@ -633,7 +631,9 @@ export default function CreateProfileScreen() {
           <TextInput
             className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
             placeholder={
-              isAddingChild ? "Enter your child's name" : 'Enter name'
+              isAddingChild
+                ? t('onboarding.createProfile.childNamePlaceholder')
+                : t('onboarding.createProfile.namePlaceholder')
             }
             placeholderTextColor={colors.muted}
             value={displayName}
@@ -667,7 +667,9 @@ export default function CreateProfileScreen() {
               autoComplete="birthdate-full"
               testID="create-profile-birthdate-input"
               accessibilityLabel={
-                isAddingChild ? "Child's birth date" : 'Birth date'
+                isAddingChild
+                  ? t('onboarding.createProfile.childBirthDateAccessLabel')
+                  : t('onboarding.createProfile.birthDateAccessLabel')
               }
               onFocus={onFieldFocus('birthdate')}
             />
@@ -683,7 +685,9 @@ export default function CreateProfileScreen() {
             className="bg-surface rounded-input px-4 py-3 mb-2"
             disabled={loading}
             accessibilityLabel={
-              isAddingChild ? "Select child's birth date" : 'Select birth date'
+              isAddingChild
+                ? t('onboarding.createProfile.selectChildBirthDateLabel')
+                : t('onboarding.createProfile.selectBirthDateLabel')
             }
             testID="create-profile-birthdate"
           >
@@ -755,7 +759,11 @@ export default function CreateProfileScreen() {
 
         <Button
           variant="primary"
-          label={isAddingChild ? 'Add child' : 'Continue'}
+          label={
+            isAddingChild
+              ? t('onboarding.createProfile.addChildButton')
+              : t('common.continue')
+          }
           onPress={onSubmit}
           disabled={!canSubmit}
           loading={loading}

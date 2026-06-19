@@ -30,16 +30,21 @@ const MILESTONE_COPY: Record<
   },
   streak_length: {
     icon: '🔥',
-    label: (threshold, _t) => `${threshold}-day streak`,
+    label: (threshold, t) =>
+      t('progress.milestoneCard.streakLength', { count: threshold }),
   },
   subject_mastered: {
     icon: '🏁',
-    label: (_threshold, _t, metadata) =>
-      `Mastered ${String(metadata?.['subjectName'] ?? 'a subject')}`,
+    label: (_threshold, t, metadata) =>
+      metadata?.['subjectName']
+        ? t('progress.milestoneCard.subjectMastered', {
+            subject: String(metadata['subjectName']),
+          })
+        : t('progress.milestoneCard.subjectMasteredFallback'),
   },
   book_completed: {
     icon: '📖',
-    label: (_threshold, _t) => 'Completed a book',
+    label: (_threshold, t) => t('progress.milestoneCard.bookCompleted'),
   },
   learning_time: {
     icon: '⏱',
@@ -47,14 +52,19 @@ const MILESTONE_COPY: Record<
   },
   cefr_level_up: {
     icon: '🗣',
-    label: (_threshold, _t) => 'Language level increased',
+    label: (_threshold, t) => t('progress.milestoneCard.cefrLevelUp'),
   },
   topics_explored: {
     icon: '🧠',
-    label: (threshold, _t, metadata) =>
-      `Explored ${threshold} topics in ${String(
-        metadata?.['subjectName'] ?? 'a subject',
-      )}`,
+    label: (threshold, t, metadata) =>
+      metadata?.['subjectName']
+        ? t('progress.milestoneCard.topicsExplored', {
+            count: threshold,
+            subject: String(metadata['subjectName']),
+          })
+        : t('progress.milestoneCard.topicsExploredFallback', {
+            count: threshold,
+          }),
   },
 };
 

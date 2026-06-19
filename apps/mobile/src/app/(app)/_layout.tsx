@@ -480,7 +480,7 @@ export default function AppLayout() {
       <View className="flex-1 bg-background">
         <ErrorFallback
           variant="centered"
-          title="We could not load your profile"
+          title={t('appShell.profileLoadErrorTitle')}
           message={formatApiError(profileLoadError)}
           primaryAction={{
             label: t('common.retry'),

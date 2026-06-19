@@ -596,9 +596,9 @@ export default function BookScreen() {
   );
   const noteCount = notes.length;
   const noteSummary = notesQuery.isLoading
-    ? 'Loading notes...'
+    ? t('library.book.loadingNotes')
     : noteCount === 0
-      ? 'Add your first note for this book'
+      ? t('library.book.notesEmptySummary')
       : t('library.book.notesSavedCount', { count: noteCount });
 
   // --- Sessions data ---
@@ -1020,10 +1020,7 @@ export default function BookScreen() {
       const otherBooks = safeAllBooks.filter((b) => b.id !== bookId);
 
       if (otherBooks.length === 0) {
-        platformAlert(
-          session.topicTitle,
-          'This is the only book on this shelf — there is nowhere to move this topic.',
-        );
+        platformAlert(session.topicTitle, t('library.book.moveOnlyBookAlert'));
         return;
       }
 
@@ -1337,7 +1334,8 @@ export default function BookScreen() {
   if (bookQuery.isLoading && !hasBookData) {
     // Extract title/emoji from the books list query if available (already cached)
     const cachedBook = allBooksQuery.data?.find?.((b) => b.id === bookId);
-    const heroTitle = cachedBook?.title ?? params.bookId ?? 'Book';
+    const heroTitle =
+      cachedBook?.title ?? params.bookId ?? t('library.book.genericTitle');
     const heroEmoji = cachedBook?.emoji ?? null;
 
     return (
@@ -1424,7 +1422,7 @@ export default function BookScreen() {
     const errorMessage =
       bookQuery.error instanceof Error
         ? bookQuery.error.message
-        : "Couldn't load this book.";
+        : t('library.book.loadErrorFallback');
 
     return (
       <View
@@ -1735,7 +1733,10 @@ export default function BookScreen() {
                     <InlineNoteCard
                       key={note.id}
                       noteId={note.id}
-                      topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
+                      topicTitle={
+                        topicTitleMap.get(note.topicId) ??
+                        t('library.book.topicFallback')
+                      }
                       content={note.content}
                       sourceLine={formatSourceLine(note, i18n?.language)}
                       updatedAt={note.updatedAt}
@@ -1780,8 +1781,8 @@ export default function BookScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={
                   sortedNotes.length === 0
-                    ? 'Add your first note for this book'
-                    : 'Add a note'
+                    ? t('library.book.a11yAddFirstNote')
+                    : t('library.book.a11yAddNote')
                 }
               >
                 <Text className="text-body-sm font-medium text-primary">
@@ -2024,8 +2025,8 @@ export default function BookScreen() {
             accessibilityRole="button"
             accessibilityLabel={
               showPastConversations
-                ? 'Collapse past conversations'
-                : 'Expand past conversations'
+                ? t('library.book.a11yCollapseSessions')
+                : t('library.book.a11yExpandSessions')
             }
           >
             <Text className="text-body-sm font-semibold text-text-secondary">

@@ -6,6 +6,7 @@
 
 import { Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface VoiceToggleProps {
@@ -14,13 +15,18 @@ interface VoiceToggleProps {
 }
 
 export function VoiceToggle({ isVoiceEnabled, onToggle }: VoiceToggleProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
 
   return (
     <Pressable
       onPress={onToggle}
       className="p-2 min-h-[44px] min-w-[44px] items-center justify-center"
-      accessibilityLabel={isVoiceEnabled ? 'Mute AI voice' : 'Unmute AI voice'}
+      accessibilityLabel={
+        isVoiceEnabled
+          ? t('session.voiceToggle.a11yMute')
+          : t('session.voiceToggle.a11yUnmute')
+      }
       accessibilityRole="button"
       accessibilityState={{ checked: isVoiceEnabled }}
       testID="voice-toggle"

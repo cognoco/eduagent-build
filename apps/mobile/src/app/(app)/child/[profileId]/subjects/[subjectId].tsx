@@ -2,6 +2,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../../../../i18n';
 import {
   RetentionSignal,
   type RetentionStatus,
@@ -17,13 +18,22 @@ import { isNewLearner } from '../../../../../lib/progressive-disclosure';
 import { useDurationLabel } from '../../../../../hooks/use-time-format';
 import { getDurationParts } from '../../../../../lib/format-relative-date';
 
-const COMPLETION_LABELS: Record<string, string> = {
-  not_started: 'Not started',
-  in_progress: 'Started',
-  completed: 'Completed',
-  verified: 'Verified',
-  stable: 'Stable',
-};
+function getCompletionLabel(status: string, t: Translate): string {
+  switch (status) {
+    case 'not_started':
+      return t('guardian.completionStatus.notStarted');
+    case 'in_progress':
+      return t('guardian.completionStatus.inProgress');
+    case 'completed':
+      return t('guardian.completionStatus.completed');
+    case 'verified':
+      return t('guardian.completionStatus.verified');
+    case 'stable':
+      return t('guardian.completionStatus.stable');
+    default:
+      return status;
+  }
+}
 
 function TopicSkeleton(): React.ReactNode {
   return (
@@ -84,7 +94,7 @@ export default function SubjectTopicsScreen() {
     routeSubjectName ??
     inventory?.subjects.find((subject) => subject.subjectId === subjectId)
       ?.subjectName ??
-    'Subject';
+    t('guardian.subjectFallback');
   const childName = Array.isArray(routeChildName)
     ? routeChildName[0]
     : routeChildName;
@@ -242,8 +252,7 @@ export default function SubjectTopicsScreen() {
                 ) : null}
               </View>
               <Text className="text-caption text-text-secondary mb-2">
-                {COMPLETION_LABELS[topic.completionStatus] ??
-                  topic.completionStatus}
+                {getCompletionLabel(topic.completionStatus, t)}
               </Text>
               {topic.masteryScore !== null &&
                 topic.masteryScore !== undefined && (

@@ -71,7 +71,12 @@
     "profileNotFound": "Tivemos problemas para carregar seu perfil. Saia e entre novamente.",
     "alreadyCompleted": "Você já concluiu isto. Volte e escolha algo novo.",
     "validationFailed": "Algo não parece certo. Verifique o que você inseriu e tente novamente.",
-    "timedOut": "Essa resposta demorou muito. Toque em reconectar para tentar novamente."
+    "timedOut": "Essa resposta demorou muito. Toque em reconectar para tentar novamente.",
+    "clerkGeneric": "Algo não foi concluído. Tente novamente.",
+    "emailNotVerified": "Verifique o seu endereço de e-mail e tente novamente.",
+    "quotaExceeded": "Quota excedida",
+    "resourceNotFound": "Recurso não encontrado",
+    "conflictState": "O pedido entra em conflito com o estado atual"
   },
   "errorBoundary": {
     "title": "Algo deu errado",
@@ -137,7 +142,43 @@
       "unsupportedSsoHint": "Se esta conta também usa login do Google ou da Apple, tente essa opção acima. Se não funcionar, entre em contato com o suporte.",
       "unsupportedContactHint": "Entre em contato com o suporte e ajudaremos você a fazer login. Mencione: {{methods}}.",
       "sentCodeTo": "Enviámos um código de verificação para <email>{{email}}</email>",
-      "offerBody": "Esta conta pode continuar com um código de verificação enviado para <id>{{identifier}}</id>. Só enviaremos o código se decidir continuar."
+      "offerBody": "Esta conta pode continuar com um código de verificação enviado para <id>{{identifier}}</id>. Só enviaremos o código se decidir continuar.",
+      "strategyWebauthn": "uma chave de segurança ou passkey",
+      "strategyTotp": "uma aplicação de autenticação",
+      "strategyPhoneCode": "um código de verificação por telefone",
+      "strategyEmailCode": "um código de verificação por e-mail",
+      "unsupportedMethodGeneric": "Esta conta necessita de um método de verificação adicional que ainda não está disponível no telemóvel.",
+      "unsupportedMethodSingle": "Esta conta requer {{method}}, que ainda não está disponível no telemóvel.",
+      "unsupportedMethodMultiple": "Esta conta requer {{methods}} ou {{last}}, que ainda não estão disponíveis no telemóvel.",
+      "transitionTimeout": "O início de sessão está a demorar mais do que o esperado. Tente iniciar sessão novamente.",
+      "sessionRevoked": "A sua sessão foi terminada noutro dispositivo. Inicie sessão novamente para continuar.",
+      "sessionExpired": "A sua sessão expirou. Inicie sessão novamente para continuar a aprender.",
+      "needsNewPassword": "A sua palavra-passe precisa de ser atualizada antes de poder iniciar sessão. Use a opção Esqueceu-se da palavra-passe? para a redefinir.",
+      "signInNotCompleted": "Não foi possível concluir o início de sessão. Tente novamente.",
+      "contactSupportEmailError": "Não conseguimos abrir a sua aplicação de e-mail. Contacte support@mentomate.app e mencione {{methods}}.",
+      "noSessionCreated": "Nenhuma sessão foi criada. Tente novamente.",
+      "authNotLoaded": "A autenticação não foi carregada. Tente novamente.",
+      "activationFailed": "Não foi possível ativar a sua sessão. Tente novamente.",
+      "ssoSignUpIncomplete": "O registo via {{provider}} necessita de informações adicionais. Registe-se com e-mail.",
+      "authNotReady": "A autenticação não está pronta. Recarregue e tente novamente.",
+      "stuckTitle": "A iniciar a sua sessão",
+      "stuckMessage": "Isto está a demorar mais do que o esperado. Tente novamente.",
+      "signUpLabel": "Registar",
+      "enterBackupCodePlaceholder": "Introduza o código de segurança",
+      "enterSixDigitCodePlaceholder": "Introduza o código de 6 dígitos",
+      "verifyButton": "Verificar",
+      "resendCode": "Reenviar código",
+      "backToSignIn": "Voltar ao início de sessão",
+      "contactSupport": "Contactar o suporte",
+      "cancelSignIn": "Cancelar início de sessão",
+      "continueWithGoogle": "Continuar com o Google",
+      "continueWithApple": "Continuar com a Apple",
+      "continueWithOpenAI": "Continuar com a OpenAI",
+      "emailPlaceholder": "voce@exemplo.com",
+      "passwordPlaceholder": "Introduza a sua palavra-passe",
+      "forgotPassword": "Esqueceu-se da palavra-passe?",
+      "signInButton": "Iniciar sessão",
+      "sendVerificationCode": "Enviar código de verificação"
     },
     "signUp": {
       "title": "Criar conta",
@@ -150,7 +191,19 @@
       "verifyEmailTitle": "Verifique seu e-mail",
       "verificationCodeLabel": "Código de verificação",
       "agreeToTerms": "Ao inscrever-se, concorda com os nossos <terms>Termos de Serviço</terms> e a nossa <privacy>Política de Privacidade</privacy>.",
-      "sentCodeTo": "Enviámos um código de verificação para <email>{{email}}</email>"
+      "sentCodeTo": "Enviámos um código de verificação para <email>{{email}}</email>",
+      "noSessionCreated": "Nenhuma sessão foi criada. Tente novamente.",
+      "activationFailed": "Não foi possível ativar a sua sessão. Tente novamente.",
+      "authNotReady": "A autenticação não está pronta. Recarregue e tente novamente.",
+      "ssoMissingFields": "O registo necessita de mais informações: {{fields}}. Registe-se com e-mail.",
+      "ssoSignUpIncomplete": "O registo via {{provider}} necessita de informações adicionais. Registe-se com e-mail.",
+      "signUpNotCompleted": "Não foi possível concluir o registo. Tente novamente.",
+      "verificationNotCompleted": "Não foi possível concluir a verificação. Tente novamente.",
+      "codePlaceholder": "Introduza o código de 6 dígitos",
+      "verifyButton": "Verificar",
+      "resendCode": "Reenviar código",
+      "useDifferentEmail": "Usar um e-mail diferente",
+      "backToSignIn": "Voltar ao início de sessão"
     },
     "forgotPassword": {
       "title": "Esqueceu a senha?",
@@ -159,7 +212,20 @@
       "resetPasswordTitle": "Redefinir senha",
       "resetCodeLabel": "Código de redefinição",
       "newPasswordLabel": "Nova senha",
-      "enterCodeAndPassword": "Introduza o código enviado para <email>{{email}}</email> e a sua nova palavra-passe"
+      "enterCodeAndPassword": "Introduza o código enviado para <email>{{email}}</email> e a sua nova palavra-passe",
+      "timeoutMessage": "Não conseguimos contactar o serviço de reposição a tempo. Verifique a sua ligação e tente novamente.",
+      "resetSuccessActivationError": "A sua palavra-passe foi reposta, mas não conseguimos iniciar a sua sessão automaticamente.",
+      "resetNotCompleted": "Não foi possível concluir a reposição da palavra-passe. Tente novamente.",
+      "retryActivationFailed": "Ainda não conseguimos iniciar a sua sessão. Use o link abaixo para iniciar sessão com a sua nova palavra-passe.",
+      "signInWithNewPassword": "Iniciar sessão com a nova palavra-passe",
+      "codePlaceholder": "Introduza o código de 6 dígitos",
+      "newPasswordPlaceholder": "Introduza a nova palavra-passe",
+      "resetPasswordButton": "Repor palavra-passe",
+      "resendCode": "Reenviar código",
+      "useDifferentEmail": "Usar um e-mail diferente",
+      "backToSignIn": "Voltar ao início de sessão",
+      "emailPlaceholder": "voce@exemplo.com",
+      "sendResetCode": "Enviar código de reposição"
     }
   },
   "guards": {
@@ -220,7 +286,17 @@
       "subjectsLoadError": "Não foi possível carregar as tuas disciplinas agora",
       "subjectsLoadErrorHint": "Ainda podes iniciar uma sessão ou tentar outra ação.",
       "a11yOpenMyNotes": "Abrir minhas notas",
-      "a11yRetrySubjects": "Tentar carregar matérias novamente"
+      "a11yRetrySubjects": "Tentar carregar matérias novamente",
+      "subjectHintPreparing": "A configurar {{name}}...",
+      "subjectHintOpen": "Abrir",
+      "subjectHintContinueTopic": "Continuar {{topic}}",
+      "subjectHintContinueSubject": "Continuar {{name}}",
+      "subjectHintQuiz": "Quiz: {{topic}}",
+      "subjectHintPractice": "Praticar: {{name}}",
+      "coachBandResumeSession": "Continue de onde parou em {{name}}.",
+      "coachBandResumeSessionNoName": "Continue de onde parou na sua sessão.",
+      "coachBandResumeTarget": "Continue de onde parou em {{name}}.",
+      "coachBandRevisitTopic": "Revisite {{topic}} — está a começar a desvanecer-se."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -314,14 +390,19 @@
       "addLearner": {
         "title": "Adicionar aluno",
         "accessibilityLabel": "Adicionar um aluno à sua família"
-      }
+      },
+      "childProfileLabel": "Perfil de {{name}}",
+      "greetingFallbackName": "Olá"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Dispensar recomendação",
-      "a11yLoadingCard": "Carregando cartão do tutor"
+      "a11yLoadingCard": "Carregando cartão do tutor",
+      "thisMorning": "ESTA MANHÃ",
+      "thisAfternoon": "ESTA TARDE",
+      "tonight": "ESTA NOITE"
     },
     "earlyAdopter": {
       "badge": "Utilizador pioneiro — o teu feedback molda o MentoMate",
@@ -329,6 +410,18 @@
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} tópicos"
+    },
+    "intentCard": {
+      "titleWithBadge": "{{title}}, {{count}} itens",
+      "opensActivityHint": "Abre esta atividade"
+    },
+    "engagementChip": {
+      "curious": "Curioso",
+      "stuck": "Bloqueado",
+      "breezing": "À vontade",
+      "focused": "Focado",
+      "scattered": "Disperso",
+      "a11yLabel": "Envolvimento: {{label}}"
     }
   },
   "nudge": {
@@ -789,7 +882,12 @@
       "wrapping": "A terminar...",
       "exit": "Sair",
       "retryClassification": "Tentar classificação novamente",
-      "skipWarmup": "Saltar o aquecimento, entrar já"
+      "skipWarmup": "Saltar o aquecimento, entrar já",
+      "a11yWrapping": "A terminar",
+      "a11yDone": "Terminei",
+      "subtitleClassifying": "A descobrir do que se trata...",
+      "subtitleExpired": "Sessão expirada - inicie uma nova.",
+      "subtitleUnreachable": "Servidor inacessível - as mensagens podem falhar"
     },
     "inputModeToggle": {
       "text": "Texto",
@@ -840,7 +938,8 @@
       "progressLabel_one": "Progresso do livro: {{count}} página",
       "progressLabel_other": "Progresso do livro: {{count}} páginas",
       "pageCount_one": "{{count}} página",
-      "pageCount_other": "{{count}} páginas"
+      "pageCount_other": "{{count}} páginas",
+      "a11yComplete": "O seu livro está pronto — toque para continuar"
     },
     "quickChips": {
       "hintLabel": "Dica",
@@ -874,6 +973,38 @@
       "helpful": "Mantendo este ritmo.",
       "notHelpful": "Ajustando a explicação.",
       "incorrect": "Vou corrigir isso."
+    },
+    "disabledReason": {
+      "offline": "Está offline — a entrada voltará quando se reconectar",
+      "expired": "Esta sessão terminou",
+      "quotaReached": "O seu limite de sessões foi atingido",
+      "chooseSave": "Escolha onde guardar esta sessão"
+    },
+    "imageAttach": {
+      "timeout": "A sua foto demorou muito tempo a carregar, por isso vou começar apenas com o texto. Se algo parecer estranho, toque na câmara novamente para tentar de novo.",
+      "failed": "Não consegui abrir a sua foto, por isso vou começar apenas com o texto. Se algo parecer estranho, toque na câmara novamente para tentar de novo."
+    },
+    "tellMentor": {
+      "parent": {
+        "title": "Diga ao Tutor",
+        "description": "Adicione algo importante para o tutor se lembrar sobre esta criança.",
+        "descriptionWithName": "Adicione algo importante para o tutor se lembrar sobre {{childName}}.",
+        "placeholder": "Eles dão-se melhor com exemplos curtos e ainda têm dificuldades com frações."
+      },
+      "adult": {
+        "title": "Adicionar uma Nota para o seu Tutor",
+        "description": "Adicione algo que queira que o seu tutor se lembre para sessões futuras.",
+        "placeholder": "Exemplos ajudam-me mesmo a entender frações."
+      },
+      "teen": {
+        "title": "Diga Algo ao seu Tutor",
+        "description": "Adicione o que o ajuda a aprender, o que gosta ou o que ainda acha difícil.",
+        "placeholder": "Exemplos ajudam-me mesmo a entender frações."
+      }
+    },
+    "voiceToggle": {
+      "a11yMute": "Silenciar voz da IA",
+      "a11yUnmute": "Ativar som da voz da IA"
     }
   },
   "quiz": {
@@ -1023,7 +1154,15 @@
       "youSaid": "Você disse: {{answer}}",
       "youSkipped": "Você pulou esta pergunta",
       "noAnswer": "Você não respondeu",
-      "playAgain": "Jogar novamente"
+      "playAgain": "Jogar novamente",
+      "tierPerfectTitle": "Ronda perfeita!",
+      "tierGreatTitle": "Ótima ronda!",
+      "tierNiceTitle": "Bom esforço!",
+      "questionFallback": "Pergunta",
+      "a11yYouSaid": "Você disse {{answer}}",
+      "a11yYouSkipped": "Você saltou esta pergunta",
+      "a11yNoAnswer": "Você não respondeu",
+      "a11yCorrectAnswer": "Resposta correta {{answer}}"
     },
     "guessWhoQuestion": {
       "typeAName": "Escreve um nome",
@@ -1035,7 +1174,11 @@
       "iDontKnow": "Não sei",
       "iDontKnowLabel": "Não sei a resposta",
       "clue": "Pista {{number}}",
-      "fallbackPrompt": "Precisa de uma alternativa? Escolha uma:"
+      "fallbackPrompt": "Precisa de uma alternativa? Escolha uma:",
+      "hintWithMCAvailableWrong": "Não é bem isso. Aqui está outra pista, e a escolha múltipla está agora disponível.",
+      "hintWithMCAvailable": "Aqui está outra pista. A escolha múltipla também está agora disponível.",
+      "hintWrong": "Não é bem isso. Aqui está outra pista.",
+      "hint": "Aqui está outra pista."
     }
   },
   "dictation": {
@@ -1255,7 +1398,8 @@
       "suggestionAdd": "Adicionar à estante",
       "levelSubject": "Disciplina",
       "levelBook": "Livro",
-      "levelTopic": "Tema"
+      "levelTopic": "Tema",
+      "loadErrorFallback": "Não foi possível carregar esta prateleira. Tente novamente."
     },
     "noteMenu": {
       "title": "Opções de nota",
@@ -1298,7 +1442,11 @@
       "mastered": "Dominado",
       "strongReviewProgress": "{{strong}}/{{total}} revisões fortes",
       "notesSavedCount_one": "{{count}} nota salva para este tópico",
-      "notesSavedCount_other": "{{count}} notas salvas para este tópico"
+      "notesSavedCount_other": "{{count}} notas salvas para este tópico",
+      "minTotalSuffix": " · {{minutes}} min no total",
+      "bookmarkFromChat": "Do chat · {{date}}",
+      "a11yAddNote": "Adicionar uma nota",
+      "a11yAddFirstNote": "Adicione a sua primeira nota para este tópico"
     },
     "book": {
       "readyToOpen": "Pronto para abrir",
@@ -1366,7 +1514,15 @@
       "a11yBookComplete": "{{title}} concluído. {{topics}} tópicos estudados.",
       "genericTitle": "Livro",
       "a11ySectionCollapse": "{{label}}. {{summary}}. Recolher secção.",
-      "a11ySectionExpand": "{{label}}. {{summary}}. Expandir secção."
+      "a11ySectionExpand": "{{label}}. {{summary}}. Expandir secção.",
+      "notesEmptySummary": "Adicione a sua primeira nota para este livro",
+      "moveOnlyBookAlert": "Este é o único livro nesta prateleira — não há para onde mover este tópico.",
+      "topicFallback": "Tópico",
+      "loadErrorFallback": "Não foi possível carregar este livro.",
+      "a11yAddFirstNote": "Adicione a sua primeira nota para este livro",
+      "a11yAddNote": "Adicionar uma nota",
+      "a11yCollapseSessions": "Recolher conversas passadas",
+      "a11yExpandSessions": "Expandir conversas passadas"
     },
     "inactiveFallbackBanner": {
       "message": "Não foi possível carregar as tuas matérias pausadas e arquivadas. Toca para tentar de novo — elas não desapareceram."
@@ -1380,7 +1536,74 @@
     "a11yClearSearch": "Limpar busca",
     "a11yEditNote": "Editar anotação",
     "a11yDeleteNote": "Excluir anotação",
-    "a11yCloseTopicPicker": "Fechar seletor de tópicos"
+    "a11yCloseTopicPicker": "Fechar seletor de tópicos",
+    "myNotes": {
+      "subtitleBookmarks_one": "1 resposta guardada",
+      "subtitleBookmarks_other": "{{count}} respostas guardadas",
+      "subtitleNotes_one": "1 nota",
+      "subtitleNotes_other": "{{count}} notas",
+      "subtitleSessions_one": "1 sessão",
+      "subtitleSessions_other": "{{count}} sessões",
+      "searchA11y": "Pesquisar {{kind}}"
+    },
+    "pickBook": {
+      "loadingFinding": "A encontrar livros novos para si...",
+      "loadingPicking": "A escolher livros para sugerir...",
+      "loadingAlmost": "Quase lá...",
+      "emptyCooldown": "Acabámos de tentar carregar novas sugestões e ainda não estão prontas. Tente novamente dentro de alguns minutos, ou digite um livro ou tópico para adicionar.",
+      "emptyNetworkError": "Não conseguimos carregar sugestões neste momento. Tente novamente, ou digite um livro ou tópico para adicionar.",
+      "emptyParse": "As sugestões não chegaram corretamente. Tente novamente, ou digite um livro ou tópico para adicionar.",
+      "emptyLockLoser": "Outro pedido já está a carregar sugestões. Tente novamente dentro de momentos.",
+      "emptyLanguageSubject": "Esta disciplina usa um fluxo de aprendizagem diferente. Digite o livro ou tópico que quer estudar.",
+      "emptyAllFiltered": "Esgotámos as sugestões óbvias para esta disciplina. Digite o próximo livro ou tópico que quer adicionar.",
+      "emptyDefault": "Ainda não há sugestões. Digite um livro ou tópico que queira adicionar."
+    },
+    "relearn": {
+      "thisTopicFallback": "este tópico",
+      "addedFromChildNamed": "Adicionado da aprendizagem de {{name}}.",
+      "addedFromChild": "Adicionado da aprendizagem de uma criança."
+    },
+    "collapsibleChapter": {
+      "a11yHeader": "{{title}}, {{notStarted}} de {{total}} tópicos não iniciados"
+    },
+    "inlineNote": {
+      "a11yCollapse": "Nota para {{topic}}. {{source}}. Toque para recolher.",
+      "a11yExpand": "Nota para {{topic}}. {{source}}. Toque para expandir.",
+      "a11yOpenSource": "Abrir sessão de origem para {{topic}}",
+      "a11yNoteOptions": "Opções de nota para {{topic}}"
+    },
+    "noteInput": {
+      "placeholder": "Escreva a sua nota..."
+    },
+    "retentionPill": {
+      "a11y": "Verificação de memória: {{label}}",
+      "a11yWithElapsed": "Verificação de memória: {{label}}, {{elapsed}}"
+    },
+    "sessionRow": {
+      "a11y": "{{title}}, {{date}}",
+      "a11yWithNote": "{{title}}, tem nota, {{date}}"
+    },
+    "topicStatusRow": {
+      "stateContinueNow": "Continuar agora",
+      "stateStarted": "Iniciado",
+      "stateUpNext": "A seguir",
+      "stateDone": "Concluído",
+      "stateLater": "Mais tarde",
+      "a11y": "{{state}}: {{title}}",
+      "a11yWithSubtitle": "{{state}}: {{title}}, {{subtitle}}"
+    },
+    "topicPicker": {
+      "a11yTopicWithChapter": "{{name}}, {{chapter}}"
+    },
+    "topicSessionRow": {
+      "a11y": "{{type}}, {{date}}, {{duration}}"
+    },
+    "bookCard": {
+      "a11y": "{{title}}. {{status}}. {{progress}}."
+    },
+    "searchResult": {
+      "a11y": "{{title}}, {{subtitle}}"
+    }
   },
   "topic": {
     "relevance": {
@@ -2054,7 +2277,31 @@
     },
     "subjectRow": {
       "hideTopics": "▴ Ocultar tópicos",
-      "seeTopics": "▾ Ver tópicos"
+      "seeTopics": "▾ Ver tópicos",
+      "masteredCount": "{{count}} dominados",
+      "actionContinue": "Continuar",
+      "actionExplore": "Explorar",
+      "a11yHintHide": "Toque para ocultar tópicos",
+      "a11yHintShow": "Toque para mostrar tópicos",
+      "a11yOpen": "Abrir progresso de {{name}}",
+      "a11yExpanded": "{{name}}, expandido",
+      "a11yCollapsed": "{{name}}, recolhido"
+    },
+    "topicStatus": {
+      "notStarted": "Não iniciado",
+      "mastered": "Dominado",
+      "needsReview": "Precisa de revisão",
+      "started": "Iniciado",
+      "covered": "Abordado"
+    },
+    "milestoneCard": {
+      "streakLength": "Sequência de {{count}} dias",
+      "subjectMastered": "Dominou {{subject}}",
+      "subjectMasteredFallback": "Dominou uma disciplina",
+      "bookCompleted": "Concluiu um livro",
+      "cefrLevelUp": "Nível de língua aumentado",
+      "topicsExplored": "Explorou {{count}} tópicos em {{subject}}",
+      "topicsExploredFallback": "Explorou {{count}} tópicos numa disciplina"
     }
   },
   "onboarding": {
@@ -2126,6 +2373,31 @@
     },
     "mentorBirth": {
       "ready": "O seu tutor está pronto."
+    },
+    "saveWizard": {
+      "startLesson": "Começar lição",
+      "openParentHome": "Abrir página inicial dos pais",
+      "switchProfileError": "Não foi possível trocar de perfil.",
+      "firstLessonReady": "A sua primeira lição está pronta.",
+      "firstLessonReadyWithTopic": "A sua primeira lição está pronta: {{topic}}."
+    },
+    "consent": {
+      "profileNotOwnedError": "Este perfil não pertence à sua conta."
+    },
+    "createProfile": {
+      "timeoutError": "A criação do seu perfil está a demorar muito tempo. Verifique a sua ligação e tente novamente.",
+      "displayNameTooLong": "O nome de exibição deve ter 50 caracteres ou menos.",
+      "childNamePlaceholder": "Introduza o nome do seu filho",
+      "namePlaceholder": "Introduza o nome",
+      "childBirthDateAccessLabel": "Data de nascimento da criança",
+      "birthDateAccessLabel": "Data de nascimento",
+      "selectChildBirthDateLabel": "Selecione a data de nascimento da criança",
+      "selectBirthDateLabel": "Selecione a data de nascimento",
+      "addChildButton": "Adicionar criança"
+    },
+    "profiles": {
+      "roleParent": "Pai/Mãe",
+      "roleLearner": "Aluno"
     }
   },
   "parentView": {
@@ -2665,7 +2937,10 @@
       "quotaResets": "A quota é reposta a {{date}}",
       "renews": "A subscrição renova a {{date}}",
       "dailyLimitHint": "Limite diário — reposto à meia-noite"
-    }
+    },
+    "accessUntil": "Acesso até {{date}}",
+    "renewsOn": "Renova a {{date}}",
+    "memberOwnerLabel": "{{name}} (proprietário)"
   },
   "sessionSummary": {
     "mentorMemoryCue": {
@@ -2770,7 +3045,9 @@
       "duration_other": "{{count}} minutos - ótima sessão!",
       "exchanges_one": "Você concluiu {{count}} troca",
       "exchanges_other": "Você concluiu {{count}} trocas"
-    }
+    },
+    "a11yContinueLearning": "Continuar a aprender",
+    "a11yContinueToHome": "Continuar para a página inicial"
   },
   "sessionTranscript": {
     "archived": {
@@ -3462,7 +3739,26 @@
     "bothChildFirstLabel": "Configurar primeiro para o meu filho",
     "bothChildFirstDescription": "Vamos começar com o seu filho e depois voltamos a si.",
     "bothSelfFirstLabel": "Experimentar primeiro uma lição",
-    "bothSelfFirstDescription": "Veja como funciona e depois configure para o seu filho após o registo."
+    "bothSelfFirstDescription": "Veja como funciona e depois configure para o seu filho após o registo.",
+    "sampleGeographyTitle": "Geografia",
+    "sampleGeographyDescription": "Porque é que alguns lugares se tornam desertos",
+    "sampleFractionsTitle": "Frações",
+    "sampleFractionsDescription": "Compare pedaços sem adivinhar",
+    "sampleWritingTitle": "Escrita",
+    "sampleWritingDescription": "Planeie um parágrafo claro",
+    "sampleGeographyMentor": "Vamos experimentar geografia. Um deserto é definido pela baixa precipitação, não pelo calor. Porque é que a terra atrás das montanhas pode permanecer seca?",
+    "sampleGeographyLearner": "Porque a chuva cai antes de o ar lá chegar?",
+    "sampleGeographyFollowUp": "Exatamente. As montanhas podem espremer a humidade de um lado, deixando o ar mais seco do outro. Isso chama-se sombra de chuva.",
+    "sampleFractionsMentor": "Vamos comparar frações. Se dois pedaços vêm do mesmo todo, o pedaço maior tem o número de baixo menor.",
+    "sampleFractionsLearner": "Então 1/2 é maior que 1/3?",
+    "sampleFractionsFollowUp": "Sim. Dividir algo em duas partes torna cada parte maior do que dividi-lo em três partes.",
+    "sampleWritingMentor": "Vamos planear um parágrafo. Comece com a única coisa em que quer que o leitor acredite.",
+    "sampleWritingLearner": "Então devo escolher o ponto principal antes dos exemplos?",
+    "sampleWritingFollowUp": "Certo. Assim que o ponto principal estiver claro, os exemplos têm uma função em vez de parecerem aleatórios.",
+    "sampleGenericMentorWithTopic": "Vamos trabalhar em {{topic}}. Vou mostrar uma ideia e depois fazer uma verificação rápida.",
+    "sampleGenericMentor": "Vamos experimentar uma amostra rápida. Vou mostrar uma ideia e depois fazer uma verificação rápida.",
+    "sampleGenericLearner": "Não tenho a certeza de como começar.",
+    "sampleGenericFollowUp": "Esse é um bom ponto de partida. Vamos tornar o primeiro passo concreto e depois construir a partir daí."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} palavra aprendida",
@@ -3712,5 +4008,57 @@
     "openAccount": "Abrir configurações da conta",
     "security": "Segurança da conta",
     "familySettings": "Configurações da família"
+  },
+  "guardian": {
+    "couldNotEnableMemory": "Não foi possível ativar a memória",
+    "couldNotSavePreference": "Não foi possível guardar a preferência",
+    "completionStatus": {
+      "notStarted": "Não iniciado",
+      "inProgress": "Iniciado",
+      "completed": "Concluído",
+      "verified": "Verificado",
+      "stable": "Estável"
+    },
+    "subjectFallback": "Disciplina",
+    "latestWeekFallback": "Última semana",
+    "learningStyle": {
+      "prefersExplanations": "Prefere explicações {{types}}",
+      "prefersStepByStep": "Prefere um ritmo passo a passo",
+      "prefersQuickerPace": "Prefere um ritmo mais rápido",
+      "likesChallenge": "Gosta de um desafio",
+      "needsEncouragement": "Precisa de incentivo extra quando o trabalho se torna difícil"
+    },
+    "focusArea": {
+      "confidenceHigh": "A aparecer muito ultimamente",
+      "confidenceMedium": "Padrão repetido",
+      "confidenceLow": "Sinal precoce"
+    },
+    "sourceBadge": {
+      "learner": "Você disse ao seu tutor",
+      "parent": "Adicionado pelos pais"
+    },
+    "remove": "Remover"
+  },
+  "appShell": {
+    "profileLoadErrorTitle": "Não conseguimos carregar o seu perfil"
+  },
+  "analogyPicker": {
+    "noPreferenceLabel": "Sem preferência",
+    "noPreferenceDescription": "Use a analogia que melhor se adequar",
+    "cookingLabel": "Culinária",
+    "cookingDescription": "Receitas, ingredientes, técnicas de cozinha",
+    "sportsLabel": "Desportos",
+    "sportsDescription": "Jogos, equipas, estratégias de treino",
+    "buildingLabel": "Construção",
+    "buildingDescription": "Construção, arquitetura, ferramentas",
+    "musicLabel": "Música",
+    "musicDescription": "Instrumentos, ritmo, composição",
+    "natureLabel": "Natureza",
+    "natureDescription": "Plantas, animais, ecossistemas",
+    "gamingLabel": "Jogos",
+    "gamingDescription": "Níveis, missões, mecânicas de jogo"
+  },
+  "usageMeter": {
+    "a11yProgressBar": "Utilização: {{used}} de {{limit}} perguntas utilizadas"
   }
 }

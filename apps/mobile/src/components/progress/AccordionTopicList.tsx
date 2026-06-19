@@ -5,6 +5,7 @@ import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
 import { childProfileHref } from '../../lib/navigation';
 import { RetentionSignal, type RetentionStatus } from './RetentionSignal';
+import type { Translate } from '../../i18n';
 
 interface AccordionTopicListProps {
   childProfileId: string;
@@ -22,24 +23,24 @@ function TopicSkeleton(): React.ReactElement {
   );
 }
 
-function getTopicStatusLabel(topic: TopicProgress): string {
+function getTopicStatusLabel(topic: TopicProgress, t: Translate): string {
   if (topic.completionStatus === 'not_started') {
-    return 'Not started';
+    return t('progress.topicStatus.notStarted');
   }
 
   if (topic.xpStatus === 'verified') {
-    return 'Mastered';
+    return t('progress.topicStatus.mastered');
   }
 
   if (topic.xpStatus === 'decayed') {
-    return 'Needs review';
+    return t('progress.topicStatus.needsReview');
   }
 
   if (topic.completionStatus === 'in_progress') {
-    return 'Started';
+    return t('progress.topicStatus.started');
   }
 
-  return 'Covered';
+  return t('progress.topicStatus.covered');
 }
 
 export function AccordionTopicList({
@@ -127,7 +128,7 @@ export function AccordionTopicList({
             </Text>
             <View className="flex-row items-center gap-2">
               <Text className="text-caption text-text-secondary">
-                {getTopicStatusLabel(topic)}
+                {getTopicStatusLabel(topic, t)}
               </Text>
               {topic.retentionStatus &&
               topic.totalSessions >= 1 &&

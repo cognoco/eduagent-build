@@ -1,5 +1,6 @@
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
 
 type TellMentorAudience = 'learner' | 'parent';
@@ -15,6 +16,7 @@ interface TellMentorInputProps {
 }
 
 function getCopy(
+  t: TFunction,
   audience: TellMentorAudience,
   birthYear?: number | null,
   childName?: string,
@@ -26,12 +28,11 @@ function getCopy(
 } {
   if (audience === 'parent') {
     return {
-      title: 'Tell the Mentor',
-      description: `Add something important for the mentor to remember about ${
-        childName ?? 'this child'
-      }.`,
-      placeholder:
-        'They do best with short examples and still get stuck on fractions.',
+      title: t('session.tellMentor.parent.title'),
+      description: childName
+        ? t('session.tellMentor.parent.descriptionWithName', { childName })
+        : t('session.tellMentor.parent.description'),
+      placeholder: t('session.tellMentor.parent.placeholder'),
       suggestions: [],
     };
   }
@@ -42,19 +43,17 @@ function getCopy(
 
   if (bracket === 'adult') {
     return {
-      title: 'Add a Note for Your Mentor',
-      description:
-        'Add something you want your mentor to remember for future sessions.',
-      placeholder: 'Examples really help me understand fractions.',
+      title: t('session.tellMentor.adult.title'),
+      description: t('session.tellMentor.adult.description'),
+      placeholder: t('session.tellMentor.adult.placeholder'),
       suggestions: [],
     };
   }
 
   return {
-    title: 'Tell Your Mentor Something',
-    description:
-      'Add what helps you learn, what you enjoy, or what still feels tricky.',
-    placeholder: 'Examples really help me understand fractions.',
+    title: t('session.tellMentor.teen.title'),
+    description: t('session.tellMentor.teen.description'),
+    placeholder: t('session.tellMentor.teen.placeholder'),
     suggestions: [],
   };
 }
@@ -69,7 +68,7 @@ export function TellMentorInput({
   onSubmit,
 }: TellMentorInputProps) {
   const { t } = useTranslation();
-  const copy = getCopy(audience, birthYear, childName);
+  const copy = getCopy(t, audience, birthYear, childName);
   const disabled = isPending || value.trim().length === 0;
 
   return (
@@ -113,7 +112,7 @@ export function TellMentorInput({
         disabled={disabled}
         testID="tell-mentor-submit"
         accessibilityRole="button"
-        accessibilityLabel={isPending ? 'Saving' : 'Save'}
+        accessibilityLabel={isPending ? t('common.saving') : t('common.save')}
         className={`rounded-button px-4 py-3 items-center mt-3 ${
           disabled ? 'bg-primary/50' : 'bg-primary'
         }`}

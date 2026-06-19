@@ -104,14 +104,17 @@ function formatSessionsSummary(
     totalSeconds > 0 && totalSeconds < 60
       ? '<1'
       : String(Math.floor(totalSeconds / 60));
-  return `${t('library.sessionCount', { count: sessions.length })} · ${totalMinutes} min total`;
+  return `${t('library.sessionCount', { count: sessions.length })}${t('library.topic.minTotalSuffix', { minutes: totalMinutes })}`;
 }
 
 function formatBookmarkSourceLine(
   bookmark: Bookmark,
   locale: string | undefined,
+  t: Translate,
 ): string {
-  return `From chat · ${formatSessionDate(bookmark.createdAt, locale)}`;
+  return t('library.topic.bookmarkFromChat', {
+    date: formatSessionDate(bookmark.createdAt, locale),
+  });
 }
 
 interface TopicSectionStripProps {
@@ -915,8 +918,8 @@ export default function TopicDetailScreen() {
                     accessibilityRole="button"
                     accessibilityLabel={
                       noteCount > 0
-                        ? 'Add a note'
-                        : 'Add your first note for this topic'
+                        ? t('library.topic.a11yAddNote')
+                        : t('library.topic.a11yAddFirstNote')
                     }
                   >
                     <Text className="text-primary text-body-sm font-medium">
@@ -967,6 +970,7 @@ export default function TopicDetailScreen() {
                       sourceLine={formatBookmarkSourceLine(
                         bookmark,
                         i18n?.language,
+                        t,
                       )}
                       onPress={() => handleSessionPress(bookmark.sessionId)}
                     />

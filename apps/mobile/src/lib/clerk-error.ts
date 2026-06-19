@@ -1,3 +1,5 @@
+import { i18next } from '../i18n';
+
 export interface ClerkError {
   message?: string;
   longMessage?: string;
@@ -5,7 +7,7 @@ export interface ClerkError {
 
 export function extractClerkError(
   err: unknown,
-  fallback = 'Something went wrong. Please try again.',
+  fallback = i18next.t('errors.clerkGeneric'),
 ): string {
   const clerkErrors = (err as { errors?: ClerkError[] }).errors;
   return clerkErrors?.[0]?.longMessage ?? clerkErrors?.[0]?.message ?? fallback;

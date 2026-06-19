@@ -17,9 +17,9 @@ import {
   useMarkProfileWeeklyReportViewed,
 } from '../../../../hooks/use-progress';
 
-function formatWeeklyReportRange(weekStart: string): string {
+function formatWeeklyReportRange(weekStart: string, fallback: string): string {
   const start = new Date(`${weekStart}T00:00:00Z`);
-  if (Number.isNaN(start.getTime())) return 'Weekly report';
+  if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
   const startLabel = start.toLocaleDateString(undefined, {
@@ -92,7 +92,10 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
               {report
-                ? formatWeeklyReportRange(report.reportData.weekStart)
+                ? formatWeeklyReportRange(
+                    report.reportData.weekStart,
+                    t('parentView.weeklyReport.weeklyReport'),
+                  )
                 : t('parentView.weeklyReport.weeklyReport')}
             </Text>
             <Text className="text-body-sm text-text-secondary mt-0.5">

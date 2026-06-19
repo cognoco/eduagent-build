@@ -252,8 +252,8 @@ export function ConsentPendingGate(): React.ReactElement {
                     onPress: () => {
                       void switchProfile(prompt.target.id).catch(() => {
                         platformAlert(
-                          'Could not switch profile',
-                          'Please try again.',
+                          t('tabs.switchProfile.errorTitle'),
+                          t('tabs.switchProfile.errorMessage'),
                         );
                       });
                     },

@@ -1518,7 +1518,9 @@ export default function SessionSummaryScreen() {
             className="bg-primary rounded-button py-3 items-center mt-2"
             testID="continue-button"
             accessibilityLabel={
-              isAlreadyPersisted ? 'Continue learning' : 'Continue to home'
+              isAlreadyPersisted
+                ? t('sessionSummary.a11yContinueLearning')
+                : t('sessionSummary.a11yContinueToHome')
             }
             accessibilityRole="button"
           >

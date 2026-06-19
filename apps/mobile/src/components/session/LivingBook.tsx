@@ -139,7 +139,7 @@ export function LivingBook({
         onPress,
         accessibilityRole: 'button' as const,
         accessibilityLabel: isComplete
-          ? 'Your book is ready — tap to continue'
+          ? t('session.livingBook.a11yComplete')
           : t('session.livingBook.progressLabel', { count: exchangeCount }),
       }
     : {
