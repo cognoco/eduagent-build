@@ -843,9 +843,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
         : null;
 
       // Email channel: send when weekly_progress_email = true AND parent has
-      // accounts.email. The Resend call is isolated in its own Inngest step;
-      // if the later notification-log write fails, retries reuse this step's
-      // completed result instead of calling Resend a second time.
+      // accounts.email. The Resend call and the notificationLog write are combined
+      // in a single Inngest step so they are atomic: a step retry replays the
+      // Resend call (idempotency key prevents a double-send) AND re-writes the
+      // log row (idempotent via DB upsert semantics). The old split design
+      // (send step → separate log step) left a window where the email could be
+      // delivered but the log step exhausted retries, breaking the 24h dedup gate
+      // on replay. [BUG-842]
       let emailSent = false;
       if (prepared.shouldSendEmail && prepared.hasParentEmail) {
         const emailResult = await step.run(
@@ -934,7 +938,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
               childSummaries,
               struggleLines,
             );
-            return sendEmail(emailPayload, {
+            const result = await sendEmail(emailPayload, {
               resendApiKey: getStepResendApiKey(),
               idempotencyKey: buildLegacyEmailIdempotencyKey(
                 'weekly',
@@ -942,20 +946,24 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
                 prepared.reportWeek,
               ),
             });
+            // [BUG-842] Write the notificationLog atomically with the send.
+            // Keeping this inside the same step means a step retry replays
+            // sendEmail (the idempotency key prevents a double-send to Resend)
+            // AND re-writes the log row — so the 24h dedup gate in
+            // prepare-weekly-progress-digest is never left without evidence
+            // of a delivered email.
+            if (result.sent) {
+              await logNotification(
+                db,
+                parentId,
+                'weekly_progress',
+                `email-${prepared.reportWeek}`,
+              );
+            }
+            return result;
           },
         );
         emailSent = emailResult.sent;
-        if (emailSent) {
-          await step.run('log-weekly-progress-email', async () => {
-            const db = getStepDatabase();
-            await logNotification(
-              db,
-              parentId,
-              'weekly_progress',
-              `email-${prepared.reportWeek}`,
-            );
-          });
-        }
       } else if (prepared.shouldSendEmail) {
         // Expected: OAuth-only accounts or Clerk not exposing email field.
         // emailSent flag in the return value already provides observability.

@@ -1304,3 +1304,110 @@ describe('send-step rehydration is pinned to the prepare-time snapshot', () => {
     expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
   });
 });
+
+// [BUG-842] Email delivery and notification log must be atomic.
+// The old split-step design (send-weekly-progress-email → log-weekly-progress-email)
+// allowed the email to be delivered without a corresponding notificationLog row
+// when Inngest exhausted retries on the log step. The fix collapses both
+// operations into a single step so the log is always written when the email
+// is sent, eliminating the dedup integrity gap on replay.
+describe('[BUG-842] email send and notificationLog write are atomic', () => {
+  // Shared prepare payload: push disabled, email enabled with a live parent address.
+  const preparedDigest = {
+    status: 'prepared',
+    parentId: PARENT_ID,
+    reportWeek: '2026-05-11',
+    childDigests: [{ childProfileId: CHILD_ID, snapshotDate: '2026-05-13' }],
+    shouldSendPush: false,
+    shouldSendEmail: true,
+    hasParentEmail: true,
+  };
+
+  function seedEmailSendDb(): void {
+    // Satisfies parent/child live checks, email address lookup, and child name
+    // lookup in one blanket mock (all profiles.findFirst calls return this row).
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      accountId: 'account-1',
+      displayName: 'Alex',
+    });
+    mockDb.query.accounts.findFirst.mockResolvedValue({
+      email: 'parent@example.com',
+    });
+    // Current + previous snapshot ensures topic delta > 0 so buildChildWeeklyDigestLine
+    // produces a non-null summaryLine and childSummaries.length > 0.
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+  }
+
+  it('[BUG-842] notificationLog is written inside the send step — log survives a step-boundary failure', async () => {
+    // Simulate the atomicity gap: Inngest delivered the email but then exhausted
+    // retries on the separate log step. In the old split design, the log step
+    // failing means logNotification was never called and the dedup row is missing.
+    // After the fix, logNotification is called inside the send step, so it is
+    // written before Inngest memoizes the step result — no gap.
+    //
+    // The test runs the send step normally and verifies logNotification was
+    // called WITHOUT a separate log step (the fixed step name is absent from the
+    // step runner's run calls).
+    seedEmailSendDb();
+    mockSendEmail.mockResolvedValue({ sent: true });
+
+    const { step, runCalls } = createInngestStepRunner({
+      runResults: { 'prepare-weekly-progress-digest': preparedDigest },
+    });
+    const handler = (
+      weeklyProgressPushGenerate as unknown as {
+        fn: (ctx: {
+          event: { data: Record<string, unknown>; name: string };
+          step: typeof step;
+        }) => Promise<unknown>;
+      }
+    ).fn;
+    const result = await handler({
+      event: {
+        data: { parentId: PARENT_ID },
+        name: 'app/weekly-progress-push.generate',
+      },
+      step,
+    });
+
+    // Email was dispatched.
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    // notificationLog must be written inside the send step — not as a
+    // separate step that can fail after the email is already delivered.
+    expect(mockLogNotification).toHaveBeenCalledTimes(1);
+    expect(mockLogNotification).toHaveBeenCalledWith(
+      mockDb,
+      PARENT_ID,
+      'weekly_progress',
+      'email-2026-05-11',
+    );
+    // The old broken code ran a separate 'log-weekly-progress-email' step;
+    // after the fix that step is gone — only 'send-weekly-progress-email' runs.
+    const stepNames = runCalls.map((c: { name: string }) => c.name);
+    expect(stepNames).not.toContain('log-weekly-progress-email');
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+  });
+
+  it('[BUG-842] notificationLog is not written when email send returns sent:false', async () => {
+    seedEmailSendDb();
+    // Resend returns failure (e.g. API error after retries).
+    mockSendEmail.mockResolvedValue({ sent: false, reason: 'resend_error' });
+
+    await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      { runResults: { 'prepare-weekly-progress-digest': preparedDigest } },
+    );
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    // No log when email was not actually delivered.
+    expect(mockLogNotification).not.toHaveBeenCalled();
+  });
+});
