@@ -1,13 +1,14 @@
-# Flow: Family Pool Section Visibility [BILLING-08]
+# Flow: Family Pool Section + Member Removal [BILLING-08]
 # Validates: the family pool section (shared quota, member list) is visible
-# on the subscription screen for a Family-tier user.
-# The section is rendered only when subscription.tier === 'family'.
+# on the subscription screen for a Family-tier user, and the owner can remove
+# a same-account non-owner child from the family plan.
 #
 # Tags: nightly, billing
 #
 # Journey: UX Journey 5 (Billing & Subscription)
 # Epics: Epic 5 (FR95-FR100), Epic 9 (RevenueCat IAP)
-# Prerequisite: Seeded user on active Family subscription (scenario: subscription-family-active)
+# Prerequisite: Seeded user on active Family subscription with removable children
+# (scenario: mentor-audit-family-pool-members)
 appId: com.mentomate.app
 tags:
   - nightly
@@ -17,13 +18,13 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "subscription-family-active"
+      SEED_SCENARIO: "mentor-audit-family-pool-members"
       API_URL: ${API_URL}
 
-# 2. Verify home screen loaded
+# 2. Verify family home screen loaded
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: "parent-home-screen"
     timeout: 15000
 
 # 3. Navigate to More tab
@@ -84,3 +85,31 @@ tags:
     id: "family-pool-section"
 
 - takeScreenshot: family-pool-section-visible
+
+# 9. A non-owner child from the seed should be removable.
+- extendedWaitUntil:
+    visible:
+      id: "remove-family-member-${CHILD_PROFILE_ID1}"
+    timeout: 15000
+
+- tapOn:
+    id: "remove-family-member-${CHILD_PROFILE_ID1}"
+
+# 10. Confirm the native destructive alert.
+- tapOn:
+    text: "Remove"
+
+# 11. The list refreshes after removal and the removed child row disappears.
+- extendedWaitUntil:
+    notVisible:
+      id: "family-member-${CHILD_PROFILE_ID1}"
+    timeout: 15000
+
+- assertVisible:
+    id: "family-member-${CHILD_PROFILE_ID2}"
+
+- tapOn:
+    text: "OK"
+    optional: true  # justified: native success alert may auto-dismiss on some drivers
+
+- takeScreenshot: family-pool-member-removed

@@ -656,6 +656,7 @@ describe('resetDatabase', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     const result = await resetDatabase(db, {}, { prefix: 'e2e-' });
@@ -1171,6 +1172,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     await seedScenario(
@@ -1218,6 +1220,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     await seedScenario(
@@ -1282,6 +1285,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .fn()
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     const result = await seedScenario(
@@ -1308,6 +1312,12 @@ describe('mentor-audit seed pack returns required IDs', () => {
           !(row.roles as string[]).includes('admin'),
       ),
     ).toHaveLength(2);
+
+    const ownerRow = captured.find(
+      (row) => row.id === result.ids.parentProfileId,
+    );
+    expect(ownerRow).toBeDefined();
+    expect(ownerRow?.defaultAppContext).toBe('family');
 
     // Quota pool row must reflect partial use (~50% of monthly cap) — the
     // audit reads this to verify the steady-state pool readout.
@@ -1433,6 +1443,7 @@ describe('mentor-audit seed pack returns required IDs', () => {
           .mockReturnValue({ returning: jest.fn().mockResolvedValue([]) }),
       }),
       query: { accounts: { findMany: jest.fn().mockResolvedValue([]) } },
+      execute: jest.fn().mockResolvedValue({ rows: [{ reg: null }] }),
     } as unknown as Database;
 
     const result = await seedScenario(
