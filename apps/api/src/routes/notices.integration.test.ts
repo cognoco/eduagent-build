@@ -11,6 +11,7 @@
  *   3. Notice belongs to another profile → 404 (scoped, must not leak existence).
  *   4. Invalid UUID param → 400 via zValidator.
  *   5. Missing JWT → 401.
+ *   6. Retry of an already-seen notice → 200 { seen: true } (idempotent, not 404).
  *
  * External boundaries mocked (per GC1/test rules):
  *   - Clerk JWKS (fetch interceptor)
@@ -221,6 +222,40 @@ describe('Integration: POST /v1/notices/:id/seen', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  it('returns 200 { seen: true } on a retry (idempotent — already-seen notice must not 404)', async () => {
+    const noticeId = await seedNotice(profileId);
+
+    // First call — marks seen.
+    const res1 = await app.request(
+      `/v1/notices/${noticeId}/seen`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+    expect(res1.status).toBe(200);
+
+    // Second call (simulates client retry after lost response) — must also succeed.
+    const res2 = await app.request(
+      `/v1/notices/${noticeId}/seen`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+    expect(res2.status).toBe(200);
+    const body2 = (await res2.json()) as Record<string, unknown>;
+    expect(body2).toMatchObject({ seen: true });
   });
 
   it('returns 401 when the request has no JWT', async () => {
