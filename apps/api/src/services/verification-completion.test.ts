@@ -88,7 +88,9 @@ function createMockDb({ selectResults = [] as unknown[][] } = {}): Database {
     select: selectMock,
     update: jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+        }),
       }),
     }),
   } as unknown as Database;
@@ -456,11 +458,15 @@ describe('processEvaluateCompletion', () => {
     // Track the id passed into the where() clause of the session event update.
     // We build a custom update mock that records the structured-assessment set payload
     // and the where arguments separately for the two update calls (card vs event).
-    const eventUpdateWhereSpy = jest.fn().mockResolvedValue(undefined);
+    const eventUpdateWhereSpy = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+    });
     const eventUpdateSetSpy = jest
       .fn()
       .mockReturnValue({ where: eventUpdateWhereSpy });
-    const cardUpdateWhereSpy = jest.fn().mockResolvedValue(undefined);
+    const cardUpdateWhereSpy = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+    });
     const cardUpdateSetSpy = jest
       .fn()
       .mockReturnValue({ where: cardUpdateWhereSpy });

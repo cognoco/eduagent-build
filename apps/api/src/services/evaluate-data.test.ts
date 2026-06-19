@@ -48,7 +48,9 @@ const sessionId = 'session-001';
 function createMockDb(overrides?: {
   queryResults?: Record<string, unknown>;
 }): Database {
-  const updateSetWhere = jest.fn().mockResolvedValue(undefined);
+  const updateSetWhere = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+  });
   const updateSet = jest.fn().mockReturnValue({ where: updateSetWhere });
   const updateMock = jest.fn().mockReturnValue({ set: updateSet });
 

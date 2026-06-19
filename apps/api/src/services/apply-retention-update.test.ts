@@ -1,18 +1,22 @@
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
-  profiles,
   retentionCards,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import {
   applyRetentionUpdate,
   insertRetentionCardIfAbsent,
@@ -37,6 +41,8 @@ function createIntegrationDb(): Database {
 
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integ-apply-retention-${RUN_ID}`;
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 interface SeededTopic {
   profileId: string;
@@ -47,30 +53,37 @@ async function seedTopic(
   database: Database,
   label: string,
 ): Promise<SeededTopic> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  if (!account) throw new Error('account insert failed');
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  const clerkUserId = `${CLERK_PREFIX}-${label}`;
+  const email = `${CLERK_PREFIX}-${label}@test.invalid`;
 
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account.id,
-      displayName: `Apply Retention ${label}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  if (!profile) throw new Error('profile insert failed');
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
+  await ensureLegacyProfileAnchorForTest(database, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName: `Apply Retention ${label}`,
+    birthYear: 2010,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName: `Apply Retention ${label}`,
+    birthYear: 2010,
+    isOwner: true,
+  });
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -107,13 +120,17 @@ async function seedTopic(
     .returning({ id: curriculumTopics.id });
   if (!topic) throw new Error('topic insert failed');
 
-  return { profileId: profile.id, topicId: topic.id };
+  return { profileId, topicId: topic.id };
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
+  await deleteLegacyAccountsForTest(database, seededAccountIds);
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 async function readCard(database: Database, cardId: string) {

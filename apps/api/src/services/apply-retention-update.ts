@@ -100,28 +100,13 @@ export async function applyRetentionUpdate({
   ];
   if (guardPredicate) predicates.push(guardPredicate);
 
-  const updateQuery = db
+  const result = await db
     .update(retentionCards)
     .set(buildSetClause(set, updatedAt))
-    .where(and(...predicates));
+    .where(and(...predicates))
+    .returning({ id: retentionCards.id });
 
-  const returning = (
-    updateQuery as {
-      returning?: (fields: {
-        id: typeof retentionCards.id;
-      }) => Promise<Array<{ id: string }>>;
-    }
-  ).returning;
-
-  if (typeof returning === 'function') {
-    const result = await returning.call(updateQuery, { id: retentionCards.id });
-    return { updated: result.length > 0 };
-  }
-
-  // Older unit-test DB doubles model updates as the awaited where() result.
-  await updateQuery;
-
-  return { updated: true };
+  return { updated: result.length > 0 };
 }
 
 export async function insertRetentionCardIfAbsent({

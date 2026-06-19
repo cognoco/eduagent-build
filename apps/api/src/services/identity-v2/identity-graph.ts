@@ -59,7 +59,26 @@ const logger = createLogger();
 // re-open BUG-411.
 const LOGIN_CLERK_UNIQUE = 'login_clerk_user_id_unique';
 const LOGIN_EMAIL_UNIQUE = 'login_email_unique';
+// Process-local cache for legacy table existence probes (pre-M-DROP bridge).
+// Hazard: a probe returning true in a long-lived Worker process survives M-DROP
+// and could attempt a dual-write after the table is gone (createIdentityGraph
+// consults tableExists() at the call sites below).
+// DECOMMISSION CONTRACT (no automatic enforcement — operator-owned):
+//   1. M-DROP is carried by migration 0118 (WI-586, identity tables) + 0119
+//      (WI-805, subscriptions/enums).
+//   2. Redeploy (restart) this service BEFORE applying M-DROP so no live process
+//      holds a stale `true`. Redeploy is the PRIMARY mitigation.
+//   3. clearLegacyTableCache() below is the test/belt-and-suspenders hook.
+//   4. Remove this cache + clearLegacyTableCache() + all tableExists() call
+//      sites when the bridge is deleted post-M-DROP (WI-779 terminal removal).
 const legacyTableExistsCache = new Map<string, boolean>();
+
+// Decommission/test hook: clears the process-local probe cache so a redeploy is
+// not the only way to drop a stale `true`. Redeploy-before-M-DROP (above) stays
+// the primary mitigation; this makes the contract explicit and testable.
+export function clearLegacyTableCache(): void {
+  legacyTableExistsCache.clear();
+}
 
 /**
  * Reverse jurisdiction map: the profile-create `location` input
