@@ -5,7 +5,7 @@ import type {
   QuizQuestion,
   VocabularyQuestion,
 } from '@eduagent/schemas';
-import { BadRequestError } from '@eduagent/schemas';
+import { BadRequestError, ConflictError } from '@eduagent/schemas';
 
 // [CR-2026-05-19-M1] Sentry external-boundary mock — proves captureException
 // fires on mastery upsert failure. Sentry is an external boundary (Sentry SDK).
@@ -929,5 +929,175 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
       'comet',
       ROUND_ID,
     );
+  });
+});
+
+// [BUG-854] completeQuizRound must reject with ConflictError (409) when the
+// client calls /complete without any prior /check calls, instead of silently
+// completing the round with score=0.
+describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
+  const PROFILE_ID = '00000000-0000-4000-8000-000000000011';
+  const ROUND_ID = '00000000-0000-4000-8000-000000000012';
+
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    isLibraryItem: false,
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Nice', 'Bordeaux'],
+    funFact: 'Paris is on the Seine river.',
+  };
+
+  // Round with no recorded /check results — the bug scenario.
+  const mockRoundNoResults = {
+    id: ROUND_ID,
+    profileId: PROFILE_ID,
+    status: 'active' as const,
+    activityType: 'capitals' as const,
+    total: 1,
+    questions: [capitalsQuestion],
+    libraryQuestionIndices: [],
+    subjectId: null,
+    score: null,
+    xpEarned: null,
+    completedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    // Simulates a client that skipped /check entirely — results is an empty
+    // array, so the server has no recorded attempts to score from.
+    results: [],
+    metadata: null,
+  };
+
+  function makeMockDb(): Database {
+    const self: Database = {
+      transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(self),
+      ),
+    } as unknown as Database;
+    return self;
+  }
+
+  let createScopedRepoSpy: jest.SpyInstance;
+
+  afterEach(() => {
+    createScopedRepoSpy?.mockRestore();
+  });
+
+  it('[BREAK/BUG-854] throws ConflictError when client calls /complete without any prior /check calls', async () => {
+    // Build a minimal repo spy that returns an empty-results round.
+    const repoSpy = {
+      quizRounds: {
+        findById: jest.fn().mockResolvedValue(mockRoundNoResults),
+        findByIdForUpdate: jest.fn().mockResolvedValue(mockRoundNoResults),
+        completeActive: jest.fn().mockResolvedValue(true),
+        findRecentByActivity: jest.fn().mockResolvedValue([]),
+        findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
+      },
+      quizMasteryItems: {
+        findByKey: jest.fn().mockResolvedValue(null),
+        upsertFromCorrectAnswer: jest.fn().mockResolvedValue(null),
+        updateSm2: jest.fn().mockResolvedValue(undefined),
+        findDueForProfile: jest.fn().mockResolvedValue([]),
+        incrementMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+        resetMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+      },
+      missedQuizItems: {
+        upsertMissedItems: jest.fn().mockResolvedValue(undefined),
+        softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: { findById: jest.fn().mockResolvedValue(null) },
+      subjects: { findById: jest.fn().mockResolvedValue(null) },
+      xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
+      vocabulary: {
+        findById: jest.fn().mockResolvedValue(null),
+        findByKey: jest.fn().mockResolvedValue(null),
+      },
+      vocabularyReviews: { upsert: jest.fn().mockResolvedValue(undefined) },
+    };
+
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    // Client provides results in the /complete body, but never called /check —
+    // so round.results is empty. Must reject, not silently zero-score.
+    await expect(
+      completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
+        { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+      ]),
+    ).rejects.toThrow(ConflictError);
+
+    // completeActive must NOT be called — the round must not be committed.
+    expect(repoSpy.quizRounds.completeActive).not.toHaveBeenCalled();
+  });
+
+  it('[NEGATIVE/BUG-854] resolves normally when round has recorded /check results', async () => {
+    mockQueueCelebration.mockResolvedValue([]);
+
+    // Same round but with a recorded /check result — the happy path.
+    const mockRoundWithResults = {
+      ...mockRoundNoResults,
+      results: [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Paris',
+          timeMs: 2000,
+          finalAttempt: true,
+        },
+      ],
+    };
+
+    const repoSpy = {
+      quizRounds: {
+        findById: jest.fn().mockResolvedValue(mockRoundWithResults),
+        findByIdForUpdate: jest.fn().mockResolvedValue(mockRoundWithResults),
+        completeActive: jest.fn().mockResolvedValue(true),
+        findRecentByActivity: jest.fn().mockResolvedValue([]),
+        findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
+      },
+      quizMasteryItems: {
+        findByKey: jest.fn().mockResolvedValue(null),
+        upsertFromCorrectAnswer: jest.fn().mockResolvedValue(null),
+        updateSm2: jest.fn().mockResolvedValue(undefined),
+        findDueForProfile: jest.fn().mockResolvedValue([]),
+        incrementMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+        resetMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+      },
+      missedQuizItems: {
+        upsertMissedItems: jest.fn().mockResolvedValue(undefined),
+        softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: { findById: jest.fn().mockResolvedValue(null) },
+      subjects: { findById: jest.fn().mockResolvedValue(null) },
+      xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
+      vocabulary: {
+        findById: jest.fn().mockResolvedValue(null),
+        findByKey: jest.fn().mockResolvedValue(null),
+      },
+      vocabularyReviews: { upsert: jest.fn().mockResolvedValue(undefined) },
+    };
+
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    const result = await completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ]);
+
+    // Round completes normally with the correct score.
+    expect(result.score).toBe(1);
+    expect(repoSpy.quizRounds.completeActive).toHaveBeenCalledTimes(1);
   });
 });

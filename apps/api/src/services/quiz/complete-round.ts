@@ -511,6 +511,19 @@ export async function completeQuizRound(
     const recordedResults = Array.isArray(round.results)
       ? (round.results as RecordedQuestionResult[])
       : [];
+
+    // [BUG-854] Guard: the completion scoring pipeline reads from
+    // `recordedResults` (persisted by /check calls). If the client calls
+    // /complete without any prior /check, recordedResults is empty → the
+    // round would silently complete with score=0 and xpEarned=0. Reject with
+    // a 409 so the client regression is detected immediately rather than
+    // silently zeroing the user's score.
+    if (recordedResults.length === 0) {
+      throw new ConflictError(
+        'No recorded answers found. Call /check for each question before calling /complete.',
+      );
+    }
+
     const finalRecordedResults = recordedResults.filter(isFinalRecordedAttempt);
     const completionSourceResults = finalRecordedResults;
     const validatedResults = validateResults(
