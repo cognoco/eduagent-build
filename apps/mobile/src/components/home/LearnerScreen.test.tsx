@@ -934,9 +934,12 @@ describe('LearnerScreen', () => {
 
     fireEvent.press(screen.getByTestId('home-coach-band-continue'));
 
-    // Resume arm ran (pushLearningResumeTarget seeds /(app)/home, then session).
-    expect(mockPush).toHaveBeenCalledWith('/(app)/home');
-    expect(mockPush).toHaveBeenCalledWith({
+    // Resume arm ran (pushLearningResumeTarget seeds /(app)/home FIRST, then the
+    // session). Assert ordered calls so a sequencing regression — pushing the
+    // session before seeding the ancestor /(app)/home (the cross-tab back-stack
+    // rule) — is caught, not just that both pushes happened.
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
