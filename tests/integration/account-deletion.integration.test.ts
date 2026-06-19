@@ -71,6 +71,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
@@ -86,10 +87,6 @@ const TEST_ENV = buildIntegrationEnv();
 
 const AUTH_USER_ID = 'integration-deletion-user';
 const AUTH_EMAIL = 'integration-deletion@integration.test';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 async function loadDeletionState(accountId: string): Promise<{
   deletionScheduledAt: Date | null;

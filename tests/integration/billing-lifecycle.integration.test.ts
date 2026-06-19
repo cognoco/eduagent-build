@@ -24,6 +24,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 
@@ -92,10 +93,6 @@ const TEST_ENV = {
 const AUTH_USER_ID = 'integration-billing-user';
 const AUTH_EMAIL = 'integration-billing@integration.test';
 const STRIPE_CURRENT_PERIOD_END = 1_777_680_000;
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 async function seedAccount() {
   const db = createIntegrationDb();

@@ -9,6 +9,7 @@ import { findOrCreateAccount, type Account } from '../services/account';
 import { resolveVerifiedClerkEmail } from '../services/clerk-user';
 import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 import { isIdentityV2Enabled } from '../config';
 import { resolveIdentityV2 } from '../services/identity-v2/identity-resolve';
 import { ensureInitialTrialSubscriptionV2 } from '../services/billing/billing-v2';
@@ -162,6 +163,9 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
           logger.error('billing.v2.initial_trial_missing_repair_failed', {
             accountId: resolved.account.id,
             reason: error instanceof Error ? error.message : String(error),
+          });
+          captureException(error, {
+            tags: { surface: 'billing.v2.initial_trial_repair' },
           });
         }
       } else {
