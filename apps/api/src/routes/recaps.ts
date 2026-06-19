@@ -13,6 +13,7 @@ const recapParamsSchema = z.object({ recapId: z.string().uuid() });
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import { notFound } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
 import {
@@ -52,8 +53,7 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
   .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
     const query = c.req.valid('query');
 
     const recaps = await listRecapsForProfile(db, profileId, {
