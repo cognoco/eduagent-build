@@ -1,4 +1,4 @@
-> **STATUS: P0 ISSUE MAP + RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, and WI-853; WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now mapped to Cosmo items WI-854 through WI-865.
+> **STATUS: P0 ISSUE MAP + RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, and WI-853; WI-859 replaced the QA-03/QA-04 closure proof with deterministic jest coverage. WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now mapped to Cosmo items WI-854 through WI-865.
 
 # Mobile App Flow Revision Plan
 
@@ -15,6 +15,8 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **Remediation update 2026-06-19 (WI-820):** QUIZ-18 no-round guard fixed and rerun in Chrome/Playwright. Cold navigation to `/quiz/play` without a round now renders `quiz-play-no-round` recovery controls instead of redirecting into an Internal Server Error.
 
 **Remediation update 2026-06-19 (WI-853):** BILLING-13 owner in-chat daily quota card now has Chrome/Playwright coverage through J-26. The seeded exhausted-owner session reaches `quota-exceeded-card`, shows owner daily usage copy and disabled input, and the upgrade CTA opens Subscription.
+
+**Remediation update 2026-06-19 (WI-859):** QA-03 (chat classifier regression) and QA-04 (chat subject-picker regression) now have deterministic jest coverage that no longer depends on live-LLM branch variance. The classifier miss/suggestion shape is pinned at the route layer (`apps/api/src/routes/subjects.test.ts` — multi-candidate + `suggestedSubjectName` passthrough, plus `assertNotProxyMode` 403 guards on `/subjects/classify` and `/subjects/resolve`) and at the service layer (`apps/api/src/services/subject-classify.test.ts`, pre-existing). The picker branch is forced deterministically in the mobile hook (`apps/mobile/src/components/session/use-subject-classification.test.ts` — single-subject auto-match, multi-candidate picker choosing the intended subject, resolve fallback) and at the screen-integration layer (`apps/mobile/src/app/(app)/session/index.test.tsx` — no-enrolled-subjects create-new escape hatch). The Maestro YAML flows (`regression/bug-233-chat-classifier-easter.yaml`, `regression/bug-234-chat-subject-picker.yaml`) remain smoke/historical evidence only, not the closure proof.
 
 **Remediation update 2026-06-19 (WI-818):** AUTH-11/AUTH-17 forced re-entry banners rerun in staging Chrome/Playwright. The mentor-audit pre-shell storage-state mutator now clears Clerk's unsuffixed and instance-suffixed session cookies before seeding the expired/revoked banner markers, so both `/sign-in` banner rows render instead of falling through to Home.
 
@@ -513,8 +515,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | --- | --- | --- | --- | --- | --- | --- |
 | QA-01 | Quick smoke check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QA-02 | Post-auth comprehensive smoke | ⚠️ | Pass w/ issues | WI-857 | ✅ 2026-06-19 | Issue mapped: align smoke manifest/status with current Chrome/deep-link coverage. |
-| QA-03 | Chat classifier regression | ⚠️ | Pass w/ issues | WI-859 | ✅ 2026-06-19 | Issue mapped: add deterministic classifier coverage without live LLM branch variance. |
-| QA-04 | Chat subject picker regression | ⚠️ | Pass w/ issues | WI-859 | ✅ 2026-06-19 | Issue mapped with QA-03: force multi-subject picker branch deterministically. |
+| QA-03 | Chat classifier regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage replaces live-LLM evidence: route + service tests pin the classifier miss/suggestion shape (multi-candidate + `suggestedSubjectName` passthrough; proxy-mode 403 guard on classify/resolve). YAML flow is smoke/historical only. |
+| QA-04 | Chat subject picker regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage forces the picker branch: hook tests cover single-subject auto-match, multi-candidate picker (learner picks the intended subject, no silent first-subject fallback), and resolve fallback; the session-screen integration test covers the no-enrolled-subjects create-new escape hatch. YAML flow is smoke/historical only. |
 | QA-05 | Return to chat after subject create | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped: reconcile existing evidence and update final status if coverage is current. |
 | QA-06 | Focused-book generation regression | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped with QA-05/07: reconcile evidence-backed status. |
 | QA-07 | Tab-bar leak regression | ⚠️ | Pass w/ issues | WI-860 | ✅ 2026-06-19 | Issue mapped with QA-05/06: reconcile evidence-backed status. |
@@ -583,9 +585,9 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 | 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 27 ✅, 5 ⚠️, 0 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
 | 7 | Billing and Monetization | 16 | ✅ | Rerun updated 2026-06-19: 12 ✅, 0 ⚠️, 0 ❌, 4 🚫. |
-| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
+| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-19: 5 ✅, 9 ⚠️, 0 ❌, 1 🚫 (QA-03/QA-04 → deterministic jest, WI-859). |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 193 pass, 60 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 195 pass, 58 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 

@@ -1600,6 +1600,50 @@ describe('SessionScreen homework flow', () => {
     testScreen.unmount();
   });
 
+  // [WI-859 / QA-04] No enrolled subjects: the classifier returns nothing to
+  // pick and the learner has no subjects to fall back to. The screen must reach
+  // the resolve-backed create-new escape hatch instead of silently starting a
+  // session against a phantom subject. Deterministic — classify + resolve are
+  // both stubbed via mockFetch, no live model involved.
+  it('[WI-859] shows the create-new escape hatch when the learner has no enrolled subjects', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+    });
+    // Learner has zero enrolled subjects.
+    mockFetch.setRoute('/subjects', { subjects: [] });
+    // Classifier can't match anything and offers no suggestion.
+    mockFetch.setRoute('/subjects/classify', {
+      candidates: [],
+      needsConfirmation: true,
+      suggestedSubjectName: null,
+    });
+    // Resolve returns rich suggestions so the picker has create options.
+    mockFetch.setRoute('/subjects/resolve', {
+      resolvedName: null,
+      suggestions: [
+        { name: 'Astronomy', description: 'Study of celestial objects' },
+      ],
+      displayMessage: 'Pick a subject that fits, or create your own.',
+    });
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    // The resolve fallback was consulted with the learner's text…
+    expect(
+      fetchCallsMatching(mockFetch, '/subjects/resolve').length,
+    ).toBeGreaterThan(0);
+    // …and the resolution surface opens with the resolve-backed suggestion plus
+    // the new-subject option, not a silent session start against no subject.
+    testScreen.getByTestId('session-subject-resolution');
+    testScreen.getByTestId('subject-resolution-resolve-Astronomy');
+    testScreen.getByTestId('subject-resolution-new');
+    expect(mockStartSession).not.toHaveBeenCalled();
+    testScreen.unmount();
+  });
+
   describe('post-session filing prompt', () => {
     /**
      * Helper: renders a freeform session, sends a message to start it,
