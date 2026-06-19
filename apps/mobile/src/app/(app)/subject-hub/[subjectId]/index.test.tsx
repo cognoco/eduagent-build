@@ -12,6 +12,7 @@ import {
 } from '../../../../test-utils/screen-render';
 import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
 import SubjectHubRoute from './index';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 
 jest.mock(
   'react-i18next',
@@ -228,5 +229,22 @@ describe('SubjectHubRoute', () => {
     screen.getByTestId('subject-hub-missing-param');
     fireEvent.press(screen.getByTestId('subject-hub-missing-param-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('falls back to the V2 Subjects tab when MODE_NAV_V2_ENABLED is on', () => {
+    mockSearchParams = () => ({});
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    try {
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+      screen.getByTestId('subject-hub-missing-param');
+      fireEvent.press(screen.getByTestId('subject-hub-missing-param-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
   });
 });

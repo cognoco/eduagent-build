@@ -10,6 +10,7 @@ import {
   goBackOrReplace,
   pushLearningResumeTarget,
 } from '../../../../lib/navigation';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -23,7 +24,13 @@ export default function SubjectHubRoute(): React.ReactElement {
   const hub = useSubjectHub(subjectId);
 
   const goBack = useCallback(() => {
-    goBackOrReplace(router, '/(app)/library' as Href);
+    // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
+    // the legacy Library tab only when V2 nav is off, so a back-stack-exhausted
+    // user lands on the tab they actually came from.
+    const fallback = (
+      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
+    ) as Href;
+    goBackOrReplace(router, fallback);
   }, [router]);
 
   const openTopic = useCallback(

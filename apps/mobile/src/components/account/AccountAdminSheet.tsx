@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
@@ -93,7 +93,7 @@ export function AccountAdminSheet(): React.ReactElement {
       <SettingsRow
         label={t('more.account.profile')}
         value={displayName}
-        onPress={() => router.push('/profiles')}
+        onPress={() => router.push('/profiles' as Href)}
         testID="account-admin-profile"
       />
       {navigationContract.gates.showAccountSecurity ? (

@@ -53,6 +53,10 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
   .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
+    // Self-scoped: lists the caller's OWN recaps via their own profileId, so
+    // (unlike the parent-scoped /recaps and /recaps/:recapId routes, which read
+    // another profile's data and therefore call assertOwnerProfile) no owner
+    // guard is needed here — there is no other profile to authorize against.
     const { db, profileId } = withProfile(c);
     const query = c.req.valid('query');
 
