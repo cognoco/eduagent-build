@@ -13,7 +13,6 @@ test('BILLING-13 owner sees in-chat daily quota card and can open subscription',
     landingPath: '/home',
   });
 
-  await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
