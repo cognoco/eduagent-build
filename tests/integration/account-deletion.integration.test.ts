@@ -1031,6 +1031,21 @@ legacyAccountDeletionCascadeDescribe(
 //   in isolation, without a subscription in the way. CUT-B3 must be resolved
 //   separately before executeDeletionV2 can handle real bootstrapped accounts.
 //
+// Guardianship / supportership gap (out of scope, same class as CUT-B3):
+//   guardianship.guardian_person_id → person.id (RESTRICT)
+//   guardianship.charge_person_id → person.id (RESTRICT)
+//   supportership.supporter_person_id → person.id (RESTRICT)
+//   supportership.supportee_person_id → person.id (RESTRICT)
+//   executeDeletionV2 does NOT pre-clear guardianship or supportership edges
+//   before deleting person rows. A family account (guardian → charge child)
+//   would hit a RESTRICT violation on DELETE person. This audit intentionally
+//   seeds a solo-owner graph (no guardianship/supportership) to test the service
+//   in the only case it currently handles. Family-account deletion requires a
+//   dedicated pre-clearing step in executeDeletionV2 (similar to CUT-B3) and
+//   is out of scope for this WI.
+//   TODO(CUT-B3 follow-up): add pre-clearing of guardianship + supportership
+//   edges before DELETE person in executeDeletionV2, then extend this audit.
+//
 // Learning-data gap (CUT-B3 / WI-723, out of scope):
 //   profiles.account_id → accounts.id (CASCADE), but executeDeletionV2 deletes
 //   organization, NOT accounts. There is NO DB-level FK linking organization to
