@@ -9,8 +9,8 @@ import { authStateDir } from './runtime';
  * §10) requires three pre-shell states that no DB seeder can produce alone:
  *
  * - `session-expired`: a captured signed-in storage state whose persisted
- *   `__session` cookie is mutated to an unparseable token so Clerk
- *   middleware rejects on the next request → forced sign-out + expired banner.
+ *   Clerk session cookies are cleared so the next request lands pre-auth →
+ *   forced sign-out + expired banner.
  * - `session-revoked`: the seeder revokes the Clerk session server-side; the
  *   storage state still carries the now-invalid token, exercising the
  *   revoked-token-refresh code path in the Hono RPC client (distinct from
@@ -32,6 +32,11 @@ import { authStateDir } from './runtime';
  * the same atomic step that mutates the auth token — without it, the spec
  * would have to rely on triggering a real 401 round-trip first, which races
  * with the redirect to /sign-in and silently lands on the home shell.
+ *
+ * Clerk also stores instance-suffixed cookie names on web, for example
+ * `__session_o7qfR7ot` and `__clerk_db_jwt_o7qfR7ot`. Clearing only the
+ * legacy unsuffixed `__session` cookie leaves the user signed in and the
+ * pre-shell banner rows fail by landing on Home.
  */
 
 type MutatorName = 'session-expired' | 'session-revoked' | 'mfa-totp';
@@ -79,24 +84,29 @@ async function writeJson(file: string, value: StorageStateJson): Promise<void> {
   await fs.writeFile(file, JSON.stringify(value, null, 2), 'utf8');
 }
 
+function isActiveClerkSessionCookie(name: string): boolean {
+  return (
+    name === '__session' ||
+    name.startsWith('__session_') ||
+    name === '__clerk_db_jwt' ||
+    name.startsWith('__clerk_db_jwt_') ||
+    name === '__client_uat' ||
+    name.startsWith('__client_uat_') ||
+    name === 'clerk_active_context'
+  );
+}
+
 /**
- * Mutate the `__session` cookie value to an unparseable token. Clerk
- * middleware rejects malformed JWTs and the SDK forces a sign-out — exactly
- * the AUTH-11 "expired banner + forced sign-out" path.
+ * Clear all app-origin Clerk cookies that can keep the captured context signed
+ * in. The banner marker itself is seeded separately via sessionStorage.
  */
-function expireSessionCookie(state: StorageStateJson): StorageStateJson {
+export function clearClerkSessionCookies(
+  state: StorageStateJson,
+): StorageStateJson {
   return {
     ...state,
-    cookies: state.cookies.map((cookie) =>
-      cookie.name === '__session'
-        ? {
-            ...cookie,
-            // Truncate + corrupt — leaves the cookie present (so the app sees
-            // an attempt) but unparseable as a JWT.
-            value: 'expired.invalid.token',
-            expires: Math.floor(Date.now() / 1000) - 60,
-          }
-        : cookie,
+    cookies: state.cookies.filter(
+      (cookie) => !isActiveClerkSessionCookie(cookie.name),
     ),
   };
 }
@@ -136,7 +146,7 @@ export async function applyMentorAuditStorageStateMutator(opts: {
 
   switch (opts.mutator) {
     case 'session-expired': {
-      await writeJson(derivedPath, expireSessionCookie(baseState));
+      await writeJson(derivedPath, clearClerkSessionCookies(baseState));
       return {
         storageStatePath: derivedPath,
         sessionStorageInit: bannerInitScript('expired'),
@@ -144,10 +154,10 @@ export async function applyMentorAuditStorageStateMutator(opts: {
     }
     case 'session-revoked':
       // The Clerk Backend revoke has already happened in the seeder; the
-      // storage state is still the captured signed-in one. We write it
-      // verbatim so the spec can `use({ storageState })` it uniformly, and
-      // additionally seed the revoked banner marker via init script.
-      await writeJson(derivedPath, baseState);
+      // captured storage state can still contain web cookies that make Clerk
+      // treat the context as signed in before it refreshes. Clear those
+      // cookies so the pre-shell sign-in route can render the revoked banner.
+      await writeJson(derivedPath, clearClerkSessionCookies(baseState));
       return {
         storageStatePath: derivedPath,
         sessionStorageInit: bannerInitScript('revoked'),
