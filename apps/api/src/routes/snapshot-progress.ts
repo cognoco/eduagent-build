@@ -12,11 +12,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import {
-  requireProfileId,
-  requireAccount,
-  type ProfileMeta,
-} from '../middleware/profile-scope';
+import { requireAccount, type ProfileMeta } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { apiError } from '../errors';
 import {
@@ -27,6 +23,7 @@ import {
 } from '../services/snapshot-aggregation';
 import { checkAndLogRateLimit } from '../services/settings';
 import { isIdentityV2Enabled } from '../config';
+import { withProfile } from '../route-utils/route-context';
 
 type SnapshotProgressRouteEnv = {
   Bindings: {
@@ -50,8 +47,7 @@ const milestonesQuerySchema = z.object({
 
 export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
   .get('/progress/inventory', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     const inventory = await buildKnowledgeInventory(db, profileId);
     return c.json(knowledgeInventorySchema.parse(inventory));
@@ -60,8 +56,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     '/progress/history',
     zValidator('query', historyQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const query = c.req.valid('query');
 
       const history = await buildProgressHistory(db, profileId, query);
@@ -72,8 +67,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
     '/progress/milestones',
     zValidator('query', milestonesQuerySchema),
     async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
+      const { db, profileId } = withProfile(c);
       const query = c.req.valid('query');
 
       // [F-144] listRecentMilestones backfills (writes) missed milestones. In
@@ -98,8 +92,7 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
   .post('/progress/refresh', async (c) => {
     // [WI-174 / DS-085] Server-derived proxy-mode write guard.
     assertNotProxyMode(c);
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+    const { db, profileId } = withProfile(c);
 
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const rateLimited = await checkAndLogRateLimit(

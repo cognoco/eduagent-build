@@ -1,7 +1,6 @@
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   assessments,
   curriculumBooks,
   curricula,
@@ -10,7 +9,6 @@ import {
   generateUUIDv7,
   learningSessions,
   needsDeepeningTopics,
-  profiles,
   retentionCards,
   sessionSummaries,
   subjects,
@@ -22,6 +20,12 @@ import {
   deleteTopicIfSafe,
   releaseBookGenerationClaimIfEmpty,
 } from './curriculum';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -44,51 +48,73 @@ function createIntegrationDb(): Database {
 
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integration-curriculum-release-${RUN_ID}`;
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
+  await deleteLegacyAccountsForTest(database, seededAccountIds);
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 async function seedProfiles(database: Database, suffix = generateUUIDv7()) {
-  const [ownerAccount] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${suffix}-owner`,
-      email: `${CLERK_PREFIX}-${suffix}-owner@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  const [attackerAccount] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${suffix}-attacker`,
-      email: `${CLERK_PREFIX}-${suffix}-attacker@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const ownerAccountId = generateUUIDv7();
+  const attackerAccountId = generateUUIDv7();
+  const ownerProfileId = generateUUIDv7();
+  const attackerProfileId = generateUUIDv7();
+  const ownerClerkUserId = `${CLERK_PREFIX}-${suffix}-owner`;
+  const attackerClerkUserId = `${CLERK_PREFIX}-${suffix}-attacker`;
+  const ownerEmail = `${CLERK_PREFIX}-${suffix}-owner@test.invalid`;
+  const attackerEmail = `${CLERK_PREFIX}-${suffix}-attacker@test.invalid`;
 
-  const [ownerProfile] = await database
-    .insert(profiles)
-    .values({
-      accountId: ownerAccount!.id,
-      displayName: 'Claim Owner',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  const [attackerProfile] = await database
-    .insert(profiles)
-    .values({
-      accountId: attackerAccount!.id,
-      displayName: 'Claim Attacker',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  seededAccountIds.push(ownerAccountId, attackerAccountId);
+  seededProfileIds.push(ownerProfileId, attackerProfileId);
+
+  await ensureLegacyProfileAnchorForTest(database, {
+    accountId: ownerAccountId,
+    profileId: ownerProfileId,
+    clerkUserId: ownerClerkUserId,
+    email: ownerEmail,
+    displayName: 'Claim Owner',
+    birthYear: 2011,
+    isOwner: true,
+  });
+  await ensureLegacyProfileAnchorForTest(database, {
+    accountId: attackerAccountId,
+    profileId: attackerProfileId,
+    clerkUserId: attackerClerkUserId,
+    email: attackerEmail,
+    displayName: 'Claim Attacker',
+    birthYear: 2011,
+    isOwner: true,
+  });
+
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId: ownerAccountId,
+    profileId: ownerProfileId,
+    clerkUserId: ownerClerkUserId,
+    email: ownerEmail,
+    displayName: 'Claim Owner',
+    birthYear: 2011,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId: attackerAccountId,
+    profileId: attackerProfileId,
+    clerkUserId: attackerClerkUserId,
+    email: attackerEmail,
+    displayName: 'Claim Attacker',
+    birthYear: 2011,
+    isOwner: true,
+  });
 
   return {
-    ownerProfileId: ownerProfile!.id,
-    attackerProfileId: attackerProfile!.id,
+    ownerProfileId,
+    attackerProfileId,
   };
 }
 
@@ -164,6 +190,18 @@ async function seedFiledTopicFixture(
       metadata: { effectiveMode: 'freeform' },
     })
     .returning({ id: learningSessions.id });
+
+  if (options.topicSessionId && options.topicSessionId !== session!.id) {
+    await database.insert(learningSessions).values({
+      id: options.topicSessionId,
+      profileId,
+      subjectId: subject!.id,
+      sessionType: 'learning',
+      status: 'completed',
+      exchangeCount: 3,
+      metadata: { effectiveMode: 'freeform' },
+    });
+  }
 
   const [topic] = await database
     .insert(curriculumTopics)
