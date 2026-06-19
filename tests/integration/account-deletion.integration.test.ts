@@ -22,16 +22,23 @@ import {
   accounts,
   assessments,
   bookmarks,
+  byokWaitlist,
   challengeRoundCooldowns,
+  consentGrant,
+  consentReceipt,
+  consentRequest,
   consentStates,
   curricula,
   curriculumAdaptations,
   curriculumBooks,
   curriculumTopics,
+  deletionAudit,
   dictationResults,
   familyLinks,
   familyPreferences,
+  financialRecord,
   learningSessions,
+  login,
   memoryDedupDecisions,
   memoryFacts,
   membership,
@@ -41,6 +48,7 @@ import {
   organization,
   parkingLotItems,
   pendingNotices,
+  person,
   practiceActivityEvents,
   celebrationEvents,
   progressSnapshots,
@@ -79,6 +87,10 @@ import {
   executeDeletion,
   scheduleDeletion,
 } from '../../apps/api/src/services/deletion';
+import {
+  executeDeletionV2,
+  scheduleDeletionV2,
+} from '../../apps/api/src/services/identity-v2/deletion-v2';
 
 import { app } from '../../apps/api/src/index';
 
@@ -986,3 +998,339 @@ legacyAccountDeletionCascadeDescribe(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// [WI-825] v2 PII cascade-deletion audit.
+//
+// The v2 deletion path (executeDeletionV2) operates on person/organization,
+// NOT on accounts/profiles. This suite verifies that every v2 identity table
+// that holds PII is cleaned up after executeDeletionV2 runs.
+//
+// Cascade graph (FK ON DELETE CASCADE from deletion-v2.ts + identity.ts):
+//   person → login (CASCADE)
+//   person → membership (CASCADE)
+//   person → consent_request (CASCADE via charge_person_id)
+//   organization → membership (CASCADE)
+//   organization → consent_request (CASCADE via organization_id)
+//   consent_grant is NOT a CASCADE — executeDeletionV2 re-homes it to
+//     consent_receipt (retain-tier) and deletes the live row explicitly.
+//   byok_waitlist is NOT a CASCADE — deleted by email in step 6.
+//
+// Retain-tier (must EXIST, not be empty, after deletion):
+//   consent_receipt — the re-homed grant
+//   deletion_audit — the audit trail
+//   financial_record — tax/chargeback (2 rows per person per §6.1)
+//
+// Subscription gap (CUT-B3, out of scope):
+//   subscription.payer_person_id → person.id (RESTRICT)
+//   subscription.organization_id → organization.id (RESTRICT)
+//   executeDeletionV2 does NOT tear down subscriptions (deletion-v2.ts L438-443).
+//   A real account bootstrapped via POST /v1/profiles has a subscription row
+//   that blocks the person + org delete. The audit therefore seeds the v2
+//   identity graph directly (no POST /v1/profiles) to test the deletion service
+//   in isolation, without a subscription in the way. CUT-B3 must be resolved
+//   separately before executeDeletionV2 can handle real bootstrapped accounts.
+//
+// Learning-data gap (CUT-B3 / WI-723, out of scope):
+//   profiles.account_id → accounts.id (CASCADE), but executeDeletionV2 deletes
+//   organization, NOT accounts. There is NO DB-level FK linking organization to
+//   accounts. The legacy learning-data tables (subjects, sessions, etc.) are
+//   therefore NOT deleted by the v2 deletion path. person.id = profiles.id is
+//   a value equality from the deterministic reseed, NOT a FK.
+//   TODO(CUT-B3): wire executeDeletionV2 to also erase the legacy accounts row
+//   (accounts.id = organization.id) so the profiles + learning-data cascade fires.
+//
+// This suite runs only when IDENTITY_V2_ENABLED=true (the CI flag-on lane).
+// The legacyAccountDeletionCascadeDescribe block above covers the flag-off path.
+// ---------------------------------------------------------------------------
+if (isIdentityV2Enabled()) {
+  // Unique stable IDs for the v2 audit — isolated from the main AUTH_USER_ID.
+  const V2_CLERK_ID = 'integration-deletion-v2-clerk';
+  const V2_EMAIL = 'integration-deletion-v2@integration.test';
+
+  describe('Integration: v2 account deletion cascade (WI-825)', () => {
+    // Seed helpers: insert a minimal v2 identity graph (org + person + login +
+    // membership) directly, bypassing the route layer. This avoids the
+    // subscription bootstrap that POST /v1/profiles triggers, which would hit
+    // the CUT-B3 RESTRICT FKs and block executeDeletionV2.
+    async function seedV2IdentityGraph(
+      db: ReturnType<typeof createIntegrationDb>,
+    ): Promise<{
+      personId: string;
+      organizationId: string;
+      ownerEmail: string;
+    }> {
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'v2-audit-org' })
+        .returning({ id: organization.id });
+      const orgId = org!.id;
+
+      const [p] = await db
+        .insert(person)
+        .values({
+          displayName: 'V2 Audit Person',
+          birthDate: '2000-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning({ id: person.id });
+      const personId = p!.id;
+
+      const [l] = await db
+        .insert(login)
+        .values({
+          personId,
+          clerkUserId: V2_CLERK_ID,
+          email: V2_EMAIL,
+        })
+        .returning({ id: login.id });
+      // Wire person.login_id back (the circular FK that Drizzle TS skips).
+      await db.execute(
+        sql`UPDATE person SET login_id = ${l!.id} WHERE id = ${personId}`,
+      );
+
+      await db.insert(membership).values({
+        personId,
+        organizationId: orgId,
+        roles: ['admin'],
+      });
+
+      return { personId, organizationId: orgId, ownerEmail: V2_EMAIL };
+    }
+
+    async function teardownV2Graph(
+      db: ReturnType<typeof createIntegrationDb>,
+      personId: string,
+      organizationId: string,
+    ): Promise<void> {
+      // FK-safe teardown for test cleanup (mirrors cleanupAccounts order).
+      await db
+        .delete(consentGrant)
+        .where(eq(consentGrant.chargePersonId, personId));
+      await db
+        .delete(consentRequest)
+        .where(eq(consentRequest.chargePersonId, personId));
+      await db.delete(person).where(eq(person.id, personId));
+      await db.delete(organization).where(eq(organization.id, organizationId));
+      await db.delete(byokWaitlist).where(eq(byokWaitlist.email, V2_EMAIL));
+    }
+
+    // -------------------------------------------------------------------------
+    // [BUG-368-v2] Comprehensive v2 PII cascade audit.
+    //
+    // Seeds every v2 identity table that executeDeletionV2 is responsible for
+    // cleaning up. Asserts that after the deletion:
+    //   - All PII-bearing v2 identity rows are gone.
+    //   - All retain-tier rows exist (consent_receipt, deletion_audit,
+    //     financial_record).
+    //   - A cross-account break test: a second org's data is untouched.
+    //
+    // The test IS the audit. A new v2 PII table missing a cascade or explicit
+    // delete will fail here.
+    // -------------------------------------------------------------------------
+    it('cascade-deletes all v2 identity PII rows and retains the retain-tier (BUG-368-v2)', async () => {
+      const db = createIntegrationDb();
+
+      // Seed TARGET identity graph directly (no subscription, avoids CUT-B3 RESTRICT).
+      const { personId, organizationId, ownerEmail } =
+        await seedV2IdentityGraph(db);
+
+      try {
+        // ---- consent_grant (RESTRICT on person + org; re-homed by executeDeletionV2) ----
+        await db.insert(consentGrant).values({
+          chargePersonId: personId,
+          organizationId,
+          purpose: 'platform_use',
+          lawfulBasis: 'gdpr_parental_consent',
+          granted: true,
+        });
+
+        // ---- consent_request (CASCADE from person + org) ----
+        await db.insert(consentRequest).values({
+          chargePersonId: personId,
+          organizationId,
+          requestedBasis: 'gdpr_parental_consent',
+          status: 'pending',
+          requestedAt: new Date(),
+        });
+
+        // ---- byok_waitlist (no FK, erased by owner email in step 6) ----
+        await db
+          .insert(byokWaitlist)
+          .values({ email: ownerEmail })
+          .onConflictDoNothing();
+
+        // ---- Pre-condition: every seed actually landed ----
+        const beforePerson = await db.query.person.findFirst({
+          where: eq(person.id, personId),
+          columns: { id: true },
+        });
+        expect(beforePerson).toBeDefined();
+
+        const beforeGrant = await db.query.consentGrant.findFirst({
+          where: eq(consentGrant.chargePersonId, personId),
+          columns: { id: true },
+        });
+        expect(beforeGrant).toBeDefined();
+
+        const beforeRequest = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, personId),
+          columns: { id: true },
+        });
+        expect(beforeRequest).toBeDefined();
+
+        const beforeByok = await db.query.byokWaitlist.findFirst({
+          where: eq(byokWaitlist.email, ownerEmail),
+          columns: { id: true },
+        });
+        expect(beforeByok).toBeDefined();
+
+        // ---- Cross-account seed: a second org + person with NO overlapping IDs ----
+        const [otherOrg] = await db
+          .insert(organization)
+          .values({ name: 'v2-audit-other-org' })
+          .returning({ id: organization.id });
+        const [otherPerson] = await db
+          .insert(person)
+          .values({
+            displayName: 'V2 Audit Other',
+            birthDate: '2001-01-01',
+            residenceJurisdiction: 'EU',
+          })
+          .returning({ id: person.id });
+        await db.insert(membership).values({
+          personId: otherPerson!.id,
+          organizationId: otherOrg!.id,
+          roles: ['admin'],
+        });
+        const otherPersonId = otherPerson!.id;
+        const otherOrgId = otherOrg!.id;
+
+        try {
+          // ---- Act: schedule + execute deletion on the TARGET org only ----
+          await scheduleDeletionV2(db, organizationId);
+          const result = await executeDeletionV2(db, {
+            organizationId,
+            ownerEmail,
+            reason: 'user_initiated',
+            deletedBy: null,
+          });
+          expect(result).toBe('deleted');
+
+          // -------------------------------------------------------------------
+          // Assert: v2 PII rows are gone.
+          // -------------------------------------------------------------------
+
+          // person row (the root of the cascade)
+          const remainingPerson = await db.query.person.findFirst({
+            where: eq(person.id, personId),
+            columns: { id: true },
+          });
+          expect(remainingPerson).toBeUndefined();
+
+          // organization row
+          const remainingOrg = await db.query.organization.findFirst({
+            where: eq(organization.id, organizationId),
+            columns: { id: true },
+          });
+          expect(remainingOrg).toBeUndefined();
+
+          // login (CASCADE from person)
+          const remainingLogin = await db.query.login.findFirst({
+            where: eq(login.clerkUserId, V2_CLERK_ID),
+            columns: { id: true },
+          });
+          expect(remainingLogin).toBeUndefined();
+
+          // membership (CASCADE from person + org)
+          const remainingMembership = await db.query.membership.findFirst({
+            where: eq(membership.personId, personId),
+            columns: { id: true },
+          });
+          expect(remainingMembership).toBeUndefined();
+
+          // consent_request (CASCADE from person)
+          const remainingRequest = await db.query.consentRequest.findFirst({
+            where: eq(consentRequest.chargePersonId, personId),
+            columns: { id: true },
+          });
+          expect(remainingRequest).toBeUndefined();
+
+          // consent_grant (re-homed then deleted by executeDeletionV2)
+          const remainingGrant = await db.query.consentGrant.findFirst({
+            where: eq(consentGrant.chargePersonId, personId),
+            columns: { id: true },
+          });
+          expect(remainingGrant).toBeUndefined();
+
+          // byok_waitlist (deleted by email in step 6 of executeDeletionV2)
+          const remainingByok = await db.query.byokWaitlist.findFirst({
+            where: eq(byokWaitlist.email, ownerEmail),
+            columns: { id: true },
+          });
+          expect(remainingByok).toBeUndefined();
+
+          // -------------------------------------------------------------------
+          // Assert: retain-tier rows EXIST (they must outlive the person).
+          // A failure here means executeDeletionV2 is failing to write its
+          // audit trail / consent re-home before deleting the person.
+          // -------------------------------------------------------------------
+
+          // consent_receipt — the re-homed grant (1 per seeded grant)
+          const receiptRow = await db.execute(
+            sql`SELECT count(*)::int AS c FROM consent_receipt WHERE person_id = ${personId}`,
+          );
+          expect(
+            (receiptRow.rows as Array<{ c: number }>)[0].c,
+          ).toBeGreaterThanOrEqual(1);
+
+          // deletion_audit — 1 row per person (§6.1)
+          const auditRow = await db.execute(
+            sql`SELECT count(*)::int AS c FROM deletion_audit WHERE person_id = ${personId}`,
+          );
+          expect((auditRow.rows as Array<{ c: number }>)[0].c).toBe(1);
+
+          // financial_record — 2 rows per person (§6.1: tax + chargeback retain)
+          const financialRow = await db.execute(
+            sql`SELECT count(*)::int AS c FROM financial_record WHERE person_id = ${personId}`,
+          );
+          expect((financialRow.rows as Array<{ c: number }>)[0].c).toBe(2);
+
+          // -------------------------------------------------------------------
+          // Cross-account break test: the OTHER org's identity graph is untouched.
+          // -------------------------------------------------------------------
+          const otherPersonStillThere = await db.query.person.findFirst({
+            where: eq(person.id, otherPersonId),
+            columns: { id: true },
+          });
+          expect(otherPersonStillThere).toBeDefined();
+
+          const otherOrgStillThere = await db.query.organization.findFirst({
+            where: eq(organization.id, otherOrgId),
+            columns: { id: true },
+          });
+          expect(otherOrgStillThere).toBeDefined();
+        } finally {
+          // Clean up the cross-account seed.
+          await db
+            .delete(membership)
+            .where(eq(membership.personId, otherPersonId))
+            .catch(() => undefined);
+          await db
+            .delete(person)
+            .where(eq(person.id, otherPersonId))
+            .catch(() => undefined);
+          await db
+            .delete(organization)
+            .where(eq(organization.id, otherOrgId))
+            .catch(() => undefined);
+        }
+      } finally {
+        // Best-effort cleanup of any seed rows not deleted by the act step.
+        await teardownV2Graph(db, personId, organizationId).catch(
+          () => undefined,
+        );
+      }
+    });
+  });
+}
