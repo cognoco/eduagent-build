@@ -338,6 +338,25 @@ export async function generateCategorizedBookSuggestions(
   } catch (error) {
     const reason = classifyError(error);
     emitFailureMetric(profileId, subjectId, reason);
+    // [BUG-861] Transient failures (network/timeout/quota/unknown) must not
+    // leave the cooldown stamp committed — the learner should be able to retry
+    // immediately after a transient infra blip. Deterministic failures
+    // (parse, all_filtered) keep the stamp so we don't hot-loop on something
+    // that will fail the same way. Reset errors are swallowed: the primary
+    // failure reason is still returned, and the stamp falling through on a
+    // reset failure is acceptable (cooldown expires naturally).
+    if (isTransientFailure(reason)) {
+      try {
+        await db
+          .update(subjects)
+          .set({ bookSuggestionsLastGenerationAttemptedAt: null })
+          .where(
+            and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+          );
+      } catch {
+        // Swallow reset errors — the original failure reason is the signal.
+      }
+    }
     return reason;
   }
 
@@ -545,6 +564,23 @@ function classifyError(error: unknown): FailureReason {
   if (lower.includes('json') || lower.includes('parse')) return 'parse';
   if (lower.includes('network') || lower.includes('fetch')) return 'network';
   return 'unknown';
+}
+
+/**
+ * [BUG-861] Transient failures (network, timeout, quota, unknown) should not
+ * leave the cooldown stamp committed, or the learner is locked out for
+ * COOLDOWN_MS even though the LLM was never reached / never produced a usable
+ * result due to an infrastructure blip. Deterministic failures (parse,
+ * all_filtered) leave the stamp so we don't immediately retry something that
+ * will fail the same way.
+ */
+function isTransientFailure(reason: FailureReason): boolean {
+  return (
+    reason === 'network' ||
+    reason === 'timeout' ||
+    reason === 'quota' ||
+    reason === 'unknown'
+  );
 }
 
 function getLanguageDisplayName(languageCode: string): string | null {
