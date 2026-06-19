@@ -37,6 +37,13 @@ export interface UseSubjectClassificationOptions {
   subjectId: string | undefined;
   effectiveMode: string;
 
+  // T25: V2 "mentor-is-the-app" entry. When true (flag on + mentor freeform
+  // entry), turn-1 subject resolution never opens the full subject-library
+  // grid and never blocks: confident picks keep the override chip visible,
+  // ambiguous picks show narrow inline disambiguation, and a classifier
+  // suggestion is created silently.
+  isV2MentorEntry: boolean;
+
   // Data
   availableSubjects: Array<{ id: string; name: string }>;
 
@@ -97,6 +104,7 @@ export function useSubjectClassification(
     setResumedBanner,
     subjectId,
     effectiveMode,
+    isV2MentorEntry,
     availableSubjects,
     classifySubject,
     resolveSubject,
@@ -432,8 +440,14 @@ export function useSubjectClassification(
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
       if (isStreaming || pendingClassification || quotaError) return;
       if (pendingSubjectResolution) {
-        showConfirmation("Pick the subject first, then I'll keep going.");
-        return;
+        if (!isV2MentorEntry) {
+          showConfirmation("Pick the subject first, then I'll keep going.");
+          return;
+        }
+        // T25: V2 is non-blocking — a fresh message supersedes the pending
+        // disambiguation. Clear it and let the new message re-resolve the
+        // subject below instead of gating on the prior prompt.
+        setPendingSubjectResolution(null);
       }
 
       setMessages((prev) => [
@@ -504,6 +518,44 @@ export function useSubjectClassification(
       let sessionSubjectId: string | undefined;
       let sessionSubjectName: string | undefined;
 
+      // T25: V2 silent subject creation. Creates the subject, sets it as the
+      // session subject, posts a tentative ack, and keeps the override chip
+      // visible — then lets the caller fall through to continueWithMessage.
+      // Returns false (and surfaces a confirmation) only if creation failed.
+      const silentlyCreateSubject = async (
+        name: string,
+        rawInputText: string,
+      ): Promise<boolean> => {
+        try {
+          const created = await createSubject.mutateAsync({
+            name,
+            rawInput: rawInputText,
+          });
+          setClassifiedSubject({
+            subjectId: created.subject.id,
+            subjectName: created.subject.name,
+          });
+          setShowWrongSubjectChip(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createLocalMessageId('ai'),
+              role: 'assistant',
+              content: `Looks like ${created.subject.name}.`,
+              isSystemPrompt: true,
+            },
+          ]);
+          sessionSubjectId = created.subject.id;
+          sessionSubjectName = created.subject.name;
+          return true;
+        } catch {
+          showConfirmation(
+            `Could not create ${name}. Pick a subject and we'll keep going.`,
+          );
+          return false;
+        }
+      };
+
       // Recitation mode: silently auto-pick the first available subject.
       // No classification prompt — the child named a poem, not a subject.
       if (
@@ -535,7 +587,9 @@ export function useSubjectClassification(
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,
             });
-            setShowWrongSubjectChip(false);
+            // T25: V2 keeps the override chip visible so a confident
+            // mis-commit (e.g. "analysis" -> English) is one tap to fix.
+            setShowWrongSubjectChip(isV2MentorEntry);
             sessionSubjectId = candidate.subjectId;
             sessionSubjectName = candidate.subjectName;
             setMessages((prev) => [
@@ -581,7 +635,43 @@ export function useSubjectClassification(
               sessionSubjectName = best.subjectName;
             }
             const suggested = result.suggestedSubjectName ?? null;
-            if (!best && suggested) {
+            if (!best && isV2MentorEntry) {
+              // T25: V2 never opens the full subject-library grid on a mentor
+              // turn. Resolve a subject silently; fall back to narrow
+              // new-subject suggestion cards (not the grid) only when there is
+              // nothing concrete to create.
+              if (suggested) {
+                const created = await silentlyCreateSubject(suggested, text);
+                if (!created) return;
+              } else {
+                try {
+                  const resolveResult = await resolveSubject.mutateAsync({
+                    rawInput: text,
+                  });
+                  if (resolveResult.resolvedName) {
+                    const created = await silentlyCreateSubject(
+                      resolveResult.resolvedName,
+                      text,
+                    );
+                    if (!created) return;
+                  } else if (resolveResult.suggestions.length > 0) {
+                    openSubjectResolutionForTurn(
+                      text,
+                      resolveResult.displayMessage ||
+                        'Pick a subject that fits, or create your own.',
+                      [],
+                      null,
+                      resolveResult.suggestions,
+                    );
+                    return;
+                  }
+                  // No resolved name and no suggestions — proceed without a
+                  // subject rather than gating on a grid.
+                } catch {
+                  // Both classifiers failed — fall through to no-subject chat.
+                }
+              }
+            } else if (!best && suggested) {
               openSubjectResolutionForTurn(
                 text,
                 `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`,
@@ -592,8 +682,7 @@ export function useSubjectClassification(
                 suggested,
               );
               return;
-            }
-            if (!best) {
+            } else if (!best) {
               try {
                 const resolveResult = await resolveSubject.mutateAsync({
                   rawInput: text,
@@ -772,13 +861,16 @@ export function useSubjectClassification(
       // CR-1: quotaError added so the callback re-creates when quota state changes.
       quotaError,
       pendingSubjectResolution,
+      setPendingSubjectResolution,
       createLocalMessageId,
       subjectId,
       classifiedSubject,
       userMessageCount,
       effectiveMode,
+      isV2MentorEntry,
       classifySubject,
       resolveSubject,
+      createSubject,
       availableSubjects,
       continueWithMessage,
       openSubjectResolution,

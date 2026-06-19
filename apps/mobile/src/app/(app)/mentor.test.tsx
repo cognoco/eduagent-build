@@ -118,6 +118,26 @@ describe('MentorScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subject-hub/spanish');
   });
 
+  it('carries a mentor-intent question into the session as rawInput (does not drop the typed text) [T25]', () => {
+    render(<MentorScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('mentor-bar-input'),
+      'what is photosynthesis?',
+    );
+    fireEvent(screen.getByTestId('mentor-bar-input'), 'submitEditing');
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+        mode: 'freeform',
+        rawInput: 'what is photosynthesis?',
+      },
+    });
+  });
+
   it('uses cached feed on feed failure and keeps the screen usable', () => {
     mockNowFeed = {
       ...mockNowFeed,

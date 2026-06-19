@@ -103,7 +103,12 @@ export default function MentorScreen(): React.ReactElement {
     if (result.kind === 'mentor') {
       router.push({
         pathname: '/(app)/session',
-        params: { entrySource: 'mentor', returnTo: 'mentor' },
+        params: {
+          entrySource: 'mentor',
+          returnTo: 'mentor',
+          mode: 'freeform',
+          rawInput: result.text,
+        },
       } as Href);
       return;
     }
