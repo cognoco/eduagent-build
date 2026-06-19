@@ -1282,6 +1282,123 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('skips a drafted note without writing it to /notes', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    // Skip path: handleSkipDraftedNote clears state + calls the no-op
+    // challengeRoundActions.skipNote(); it must NOT POST to /notes.
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Here is your note draft.');
+        await onDone({
+          exchangeCount: 3,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-draft-skip',
+          challengeRound: {
+            state: 'drafting',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 2,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          draftedNote: {
+            id: 'draft-skip-1',
+            body: 'Linear equations stay balanced when you do the same thing to both sides.',
+            sourceAnswerEventIds: ['answer-event-1'],
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('drafted-note-review');
+    });
+
+    fireEvent.press(testScreen.getByTestId('drafted-note-skip'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(testScreen.queryByTestId('drafted-note-review')).toBeNull();
+    });
+    expect(fetchCallsMatching(mockFetch, '/notes')).toHaveLength(0);
+  });
+
+  it('renders the fallback composer when the server emits an ungrounded draft (body=null)', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    // Server-side buildValidatedDraft falls back to body=null + fallbackPrompt
+    // when validateNoteDraft rejects the LLM draft (grounding failed). The
+    // mobile surface must show the write-your-own composer, not an LLM note.
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Write a note in your own words.');
+        await onDone({
+          exchangeCount: 3,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-draft-fallback',
+          challengeRound: {
+            state: 'drafting',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 2,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          draftedNote: {
+            id: 'draft-fallback-1',
+            body: null,
+            sourceAnswerEventIds: [],
+            fallbackPrompt:
+              'Write a short note in your own words from the parts you can explain clearly.',
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('drafted-note-review');
+      testScreen.getByTestId('drafted-note-fallback-prompt');
+      testScreen.getByText(
+        'Write a short note in your own words from the parts you can explain clearly.',
+      );
+    });
+    // body=null starts the review in editing mode (composer), not a read-only
+    // preview of an LLM-authored note.
+    testScreen.getByTestId('drafted-note-input');
+    expect(testScreen.queryByTestId('drafted-note-preview')).toBeNull();
+  });
+
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
