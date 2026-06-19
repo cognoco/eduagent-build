@@ -8,14 +8,18 @@
 import { and, eq } from 'drizzle-orm';
 import {
   accounts,
+  generateUUIDv7,
+  membership,
   profileQuotaUsage,
   profiles,
   quotaPools,
+  subscription as subscriptionV2,
   subscriptions,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const FREE_USER_ID = 'integration-quota-reset-free';
@@ -25,12 +29,28 @@ const PLUS_EMAIL = 'integration-quota-reset-plus@integration.test';
 const FAMILY_USER_ID = 'integration-quota-reset-family';
 const FAMILY_EMAIL = 'integration-quota-reset-family@integration.test';
 
+function isIdentityV2Enabled(): boolean {
+  return process.env.IDENTITY_V2_ENABLED === 'true';
+}
+
 async function seedAccount(clerkUserId: string, email: string) {
   const db = createIntegrationDb();
   const [account] = await db
     .insert(accounts)
     .values({ clerkUserId, email })
     .returning();
+
+  if (isIdentityV2Enabled()) {
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId: account!.id,
+      profileId: generateUUIDv7(),
+      displayName: 'Quota Reset Owner',
+      birthYear: 1990,
+      clerkUserId,
+      email,
+      isOwner: true,
+    });
+  }
 
   return account!;
 }
@@ -55,6 +75,26 @@ async function seedSubscriptionWithQuota(input: {
       currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
     })
     .returning();
+
+  if (isIdentityV2Enabled()) {
+    const ownerMembership = await db.query.membership.findFirst({
+      where: eq(membership.organizationId, input.accountId),
+      columns: { personId: true },
+    });
+    if (!ownerMembership) {
+      throw new Error('Owner membership not found for v2 quota reset seed');
+    }
+
+    await db.insert(subscriptionV2).values({
+      id: subscription!.id,
+      organizationId: input.accountId,
+      planTier: input.tier,
+      status: 'active',
+      payerPersonId: ownerMembership.personId,
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
+    });
+  }
 
   const [quotaPool] = await db
     .insert(quotaPools)

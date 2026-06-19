@@ -11,6 +11,7 @@ import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import { createLogger } from '../services/logger';
 import { isIdentityV2Enabled } from '../config';
 import { resolveIdentityV2 } from '../services/identity-v2/identity-resolve';
+import { ensureInitialTrialSubscriptionV2 } from '../services/billing/billing-v2';
 import type { AuthUser } from './auth';
 import type { Database } from '@eduagent/database';
 
@@ -151,6 +152,18 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
         // write-authority guard. resolved.personId is the login→person binding,
         // never request-supplied.
         c.set('callerPersonId', resolved.personId);
+        try {
+          await withTransientDatabaseRetry(
+            'accountMiddleware.ensureInitialTrialSubscriptionV2',
+            () => ensureInitialTrialSubscriptionV2(db, resolved.account.id),
+            { idempotent: true },
+          );
+        } catch (error) {
+          logger.error('billing.v2.initial_trial_missing_repair_failed', {
+            accountId: resolved.account.id,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
       } else {
         c.set('clerkIdentity', {
           clerkUserId: user.userId,

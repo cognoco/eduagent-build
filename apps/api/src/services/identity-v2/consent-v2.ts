@@ -36,6 +36,7 @@ import {
   membership,
   nudges,
   person,
+  subscription as subscriptionTable,
   type Database,
 } from '@eduagent/database';
 import type { ConsentStatus, ConsentType } from '@eduagent/schemas';
@@ -437,8 +438,8 @@ export interface ProcessConsentResponseV2Result {
  * replay/expiry, then:
  *   - approve → tx: request → 'approved' + INSERT consent_grant(granted=true)
  *     + back-link consent_grant_id. (NEVER creates a guardianship edge.)
- *   - deny    → tx: request → 'denied' + cascade-delete the child person (the
- *     legacy deny-cascade; person.id = profiles.id, FK cascade unchanged).
+ *   - deny    → tx: request → 'denied' + delete payer subscription if this
+ *     person owns one + cascade-delete the person.
  *
  * The atomic status transition's WHERE prevents the TOCTOU double-submit race.
  */
@@ -548,7 +549,15 @@ export async function processConsentResponseV2(
       if (!updated) {
         throw new ConsentAlreadyProcessedError();
       }
-      // Deny cascade-deletes the child person (FK cascades handle child data).
+      // A consent-pending owner can already have the launch trial subscription;
+      // remove only rows where THIS person is the payer before deleting them.
+      // Managed children are not payers, so this is a no-op for ordinary
+      // parent-created child consent flows.
+      await tx
+        .delete(subscriptionTable)
+        .where(eq(subscriptionTable.payerPersonId, chargePersonId));
+
+      // Deny cascade-deletes the person (FK cascades handle child data).
       await tx.delete(person).where(eq(person.id, chargePersonId));
     });
   }

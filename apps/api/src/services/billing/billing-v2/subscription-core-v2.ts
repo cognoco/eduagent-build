@@ -24,27 +24,22 @@
 // structured signal (captureException / safeSend Inngest), never bare console.warn.
 //
 // M-REPOINT PRECONDITION (WI-586 convergence runbook §4). The provisioning paths
-// here (createSubscriptionV2, ensureFreeSubscriptionV2, and the reconcile they
-// call) insert `quota_pools` rows referencing the NEW `subscription.id`. Until
+// here insert `quota_pools` rows referencing the NEW `subscription.id`. Until
 // the FK re-point (M-REPOINT, §4 step 6), `quota_pools.subscription_id` still
-// targets LEGACY `subscriptions(id)`, so such an insert would FK-fail. This is
-// safe in the sanctioned flow: §4 applies M-REPOINT (step 6) BEFORE the flip
-// (step 7), and IDENTITY_V2_ENABLED is 'false' in every deployed env until that
-// flip (single-live-store) — so these v2 writes never run against an
-// un-re-pointed FK. An out-of-order flip (flag flipped true before M-REPOINT)
-// would surface as a raw FK error on the quota_pools insert; that is the
-// expected loud failure, not a state this module guards against.
+// targets LEGACY `subscriptions(id)`, so flag-on pre-repoint CI needs an
+// id-aligned legacy parent row. Remove that bridge with the convergence drop.
 //
 // Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
 // subscription-core.ts stays byte-identical.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, lte, ne, or } from 'drizzle-orm';
+import { and, eq, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   subscription as subscriptionTable,
   organization,
   quotaPools,
+  subscriptions as legacySubscriptions,
   type Database,
   findSubscriptionByOrganizationId__unscoped,
   findSubscriptionByStripeIdV2__unscoped,
@@ -55,6 +50,7 @@ import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
 import { safeSend } from '../../safe-non-core';
+import { computeTrialEndDate } from '../../trial';
 import { inngest } from '../../../inngest/client';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
 import {
@@ -68,6 +64,7 @@ import { mapSubscriptionV2Row } from './types-v2';
 import { reconcileQuotaStateForSubscriptionV2 } from './quota-reconcile-v2';
 
 const logger = createLogger();
+let legacySubscriptionsTableExistsCache: boolean | null = null;
 
 // ---------------------------------------------------------------------------
 // [BUG-120] Zod input contract for activateSubscriptionFromCheckoutV2 — same as
@@ -85,6 +82,49 @@ const activateCheckoutInputSchema = z.object({
     message: 'eventTimestamp must be ISO-8601 / parseable by Date',
   }),
 });
+
+async function legacySubscriptionsTableExists(db: Database): Promise<boolean> {
+  if (legacySubscriptionsTableExistsCache !== null) {
+    return legacySubscriptionsTableExistsCache;
+  }
+
+  const raw = (await db.execute(
+    sql`SELECT to_regclass('public.subscriptions') AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  legacySubscriptionsTableExistsCache = rows[0]?.reg != null;
+  return legacySubscriptionsTableExistsCache;
+}
+
+async function ensureLegacySubscriptionParent(
+  db: Database,
+  input: {
+    subscriptionId: string;
+    organizationId: string;
+    tier: SubscriptionTier;
+    status: SubscriptionStatus;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    trialEndsAt?: Date | null;
+  },
+): Promise<void> {
+  if (!(await legacySubscriptionsTableExists(db))) return;
+
+  await db
+    .insert(legacySubscriptions)
+    .values({
+      id: input.subscriptionId,
+      accountId: input.organizationId,
+      tier: input.tier,
+      status: input.status,
+      stripeCustomerId: input.stripeCustomerId ?? null,
+      stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+      trialEndsAt: input.trialEndsAt ?? null,
+    })
+    .onConflictDoNothing();
+}
 
 /**
  * Resolve the payer person id for an organization (the org's owner person).
@@ -175,6 +215,15 @@ export async function createSubscriptionV2(
     cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
 
     const tierConfig = getTierConfig(tier);
+    await ensureLegacySubscriptionParent(tx as unknown as Database, {
+      subscriptionId: subRow.id,
+      organizationId,
+      tier,
+      status: subRow.status as SubscriptionStatus,
+      stripeCustomerId: options?.stripeCustomerId ?? null,
+      stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
+      trialEndsAt: subRow.trialEndsAt ?? null,
+    });
     await tx.insert(quotaPools).values({
       subscriptionId: subRow.id,
       monthlyLimit,
@@ -450,6 +499,110 @@ export async function resetMonthlyQuotaV2(
 const FREE_TIER_LIMIT = getTierConfig('free').monthlyQuota;
 
 /**
+ * Repairs a structurally-resolved v2 organization that somehow lacks the
+ * subscription normally created by the owner-bootstrap graph transaction.
+ * This mirrors the legacy account missing-trial repair: the recovery target is
+ * the launch plus trial, not the defensive free-tier metering fallback.
+ */
+export async function ensureInitialTrialSubscriptionV2(
+  db: Database,
+  organizationId: string,
+  timezone?: string | null,
+): Promise<SubscriptionRow> {
+  const existing = await getSubscriptionByAccountIdV2(db, organizationId);
+  if (existing) return existing;
+
+  const payerPersonId = await resolvePayerPersonId(db, organizationId);
+  if (!payerPersonId) {
+    captureException(
+      new Error(
+        'ensureInitialTrialSubscriptionV2: organization has no owner person for payer anchor',
+      ),
+      {
+        extra: {
+          context: 'billing.v2.ensure_initial_trial.no_payer',
+          organizationId,
+        },
+      },
+    );
+    throw new Error(
+      `ensureInitialTrialSubscriptionV2: no owner person for organization ${organizationId}`,
+    );
+  }
+
+  const tierConfig = getTierConfig('plus');
+  const provisioned = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    const [orgRow] = await tx
+      .select({ id: organization.id, timezone: organization.timezone })
+      .from(organization)
+      .where(eq(organization.id, organizationId))
+      .for('update');
+    if (!orgRow) {
+      throw new Error(
+        `ensureInitialTrialSubscriptionV2: organization ${organizationId} not found`,
+      );
+    }
+
+    const already = await findSubscriptionByOrganizationId__unscoped(
+      txDb,
+      organizationId,
+    );
+    if (already) return already;
+
+    const now = new Date();
+    const cycleResetAt = new Date(now);
+    cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+    const trialEndsAt = computeTrialEndDate(
+      now,
+      timezone ?? orgRow.timezone ?? null,
+    );
+
+    const [row] = await tx
+      .insert(subscriptionTable)
+      .values({
+        organizationId,
+        planTier: 'plus',
+        status: 'trial',
+        payerPersonId,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        trialEndsAt,
+      })
+      .returning();
+    if (!row) {
+      throw new Error('Initial trial subscription insert did not return a row');
+    }
+
+    await ensureLegacySubscriptionParent(txDb, {
+      subscriptionId: row.id,
+      organizationId,
+      tier: 'plus',
+      status: 'trial',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      trialEndsAt,
+    });
+    await tx
+      .insert(quotaPools)
+      .values({
+        subscriptionId: row.id,
+        monthlyLimit: tierConfig.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt,
+      })
+      .onConflictDoNothing({ target: quotaPools.subscriptionId });
+    await reconcileQuotaStateForSubscriptionV2(txDb, row.id, now);
+    return row;
+  });
+
+  return mapSubscriptionV2Row(provisioned);
+}
+
+/**
  * v2 of ensureFreeSubscription. Auto-provisions a free-tier subscription +
  * quota pool for an organization if none exists.
  *
@@ -532,6 +685,16 @@ export async function ensureFreeSubscriptionV2(
       .returning();
 
     if (!row) throw new Error('Free subscription insert did not return a row');
+
+    await ensureLegacySubscriptionParent(txDb, {
+      subscriptionId: row.id,
+      organizationId,
+      tier: 'free',
+      status: 'active',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      trialEndsAt: null,
+    });
 
     await tx
       .insert(quotaPools)

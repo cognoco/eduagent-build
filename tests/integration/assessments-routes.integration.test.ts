@@ -6,13 +6,7 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import {
-  assessments,
-  generateUUIDv7,
-  profiles,
-  retentionCards,
-  xpLedger,
-} from '@eduagent/database';
+import { assessments, retentionCards, xpLedger } from '@eduagent/database';
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
@@ -152,18 +146,15 @@ describe('Integration: assessment routes', () => {
 
   it('[BREAK / CR-FULL-2] rejects proxy-mode assessment answers', async () => {
     const ownerProfile = await createOwnerProfile();
-    const childProfile = {
-      id: generateUUIDv7(),
-      accountId: ownerProfile.accountId,
-      isOwner: false,
-    };
     const db = getIntegrationDb();
-    await db.insert(profiles).values({
-      id: childProfile.id,
-      accountId: childProfile.accountId,
+
+    const childProfile = await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: ASSESSMENTS_USER,
       displayName: 'Assessment Child',
       birthYear: 2000,
-      isOwner: false,
+      kind: 'child',
     });
 
     const subject = await seedSubject(childProfile.id, 'Biology');
