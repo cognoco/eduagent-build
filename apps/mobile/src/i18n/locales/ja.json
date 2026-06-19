@@ -393,7 +393,12 @@
       "weeklyEmailDigestTitle": "週間進捗メール",
       "monthlyEmailDigestTitle": "月間進捗メール",
       "emailDigestDescription": "アカウントのメールアドレスに送信されます。",
-      "updateErrorTitle": "通知設定を更新できませんでした"
+      "updateErrorTitle": "通知設定を更新できませんでした",
+      "pushMissingPermission": "お使いのデバイスからの通知を許可してください。",
+      "pushMissingServer": "ここでプッシュ通知をオンにしてください。",
+      "pushMissingToken": "このデバイスをプッシュ通知に登録してください。",
+      "openSettingsTitle": "設定を開く",
+      "openSettingsDescription": "このアプリの通知はブロックされています。システム設定でオンにしてください。"
     },
     "account": {
       "sectionHeader": "アカウント",
@@ -3266,6 +3271,12 @@
       "crossContextPromptMessage": "現在セッション中です。先にこちらを完了するか、アップデートを開いて現在のセッションを終了してください。",
       "stayHere": "このままにする",
       "openUpdate": "アップデートを開く"
+    },
+    "guardianPrimer": {
+      "title": "最新情報を受け取りますか？",
+      "message": "お子様があなたの助けを必要としているときに、そっとお知らせを送信できます。この設定はいつでも設定で変更できます。",
+      "allow": "許可する",
+      "notNow": "後で"
     }
   },
   "myNotes": {

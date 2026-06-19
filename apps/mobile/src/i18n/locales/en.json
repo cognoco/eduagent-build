@@ -419,7 +419,12 @@
       "weeklyEmailDigestTitle": "Weekly progress email",
       "monthlyEmailDigestTitle": "Monthly progress email",
       "emailDigestDescription": "Sent to your account email.",
-      "updateErrorTitle": "Could not update notification settings"
+      "updateErrorTitle": "Could not update notification settings",
+      "pushMissingPermission": "Allow notifications from your device.",
+      "pushMissingServer": "Turn on push notifications here.",
+      "pushMissingToken": "Register this device for push notifications.",
+      "openSettingsTitle": "Open Settings",
+      "openSettingsDescription": "Notifications are blocked for this app. Turn them on in system settings."
     },
     "privacy": {
       "privacyAndData": "Privacy & data",
@@ -3131,6 +3136,12 @@
       "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
       "stayHere": "Stay here",
       "openUpdate": "Open update"
+    },
+    "guardianPrimer": {
+      "title": "Stay in the loop?",
+      "message": "We can send a gentle nudge when a child needs your attention. You can change this anytime in Settings.",
+      "allow": "Allow",
+      "notNow": "Not now"
     }
   },
   "nudge": {

@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import type {
   NotificationPrefsInput,
+  NotificationPrefsResponse as NotificationPrefs,
   AnalogyDomain,
   CelebrationLevel,
   LanguageCode,
@@ -16,20 +17,6 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
-
-// ---------------------------------------------------------------------------
-// Types — NotificationPrefs is the API response shape (maxDailyPush required)
-// ---------------------------------------------------------------------------
-
-interface NotificationPrefs {
-  reviewReminders: boolean;
-  dailyReminders: boolean;
-  weeklyProgressPush: boolean;
-  weeklyProgressEmail: boolean;
-  monthlyProgressEmail: boolean;
-  pushEnabled: boolean;
-  maxDailyPush: number;
-}
 
 // ---------------------------------------------------------------------------
 // Query hooks
