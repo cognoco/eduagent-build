@@ -3307,13 +3307,17 @@
   },
   "createProfile": {
     "titleChild": "Conte-nos sobre seu/sua filho(a)",
+    "titleParent": "Conte-nos sobre você",
     "titleSelf": "Quem é o(a) aprendiz?",
     "displayNameLabel": "Nome de exibição",
+    "parentDisplayNameLabel": "Seu nome de exibição",
     "childDisplayNameLabel": "Nome de exibição da criança",
     "birthDateLabel": "Data de nascimento",
+    "parentBirthDateLabel": "Sua data de nascimento",
     "childBirthDateLabel": "Data de nascimento da criança",
-    "birthDateHint": "Para que seu tutor fale com você da maneira certa. A idade mínima é 11 anos.",
-    "childBirthDateHint": "Para que o tutor do seu/sua filho(a) fale com ele(a) da maneira certa. A idade mínima é 11 anos.",
+    "birthDateHint": "Para que seu tutor fale com você da maneira certa. A idade mínima é {{age}} anos.",
+    "parentBirthDateHint": "Isto é para o adulto que está configurando a conta. Você pode adicionar seu/sua filho(a) em seguida. A idade mínima é {{age}} anos.",
+    "childBirthDateHint": "Para que o tutor do seu/sua filho(a) fale com ele(a) da maneira certa. A idade mínima é {{age}} anos.",
     "webDateFormatHint": "Insira sua data de nascimento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Insira a data de nascimento do seu/sua filho(a) como AAAA-MM-DD.",
     "selectDob": "Selecione a data de nascimento",
@@ -3324,6 +3328,8 @@
     "upgradeRequiredTitle": "Upgrade necessário",
     "upgradeRequiredBody": "Sua assinatura não suporta perfis adicionais. Faça o upgrade para o plano Família ou Pro.",
     "seePlans": "Ver planos",
+    "minimumAgeError": "Aprendizes devem ter pelo menos {{age}} anos. Escolha uma data de nascimento anterior.",
+    "parentAdultAgeError": "Contas de pais precisam da data de nascimento de um adulto. Insira seus próprios dados primeiro e depois adicione seu/sua filho(a).",
     "a11yCloseDatePicker": "Fechar seletor de data"
   },
   "clerkGate": {

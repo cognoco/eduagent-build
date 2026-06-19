@@ -21,6 +21,11 @@ import {
   type SupportedSSOStrategy,
 } from '../../lib/clerk-sso';
 import { extractClerkError } from '../../lib/clerk-error';
+import {
+  CLERK_REQUEST_TIMEOUT_MS,
+  isClerkRequestTimeoutError,
+  withClerkTimeout,
+} from '../../lib/clerk-timeout';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
@@ -79,6 +84,26 @@ export default function SignUpScreen() {
     setPendingSessionActivationId(null);
     setActivationFailureContext(null);
   }, []);
+
+  const formatSignUpError = useCallback(
+    (err: unknown): string => {
+      if (isClerkRequestTimeoutError(err)) {
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'sign-up: Clerk request timed out',
+          level: 'warning',
+          data: {
+            operation: err.operation,
+            timeoutMs: CLERK_REQUEST_TIMEOUT_MS,
+          },
+        });
+        return t('accountSecurity.timeoutMessage');
+      }
+
+      return extractClerkError(err);
+    },
+    [t],
+  );
 
   const activateCreatedSession = useCallback(
     async (
@@ -239,7 +264,13 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [activateCreatedSession, clearActivationFailure, isLoaded, startSSOFlow],
+    [
+      activateCreatedSession,
+      clearActivationFailure,
+      isLoaded,
+      router,
+      startSSOFlow,
+    ],
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -254,19 +285,25 @@ export default function SignUpScreen() {
         console.log(
           `[AUTH-DEBUG] signUp.create → email=${emailAddress.trim()}`,
         );
-      await signUp.create({ emailAddress, password });
+      await withClerkTimeout(
+        signUp.create({ emailAddress, password }),
+        'signUp.create',
+      );
       if (__DEV__)
         console.log(
           `[AUTH-DEBUG] signUp.create → status=${signUp.status}` +
             ` | createdSessionId=${signUp.createdSessionId ?? 'null'}`,
         );
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      await withClerkTimeout(
+        signUp.prepareEmailAddressVerification({ strategy: 'email_code' }),
+        'signUp.prepareEmailAddressVerification',
+      );
       if (__DEV__)
         console.log('[AUTH-DEBUG] prepareEmailAddressVerification → OK');
       setPendingVerification(true);
     } catch (err: unknown) {
       if (__DEV__) console.warn('[AUTH-DEBUG] signUp flow threw:', err);
-      setError(extractClerkError(err));
+      setError(formatSignUpError(err));
     } finally {
       setLoading(false);
     }
@@ -277,6 +314,7 @@ export default function SignUpScreen() {
     signUp,
     emailAddress,
     password,
+    formatSignUpError,
   ]);
 
   const onVerifyPress = useCallback(async () => {

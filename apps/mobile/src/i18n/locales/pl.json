@@ -3447,13 +3447,17 @@
   },
   "createProfile": {
     "titleChild": "Opowiedz nam o swoim dziecku",
+    "titleParent": "Opowiedz nam o sobie",
     "titleSelf": "Kto się uczy?",
     "displayNameLabel": "Wyświetlana nazwa",
+    "parentDisplayNameLabel": "Twoja wyświetlana nazwa",
     "childDisplayNameLabel": "Wyświetlana nazwa dziecka",
     "birthDateLabel": "Data urodzenia",
+    "parentBirthDateLabel": "Twoja data urodzenia",
     "childBirthDateLabel": "Data urodzenia dziecka",
-    "birthDateHint": "Dzięki temu Twój mentor będzie zwracał się do Ciebie w odpowiedni sposób. Minimalny wiek to 11 lat.",
-    "childBirthDateHint": "Dzięki temu mentor Twojego dziecka będzie zwracał się do niego w odpowiedni sposób. Minimalny wiek to 11 lat.",
+    "birthDateHint": "Dzięki temu Twój mentor będzie zwracał się do Ciebie w odpowiedni sposób. Minimalny wiek to {{age}} lat.",
+    "parentBirthDateHint": "To informacje dla dorosłego, który zakłada konto. Następnie możesz dodać swoje dziecko. Minimalny wiek to {{age}} lat.",
+    "childBirthDateHint": "Dzięki temu mentor Twojego dziecka będzie zwracał się do niego w odpowiedni sposób. Minimalny wiek to {{age}} lat.",
     "webDateFormatHint": "Wpisz swoją datę urodzenia w formacie RRRR-MM-DD.",
     "childWebDateFormatHint": "Wpisz datę urodzenia swojego dziecka w formacie RRRR-MM-DD.",
     "selectDob": "Wybierz datę urodzenia",
@@ -3464,6 +3468,8 @@
     "upgradeRequiredTitle": "Wymagane ulepszenie",
     "upgradeRequiredBody": "Twoja subskrypcja nie obsługuje dodatkowych profili. Ulepsz plan do Rodzinnego lub Pro.",
     "seePlans": "Zobacz plany",
+    "minimumAgeError": "Uczący się muszą mieć co najmniej {{age}} lat. Wybierz wcześniejszą datę urodzenia.",
+    "parentAdultAgeError": "Konta rodziców wymagają daty urodzenia osoby dorosłej. Najpierw wpisz swoje dane, a potem dodaj dziecko.",
     "a11yCloseDatePicker": "Zamknij wybór daty"
   },
   "clerkGate": {

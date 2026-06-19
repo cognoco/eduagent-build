@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PROFILE_MINIMUM_AGE } from './age.ts';
 import { isoDateField } from './common.ts';
 import { consentStatusSchema } from './consent.ts';
 
@@ -33,7 +34,7 @@ export type AppContext = z.infer<typeof appContextSchema>;
 
 // BKT-C.1 — age cutoff for pronouns prompt during onboarding (COPPA-transition
 // age; below this, the field is never prompted and stays null).
-export const PRONOUNS_PROMPT_MIN_AGE = 13;
+export const PRONOUNS_PROMPT_MIN_AGE = PROFILE_MINIMUM_AGE;
 
 export const birthYearSchema = z
   .number()
@@ -51,8 +52,8 @@ export const birthYearSchema = z
   // born in December of (currentYear - 13) could be only 12 years old,
   // so we require birthYear ≤ (currentYear - 13) for the v1 floor.
   // Ships with this documented rationale (data-model.md §2A.5 requirement).
-  .refine((y) => y <= new Date().getFullYear() - 13, {
-    message: 'birthYear must correspond to a minimum age of 13',
+  .refine((y) => y <= new Date().getFullYear() - PROFILE_MINIMUM_AGE, {
+    message: `birthYear must correspond to a minimum age of ${PROFILE_MINIMUM_AGE}`,
   });
 
 export const profileCreateSchema = z

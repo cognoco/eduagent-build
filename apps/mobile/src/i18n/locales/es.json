@@ -3307,13 +3307,17 @@
   },
   "createProfile": {
     "titleChild": "Háblanos de tu hijo/a",
+    "titleParent": "Háblanos de ti",
     "titleSelf": "¿Quién va a aprender?",
     "displayNameLabel": "Nombre de usuario",
+    "parentDisplayNameLabel": "Tu nombre de usuario",
     "childDisplayNameLabel": "Nombre de usuario del niño/a",
     "birthDateLabel": "Fecha de nacimiento",
+    "parentBirthDateLabel": "Tu fecha de nacimiento",
     "childBirthDateLabel": "Fecha de nacimiento del niño/a",
-    "birthDateHint": "Así tu tutor se dirigirá a ti correctamente. La edad mínima es 11 años.",
-    "childBirthDateHint": "Así el tutor de tu hijo/a se dirigirá a él/ella correctamente. La edad mínima es 11 años.",
+    "birthDateHint": "Así tu tutor se dirigirá a ti correctamente. La edad mínima es {{age}} años.",
+    "parentBirthDateHint": "Esto es para el adulto que configura la cuenta. Después podrás añadir a tu hijo/a. La edad mínima es {{age}} años.",
+    "childBirthDateHint": "Así el tutor de tu hijo/a se dirigirá a él/ella correctamente. La edad mínima es {{age}} años.",
     "webDateFormatHint": "Introduce tu fecha de nacimiento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Introduce la fecha de nacimiento de tu hijo/a como AAAA-MM-DD.",
     "selectDob": "Selecciona la fecha de nacimiento",
@@ -3324,6 +3328,8 @@
     "upgradeRequiredTitle": "Se requiere una mejora",
     "upgradeRequiredBody": "Tu suscripción no admite perfiles adicionales. Mejora a un plan Familiar o Pro.",
     "seePlans": "Ver planes",
+    "minimumAgeError": "Los estudiantes deben tener al menos {{age}} años. Elige una fecha de nacimiento anterior.",
+    "parentAdultAgeError": "Las cuentas de padres necesitan la fecha de nacimiento de un adulto. Introduce primero tus propios datos y luego añade a tu hijo/a.",
     "a11yCloseDatePicker": "Cerrar selector de fecha"
   },
   "clerkGate": {

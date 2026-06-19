@@ -36,9 +36,19 @@ const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
 const mockTabs = Object.assign(
-  ({ children }: { children?: React.ReactNode }) => {
+  ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    screenOptions?: unknown;
+  }) => {
     const { View } = require('react-native');
-    return <View testID="tabs">{children}</View>;
+    return (
+      <View testID="tabs" {...props}>
+        {children}
+      </View>
+    );
   },
   {
     Screen: () => null,
@@ -55,8 +65,9 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
 }));
 
+let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -289,6 +300,7 @@ describe('AppLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -844,6 +856,41 @@ describe('AppLayout', () => {
     await screen.findByTestId('profile-switched-toast');
     screen.getByText('Profile switched');
     screen.getByText('The profile you were viewing has been removed.');
+  });
+
+  it('keeps v2 top and bottom chrome outside system navigation overlays when reported insets are zero', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+      renderLayout();
+
+      expect(await screen.findByTestId('account-avatar-shell')).toHaveStyle({
+        top: 32,
+      });
+      const tabs = await screen.findByTestId('tabs');
+      const screenOptions = tabs.props.screenOptions as ({
+        route,
+      }: {
+        route: { name: string };
+      }) => { tabBarStyle: { height?: number; paddingBottom?: number } };
+      expect(screenOptions({ route: { name: 'mentor' } }).tabBarStyle).toEqual(
+        expect.objectContaining({
+          height: 104,
+          paddingBottom: 48,
+        }),
+      );
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
   });
 
   it('shows proxy banner and switches back to the owner profile', async () => {

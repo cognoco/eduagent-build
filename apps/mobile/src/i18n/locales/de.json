@@ -3307,13 +3307,17 @@
   },
   "createProfile": {
     "titleChild": "Erzähl uns von deinem Kind",
+    "titleParent": "Erzähl uns von dir",
     "titleSelf": "Wer lernt hier?",
     "displayNameLabel": "Anzeigename",
+    "parentDisplayNameLabel": "Dein Anzeigename",
     "childDisplayNameLabel": "Anzeigename des Kindes",
     "birthDateLabel": "Geburtsdatum",
+    "parentBirthDateLabel": "Dein Geburtsdatum",
     "childBirthDateLabel": "Geburtsdatum des Kindes",
-    "birthDateHint": "Damit dein Tutor richtig mit dir spricht. Mindestalter ist 11.",
-    "childBirthDateHint": "Damit der Tutor deines Kindes richtig mit ihm spricht. Mindestalter ist 11.",
+    "birthDateHint": "Damit dein Tutor richtig mit dir spricht. Mindestalter ist {{age}}.",
+    "parentBirthDateHint": "Das ist für den Erwachsenen, der das Konto einrichtet. Du kannst dein Kind als Nächstes hinzufügen. Mindestalter ist {{age}}.",
+    "childBirthDateHint": "Damit der Tutor deines Kindes richtig mit ihm spricht. Mindestalter ist {{age}}.",
     "webDateFormatHint": "Gib dein Geburtsdatum als JJJJ-MM-TT ein.",
     "childWebDateFormatHint": "Gib das Geburtsdatum deines Kindes als JJJJ-MM-TT ein.",
     "selectDob": "Geburtsdatum auswählen",
@@ -3324,6 +3328,8 @@
     "upgradeRequiredTitle": "Upgrade erforderlich",
     "upgradeRequiredBody": "Dein Abonnement unterstützt keine zusätzlichen Profile. Bitte upgrade auf Familie oder Pro.",
     "seePlans": "Abos ansehen",
+    "minimumAgeError": "Lernende müssen mindestens {{age}} Jahre alt sein. Bitte wähle ein früheres Geburtsdatum.",
+    "parentAdultAgeError": "Elternkonten benötigen das Geburtsdatum eines Erwachsenen. Gib zuerst deine eigenen Daten ein und füge danach dein Kind hinzu.",
     "a11yCloseDatePicker": "Datumsauswahl schließen"
   },
   "clerkGate": {

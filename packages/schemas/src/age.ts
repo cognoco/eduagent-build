@@ -7,6 +7,9 @@
  */
 export type AgeBracket = 'child' | 'adolescent' | 'adult';
 
+export const PROFILE_MINIMUM_AGE = 13;
+export const PARENT_ACCOUNT_MINIMUM_AGE = 18;
+
 /**
  * The active-profile role discriminator. Mirrors
  * `ActiveProfileRole` in apps/mobile/src/hooks/use-active-profile-role.ts —
@@ -53,8 +56,8 @@ export function computeAgeBracket(
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
-  if (age < 13) return 'child';
-  if (age < 18) return 'adolescent';
+  if (age < PROFILE_MINIMUM_AGE) return 'child';
+  if (age < PARENT_ACCOUNT_MINIMUM_AGE) return 'adolescent';
   return 'adult';
 }
 
@@ -68,7 +71,7 @@ export function isAdultOwner(
   if (profile.birthYear == null) return false;
 
   const year = currentYear ?? new Date().getFullYear();
-  return year - profile.birthYear >= 18;
+  return year - profile.birthYear >= PARENT_ACCOUNT_MINIMUM_AGE;
 }
 
 /**
@@ -91,5 +94,5 @@ export function isUnambiguouslyAdult(
   currentYear?: number,
 ): boolean {
   const year = currentYear ?? new Date().getFullYear();
-  return birthYear < year - 18;
+  return birthYear < year - PARENT_ACCOUNT_MINIMUM_AGE;
 }

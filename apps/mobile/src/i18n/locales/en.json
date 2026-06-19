@@ -3509,13 +3509,17 @@
   },
   "createProfile": {
     "titleChild": "Tell us about your child",
+    "titleParent": "Tell us about you",
     "titleSelf": "Who's the learner?",
     "displayNameLabel": "Display name",
+    "parentDisplayNameLabel": "Your display name",
     "childDisplayNameLabel": "Child's display name",
     "birthDateLabel": "Birth date",
+    "parentBirthDateLabel": "Your birth date",
     "childBirthDateLabel": "Child's birth date",
-    "birthDateHint": "So your mentor talks to you the right way. Minimum age is 11.",
-    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is 11.",
+    "birthDateHint": "So your mentor talks to you the right way. Minimum age is {{age}}.",
+    "parentBirthDateHint": "This is for the adult setting up the account. You can add your child next. Minimum age is {{age}}.",
+    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is {{age}}.",
     "webDateFormatHint": "Enter your birth date as YYYY-MM-DD.",
     "childWebDateFormatHint": "Enter your child's birth date as YYYY-MM-DD.",
     "selectDob": "Select date of birth",
@@ -3526,6 +3530,8 @@
     "upgradeRequiredTitle": "Upgrade required",
     "upgradeRequiredBody": "Your subscription does not support additional profiles. Please upgrade to Family or Pro.",
     "seePlans": "See plans",
+    "minimumAgeError": "Learners must be at least {{age}} years old. Please choose an earlier birth date.",
+    "parentAdultAgeError": "Parent accounts need an adult birth date. Enter your own details first, then add your child next.",
     "a11yCloseDatePicker": "Close date picker"
   },
   "clerkGate": {

@@ -2,23 +2,24 @@
   "source": "octo-mate.svg",
   "cleanSource": "octo-mate-animation-source.svg",
   "coordinateSystem": {
-    "viewBox": "0 0 1042 1024",
+    "viewBox": "0 0 1042 1068",
     "width": 1042,
-    "height": 1024
+    "height": 1068
   },
   "mascotBounds": {
     "x": 32,
     "y": 12,
     "width": 990,
-    "height": 1012,
+    "height": 1048,
     "derivedFrom": "octo-mate.png colored/dark pixel scan"
   },
   "sourceShape": {
-    "originalPathCount": 1585,
-    "cleanPathCount": 105,
+    "originalPathCount": 1587,
+    "cleanPathCount": 107,
     "notes": [
       "The original SVG includes the gray/white checkerboard as real paths.",
-      "The clean source keeps colored and dark mascot paths only, preserving source order."
+      "The clean source keeps colored and dark mascot paths only, preserving source order.",
+      "Two lower-arm tip repair paths extend the clipped viewer-right lower tentacle beyond the original 1024px canvas."
     ]
   },
   "palette": {

@@ -117,6 +117,8 @@ const ACCOUNT_AVATAR_HIDDEN_PATHS = [
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
 const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 const PREVIEW_PROBE_TIMEOUT_MS = 2_500;
+const V2_CHROME_MIN_TOP_INSET = 24;
+const V2_TAB_BAR_MIN_BOTTOM_INSET = 48;
 
 const iconMap: Record<
   string,
@@ -622,6 +624,12 @@ export default function AppLayout() {
     !ACCOUNT_AVATAR_HIDDEN_PATHS.some((hiddenPath) =>
       pathname.startsWith(hiddenPath),
     );
+  const chromeTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? Math.max(insets.top, V2_CHROME_MIN_TOP_INSET)
+    : insets.top;
+  const tabBarBottomInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+    ? Math.max(insets.bottom, V2_TAB_BAR_MIN_BOTTOM_INSET)
+    : Math.max(insets.bottom, 24);
 
   return (
     <FeedbackProvider>
@@ -636,7 +644,8 @@ export default function AppLayout() {
         {showAccountAvatar ? (
           <View
             className="absolute right-4 z-40"
-            style={{ top: insets.top + 8 }}
+            style={{ top: chromeTopInset + 8 }}
+            testID="account-avatar-shell"
           >
             <AccountAvatar />
           </View>
@@ -682,8 +691,8 @@ export default function AppLayout() {
                       ? proxyColors.border
                       : colors.border,
                     borderTopWidth: isProxyChromeActive ? 2 : 1,
-                    height: 56 + Math.max(insets.bottom, 24),
-                    paddingBottom: Math.max(insets.bottom, 24),
+                    height: 56 + tabBarBottomInset,
+                    paddingBottom: tabBarBottomInset,
                   },
               tabBarActiveTintColor: colors.accent,
               tabBarInactiveTintColor: colors.textSecondary,
@@ -825,7 +834,7 @@ export default function AppLayout() {
           <Pressable
             onPress={acknowledgeProfileRemoval}
             className="absolute left-4 right-4 z-50"
-            style={{ top: insets.top + 8 }}
+            style={{ top: chromeTopInset + 8 }}
             testID="profile-switched-toast"
             accessibilityRole="alert"
           >

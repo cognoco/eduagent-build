@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import {
   useRouter,
   useLocalSearchParams,
@@ -795,6 +796,13 @@ function SessionScreenInner() {
     effectiveMode,
   );
 
+  // T25: V2 "mentor-is-the-app" turn-1 subject resolution — flag-gated and
+  // scoped to the mentor entry (both freeform questions and homework/camera
+  // launched from the mentor bar). Drives non-blocking, no-grid subject
+  // resolution in useSubjectClassification and relaxes the composer gate below.
+  const isV2MentorEntry =
+    FEATURE_FLAGS.MODE_NAV_V2_ENABLED && entrySource === 'mentor';
+
   const {
     handleResolveSubject,
     handleCreateResolveSuggestion,
@@ -818,6 +826,7 @@ function SessionScreenInner() {
     setResumedBanner,
     subjectId: subjectId ?? undefined,
     effectiveMode,
+    isV2MentorEntry,
     availableSubjects,
     classifySubject,
     resolveSubject,
@@ -1113,8 +1122,11 @@ function SessionScreenInner() {
     onSkipWarmup: handleSkipWarmup,
   });
 
+  // T25: V2 mentor entry is non-blocking — a pending subject disambiguation
+  // shows inline chips but never disables the composer; the learner can keep
+  // typing and the new message supersedes the prompt.
   const isSubjectFlowBlockingComposer =
-    pendingClassification || !!pendingSubjectResolution;
+    pendingClassification || (!isV2MentorEntry && !!pendingSubjectResolution);
 
   const showSessionToolAccessory =
     conversationStage === 'teaching' &&

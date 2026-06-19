@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -6,9 +7,16 @@ import {
 } from '@testing-library/react-native';
 import { useSignUp, useSSO } from '@clerk/clerk-expo';
 import { Platform } from 'react-native';
+import { CLERK_REQUEST_TIMEOUT_MS } from '../../lib/clerk-timeout';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
+
+function neverResolves(): Promise<never> {
+  return new Promise<never>((resolve) => {
+    void resolve;
+  });
+}
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
@@ -48,6 +56,7 @@ describe('SignUpScreen', () => {
   const mockSetActive = jest.fn();
 
   afterEach(() => {
+    jest.useRealTimers();
     Object.defineProperty(Platform, 'OS', {
       value: 'ios',
       configurable: true,
@@ -265,6 +274,73 @@ describe('SignUpScreen', () => {
     await waitFor(() => {
       screen.getByText('Email already in use');
     });
+  });
+
+  it('[auth-sign-up-timeout] recovers when signUp.create never resolves', async () => {
+    jest.useFakeTimers();
+    mockCreate.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith({
+        emailAddress: 'new@example.com',
+        password: 'secure123',
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(CLERK_REQUEST_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+
+    screen.getByText(
+      'The security service did not respond in time. Check your connection and try again.',
+    );
+    expect(mockPrepareVerification).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
+  });
+
+  it('[auth-sign-up-timeout] recovers when email verification preparation never resolves', async () => {
+    jest.useFakeTimers();
+    mockCreate.mockResolvedValue(undefined);
+    mockPrepareVerification.mockImplementation(neverResolves);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      expect(mockPrepareVerification).toHaveBeenCalledWith({
+        strategy: 'email_code',
+      });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(CLERK_REQUEST_TIMEOUT_MS);
+      await Promise.resolve();
+    });
+
+    screen.getByText(
+      'The security service did not respond in time. Check your connection and try again.',
+    );
+    expect(
+      screen.getByTestId('sign-up-button').props.accessibilityState,
+    ).toEqual(expect.objectContaining({ busy: false, disabled: false }));
   });
 
   it('displays error on verification failure', async () => {
