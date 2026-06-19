@@ -60,6 +60,34 @@ export class SubjectNotLanguageLearningError extends Error {
   }
 }
 
+/**
+ * [WI-855 / SUBJECT-20] Thrown when a profile is at the hard subject cap and the
+ * request would create a net-new subject. The route maps this to HTTP 409
+ * Conflict with the stable `SUBJECT_LIMIT_EXCEEDED` code (see ERROR_CODES) so
+ * mobile branches on the typed code instead of regexing the message.
+ *
+ * PRD (docs/PRD.md "Subject Limits") defines TWO limits:
+ *  - Soft limit (10 active): a non-blocking prompt/override flow — OUT OF SCOPE
+ *    here, tracked as a separate WI.
+ *  - Hard limit (25 total active+paused+archived): the BLOCKING gate this class
+ *    enforces — "Must archive or delete before creating new".
+ */
+export class SubjectLimitError extends Error {
+  constructor(
+    message = 'You have reached the maximum number of subjects. Delete or archive one before creating a new subject.',
+  ) {
+    super(message);
+    this.name = 'SubjectLimitError';
+  }
+}
+
+/**
+ * [WI-855] PRD hard limit: 25 total subjects per profile across ALL statuses
+ * (active + paused + archived). The soft limit (10 active) is a separate,
+ * non-blocking prompt and is intentionally not enforced here.
+ */
+export const MAX_TOTAL_SUBJECTS = 25;
+
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
@@ -333,6 +361,27 @@ export async function createSubjectWithStructure(
       ? input.rawInput
       : undefined);
   const effectiveFocusDescription = input.focusDescription ?? undefined;
+
+  // [WI-855 / SUBJECT-20] Hard-limit gate (PRD: 25 total subjects across all
+  // statuses: active + paused + archived). Guards every creation branch below.
+  // Exemption: the focused-book path (effectiveFocus set) re-uses an existing
+  // active same-name subject via findExistingSubjectByName, inserting NO net-new
+  // subject row — so it is allowed even at the cap. Every other path (broad,
+  // narrow, language) always inserts a new subject, so no exemption applies.
+  const repo = createScopedRepository(db, profileId);
+  const allSubjects = await repo.subjects.findMany();
+  if (allSubjects.length >= MAX_TOTAL_SUBJECTS) {
+    const reusesExistingSubject =
+      effectiveFocus !== undefined &&
+      allSubjects.some(
+        (row) =>
+          row.status === 'active' &&
+          row.name.toLowerCase() === input.name.trim().toLowerCase(),
+      );
+    if (!reusesExistingSubject) {
+      throw new SubjectLimitError();
+    }
+  }
 
   // Focused book path: input combines a broad subject with a specific focus area
   if (effectiveFocus) {

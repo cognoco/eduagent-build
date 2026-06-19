@@ -8,6 +8,8 @@ import {
   deleteSubject,
   archiveInactiveSubjects,
   createSubjectWithStructure,
+  SubjectLimitError,
+  MAX_TOTAL_SUBJECTS,
 } from './subject';
 import { inngest } from '../inngest/client';
 import * as sentry from './sentry';
@@ -573,7 +575,11 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
     });
 
     const lockOrder = (db.execute as jest.Mock).mock.invocationCallOrder[0];
-    const lookupOrder = findMany.mock.invocationCallOrder[0];
+    // [WI-855] The hard-limit gate reads all subjects (findMany call 0) BEFORE
+    // the lock; the focused-subject lookup is the call inside the transaction,
+    // which must still happen AFTER the advisory lock. Assert against the LAST
+    // findMany invocation (the in-transaction lookup), not the gate's count.
+    const lookupOrder = findMany.mock.invocationCallOrder.at(-1);
     if (lockOrder == null || lookupOrder == null) {
       throw new Error('Expected lock and subject lookup call order');
     }
@@ -598,7 +604,13 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
       focus: 'Tea',
     });
 
-    const values = extractSqlTextAndValues(findMany.mock.calls[0]?.[0]?.where);
+    // [WI-855] The hard-limit gate's count is findMany call 0 (no where clause);
+    // the focused-subject lookup is the call carrying the LOWER(name) predicate.
+    // Find that call rather than assuming it is call 0.
+    const lookupCall = findMany.mock.calls.find((call) =>
+      extractSqlTextAndValues(call?.[0]?.where).includes('botany'),
+    );
+    const values = extractSqlTextAndValues(lookupCall?.[0]?.where);
     expect(values).toContain('botany');
     expect(values).not.toContain(' botany ');
   });
@@ -684,6 +696,8 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     }));
     const db = {
       query: {
+        // [WI-855] Gate reads all subjects first; empty → under the cap.
+        subjects: createSubjectQueryMocks(),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -723,6 +737,11 @@ describe('createSubjectWithStructure deterministic fallback', () => {
       name: 'History',
     });
     const db = {
+      query: {
+        // [WI-855] Gate reads all subjects first; empty → under the cap, so
+        // execution proceeds to the getProfileAge read that this test rejects.
+        subjects: createSubjectQueryMocks(),
+      },
       insert: jest.fn(() => ({
         values: jest.fn(() => ({
           returning: jest.fn().mockResolvedValue([subjectRow]),
@@ -754,6 +773,8 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     }));
     const db = {
       query: {
+        // [WI-855] Gate reads all subjects first; empty → under the cap.
+        subjects: createSubjectQueryMocks(),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
@@ -785,6 +806,154 @@ describe('createSubjectWithStructure deterministic fallback', () => {
   });
 });
 
+describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
+  // PRD hard limit: 25 total subjects (active + paused + archived) per profile.
+  // At the cap, creating a net-new subject must throw SubjectLimitError so the
+  // route returns 409 SUBJECT_LIMIT_EXCEEDED. Re-using an existing same-name
+  // active subject (focused-book reuse path) creates no net-new row → allowed.
+  function manySubjectRows(count: number) {
+    return Array.from({ length: count }, (_unused, i) =>
+      mockSubjectRow({
+        id: `subject-${i}`,
+        profileId: uuidProfileId,
+        name: `Subject ${i}`,
+        status: 'active',
+      }),
+    );
+  }
+
+  it('throws SubjectLimitError when at the cap and the name is net-new', async () => {
+    setupScopedRepo({ findManyResult: manySubjectRows(MAX_TOTAL_SUBJECTS) });
+    const db = createMockDb();
+
+    await expect(
+      createSubjectWithStructure(db, uuidProfileId, { name: 'Brand New' }),
+    ).rejects.toBeInstanceOf(SubjectLimitError);
+    // Gate must fire before any insert.
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('counts ALL statuses toward the cap (active + paused + archived)', async () => {
+    const mixed = [
+      ...manySubjectRows(10).map((r, i) => ({
+        ...r,
+        status: 'active' as const,
+        name: `Active ${i}`,
+      })),
+      ...manySubjectRows(10).map((r, i) => ({
+        ...r,
+        id: `paused-${i}`,
+        status: 'paused' as const,
+        name: `Paused ${i}`,
+      })),
+      ...manySubjectRows(5).map((r, i) => ({
+        ...r,
+        id: `archived-${i}`,
+        status: 'archived' as const,
+        name: `Archived ${i}`,
+      })),
+    ];
+    expect(mixed.length).toBe(MAX_TOTAL_SUBJECTS);
+    setupScopedRepo({ findManyResult: mixed });
+    const db = createMockDb();
+
+    await expect(
+      createSubjectWithStructure(db, uuidProfileId, { name: 'Net New' }),
+    ).rejects.toBeInstanceOf(SubjectLimitError);
+  });
+
+  it('allows re-using an existing active same-name subject even at the cap', async () => {
+    // At the cap, but the requested name matches an existing ACTIVE subject.
+    // The focused-book path reuses that subject (no net-new row), so the gate
+    // must NOT throw. Real service drive-through, not a re-implementation.
+    const existingSubject = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'Botany',
+      status: 'active',
+    });
+    const rows = manySubjectRows(MAX_TOTAL_SUBJECTS);
+    rows[0] = existingSubject;
+    // Shared findMany mock returns these rows for both the gate count and the
+    // findExistingSubjectByName lookup. Since the focused subject already
+    // exists AND already has a generated book, the path returns without insert.
+    setupScopedRepo({ findManyResult: rows });
+    const db = {
+      query: {
+        subjects: createSubjectQueryMocks(),
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+        curriculumBooks: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue(
+              mockBookRow({ id: uuidExistingBookId, topicsGenerated: true }),
+            ),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+      execute: jest.fn().mockResolvedValue(undefined),
+      insert: jest.fn(() => {
+        throw new Error('insert must not be called on the reuse path');
+      }),
+    } as unknown as Database;
+    (db as unknown as { transaction: jest.Mock }).transaction = jest.fn(
+      async (fn: (tx: typeof db) => unknown) => fn(db),
+    );
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'Botany',
+      focus: 'Tea',
+    });
+
+    // Reused the existing subject — no SubjectLimitError thrown.
+    expect(result.subject.id).toBe(uuidSubjectId);
+    expect(result.structureType).toBe('focused_book');
+  });
+
+  it('does not throw when under the cap (proceeds to create)', async () => {
+    setupScopedRepo({
+      findManyResult: manySubjectRows(MAX_TOTAL_SUBJECTS - 1),
+    });
+    // LLM classification fails → deterministic broad fallback (no LLM needed).
+    const detectSpy = jest
+      .spyOn(bookGeneration, 'detectSubjectType')
+      .mockRejectedValue(new Error('LLM unavailable'));
+    const ageSpy = jest
+      .spyOn(profileService, 'getProfileAge')
+      .mockResolvedValue(11);
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'History',
+    });
+    const insertValues = jest.fn((values: unknown) => ({
+      returning: jest
+        .fn()
+        .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
+    }));
+    const db = {
+      query: {
+        subjects: createSubjectQueryMocks(),
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+      },
+      insert: jest.fn(() => ({ values: insertValues })),
+    } as unknown as Database;
+
+    await expect(
+      createSubjectWithStructure(db, uuidProfileId, { name: 'History' }),
+    ).resolves.toEqual(
+      expect.objectContaining({ structureType: expect.any(String) }),
+    );
+
+    detectSpy.mockRestore();
+    ageSpy.mockRestore();
+  });
+});
+
 describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
   // The learner-age read at the deterministic (no-focus) path must switch
   // between the legacy `getProfileAge` (reads the soon-to-be-dropped `profiles`
@@ -812,6 +981,8 @@ describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
     }));
     return {
       query: {
+        // [WI-855] Gate reads all subjects first; empty → under the cap.
+        subjects: createSubjectQueryMocks(),
         curricula: {
           findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
         },
