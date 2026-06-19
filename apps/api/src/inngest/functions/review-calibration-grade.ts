@@ -124,6 +124,12 @@ export async function handleReviewCalibrationGrade({
       guard: { kind: 'none' },
       updatedAt: eventAt,
     });
+    // xp_ledger.status sync intentionally NOT performed here. The retention-path
+    // xp_ledger side-effect was removed in 5fed808e9: post-sunset,
+    // insertSessionXpEntry writes xp_ledger.status='verified' at insert time
+    // (no 'pending' state), so the card's xpStatus written above is the source
+    // of truth. The decay-case ledger split (xpStatus='decayed' not mirrored to
+    // xp_ledger.status, which progress.ts reads) is tracked in WI-848.
   });
 
   await step.run('stamp-mastery-on-verify', async () => {

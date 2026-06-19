@@ -899,6 +899,12 @@ export async function processRecallTest(
     updatedAt: new Date(),
   });
 
+  // xp_ledger.status sync intentionally NOT performed here. The retention-path
+  // xp_ledger side-effect was removed in 5fed808e9: post-sunset,
+  // insertSessionXpEntry writes xp_ledger.status='verified' at insert time (no
+  // 'pending' state), so the card's xpStatus written above is the source of
+  // truth. The decay-case ledger split (xpStatus='decayed' not mirrored to
+  // xp_ledger.status, which progress.ts reads) is tracked in WI-848.
   if (!persisted && attemptMode !== 'dont_remember') {
     // The post-LLM write lost an optimistic-lock race against another writer
     // (e.g. session-completed updating the same card concurrently). The
