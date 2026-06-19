@@ -480,6 +480,110 @@ describe('requestConsent', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [QA-09 / ACCOUNT-19] Generated consent email URL shape
+//
+// The consent link parents click is built inline as
+//   `${appUrl}/v1/consent-page?token=${token}`
+// where `token` is a freshly minted crypto.randomUUID(). This regression pins
+// the EXACT URL structure (path, query param name, UUID token) deterministically
+// — no real mailbox is needed because the Resend send is the only fetch and the
+// outbound body is inspected directly. Only true SMTP/provider delivery (the
+// email actually arriving) is out of scope and stays Blocked in the flow plan.
+// ---------------------------------------------------------------------------
+
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/** Extracts the single consent-page URL embedded in the sent email body. */
+function extractConsentUrlFromFetch(): string {
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const [, init] = fetchMock.mock.calls[0]!;
+  const body = JSON.parse(String(init?.body)) as { text: string };
+  const match = body.text.match(/https?:\/\/\S*\/v1\/consent-page\?token=\S+/);
+  if (!match) {
+    throw new Error(`No consent-page URL found in email body: ${body.text}`);
+  }
+  return match[0];
+}
+
+describe('[QA-09] generated consent email URL shape', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('requestConsent builds `<appUrl>/v1/consent-page?token=<uuid>` with a real UUID token', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await requestConsent(
+      db,
+      {
+        childProfileId: CHILD_ID,
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS,
+    );
+
+    const url = extractConsentUrlFromFetch();
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe('https://api.mentomate.com');
+    expect(parsed.pathname).toBe('/v1/consent-page');
+    const token = parsed.searchParams.get('token');
+    expect(token).toMatch(UUID_RE);
+    // The link must carry ONLY the token query param (no PII leakage).
+    expect([...parsed.searchParams.keys()]).toEqual(['token']);
+
+    // The URL token must equal the token persisted on the insert row — the link
+    // is dead-on-arrival otherwise (DS-020 family).
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
+    const insertedValues = insertCall.values.mock.calls[0]![0] as {
+      consentToken: string;
+    };
+    expect(token).toBe(insertedValues.consentToken);
+  });
+
+  it('requestConsent preserves the appUrl host/port exactly when it carries a port', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({ insertReturning: [row] });
+
+    await requestConsent(
+      db,
+      {
+        childProfileId: CHILD_ID,
+        parentEmail: 'parent@example.com',
+        consentType: 'GDPR',
+      },
+      'http://localhost:8787',
+      EMAIL_OPTIONS,
+    );
+
+    const url = extractConsentUrlFromFetch();
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe('http://localhost:8787');
+    expect(parsed.pathname).toBe('/v1/consent-page');
+    expect(parsed.searchParams.get('token')).toMatch(UUID_RE);
+  });
+
+  it('resendConsent rebuilds the same `<appUrl>/v1/consent-page?token=<uuid>` shape with a fresh UUID', async () => {
+    const row = mockConsentRow({ parentEmail: 'stored-parent@example.com' });
+    const db = createMockDb({ findFirstResult: row });
+
+    await resendConsent(
+      db,
+      { childProfileId: CHILD_ID, consentType: 'GDPR' },
+      'https://api.mentomate.com',
+      EMAIL_OPTIONS,
+    );
+
+    const url = extractConsentUrlFromFetch();
+    const parsed = new URL(url);
+    expect(parsed.origin).toBe('https://api.mentomate.com');
+    expect(parsed.pathname).toBe('/v1/consent-page');
+    expect(parsed.searchParams.get('token')).toMatch(UUID_RE);
+    expect([...parsed.searchParams.keys()]).toEqual(['token']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // resendConsent [WI-374] — resend reuses the STORED email, never a client value
 // ---------------------------------------------------------------------------
 
