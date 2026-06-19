@@ -157,12 +157,6 @@ export default function QuizPlayScreen(): React.ReactElement {
   }, [currentQuestion]);
 
   useEffect(() => {
-    if (!round || !currentQuestion) {
-      router.replace(exitHref as Href);
-    }
-  }, [currentQuestion, exitHref, round, router]);
-
-  useEffect(() => {
     if (!currentQuestion) return;
 
     // [BUG-STALE-OPTIONS] shuffledOptions is now derived via useMemo (above)
@@ -420,8 +414,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   if (!round || !currentQuestion) {
     // [UX-DE-H1] Render an actionable error state instead of a dead plain-text
-    // fallback. The useEffect redirect may not fire (e.g. stale router ref),
-    // so we always give the user a way out.
+    // fallback or an automatic redirect that can mask the recovery controls.
     return (
       <View
         className="flex-1 bg-background px-5 items-center justify-center"
