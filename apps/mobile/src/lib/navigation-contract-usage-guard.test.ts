@@ -139,7 +139,7 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     reason:
       'boundary: push-token registration reads raw proxy state to avoid registering proxied child sessions on the parent device. Auxiliary to the canonical 8 — the test harness for this hook does not wire AppContext/QueryClient, so reading via useNavigationContract is not currently viable.',
     expectedFindings: {
-      'proxy-state-read': 2,
+      'proxy-state-read': 1,
       'raw-hook-call': 1,
       'raw-hook-import': 1,
     },

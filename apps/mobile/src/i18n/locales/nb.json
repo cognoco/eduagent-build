@@ -393,7 +393,12 @@
       "weeklyEmailDigestTitle": "Ukentlig fremdrifts-e-post",
       "monthlyEmailDigestTitle": "Månedlig fremdrifts-e-post",
       "emailDigestDescription": "Sendes til e-postadressen på kontoen din.",
-      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger"
+      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger",
+      "pushMissingPermission": "Tillat varsler fra enheten din.",
+      "pushMissingServer": "Slå på push-varsler her.",
+      "pushMissingToken": "Registrer denne enheten for push-varsler.",
+      "openSettingsTitle": "Åpne innstillinger",
+      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -3266,6 +3271,12 @@
       "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
+    },
+    "guardianPrimer": {
+      "title": "Holde deg oppdatert?",
+      "message": "Vi kan sende et lite varsel når et barn trenger din oppmerksomhet. Du kan endre dette når som helst i Innstillinger.",
+      "allow": "Tillat",
+      "notNow": "Ikke nå"
     }
   },
   "myNotes": {

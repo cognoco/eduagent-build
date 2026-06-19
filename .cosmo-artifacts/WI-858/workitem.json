@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-8133-959a-db5fed5bbc59",
+  "id": "WI-858",
+  "name": "[SUBJECT-06/22] Refresh pick-book coverage evidence and stale inventory rows",
+  "description": "SUBJECT-06 and SUBJECT-22 need current deterministic evidence for broad-subject pick-book routing and degraded pick-book recovery states.",
+  "acceptanceCriteria": "Refresh SUBJECT-06/SUBJECT-22 evidence so the flow inventory and revision plan cite deterministic proof for broad-subject routing into /(app)/pick-book/[subjectId] and pick-book degraded states. Coverage must include broad create-subject routing, shelf entry routing, suggestion/custom-text filing, shelf-to-book stack seeding, missing/stale subject handling, loading/slow hint, retryable suggestion errors, empty/manual-entry fallback, and 8s filing skip. Add narrow tests only where current proof is missing. Expected files: apps/mobile/src/app/create-subject.test.tsx, apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx, apps/mobile/src/app/(app)/pick-book/_layout.test.tsx, apps/mobile/src/app/(app)/shelf/[subjectId]/index.test.tsx, apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts, and relevant pick-book Maestro YAMLs. Update docs/flows/mobile-app-flow-inventory.md and docs/flows/plans/flow-revision-plan-2026-06-17.md with exact evidence and final status.",
+  "riskImpact": "P0 V2 learning coverage gap: pick-book regressions could be misclassified because the evidence and inventory are not aligned with the current app paths.",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P0",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Auto",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

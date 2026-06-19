@@ -154,6 +154,7 @@ export const notificationPrefsResponseSchema = notificationPrefsSchema.extend({
   weeklyProgressEmail: z.boolean(),
   monthlyProgressEmail: z.boolean(),
   maxDailyPush: z.number().int(),
+  pushTokenRegistered: z.boolean(),
 });
 export type NotificationPrefsResponse = z.infer<
   typeof notificationPrefsResponseSchema
