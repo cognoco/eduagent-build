@@ -18,6 +18,7 @@ import {
   type EvaluateFailureAction,
 } from './evaluate';
 import { findOwnedCurriculumTopic } from './curriculum-topic-ownership';
+import { applyRetentionUpdate } from './apply-retention-update';
 import type { EvaluateEligibility } from '@eduagent/schemas';
 
 export type { EvaluateEligibility };
@@ -113,18 +114,14 @@ export async function advanceEvaluateRung(
   const currentRung = (card.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4;
   const newRung = Math.min(4, currentRung + 1) as 1 | 2 | 3 | 4;
 
-  await db
-    .update(retentionCards)
-    .set({
-      evaluateDifficultyRung: newRung,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId),
-      ),
-    );
+  await applyRetentionUpdate({
+    db,
+    profileId,
+    cardId: card.id,
+    set: { evaluateDifficultyRung: newRung },
+    guard: { kind: 'none' },
+    updatedAt: new Date(),
+  });
 
   return newRung;
 }
@@ -158,18 +155,14 @@ export async function processEvaluateFailureEscalation(
       newRung = 1;
     }
 
-    await db
-      .update(retentionCards)
-      .set({
-        evaluateDifficultyRung: newRung,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(retentionCards.id, card.id),
-          eq(retentionCards.profileId, profileId),
-        ),
-      );
+    await applyRetentionUpdate({
+      db,
+      profileId,
+      cardId: card.id,
+      set: { evaluateDifficultyRung: newRung },
+      guard: { kind: 'none' },
+      updatedAt: new Date(),
+    });
   }
 
   return action;

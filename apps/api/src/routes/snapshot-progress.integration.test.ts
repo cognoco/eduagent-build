@@ -104,7 +104,8 @@ async function createChildProfile(): Promise<{ id: string }> {
     env: TEST_ENV,
     user: { userId: AUTH_USER_ID, email: AUTH_EMAIL },
     displayName: 'Snapshot Progress Child',
-    birthYear: 2014,
+    birthYear: new Date().getFullYear() - 14,
+    kind: 'child',
   });
   expect(profile.isOwner).toBe(false);
   return { id: profile.id };

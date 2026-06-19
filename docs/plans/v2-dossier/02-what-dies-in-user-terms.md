@@ -13,7 +13,7 @@
 |---|---|
 | **The "More" tab** (account, notifications, help, privacy, …) | Behind the **avatar** (top-corner sheet); owner-gating preserved |
 | **The Library tab** (the bookshelf of subjects/books) | Browsing → **Subjects tab**; saved items → **Journal** (still browsable, not search-only) |
-| **The Progress tab** (mastery stats, streak chip, saved, vocabulary, reports, milestones) | Per-subject progress → **Subject hub**; paper trail → **Journal**; "what next" → **Mentor feed** |
+| **The Progress tab** (mastery stats, streak chip, saved, vocabulary, reports, milestones) | Per-subject progress → **Subject hub**; paper trail → **Journal**; "what next" → **Mentor feed**; **achievement milestones → `milestone_reached` moment cards** in the Mentor feed + Journal moments strip (data kept, gallery screen deleted) |
 | **The Recaps tab** (V1 guardian tab) | Into the **Journal** |
 | **The own-learning tab** | Already a redirect today (half-dead); folds into the single Mentor tab + Me scope |
 | **The Study ⇄ Family mode switcher** | Replaced by the **scope chip** `[Support hub] [Jakub] [Me]` (S4) |
@@ -33,7 +33,7 @@
 | Settings / billing / security / privacy / add-child (More tab) | **Avatar sheet** — billing, security, export/delete stay owner-only exactly as today |
 | Browsing my subjects (Library) | **Subjects tab** — one hub per subject: "Next up" on top, chapters collapsible on the page, topic detail as a slide-up sheet (max depth 2) |
 | Per-subject progress (Progress → subject) | Merged **into the Subject hub** (shelf + progress become one screen) |
-| My recaps / reports / vocabulary / transcripts | **Journal** (recaps · notes · mentor memory, + the moments strip) |
+| My recaps / reports / vocabulary / transcripts | **Journal** (recaps · **My Reports** (weekly/monthly) · notes · mentor memory, + the moments strip). My Reports is the durable home — a report that's never tapped is never lost |
 | Starting quiz / dictation / practice / homework (scattered buttons) | The **feed proposes them** as cards; the **bar + camera + Homework chip** takes them on demand |
 | "Continue where I left off" | The **`/now` anchor card** (1–3 ranked, declinable) |
 | Parent viewing child progress (proxy + family mode) | **Scope chip person-scope** (S4): structural view only |
@@ -57,13 +57,19 @@
 
 1. **Milestones gallery is already unreachable** — fully built screen, zero inbound
    navigation anywhere in the app today. It doesn't "die in V2"; it died quietly at
-   some point and nobody removed the file. Needs an explicit keep/delete call in S6.
+   some point and nobody removed the file. **Disposition resolved 2026-06-14:** the
+   standalone gallery screen + its `useProgressMilestones` read hook are deleted in
+   S6 (T5); the eight achievement types now surface as **`milestone_reached` moments**
+   in the Mentor feed + Journal moments strip, emitted from the existing
+   `storeMilestones()` detection path (S0 producer) on the newly-inserted set only.
+   The milestone **data, detection, and table are kept** — only the dead destination
+   screen dies.
 2. **Recall-test screen** exists as a real route but no V2 doc dispositions it by
    name. Same: needs an explicit S6 line.
 3. **own-learning** is already just a redirect — its row in the kill list is
    ceremonial.
-4. **The spec body still calls XP "backend-only"** (§13/§2.1 wording) — the plans
-   corrected this (XP is live in 4+ UI surfaces) but the spec never got the edit.
-   One-line fix owed so future readers aren't misled.
+4. **XP is not backend-only** — resolved 2026-06-13. The spec and plans now keep
+   earned private receipts (XP/practice points, reflection bonus, quiz personal
+   bests, mastery/progress deltas) while deleting coercive reward presentation.
 
-Last updated: 2026-06-12
+Last updated: 2026-06-14

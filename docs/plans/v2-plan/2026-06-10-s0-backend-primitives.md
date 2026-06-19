@@ -19,7 +19,7 @@ status: draft
 In scope:
 - `packages/database/src/schema/activity-ledger.ts` (new table)
 - `packages/database/src/schema/index.ts` (barrel export — one added line)
-- `apps/api/drizzle/0108_*.sql` (generated additive migration)
+- `apps/api/drizzle/0111_zippy_gateway.sql` + `0112_rls_mentor_activity_ledger.sql` (landed ledger table + RLS policy migrations)
 - `apps/api/src/services/activity-ledger.ts` (writer helper + kind/visibility constants)
 - `packages/schemas/src/now-feed.ts` (new — `/now` request/response + card schemas)
 - `packages/schemas/src/activity-ledger.ts` (new — ledger row kinds, visibility, template keys)
@@ -34,11 +34,23 @@ In scope:
 Out of scope (must not change):
 - **The retention gate / `applyRetentionUpdate()` SRS refactor (spec §8.3) — that is plan S0-R, a separate track.** `GET /now` reads `retention_cards` exactly as it is today; no writer in `services/retention-data.ts`, `inngest/functions/review-calibration-grade.ts`, `services/verification-completion.ts`, `services/evaluate-data.ts`, `services/retention-mastery.ts`, or `inngest/functions/topic-probe-extract.ts` is touched.
 - **Any UI** — no mobile screens, no `apps/mobile/src/lib/feature-flags.ts` change (the mobile-side `MODE_NAV_V2_ENABLED` flag and its consumption is an S1 deliverable; this plan only reserves the API-side env var name — see T9 / Deliverable 2(e)).
-- **Any `person` / `edge` / `membership` read or write.** Those tables do not exist in code (spec §9). The ledger column is `profileId`. The `scope` query param is accepted and validated, but in S0 only `scope=self` (the learner's own Me scope) returns data; supporter scopes are a documented S4 follow-on (T7).
+- **Any live `person` / `edge` / `membership` read or write.** Identity schema now exists in code, but it is not live for S0. The ledger column remains `profileId` until the IF flip + convergence. The `scope` query param is accepted and validated, but in S0 only `scope=self` (the learner's own Me scope) returns data; supporter scopes are a documented S4 follow-on (T7).
 - **The supporter `/now` path** (aggregated feed, per-edge fairness, attention items) — designed-for in the contract (T7) but not implemented (needs identity → S4).
 - Existing tables' columns; existing routes; the LLM router.
 
 ---
+
+## Verified audit amendments (2026-06-13)
+
+S0 has landed since this draft was written. Treat the tasks below as historical implementation detail unless they are explicitly updated during a follow-up.
+
+- **Migration numbering is stale.** Do not generate or apply `0108_*` from this plan. The ledger table landed in `apps/api/drizzle/0111_zippy_gateway.sql`; RLS landed in `apps/api/drizzle/0112_rls_mentor_activity_ledger.sql`. Any future migration must use the current migration head and must not recreate `ledger_visibility` or `mentor_activity_ledger`.
+- **RLS is part of the accepted S0 contract.** The Drizzle table must keep RLS enabled and the SQL migration/policy must keep `ALTER TABLE "mentor_activity_ledger" ENABLE ROW LEVEL SECURITY` plus `mentor_activity_ledger_profile_isolation` using `app.current_profile_id`. Do not treat RLS as a later hardening afterthought.
+- **Identity wording is stale.** `person` / `supportership` / `membership` schema now exists in code, but it is not live for S0. The actual guard is runtime/cutover status: no S0-S3 code may read or write identity runtime data before the IF flip + convergence. Any such dependency is misclassified and moves to the identity-coupled phase.
+- **Producer coverage is incomplete.** Current code only wires `writeActivityMoment()` in the session-filing path. Before S1/S3 depend on ledger moments beyond `session_filed`, add a producer wiring sweep for every S0 `LedgerKind`: `session_filed`, `topic_mastered`, `retention_due`, `needs_deepening_added`, `recap_ready`, `snapshot_ready`, `milestone_reached`, with exact producer files and tests; or explicitly narrow the consumer plans to the kinds that are actually produced.
+  - **`milestone_reached` producer is the existing milestone-detection path — wire, don't build.** `storeMilestones(db, profileId, detected)` (`apps/api/src/services/milestone-detection.ts:202`, called from `snapshot-aggregation.ts:1075,1282`, driven by the `daily-snapshot` cron) already detects and inserts *new* achievement milestones (`vocabulary_count`, `topic_mastered_count`, `book_completed`, `session_count`, `streak_length`, `learning_time`, `subject_mastered`, `topics_explored` — `milestoneTypeSchema`, `packages/schemas/src/snapshots.ts:141`) via `onConflictDoNothing`, and **returns only the rows it actually inserted**. For each returned (genuinely new) milestone, emit one `writeActivityMoment({ kind: 'milestone_reached', templateKey: 'ledger.milestone_reached.default', params: { milestoneType, threshold, label }, visibility: 'self' })`. Because the moment fires only on the newly-inserted set, a milestone is announced once and never re-announced. **The milestones table, `detectMilestones`/`storeMilestones`, and snapshot aggregation all STAY** — this kind only adds a moment emit; it does not move the detection logic. This is the heir that lets S6 delete the standalone milestones *gallery screen* (former `progress/milestones.tsx`) without losing the achievement data.
+- **`/now` acceptance coverage must match the landed candidate set.** Route-level tests should be real integration-style scoping tests, not only a mocked route test, and should seed all candidate classes (`unfinished_session`, `retention_due`, `parked_item`, `needs_deepening`, `challenge_ready`, `ledger_moment`) for profile A/B leak checks. Correct the pattern reference to the repo's `tests/integration/*` routes tests when adding this.
+- **Deep links are abstract route keys, not guaranteed mobile paths.** S0 emits closed catalog keys only. S1/S2 own mapping those keys to current Expo Router paths: current `session.resume` maps to `/(app)/session` with `sessionId`; `subject.topic` maps to `/(app)/topic/[topicId]`; `subject.hub` must switch to the S2 hub under V2. `retention.review` and `challenge.start` need either dedicated leaves or an explicit defer before S1 can push them.
 
 ## Surface map (files × responsibility)
 
@@ -50,7 +62,7 @@ Out of scope (must not change):
 | `schemas/src/now-feed.ts` | `nowQuerySchema`, `nowCardSchema`, `nowResponseSchema`, `nowScopeSchema`, card-`kind` enum, `deepLinkSchema`, `nowOverflowItemSchema` |
 | `services/now-feed.ts` | `buildNowFeed()` ranking algorithm + `RANKING` constants + `resolveDeepLink()` closed route catalog |
 | `routes/now.ts` | `nowRoutes` Hono group — `GET /now` (+ `GET /now/overflow`) |
-| `apps/api/drizzle/0108_*.sql` | additive migration (table + enum + indexes) |
+| `apps/api/drizzle/0111_zippy_gateway.sql`; `0112_rls_mentor_activity_ledger.sql` | landed additive table/enum/index migration + RLS enablement/policy migration |
 | `docs/adr/MMT-ADR-0022-*.md` | ADR for the ledger as load-bearing GDPR-timer substrate (spec §12 obligation #4) |
 
 ---
@@ -110,10 +122,10 @@ Out of scope (must not change):
   (Add `import { sql } from 'drizzle-orm';` at the top — the partial index uses it.)
   **done when:** `packages/database/src/schema/activity-ledger.test.ts` (new, T1a) asserts the table is exported from `@eduagent/database`, has columns `id, profileId, actorJob, kind, templateKey, params, visibility, createdAt, surfacedAt`, that `ledgerVisibilityEnum.enumValues` deep-equals `['self','supporter','both']`, and that `visibility` defaults to `'self'`. `pnpm exec nx run database:typecheck` passes.
 
-- [ ] **T2: Generate the additive migration `0108`.**
-  Run `pnpm run db:generate:dev` (drizzle-kit, output dir `apps/api/drizzle/` per `drizzle.config.ts:12`). Confirm the generated `0108_*.sql` contains exactly: `CREATE TYPE "ledger_visibility"`, `CREATE TABLE "mentor_activity_ledger"`, and the two `CREATE INDEX` statements — and **no `DROP`/`ALTER` of any existing object**. The latest existing migration is `0107_gorgeous_cardiac.sql`, so the new file is `0108_*`. (Note `0106_identity_t1_org_membership.sql` is the reverted T1 reference-only file per project memory — do not touch it; the new migration must not reference org/membership.)
-  **Additive-only: no `## Rollback` section is required.** State this explicitly in the plan/PR: the migration only `CREATE`s a new type, table, and indexes; it drops/alters nothing, so per the repo's Schema-And-Deploy-Safety rule (rollback note is mandatory only for migrations that drop columns/tables/types) none is owed. Forward recovery if ever needed is `DROP TABLE mentor_activity_ledger; DROP TYPE ledger_visibility;` — non-destructive to any pre-existing data.
-  **done when:** the generated `apps/api/drizzle/0108_*.sql` exists, `git diff --stat` shows only the new SQL file + drizzle journal touched, and a grep of the file shows zero `DROP TABLE`/`DROP COLUMN`/`ALTER TABLE ... DROP` lines. `pnpm run db:push:dev` applies cleanly against the dev DB (manual dev check, not CI).
+- [ ] **T2: Verify the landed ledger migrations and RLS policy.**
+  Do not generate `0108_*`. Verify the current landed migrations instead: `apps/api/drizzle/0111_zippy_gateway.sql` creates `ledger_visibility`, `mentor_activity_ledger`, and the required indexes; `apps/api/drizzle/0112_rls_mentor_activity_ledger.sql` enables row-level security and defines `mentor_activity_ledger_profile_isolation` using `app.current_profile_id`. Any future correction uses the current migration head and must be additive unless a rollback section explicitly covers data loss.
+  **Additive-only posture:** the original ledger creation created only new objects; RLS hardening is now part of the accepted S0 floor. Forward recovery for a pre-launch reset remains dropping the ledger table/type and rerunning migrations; production rollback must follow the repo Schema-And-Deploy-Safety rule for whatever new migration is authored.
+  **done when:** the landed SQL files are present, no future migration recreates `mentor_activity_ledger` or `ledger_visibility`, RLS remains enabled in SQL and schema tests, and the dev DB applies the current migration chain cleanly. Add a regression test or SQL assertion that removing the RLS policy fails the S0 verification.
 
 - [ ] **T3: Define ledger schema contracts in `@eduagent/schemas`.**
   Create `packages/schemas/src/activity-ledger.ts` with the kind enum, visibility enum, template-key enum, and params parser; add `export * from './activity-ledger';` to `packages/schemas/src/index.ts`. The S0 kind set is the minimum the §8.2 consumers need — keep it closed and stable (new kinds are an additive PR + a `templateKey` entry, never a migration).
@@ -131,6 +143,7 @@ Out of scope (must not change):
     'needs_deepening_added', // a weak concept was routed to needs_deepening
     'recap_ready',          // a session summary/recap was generated
     'snapshot_ready',       // daily snapshot produced
+    'milestone_reached',    // a NEW achievement milestone was detected+stored (former Progress milestones gallery → moments)
   ]);
   export type LedgerKind = z.infer<typeof ledgerKindSchema>;
 
@@ -142,6 +155,7 @@ Out of scope (must not change):
     'ledger.needs_deepening_added.default',
     'ledger.recap_ready.default',
     'ledger.snapshot_ready.default',
+    'ledger.milestone_reached.default',
   ]);
   export type LedgerTemplateKey = z.infer<typeof ledgerTemplateKeySchema>;
 
@@ -401,7 +415,7 @@ Out of scope (must not change):
 | `needs_deepening` | `needsDeepeningTopics` via parent-chain | `status='active'` **AND** (`pendingExpiresAt IS NULL` OR `pendingExpiresAt > now`) — surface **before** expiry, reconciling with the existing clock (see backstop); order by `pendingExpiresAt ASC NULLS LAST`, then `createdAt ASC` | `now.needs_deepening.default` | `subject.topic` `{ subjectId, bookId, topicId }` |
 | `challenge_ready` | `getAssessmentEligibleTopics(db, profileId)` (existing, `retention-data.ts:632`) | as-is (completed topic, ≥ min exchanges, no active assessment) | `now.challenge_ready.default` | `challenge.start` `{ subjectId, topicId }` |
 | `parked_item` | `parkingLotItems` (scoped repo) | `explored=false`; order `createdAt ASC` (oldest first — see aging window) | `now.parked_item.default` | `subject.topic` `{ subjectId, bookId, topicId }` (or `session.resume` `{ sessionId }` when the item has no topic) |
-| `ledger_moment` | `mentorActivityLedger` (scoped repo) | `surfacedAt IS NULL`; order `createdAt ASC` | `now.ledger_moment.<kind>` derived from the row's `kind` | depends on `kind` (`session_filed`→`subject.hub`; `topic_mastered`/`recap_ready`→`subject.topic`; else `subject.hub`) |
+| `ledger_moment` | `mentorActivityLedger` (scoped repo) | `surfacedAt IS NULL`; order `createdAt ASC` | `now.ledger_moment.<kind>` derived from the row's `kind` | depends on `kind` (`session_filed`→`subject.hub`; `topic_mastered`/`recap_ready`→`subject.topic`; `milestone_reached`→`subject.hub` when the milestone carries a `subjectId` in `params`, else no deep link — it is a celebratory receipt, not a navigation target; else `subject.hub`) |
 
 Each row is mapped to a candidate `{ kind, priority, sortKey, tieId, templateKey, params, deepLink, scope }`. `deepLink` is built via `resolveDeepLink()` (T8) — never an interpolated string.
 

@@ -2089,12 +2089,16 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "最初のトピックの準備ができました",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
     "stepIndicator": {
       "stepOf": "ステップ {{current}}/{{total}}"
+    },
+    "mentorBirth": {
+      "ready": "メンターの準備ができました。"
     }
   },
   "parentView": {
@@ -2502,7 +2506,13 @@
     "children": "家族",
     "childrenLabel": "家族",
     "recaps": "ふりかえり",
-    "recapsLabel": "ふりかえり"
+    "recapsLabel": "ふりかえり",
+    "mentor": "メンター",
+    "mentorLabel": "メンター",
+    "subjects": "科目",
+    "subjectsLabel": "科目",
+    "journal": "ジャーナル",
+    "journalLabel": "ジャーナル"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3467,244 @@
     "sessionCount_other": "学習セッションを{{count}}回完了",
     "hourCount_one": "学習時間{{count}}時間",
     "hourCount_other": "学習時間{{count}}時間"
+  },
+  "mentorHome": {
+    "cards": {
+      "unfinished_session": {
+        "title": "前回のセッションを続ける",
+        "cta": "続ける",
+        "arcDue": "再開の準備ができました",
+        "arcAdvancing": "順調に進んでいます",
+        "arcMastered": "セッション完了"
+      },
+      "retention_due": {
+        "title": "復習の時期です",
+        "cta": "復習",
+        "arcDue": "練習が必要です",
+        "arcAdvancing": "力がついています",
+        "arcMastered": "復習完了"
+      },
+      "parked_item": {
+        "title": "保存した質問に戻る",
+        "cta": "開く",
+        "arcDue": "待機中",
+        "arcAdvancing": "再開しました",
+        "arcMastered": "整理済み"
+      },
+      "needs_deepening": {
+        "title": "難しい概念を深める",
+        "cta": "取り組む",
+        "arcDue": "もう一度見直しましょう",
+        "arcAdvancing": "理解が深まっています",
+        "arcMastered": "定着しました"
+      },
+      "challenge_ready": {
+        "title": "チャレンジラウンドに挑戦",
+        "cta": "チャレンジ開始",
+        "arcDue": "テストの準備ができました",
+        "arcAdvancing": "チャレンジ進行中",
+        "arcMastered": "チャレンジクリア"
+      },
+      "generic": {
+        "title": "次の学習ステップを開く",
+        "cta": "開く"
+      },
+      "complete": "完了",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "学習の記録",
+      "generic": {
+        "title": "学習の記録が保存されました。"
+      },
+      "session_filed": {
+        "title": "{{topicTitle}}を学習記録に保存しました。"
+      },
+      "quota": {
+        "title": "学習の記録が保存されました。"
+      }
+    },
+    "overflow": {
+      "more": "他{{count}}件の選択肢"
+    },
+    "empty": {
+      "title": "今すぐやるべきことはありません",
+      "cta": "他の学習オプションを見る"
+    },
+    "bar": {
+      "unavailable": "チューターは一時的にオフラインです。入力は可能です。",
+      "cameraLabel": "カメラ",
+      "placeholder": "学習したいことを質問、貼り付け、または入力してください。",
+      "micLabel": "マイク",
+      "homeworkChip": "宿題"
+    },
+    "onTrack": {
+      "label": "順調",
+      "reviewsDue": "件の復習",
+      "dueCleared": "復習はありません"
+    },
+    "rewards": {
+      "privateLabel": "非公開の学習レシート",
+      "practicePoints": "{{topicTitle}}で+{{amount}}練習ポイント",
+      "practicePointsNoTopic": "+{{amount}}練習ポイント",
+      "reflectionBonus": "{{multiplier}}倍の振り返りボーナスが適用されました",
+      "quizPersonalBestCapitals": "首都クイズの自己ベスト更新: {{score}}",
+      "quizPersonalBestGuessWho": "人物当てクイズの自己ベスト更新: {{score}}",
+      "masteryDelta": "{{mastered}}個習得済み、今週+{{weeklyDelta}}個",
+      "masteryDeltaNoWeekly": "{{mastered}}個習得済み"
+    },
+    "lightPractice": {
+      "prompt": "軽い練習をしますか？",
+      "fatigueReason": "現在フィードが軽いため、こちらをおすすめします。",
+      "capitals": "首都",
+      "guessWho": "人物当て",
+      "vocabulary": "単語",
+      "dictation": "ディクテーション"
+    },
+    "celebration": {
+      "ownChoice": "次のステップを選択しました。"
+    },
+    "coldStart": {
+      "caption": "何に取り組みますか？",
+      "equalWeight": "プロンプトの例",
+      "placeholderRotation": {
+        "one": "質問を入力するか、宿題を貼り付けてください…"
+      },
+      "orJustType": "または、こちらから始めてください。",
+      "chipHomework": "宿題を手伝って",
+      "chipLearn": "新しいことを教えて",
+      "chipAsk": "質問があります",
+      "homeworkReply": "カメラで問題を撮影するか、ここに入力してください。"
+    },
+    "title": "メンター",
+    "subtitle": "次に役立ついくつかのステップと、質問や記録ができる場所です。",
+    "fallback": {
+      "cached": "再接続中に、最後に保存されたフィードを表示しています。"
+    },
+    "error": {
+      "title": "次のステップを読み込めませんでした",
+      "message": "再試行するか、教科を直接閲覧できます。",
+      "subjects": "教科を閲覧"
+    }
+  },
+  "subjectsBrowse": {
+    "title": "科目",
+    "searchPlaceholder": "科目を検索",
+    "showEverything": "すべて表示",
+    "emptyTitle": "科目がまだありません",
+    "emptyMessage": "科目を作成して、学習マップの作成を始めましょう。",
+    "createSubject": "科目を作成",
+    "openSubject": "科目を開く",
+    "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
+    "reviewsDue": "{{count}}件の復習",
+    "errorTitle": "教科を読み込めませんでした",
+    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。"
+  },
+  "subjectHub": {
+    "loading": "科目を読み込み中…",
+    "errors": {
+      "missingSubjectTitle": "科目が見つかりません",
+      "missingSubjectMessage": "戻って、もう一度科目を選択してください。",
+      "loadTitle": "この科目を読み込めませんでした",
+      "loadMessage": "再試行するか、科目一覧に戻ってください。"
+    },
+    "progress": {
+      "threeState": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
+      "reviewsDue": "{{count}}件の復習",
+      "noReviewsDue": "復習はありません",
+      "weeklyDelta": "今週+{{count}}個習得済み",
+      "noWeeklyDelta": "今週は新しい習得がありません",
+      "practicePoints": "最近の練習ポイント: {{points}}",
+      "noPracticePoints": "最近の練習ポイントはありません"
+    },
+    "nextUp": {
+      "heading": "次へ",
+      "allCaughtUp": "すべて完了しました",
+      "resume": "再開",
+      "upNext": "次のトピックを学習する",
+      "review": "復習",
+      "structuralOnly": "このビューでは、学習アクションは学習者に非公開です。"
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}}個習得済み"
+    },
+    "search": {
+      "placeholder": "トピックを検索",
+      "micLabel": "音声で検索",
+      "noResults": "その検索に一致するトピックはありません。"
+    },
+    "notes": {
+      "heading": "メモ",
+      "authorSelf": "自分のメモ",
+      "authorMentor": "チューターから保存"
+    },
+    "sheet": {
+      "close": "閉じる",
+      "about": "このトピックについて",
+      "masteryLine": "ステータス: {{state}}",
+      "study": "学習",
+      "review": "復習",
+      "seeFullTopic": "トピック全体を見る"
+    },
+    "topic": {
+      "continueNow": "今すぐ続ける",
+      "started": "開始済み",
+      "upNext": "次へ",
+      "later": "後で",
+      "done": "完了",
+      "mastered": "習得済み"
+    }
+  },
+  "journal": {
+    "title": "ジャーナル",
+    "trust": {
+      "privacyPromise": "あなたのプライベートな学習の記録：保存されたモーメント、ノート、レポート、メンターの記憶。"
+    },
+    "sections": {
+      "recaps": "要約",
+      "recapsSubtitle": "最近のセッションの概要を確認します。",
+      "reports": "マイレポート",
+      "reportsSubtitle": "週次および月次の進捗レポートを開きます。",
+      "notes": "保存したノート",
+      "notesSubtitle": "ノート、ブックマーク、保存したセッションを閲覧します。",
+      "memory": "メンターの記憶",
+      "memorySubtitle": "メンターが記憶している内容を確認・管理します。"
+    },
+    "moments": {
+      "title": "最近のモーメント",
+      "empty": "新しい学習モーメントはここに表示されます。",
+      "errorTitle": "最近のモーメントを読み込めませんでした",
+      "generic": "学習モーメントが保存されました。",
+      "session_filed": "{{topicTitle}}を学習記録に保存しました。",
+      "topic_mastered": "{{topicTitle}}を習得済みとしてマークしました。",
+      "recap_ready": "要約の準備ができました。",
+      "snapshot_ready": "学習スナップショットの準備ができました。",
+      "reflection_bonus": "振り返りボーナスが保存されました。",
+      "quiz_personal_best": "自己ベストが保存されました。"
+    },
+    "recaps": {
+      "empty": "完了したセッションの概要はここに表示されます。",
+      "error": "概要を読み込めませんでした。",
+      "openLabel": "{{title}}の概要を開く"
+    },
+    "reports": {
+      "error": "レポートを読み込めませんでした。"
+    },
+    "notes": {
+      "sessions": "最近の学習セッション",
+      "notes": "保存した学習ノート",
+      "bookmarks": "保存したメンターの返信"
+    },
+    "memory": {
+      "title": "メンターの記憶の管理",
+      "body": "メンターが記憶している内容を、記憶の全画面から確認、編集、非表示、エクスポート、または消去できます。",
+      "open": "記憶の管理を開く"
+    }
+  },
+  "accountAdmin": {
+    "title": "アカウント",
+    "openAccount": "アカウント設定を開く",
+    "security": "アカウントのセキュリティ",
+    "familySettings": "ファミリー設定"
   }
 }

@@ -7,7 +7,10 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
+import {
+  combinedSignal,
+  LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+} from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
 export interface EnrichedBook {
@@ -45,7 +48,10 @@ export function useAllBooks(): {
   const libraryBooksQuery = useQuery({
     queryKey: ['library', 'books', activeProfile?.id],
     queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
+      const { signal, cleanup } = combinedSignal(
+        querySignal,
+        LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+      );
       try {
         const res = await client.library.books.$get({}, { init: { signal } });
         await assertOk(res);

@@ -520,6 +520,7 @@ jobs:
           EXPO_PUBLIC_GIT_SHA: ${{ github.sha }}
           EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
           EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
+          EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'
           # [M4 / config-secrets] RevenueCat public keys — excluded from eas.json
           # via EAS_JSON_DENYLIST but must be baked into every OTA bundle so
           # Purchases.configure() receives non-empty strings. Missing → silent

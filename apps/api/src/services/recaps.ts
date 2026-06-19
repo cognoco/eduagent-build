@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import {
   curriculumBooks,
   curriculumTopics,
+  profiles,
   sessionSummaries,
   subjects,
   type Database,
@@ -15,6 +16,7 @@ import {
   getChildSessions,
   getChildrenForParent,
 } from './dashboard';
+import { listProfileSessions } from './session/session-crud';
 
 type DashboardChildSummary = Awaited<
   ReturnType<typeof getChildrenForParent>
@@ -40,6 +42,36 @@ function toRecapItem(
     sessionId: session.sessionId,
     childProfileId: child.profileId,
     childDisplayName: child.displayName,
+    subjectId: session.subjectId,
+    subjectName: session.subjectName,
+    topicId: session.topicId,
+    topicTitle: session.topicTitle,
+    sessionType: session.sessionType as RecapListItem['sessionType'],
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+    exchangeCount: session.exchangeCount,
+    displayTitle: session.displayTitle,
+    displaySummary: session.displaySummary,
+    highlight: session.highlight,
+    narrative: session.narrative,
+    conversationPrompt: session.conversationPrompt,
+    engagementSignal: session.engagementSignal,
+    nextTopicTitle: nextTopic.nextTopicTitle,
+    nextTopicReason: nextTopic.nextTopicReason,
+  };
+}
+
+function profileSessionToRecapItem(
+  profileId: string,
+  displayName: string,
+  session: Awaited<ReturnType<typeof listProfileSessions>>['sessions'][number],
+  nextTopic: NextTopic = NO_NEXT_TOPIC,
+): RecapListItem {
+  return {
+    recapId: session.sessionId,
+    sessionId: session.sessionId,
+    childProfileId: profileId,
+    childDisplayName: displayName,
     subjectId: session.subjectId,
     subjectName: session.subjectName,
     topicId: session.topicId,
@@ -211,6 +243,40 @@ export async function listRecapsForParent(
     )
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
     .slice(0, Math.min(Math.max(options.limit ?? 20, 1), 50));
+}
+
+export async function listRecapsForProfile(
+  db: Database,
+  profileId: string,
+  options: {
+    limit?: number;
+  } = {},
+): Promise<RecapListItem[]> {
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+  const [profile, page] = await Promise.all([
+    db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+      columns: { displayName: true },
+    }),
+    listProfileSessions(db, profileId, { limit }),
+  ]);
+
+  const sessionIds = page.sessions.map((session) => session.sessionId);
+  let nextTopicBySession: Map<string, NextTopic>;
+  try {
+    nextTopicBySession = await loadNextTopicMap(db, [profileId], sessionIds);
+  } catch {
+    nextTopicBySession = new Map();
+  }
+
+  return page.sessions.map((session) =>
+    profileSessionToRecapItem(
+      profileId,
+      profile?.displayName ?? 'Learner',
+      session,
+      nextTopicBySession.get(session.sessionId),
+    ),
+  );
 }
 
 export async function getRecapForParent(

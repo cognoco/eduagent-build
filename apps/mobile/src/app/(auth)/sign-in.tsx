@@ -52,6 +52,7 @@ import {
 } from '../../lib/pending-auth-redirect';
 import { ErrorFallback } from '../../components/common/ErrorFallback';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { getPostAuthDefaultPath } from '../(app)/_lib/auth-redirect';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -229,7 +230,7 @@ export default function SignInScreen() {
   const browserRedirectTarget = readWebSearchParam('redirectTo');
   const requestedRedirectTarget = toInternalAppRedirectPath(
     localRedirectTarget ?? browserRedirectTarget ?? undefined,
-    peekPendingAuthRedirect() ?? '/(app)/home',
+    peekPendingAuthRedirect() ?? getPostAuthDefaultPath(),
   );
   const requestedRedirectRef = useRef(
     localRedirectTarget || browserRedirectTarget
@@ -654,9 +655,9 @@ export default function SignInScreen() {
       void SecureStore.setItemAsync(HAS_SIGNED_IN_KEY, 'true').catch(() => {
         /* non-fatal */
       });
-      // Don't navigate explicitly — the auth layout guard redirects to
-      // /(app)/home once Clerk's useAuth() state propagates with
-      // isSignedIn: true.  Calling router.replace() here races with Clerk's
+      // Don't navigate explicitly — the auth layout guard redirects once
+      // Clerk's useAuth() state propagates with isSignedIn: true.
+      // Calling router.replace() here races with Clerk's
       // React state update: the app layout renders before isSignedIn
       // flips, sees !isSignedIn, and bounces back to sign-in.
       return true;
@@ -1010,7 +1011,7 @@ export default function SignInScreen() {
   }, [clearVerificationFlow]);
 
   // After setActive() succeeds, show a spinner until the auth layout guard
-  // redirects to /(app)/home.  This prevents the user from ever seeing
+  // redirects. This prevents the user from ever seeing
   // a flash of the empty sign-in form during the Clerk state propagation.
   if (isTransitioning) {
     if (transitionStuck) {
@@ -1031,14 +1032,15 @@ export default function SignInScreen() {
                 // form state. Without this, Clerk holds the active session and
                 // re-submitting credentials can silently re-trigger the
                 // transition or fail with "session exists". If isSignedIn is
-                // still true after signOut (race), redirect home instead.
+                // still true after signOut (race), redirect to the current
+                // signed-in default instead.
                 void clerkSignOut()
                   .catch(() => {
                     /* signOut failure is non-fatal here — still reset form */
                   })
                   .finally(() => {
                     if (isClerkSignedIn) {
-                      router.replace('/(app)/home');
+                      router.replace(getPostAuthDefaultPath());
                       return;
                     }
                     clearTransitionState();

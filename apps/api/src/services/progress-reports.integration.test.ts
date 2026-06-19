@@ -23,14 +23,12 @@
  */
 
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   familyLinks,
   generateUUIDv7,
+  guardianship,
   monthlyReports,
-  profiles,
   weeklyReports,
   type Database,
 } from '@eduagent/database';
@@ -41,6 +39,13 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { app } from '../index';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  ensureV2IdentityForLegacyProfileTest,
+  legacyIdentityTableExistsForTest,
+} from '../test-utils/legacy-identity-anchors';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection; DATABASE_URL resolved from env or Doppler
@@ -70,6 +75,7 @@ const TEST_ENV = {
   DATABASE_URL: process.env.DATABASE_URL ?? '',
   CLERK_JWKS_URL,
   CLERK_AUDIENCE,
+  IDENTITY_V2_ENABLED: process.env.IDENTITY_V2_ENABLED ?? 'true',
 };
 
 // ---------------------------------------------------------------------------
@@ -80,6 +86,7 @@ function makeJwt(clerkUserId: string, email: string): string {
   return signTestJwt({
     sub: clerkUserId,
     email,
+    email_verified: true,
     iss: 'https://clerk.test',
     aud: CLERK_AUDIENCE,
   });
@@ -102,27 +109,42 @@ function authHeaders(
 // ---------------------------------------------------------------------------
 
 let db: Database;
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedAccountAndProfile(
   clerkUserId: string,
   email: string,
 ): Promise<{ accountId: string; profileId: string }> {
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  const displayName = `Test Profile ${clerkUserId}`;
+  const birthYear = new Date().getFullYear() - 20;
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Test Profile ${clerkUserId}`,
-      birthYear: new Date().getFullYear() - 20,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { accountId: account!.id, profileId: profile!.id };
+  await ensureLegacyProfileAnchorForTest(db, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName,
+    birthYear,
+    isOwner: true,
+  });
+
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName,
+    birthYear,
+    isOwner: true,
+  });
+
+  return { accountId, profileId };
 }
 
 async function seedMonthlyReport(
@@ -211,9 +233,13 @@ async function seedWeeklyReport(
 // ---------------------------------------------------------------------------
 
 async function cleanupTestAccounts(): Promise<void> {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_integ_rpt_${RUN_ID}%`));
+  await deleteV2IdentitiesForTest(db, {
+    profileIds: seededProfileIds,
+    accountIds: seededAccountIds,
+  });
+  await deleteLegacyAccountsForTest(db, seededAccountIds);
+  seededProfileIds.length = 0;
+  seededAccountIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,22 +283,42 @@ describeIfDb(
       weeklyReportBId = await seedWeeklyReport(profileBId, profileBId);
 
       // --- Dashboard (parent-child) setup ---
-      // Child profile C belongs to account A; A is the parent via familyLinks.
-      const [childProfile] = await db
-        .insert(profiles)
-        .values({
-          accountId: accountAId,
-          displayName: `Test Child ${RUN_ID}`,
-          birthYear: new Date().getFullYear() - 12,
-          isOwner: false,
-        })
-        .returning({ id: profiles.id });
-      childProfileCId = childProfile!.id;
-
-      await db.insert(familyLinks).values({
-        parentProfileId: profileAId,
-        childProfileId: childProfileCId,
+      // Child profile C belongs to account A; dashboard access is represented
+      // by family_links pre-repoint and guardianship under identity v2.
+      childProfileCId = generateUUIDv7();
+      seededProfileIds.push(childProfileCId);
+      await ensureLegacyProfileAnchorForTest(db, {
+        accountId: accountAId,
+        profileId: childProfileCId,
+        displayName: `Test Child ${RUN_ID}`,
+        birthYear: new Date().getFullYear() - 12,
+        isOwner: false,
       });
+      await ensureV2IdentityForLegacyProfileTest(db, {
+        accountId: accountAId,
+        profileId: childProfileCId,
+        clerkUserId: `${CLERK_ID_A}_child`,
+        email: `rpt_${RUN_ID}_child@test.invalid`,
+        displayName: `Test Child ${RUN_ID}`,
+        birthYear: new Date().getFullYear() - 12,
+        isOwner: false,
+      });
+
+      if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+        await db.insert(familyLinks).values({
+          parentProfileId: profileAId,
+          childProfileId: childProfileCId,
+        });
+      }
+
+      await db
+        .insert(guardianship)
+        .values({
+          guardianPersonId: profileAId,
+          chargePersonId: childProfileCId,
+          qualification: 'biological_parent',
+        })
+        .onConflictDoNothing();
 
       // Reports for the parent-child pair (profileId = parent, childProfileId = child)
       dashboardMonthlyReportId = await seedMonthlyReport(

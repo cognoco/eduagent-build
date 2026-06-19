@@ -20,6 +20,7 @@
 const mockGetChildrenForParent = jest.fn();
 const mockGetChildSessions = jest.fn();
 const mockGetChildSessionDetail = jest.fn();
+const mockListProfileSessions = jest.fn();
 
 jest.mock('./dashboard' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -35,10 +36,28 @@ jest.mock('./dashboard' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+jest.mock(
+  './session/session-crud' /* gc1-allow: scoped session service boundary */,
+  () => {
+    const actual = jest.requireActual(
+      './session/session-crud',
+    ) as typeof import('./session/session-crud');
+    return {
+      ...actual,
+      listProfileSessions: (...args: unknown[]) =>
+        mockListProfileSessions(...args),
+    };
+  },
+);
+
 import type { Database } from '@eduagent/database';
 
 import { ForbiddenError } from '../errors';
-import { getRecapForParent, listRecapsForParent } from './recaps';
+import {
+  getRecapForParent,
+  listRecapsForParent,
+  listRecapsForProfile,
+} from './recaps';
 
 const PARENT_ID = 'a0000000-0000-4000-8000-000000000001';
 const VISIBLE_CHILD = 'a0000000-0000-4000-8000-000000000010';
@@ -79,6 +98,7 @@ beforeEach(() => {
   mockGetChildrenForParent.mockReset();
   mockGetChildSessions.mockReset();
   mockGetChildSessionDetail.mockReset();
+  mockListProfileSessions.mockReset();
 });
 
 describe('listRecapsForParent — per-child ForbiddenError isolation', () => {
@@ -313,5 +333,64 @@ describe('getRecapForParent — per-child ForbiddenError isolation', () => {
     await expect(getRecapForParent(db, PARENT_ID, RECAP_ID)).rejects.toThrow(
       'boom',
     );
+  });
+});
+
+describe('listRecapsForProfile — self-scope session mapping', () => {
+  it('maps scoped profile sessions to recap items without parent or child-edge reads', async () => {
+    mockListProfileSessions.mockResolvedValue({
+      sessions: [sessionRow(RECAP_ID)],
+      nextCursor: null,
+    });
+
+    const profileDb = {
+      query: {
+        profiles: {
+          findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
+        },
+      },
+    } as unknown as Database;
+
+    const recaps = await listRecapsForProfile(profileDb, VISIBLE_CHILD, {
+      limit: 7,
+    });
+
+    expect(mockListProfileSessions).toHaveBeenCalledWith(
+      profileDb,
+      VISIBLE_CHILD,
+      { limit: 7 },
+    );
+    expect(mockGetChildrenForParent).not.toHaveBeenCalled();
+    expect(mockGetChildSessions).not.toHaveBeenCalled();
+    expect(recaps).toEqual([
+      expect.objectContaining({
+        recapId: RECAP_ID,
+        childProfileId: VISIBLE_CHILD,
+        childDisplayName: 'Self Learner',
+        subjectName: 'Mathematics',
+      }),
+    ]);
+  });
+
+  it('falls back to a neutral display name when the profile row is unavailable', async () => {
+    mockListProfileSessions.mockResolvedValue({
+      sessions: [sessionRow(RECAP_ID)],
+      nextCursor: null,
+    });
+
+    const profileDb = {
+      query: {
+        profiles: {
+          findFirst: jest.fn(async () => null),
+        },
+      },
+    } as unknown as Database;
+
+    const recaps = await listRecapsForProfile(profileDb, VISIBLE_CHILD);
+
+    expect(recaps[0]).toMatchObject({
+      childProfileId: VISIBLE_CHILD,
+      childDisplayName: 'Learner',
+    });
   });
 });

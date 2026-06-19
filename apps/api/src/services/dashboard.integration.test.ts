@@ -3,6 +3,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   assessments,
   consentGrant,
+  consentRequest,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -37,6 +38,10 @@ import {
   countGuidedMetrics,
   countGuidedMetricsBatch,
 } from './session/session-analytics';
+import {
+  deleteLegacyAccountsForTest,
+  ensureLegacyProfileAnchorForTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -159,6 +164,13 @@ async function seedProfile(input: {
     })
     .returning({ id: person.id });
   personIds.push(p!.id);
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: p!.id,
+    accountId: orgId,
+    displayName: input.displayName,
+    birthYear,
+    isOwner: input.isOwner ?? true,
+  });
 
   await db.insert(membership).values({
     personId: p!.id,
@@ -511,7 +523,15 @@ async function seedConsentState(input: {
     input.status === 'PENDING' ||
     input.status === 'PARENTAL_CONSENT_REQUESTED'
   ) {
-    return; // absence of a consent_grant row = not consented
+    await db.insert(consentRequest).values({
+      chargePersonId: input.profileId,
+      organizationId: input.orgId,
+      purpose: 'platform_use',
+      requestedBasis: 'gdpr_parental_consent',
+      status: input.status === 'PENDING' ? 'pending' : 'requested',
+      requestedAt: new Date(),
+    });
+    return;
   }
   await db.insert(consentGrant).values({
     chargePersonId: input.profileId,
@@ -535,7 +555,18 @@ async function seedConsentStateWithType(input: {
     input.status === 'PENDING' ||
     input.status === 'PARENTAL_CONSENT_REQUESTED'
   ) {
-    return; // absence of a consent_grant row = not consented
+    await db.insert(consentRequest).values({
+      chargePersonId: input.profileId,
+      organizationId: input.orgId,
+      purpose: 'platform_use',
+      requestedBasis:
+        input.consentType === 'GDPR'
+          ? 'gdpr_parental_consent'
+          : 'coppa_parental_consent',
+      status: input.status === 'PENDING' ? 'pending' : 'requested',
+      requestedAt: new Date(),
+    });
+    return;
   }
   const lawfulBasis =
     input.consentType === 'GDPR'
@@ -562,9 +593,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await deleteLegacyAccountsForTest(db, orgIds);
   for (const pid of personIds) {
     await db.delete(guardianship).where(eq(guardianship.guardianPersonId, pid));
     await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
+    await db
+      .delete(consentRequest)
+      .where(eq(consentRequest.chargePersonId, pid));
     await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
     await db.delete(membership).where(eq(membership.personId, pid));
     await db.delete(person).where(eq(person.id, pid));

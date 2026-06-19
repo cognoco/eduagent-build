@@ -22,6 +22,7 @@
         "EXPO_PUBLIC_API_URL": "https://api-stg.mentomate.com",
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
@@ -38,6 +39,7 @@
         "EXPO_PUBLIC_API_URL": "https://api-stg.mentomate.com",
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     }

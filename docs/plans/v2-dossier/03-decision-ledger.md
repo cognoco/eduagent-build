@@ -16,7 +16,7 @@
 
 | ID | The question | Blocks | Recommendation |
 |---|---|---|---|
-| **§13.6 — evidence gate** | What evidence authorizes S3+ (and the back half) to proceed? Currently UNDEFINED, and pre-launch there is no telemetry population to measure "vs V1 baseline" on — as written, the gate cannot fire. | **S3–S6 entirely.** The program's pivot point. | **Redefine as observed-cohort evidence**, not telemetry: 3–5 friendly families with a 13+ teen; pass = (a) teen returns *unprompted* ≥2× in week one and engages a feed card (not only the camera), (b) parent answers "what did my kid work on this week?" from the app alone in <1 min. Pre-committed stop rule: if (a) fails across the cohort, V2 ends at a measured S2 — feed demoted, camera-first shell kept. Formalized in the Layer-3 **Bet Sheet** for your ruling. |
+| **§13.6 — evidence gate** | What evidence authorizes S3+ (and the back half) to proceed? Pre-launch telemetry still cannot measure "vs V1 baseline," so the gate must be observable before launch. | **S3–S6 entirely.** The program's pivot point. | **Folded into the spec/plans 2026-06-13 as observed-cohort evidence**, not telemetry: 3–5 friendly families with a 13+ teen; pass = (a) teen returns *unprompted* ≥2× in week one and engages a feed/Subject action (not only the camera), (b) parent answers "what did my kid work on this week?" from the app alone in <1 min. Pre-committed stop rule: if (a) fails across the cohort, V2 ends at a measured S2 — feed demoted, camera-first shell kept. The actual PASS/FAIL still must be recorded in the Layer-3 **Bet Sheet** / decision log before S3 starts. |
 | **§13.7 — assertiveness dial** | Default mentor proposal tone; who moves it? | S1 *copy templates only* (the build proceeds regardless). | **Adopt the spec's own recommendation as-is**: calm default (invitation, not summons); a two-position dial (*relaxed / push me*) set conversationally and mirrored in settings; never age-inferred. Two positions, not a slider (each position × 10 languages multiplies copy). Nothing further to research — this just needs your "yes." |
 | **§13.4 — "Journal" vs "Notebook"** | Third tab's name, kid-tested together with the trust line ("your space is private, unless you're not safe"). | The name only; S3 ships default + one-key flip. | Keep **Journal** as the shipped default; **test both names in the Layer-2 prototype** — the cheapest possible kid-test, no build needed. |
 | **§13.1 — V0 retirement threshold** | When may the legacy 5-tab shell actually be deleted? | S6 deletion tasks only (T9–T12). | **Defer** — rule it when S6 is near. Placeholder bar to react to then: two release cycles of V2 default-on in production with no shell-attributable support issues. |
@@ -30,8 +30,8 @@
   ("calm default, yes") clears it. The real S1 holds are process, not decisions:
   the new-llm→main merge (PRG-17) and WI-678's plan-set re-key.
 - **§13.6 blocks S3+** — S4/S5 sit behind both the evidence gate and the identity
-  cutover. Ruling §13.6 as observed-cohort evidence (Bet Sheet) is the single
-  highest-leverage decision on this list.
+  cutover. The planning default is now observed-cohort evidence; the remaining
+  gate is the recorded PASS/FAIL after the cohort, not another metric-design debate.
 - **Ruled 2026-06-12: launch waits for the full build.** No S1–S3 launch, no
   "parent insight rides V1 surfaces" launch state — that fork (SURPRISE 1's
   launch half) is closed. The evidence gate remains an *internal* checkpoint on
@@ -49,4 +49,4 @@
 | Mentor-character timing? | Ruled, parallel brand track (owner: Zuzana); **no V2 beat waits on it** — interim carrier is the conversation surface |
 | Which §13 decisions block what? | The blocking map above |
 
-Last updated: 2026-06-12
+Last updated: 2026-06-13

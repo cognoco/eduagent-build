@@ -166,6 +166,7 @@ describe('note routes', () => {
             subjectName: 'Chemistry',
             sessionId: SESSION_ID,
             content: 'Remember that atoms are mostly empty space.',
+            origin: 'self',
             createdAt: '2026-05-15T10:00:00.000Z',
             updatedAt: '2026-05-15T10:05:00.000Z',
           },

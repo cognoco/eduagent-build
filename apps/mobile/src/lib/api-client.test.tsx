@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { renderHook } from '@testing-library/react-native';
+import { CancelledError } from '@tanstack/react-query';
 import {
   setOnAuthExpired,
   clearOnAuthExpired,
@@ -21,15 +22,27 @@ import {
 } from './api-client';
 import {
   ForbiddenError,
+  fetchOrThrowNetworkError,
+  NetworkError,
   UnauthorizedError,
   UpstreamError,
   QuotaExceededError,
 } from './api-errors';
+import { combinedSignal } from './query-timeout';
 
 const mockGetToken = jest.fn();
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: mockGetToken }),
 }));
+
+function abortError(): Error {
+  if (typeof DOMException !== 'undefined') {
+    return new DOMException('Aborted', 'AbortError');
+  }
+  const err = new Error('Aborted');
+  err.name = 'AbortError';
+  return err;
+}
 
 // ./api uses real implementation: getApiUrl() returns a localhost URL in __DEV__ (test env)
 // and EXPO_PUBLIC_API_URL is not set in CI test runs, so the __DEV__ branch fires.
@@ -156,6 +169,76 @@ describe('useApiClient header snapshot [BUG-631 / I-3]', () => {
 
     expect(capturedHeaders).not.toBeNull();
     expect(capturedHeaders!.has('X-Proxy-Mode')).toBe(false);
+  });
+});
+
+describe('useApiClient abort classification [WI-819]', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    mockGetToken.mockResolvedValue('test-token');
+    setActiveProfileId('profile-A');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+    mockGetToken.mockReset();
+    jest.useRealTimers();
+  });
+
+  it('does not wrap query-cancellation AbortError as NetworkError', async () => {
+    const queryController = new AbortController();
+    const { signal, cleanup } = combinedSignal(queryController.signal);
+    globalThis.fetch = jest.fn(
+      async (input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal =
+            init?.signal ??
+            (typeof Request !== 'undefined' && input instanceof Request
+              ? input.signal
+              : undefined);
+          signal?.addEventListener('abort', () => reject(abortError()));
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    const request = fetchOrThrowNetworkError('https://example.test/probe', {
+      signal,
+    }).catch((err: unknown) => err);
+
+    queryController.abort();
+    const err = await request;
+
+    expect(err).toBeInstanceOf(CancelledError);
+    expect(err).not.toBeInstanceOf(NetworkError);
+    cleanup();
+  });
+
+  it('still wraps timeout AbortError as NetworkError', async () => {
+    jest.useFakeTimers();
+    const { signal, cleanup } = combinedSignal(undefined, 25);
+    globalThis.fetch = jest.fn(
+      async (input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal =
+            init?.signal ??
+            (typeof Request !== 'undefined' && input instanceof Request
+              ? input.signal
+              : undefined);
+          signal?.addEventListener('abort', () => reject(abortError()));
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    const request = fetchOrThrowNetworkError('https://example.test/probe', {
+      signal,
+    }).catch((err: unknown) => err);
+
+    jest.advanceTimersByTime(25);
+    const err = await request;
+
+    expect(err).toBeInstanceOf(NetworkError);
+    cleanup();
   });
 });
 

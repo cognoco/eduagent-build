@@ -34,6 +34,8 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 
 import { recallNudge } from './recall-nudge';
 
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -74,10 +76,16 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockInngestTransport.clear();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  delete process.env['IDENTITY_V2_ENABLED'];
 });
 
 afterEach(() => {
   delete process.env['DATABASE_URL'];
+  if (ORIGINAL_IDENTITY_V2_ENABLED === undefined) {
+    delete process.env['IDENTITY_V2_ENABLED'];
+  } else {
+    process.env['IDENTITY_V2_ENABLED'] = ORIGINAL_IDENTITY_V2_ENABLED;
+  }
 });
 
 // ---------------------------------------------------------------------------

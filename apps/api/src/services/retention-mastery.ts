@@ -1,9 +1,6 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import {
-  curriculumBooks,
-  retentionCards,
-  type Database,
-} from '@eduagent/database';
+import { and, isNull, sql } from 'drizzle-orm';
+import { curriculumBooks, type Database } from '@eduagent/database';
+import { applyRetentionUpdate } from './apply-retention-update';
 
 interface StampMasteryOnVerifyInput {
   profileId: string;
@@ -30,19 +27,14 @@ export async function stampMasteryOnVerify(
   // book as not-yet-complete and neither stamps it. (Correctness-lens
   // book-mastery sibling-topic race finding.)
   await db.transaction(async (tx) => {
-    await tx
-      .update(retentionCards)
-      .set({
-        masteredAt,
-        updatedAt: masteredAt,
-      })
-      .where(
-        and(
-          eq(retentionCards.id, input.cardId),
-          eq(retentionCards.profileId, input.profileId),
-          isNull(retentionCards.masteredAt),
-        ),
-      );
+    await applyRetentionUpdate({
+      db: tx as unknown as Database,
+      profileId: input.profileId,
+      cardId: input.cardId,
+      set: { masteredAt },
+      guard: { kind: 'masteredAtNull' },
+      updatedAt: masteredAt,
+    });
 
     await tx
       .update(curriculumBooks)

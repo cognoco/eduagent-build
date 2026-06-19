@@ -105,6 +105,12 @@
     "languageChangeFailedTitle": "Couldn't change language",
     "languageChangeFailedMessage": "We couldn't switch the app language. Please try again."
   },
+  "accountAdmin": {
+    "title": "Account",
+    "openAccount": "Open account settings",
+    "security": "Account security",
+    "familySettings": "Family settings"
+  },
   "friendlyErrors": {
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
     "subjectPaused": "This subject is on pause right now. You can resume it from your subjects list.",
@@ -2181,9 +2187,13 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Your first topic is ready",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
+    },
+    "mentorBirth": {
+      "ready": "Your mentor is ready."
     },
     "stepIndicator": {
       "stepOf": "Step {{current}} of {{total}}"
@@ -2581,6 +2591,12 @@
     },
     "home": "Home",
     "homeLabel": "Home",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Subjects",
+    "subjectsLabel": "Subjects",
+    "journal": "Journal",
+    "journalLabel": "Journal",
     "familyHub": "Family Hub",
     "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
@@ -2595,6 +2611,239 @@
     "progressLabel": "Progress",
     "more": "More",
     "moreLabel": "More"
+  },
+  "mentorHome": {
+    "title": "Mentor",
+    "subtitle": "A few useful next steps, plus one place to ask or capture anything.",
+    "fallback": {
+      "cached": "Showing the last saved feed while we reconnect."
+    },
+    "error": {
+      "title": "We could not load your next steps",
+      "message": "You can retry or browse subjects directly.",
+      "subjects": "Browse subjects"
+    },
+    "cards": {
+      "unfinished_session": {
+        "title": "Continue your last session",
+        "cta": "Continue",
+        "arcDue": "Ready to pick back up",
+        "arcAdvancing": "You are moving this forward",
+        "arcMastered": "Session wrapped"
+      },
+      "retention_due": {
+        "title": "Review what is due",
+        "cta": "Review",
+        "arcDue": "Due for practice",
+        "arcAdvancing": "Getting stronger",
+        "arcMastered": "Review cleared"
+      },
+      "parked_item": {
+        "title": "Return to a saved question",
+        "cta": "Open",
+        "arcDue": "Waiting for you",
+        "arcAdvancing": "Back in motion",
+        "arcMastered": "Filed"
+      },
+      "needs_deepening": {
+        "title": "Deepen a tricky idea",
+        "cta": "Work on it",
+        "arcDue": "Needs another pass",
+        "arcAdvancing": "Understanding is improving",
+        "arcMastered": "Solid now"
+      },
+      "challenge_ready": {
+        "title": "Try a challenge round",
+        "cta": "Start challenge",
+        "arcDue": "Ready to test",
+        "arcAdvancing": "Challenge in progress",
+        "arcMastered": "Challenge cleared"
+      },
+      "generic": {
+        "title": "Open your next learning step",
+        "cta": "Open"
+      },
+      "complete": "Done",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Learning moment",
+      "generic": {
+        "title": "A learning moment was saved."
+      },
+      "session_filed": {
+        "title": "Saved {{topicTitle}} to your learning record."
+      },
+      "quota": {
+        "title": "A learning moment was saved."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} more options"
+    },
+    "empty": {
+      "title": "Nothing needs you right now",
+      "cta": "Browse more learning options"
+    },
+    "bar": {
+      "unavailable": "The mentor is offline for a moment. You can still type.",
+      "cameraLabel": "Camera",
+      "placeholder": "Ask, paste, or describe what you want to learn.",
+      "micLabel": "Mic",
+      "homeworkChip": "Homework"
+    },
+    "onTrack": {
+      "label": "On track",
+      "reviewsDue": "reviews due",
+      "dueCleared": "No reviews due"
+    },
+    "rewards": {
+      "privateLabel": "Private learning receipt",
+      "practicePoints": "+{{amount}} practice points for {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} practice points",
+      "reflectionBonus": "{{multiplier}} reflection bonus applied",
+      "quizPersonalBestCapitals": "New capitals personal best: {{score}}",
+      "quizPersonalBestGuessWho": "New Guess Who personal best: {{score}}",
+      "masteryDelta": "{{mastered}} mastered, +{{weeklyDelta}} this week",
+      "masteryDeltaNoWeekly": "{{mastered}} mastered"
+    },
+    "lightPractice": {
+      "prompt": "Prefer something light?",
+      "fatigueReason": "Suggested because this feed is light right now.",
+      "capitals": "Capitals",
+      "guessWho": "Guess Who",
+      "vocabulary": "Vocabulary",
+      "dictation": "Dictation"
+    },
+    "celebration": {
+      "ownChoice": "You chose the next step."
+    },
+    "coldStart": {
+      "caption": "What do you want to work on?",
+      "equalWeight": "Example prompt",
+      "placeholderRotation": {
+        "one": "Type a question or paste homework..."
+      },
+      "orJustType": "Or start with one of these.",
+      "chipHomework": "Help me with homework",
+      "chipLearn": "Teach me something new",
+      "chipAsk": "I have a question",
+      "homeworkReply": "Use the camera to capture the problem, or type it here."
+    }
+  },
+  "subjectsBrowse": {
+    "title": "Subjects",
+    "searchPlaceholder": "Search subjects",
+    "showEverything": "Show me everything",
+    "emptyTitle": "No subjects yet",
+    "emptyMessage": "Create a subject to start building your learning map.",
+    "createSubject": "Create subject",
+    "openSubject": "Open subject",
+    "errorTitle": "We could not load subjects",
+    "errorMessage": "Try again, or come back in a moment.",
+    "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+    "reviewsDue": "{{count}} reviews due"
+  },
+  "subjectHub": {
+    "loading": "Loading subject...",
+    "errors": {
+      "missingSubjectTitle": "Subject not found",
+      "missingSubjectMessage": "Go back and choose a subject again.",
+      "loadTitle": "Could not load this subject",
+      "loadMessage": "Try again, or go back to your subjects."
+    },
+    "progress": {
+      "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+      "reviewsDue": "{{count}} reviews due",
+      "noReviewsDue": "No reviews due",
+      "weeklyDelta": "+{{count}} mastered this week",
+      "noWeeklyDelta": "No new mastery this week",
+      "practicePoints": "{{points}} practice points recently",
+      "noPracticePoints": "No recent practice points"
+    },
+    "nextUp": {
+      "heading": "Next up",
+      "allCaughtUp": "All caught up",
+      "resume": "Resume",
+      "upNext": "Study the next topic",
+      "review": "Review",
+      "structuralOnly": "Study actions are private to the learner in this view."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} mastered"
+    },
+    "search": {
+      "placeholder": "Search topics",
+      "micLabel": "Search by voice",
+      "noResults": "No topics match that search."
+    },
+    "notes": {
+      "heading": "Notes",
+      "authorSelf": "My notes",
+      "authorMentor": "Saved from mentor"
+    },
+    "sheet": {
+      "close": "Close",
+      "about": "About this topic",
+      "masteryLine": "Status: {{state}}",
+      "study": "Study",
+      "review": "Review",
+      "seeFullTopic": "See full topic"
+    },
+    "topic": {
+      "continueNow": "Continue now",
+      "started": "Started",
+      "upNext": "Up next",
+      "later": "Later",
+      "done": "Done",
+      "mastered": "Mastered"
+    }
+  },
+  "journal": {
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Your private learning trail: saved moments, notes, reports, and mentor memory."
+    },
+    "sections": {
+      "recaps": "Recaps",
+      "recapsSubtitle": "Review recent session summaries.",
+      "reports": "My reports",
+      "reportsSubtitle": "Open weekly and monthly progress reports.",
+      "notes": "Saved notes",
+      "notesSubtitle": "Browse notes, bookmarks, and saved sessions.",
+      "memory": "Mentor memory",
+      "memorySubtitle": "See and manage what your mentor remembers."
+    },
+    "moments": {
+      "title": "Recent moments",
+      "empty": "New learning moments will appear here.",
+      "errorTitle": "Could not load recent moments",
+      "generic": "A learning moment was saved.",
+      "session_filed": "Saved {{topicTitle}} to your learning record.",
+      "topic_mastered": "Marked {{topicTitle}} as mastered.",
+      "recap_ready": "A recap is ready.",
+      "snapshot_ready": "A learning snapshot is ready.",
+      "reflection_bonus": "Reflection bonus saved.",
+      "quiz_personal_best": "Personal best saved."
+    },
+    "recaps": {
+      "empty": "Your finished session summaries will appear here.",
+      "error": "Could not load your recaps.",
+      "openLabel": "Open recap for {{title}}"
+    },
+    "reports": {
+      "error": "Could not load your reports."
+    },
+    "notes": {
+      "sessions": "Recent learning sessions",
+      "notes": "Study notes you saved",
+      "bookmarks": "Saved mentor replies"
+    },
+    "memory": {
+      "title": "Mentor memory controls",
+      "body": "Review, edit, hide, export, or clear what your mentor remembers from the full memory screen.",
+      "open": "Open memory controls"
+    }
   },
   "recaps": {
     "title": "Recaps",

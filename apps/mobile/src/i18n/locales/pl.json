@@ -2216,12 +2216,16 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Twój pierwszy temat jest gotowy",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
     "stepIndicator": {
       "stepOf": "Krok {{current}} z {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "Twój mentor jest gotowy."
     }
   },
   "parentView": {
@@ -2645,7 +2649,13 @@
     "children": "Rodzina",
     "childrenLabel": "Rodzina",
     "recaps": "Podsumowania",
-    "recapsLabel": "Podsumowania"
+    "recapsLabel": "Podsumowania",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Przedmioty",
+    "subjectsLabel": "Przedmioty",
+    "journal": "Dziennik",
+    "journalLabel": "Dziennik"
   },
   "subscription": {
     "trial": {
@@ -3609,5 +3619,244 @@
     "topicCount_many": "Opanowano {{count}} tematów",
     "wordCount_few": "Nauczono się {{count}} słów",
     "wordCount_many": "Nauczono się {{count}} słów"
+  },
+  "mentorHome": {
+    "cards": {
+      "unfinished_session": {
+        "title": "Kontynuuj ostatnią sesję",
+        "cta": "Kontynuuj",
+        "arcDue": "Gotowe do wznowienia",
+        "arcAdvancing": "Robisz postępy",
+        "arcMastered": "Sesja zakończona"
+      },
+      "retention_due": {
+        "title": "Przejrzyj zaległości",
+        "cta": "Przejrzyj",
+        "arcDue": "Do przećwiczenia",
+        "arcAdvancing": "Coraz lepiej",
+        "arcMastered": "Powtórka zaliczona"
+      },
+      "parked_item": {
+        "title": "Wróć do zapisanego pytania",
+        "cta": "Otwórz",
+        "arcDue": "Czeka na Ciebie",
+        "arcAdvancing": "Znowu w ruchu",
+        "arcMastered": "Zapisano"
+      },
+      "needs_deepening": {
+        "title": "Zgłęb trudne zagadnienie",
+        "cta": "Popracuj nad tym",
+        "arcDue": "Wymaga powtórki",
+        "arcAdvancing": "Coraz lepiej rozumiesz",
+        "arcMastered": "Już opanowane"
+      },
+      "challenge_ready": {
+        "title": "Spróbuj rundy z wyzwaniem",
+        "cta": "Rozpocznij wyzwanie",
+        "arcDue": "Gotowe do testu",
+        "arcAdvancing": "Wyzwanie w toku",
+        "arcMastered": "Wyzwanie ukończone"
+      },
+      "generic": {
+        "title": "Otwórz następny krok nauki",
+        "cta": "Otwórz"
+      },
+      "complete": "Gotowe",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Chwila nauki",
+      "generic": {
+        "title": "Zapisano chwilę nauki."
+      },
+      "session_filed": {
+        "title": "Zapisano {{topicTitle}} w Twojej historii nauki."
+      },
+      "quota": {
+        "title": "Zapisano chwilę nauki."
+      }
+    },
+    "overflow": {
+      "more": "Jeszcze {{count}} opcji"
+    },
+    "empty": {
+      "title": "Nic nie wymaga teraz Twojej uwagi",
+      "cta": "Przeglądaj więcej opcji nauki"
+    },
+    "bar": {
+      "unavailable": "Tutor jest chwilowo niedostępny. Nadal możesz pisać.",
+      "cameraLabel": "Aparat",
+      "placeholder": "Zapytaj, wklej lub opisz, czego chcesz się nauczyć.",
+      "micLabel": "Mikrofon",
+      "homeworkChip": "Praca domowa"
+    },
+    "onTrack": {
+      "label": "Na bieżąco",
+      "reviewsDue": "zaległych powtórek",
+      "dueCleared": "Brak zaległych powtórek"
+    },
+    "rewards": {
+      "privateLabel": "Prywatne podsumowanie nauki",
+      "practicePoints": "+{{amount}} punktów praktyki za {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} punktów praktyki",
+      "reflectionBonus": "Zastosowano bonus za refleksję {{multiplier}}",
+      "quizPersonalBestCapitals": "Nowy rekord w stolicach: {{score}}",
+      "quizPersonalBestGuessWho": "Nowy rekord w Zgadnij kto to: {{score}}",
+      "masteryDelta": "{{mastered}} opanowane, +{{weeklyDelta}} w tym tygodniu",
+      "masteryDeltaNoWeekly": "{{mastered}} opanowane"
+    },
+    "lightPractice": {
+      "prompt": "Wolisz coś lżejszego?",
+      "fatigueReason": "Sugerowane, ponieważ na razie nie ma tu nic pilnego.",
+      "capitals": "Stolice",
+      "guessWho": "Zgadnij kto to",
+      "vocabulary": "Słownictwo",
+      "dictation": "Dyktando"
+    },
+    "celebration": {
+      "ownChoice": "Wybrałeś/aś następny krok."
+    },
+    "coldStart": {
+      "caption": "Nad czym chcesz popracować?",
+      "equalWeight": "Przykładowe polecenie",
+      "placeholderRotation": {
+        "one": "Wpisz pytanie lub wklej pracę domową..."
+      },
+      "orJustType": "Lub zacznij od jednego z tych.",
+      "chipHomework": "Pomóż mi z pracą domową",
+      "chipLearn": "Naucz mnie czegoś nowego",
+      "chipAsk": "Mam pytanie",
+      "homeworkReply": "Użyj aparatu, aby sfotografować zadanie, lub wpisz je tutaj."
+    },
+    "title": "Mentor",
+    "subtitle": "Kilka przydatnych kroków i jedno miejsce na pytania i notatki.",
+    "fallback": {
+      "cached": "Wyświetlanie ostatniego zapisanego kanału podczas ponownego łączenia."
+    },
+    "error": {
+      "title": "Nie udało się wczytać kolejnych kroków",
+      "message": "Możesz spróbować ponownie lub bezpośrednio przeglądać tematy.",
+      "subjects": "Przeglądaj tematy"
+    }
+  },
+  "subjectsBrowse": {
+    "title": "Przedmioty",
+    "searchPlaceholder": "Szukaj przedmiotów",
+    "showEverything": "Pokaż mi wszystko",
+    "emptyTitle": "Brak przedmiotów",
+    "emptyMessage": "Utwórz przedmiot, aby zacząć budować swoją mapę nauki.",
+    "createSubject": "Utwórz przedmiot",
+    "openSubject": "Otwórz przedmiot",
+    "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
+    "reviewsDue": "{{count}} zaległych powtórek",
+    "errorTitle": "Nie udało się wczytać tematów",
+    "errorMessage": "Spróbuj ponownie lub wróć za chwilę."
+  },
+  "subjectHub": {
+    "loading": "Ładowanie przedmiotu...",
+    "errors": {
+      "missingSubjectTitle": "Nie znaleziono przedmiotu",
+      "missingSubjectMessage": "Wróć i wybierz przedmiot ponownie.",
+      "loadTitle": "Nie można załadować tego przedmiotu",
+      "loadMessage": "Spróbuj ponownie lub wróć do swoich przedmiotów."
+    },
+    "progress": {
+      "threeState": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
+      "reviewsDue": "{{count}} zaległych powtórek",
+      "noReviewsDue": "Brak zaległych powtórek",
+      "weeklyDelta": "+{{count}} opanowane w tym tygodniu",
+      "noWeeklyDelta": "Brak nowych opanowanych tematów w tym tygodniu",
+      "practicePoints": "{{points}} punktów praktyki ostatnio",
+      "noPracticePoints": "Brak ostatnich punktów praktyki"
+    },
+    "nextUp": {
+      "heading": "Następne",
+      "allCaughtUp": "Wszystko na bieżąco",
+      "resume": "Wznów",
+      "upNext": "Ucz się następnego tematu",
+      "review": "Powtórz",
+      "structuralOnly": "Działania związane z nauką są w tym widoku prywatne dla ucznia."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} opanowane"
+    },
+    "search": {
+      "placeholder": "Szukaj tematów",
+      "micLabel": "Szukaj głosem",
+      "noResults": "Brak tematów pasujących do wyszukiwania."
+    },
+    "notes": {
+      "heading": "Notatki",
+      "authorSelf": "Moje notatki",
+      "authorMentor": "Zapisane od tutora"
+    },
+    "sheet": {
+      "close": "Zamknij",
+      "about": "O tym temacie",
+      "masteryLine": "Status: {{state}}",
+      "study": "Ucz się",
+      "review": "Powtórz",
+      "seeFullTopic": "Zobacz cały temat"
+    },
+    "topic": {
+      "continueNow": "Kontynuuj teraz",
+      "started": "Rozpoczęto",
+      "upNext": "Następne",
+      "later": "Później",
+      "done": "Gotowe",
+      "mastered": "Opanowane"
+    }
+  },
+  "journal": {
+    "title": "Dziennik",
+    "trust": {
+      "privacyPromise": "Twoja prywatna ścieżka nauki: zapisane chwile, notatki, raporty i pamięć mentora."
+    },
+    "sections": {
+      "recaps": "Podsumowania",
+      "recapsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
+      "reports": "Moje raporty",
+      "reportsSubtitle": "Otwieraj tygodniowe i miesięczne raporty postępów.",
+      "notes": "Zapisane notatki",
+      "notesSubtitle": "Przeglądaj notatki, zakładki i zapisane sesje.",
+      "memory": "Pamięć mentora",
+      "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym."
+    },
+    "moments": {
+      "title": "Ostatnie chwile",
+      "empty": "Nowe momenty nauki pojawią się tutaj.",
+      "errorTitle": "Nie udało się wczytać ostatnich chwil",
+      "generic": "Zapisano moment nauki.",
+      "session_filed": "Zapisano {{topicTitle}} w Twojej historii nauki.",
+      "topic_mastered": "Oznaczono {{topicTitle}} jako opanowane.",
+      "recap_ready": "Podsumowanie jest gotowe.",
+      "snapshot_ready": "Migawka postępów jest gotowa.",
+      "reflection_bonus": "Zapisano premię za refleksję.",
+      "quiz_personal_best": "Zapisano rekord osobisty."
+    },
+    "recaps": {
+      "empty": "Podsumowania ukończonych sesji pojawią się tutaj.",
+      "error": "Nie udało się wczytać podsumowań.",
+      "openLabel": "Otwórz podsumowanie dla {{title}}"
+    },
+    "reports": {
+      "error": "Nie udało się wczytać raportów."
+    },
+    "notes": {
+      "sessions": "Ostatnie sesje nauki",
+      "notes": "Zapisane notatki",
+      "bookmarks": "Zapisane odpowiedzi tutora"
+    },
+    "memory": {
+      "title": "Zarządzanie pamięcią tutora",
+      "body": "Przeglądaj, edytuj, ukrywaj, eksportuj lub usuwaj to, co pamięta Twój tutor, na pełnym ekranie pamięci.",
+      "open": "Otwórz zarządzanie pamięcią"
+    }
+  },
+  "accountAdmin": {
+    "title": "Konto",
+    "openAccount": "Otwórz ustawienia konta",
+    "security": "Bezpieczeństwo konta",
+    "familySettings": "Ustawienia rodzinne"
   }
 }

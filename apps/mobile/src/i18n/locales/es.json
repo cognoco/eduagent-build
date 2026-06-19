@@ -2089,12 +2089,16 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Tu primer tema está listo",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
     "stepIndicator": {
       "stepOf": "Paso {{current}} de {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "Tu mentor está listo."
     }
   },
   "parentView": {
@@ -2502,7 +2506,13 @@
     "children": "Familia",
     "childrenLabel": "Familia",
     "recaps": "Resúmenes",
-    "recapsLabel": "Resúmenes"
+    "recapsLabel": "Resúmenes",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Asignaturas",
+    "subjectsLabel": "Asignaturas",
+    "journal": "Diario",
+    "journalLabel": "Diario"
   },
   "subscription": {
     "trial": {
@@ -3457,5 +3467,244 @@
     "sessionCount_other": "{{count}} sesiones de aprendizaje completadas",
     "hourCount_one": "{{count}} hora de aprendizaje",
     "hourCount_other": "{{count}} horas de aprendizaje"
+  },
+  "mentorHome": {
+    "cards": {
+      "unfinished_session": {
+        "title": "Continúa tu última sesión",
+        "cta": "Continuar",
+        "arcDue": "Listo para retomar",
+        "arcAdvancing": "Estás avanzando",
+        "arcMastered": "Sesión terminada"
+      },
+      "retention_due": {
+        "title": "Repasa lo que toca",
+        "cta": "Repasar",
+        "arcDue": "Toca practicar",
+        "arcAdvancing": "Se está fortaleciendo",
+        "arcMastered": "Repaso completado"
+      },
+      "parked_item": {
+        "title": "Vuelve a una pregunta guardada",
+        "cta": "Abrir",
+        "arcDue": "Esperándote",
+        "arcAdvancing": "De nuevo en marcha",
+        "arcMastered": "Archivado"
+      },
+      "needs_deepening": {
+        "title": "Profundiza en una idea difícil",
+        "cta": "Trabajar en ello",
+        "arcDue": "Necesita otro repaso",
+        "arcAdvancing": "La comprensión está mejorando",
+        "arcMastered": "Ahora está claro"
+      },
+      "challenge_ready": {
+        "title": "Prueba una ronda de desafío",
+        "cta": "Empezar desafío",
+        "arcDue": "Listo para probar",
+        "arcAdvancing": "Desafío en curso",
+        "arcMastered": "Desafío superado"
+      },
+      "generic": {
+        "title": "Abre tu siguiente paso de aprendizaje",
+        "cta": "Abrir"
+      },
+      "complete": "Hecho",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Momento de aprendizaje",
+      "generic": {
+        "title": "Se guardó un momento de aprendizaje."
+      },
+      "session_filed": {
+        "title": "Se guardó {{topicTitle}} en tu historial de aprendizaje."
+      },
+      "quota": {
+        "title": "Se guardó un momento de aprendizaje."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} opciones más"
+    },
+    "empty": {
+      "title": "Nada te necesita ahora mismo",
+      "cta": "Explora más opciones de aprendizaje"
+    },
+    "bar": {
+      "unavailable": "El tutor está desconectado un momento. Aún puedes escribir.",
+      "cameraLabel": "Cámara",
+      "placeholder": "Pregunta, pega o describe lo que quieres aprender.",
+      "micLabel": "Micro",
+      "homeworkChip": "Tarea"
+    },
+    "onTrack": {
+      "label": "Al día",
+      "reviewsDue": "repasos pendientes",
+      "dueCleared": "No hay repasos pendientes"
+    },
+    "rewards": {
+      "privateLabel": "Recibo de aprendizaje privado",
+      "practicePoints": "+{{amount}} puntos de práctica por {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} puntos de práctica",
+      "reflectionBonus": "Bono de reflexión de {{multiplier}} aplicado",
+      "quizPersonalBestCapitals": "Nuevo récord personal de capitales: {{score}}",
+      "quizPersonalBestGuessWho": "Nuevo récord personal de Adivina Quién: {{score}}",
+      "masteryDelta": "{{mastered}} dominados, +{{weeklyDelta}} esta semana",
+      "masteryDeltaNoWeekly": "{{mastered}} dominados"
+    },
+    "lightPractice": {
+      "prompt": "¿Prefieres algo ligero?",
+      "fatigueReason": "Sugerido porque esta sección está ligera ahora mismo.",
+      "capitals": "Capitales",
+      "guessWho": "Adivina Quién",
+      "vocabulary": "Vocabulario",
+      "dictation": "Dictado"
+    },
+    "celebration": {
+      "ownChoice": "Elegiste el siguiente paso."
+    },
+    "coldStart": {
+      "caption": "¿En qué quieres trabajar?",
+      "equalWeight": "Ejemplo de pregunta",
+      "placeholderRotation": {
+        "one": "Escribe una pregunta o pega una tarea..."
+      },
+      "orJustType": "O empieza con una de estas.",
+      "chipHomework": "Ayúdame con la tarea",
+      "chipLearn": "Enséñame algo nuevo",
+      "chipAsk": "Tengo una pregunta",
+      "homeworkReply": "Usa la cámara para capturar el problema o escríbelo aquí."
+    },
+    "title": "Tutor",
+    "subtitle": "Algunos próximos pasos útiles, además de un lugar para preguntar o apuntar cualquier cosa.",
+    "fallback": {
+      "cached": "Mostrando la última información guardada mientras nos reconectamos."
+    },
+    "error": {
+      "title": "No pudimos cargar tus próximos pasos",
+      "message": "Puedes reintentar o explorar las materias directamente.",
+      "subjects": "Explorar materias"
+    }
+  },
+  "subjectsBrowse": {
+    "title": "Temas",
+    "searchPlaceholder": "Buscar temas",
+    "showEverything": "Muéstramelo todo",
+    "emptyTitle": "Aún no hay temas",
+    "emptyMessage": "Crea un tema para empezar a construir tu mapa de aprendizaje.",
+    "createSubject": "Crear tema",
+    "openSubject": "Abrir tema",
+    "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
+    "reviewsDue": "{{count}} repasos pendientes",
+    "errorTitle": "No pudimos cargar las materias",
+    "errorMessage": "Inténtalo de nuevo o vuelve en un momento."
+  },
+  "subjectHub": {
+    "loading": "Cargando tema...",
+    "errors": {
+      "missingSubjectTitle": "Tema no encontrado",
+      "missingSubjectMessage": "Vuelve atrás y elige un tema de nuevo.",
+      "loadTitle": "No se pudo cargar este tema",
+      "loadMessage": "Inténtalo de nuevo o vuelve a tus temas."
+    },
+    "progress": {
+      "threeState": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
+      "reviewsDue": "{{count}} repasos pendientes",
+      "noReviewsDue": "No hay repasos pendientes",
+      "weeklyDelta": "+{{count}} dominados esta semana",
+      "noWeeklyDelta": "Ningún tema dominado esta semana",
+      "practicePoints": "{{points}} puntos de práctica recientemente",
+      "noPracticePoints": "No hay puntos de práctica recientes"
+    },
+    "nextUp": {
+      "heading": "A continuación",
+      "allCaughtUp": "Todo al día",
+      "resume": "Reanudar",
+      "upNext": "Estudiar el siguiente tema",
+      "review": "Repasar",
+      "structuralOnly": "Las acciones de estudio son privadas para el estudiante en esta vista."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} dominados"
+    },
+    "search": {
+      "placeholder": "Buscar temas",
+      "micLabel": "Buscar por voz",
+      "noResults": "Ningún tema coincide con esa búsqueda."
+    },
+    "notes": {
+      "heading": "Notas",
+      "authorSelf": "Mis notas",
+      "authorMentor": "Guardado del tutor"
+    },
+    "sheet": {
+      "close": "Cerrar",
+      "about": "Sobre este tema",
+      "masteryLine": "Estado: {{state}}",
+      "study": "Estudiar",
+      "review": "Repasar",
+      "seeFullTopic": "Ver tema completo"
+    },
+    "topic": {
+      "continueNow": "Continuar ahora",
+      "started": "Empezado",
+      "upNext": "A continuación",
+      "later": "Más tarde",
+      "done": "Hecho",
+      "mastered": "Dominado"
+    }
+  },
+  "journal": {
+    "title": "Diario",
+    "trust": {
+      "privacyPromise": "Tu historial de aprendizaje privado: momentos guardados, notas, informes y memoria del tutor."
+    },
+    "sections": {
+      "recaps": "Resúmenes",
+      "recapsSubtitle": "Revisa los resúmenes de sesiones recientes.",
+      "reports": "Mis informes",
+      "reportsSubtitle": "Abre los informes de progreso semanales y mensuales.",
+      "notes": "Notas guardadas",
+      "notesSubtitle": "Explora notas, marcadores y sesiones guardadas.",
+      "memory": "Memoria del tutor",
+      "memorySubtitle": "Ve y gestiona lo que tu tutor recuerda."
+    },
+    "moments": {
+      "title": "Momentos recientes",
+      "empty": "Aquí aparecerán nuevos momentos de aprendizaje.",
+      "errorTitle": "No se pudieron cargar los momentos recientes",
+      "generic": "Se ha guardado un momento de aprendizaje.",
+      "session_filed": "Se ha guardado {{topicTitle}} en tu historial de aprendizaje.",
+      "topic_mastered": "Se ha marcado {{topicTitle}} como dominado.",
+      "recap_ready": "Hay un resumen listo.",
+      "snapshot_ready": "Hay una instantánea de aprendizaje lista.",
+      "reflection_bonus": "Bono de reflexión guardado.",
+      "quiz_personal_best": "Récord personal guardado."
+    },
+    "recaps": {
+      "empty": "Aquí aparecerán los resúmenes de tus sesiones terminadas.",
+      "error": "No se pudieron cargar tus resúmenes.",
+      "openLabel": "Abrir resumen de {{title}}"
+    },
+    "reports": {
+      "error": "No se pudieron cargar tus informes."
+    },
+    "notes": {
+      "sessions": "Sesiones de aprendizaje recientes",
+      "notes": "Notas de estudio que guardaste",
+      "bookmarks": "Respuestas guardadas del tutor"
+    },
+    "memory": {
+      "title": "Controles de memoria del tutor",
+      "body": "Revisa, edita, oculta, exporta o borra lo que tu tutor recuerda desde la pantalla de memoria completa.",
+      "open": "Abrir controles de memoria"
+    }
+  },
+  "accountAdmin": {
+    "title": "Cuenta",
+    "openAccount": "Abrir configuración de la cuenta",
+    "security": "Seguridad de la cuenta",
+    "familySettings": "Configuración familiar"
   }
 }

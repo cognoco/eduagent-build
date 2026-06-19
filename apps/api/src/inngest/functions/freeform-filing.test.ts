@@ -27,6 +27,7 @@ const mockDb = {
     curriculumTopics: { findFirst: mockCurriculumTopicsFindFirst },
     curriculumBooks: { findFirst: mockCurriculumBooksFindFirst },
     consentStates: { findFirst: jest.fn().mockResolvedValue(null) },
+    membership: { findFirst: jest.fn().mockResolvedValue(null) },
   },
 };
 
@@ -55,6 +56,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
       profileId: col('profileId'),
       consentType: col('consentType'),
       requestedAt: col('requestedAt'),
+    },
+    membership: {
+      personId: col('personId'),
+      organizationId: col('organizationId'),
     },
   },
 });
@@ -153,6 +158,7 @@ import type { InngestStepSendEventCall } from '../../test-utils/inngest-step-run
 
 const testProfileId = '00000000-0000-4000-8000-000000000001';
 const testSessionId = '00000000-0000-4000-8000-000000000002';
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
 
 async function executeSteps(
   eventData: Record<string, unknown>,
@@ -199,11 +205,18 @@ describe('freeformFilingRetry', () => {
     // Tests that need a null row (missing-session abort) override this in their own beforeEach.
     mockDb.query.learningSessions.findFirst.mockResolvedValue(mockSessionRow);
     mockDb.query.consentStates.findFirst.mockResolvedValue(null);
+    mockDb.query.membership.findFirst.mockResolvedValue(null);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+    delete process.env['IDENTITY_V2_ENABLED'];
   });
 
   afterEach(() => {
     delete process.env['DATABASE_URL'];
+    if (ORIGINAL_IDENTITY_V2_ENABLED === undefined) {
+      delete process.env['IDENTITY_V2_ENABLED'];
+    } else {
+      process.env['IDENTITY_V2_ENABLED'] = ORIGINAL_IDENTITY_V2_ENABLED;
+    }
   });
 
   it('should be defined as an Inngest function with the expected id', () => {

@@ -306,6 +306,30 @@ export async function runHarness(
           let schemaViolation: string | undefined;
           let qualityIssues: QualityIssue[] | undefined;
 
+          if (flow.evaluateDeterministic) {
+            try {
+              qualityIssues = await flow.evaluateDeterministic({
+                input: item.input,
+                messages,
+                profile,
+                scenarioId: item.scenarioId,
+              });
+            } catch (deterministicErr) {
+              qualityIssues = [
+                {
+                  severity: 'error',
+                  code: 'deterministic-check-threw',
+                  message:
+                    deterministicErr instanceof Error
+                      ? deterministicErr.message
+                      : String(deterministicErr),
+                },
+              ];
+            }
+
+            recordQualityIssues(summary, qualityIssues);
+          }
+
           if (options.live && flow.runLive) {
             if (liveCallsMade >= maxLiveCalls) {
               liveError = `live budget exceeded (${maxLiveCalls} calls); re-run with --max-live-calls to raise`;
@@ -355,11 +379,12 @@ export async function runHarness(
                 }
 
                 if (flow.evaluateQuality && liveResponse) {
+                  let liveQualityIssues: QualityIssue[];
                   try {
                     // Awaited because evaluateQuality may be async (LLM-judge
                     // flows); awaiting a plain array is a no-op for the
                     // existing sync evaluators.
-                    qualityIssues = await flow.evaluateQuality({
+                    liveQualityIssues = await flow.evaluateQuality({
                       input: item.input,
                       messages,
                       liveResponse,
@@ -367,7 +392,7 @@ export async function runHarness(
                       scenarioId: item.scenarioId,
                     });
                   } catch (qualityErr) {
-                    qualityIssues = [
+                    liveQualityIssues = [
                       {
                         severity: 'error',
                         code: 'quality-check-threw',
@@ -379,13 +404,11 @@ export async function runHarness(
                     ];
                   }
 
-                  for (const issue of qualityIssues) {
-                    if (issue.severity === 'warning') {
-                      summary.qualityWarnings++;
-                    } else {
-                      summary.qualityFailures++;
-                    }
-                  }
+                  recordQualityIssues(summary, liveQualityIssues);
+                  qualityIssues = [
+                    ...(qualityIssues ?? []),
+                    ...liveQualityIssues,
+                  ];
                 }
               } catch (err) {
                 // `|| String(err)` so an Error with an empty message never
@@ -445,6 +468,19 @@ export async function runHarness(
   }
 
   return summary;
+}
+
+function recordQualityIssues(
+  summary: RunSummary,
+  qualityIssues: QualityIssue[] | undefined,
+): void {
+  for (const issue of qualityIssues ?? []) {
+    if (issue.severity === 'warning') {
+      summary.qualityWarnings++;
+    } else {
+      summary.qualityFailures++;
+    }
+  }
 }
 
 export function listFlows(flows: FlowDefinition[]): void {

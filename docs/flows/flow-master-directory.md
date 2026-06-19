@@ -1,6 +1,6 @@
 # Flow Master Directory
 
-> **STATUS: DRAFT** - master flow map for audience access, scope, and verification. Created 2026-05-22.
+> **STATUS: PARKED — revive after V2 cutover (decided 2026-06-18).** Master flow map for audience access, scope, and verification. Created 2026-05-22. The per-flow detail-page system (`master-directory/`) reached only ~12.5% coverage (21/168) and is framed against the V0/V1 nav model. Rather than finish it against a shell that V2 ("mentor-is-the-app", `docs/plans/v2-plan/`) retires, it is intentionally frozen. **Revive plan:** once the V2 shell lands (S6 cutover), rebuild this register + the per-flow pages V2-shell-aware (Mentor/Subjects/Journal + scope chip, not Family/Study mode). The current-state index/mapping job is meanwhile carried by `mobile-app-flow-inventory.md` (canonical) + `docs/plans/v2-plan/02-flow-map.md` (inventory→V2 bridge). Do not invest further here pre-V2; do not delete.
 
 This document is the durable directory of product flows. It is intentionally separate from the revision plans:
 

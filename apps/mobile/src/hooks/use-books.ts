@@ -15,8 +15,23 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
+import {
+  combinedSignal,
+  LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+} from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { NetworkError } from '../lib/api-errors';
+
+const BOOK_DETAIL_NETWORK_RETRY_LIMIT = 4;
+const BOOK_DETAIL_DEFAULT_RETRY_LIMIT = 2;
+
+function retryBookDetailRead(failureCount: number, error: unknown): boolean {
+  if (error instanceof NetworkError) {
+    return failureCount < BOOK_DETAIL_NETWORK_RETRY_LIMIT;
+  }
+
+  return failureCount < BOOK_DETAIL_DEFAULT_RETRY_LIMIT;
+}
 
 export function useBooks(
   subjectId: string | undefined,
@@ -40,7 +55,10 @@ export function useBooks(
     },
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId) throw new Error('subjectId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
+      const { signal, cleanup } = combinedSignal(
+        querySignal,
+        LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+      );
       try {
         const res = await client.subjects[':subjectId'].books.$get(
           { param: { subjectId } },
@@ -73,12 +91,15 @@ export function useBookWithTopics(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useQuery<BookWithTopics | null, Error>({
     queryKey: ['book', subjectId, bookId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId || !bookId)
         throw new Error('subjectId and bookId are required');
-      const { signal, cleanup } = combinedSignal(querySignal);
+      const { signal, cleanup } = combinedSignal(
+        querySignal,
+        LEARNING_ENTRY_QUERY_TIMEOUT_MS,
+      );
       try {
         const res = await client.subjects[':subjectId'].books[':bookId'].$get(
           { param: { subjectId, bookId } },
@@ -91,6 +112,7 @@ export function useBookWithTopics(
       }
     },
     enabled: !!activeProfile && !!subjectId && !!bookId,
+    retry: retryBookDetailRead,
   });
 }
 

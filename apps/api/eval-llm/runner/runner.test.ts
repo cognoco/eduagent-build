@@ -174,3 +174,48 @@ describe('runHarness live budget cap', () => {
     expect(calls.count).toBe(3);
   });
 });
+
+describe('runHarness deterministic quality checks', () => {
+  afterEach(async () => {
+    const dir = path.resolve(
+      __dirname,
+      '..',
+      'snapshots',
+      'test-deterministic-flow',
+    );
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  it('runs deterministic quality checks without --live', async () => {
+    const flow: FlowDefinition<{ ok: boolean }> = {
+      id: 'test-deterministic-flow',
+      name: 'Test Deterministic Flow',
+      sourceFile: 'test',
+      buildPromptInput: () => ({ ok: false }),
+      buildPrompt: () => ({ system: 'deterministic check only' }),
+      evaluateDeterministic: ({ input }) =>
+        input.ok
+          ? []
+          : [
+              {
+                severity: 'error',
+                code: 'not-ok',
+                message: 'Input failed deterministic check',
+              },
+            ],
+    };
+
+    const summary = await runHarness([flow as FlowDefinition], {
+      live: false,
+      profileFilter: new Set(['12yo-dinosaurs']),
+    });
+
+    expect(summary.liveCallsOk).toBe(0);
+    expect(summary.qualityFailures).toBe(1);
+    expect(summary.snapshotsWritten).toBe(1);
+  });
+});

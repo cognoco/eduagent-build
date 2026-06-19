@@ -1,9 +1,5 @@
-import { and, eq, isNull, lt, or } from 'drizzle-orm';
-import {
-  createScopedRepository,
-  retentionCards,
-  type Database,
-} from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { createScopedRepository, retentionCards } from '@eduagent/database';
 import { reviewCalibrationRequestedEventSchema } from '@eduagent/schemas';
 import type { ReviewCalibrationRequestedEvent } from '@eduagent/schemas';
 import { inngest } from '../client';
@@ -13,46 +9,14 @@ import {
   rowToRetentionState,
 } from '../../services/retention-data';
 import { canRetestTopic, processRecallResult } from '../../services/retention';
-import { syncXpLedgerStatus } from '../../services/xp';
 import { stampMasteryOnVerify } from '../../services/retention-mastery';
-import { createLogger } from '../../services/logger';
-import { captureException } from '../../services/sentry';
+import { applyRetentionUpdate } from '../../services/apply-retention-update';
 
-const logger = createLogger();
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function parseEventData(data: unknown): ReviewCalibrationRequestedEvent | null {
   const parsed = reviewCalibrationRequestedEventSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
-}
-
-async function syncXpBestEffort(
-  db: Database,
-  profileId: string,
-  topicId: string,
-  xpChange: 'none' | 'verified' | 'decayed',
-): Promise<void> {
-  if (xpChange !== 'verified' && xpChange !== 'decayed') return;
-
-  try {
-    await syncXpLedgerStatus(db, profileId, topicId, xpChange);
-  } catch (err) {
-    logger.error('[review-calibration-grade] XP sync failed (non-fatal)', {
-      event: 'review_calibration.xp_sync_failed',
-      profileId,
-      topicId,
-      xpChange,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    captureException(err, {
-      profileId,
-      extra: {
-        site: 'reviewCalibrationGrade.syncXpLedgerStatus',
-        topicId,
-        xpChange,
-      },
-    });
-  }
 }
 
 export async function handleReviewCalibrationGrade({
@@ -106,28 +70,23 @@ export async function handleReviewCalibrationGrade({
   // case, and the alternative wastes a paid LLM call on every lost claim.
   const claimed = await step.run('claim-cooldown-slot', async () => {
     const db = getStepDatabase();
-    return db
-      .update(retentionCards)
-      .set({
-        lastReviewedAt: eventAt,
-        updatedAt: eventAt,
-      })
-      .where(
-        and(
-          eq(retentionCards.id, card.id),
-          eq(retentionCards.profileId, profileId),
-          or(
-            isNull(retentionCards.lastReviewedAt),
-            lt(retentionCards.lastReviewedAt, cooldownThreshold),
-            // Re-entrancy: lastReviewedAt === eventAt means OUR claim from an
-            // earlier at-least-once execution of this step (eventAt derives
-            // deterministically from the event payload), not a competitor's —
-            // a retry after a lost step checkpoint must not lose its own slot.
-            eq(retentionCards.lastReviewedAt, eventAt),
-          ),
-        ),
-      )
-      .returning({ id: retentionCards.id });
+    const { updated } = await applyRetentionUpdate({
+      db,
+      profileId,
+      cardId: card.id,
+      set: { lastReviewedAt: eventAt },
+      guard: {
+        kind: 'cooldownClaim',
+        cooldownThreshold,
+        // Re-entrancy: lastReviewedAt === eventAt means OUR claim from an
+        // earlier at-least-once execution of this step (eventAt derives
+        // deterministically from the event payload), not a competitor's —
+        // a retry after a lost step checkpoint must not lose its own slot.
+        allowLastReviewedAt: eventAt,
+      },
+      updatedAt: eventAt,
+    });
+    return updated ? [{ id: card.id }] : [];
   });
 
   if (claimed.length === 0) {
@@ -146,9 +105,11 @@ export async function handleReviewCalibrationGrade({
     // profileId conditions remain (explicit profileId write protection).
     // Idempotent under retry: values derive deterministically from the
     // state loaded above, the graded quality, and the event timestamp.
-    await db
-      .update(retentionCards)
-      .set({
+    await applyRetentionUpdate({
+      db,
+      profileId,
+      cardId: card.id,
+      set: {
         easeFactor: result.newState.easeFactor,
         intervalDays: result.newState.intervalDays,
         repetitions: result.newState.repetitions,
@@ -159,14 +120,16 @@ export async function handleReviewCalibrationGrade({
           ? new Date(result.newState.nextReviewAt)
           : null,
         lastReviewedAt: eventAt,
-        updatedAt: eventAt,
-      })
-      .where(
-        and(
-          eq(retentionCards.id, card.id),
-          eq(retentionCards.profileId, profileId),
-        ),
-      );
+      },
+      guard: { kind: 'none' },
+      updatedAt: eventAt,
+    });
+    // xp_ledger.status sync intentionally NOT performed here. The retention-path
+    // xp_ledger side-effect was removed in 5fed808e9: post-sunset,
+    // insertSessionXpEntry writes xp_ledger.status='verified' at insert time
+    // (no 'pending' state), so the card's xpStatus written above is the source
+    // of truth. The decay-case ledger split (xpStatus='decayed' not mirrored to
+    // xp_ledger.status, which progress.ts reads) is tracked in WI-848.
   });
 
   await step.run('stamp-mastery-on-verify', async () => {
@@ -178,11 +141,6 @@ export async function handleReviewCalibrationGrade({
       xpChange: result.xpChange,
       masteredAt: eventAt,
     });
-  });
-
-  await step.run('sync-xp-ledger', async () => {
-    const db = getStepDatabase();
-    await syncXpBestEffort(db, profileId, topicId, result.xpChange);
   });
 
   return {
