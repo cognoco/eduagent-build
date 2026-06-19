@@ -307,6 +307,7 @@ export async function getRecapForParent(
           parentProfileId,
           child.profileId,
           recapId,
+          { identityV2Enabled: opts?.identityV2Enabled },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) return null;
