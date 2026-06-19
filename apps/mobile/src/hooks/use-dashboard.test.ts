@@ -15,13 +15,16 @@ import { queryKeys } from '../lib/query-keys';
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
-jest.mock('../lib/app-context' /* gc1-allow: dashboard child hooks are family-mode only; test controls mode boundary */, () => ({
-  useAppContext: () => ({
-    mode: 'family',
-    setMode: jest.fn(),
-    familyCapable: true,
+jest.mock(
+  '../lib/app-context' /* gc1-allow: dashboard child hooks are family-mode only; test controls mode boundary */,
+  () => ({
+    useAppContext: () => ({
+      mode: 'family',
+      setMode: jest.fn(),
+      familyCapable: true,
+    }),
   }),
-}));
+);
 
 let queryClient: QueryClient;
 
@@ -75,10 +78,16 @@ describe('useDashboard', () => {
     expect(result.current.data).toEqual(dashboardData);
   });
 
-  it('fetches demo data when children array is empty', async () => {
-    const emptyResponse = { children: [] };
+  it('fetches demo data when children array is empty and there are no pending notices', async () => {
+    const emptyResponse = {
+      children: [],
+      pendingNotices: [],
+      demoMode: false,
+    };
     const demoData = {
       children: [{ id: 'demo-1', displayName: 'Demo Child', subjects: [] }],
+      pendingNotices: [],
+      demoMode: true,
     };
 
     mockFetch
@@ -101,6 +110,45 @@ describe('useDashboard', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(result.current.data).toEqual(demoData);
   });
+
+  // WI-854 [HOME-15]: when the last child is archived/deleted the real
+  // dashboard carries empty children BUT pending consent notices. The demo
+  // fallback must NOT replace it — demo data has no pendingNotices, which would
+  // hide the owner post-grace consent-archive/delete toast.
+  it.each([['consent_archived' as const], ['consent_deleted' as const]])(
+    'preserves the real dashboard (no demo fallback) when children are empty but a %s pending notice exists [WI-854]',
+    async (noticeType) => {
+      const realResponse = {
+        children: [],
+        pendingNotices: [
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            type: noticeType,
+            payload: { childName: 'Emma' },
+            createdAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        demoMode: false,
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        new Response(JSON.stringify(realResponse), { status: 200 }),
+      );
+
+      const { result } = renderHook(() => useDashboard(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
+      });
+
+      // Only the real /dashboard call — the /dashboard/demo substitution must
+      // not fire when pending notices are present.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.current.data).toEqual(realResponse);
+    },
+  );
 
   it('handles API errors', async () => {
     mockFetch.mockResolvedValueOnce(

@@ -92,7 +92,16 @@ export function useDashboard(): UseQueryResult<DashboardData> {
         await assertOk(res);
         const data = (await res.json()) as DashboardData;
 
-        if ((data.children?.length ?? 0) === 0) {
+        // [WI-854 / HOME-15] Only fall back to demo data for a genuinely empty
+        // dashboard. When the last child is archived/deleted the real response
+        // has empty children BUT carries pending consent notices — demo data has
+        // none, so substituting it would hide the owner post-grace consent
+        // archive/delete toast. Preserve the real dashboard whenever notices are
+        // present.
+        const hasNoChildren = (data.children?.length ?? 0) === 0;
+        const hasPendingNotices = (data.pendingNotices?.length ?? 0) > 0;
+
+        if (hasNoChildren && !hasPendingNotices) {
           const demoRes = await client.dashboard.demo.$get(
             {},
             { init: { signal } },
