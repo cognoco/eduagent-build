@@ -630,7 +630,11 @@ export const monthlyReportGenerate = inngest.createFunction(
       const childDisplayName = activeChild.displayName?.trim()
         ? activeChild.displayName.trim()
         : 'Your child';
-      await sendPushNotification(
+      // [BUG-841] Capture and return the real result so the email-gate and
+      // observability see the actual delivery outcome (no_push_token,
+      // push_disabled, daily_cap_exceeded, etc.) instead of a hardcoded
+      // {sent:true, reason:undefined}. Matches weekly-progress-push pattern.
+      return sendPushNotification(
         db,
         {
           profileId: parentId,
@@ -640,7 +644,6 @@ export const monthlyReportGenerate = inngest.createFunction(
         },
         { respectPushPreference: true },
       );
-      return { sent: true, reason: undefined };
     });
 
     // [CR-2026-05-21-022] Step 3: Send email in a separate step. If this step

@@ -2050,6 +2050,76 @@ describe('monthlyReportGenerate', () => {
         expect.anything(),
       );
     });
+
+    // [BUG-841] send-monthly-push step must surface the real sendPushNotification
+    // result rather than always returning {sent:true, reason:undefined}.
+    //
+    // Assertion strategy: wrap step.run to record each step's actual return
+    // value (what the function returns from the step callback), then assert the
+    // memoized value for 'send-monthly-push' matches the real push outcome.
+    it('[BUG-841] send-monthly-push step returns real result when push has no token (not hardcoded sent:true)', async () => {
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'no_push_token',
+      });
+
+      const runner = createInngestStepRunner();
+      const stepReturnValues: Record<string, unknown> = {};
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          stepReturnValues[name] = value;
+          return value;
+        },
+      };
+
+      const handler = (monthlyReportGenerate as any).fn;
+      await handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: recordingStep,
+      });
+
+      // The 'send-monthly-push' step result must reflect sent:false with the
+      // real reason — not the pre-fix hardcoded {sent:true, reason:undefined}.
+      expect(stepReturnValues['send-monthly-push']).toEqual(
+        expect.objectContaining({ sent: false, reason: 'no_push_token' }),
+      );
+    });
+
+    it('[BUG-841] send-monthly-push step returns sent:true + ticketId when push delivers', async () => {
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: true,
+        ticketId: 'expo-ticket-123',
+      });
+
+      const runner = createInngestStepRunner();
+      const stepReturnValues: Record<string, unknown> = {};
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          stepReturnValues[name] = value;
+          return value;
+        },
+      };
+
+      const handler = (monthlyReportGenerate as any).fn;
+      await handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: recordingStep,
+      });
+
+      expect(stepReturnValues['send-monthly-push']).toEqual(
+        expect.objectContaining({ sent: true, ticketId: 'expo-ticket-123' }),
+      );
+    });
   });
 });
 

@@ -24,15 +24,17 @@
 `/execute` builds a fix on a branch and stops the moment the code is written. But a Work Item is
 not done then — it is done when a **separate, automated reviewer** (run by the program, not you)
 has checked the change and the item reaches **Closed**. Your job as shepherd-of-one is everything
-around the build *up to a strict-green PR*, and then **shepherding that PR through review**: claim
-it, build it, drive it to a **green PR**, **hand it off** (you do **not** merge — see below), then
-**watch for the reviewer's verdict and act on it.** The review is asynchronous and silent — nobody
-pings you — so you arm a monitor and respond when it fires.
+around the build *up to a strict-green PR*, then **merging that PR to `main` and finalizing the
+item**, and then **shepherding it through review**: claim it, build it, drive it to a **green PR**,
+**merge it**, run **`/cosmo:execute complete`**, then **watch for the reviewer's verdict and act on
+it.** The review is asynchronous and silent — nobody pings you — so you arm a monitor and respond
+when it fires.
 
-> **You stop at a green PR. You do NOT merge, and you do NOT run `/cosmo:execute complete`.**
-> At this rung, merging the PR to `main` and finalizing the item are done by the program (us), not
-> by you. Merging becomes yours at the *next* rung. Your deliverable is a green PR plus driving the
-> review verdict to a clean close.
+> **You drive to a green PR, then you MERGE it and run `/cosmo:execute complete`.**
+> At this rung, merging the PR to `main` and finalizing the item to **Stage=Reviewing** are yours.
+> The one thing that is *not* yours is the **review verdict that Closes the item** — that gate is
+> always the external automated reviewer. Your deliverable is a merged, finalized item driven
+> through the review verdict to a clean close.
 
 ---
 
@@ -71,35 +73,35 @@ once per round.
 
 Never call a PR with a red required check "green."
 
-**Phase 7 — Stop at the green PR; hand off.** Once the PR is green by Phase 6, **STOP.**
-**Do NOT merge the PR, and do NOT run `/cosmo:execute complete`.** At this rung those two acts —
-merging to `main` and finalizing the item to `Stage=Reviewing` — are done by the program (us), not
-by you. Report the green PR up: its number, the head commit, and a one-line "ready" note. Then move
-to Phase 8. (Why the hard stop: merging and finalizing are the privileges of the *next* rung; for
-now you hand a clean, green PR to the program and we take it from there.)
+**Phase 7 — Merge and finalize.** Once the PR is green by Phase 6, **merge it to `main`** (squash,
+via `gh pr merge`), then run **`/cosmo:execute complete`** — it authors `Fixed In` from the landed
+commit, writes the completion summary, moves the item to `Stage=Reviewing`, and settles your claim.
+Never hand-edit `Stage` or `Fixed In`; `complete` is the only sanctioned writer. At this rung both
+acts — merging to `main` and finalizing to `Stage=Reviewing` — are yours.
 
-**Phase 8 — Arm the review monitor and shepherd the verdict.** After you hand off, the program
-merges your PR and moves the item to `Stage=Reviewing`; the separate automated reviewer then checks
-it. Arm a monitor (next two sections) so the verdict wakes you, and react to it. Do **not** consider
-the WI done at hand-off — a green PR earns the review, it does not close the item.
+**Phase 8 — Arm the review monitor and shepherd the verdict.** Arm a monitor (next two sections) so
+the verdict wakes you, and react to it. Do **not** consider the WI done at finalize — moving to
+`Reviewing` *earns* the review, it does not close the item.
 
 ---
 
 ## How the review works (read this carefully — it's the part `/execute` never showed you)
 
-Once the program has merged your green PR and moved the item to **Stage=Reviewing**, a **separate
-automated reviewer session** (run by the program, currently a Codex clone — **not you, not your
-session**) checks it and runs `/cosmo:review` + `/cosmo:qa`. It will **not** notify you of its
-verdict — you have to watch for it. Three possible outcomes:
+Once you have merged your green PR and `/cosmo:execute complete` has moved the item to
+**Stage=Reviewing**, a **separate automated reviewer session** (run by the program, currently a
+Codex clone — **not you, not your session**) checks it and runs `/cosmo:review` + `/cosmo:qa`. It
+will **not** notify you of its verdict — you have to watch for it. Three possible outcomes:
 
 - **→ Closed / Resolution=Done = APPROVED.** You're finished. Tear down the monitor and the worktree.
 - **→ Executing (tag: rework) = BOUNCED.** The reviewer left a `[zdx:review]` / `[cosmo:qa]` note on
   the WI page saying why. **Read that note**, then loop back: re-claim (Phase 0), fix it in your
-  worktree, and drive the PR back to green (Phases 3–6) and hand off again (Phase 7). A bounce is
-  almost always **a real code finding** — fix it like any review comment.
+  worktree, and drive the PR back to green (Phases 3–6), then merge and finalize again (Phase 7). A
+  bounce is almost always **a real code finding** — fix it like any review comment.
+  - If the bounce is about **merge/finalize mechanics** (wrong `Fixed In`, summary missing a
+    DoD artifact, a bad squash) — those are now *yours*: re-run `/cosmo:execute complete` or fix the
+    mechanic and re-finalize.
   - *Rare:* if the bounce note doesn't actually describe your code (the review harness has known
-    rough edges), or it's about merge/finalize mechanics — which are *our* responsibility at this
-    rung, not yours — **don't spin**: escalate to us with the note quoted and we'll adjudicate.
+    rough edges), **don't spin**: escalate to us with the note quoted and we'll adjudicate.
 - **→ a "human" verdict.** The reviewer needs an operator decision it can't make. Escalate to us
   with the specific question.
 
@@ -110,8 +112,8 @@ not close the WI.
 
 ## Arming the review monitor
 
-Because the reviewer is silent and asynchronous, arm a **monitor** right after you hand off the
-green PR (Phase 7–8) so a verdict *wakes you* instead of you remembering to poll. Hand this to the
+Because the reviewer is silent and asynchronous, arm a **monitor** right after you merge and
+finalize (Phase 7–8) so a verdict *wakes you* instead of you remembering to poll. Hand this to the
 **Monitor tool** with `persistent: true` (set `WI` to your item number):
 
 ```bash
@@ -141,32 +143,33 @@ or reboot, and its *silence then looks identical to "no verdict yet."* So:
 ## What you own that a plain executor never does
 
 In the full Quartet, an executor builds and hands a green PR up; a *shepherd* merges and tracks the
-review; a *reviewer* closes. At this rung you grow into the shepherd's role one piece at a time. Two
-things are yours now that plain `/execute` never asked of you:
+review; a *reviewer* closes. At this rung you take on the **whole shepherd's role** — everything but
+the reviewer. Three things are yours now that plain `/execute` never asked of you:
 1. **Driving to a *strict-green* PR** — not "tests pass," but the full Phase-6 gate, including
    reading the `claude-review` **verdict body** (not just the check colour) and triaging its
    findings.
-2. **Shepherding the WI through review** — arm the monitor, read the verdict, and re-engage on a
+2. **Merging to `main` and finalizing the item** — squash-merge the green PR, then run
+   `/cosmo:execute complete` to author `Fixed In`, the completion summary, and `Stage=Reviewing`.
+3. **Shepherding the WI through review** — arm the monitor, read the verdict, and re-engage on a
    bounce until it closes.
 
-Two things are deliberately **not yours yet** — they belong to the program at this rung and become
-yours at the next one: **merging the PR to `main`** and **finalizing the item** (`/cosmo:execute
-complete`). And the reviewer is always external — that one is never yours.
+The **one** thing that is never yours is the **reviewer** — the external automated session that
+runs `/cosmo:review` + `/cosmo:qa` and Closes the item. You earn that review; you do not perform it.
 
 ---
 
 ## Hard rules
 
-- **You stop at a green PR. You do NOT merge and do NOT run `/cosmo:execute complete`** — both are
-  the program's at this rung. Hand the green PR up and let us take it from there.
-- **The WI is not done at hand-off.** Reviewing ≠ done; only the reviewer's Close finishes it.
+- **Green PR → merge → `/cosmo:execute complete`.** Once the PR is strict-green, you squash-merge it
+  to `main` and finalize the item; both are yours at this rung. The reviewer's Close is *not*.
+- **The WI is not done at finalize.** Reviewing ≠ done; only the external reviewer's Close finishes it.
 - **Strict green, read the verdict body.** A green check colour is not approval — read the
   `claude-review` *verdict* (must-fix/should-fix counts); a red or absent review is never approval.
   Never call a PR with a red required check "green."
 - **Worktree discipline.** `/commit` only from your `.worktrees/WI-NN`; never stage another session's
   files; push with an explicit refspec (`git push origin HEAD:WI-NN`), never a bare `git push`.
-- **Never self-close**, and never hand-edit `Stage` or `Fixed In` — closing and lifecycle fields are
-  not yours.
+- **Never self-close**, and never hand-edit `Stage` or `Fixed In` — `/cosmo:execute complete` is the
+  only sanctioned writer of those fields, and only the external reviewer Closes the item.
 - **No `eslint-disable` / suppression to get green** — fix the root cause.
 - **When in doubt, ask us.** A confusing bounce, a red you can't diagnose, a destructive step — stop
   and escalate rather than guessing.
