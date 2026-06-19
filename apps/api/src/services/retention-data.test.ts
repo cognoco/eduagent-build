@@ -1057,7 +1057,7 @@ describe('processRecallTest', () => {
     );
   });
 
-  it('does not update xp_ledger when recall fails with decay', async () => {
+  it('[WI-848] syncs xp_ledger.status to decayed when recall result is decay', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -1084,20 +1084,28 @@ describe('processRecallTest', () => {
       answer: 'Wrong answer',
     });
 
-    const updateTables = (db.update as jest.Mock).mock.calls.map(
-      ([table]) => table,
-    );
-    expect(updateTables).not.toContain(xpLedger);
-    expect(updateTables.some((table) => table === curriculumBooks)).toBe(false);
-
+    // retention_cards must be updated with xpStatus='decayed'
     const setMock = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setMock.mock.calls).toEqual(
       expect.arrayContaining([
-        [
-          expect.objectContaining({
-            xpStatus: 'decayed',
-          }),
-        ],
+        [expect.objectContaining({ xpStatus: 'decayed' })],
+      ]),
+    );
+
+    // xp_ledger.status must also be synced to 'decayed' (WI-848)
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]) => table,
+    );
+    expect(updateTables).toContain(xpLedger);
+    // book rows must not be mutated on the decay path (regression guard)
+    expect(updateTables).not.toContain(curriculumBooks);
+    const xpLedgerUpdateIdx = updateTables.indexOf(xpLedger);
+    const xpLedgerSetCalls = (db.update as jest.Mock).mock.results[
+      xpLedgerUpdateIdx
+    ]!.value.set.mock.calls;
+    expect(xpLedgerSetCalls).toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ status: 'decayed' })],
       ]),
     );
   });

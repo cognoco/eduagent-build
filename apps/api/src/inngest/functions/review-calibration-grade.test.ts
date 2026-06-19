@@ -1,5 +1,35 @@
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { handleReviewCalibrationGrade } from './review-calibration-grade';
+import { xpLedger } from '@eduagent/database';
+
+// Pattern A (jest.requireActual spread): only getStepDatabase is overridden —
+// it calls neon-serverless which needs a real DATABASE_URL, not exercisable in
+// Jest's Node env. The spread keeps every other helper export real, so no GC1
+// escape is needed.
+const mockGetStepDatabase = jest.fn();
+jest.mock('../helpers', () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
+});
+
+function createMockStepDb() {
+  const mock: Record<string, unknown> = {
+    update: jest.fn().mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation(() => {
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{ id: 'row-1' }]);
+          return p;
+        }),
+      }),
+    }),
+  };
+  return mock;
+}
 
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
@@ -172,5 +202,63 @@ describe('reviewCalibrationGrade', () => {
       sessionId: SESSION_ID,
     });
     expect(runCalls.map((c) => c.name)).not.toContain('grade-recall-quality');
+  });
+
+  // [WI-848] finalize-retention-update callback runs inline (not stubbed) so
+  // the real syncXpLedgerStatus call can be asserted via db.update.
+  it('[WI-848] syncs xp_ledger.status to decayed when calibration grade yields decay', async () => {
+    const db = createMockStepDb();
+    mockGetStepDatabase.mockReturnValue(db);
+
+    await executeHandlerWithResults(makeValidPayload(), {
+      'load-retention-card': makeFreshCard(),
+      'claim-cooldown-slot': [{ id: CARD_ID }],
+      'grade-recall-quality': 0, // quality 0 → processRecallResult yields xpChange:'decayed'
+      // finalize-retention-update: intentionally omitted so the callback runs inline
+      'stamp-mastery-on-verify': undefined,
+    });
+
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]: [unknown]) => table,
+    );
+    expect(updateTables).toContain(xpLedger);
+
+    const xpLedgerIdx = updateTables.indexOf(xpLedger);
+    const xpSetCalls = (db.update as jest.Mock).mock.results[xpLedgerIdx]!.value
+      .set.mock.calls;
+    expect(xpSetCalls).toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ status: 'decayed' })],
+      ]),
+    );
+  });
+
+  it('[WI-848] does NOT sync xp_ledger to decayed when calibration grade yields verified', async () => {
+    const db = createMockStepDb();
+    mockGetStepDatabase.mockReturnValue(db);
+
+    await executeHandlerWithResults(makeValidPayload(), {
+      'load-retention-card': makeFreshCard(),
+      'claim-cooldown-slot': [{ id: CARD_ID }],
+      'grade-recall-quality': 5, // quality 5 → processRecallResult yields xpChange:'verified'
+      // finalize-retention-update: intentionally omitted so the callback runs inline
+      'stamp-mastery-on-verify': undefined,
+    });
+
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]: [unknown]) => table,
+    );
+    // xpLedger must not be updated with 'decayed' on a pass
+    const xpLedgerIdx = updateTables.indexOf(xpLedger);
+    if (xpLedgerIdx !== -1) {
+      const xpSetCalls = (db.update as jest.Mock).mock.results[xpLedgerIdx]!
+        .value.set.mock.calls as Array<[Record<string, unknown>]>;
+      expect(xpSetCalls).not.toEqual(
+        expect.arrayContaining([
+          [expect.objectContaining({ status: 'decayed' })],
+        ]),
+      );
+    }
+    // If xpLedger is not in the update tables at all, that also satisfies the assertion.
   });
 });
