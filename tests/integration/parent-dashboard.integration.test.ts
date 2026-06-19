@@ -31,6 +31,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 
@@ -113,7 +114,7 @@ async function seedFamilyLink(
     .values({ parentProfileId, childProfileId })
     .onConflictDoNothing();
 
-  if (process.env.IDENTITY_V2_ENABLED === 'true') {
+  if (isIdentityV2Enabled()) {
     const parentMembership = await db.query.membership.findFirst({
       where: eq(membership.personId, parentProfileId),
       columns: { organizationId: true },
@@ -716,7 +717,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
-    if (process.env.IDENTITY_V2_ENABLED === 'true') {
+    if (isIdentityV2Enabled()) {
       const childMemberships = await db.query.membership.findMany({
         where: eq(membership.personId, childProfileId),
         columns: { organizationId: true },

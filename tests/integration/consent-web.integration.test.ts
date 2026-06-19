@@ -13,7 +13,11 @@ import {
   profiles,
 } from '@eduagent/database';
 
-import { buildIntegrationEnv, cleanupAccounts } from './helpers';
+import {
+  buildIntegrationEnv,
+  cleanupAccounts,
+  isIdentityV2Enabled,
+} from './helpers';
 import {
   createProfileViaRoute,
   getIntegrationDb,
@@ -27,10 +31,6 @@ const CONSENT_WEB_USER = {
   userId: 'integration-consent-web-user',
   email: 'integration-consent-web@integration.test',
 };
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 function postConfirm(body: Record<string, string>) {
   return app.request(

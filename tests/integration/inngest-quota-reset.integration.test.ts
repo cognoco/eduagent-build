@@ -17,7 +17,11 @@ import {
   subscriptions,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
 import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
@@ -28,10 +32,6 @@ const PLUS_USER_ID = 'integration-quota-reset-plus';
 const PLUS_EMAIL = 'integration-quota-reset-plus@integration.test';
 const FAMILY_USER_ID = 'integration-quota-reset-family';
 const FAMILY_EMAIL = 'integration-quota-reset-family@integration.test';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 async function seedAccount(clerkUserId: string, email: string) {
   const db = createIntegrationDb();

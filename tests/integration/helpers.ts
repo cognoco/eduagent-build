@@ -13,7 +13,7 @@ import {
   supportership,
 } from '@eduagent/database';
 
-function isIdentityV2Enabled(): boolean {
+export function isIdentityV2Enabled(): boolean {
   return process.env.IDENTITY_V2_ENABLED === 'true';
 }
 

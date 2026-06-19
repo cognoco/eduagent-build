@@ -33,11 +33,7 @@ import {
   buildAuthHeaders as buildSignedAuthHeaders,
   type TestJWTClaims,
 } from './test-keys';
-import { createIntegrationDb } from './helpers';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
+import { createIntegrationDb, isIdentityV2Enabled } from './helpers';
 
 const TEST_CONSENT_PURPOSE = 'platform_use';
 

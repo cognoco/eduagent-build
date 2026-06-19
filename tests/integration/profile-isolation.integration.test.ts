@@ -24,6 +24,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 
@@ -36,10 +37,6 @@ const PRIMARY_EMAIL = 'integration-profile-primary@integration.test';
 const SECONDARY_USER_ID = 'integration-profile-secondary';
 const SECONDARY_EMAIL = 'integration-profile-secondary@integration.test';
 const FABRICATED_PROFILE_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
 
 async function createProfile(input: {
   userId: string;
