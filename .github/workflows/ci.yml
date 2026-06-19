@@ -332,26 +332,20 @@ jobs:
   # the identity-v2 HTTP-route surface — which buildIntegrationEnv() never
   # sets — its first flag-on committed-migration coverage.
   #
-  # LANDS NON-BLOCKING (continue-on-error: true). Expected to surface reds
-  # while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. Reds here
-  # are diagnostic signal, not CI failures for unrelated PRs.
+  # BLOCKING as of WI-817 (continue-on-error removed below). D1-D4 (WI-790/791/
+  # 792/793) and :709/FG1 defects are green, and the lane is deterministically
+  # green via `jest --forceExit` — the prior reds were a "Jest did not exit"
+  # open-handles teardown (0 test failures), not test reds.
   #
-  # HOW TO FLIP THIS TO REQUIRED (WI-586/WP-FLAG close gate):
-  #   Mirrors the i18n-ratchet pattern used for "pnpm audit (High+, advisory)"
-  #   and "sync-skills orphan check (advisory)" — both land continue-on-error
-  #   and are flipped to required by removing that flag once the blocking reds
-  #   are resolved.
-  #
-  #   Step 1 — Confirm D1-D4/FG1/:709 are all green on this job (watch the
-  #             "Flag-ON integration" check in the PR checks list — it reports
-  #             separately from `main` because it's a separate job).
-  #   Step 2 — Remove `continue-on-error: true` from this job.
-  #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)" to the branch
-  #             protection required-status-checks list in GitHub Settings →
-  #             Branches → main → Edit → "Require status checks to pass" →
-  #             search for the job name and add it.
-  #   Step 4 — This job then becomes the WI-586/WP-FLAG close gate: WI-586
-  #             cannot close until this check is green and required.
+  # MAKE-REQUIRED PROCEDURE (mirrors the i18n-ratchet "advisory → required" flip):
+  #   Step 1 — Confirm defects green on this job. DONE (WI-817 diagnosis).
+  #   Step 2 — Remove `continue-on-error: true` from this job. DONE (WI-817).
+  #   Step 3 — [OPERATOR, remaining] Add "Flag-ON integration (IDENTITY_V2_ENABLED)"
+  #             to the branch-protection required-status-checks list in GitHub
+  #             Settings → Branches → main → Edit → "Require status checks to
+  #             pass" → search for the job name (it reports separately from
+  #             `main` because it's a separate job) and add it.
+  #   Step 4 — This job then becomes the WP-FLAG close gate.
   #
   # The job name intentionally ends with a parenthetical so it is distinct
   # from the `main` job in the required-check picker.
@@ -359,10 +353,14 @@ jobs:
   integration-flag-on:
     name: Flag-ON integration (IDENTITY_V2_ENABLED)
     runs-on: ubuntu-latest
-    # NON-BLOCKING: allowed-red while D1-D4/FG1/:709 defect WIs exist.
-    # Remove this line (and add to branch-protection required checks) once
-    # those WIs are green — see HOW TO FLIP above.
-    continue-on-error: true
+    # BLOCKING as of WI-817 — the defect WIs are green and the lane is
+    # deterministically green via `jest --forceExit` (the prior reds were a
+    # "Jest did not exit" open-handles teardown, not test failures). The
+    # remaining make-required step is operator-only: add the
+    # "Flag-ON integration (IDENTITY_V2_ENABLED)" check to branch protection.
+    # WATCH (WI-789 / repoint-journaling): this lane runs the PRE-repoint
+    # committed-migration schema; when the repoint migrations later journal,
+    # they MUST keep this now-required lane green (repoint-sensitive tests).
     services:
       postgres:
         image: pgvector/pgvector:pg16
