@@ -82,7 +82,7 @@ const FULL_SCREEN_ROUTES = new Set([
 // belt-and-braces fix is an explicit `<Tabs.Screen href={null}>` entry per
 // non-tab route below; this is the same pattern Expo Router docs recommend
 // for hidden routes.
-const HIDDEN_TAB_ROUTES = [
+export const HIDDEN_TAB_ROUTES = [
   'account',
   'dashboard',
   'subscription',

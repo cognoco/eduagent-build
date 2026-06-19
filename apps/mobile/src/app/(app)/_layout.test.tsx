@@ -186,6 +186,7 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
+const { HIDDEN_TAB_ROUTES } = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
@@ -1419,6 +1420,44 @@ describe('computeVisibleTabs', () => {
     const tabs = computeVisibleTabs('learner', true);
     expect(tabs).toEqual(new Set(['home', 'library', 'progress']));
     expect(tabs.has('more')).toBe(false);
+  });
+});
+
+// [QA-07 / WI-860] Tab-bar leak regression (Bug 763). Dynamic / nested-layout
+// routes (shelf/[subjectId], subject/[subjectId], pick-book/[subjectId],
+// child/[profileId], etc.) are auto-discovered by Expo Router on web and can
+// surface in the tab bar / debug-link list as /shelf/undefined,
+// /subject/undefined, etc. The belt-and-braces guard is an explicit
+// `<Tabs.Screen name={route} options={{ href: null }} />` per non-tab route,
+// driven by the HIDDEN_TAB_ROUTES list. This asserts the load-bearing dynamic
+// routes from Bug 763 are members of that list so they cannot leak.
+describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
+  it('hides every dynamic / non-tab route that Bug 763 surfaced into the tab bar', () => {
+    const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
+    for (const route of [
+      'shelf',
+      'subject',
+      'subject-hub',
+      'pick-book',
+      'child',
+      'session',
+      'quiz',
+      'homework',
+      'dictation',
+      'practice',
+      'vocabulary',
+      'topic',
+      'my-notes',
+    ]) {
+      expect(hidden.has(route)).toBe(true);
+    }
+  });
+
+  it('does not list any of the five real tab routes as hidden', () => {
+    const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
+    for (const tab of ['home', 'own-learning', 'library', 'progress', 'more']) {
+      expect(hidden.has(tab)).toBe(false);
+    }
   });
 });
 

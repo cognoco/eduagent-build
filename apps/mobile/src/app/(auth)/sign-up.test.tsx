@@ -529,4 +529,170 @@ describe('SignUpScreen', () => {
     // silently hangs (button disables, no verification UI, no error).
     expect(screen.getByTestId('clerk-captcha')).toBeTruthy();
   });
+
+  // ---------------------------------------------------------------------------
+  // [AUTH-03] Email-verification phase: resend, change email, back to sign in,
+  // and setActive-failure retry (verification + OAuth contexts) that preserves
+  // the created sessionId. Closure proof for WI-870 — deterministic jest
+  // coverage of the branches the browser sweep could not reach without a real
+  // mailbox/OAuth provider.
+  // ---------------------------------------------------------------------------
+
+  // Drives the screen from the email/password form into the pending-verification
+  // phase so the verify/resend/back controls are mounted.
+  async function reachVerificationPhase() {
+    mockCreate.mockResolvedValue(undefined);
+    mockPrepareVerification.mockResolvedValue(undefined);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('sign-up-code');
+    });
+  }
+
+  it('[AUTH-03] resends the verification code via prepareEmailAddressVerification', async () => {
+    await reachVerificationPhase();
+
+    // The create-phase prepare call already fired once; clear so we assert the
+    // resend specifically re-issues a fresh email_code prepare.
+    mockPrepareVerification.mockClear();
+    mockPrepareVerification.mockResolvedValue(undefined);
+
+    fireEvent.press(screen.getByTestId('sign-up-resend-code'));
+
+    await waitFor(() => {
+      expect(mockPrepareVerification).toHaveBeenCalledWith({
+        strategy: 'email_code',
+      });
+    });
+  });
+
+  it('[AUTH-03] "Use a different email" returns to the form and clears the code', async () => {
+    await reachVerificationPhase();
+
+    fireEvent.changeText(screen.getByTestId('sign-up-code'), '123456');
+    fireEvent.press(screen.getByTestId('sign-up-back-from-verify'));
+
+    // Back on the email/password form; verification controls are gone.
+    await waitFor(() => {
+      screen.getByTestId('sign-up-button');
+    });
+    expect(screen.queryByTestId('sign-up-code')).toBeNull();
+    expect(screen.queryByTestId('sign-up-verify-button')).toBeNull();
+
+    // The email field is editable again and retains the typed address so the
+    // user can correct it rather than re-typing from scratch.
+    expect(screen.getByTestId('sign-up-email').props.value).toBe(
+      'new@example.com',
+    );
+  });
+
+  it('[AUTH-03] "Back to sign in" from the verify phase replaces to /(auth)/sign-in', async () => {
+    await reachVerificationPhase();
+
+    fireEvent.press(screen.getByTestId('verify-back-to-sign-in'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+  });
+
+  it('[AUTH-03] verification setActive-failure shows retry; retry re-calls setActive with the SAME sessionId', async () => {
+    mockCreate.mockResolvedValue(undefined);
+    mockPrepareVerification.mockResolvedValue(undefined);
+    mockAttemptVerification.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_verify_retry_77',
+    });
+    // First setActive throws (transient), second succeeds.
+    mockSetActive
+      .mockRejectedValueOnce(new Error('transient activation failure'))
+      .mockResolvedValueOnce(undefined);
+
+    render(<SignUpScreen />);
+
+    fireEvent.changeText(
+      screen.getByTestId('sign-up-email'),
+      'new@example.com',
+    );
+    fireEvent.changeText(screen.getByTestId('sign-up-password'), 'secure123');
+    fireEvent.press(screen.getByTestId('sign-up-button'));
+
+    await waitFor(() => screen.getByTestId('sign-up-code'));
+
+    fireEvent.changeText(screen.getByTestId('sign-up-code'), '123456');
+    fireEvent.press(screen.getByTestId('sign-up-verify-button'));
+
+    // setActive threw → activation-failure UI surfaces with a retry control.
+    await waitFor(() => screen.getByTestId('sign-up-retry-activation'));
+    screen.getByText('Could not activate your session. Please try again.');
+
+    // Retry must re-attempt setActive with the preserved sessionId, not null.
+    fireEvent.press(screen.getByTestId('sign-up-retry-activation'));
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledTimes(2);
+      expect(mockSetActive).toHaveBeenNthCalledWith(2, {
+        session: 'sess_verify_retry_77',
+      });
+    });
+  });
+
+  it('[AUTH-03/AUTH-08] OAuth setActive-failure shows retry; retry re-calls setActive with the SAME sessionId', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: 'sess_oauth_re_42',
+    });
+    mockSetActive
+      .mockRejectedValueOnce(new Error('oauth activation failure'))
+      .mockResolvedValueOnce(undefined);
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    // setActive threw on the OAuth path → oauth-context retry UI appears.
+    await waitFor(() => screen.getByTestId('sign-up-oauth-retry'));
+    screen.getByTestId('sign-up-oauth-clear');
+
+    fireEvent.press(screen.getByTestId('sign-up-oauth-retry'));
+
+    await waitFor(() => {
+      expect(mockSetActive).toHaveBeenCalledTimes(2);
+      expect(mockSetActive).toHaveBeenNthCalledWith(2, {
+        session: 'sess_oauth_re_42',
+      });
+    });
+  });
+
+  it('[AUTH-03/AUTH-08] OAuth "Try another method" clears the activation-failure UI', async () => {
+    Object.defineProperty(Platform, 'OS', {
+      value: 'android',
+      configurable: true,
+      writable: true,
+    });
+    mockStartSSOFlow.mockResolvedValue({ createdSessionId: 'sess_oauth_clr' });
+    mockSetActive.mockRejectedValueOnce(new Error('oauth activation failure'));
+
+    render(<SignUpScreen />);
+
+    fireEvent.press(screen.getByTestId('sign-up-google-sso'));
+
+    await waitFor(() => screen.getByTestId('sign-up-oauth-clear'));
+
+    fireEvent.press(screen.getByTestId('sign-up-oauth-clear'));
+
+    expect(screen.queryByTestId('sign-up-oauth-retry')).toBeNull();
+    expect(screen.queryByTestId('sign-up-oauth-clear')).toBeNull();
+  });
 });

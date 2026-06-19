@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-81e5-91bf-d2624d12aeb4",
+  "id": "WI-870",
+  "name": "[AUTH-03/05/06/08/09] Add deterministic auth-provider handoff coverage",
+  "description": "Primary auth recovery/provider handoff rows only passed through partial Chrome/source coverage; deterministic coverage is needed for verification, reset, OAuth, and SSO completion branches.",
+  "acceptanceCriteria": "Add deterministic coverage for AUTH-03, AUTH-05, AUTH-06, AUTH-08, and AUTH-09 without requiring a real mailbox or external OAuth provider. Cover email verification verify/resend/change/back and setActive retry preservation; password reset entry plus reset-complete recovery; additional verification/security challenge fallback where possible through Clerk test stubs or source-level harness; OAuth sign-in/up account-linking success/failure/cancel; SSO callback completion, fallback, and cancel/deep-link return. Update the flow plan rows with the exact evidence and either promote to Pass or document any remaining truly external boundary as Blocked. Do not weaken real Clerk/provider integration behavior.",
+  "riskImpact": "P1 primary-auth coverage gap: sign-up verification, password recovery, OAuth, and SSO callback handoffs are key entry/recovery flows, but live mailbox/provider completion was not exercised in the browser sweep. A regression here can block account access or onboarding without a stable local proof.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

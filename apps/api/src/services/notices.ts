@@ -109,6 +109,10 @@ export async function markPendingNoticeSeen(
   ownerProfileId: string,
   noticeId: string,
 ): Promise<boolean> {
+  // Idempotent: no isNull(seenAt) filter so retries succeed even after the
+  // server committed the UPDATE but the response was lost. IDOR protection is
+  // preserved by the ownerProfileId match — wrong profile still returns 0.
+  // Matches the idempotent shape of nudges.markNudgeRead.
   const rows = await db
     .update(pendingNotices)
     .set({ seenAt: new Date() })
@@ -116,7 +120,6 @@ export async function markPendingNoticeSeen(
       and(
         eq(pendingNotices.id, noticeId),
         eq(pendingNotices.ownerProfileId, ownerProfileId),
-        isNull(pendingNotices.seenAt),
       ),
     )
     .returning({ id: pendingNotices.id });

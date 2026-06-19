@@ -397,7 +397,12 @@
       "weeklyEmailDigestTitle": "Wöchentliche Fortschritts-E-Mail",
       "monthlyEmailDigestTitle": "Monatliche Fortschritts-E-Mail",
       "emailDigestDescription": "Wird an die E-Mail-Adresse deines Kontos gesendet.",
-      "updateErrorTitle": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden"
+      "updateErrorTitle": "Benachrichtigungseinstellungen konnten nicht aktualisiert werden",
+      "pushMissingPermission": "Benachrichtigungen von deinem Gerät zulassen.",
+      "pushMissingServer": "Push-Benachrichtigungen hier aktivieren.",
+      "pushMissingToken": "Dieses Gerät für Push-Benachrichtigungen registrieren.",
+      "openSettingsTitle": "Einstellungen öffnen",
+      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -3266,6 +3271,12 @@
       "crossContextPromptMessage": "Du bist in einer Sitzung. Beende sie zuerst oder öffne das Update und verlasse den aktuellen Vorgang.",
       "stayHere": "Hier bleiben",
       "openUpdate": "Update öffnen"
+    },
+    "guardianPrimer": {
+      "title": "Auf dem Laufenden bleiben?",
+      "message": "Wir können dich benachrichtigen, wenn ein Kind deine Aufmerksamkeit braucht. Du kannst das jederzeit in den Einstellungen ändern.",
+      "allow": "Zulassen",
+      "notNow": "Nicht jetzt"
     }
   },
   "myNotes": {
