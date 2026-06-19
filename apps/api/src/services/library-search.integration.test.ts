@@ -97,6 +97,41 @@ describeIfDb('searchLibrary (integration)', () => {
       .where(like(accounts.clerkUserId, `clerk_libsearch_${RUN_ID}%`));
   });
 
+  describe('ILIKE pattern escaping (BUG-857)', () => {
+    it('treats % in the query as a literal character, not a wildcard', async () => {
+      const { profileId } = await seedProfile();
+      // Seed two subjects: one with a literal "%" and one without
+      await db
+        .insert(subjects)
+        .values({ profileId, name: '50% discount offer' });
+      await db
+        .insert(subjects)
+        .values({ profileId, name: 'unrelated biology notes' });
+
+      const result = await searchLibrary(db, profileId, '50%');
+
+      // Only the subject containing the literal "50%" should match
+      expect(result.subjects).toHaveLength(1);
+      expect(result.subjects[0]!.name).toBe('50% discount offer');
+    });
+
+    it('treats _ in the query as a literal character, not a single-char wildcard', async () => {
+      const { profileId } = await seedProfile();
+      // Seed a subject that would match "foo_bar" as a wildcard (fooXbar)
+      // but should NOT match when _ is treated as a literal
+      await db.insert(subjects).values({ profileId, name: 'fooXbar topic' });
+      await db
+        .insert(subjects)
+        .values({ profileId, name: 'foo_bar literal topic' });
+
+      const result = await searchLibrary(db, profileId, 'foo_bar');
+
+      // Only the subject with a literal underscore should match
+      expect(result.subjects).toHaveLength(1);
+      expect(result.subjects[0]!.name).toBe('foo_bar literal topic');
+    });
+  });
+
   describe('notes', () => {
     it('returns sessionId on matched note rows', async () => {
       const { profileId } = await seedProfile();

@@ -1,4 +1,4 @@
-import { eq, and, ilike, asc, desc, inArray, isNull, or } from 'drizzle-orm';
+import { eq, and, sql, asc, desc, inArray, isNull, or } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -48,7 +48,10 @@ export async function searchLibrary(
       .select({ id: subjects.id, name: subjects.name })
       .from(subjects)
       .where(
-        and(eq(subjects.profileId, profileId), ilike(subjects.name, pattern)),
+        and(
+          eq(subjects.profileId, profileId),
+          sql`${subjects.name} ILIKE ${pattern} ESCAPE '\\'`,
+        ),
       )
       .orderBy(asc(subjects.name), asc(subjects.id))
       .limit(20),
@@ -65,7 +68,7 @@ export async function searchLibrary(
       .where(
         and(
           eq(subjects.profileId, profileId),
-          ilike(curriculumBooks.title, pattern),
+          sql`${curriculumBooks.title} ILIKE ${pattern} ESCAPE '\\'`,
         ),
       )
       .orderBy(
@@ -93,7 +96,7 @@ export async function searchLibrary(
       .where(
         and(
           eq(subjects.profileId, profileId),
-          ilike(curriculumTopics.title, pattern),
+          sql`${curriculumTopics.title} ILIKE ${pattern} ESCAPE '\\'`,
         ),
       )
       .orderBy(
@@ -126,7 +129,7 @@ export async function searchLibrary(
         and(
           eq(topicNotes.profileId, profileId),
           eq(subjects.profileId, profileId),
-          ilike(topicNotes.content, pattern),
+          sql`${topicNotes.content} ILIKE ${pattern} ESCAPE '\\'`,
         ),
       )
       .orderBy(asc(subjects.name), asc(topicNotes.id))
@@ -174,12 +177,12 @@ export async function searchLibrary(
             'auto_closed',
           ]),
           or(
-            ilike(sessionSummaries.content, pattern),
-            ilike(sessionSummaries.narrative, pattern),
-            ilike(sessionSummaries.learnerRecap, pattern),
-            ilike(sessionSummaries.aiFeedback, pattern),
-            ilike(sessionSummaries.highlight, pattern),
-            ilike(sessionSummaries.closingLine, pattern),
+            sql`${sessionSummaries.content} ILIKE ${pattern} ESCAPE '\\'`,
+            sql`${sessionSummaries.narrative} ILIKE ${pattern} ESCAPE '\\'`,
+            sql`${sessionSummaries.learnerRecap} ILIKE ${pattern} ESCAPE '\\'`,
+            sql`${sessionSummaries.aiFeedback} ILIKE ${pattern} ESCAPE '\\'`,
+            sql`${sessionSummaries.highlight} ILIKE ${pattern} ESCAPE '\\'`,
+            sql`${sessionSummaries.closingLine} ILIKE ${pattern} ESCAPE '\\'`,
           ),
         ),
       )
