@@ -87,7 +87,12 @@ else
   git fetch origin main --quiet
 
   echo "Creating worktree at $WORKTREE_REL on new branch $BRANCH from origin/main..."
-  git worktree add "$WORKTREE_REL" -b "$BRANCH" origin/main
+  # --no-track --no-guess-remote: the new branch must NOT track origin/main or
+  # any other remote branch. A bare `git push` from the worktree must fail with
+  # "no upstream configured" so executors cannot accidentally fast-forward a
+  # shared integration branch. Pushes must always supply an explicit refspec
+  # (git push origin HEAD:<branch>). See commit skill §Worktree push rule.
+  git worktree add --no-track --no-guess-remote "$WORKTREE_REL" -b "$BRANCH" origin/main
 fi
 
 # ── Setup: pnpm install + env:sync ──────────────────────────────────────

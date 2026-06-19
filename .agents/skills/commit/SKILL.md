@@ -70,6 +70,27 @@ enforces, so the type set can never drift out of sync with the linter.
    `pnpm eval:llm` and re-stage before committing. Bypass only for pure
    rename / comment / type-only refactors that cannot change generation output.
 
+## Worktree push rule
+
+When the current workspace is a linked worktree (detected by `GIT_DIR ≠ GIT_COMMON_DIR`),
+**always push with an explicit refspec** — never a bare `git push`:
+
+```bash
+git push origin HEAD:<local-branch-name>
+```
+
+This pushes to `origin/<local-branch-name>` (e.g. `origin/WI-78`), not to whatever
+the worktree's upstream may track. An orchestrator or operator then merges that
+branch into the shared integration branch via PR — the executor never lands directly.
+
+Rationale: worktrees created by `scripts/setup-worktree.sh` are intentionally
+`--no-track`, so a bare `git push` will error. If a worktree was created by other
+means and has tracking set, a bare push can accidentally fast-forward a protected
+branch. The explicit refspec is safe in both cases.
+
+**Never override this with `--set-upstream` or `git branch --set-upstream-to`**
+to "fix" the missing upstream — the missing upstream is the guard.
+
 ## EduAgent staging note
 
 Don't commit half a feature: if a staged file references code that is modified
