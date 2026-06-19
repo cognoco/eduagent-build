@@ -16,19 +16,20 @@
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  accounts,
-  consentStates,
-  familyLinks,
-  profiles,
-} from '@eduagent/database';
+import { profiles } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
+import {
+  buildAuthHeaders,
+  createProfileViaRoute,
+  seedDirectChildProfileForTest,
+  seedFamilyLinkForTest,
+  setProfileConsentStatusForTest,
+} from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
 
@@ -52,16 +53,12 @@ async function createChildProfileDirect(
     .where(eq(profiles.id, parentProfileId));
   if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
 
-  const [child] = await db
-    .insert(profiles)
-    .values({
-      accountId: parent.accountId,
-      displayName,
-      birthYear,
-      isOwner: false,
-    })
-    .returning({ id: profiles.id });
-  if (!child) throw new Error('Child profile insert returned no row');
+  const child = await seedDirectChildProfileForTest({
+    parentProfileId,
+    accountId: parent.accountId,
+    displayName,
+    birthYear,
+  });
   return child.id;
 }
 
@@ -69,11 +66,7 @@ async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
-  const db = createIntegrationDb();
-  await db
-    .insert(familyLinks)
-    .values({ parentProfileId, childProfileId })
-    .onConflictDoNothing();
+  await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 }
 
 async function setChildConsentStatus(
@@ -81,18 +74,17 @@ async function setChildConsentStatus(
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN',
 ): Promise<void> {
   const db = createIntegrationDb();
-  await db
-    .delete(consentStates)
-    .where(eq(consentStates.profileId, childProfileId));
-  await db.insert(consentStates).values({
+  const [child] = await db
+    .select({ accountId: profiles.accountId })
+    .from(profiles)
+    .where(eq(profiles.id, childProfileId));
+  if (!child) throw new Error(`Child profile ${childProfileId} not found`);
+
+  await setProfileConsentStatusForTest({
     profileId: childProfileId,
-    consentType: 'GDPR',
+    accountId: child.accountId,
     status,
     parentEmail: PARENT_USER.email,
-    consentToken: `wi156-token-${childProfileId}-${status}`,
-    respondedAt:
-      status === 'CONSENTED' || status === 'WITHDRAWN' ? new Date() : null,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 }
 

@@ -78,6 +78,8 @@ function makeSuggestion(
  */
 function makeTx(opts: {
   lockGot?: boolean;
+  freshSubjectFound?: boolean;
+  freshSubjectLastAttemptedAt?: Date | null;
   unpicked?: Array<{ id: string }>;
   existingBookTitles?: string[];
   existingSuggestionTitles?: string[];
@@ -88,6 +90,8 @@ function makeTx(opts: {
 }) {
   const {
     lockGot = true,
+    freshSubjectFound = true,
+    freshSubjectLastAttemptedAt = null,
     unpicked = [],
     existingBookTitles = [],
     existingSuggestionTitles = [],
@@ -97,15 +101,17 @@ function makeTx(opts: {
 
   // [WI-194] The service now invokes db.transaction() twice — once before
   // the LLM call (Phase 1: lock + reserve + read prompt inputs) and once
-  // after (Phase 3: re-lock + re-check + insert). Phase 1 makes 4 select
+  // after (Phase 3: re-lock + re-check + insert). Phase 1 makes 5 select
   // calls; Phase 3 makes 1 select call (the unpicked re-check). All select
   // calls go through this single tx mock so we feed the script in order.
-  //   1. Phase 1: unpicked bookSuggestions check
-  //   2. Phase 1: existingBookTitles (curriculumBooks)
-  //   3. Phase 1: existingSuggestionTitles (bookSuggestions)
-  //   4. Phase 1: studiedTopics (learningSessions join chain)
-  //   5. Phase 3: unpicked re-check
+  //   1. Phase 1: fresh subject cooldown re-read
+  //   2. Phase 1: unpicked bookSuggestions check
+  //   3. Phase 1: existingBookTitles (curriculumBooks)
+  //   4. Phase 1: existingSuggestionTitles (bookSuggestions)
+  //   5. Phase 1: studiedTopics (learningSessions join chain)
+  //   6. Phase 3: unpicked re-check
   const selectResults = [
+    freshSubjectFound ? [{ lastAttemptedAt: freshSubjectLastAttemptedAt }] : [],
     unpicked,
     existingBookTitles.map((title) => ({ title })),
     existingSuggestionTitles.map((title) => ({ title })),
@@ -268,6 +274,33 @@ describe('generateCategorizedBookSuggestions', () => {
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        'book_suggestion_generation_failed',
+        expect.objectContaining({ reason: 'cooldown' }),
+      );
+    });
+
+    it('re-checks cooldown after acquiring the lock before calling the LLM', async () => {
+      const staleInitialRead = new Date(Date.now() - COOLDOWN_MS - 1_000);
+      const freshLockedRead = new Date(Date.now() - COOLDOWN_MS + 10_000);
+      const subject = makeSubject({
+        bookSuggestionsLastGenerationAttemptedAt: staleInitialRead,
+      });
+      const { tx, mocks } = makeTx({
+        freshSubjectLastAttemptedAt: freshLockedRead,
+      });
+      const { db } = makeDb(subject, async (cb) => cb(tx));
+
+      const outcome = await generateCategorizedBookSuggestions(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+      );
+
+      expect(outcome).toBe('cooldown');
+      expect(routeAndCallMock).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.insert).not.toHaveBeenCalled();
       expect(loggerWarnMock).toHaveBeenCalledWith(
         'book_suggestion_generation_failed',
         expect.objectContaining({ reason: 'cooldown' }),

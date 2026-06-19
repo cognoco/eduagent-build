@@ -1,16 +1,22 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   assessments,
+  consentGrant,
+  consentRequest,
   consentStates,
   curricula,
   curriculumBooks,
   curriculumTopics,
+  familyLinks,
+  generateUUIDv7,
+  guardianship,
   learningSessions,
   learningModes,
   membership,
   needsDeepeningTopics,
   notificationPreferences,
   parkingLotItems,
+  person,
   profiles,
   retentionCards,
   sessionSummaries,
@@ -27,10 +33,14 @@ import {
   buildAuthHeaders as buildSignedAuthHeaders,
   type TestJWTClaims,
 } from './test-keys';
-import { createIntegrationDb } from './helpers';
+import { createIntegrationDb, isIdentityV2Enabled } from './helpers';
 
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
+const TEST_CONSENT_PURPOSE = 'platform_use';
+
+function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
+  return consentType === 'COPPA'
+    ? 'coppa_parental_consent'
+    : 'gdpr_parental_consent';
 }
 
 type AppLike = {
@@ -158,6 +168,171 @@ export async function createProfileViaRoute(input: {
     );
   }
   return { ...apiProfile, accountId: row.accountId };
+}
+
+export async function seedDirectChildProfileForTest(input: {
+  parentProfileId: string;
+  accountId: string;
+  displayName: string;
+  birthYear: number;
+  location?: 'EU' | 'US' | 'OTHER' | null;
+  profileId?: string;
+}): Promise<{ id: string; accountId: string; isOwner: false }> {
+  const db = createIntegrationDb();
+  const childId = input.profileId ?? generateUUIDv7();
+  const location = input.location ?? 'EU';
+
+  await db
+    .insert(profiles)
+    .values({
+      id: childId,
+      accountId: input.accountId,
+      displayName: input.displayName,
+      birthYear: input.birthYear,
+      location,
+      isOwner: false,
+    })
+    .onConflictDoNothing();
+
+  if (isIdentityV2Enabled()) {
+    await db
+      .insert(person)
+      .values({
+        id: childId,
+        displayName: input.displayName,
+        birthDate: `${input.birthYear}-01-01`,
+        residenceJurisdiction: location,
+      })
+      .onConflictDoNothing();
+
+    await db
+      .insert(membership)
+      .values({
+        personId: childId,
+        organizationId: input.accountId,
+        roles: ['learner'],
+      })
+      .onConflictDoNothing();
+  }
+
+  return { id: childId, accountId: input.accountId, isOwner: false };
+}
+
+export async function seedFamilyLinkForTest(input: {
+  parentProfileId: string;
+  childProfileId: string;
+}): Promise<void> {
+  const db = createIntegrationDb();
+  await db
+    .insert(familyLinks)
+    .values({
+      parentProfileId: input.parentProfileId,
+      childProfileId: input.childProfileId,
+    })
+    .onConflictDoNothing();
+
+  if (isIdentityV2Enabled()) {
+    await db
+      .insert(guardianship)
+      .values({
+        guardianPersonId: input.parentProfileId,
+        chargePersonId: input.childProfileId,
+      })
+      .onConflictDoNothing();
+  }
+}
+
+export async function setProfileConsentStatusForTest(input: {
+  profileId: string;
+  accountId: string;
+  status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
+  consentType?: 'GDPR' | 'COPPA';
+  parentEmail?: string;
+  guardianPersonId?: string;
+}): Promise<void> {
+  const db = createIntegrationDb();
+  const consentType = input.consentType ?? 'GDPR';
+  const respondedAt =
+    input.status === 'CONSENTED' || input.status === 'WITHDRAWN'
+      ? new Date()
+      : null;
+
+  await db
+    .delete(consentStates)
+    .where(eq(consentStates.profileId, input.profileId));
+  await db.insert(consentStates).values({
+    profileId: input.profileId,
+    consentType,
+    status: input.status,
+    parentEmail: input.parentEmail ?? null,
+    consentToken: `integration-consent-${input.profileId}-${input.status}`,
+    respondedAt,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  if (!isIdentityV2Enabled()) return;
+
+  const basis = consentTypeToBasis(consentType);
+  await db
+    .delete(consentRequest)
+    .where(
+      and(
+        eq(consentRequest.chargePersonId, input.profileId),
+        eq(consentRequest.organizationId, input.accountId),
+        eq(consentRequest.purpose, TEST_CONSENT_PURPOSE),
+        eq(consentRequest.requestedBasis, basis),
+      ),
+    );
+  await db
+    .delete(consentGrant)
+    .where(
+      and(
+        eq(consentGrant.chargePersonId, input.profileId),
+        eq(consentGrant.organizationId, input.accountId),
+        eq(consentGrant.purpose, TEST_CONSENT_PURPOSE),
+        eq(consentGrant.lawfulBasis, basis),
+      ),
+    );
+
+  if (
+    input.status === 'PENDING' ||
+    input.status === 'PARENTAL_CONSENT_REQUESTED'
+  ) {
+    await db.insert(consentRequest).values({
+      chargePersonId: input.profileId,
+      organizationId: input.accountId,
+      purpose: TEST_CONSENT_PURPOSE,
+      requestedBasis: basis,
+      guardianPersonId: input.guardianPersonId ?? null,
+      guardianEmail: input.parentEmail ?? null,
+      status:
+        input.status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
+      token:
+        input.status === 'PARENTAL_CONSENT_REQUESTED'
+          ? `integration-v2-consent-${input.profileId}`
+          : null,
+      tokenExpiresAt:
+        input.status === 'PARENTAL_CONSENT_REQUESTED'
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          : null,
+      requestedAt: new Date(),
+    });
+    return;
+  }
+
+  await db.insert(consentGrant).values({
+    chargePersonId: input.profileId,
+    organizationId: input.accountId,
+    purpose: TEST_CONSENT_PURPOSE,
+    lawfulBasis: basis,
+    granted: true,
+    withdrawnAt: input.status === 'WITHDRAWN' ? new Date() : null,
+    priorValue: input.status === 'WITHDRAWN' ? true : null,
+    auditFact: {
+      source: 'integration_test',
+      guardianPersonId: input.guardianPersonId ?? null,
+    },
+  });
 }
 
 export async function setSubscriptionTierForProfile(
@@ -386,15 +561,54 @@ export async function seedConsentRequest(input: {
   expiresAt?: Date | null;
 }): Promise<void> {
   const db = createIntegrationDb();
+  const status = input.status ?? 'PARENTAL_CONSENT_REQUESTED';
+  const consentType = input.consentType ?? 'GDPR';
+  const parentEmail = input.parentEmail ?? 'parent.integration@test.invalid';
+  const expiresAt =
+    input.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
   await db.insert(consentStates).values({
     profileId: input.profileId,
-    consentType: input.consentType ?? 'GDPR',
-    status: input.status ?? 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: input.parentEmail ?? 'parent.integration@test.invalid',
+    consentType,
+    status,
+    parentEmail,
     consentToken: input.token,
     respondedAt: input.respondedAt ?? null,
-    expiresAt:
-      input.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    expiresAt,
+  });
+
+  if (!isIdentityV2Enabled()) return;
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, input.profileId),
+    columns: { accountId: true },
+  });
+  if (!profile) {
+    throw new Error(`Profile ${input.profileId} not found for consent seed`);
+  }
+
+  if (status === 'PENDING' || status === 'PARENTAL_CONSENT_REQUESTED') {
+    await db.insert(consentRequest).values({
+      chargePersonId: input.profileId,
+      organizationId: profile.accountId,
+      purpose: TEST_CONSENT_PURPOSE,
+      requestedBasis: consentTypeToBasis(consentType),
+      guardianEmail: parentEmail,
+      status: status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
+      token: status === 'PARENTAL_CONSENT_REQUESTED' ? input.token : null,
+      tokenExpiresAt:
+        status === 'PARENTAL_CONSENT_REQUESTED' ? expiresAt : null,
+      requestedAt: new Date(),
+    });
+    return;
+  }
+
+  await setProfileConsentStatusForTest({
+    profileId: input.profileId,
+    accountId: profile.accountId,
+    status,
+    consentType,
+    parentEmail,
   });
 }
 

@@ -17,14 +17,18 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { consentStates } from '@eduagent/database';
+import { profiles } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
-import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
+import {
+  buildAuthHeaders,
+  createProfileViaRoute,
+  setProfileConsentStatusForTest,
+} from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
 
@@ -43,17 +47,17 @@ async function setConsentStatus(
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN',
 ): Promise<void> {
   const db = createIntegrationDb();
-  // Delete any existing row first (profile creation may auto-insert PENDING).
-  await db.delete(consentStates).where(eq(consentStates.profileId, profileId));
-  await db.insert(consentStates).values({
+  const [profile] = await db
+    .select({ accountId: profiles.accountId })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
+  if (!profile) throw new Error(`Profile ${profileId} not found`);
+
+  await setProfileConsentStatusForTest({
     profileId,
-    consentType: 'GDPR',
+    accountId: profile.accountId,
     status,
     parentEmail: 'parent@wi130.test.invalid',
-    consentToken: `wi130-token-${profileId}-${status}`,
-    respondedAt:
-      status === 'CONSENTED' || status === 'WITHDRAWN' ? new Date() : null,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 }
 

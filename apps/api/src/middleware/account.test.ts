@@ -3,6 +3,44 @@ import { accountMiddleware, requireAccountMiddleware } from './account';
 import { clearVerifiedClerkEmailCacheForTest } from '../services/clerk-user';
 import type { AppVariables } from '../types/hono';
 
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return { ...actual, captureException: jest.fn() };
+});
+
+const mockResolveIdentityV2 = jest.fn();
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/identity-v2/identity-resolve',
+    ) as typeof import('../services/identity-v2/identity-resolve');
+    return {
+      ...actual,
+      resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
+    };
+  },
+);
+
+const mockEnsureInitialTrialSubscriptionV2 = jest.fn();
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      ensureInitialTrialSubscriptionV2: (...args: unknown[]) =>
+        mockEnsureInitialTrialSubscriptionV2(...args),
+    };
+  },
+);
+
+import { captureException } from '../services/sentry';
+
 // Mock the account service
 jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -240,6 +278,59 @@ describe('accountMiddleware', () => {
       {},
       'clerk_verified',
       'user@example.com',
+    );
+  });
+
+  // [WI-820 MUST-FIX] Silent recovery without escalation is banned in
+  // billing/auth/webhook code. When ensureInitialTrialSubscriptionV2 fails
+  // the catch block must call captureException (not just logger.error) so the
+  // failure reaches Sentry. The request must still proceed — the repair failure
+  // must not break the user action.
+  it('[BREAK][WI-820] escalates to Sentry when billing repair fails, and still calls next()', async () => {
+    const repairError = new Error('billing-repair-boom');
+    mockEnsureInitialTrialSubscriptionV2.mockRejectedValue(repairError);
+    mockResolveIdentityV2.mockResolvedValue({
+      account: {
+        id: 'acct-v2',
+        clerkUserId: 'clerk_v2',
+        email: 'v2@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'person-v2',
+    });
+
+    const app = new Hono<{
+      Bindings: { IDENTITY_V2_ENABLED?: string };
+      Variables: AppVariables;
+    }>();
+    app.use('*', async (c, next) => {
+      c.set('user', {
+        userId: 'clerk_v2',
+        email: 'v2@example.com',
+        emailVerified: true,
+      } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
+      await next();
+    });
+    app.use('*', accountMiddleware);
+    app.get('/test', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/test', undefined, {
+      IDENTITY_V2_ENABLED: 'true',
+    });
+
+    // Request must succeed — repair failure must not break the user action.
+    expect(res.status).toBe(200);
+    // Failure must be escalated to Sentry (not just logged).
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      repairError,
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          surface: 'billing.v2.initial_trial_repair',
+        }),
+      }),
     );
   });
 });

@@ -11,6 +11,7 @@ import {
 import { canRetestTopic, processRecallResult } from '../../services/retention';
 import { stampMasteryOnVerify } from '../../services/retention-mastery';
 import { applyRetentionUpdate } from '../../services/apply-retention-update';
+import { syncXpLedgerStatus } from '../../services/xp';
 
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -124,12 +125,12 @@ export async function handleReviewCalibrationGrade({
       guard: { kind: 'none' },
       updatedAt: eventAt,
     });
-    // xp_ledger.status sync intentionally NOT performed here. The retention-path
-    // xp_ledger side-effect was removed in 5fed808e9: post-sunset,
-    // insertSessionXpEntry writes xp_ledger.status='verified' at insert time
-    // (no 'pending' state), so the card's xpStatus written above is the source
-    // of truth. The decay-case ledger split (xpStatus='decayed' not mirrored to
-    // xp_ledger.status, which progress.ts reads) is tracked in WI-848.
+    // [WI-848] Mirror decay to xp_ledger.status. The verified write is already
+    // handled at insert time by insertSessionXpEntry (post-sunset, 5fed808e9).
+    // No-op when no ledger row exists (topic never completed a session).
+    if (result.xpChange === 'decayed') {
+      await syncXpLedgerStatus(db, profileId, topicId, 'decayed');
+    }
   });
 
   await step.run('stamp-mastery-on-verify', async () => {

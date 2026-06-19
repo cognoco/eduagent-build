@@ -19,11 +19,9 @@
 //
 // SEQUENCING: the `profile_quota_usage` insert's satellite FKs target the
 // LEGACY `subscriptions`/`profiles` tables until the convergence FK re-point
-// (M-REPOINT, WI-586). Like createIdentityGraph's quota_pools insert, this
-// orchestrator therefore cannot commit before M-REPOINT — coherent with the
-// single-live-store invariant (IDENTITY_V2_ENABLED is 'false' everywhere until
-// the flip, and M-REPOINT lands in the same freeze window). Full-write
-// integration tests are gated on IDENTITY_V2_REPOINTED.
+// (M-REPOINT, WI-586). The owner bootstrap already dual-writes retained legacy
+// FK parents; this child writer mirrors that bridge for `profiles` so flag-on
+// pre-repoint CI can exercise the real route.
 // ---------------------------------------------------------------------------
 
 import { sql } from 'drizzle-orm';
@@ -31,6 +29,7 @@ import {
   guardianship,
   membership,
   person,
+  profiles,
   type Database,
 } from '@eduagent/database';
 import {
@@ -52,6 +51,16 @@ import {
 } from './identity-graph';
 import { getOwnerProfileV2, jurisdictionToLocation } from './profile-v2';
 import { createDirectConsentGrant } from './consent-v2';
+
+async function legacyProfilesTableExists(db: Database): Promise<boolean> {
+  const raw = (await db.execute(
+    sql`SELECT to_regclass('public.profiles') AS reg`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ reg: string | null }>)
+    : ((raw as { rows?: Array<{ reg: string | null }> }).rows ?? []);
+  return rows[0]?.reg != null;
+}
 
 export interface CreateChildProfileV2Input {
   /**
@@ -171,14 +180,31 @@ export async function createChildProfileV2(
       .returning();
     if (!childRow) throw new Error('child person insert did not return a row');
 
-    // (2) learner membership scoped to the caller's org.
+    // (2) Pre-M-REPOINT bridge for retained quota/profile satellites whose FKs
+    // still target legacy profiles(id). Remove with the FK convergence drop.
+    if (await legacyProfilesTableExists(txDb)) {
+      await txDb.insert(profiles).values({
+        id: childRow.id,
+        accountId: organizationId,
+        displayName: input.displayName,
+        avatarUrl: input.avatarUrl ?? null,
+        birthYear: input.birthYear,
+        location: input.location ?? null,
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: input.conversationLanguage ?? 'en',
+        pronouns: input.pronouns ?? null,
+      });
+    }
+
+    // (3) learner membership scoped to the caller's org.
     await txDb.insert(membership).values({
       personId: childRow.id,
       organizationId,
       roles: ['learner'],
     });
 
-    // (3) owner→child guardianship edge. MUST precede the consent grant — the
+    // (4) owner→child guardianship edge. MUST precede the consent grant — the
     // grant treats the edge as a precondition (consent-v2.ts inv 14).
     const [edge] = await txDb
       .insert(guardianship)
@@ -189,10 +215,10 @@ export async function createChildProfileV2(
       .returning();
     if (!edge) throw new Error('guardianship insert did not return a row');
 
-    // (4) per-profile quota satellite (role child).
+    // (5) per-profile quota satellite (role child).
     await provisionProfileQuotaUsageV2(txDb, sub.id, childRow.id, 'child');
 
-    // (5) direct consent grant when the child's age requires it (consentCheck
+    // (6) direct consent grant when the child's age requires it (consentCheck
     // computed above). The parent is the consenting adult, so the grant is
     // written CONSENTED with no email loop.
     let consented = false;

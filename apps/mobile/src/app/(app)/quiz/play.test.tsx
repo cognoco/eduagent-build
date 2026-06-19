@@ -1047,6 +1047,7 @@ describe('QuizPlayScreen — no round loaded', () => {
     screen.getByTestId('quiz-play-no-round');
     screen.getByTestId('quiz-play-no-round-retry');
     screen.getByTestId('quiz-play-no-round-home');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });
 

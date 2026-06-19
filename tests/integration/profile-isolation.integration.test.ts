@@ -13,12 +13,18 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { subjects, profiles, subscriptions } from '@eduagent/database';
+import {
+  profiles,
+  subjects,
+  subscription as subscriptionV2,
+  subscriptions,
+} from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 
@@ -37,6 +43,7 @@ async function createProfile(input: {
   email: string;
   displayName: string;
   birthYear: number;
+  kind?: 'owner' | 'child';
 }): Promise<{
   id: string;
   isOwner: boolean;
@@ -47,11 +54,12 @@ async function createProfile(input: {
       method: 'POST',
       headers: buildAuthHeaders({ sub: input.userId, email: input.email }),
       body: JSON.stringify({
+        ...(input.kind ? { kind: input.kind } : {}),
         displayName: input.displayName,
         birthYear: input.birthYear,
       }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -61,7 +69,7 @@ async function createProfile(input: {
 
 async function seedSubject(
   profileId: string,
-  name: string
+  name: string,
 ): Promise<{ id: string; profileId: string; name: string }> {
   const db = createIntegrationDb();
   const [subject] = await db
@@ -99,6 +107,13 @@ async function seedFamilySubscription(profileId: string) {
     .update(subscriptions)
     .set({ tier: 'family', status: 'active' })
     .where(eq(subscriptions.accountId, profile.accountId));
+
+  if (isIdentityV2Enabled()) {
+    await db
+      .update(subscriptionV2)
+      .set({ planTier: 'family', status: 'active', updatedAt: new Date() })
+      .where(eq(subscriptionV2.organizationId, profile.accountId));
+  }
 }
 
 async function listSubjectsForUser(input: {
@@ -112,10 +127,10 @@ async function listSubjectsForUser(input: {
       method: 'GET',
       headers: buildAuthHeaders(
         { sub: input.userId, email: input.email },
-        input.profileId
+        input.profileId,
       ),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 }
 
@@ -197,6 +212,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       email: PRIMARY_EMAIL,
       displayName: 'Second Profile',
       birthYear: 2012,
+      kind: 'child',
     });
 
     expect(ownerProfile.isOwner).toBe(true);
@@ -233,6 +249,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       email: PRIMARY_EMAIL,
       displayName: 'Teen Profile',
       birthYear: 2001,
+      kind: 'child',
     });
 
     await seedSubject(ownerProfile.id, 'Owner Mathematics');

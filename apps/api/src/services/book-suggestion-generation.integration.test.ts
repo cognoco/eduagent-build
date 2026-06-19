@@ -1,6 +1,6 @@
 import { resolve } from 'path';
 
-import { eq, and, isNull, like } from 'drizzle-orm';
+import { eq, and, isNull, like, sql } from 'drizzle-orm';
 import {
   accounts,
   profiles,
@@ -64,6 +64,36 @@ async function seedSubject(profileId: string, name: string) {
     })
     .returning();
   return subject!;
+}
+
+async function waitForCooldownReservation(subjectId: string) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const [row] = await db
+      .select({
+        lastAttemptedAt: subjects.bookSuggestionsLastGenerationAttemptedAt,
+      })
+      .from(subjects)
+      .where(eq(subjects.id, subjectId))
+      .limit(1);
+    if (row?.lastAttemptedAt) return;
+    await new Promise((res) => setTimeout(res, 25));
+  }
+  throw new Error('Timed out waiting for cooldown reservation to commit.');
+}
+
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: () => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 async function cleanup() {
@@ -145,6 +175,79 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     expect(rows).toHaveLength(4);
   });
 
+  it('continues final insert after a non-writer briefly holds the advisory lock', async () => {
+    const profile = await seedProfile();
+    const subject = await seedSubject(profile.id, 'Civics');
+    const lockKey = `book_suggestions:${profile.id}:${subject.id}`;
+
+    const baseProvider = (
+      llmFixture as unknown as {
+        provider: { chat: (...args: unknown[]) => Promise<unknown> };
+      }
+    ).provider;
+    const originalChat = baseProvider.chat.bind(baseProvider);
+    const releaseChat = deferred();
+    const releaseBlocker = deferred();
+    const blockerReady = deferred();
+
+    let firstPromise:
+      | ReturnType<typeof generateCategorizedBookSuggestions>
+      | undefined;
+    let blockerPromise: Promise<void> | undefined;
+
+    baseProvider.chat = async (...args: unknown[]) => {
+      await releaseChat.promise;
+      return originalChat(...args);
+    };
+
+    try {
+      firstPromise = generateCategorizedBookSuggestions(
+        db,
+        profile.id,
+        subject.id,
+      );
+      await waitForCooldownReservation(subject.id);
+
+      blockerPromise = db.transaction(async (tx) => {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+        );
+        blockerReady.resolve();
+        await releaseBlocker.promise;
+      });
+      await blockerReady.promise;
+
+      releaseChat.resolve();
+      await new Promise((res) => setTimeout(res, 75));
+      releaseBlocker.resolve();
+
+      const outcome = await firstPromise;
+      await blockerPromise;
+
+      expect(outcome).toBe('success');
+      expect(llmFixture.chatCalls).toHaveLength(1);
+
+      const rows = await db
+        .select()
+        .from(bookSuggestions)
+        .where(
+          and(
+            eq(bookSuggestions.subjectId, subject.id),
+            isNull(bookSuggestions.pickedAt),
+          ),
+        );
+      expect(rows).toHaveLength(4);
+    } finally {
+      baseProvider.chat = originalChat;
+      releaseChat.resolve();
+      releaseBlocker.resolve();
+      await Promise.allSettled([
+        firstPromise ?? Promise.resolve(),
+        blockerPromise ?? Promise.resolve(),
+      ]);
+    }
+  });
+
   it('cool-down blocks a second call within 5 minutes', async () => {
     const profile = await seedProfile();
     const subject = await seedSubject(profile.id, 'Biology');
@@ -209,18 +312,19 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     };
     llmFixture.setChatResponse(JSON.parse(slowResponse));
 
+    let firstPromise:
+      | ReturnType<typeof generateCategorizedBookSuggestions>
+      | undefined;
     try {
       // Start first call — it enters Phase 1 (commits cooldown reservation),
       // then awaits the 250ms LLM call.
-      const firstPromise = generateCategorizedBookSuggestions(
+      firstPromise = generateCategorizedBookSuggestions(
         db,
         profile.id,
         subject.id,
       );
 
-      // Give Phase 1 time to commit before firing the second call. 50ms is
-      // generous for a local DB.
-      await new Promise((res) => setTimeout(res, 50));
+      await waitForCooldownReservation(subject.id);
 
       // Second call: should observe the committed cooldown reservation row
       // and exit early ('cooldown') without entering Phase 1.
@@ -240,6 +344,7 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     } finally {
       // Restore the original chat to avoid leaking the delay into other tests.
       baseProvider.chat = originalChat;
+      await firstPromise?.catch(() => undefined);
     }
   }, 30_000);
 });

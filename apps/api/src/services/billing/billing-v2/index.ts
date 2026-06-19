@@ -16,6 +16,7 @@ export {
   linkStripeCustomerV2,
   getQuotaPoolV2,
   resetMonthlyQuotaV2,
+  ensureInitialTrialSubscriptionV2,
   ensureFreeSubscriptionV2,
   markSubscriptionCancelledV2,
   updateQuotaPoolLimitV2,

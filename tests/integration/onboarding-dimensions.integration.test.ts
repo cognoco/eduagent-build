@@ -13,14 +13,19 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { profiles, learningProfiles, familyLinks } from '@eduagent/database';
+import { learningProfiles, person, profiles } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import {
+  seedDirectChildProfileForTest,
+  seedFamilyLinkForTest,
+} from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
 
@@ -66,23 +71,57 @@ async function createChildProfileDirect(
     .where(eq(profiles.id, parentProfileId));
   if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
 
-  const [child] = await db
-    .insert(profiles)
-    .values({ accountId: parent.accountId, displayName, birthYear })
-    .returning({ id: profiles.id });
-  return child!.id;
+  const child = await seedDirectChildProfileForTest({
+    parentProfileId,
+    accountId: parent.accountId,
+    displayName,
+    birthYear,
+  });
+  return child.id;
 }
 
 async function createFamilyLink(
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
-  const db = createIntegrationDb();
-  await db.insert(familyLinks).values({
+  await seedFamilyLinkForTest({
     parentProfileId,
     childProfileId,
-    role: 'parent',
   });
+}
+
+async function readConversationLanguage(profileId: string): Promise<string> {
+  const db = createIntegrationDb();
+  if (isIdentityV2Enabled()) {
+    const [profile] = await db
+      .select({ conversationLanguage: person.conversationLanguage })
+      .from(person)
+      .where(eq(person.id, profileId));
+    return profile!.conversationLanguage;
+  }
+
+  const [profile] = await db
+    .select({ conversationLanguage: profiles.conversationLanguage })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
+  return profile!.conversationLanguage;
+}
+
+async function readPronouns(profileId: string): Promise<string | null> {
+  const db = createIntegrationDb();
+  if (isIdentityV2Enabled()) {
+    const [profile] = await db
+      .select({ pronouns: person.pronouns })
+      .from(person)
+      .where(eq(person.id, profileId));
+    return profile!.pronouns;
+  }
+
+  const [profile] = await db
+    .select({ pronouns: profiles.pronouns })
+    .from(profiles)
+    .where(eq(profiles.id, profileId));
+  return profile!.pronouns;
 }
 
 beforeEach(async () => {
@@ -127,13 +166,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     const body = (await res.json()) as { success: boolean };
     expect(body.success).toBe(true);
 
-    // Verify persisted in DB
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ conversationLanguage: profiles.conversationLanguage })
-      .from(profiles)
-      .where(eq(profiles.id, profileId));
-    expect(profile!.conversationLanguage).toBe('cs');
+    expect(await readConversationLanguage(profileId)).toBe('cs');
   });
 
   it('PATCH /onboarding/pronouns updates pronouns for own profile', async () => {
@@ -161,12 +194,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     const body = (await res.json()) as { success: boolean };
     expect(body.success).toBe(true);
 
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ pronouns: profiles.pronouns })
-      .from(profiles)
-      .where(eq(profiles.id, profileId));
-    expect(profile!.pronouns).toBe('they/them');
+    expect(await readPronouns(profileId)).toBe('they/them');
   });
 
   it('PATCH /onboarding/interests/context updates interests for own profile', async () => {
@@ -253,14 +281,8 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     // Profile-scope middleware rejects foreign profileId with 403
     expect(res.status).toBe(403);
 
-    // Verify the profile was NOT modified
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ conversationLanguage: profiles.conversationLanguage })
-      .from(profiles)
-      .where(eq(profiles.id, profileA));
     // Default is 'en' (NOT NULL) — verify the attacker's PATCH didn't change it.
-    expect(profile!.conversationLanguage).toBe('en');
+    expect(await readConversationLanguage(profileA)).toBe('en');
   });
 
   it('returns 403 when PATCH /onboarding/pronouns targets a profile owned by another account [SECURITY]', async () => {
@@ -293,12 +315,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
 
     expect(res.status).toBe(403);
 
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ pronouns: profiles.pronouns })
-      .from(profiles)
-      .where(eq(profiles.id, profileA));
-    expect(profile!.pronouns).toBeNull();
+    expect(await readPronouns(profileA)).toBeNull();
   });
 
   it('returns 404 when PATCH /onboarding/interests/context targets a profile owned by another account [SECURITY]', async () => {
@@ -369,12 +386,7 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
 
     expect(res.status).toBe(200);
 
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ conversationLanguage: profiles.conversationLanguage })
-      .from(profiles)
-      .where(eq(profiles.id, childProfileId));
-    expect(profile!.conversationLanguage).toBe('es');
+    expect(await readConversationLanguage(childProfileId)).toBe('es');
   });
 
   it('non-parent cannot PATCH /onboarding/:profileId/language for an unlinked child (403)', async () => {
@@ -416,14 +428,8 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     // assertParentAccess should reject — either 403 or 404
     expect([403, 404]).toContain(res.status);
 
-    // Verify NOT modified
-    const db = createIntegrationDb();
-    const [profile] = await db
-      .select({ conversationLanguage: profiles.conversationLanguage })
-      .from(profiles)
-      .where(eq(profiles.id, childProfileId));
     // Default is 'en' (NOT NULL) — verify the attacker's PATCH didn't change it.
-    expect(profile!.conversationLanguage).toBe('en');
+    expect(await readConversationLanguage(childProfileId)).toBe('en');
   });
 
   // ---- Validation -----------------------------------------------------------

@@ -1,4 +1,4 @@
-> **STATUS: P0 ISSUE MAP UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. The targeted rerun cleared the rows tied to WI-819, WI-824, WI-825, WI-826, and WI-853; WI-821 still fails on recap detail. Remaining failure issues: WI-818, WI-820, WI-821, WI-822, WI-823. Remaining P0 pass-with-issues rows are now mapped to Cosmo items WI-854 through WI-865.
+> **STATUS: P0 ISSUE MAP + RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, and WI-853; WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now mapped to Cosmo items WI-854 through WI-865.
 
 # Mobile App Flow Revision Plan
 
@@ -11,6 +11,12 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **Rerun update 2026-06-18:** Targeted staging Chrome/Chromium reruns were completed for rows tied to `WI-819`, `WI-821`, `WI-824`, and `WI-826`. `WI-819` rows passed through J-08 and J-11 live-session journeys; `WI-824` rows passed through the profile-limit upgrade path; `WI-826` rows passed through the withdrawal countdown banner path. `WI-821` partially improved because the Recaps list loads rows, but recap detail still renders the error state and remains failed. `WI-808` / `ic-116` were test-fixture-only commits with no direct manual/browser flow row in this plan.
 
 **Remediation update 2026-06-18 (WI-825):** subject-onboarding drift resolved in the inventory and J-09 browser expectations. SUBJECT-05/07/08/18 now distinguish broad topic-interest picker, language setup, and first-focused-subject `/ready` behavior.
+
+**Remediation update 2026-06-19 (WI-820):** QUIZ-18 no-round guard fixed and rerun in Chrome/Playwright. Cold navigation to `/quiz/play` without a round now renders `quiz-play-no-round` recovery controls instead of redirecting into an Internal Server Error.
+
+**Remediation update 2026-06-19 (WI-818):** AUTH-11/AUTH-17 forced re-entry banners rerun in staging Chrome/Playwright. The mentor-audit pre-shell storage-state mutator now clears Clerk's unsuffixed and instance-suffixed session cookies before seeding the expired/revoked banner markers, so both `/sign-in` banner rows render instead of falling through to Home.
+
+**Remediation update 2026-06-19 (WI-822):** BILLING-08 family-pool removal path fixed and rerun in Chrome/Playwright. The `mentor-audit-family-pool-members` seed now lands the owner in family context, the family-pool flow exercises a removable child row, and the browser regression confirms confirm/remove/list-refresh behavior.
 
 **P0 issue-map update 2026-06-19:** BILLING-13 is resolved by `WI-853`; the remaining 22 P0 pass-with-issues rows are grouped into 12 Cosmo issue clusters so shared blockers are visible before further implementation: `WI-854` HOME-15, `WI-855` SUBJECT-20, `WI-856` ACCOUNT-32/38, `WI-857` QA-02/15, `WI-858` SUBJECT-06/22, `WI-859` QA-03/04, `WI-860` QA-05/06/07, `WI-861` HOMEWORK-08/09, `WI-862` QUIZ-02/16, `WI-863` DICT-03/05/06, `WI-864` LEARN-50, and `WI-865` CC-05.
 
@@ -199,13 +205,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-08 | OAuth sign in/up | ⚠️ | Pass w/ issues |  |  | OAuth account-linking path partially covered; provider completion is external to browser sweep. |
 | AUTH-09 | SSO callback completion/fallback/cancel | ⚠️ | Pass w/ issues |  |  | Deep-link landing behavior covered; native handoff branch only partially browser-reachable. |
 | AUTH-10 | Sign out | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-11 | Session-expired forced sign-out + re-entry banner | ❌ | Fail | WI-818 |  | Forced session-expired re-entry banner did not appear as specified. |
+| AUTH-11 | Session-expired forced sign-out + re-entry banner | ✅ | Pass | WI-818 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: `mentor-audit-session-expired` lands on `/sign-in` with `session-expired-banner` visible after clearing Clerk session cookie variants. |
 | AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-13 | Deep-link auth redirect preservation | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-14 | Sign-in transition spinner + stuck recovery: 8s | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-15 | Welcome intro | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | AUTH-16 | Not-found catch-all with recovery | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| AUTH-17 | Session-REVOKED banner | ❌ | Fail | WI-818 |  | Revoked-session re-entry banner did not appear as specified. |
+| AUTH-17 | Session-REVOKED banner | ✅ | Pass | WI-818 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: `mentor-audit-session-revoked` lands on `/sign-in` with `session-revoked-banner` visible after clearing Clerk session cookie variants. |
 | AUTH-18 | OAuth stuck-spinner watchdog | 🚫 | Blocked |  |  | Requires native OAuth custom tab/AppState transition; not testable in Chrome-only sweep. |
 
 ---
@@ -407,7 +413,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QUIZ-15 | Final-question auto-save: immediate round submit; "saving" panel → See Results / One More; navigation queued if save in flight;… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⚠️ | Pass w/ issues | WI-862 | ✅ 2026-06-19 | Issue mapped with QUIZ-02: force quiz discovery card and mark-surfaced branch in Chrome. |
 | QUIZ-17 | Quiz index load-error retry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QUIZ-18 | Play no-round guard | ❌ | Fail | WI-820 |  | No-round guard renders Internal Server Error instead of recovery state. |
+| QUIZ-18 | Play no-round guard | ✅ | Pass | WI-820 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: cold `/quiz/play` with no round renders `quiz-play-no-round`, Retry, and Go Home recovery controls; focused unit regression passed. |
 | DICT-01 | Choice screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | DICT-02 | Text preview + edit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | DICT-03 | "Surprise me" generation | ⚠️ | Pass w/ issues | WI-863 | ✅ 2026-06-19 | Issue mapped: add deterministic dictation generation coverage with controlled response. |
@@ -484,7 +490,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | BILLING-05 | Manage billing: native deep link w/ retry + fallback-URL alert | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-06 | Child paywall | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-07 | Daily-quota-exceeded adult path: NO paywall branch | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| BILLING-08 | Family pool section + **member removal** | ❌ | Fail | WI-822 |  | Family pool rendered without expected removable-member controls. |
+| BILLING-08 | Family pool section + **member removal** | ✅ | Pass | WI-822 | ✅ 06-19 | Rerun 2026-06-19 in Chrome/Playwright passed: seeded family owner saw removable child controls, confirmed removal, and the list refreshed with the removed child hidden and the remaining child still visible. |
 | BILLING-09 | Top-up credits | 🚫 | Blocked |  |  | Requires native store purchase/restore/top-up or push-notification tap. |
 | BILLING-10 | BYOK waitlist | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | BILLING-11 | Trial banner states | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -564,20 +570,20 @@ If a flow is found in the app but is missing from `mobile-app-flow-inventory.md`
 
 ## Master Roll-Up
 
-Updated from the 2026-06-18 Chrome/Chromium sweep. Row-level notes remain the source of truth for per-flow evidence and linked Cosmo issues.
+Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 reruns. Row-level notes remain the source of truth for per-flow evidence and linked Cosmo issues.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Auth and Access | 18 | ❌ | Updated 2026-06-18: 10 ✅, 5 ⚠️, 2 ❌, 1 🚫. |
+| 1 | Auth and Access | 18 | ⚠️ | Rerun updated 2026-06-19: 12 ✅, 5 ⚠️, 0 ❌, 1 🚫. |
 | 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-18: 30 ✅, 19 ⚠️, 0 ❌, 2 🚫. |
 | 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ➖. |
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
-| 5 | Practice Hub and Practice Activities | 36 | ❌ | Updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ❌, 4 🚫. |
+| 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 27 ✅, 5 ⚠️, 0 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
-| 7 | Billing and Monetization | 16 | ❌ | Rerun updated 2026-06-18: 10 ✅, 1 ⚠️, 1 ❌, 4 🚫. |
+| 7 | Billing and Monetization | 16 | ⚠️ | Rerun updated 2026-06-19: 11 ✅, 1 ⚠️, 0 ❌, 4 🚫. |
 | 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-18: 3 ✅, 11 ⚠️, 0 ❌, 1 🚫. |
 | 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 188 pass, 61 pass-w/issues, 8 fail, 19 blocked, 4 removed, 0 untested. |
+| **Total** | | **280** | ❌ | 192 pass, 61 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 

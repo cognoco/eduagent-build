@@ -55,6 +55,7 @@ import { loadTopicTitle, sessionCompleted } from './session-completed';
 import {
   deleteLegacyAccountsForTest,
   ensureLegacyProfileAnchorForTest,
+  ensureLegacySubscriptionAnchorForTest,
 } from '../../test-utils/legacy-identity-anchors';
 
 // ── Database env bootstrap ────────────────────────────────────────────────────
@@ -146,6 +147,22 @@ async function seedAccount(): Promise<{ accountId: string }> {
     personId: owner!.id,
     organizationId: org!.id,
     roles: ['admin'],
+  });
+  const subscriptionId = generateUUIDv7();
+  await db.insert(subscription).values({
+    id: subscriptionId,
+    organizationId: org!.id,
+    payerPersonId: owner!.id,
+    planTier: 'free',
+    status: 'active',
+    periodStartAt: new Date(),
+    periodEndAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
+  await ensureLegacySubscriptionAnchorForTest(db, {
+    subscriptionId,
+    accountId: org!.id,
+    tier: 'free',
+    status: 'active',
   });
 
   return { accountId: org!.id };

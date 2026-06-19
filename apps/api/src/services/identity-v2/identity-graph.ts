@@ -50,6 +50,8 @@ import { inngest } from '../../inngest/client';
 import { computeTrialEndDate } from '../trial';
 import { getTierConfig } from '../subscription';
 import { resolveIdentityV2, type ResolvedIdentityV2 } from './identity-resolve';
+import { checkConsentRequiredFromDate } from '../consent';
+import { ProfileValidationError } from '../profile';
 
 const logger = createLogger();
 
@@ -254,6 +256,19 @@ export async function createIdentityGraph(
   db: Database,
   input: CreateIdentityGraphInput,
 ): Promise<ResolvedIdentityV2> {
+  const consentCheck = checkConsentRequiredFromDate(
+    input.birthYear,
+    input.birthMonth,
+    input.birthDay,
+  );
+  if (consentCheck.belowMinimumAge) {
+    throw new ProfileValidationError(
+      'CHILD_AGE_VIOLATION',
+      'birthYear',
+      'Users must be at least 13 years old to create a profile',
+    );
+  }
+
   // birth_date: exact full date when WI-297 parts present (calendar-validated),
   // else birthYear-01-01 (the reseed convention).
   const birthDate =

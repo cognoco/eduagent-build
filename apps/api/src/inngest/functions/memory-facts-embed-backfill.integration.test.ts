@@ -16,16 +16,13 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { asc, eq, isNotNull, like } from 'drizzle-orm';
+import { asc, eq, isNotNull } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { generateUUIDv7, memoryFacts, type Database } from '@eduagent/database';
 import {
-  accounts,
-  createDatabase,
-  generateUUIDv7,
-  memoryFacts,
-  profiles,
-  type Database,
-} from '@eduagent/database';
+  seedLearningProfile,
+  setupTestDb,
+} from '../../../../../tests/integration/helpers/memory-facts';
 import * as embeddingsService from '../../services/embeddings';
 import { EmbeddingDimensionMismatchError } from '../../services/embeddings';
 import { memoryFactsEmbedBackfill } from './memory-facts-embed-backfill';
@@ -33,38 +30,12 @@ import { memoryFactsEmbedBackfill } from './memory-facts-embed-backfill';
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 let db: Database;
+let cleanupDb: (() => Promise<void>) | undefined;
 
 const RUN_ID = generateUUIDv7();
-const CLERK_PREFIX = `clerk_embedfill_integ_${RUN_ID}`;
-let seedCounter = 0;
 
 const VECTOR_DIM = 1024;
 const okVector = (): number[] => new Array(VECTOR_DIM).fill(0.5);
-
-async function seedAccount(): Promise<{ accountId: string }> {
-  const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}_${idx}`,
-      email: `embedfill-integ-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  return { accountId: account!.id };
-}
-
-async function seedProfile(accountId: string): Promise<{ profileId: string }> {
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId,
-      displayName: 'Embed Backfill Test',
-      birthYear: new Date().getUTCFullYear() - 14,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  return { profileId: profile!.id };
-}
 
 /**
  * Seed N memory_facts rows with NULL embeddings, ordered by uuidv7 id so the
@@ -130,13 +101,13 @@ beforeAll(async () => {
   // Ensure the helper sees a Voyage key; the value is irrelevant because we
   // spy on generateEmbedding before any call would actually leave the process.
   process.env['VOYAGE_API_KEY'] ??= 'test-voyage-key';
-  db = createDatabase(databaseUrl);
+  const setup = await setupTestDb();
+  db = setup.db;
+  cleanupDb = setup.cleanup;
 }, 30_000);
 
 afterAll(async () => {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await cleanupDb?.();
 }, 30_000);
 
 describe('memory-facts-embed-backfill cursor on failure (BUG-366)', () => {
@@ -152,8 +123,7 @@ describe('memory-facts-embed-backfill cursor on failure (BUG-366)', () => {
   // (Voyage 503-style). Cursor must NOT advance past row #3 — when the inner
   // loop iterates again it must re-fetch row #3 plus anything still NULL.
   it('[BUG-366] does not advance cursor past a transient failure within the run', async () => {
-    const { accountId } = await seedAccount();
-    const { profileId } = await seedProfile(accountId);
+    const { profileId } = await seedLearningProfile(db);
     const ids = await seedRows(profileId, 5);
     const row3Id = ids[2]!;
 
@@ -218,8 +188,7 @@ describe('memory-facts-embed-backfill cursor on failure (BUG-366)', () => {
   // the same wrong-sized vector. Cursor advances past the row, but the row
   // remains NULL and is surfaced via the log/metric for ops.
   it('[BUG-366] advances cursor past a dimension_mismatch failure', async () => {
-    const { accountId } = await seedAccount();
-    const { profileId } = await seedProfile(accountId);
+    const { profileId } = await seedLearningProfile(db);
     const ids = await seedRows(profileId, 3);
     const row2Id = ids[1]!;
     const failingText = `fact #2 ${RUN_ID}`;
@@ -261,8 +230,7 @@ describe('memory-facts-embed-backfill cursor on failure (BUG-366)', () => {
   // When Voyage is fully down (every row fails transiently), the function
   // must halt to avoid spinning forever on the same first row.
   it('[BUG-366] halts when no forward progress is possible (Voyage fully down)', async () => {
-    const { accountId } = await seedAccount();
-    const { profileId } = await seedProfile(accountId);
+    const { profileId } = await seedLearningProfile(db);
     await seedRows(profileId, 3);
 
     generateEmbeddingSpy = jest

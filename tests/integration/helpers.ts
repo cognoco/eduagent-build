@@ -2,6 +2,7 @@ import { inArray, sql } from 'drizzle-orm';
 import {
   accounts,
   consentGrant,
+  consentRequest,
   createDatabase,
   guardianship,
   login,
@@ -12,7 +13,7 @@ import {
   supportership,
 } from '@eduagent/database';
 
-function isIdentityV2Enabled(): boolean {
+export function isIdentityV2Enabled(): boolean {
   return process.env.IDENTITY_V2_ENABLED === 'true';
 }
 
@@ -170,19 +171,28 @@ export async function cleanupAccounts(input: {
     //
     // Order:
     //   1. guardianship edges (RESTRICT on person, both directions)
-    //   2. consent_grant     (RESTRICT on person AND organization)
-    //   3. supportership     (RESTRICT on person, both directions)
-    //   4. subscription      (RESTRICT on person AND organization; CASCADE its
+    //   2. consent_request   (CASCADE on person/org, but may back-link grant)
+    //   3. consent_grant     (RESTRICT on person AND organization)
+    //   4. supportership     (RESTRICT on person, both directions)
+    //   5. subscription      (RESTRICT on person AND organization; CASCADE its
     //                         own children — quota_pools, profile_quota_usage,
     //                         subscription_payers, top_up_credits, usage_events)
-    //   5. person            (CASCADE login, membership)
-    //   6. organization
+    //   6. person            (CASCADE login, membership)
+    //   7. organization
     await db
       .delete(guardianship)
       .where(inArray(guardianship.guardianPersonId, personIdList));
     await db
       .delete(guardianship)
       .where(inArray(guardianship.chargePersonId, personIdList));
+    await db
+      .delete(consentRequest)
+      .where(inArray(consentRequest.chargePersonId, personIdList));
+    if (orgIdList.length > 0) {
+      await db
+        .delete(consentRequest)
+        .where(inArray(consentRequest.organizationId, orgIdList));
+    }
     await db
       .delete(supportership)
       .where(inArray(supportership.supporterPersonId, personIdList));
