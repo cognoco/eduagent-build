@@ -167,6 +167,8 @@ export async function listBookmarks(
     // ordered and lexicographically sortable. If the id generator ever changes
     // (see generateUUIDv7 in packages/database), rewrite this to cursor on
     // createdAt + id instead, or results will paginate in random order.
+    // [BUG-859] That invariant is guarded by bookmarks.id-default.test.ts,
+    // which fails if the id default stops emitting a time-ordered UUIDv7.
     conditions.push(lt(bookmarks.id, options.cursor));
   }
 
