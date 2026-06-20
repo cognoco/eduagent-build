@@ -30,6 +30,7 @@ import {
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
 import { mockExpoPush } from './external-mocks';
 import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
+import { trialNotificationSend } from '../../apps/api/src/inngest/functions/trial-notification-send';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 import { EXTENDED_TRIAL_MONTHLY_EQUIVALENT } from '../../apps/api/src/services/trial';
 
@@ -422,8 +423,11 @@ describe('Integration: trial-expiry Inngest function', () => {
     );
     expect(result.expiredCount).toBeGreaterThanOrEqual(1);
     expect(result.extendedExpiredCount).toBeGreaterThanOrEqual(1);
-    expect(result.warningsSent).toBeGreaterThanOrEqual(1);
-    expect(result.softLandingSent).toBeGreaterThanOrEqual(2);
+    // [TRIAL-FANOUT] result counts were renamed warningsSent/softLandingSent ->
+    // warningsQueued/softLandingQueued when the sends became a fan-out (the cron
+    // now QUEUES per-trial events; trial-notification-send does the actual send).
+    expect(result.warningsQueued).toBeGreaterThanOrEqual(1);
+    expect(result.softLandingQueued).toBeGreaterThanOrEqual(2);
 
     // [TRIAL-FANOUT] The cron dispatches one fan-out event per step carrying a
     // per-trial notification array; the actual send happens in the
@@ -480,6 +484,24 @@ describe('Integration: trial-expiry Inngest function', () => {
     expect(updatedExtendedQuota!.monthlyLimit).toBe(freeTier.monthlyQuota);
     expect(updatedExtendedQuota!.usedThisMonth).toBe(0);
     expect(updatedExtendedQuota!.usedToday).toBe(0);
+
+    // [TRIAL-FANOUT] The cron only QUEUES per-trial events; the actual push
+    // send now happens in the trial-notification-send handler (which owns the
+    // atomic rate-limit gate). Drain every queued event through the REAL handler
+    // so the end-to-end Expo Push delivery asserted below is genuinely exercised
+    // — the cron-sends-directly path no longer exists.
+    for (const evt of [...warningPayload, ...softLandingPayload]) {
+      await (
+        trialNotificationSend as { fn: (input: unknown) => Promise<unknown> }
+      ).fn({
+        event: { name: evt.name, data: evt.data },
+        step: {
+          run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
+            fn(),
+          ),
+        },
+      });
+    }
 
     // Verify the REAL notifications service called Expo Push API
     const pushCalls = getFetchCalls('exp.host');
