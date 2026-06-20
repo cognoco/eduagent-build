@@ -70,6 +70,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { seedConsentState } from '../test-utils/consent-seed';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
@@ -269,12 +270,22 @@ const mockRevokeChildConsentV2 = jest.fn().mockResolvedValue({
 const mockRestoreChildConsentV2 = jest
   .fn()
   .mockResolvedValue({ status: 'CONSENTED' });
-const mockGetProfileConsentStateV2 = jest.fn().mockResolvedValue(null);
-const mockGetChildConsentForParentV2 = jest.fn().mockResolvedValue(null);
+// WI-867: getProfileConsentStateV2 removed — real function runs via seedConsentState.
+// getChildConsentForParentV2 delegates to real by default; BUG-765 tests inject errors per-test.
+const realFamilyV2 = jest.requireActual(
+  '../services/identity-v2/family-v2',
+) as typeof import('../services/identity-v2/family-v2');
+const mockGetChildConsentForParentV2 = jest
+  .fn()
+  .mockImplementation((...args: unknown[]) =>
+    realFamilyV2.getChildConsentForParentV2(
+      ...(args as Parameters<typeof realFamilyV2.getChildConsentForParentV2>),
+    ),
+  );
 
 jest.mock(
   '../services/identity-v2/consent-v2',
-  /* gc1-allow: ACTION functions (requestConsentV2, resendConsentV2, processConsentResponseV2, revokeChildConsentV2, restoreChildConsentV2) are write/email operations not exercisable in unit tests; getOrgMemberDisplayNameV2 uses db.select() chain (not seedable via db.query.*); getProfileConsentStateV2 mocked for per-test state injection. Integration twin: tests/integration/consent.integration.test.ts */
+  /* gc1-allow: ACTION functions (requestConsentV2, resendConsentV2, processConsentResponseV2, revokeChildConsentV2, restoreChildConsentV2) are write/email operations not exercisable in unit tests; getOrgMemberDisplayNameV2 uses db.select() chain (not seedable via db.query.*). Integration twin: tests/integration/consent.integration.test.ts */
   () => ({
     ...jest.requireActual('../services/identity-v2/consent-v2'),
     getOrgMemberDisplayNameV2: (...args: unknown[]) =>
@@ -287,14 +298,12 @@ jest.mock(
       mockRevokeChildConsentV2(...args),
     restoreChildConsentV2: (...args: unknown[]) =>
       mockRestoreChildConsentV2(...args),
-    getProfileConsentStateV2: (...args: unknown[]) =>
-      mockGetProfileConsentStateV2(...args),
   }),
 );
 
 jest.mock(
   '../services/identity-v2/family-v2',
-  /* gc1-allow: getChildConsentForParentV2 requires guardianship edges (db.query.guardianship) not seeded in unit test fixtures; per-test error injection needed for BUG-765 typed-error classification coverage. Integration twin: tests/integration/consent.integration.test.ts */
+  /* gc1-allow: pattern-a conversion — getChildConsentForParentV2 delegates to real by default via mockGetChildConsentForParentV2; BUG-765 tests inject typed errors per-test via mockRejectedValueOnce. Integration twin: tests/integration/consent.integration.test.ts */
   () => ({
     ...jest.requireActual('../services/identity-v2/family-v2'),
     getChildConsentForParentV2: (...args: unknown[]) =>
@@ -373,8 +382,12 @@ beforeEach(() => {
     withdrawnAt: '2026-01-15T10:00:00.000Z',
   });
   mockRestoreChildConsentV2.mockResolvedValue({ status: 'CONSENTED' });
-  mockGetProfileConsentStateV2.mockResolvedValue(null);
-  mockGetChildConsentForParentV2.mockResolvedValue(null);
+  // WI-867: restore real-function delegation after per-test error injection.
+  mockGetChildConsentForParentV2.mockImplementation((...args: unknown[]) =>
+    realFamilyV2.getChildConsentForParentV2(
+      ...(args as Parameters<typeof realFamilyV2.getChildConsentForParentV2>),
+    ),
+  );
 });
 
 describe('consent routes', () => {
@@ -1079,11 +1092,11 @@ describe('consent routes', () => {
     });
 
     it('returns 200 with consent status and masked parentEmail when consent exists', async () => {
-      mockGetProfileConsentStateV2.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        guardianEmail: 'parent@example.com',
-        consentType: 'GDPR',
-        requestedAt: new Date().toISOString(),
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'test-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: 'parent@example.com' },
       });
 
       const res = await app.request(
@@ -1107,11 +1120,11 @@ describe('consent routes', () => {
     });
 
     it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
-      mockGetProfileConsentStateV2.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        guardianEmail: 'sensitive.parent.email@example.com',
-        consentType: 'GDPR',
-        requestedAt: new Date().toISOString(),
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'child-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: 'sensitive.parent.email@example.com' },
       });
 
       const res = await app.request(
@@ -1130,11 +1143,11 @@ describe('consent routes', () => {
     });
 
     it('[BUG-625 / A-10] returns null when no parentEmail set', async () => {
-      mockGetProfileConsentStateV2.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        guardianEmail: null,
-        consentType: 'GDPR',
-        requestedAt: new Date().toISOString(),
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'test-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: null },
       });
 
       const res = await app.request(
