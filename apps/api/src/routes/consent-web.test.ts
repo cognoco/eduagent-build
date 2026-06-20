@@ -114,9 +114,19 @@ const ENV = {
   // IDENTITY_V2_ENABLED unset ⇒ legacy consent_states path (isIdentityV2Enabled === false)
 } as const;
 
+/** Hono env mirroring consentWebRoutes' own (ConsentWebEnv is not exported). */
+type ConsentWebTestEnv = {
+  Bindings: {
+    DATABASE_URL: string;
+    CONSENT_POLICY_VERSION: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
+  Variables: { db: Database };
+};
+
 /** Mount consentWebRoutes standalone with the db stub injected per request. */
 function mountWith(db: Database) {
-  return new Hono()
+  return new Hono<ConsentWebTestEnv>()
     .use('*', async (c, next) => {
       c.set('db', db);
       await next();
