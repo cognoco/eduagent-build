@@ -369,6 +369,16 @@ export const resendWebhookRoute = new Hono<{
   const dedupKv = c.env.IDEMPOTENCY_KV;
   const dedupKey = `${SVIX_DEDUP_PREFIX}${webhookId}`;
 
+  // [BUG: compound-dedup] Track whether each replay gate could give an
+  // authoritative answer. A gate is "unavailable" when it cannot confirm
+  // whether this svix-id was already processed: the DB claim threw / the DB
+  // is unbound, or the KV is unbound / its read threw. If BOTH gates are
+  // unavailable the handler has NO replay protection — we must fail closed
+  // (503 → Svix retries later) instead of re-firing side-effects on every
+  // replay within the tolerance window.
+  let dbDedupUnavailable = false;
+  let kvDedupUnavailable = false;
+
   if (db) {
     const claim = await claimWebhookId(db, RESEND_WEBHOOK_SOURCE, webhookId);
     if (claim === 'replay') {
@@ -387,7 +397,9 @@ export const resendWebhookRoute = new Hono<{
     if (claim === 'unavailable') {
       // DB unavailable: silent recovery is banned, escalate. We continue to
       // KV-based protection (weaker) rather than 500-ing — webhook stays
-      // functional under DB outage.
+      // functional under DB outage. The compound-unavailable guard below
+      // fails closed only if the KV gate is ALSO unavailable.
+      dbDedupUnavailable = true;
       logger.warn(
         '[resend] DB dedup unavailable; falling back to KV (weaker guarantee)',
         {
@@ -413,8 +425,12 @@ export const resendWebhookRoute = new Hono<{
     c.env.ENVIRONMENT === 'production' ||
     c.env.ENVIRONMENT === 'staging'
   ) {
-    // No DB middleware in a deployed environment means the atomic gate is
-    // off — surface the regression instead of silently weakening.
+    // No DB middleware bound in a DEPLOYED environment is abnormal — the
+    // atomic gate is off where it should be on, so count it toward the
+    // compound-unavailable guard. (In dev/local an unbound DB is the normal
+    // config, not an outage, so it must NOT trip fail-closed.)
+    dbDedupUnavailable = true;
+    // Surface the regression instead of silently weakening.
     logger.warn('[resend] db not bound in middleware — atomic dedup disabled', {
       event: 'resend.dedup_db_missing',
       environment: c.env.ENVIRONMENT,
@@ -444,6 +460,9 @@ export const resendWebhookRoute = new Hono<{
     } catch (err) {
       // KV read failure must not silently weaken replay protection.
       // (AGENTS.md: "Silent recovery without escalation is banned.")
+      // The KV gate could not answer "already processed?" — count it toward
+      // the compound-unavailable guard below.
+      kvDedupUnavailable = true;
       logger.warn('[resend] svix-id dedup read failed; allowing request', {
         event: 'resend.dedup_lookup_failed',
         webhookId,
@@ -529,6 +548,11 @@ export const resendWebhookRoute = new Hono<{
     c.env.ENVIRONMENT === 'production' ||
     c.env.ENVIRONMENT === 'staging'
   ) {
+    // KV binding missing in a DEPLOYED environment is abnormal — the svix-id
+    // replay gate is off where it should be on, so count it toward the
+    // compound-unavailable guard. (In dev/local an unbound KV is the normal
+    // config, not an outage, so it must NOT trip fail-closed.)
+    kvDedupUnavailable = true;
     // Binding missing in deployed environments must surface — production
     // without dedup means the protection is silently off.
     logger.warn(
@@ -553,6 +577,53 @@ export const resendWebhookRoute = new Hono<{
           },
         }),
       'resend-webhook.dedup-kv-missing',
+    );
+  }
+
+  // [BUG: compound-dedup] FAIL CLOSED when BOTH replay gates are unavailable.
+  // Each gate degrades independently above (DB→KV fallback, KV→continue), but
+  // when neither can confirm "already processed?" the handler has no replay
+  // protection at all — proceeding would re-fire app/email.bounced (and
+  // siblings) on every Svix replay inside the 5-minute tolerance window.
+  // Return 503 so Svix retries later (by which point a gate may have
+  // recovered), and escalate the compound outage so it is visible. A gate
+  // cleanly reporting "already processed" already 409'd above; a clean "not a
+  // duplicate" leaves both flags false and processes normally below.
+  if (dbDedupUnavailable && kvDedupUnavailable) {
+    logger.error(
+      '[resend] BOTH dedup gates unavailable — failing closed (503) to preserve replay protection',
+      {
+        event: 'resend.dedup_compound_unavailable',
+        webhookId,
+      },
+    );
+    captureException(
+      new Error('Resend webhook compound dedup failure (DB + KV unavailable)'),
+      {
+        extra: { context: 'resend-webhook.dedup.compound', webhookId },
+      },
+    );
+    await safeSend(
+      () =>
+        inngest.send({
+          // orphan-allow: structured telemetry required by AGENTS.md. Both
+          // replay gates were unavailable; the handler fails closed (503) +
+          // escalates via logger.error + captureException(Sentry). The event
+          // is a dashboard-queryable outage signal — remediation is a
+          // DB/KV availability fix, not an Inngest handler.
+          name: 'app/resend-webhook.dedup_compound_unavailable',
+          data: {
+            webhookId,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'resend-webhook.dedup-compound-unavailable',
+    );
+    return apiError(
+      c,
+      503,
+      ERROR_CODES.SERVICE_UNAVAILABLE,
+      'Webhook replay protection temporarily unavailable; retry later',
     );
   }
 

@@ -944,11 +944,32 @@ describe('[CCR-PR120-M7] svix-id replay dedup', () => {
   });
 
   it('KV missing in production surfaces an Inngest observability event', async () => {
+    // Use a HEALTHY DB so the DB gate still protects — this isolates the
+    // KV-missing observability path. (With NO DB middleware too, production +
+    // both-unbound is the compound-outage case, which now correctly 503s and
+    // is owned by the dedicated compound-dedup tests below.)
+    const appWithDb = buildAppWithDb(makeFakeDb());
     const env = { ...TEST_ENV, ENVIRONMENT: 'production' };
 
-    const res = await makeRequest(
-      { type: 'email.delivered', data: { to: 'a@b.com' } },
-      {},
+    const rawBody = JSON.stringify({
+      type: 'email.delivered',
+      data: { to: 'a@b.com' },
+    });
+    const id = 'msg_kv_missing_prod';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
       env,
     );
 
@@ -1432,6 +1453,279 @@ describe('[BUG-319] atomic DB-based webhook idempotency', () => {
     ]);
     expect(responses.every((r) => r.status === 200)).toBe(true);
     expect(inngest.send).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Compound dedup failure — both replay gates unavailable must FAIL CLOSED.
+//
+// The DB dedup and the IDEMPOTENCY_KV dedup each degrade independently: when
+// one is unavailable the other still protects against replay. But when BOTH
+// are unavailable at once — DB claim throws AND KV is unbound (or its read
+// throws) — the handler had NO replay protection and still 200'd + dispatched
+// the bounce event, so every Svix replay inside the 5-minute tolerance window
+// re-fired `app/email.bounced` (and siblings).
+//
+// Fix: on the true compound-unavailable case, return 503 so Resend/Svix retries
+// later, do NOT dispatch the event, and escalate (captureException + structured
+// Inngest signal) so the outage is visible. A gate cleanly reporting "already
+// processed" must still 409/skip; a clean "not a duplicate" must process.
+// ---------------------------------------------------------------------------
+
+describe('compound dedup failure — fail closed when BOTH gates unavailable', () => {
+  beforeEach(() => {
+    (inngest.send as jest.Mock).mockClear();
+    mockLoggerWarn.mockClear();
+    const sentryMock = require('../services/sentry') as {
+      captureException: jest.Mock;
+    };
+    sentryMock.captureException.mockClear();
+  });
+
+  it('DB unavailable + KV unbound (deployed env): 503, no bounce dispatch, escalates', async () => {
+    const db = makeFakeDb({ failWith: new Error('db pool exhausted') });
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_compound', to: 'c@example.com' },
+    });
+    const id = 'msg_compound_unbound';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      // No IDEMPOTENCY_KV in env → KV gate unbound. ENVIRONMENT=production
+      // makes an unbound KV an OUTAGE (abnormal), not the dev-default config.
+      { ...TEST_ENV, ENVIRONMENT: 'production' },
+    );
+
+    // Fail CLOSED: 503 so Svix retries later instead of processing unprotected.
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('SERVICE_UNAVAILABLE');
+
+    // The bounce event must NOT fire — that is the duplicate-side-effect we are
+    // preventing across replays.
+    const bounceDispatched = (inngest.send as jest.Mock).mock.calls.some(
+      (call) => call[0]?.name === 'app/email.bounced',
+    );
+    expect(bounceDispatched).toBe(false);
+
+    // Compound outage must be escalated (structured signal + Sentry).
+    const sentryMock = require('../services/sentry') as {
+      captureException: jest.Mock;
+    };
+    expect(sentryMock.captureException).toHaveBeenCalled();
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_compound_unavailable',
+      }),
+    );
+  });
+
+  it('DB unavailable + KV read throws: 503, no bounce dispatch, escalates', async () => {
+    const db = makeFakeDb({ failWith: new Error('db pool exhausted') });
+    const appWithDb = buildAppWithDb(db);
+    const kv: KVNamespaceLike = {
+      get: jest.fn().mockRejectedValue(new Error('kv read boom')),
+      put: jest.fn().mockResolvedValue(undefined),
+    };
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_compound2', to: 'c2@example.com' },
+    });
+    const id = 'msg_compound_kvthrow';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      { ...TEST_ENV, IDEMPOTENCY_KV: kv },
+    );
+
+    expect(res.status).toBe(503);
+    const bounceDispatched = (inngest.send as jest.Mock).mock.calls.some(
+      (call) => call[0]?.name === 'app/email.bounced',
+    );
+    expect(bounceDispatched).toBe(false);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_compound_unavailable',
+      }),
+    );
+  });
+
+  it('only DB unavailable (KV healthy): NOT fail-closed — processes via KV gate', async () => {
+    const db = makeFakeDb({ failWith: new Error('db pool exhausted') });
+    const appWithDb = buildAppWithDb(db);
+    const kv = makeFakeKV();
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_db_only', to: 'd1@example.com' },
+    });
+    const id = 'msg_db_only_down';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      { ...TEST_ENV, IDEMPOTENCY_KV: kv },
+    );
+
+    // KV still protects → normal processing, not 503.
+    expect(res.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/email.bounced' }),
+    );
+    const compoundSignalled = (inngest.send as jest.Mock).mock.calls.some(
+      (call) =>
+        call[0]?.name === 'app/resend-webhook.dedup_compound_unavailable',
+    );
+    expect(compoundSignalled).toBe(false);
+  });
+
+  it('only KV unbound (DB healthy): NOT fail-closed — processes via DB gate', async () => {
+    const db = makeFakeDb();
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_kv_only', to: 'k1@example.com' },
+    });
+    const id = 'msg_kv_only_unbound';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      // No IDEMPOTENCY_KV → KV unbound, but DB claim succeeds.
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/email.bounced' }),
+    );
+    const compoundSignalled = (inngest.send as jest.Mock).mock.calls.some(
+      (call) =>
+        call[0]?.name === 'app/resend-webhook.dedup_compound_unavailable',
+    );
+    expect(compoundSignalled).toBe(false);
+  });
+
+  it('dev default (both unbound, no ENVIRONMENT): NOT fail-closed — processes 200', async () => {
+    // In local/dev neither binding exists by design — that is the normal
+    // config, not an outage. Fail-closed must not break local webhook delivery.
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_dev_default', to: 'dev@example.com' },
+    });
+    const id = 'msg_dev_default';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    // Plain `app` has no DB middleware; TEST_ENV has no IDEMPOTENCY_KV and no
+    // ENVIRONMENT → dev default.
+    const res = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/email.bounced' }),
+    );
+    const compoundSignalled = (inngest.send as jest.Mock).mock.calls.some(
+      (call) =>
+        call[0]?.name === 'app/resend-webhook.dedup_compound_unavailable',
+    );
+    expect(compoundSignalled).toBe(false);
+  });
+
+  it('compound break-test proof: a known REPLAY still 409s when DB is the survivor', async () => {
+    // Anchors that fail-closed does not swallow the clean "already processed"
+    // signal: with a healthy DB, the second identical webhook is a replay and
+    // must 409 (not 503, not 200) even though KV is unbound.
+    const db = makeFakeDb();
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_replay_survivor', to: 'rs@example.com' },
+    });
+    const id = 'msg_replay_survivor';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const headers = {
+      'Content-Type': 'application/json',
+      'svix-id': id,
+      'svix-timestamp': ts,
+      'svix-signature': sig,
+    };
+
+    const first = await appWithDb.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    expect(first.status).toBe(200);
+
+    (inngest.send as jest.Mock).mockClear();
+    const second = await appWithDb.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    expect(second.status).toBe(409);
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 });
 
