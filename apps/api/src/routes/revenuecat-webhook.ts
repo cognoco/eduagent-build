@@ -25,7 +25,7 @@ import { apiError } from '../errors';
 // organization resolution, new `subscription` store). The route body and the
 // bearer-auth / SANDBOX / idempotency-gate guards are unchanged.
 import { getRevenuecatWebhookHandlers } from '../services/billing/billing-v2/dispatch';
-import { captureException } from '../services/sentry';
+import { captureException, captureMessage } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -220,6 +220,43 @@ export const revenuecatWebhookRoute = new Hono<{
       received: true,
       skipped: true,
       reason: 'sandbox_in_production',
+    });
+  }
+
+  // [revenuecat-webhook fail-closed guard] RevenueCat does not guarantee the
+  // `environment` field is present, and new/unknown values (e.g. 'TESTING') can
+  // appear. A deny-list that only rejects 'SANDBOX' fails OPEN: a malformed,
+  // replayed, or test payload with `environment` omitted or set to anything
+  // other than 'PRODUCTION' would otherwise reach handler dispatch and mutate
+  // PRODUCTION billing state from a non-production source. In production we
+  // require `environment === 'PRODUCTION'` explicitly (allow-list) and reject
+  // everything else with the same {skipped} ack shape. Silent recovery is
+  // banned in billing/webhook code — escalate via logger.warn + captureMessage.
+  if (
+    c.env.ENVIRONMENT === 'production' &&
+    event.environment !== 'PRODUCTION'
+  ) {
+    logger.warn(
+      '[revenuecat] Rejected non-PRODUCTION webhook event in production environment',
+      {
+        eventType: event.type,
+        eventId: event.id,
+        environment: event.environment ?? null,
+      },
+    );
+    captureMessage('RevenueCat non-PRODUCTION webhook rejected in production', {
+      level: 'warning',
+      extra: {
+        context: 'revenuecat.webhook.non_production_environment',
+        eventType: event.type,
+        eventId: event.id,
+        environment: event.environment ?? null,
+      },
+    });
+    return c.json({
+      received: true,
+      skipped: true,
+      reason: 'non_production_environment',
     });
   }
 

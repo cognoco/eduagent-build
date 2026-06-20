@@ -2217,6 +2217,70 @@ describe('sandbox events [BUG-624 / A-8]', () => {
     expect(res.status).toBe(200);
     expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
   });
+
+  // BREAK TEST: in production, the SANDBOX guard previously only fired on the
+  // literal 'SANDBOX' value. A malformed / replayed / test payload that OMITS
+  // `environment` (undefined) reached production and mutated billing state from
+  // a non-production source. Production must require environment === 'PRODUCTION'
+  // explicitly and reject anything else with the {skipped} ack.
+  it('rejects production events with environment field MISSING (fail-closed)', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE');
+    // Remove the environment field entirely to simulate a malformed/replay payload.
+    delete (payload.event as { environment?: string }).environment;
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'non_production_environment',
+    });
+    // No billing-state mutation, no account lookup must occur.
+    expect(findAccountByClerkId).not.toHaveBeenCalled();
+    expect(ensureFreeSubscription).not.toHaveBeenCalled();
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+    expect(writeSubscriptionStatus).not.toHaveBeenCalled();
+    // Anomaly must be escalated to Sentry (silent recovery is banned).
+    expect(mockCaptureMessage).toHaveBeenCalled();
+  });
+
+  // BREAK TEST: a NEW / unexpected environment value (e.g. 'TESTING') in
+  // production must also be rejected — the guard is allow-list, not deny-list.
+  it("rejects production events with a non-PRODUCTION environment value ('TESTING')", async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      environment: 'TESTING',
+    });
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'production',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'non_production_environment',
+    });
+    expect(findAccountByClerkId).not.toHaveBeenCalled();
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalled();
+  });
+
+  // Non-production must stay permissive: a missing environment in staging/dev
+  // still drives the normal QA flow (no new gate outside production).
+  it('accepts events with missing environment in non-production (staging)', async () => {
+    const payload = makeWebhookPayload('INITIAL_PURCHASE');
+    delete (payload.event as { environment?: string }).environment;
+    const res = await makeRequest(payload, {
+      ...TEST_ENV,
+      ENVIRONMENT: 'staging',
+    });
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
