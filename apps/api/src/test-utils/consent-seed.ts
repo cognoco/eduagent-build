@@ -155,7 +155,11 @@ export function seedConsentState(
 
   function currentState(): SeedConsentState {
     const idx = Math.min(callIndex, states.length - 1);
-    return states[idx];
+    const state = states[idx];
+    if (state === undefined) {
+      throw new Error('seedConsentState: opts.state must be a non-empty array');
+    }
+    return state;
   }
 
   // membership.findFirst — always returns the single membership row so
