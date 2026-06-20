@@ -66,6 +66,7 @@ import {
   weeklySelfReportGenerate,
 } from './functions/weekly-self-reports';
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
+import { challengeRoundFinalizeFailed } from './functions/challenge-round-finalize-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
 import { subjectRetryCurriculum } from './functions/subject-retry-curriculum';
@@ -159,6 +160,7 @@ export {
   dailyReminderSend,
   askSilentClassify,
   askSilentClassifyOnFailure,
+  challengeRoundFinalizeFailed,
   orphanPersistFailed,
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
@@ -242,6 +244,7 @@ export const functions = [
   dailyReminderSend,
   askSilentClassify,
   askSilentClassifyOnFailure,
+  challengeRoundFinalizeFailed,
   orphanPersistFailed,
   subjectPrewarmCurriculum,
   subjectRetryCurriculum,
