@@ -4107,5 +4107,81 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Utilização: {{used}} de {{limit}} perguntas utilizadas"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Central de apoio",
+      "subtitle": "Um painel para os alunos que você apoia.",
+      "empty": "Adicione um aluno para ver as necessidades de apoio aqui.",
+      "openPerson": "Abrir {{name}}",
+      "personHint": "Abrir a vista de apoio deste aluno.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Sinais de apoio para este aluno."
+    },
+    "subjects": {
+      "title": "Disciplinas",
+      "subtitle": "Uma vista estrutural das disciplinas de cada aluno.",
+      "empty": "Adicione um aluno para ver as suas disciplinas aqui.",
+      "openPerson": "Abrir disciplinas de {{name}}",
+      "personHint": "Abrir a vista estrutural da disciplina.",
+      "structuralOnly": "Apenas estrutura de disciplina, capítulo e tópico.",
+      "bookCount": "{{count}} livro",
+      "bookCount_other": "{{count}} livros",
+      "errorTitle": "Não foi possível carregar as disciplinas",
+      "errorMessage": "Tente novamente daqui a pouco."
+    },
+    "journal": {
+      "title": "Diário",
+      "subtitle": "Registos de apoio enviados para si, agrupados por aluno.",
+      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento.",
+      "personPlaceholderTitle": "Registos partilhados chegam no S5",
+      "personPlaceholderMessage": "Por enquanto, este âmbito mantém ocultas as notas do aluno, conversas e artefactos privados do diário."
+    }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "pai/mãe",
+      "sibling": "irmão/irmã",
+      "teacher": "professor(a)",
+      "other": "apoiador(a)"
+    },
+    "contract": {
+      "title": "Contrato de visibilidade",
+      "supporterFallback": "Seu apoiador",
+      "supporteeFallback": "este aprendiz",
+      "supporterLine": "Você está pedindo para apoiar {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} quer te apoiar como seu/sua {{relation}}.",
+      "reportableKinds": "Apoiadores podem ver o domínio, esforço e engajamento observável.",
+      "artifactWall": "Conversas privadas, notas e artefatos do diário permanecem ocultos.",
+      "renderEquivalence": "Ambos os lados veem os mesmos fatos, enquadrados para seu papel.",
+      "safetyException": "Alertas de segurança ainda chegam aos adultos responsáveis.",
+      "accept": "Aceitar contrato",
+      "accepted": "Aceito"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Nenhum registro compartilhado ainda",
+      "emptyForPerson": "{{name}}: nenhum registro compartilhado ainda.",
+      "structuralOnly": "Apenas fatos estruturais. Sem notas brutas ou texto de chat.",
+      "errorTitle": "Erro ao carregar registro compartilhado",
+      "errorMessage": "Tente novamente em um instante.",
+      "retry": "Tentar novamente"
+    },
+    "appeal": {
+      "label": "Solicitar relatório de atenção"
+    },
+    "revocation": {
+      "title": "Acesso encerrado",
+      "message": "Este link de apoio está terminando. O período de carência termina em {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Seu espaço está mudando",
+      "message": "Agora você escolhe o que este apoiador pode ver.",
+      "version": "Versão do contrato {{version}}"
+    },
+    "coLearning": {
+      "title": "Explicação opcional",
+      "fill": "Preencher resposta",
+      "dismiss": "Dispensar"
+    }
   }
 }

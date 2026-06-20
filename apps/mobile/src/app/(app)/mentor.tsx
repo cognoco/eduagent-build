@@ -17,12 +17,14 @@ import {
   type NowCardArcState,
   type RewardReceipt,
 } from '../../components/mentor';
+import { SupportHubMentorTab } from '../../components/support';
 import { ErrorFallback } from '../../components/common';
 import { useNowFeed, useNowOverflow } from '../../hooks/use-now-feed';
 import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { useScopeContext } from '../../lib/scope-context';
 import { isSchoolDayEvening } from '../../lib/school-day-evening';
 
 function resumeDeepLinkFromCache(
@@ -72,7 +74,7 @@ function pushMentorHomeworkCamera(router: ReturnType<typeof useRouter>): void {
   } as Href);
 }
 
-export default function MentorScreen(): React.ReactElement {
+function LearnerMentorScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const nowFeed = useNowFeed();
@@ -330,4 +332,31 @@ export default function MentorScreen(): React.ReactElement {
       />
     </View>
   );
+}
+
+export default function MentorScreen(): React.ReactElement {
+  const { activeScope, availableScopes, setActiveScope } = useScopeContext();
+  const personScopes = availableScopes.filter(
+    (scope) => scope.kind === 'person',
+  );
+
+  if (activeScope.kind === 'supporter-hub') {
+    return (
+      <SupportHubMentorTab
+        personScopes={personScopes}
+        onOpenPersonScope={setActiveScope}
+      />
+    );
+  }
+
+  if (activeScope.kind === 'person') {
+    return (
+      <SupportHubMentorTab
+        personScopes={[activeScope]}
+        activePersonScope={activeScope}
+      />
+    );
+  }
+
+  return <LearnerMentorScreen />;
 }

@@ -189,7 +189,6 @@ async function runAutoFileSession({
           bookId: result.bookId,
           topicId: result.topicId,
         },
-        visibility: 'self',
       });
       return { written: true };
     } catch (err) {

@@ -9,9 +9,9 @@
 // parent's account with no UI affordance to clean up.
 //
 // These are real-DB integration tests (no internal mocks). They seed the v2
-// identity graph (person/organization/login/membership/guardianship) — the
-// committed-migration close-gate DB has dropped accounts/profiles/family_links
-// — and drive cloneTopicFromChild → undoCloneFromChild through the real service.
+// identity graph (person/organization/login/membership/guardianship) plus the
+// legacy profile anchors still required by learning-table FKs, then drive
+// cloneTopicFromChild → undoCloneFromChild through the real service.
 //
 // Red-before / green-after: against the pre-fix undoCloneFromChild (topic-only
 // delete), the "deletes the orphan subject AND book" case is RED (the orphan
@@ -128,6 +128,25 @@ async function seedFamily(): Promise<Fixture> {
   const childId = randomUUID();
 
   if (isIdentityV2Enabled()) {
+    // Learning tables still FK to profiles.id while the v2 identity graph is
+    // under rollout, so flag-on fixtures need legacy anchors as well.
+    await ensureLegacyProfileAnchorForTest(db, {
+      profileId: adultId,
+      accountId,
+      displayName: 'Parent',
+      birthYear: 1985,
+      isOwner: true,
+      email: EMAIL,
+      clerkUserId: CLERK_USER_ID,
+    });
+    await ensureLegacyProfileAnchorForTest(db, {
+      profileId: childId,
+      accountId,
+      displayName: 'Ada',
+      birthYear: 2013,
+      isOwner: false,
+    });
+
     // v2 graph: organization + adult/child person + login/membership + edge.
     await ensureV2IdentityForLegacyProfileTest(db, {
       accountId,

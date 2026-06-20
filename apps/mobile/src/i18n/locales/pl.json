@@ -4265,5 +4265,83 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Wykorzystanie: {{used}} z {{limit}} pytań użytych"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Centrum wsparcia",
+      "subtitle": "Panel kontrolny dla uczniów, których wspierasz.",
+      "empty": "Dodaj ucznia, aby zobaczyć tutaj potrzeby wsparcia.",
+      "openPerson": "Otwórz {{name}}",
+      "personHint": "Otwórz widok wsparcia dla tego ucznia.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Sygnały wsparcia dla tego ucznia."
+    },
+    "subjects": {
+      "title": "Przedmioty",
+      "subtitle": "Strukturalny widok przedmiotów każdego ucznia.",
+      "empty": "Dodaj ucznia, aby zobaczyć tutaj jego przedmioty.",
+      "openPerson": "Zobacz przedmioty {{name}}",
+      "personHint": "Otwórz strukturalny widok przedmiotów.",
+      "structuralOnly": "Tylko struktura przedmiotów, rozdziałów i tematów.",
+      "bookCount": "{{count}} książka",
+      "bookCount_few": "{{count}} książki",
+      "bookCount_many": "{{count}} książek",
+      "bookCount_other": "{{count}} książek",
+      "errorTitle": "Nie udało się wczytać przedmiotów",
+      "errorMessage": "Spróbuj ponownie za chwilę."
+    },
+    "journal": {
+      "title": "Dziennik",
+      "subtitle": "Zapisy wsparcia wysłane do Ciebie, pogrupowane według uczniów.",
+      "personHint": "Udostępnione zapisy pojawią się tutaj po wyrażeniu zgody.",
+      "personPlaceholderTitle": "Udostępnione zapisy pojawią się w S5",
+      "personPlaceholderMessage": "Na razie ten zakres ukrywa notatki uczniów, czaty i prywatne zapisy w dzienniku."
+    }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "rodzic",
+      "sibling": "rodzeństwo",
+      "teacher": "nauczyciel",
+      "other": "opiekun"
+    },
+    "contract": {
+      "title": "Umowa o widoczności",
+      "supporterFallback": "Twój opiekun",
+      "supporteeFallback": "ten uczeń",
+      "supporterLine": "Prosisz o wsparcie dla {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} chce Cię wspierać jako Twój/Twoja {{relation}}.",
+      "reportableKinds": "Opiekunowie mogą widzieć postępy, wysiłek i widoczne zaangażowanie.",
+      "artifactWall": "Prywatne czaty, notatki i wpisy w dzienniku pozostają ukryte.",
+      "renderEquivalence": "Obie strony widzą te same fakty, przedstawione z perspektywy ich roli.",
+      "safetyException": "Zgłoszenia dotyczące bezpieczeństwa nadal docierają do odpowiednich dorosłych.",
+      "accept": "Zaakceptuj umowę",
+      "accepted": "Zaakceptowano"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Brak udostępnionych danych",
+      "emptyForPerson": "{{name}}: brak udostępnionych danych.",
+      "structuralOnly": "Tylko fakty strukturalne. Bez surowych notatek i treści czatów.",
+      "errorTitle": "Nie udało się wczytać udostępnionych danych",
+      "errorMessage": "Spróbuj ponownie za chwilę.",
+      "retry": "Spróbuj ponownie"
+    },
+    "appeal": {
+      "label": "Poproś o raport uwagi"
+    },
+    "revocation": {
+      "title": "Koniec udostępniania",
+      "message": "Ten link wsparcia wygasa. Okres prolongaty kończy się {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Twoja przestrzeń się zmienia",
+      "message": "Teraz Ty decydujesz, co ten opiekun może zobaczyć.",
+      "version": "Wersja umowy {{version}}"
+    },
+    "coLearning": {
+      "title": "Opcjonalne wyjaśnienie",
+      "fill": "Uzupełnij",
+      "dismiss": "Odrzuć"
+    }
   }
 }

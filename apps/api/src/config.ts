@@ -157,6 +157,11 @@ const envSchema = z.object({
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // S5 managed visibility tier. Built dark for launch: day-one visibility
+  // links are credentialed/consent-capable only; managed handoff activation is
+  // a separate server-enforced flag flip.
+  MANAGED_TIER_ACTIVE: z.enum(['true', 'false']).default('false'),
+
   // Identity Foundation cutover (CUT-B WP). The SINGLE flag for the whole
   // identity surface (auth/account/person/consent-read/billing) — never
   // per-domain flags (partial activation = split-brain, banned). Default-OFF:
@@ -272,6 +277,10 @@ export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
  * undefined) stays on legacy.
  */
 export function isIdentityV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+export function isManagedTierActive(value: string | undefined): boolean {
   return value === 'true';
 }
 

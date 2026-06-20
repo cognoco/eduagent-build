@@ -111,6 +111,8 @@ import {
 import { needsDeepeningExpirePending } from './functions/needs-deepening-expire-pending';
 import { notifyParentChildCapHit } from './functions/notify-parent-child-cap-hit';
 import { accountSecurityNotification } from './functions/account-security-notification';
+import { supportershipRevocation } from './functions/supportership-revocation';
+import { graduationNarration } from './functions/graduation-narration';
 
 export {
   inngest,
@@ -194,6 +196,8 @@ export {
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  supportershipRevocation,
+  graduationNarration,
 };
 
 // All Inngest functions to register with the serve handler
@@ -279,4 +283,6 @@ export const functions = [
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  supportershipRevocation,
+  graduationNarration,
 ];

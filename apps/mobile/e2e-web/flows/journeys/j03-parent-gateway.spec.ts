@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { switchAppMode } from '../../helpers/mode-switcher';
+import { expectAppMode, switchAppMode } from '../../helpers/mode-switcher';
 import { enterFamilyHome } from '../../helpers/parent-home';
 
 test('J-03 seeded parent lands on parent home @smoke', async ({ page }) => {
@@ -32,14 +32,10 @@ test('J-03 parent can switch between Family and My Learning @smoke', async ({
 
   await switchAppMode(page, 'study');
 
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
-    timeout: 30_000,
-  });
+  await expectAppMode(page, 'study', 30_000);
   await expect(page.getByTestId('parent-home-screen')).toHaveCount(0);
 
   await switchAppMode(page, 'family');
 
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
-    timeout: 30_000,
-  });
+  await expectAppMode(page, 'family', 30_000);
 });

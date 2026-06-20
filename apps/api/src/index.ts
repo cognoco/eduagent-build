@@ -92,6 +92,7 @@ import { maintenanceRoutes } from './routes/maintenance';
 import { challengeRoundRoutes } from './routes/challenge-round';
 import { nowRoutes } from './routes/now';
 import { scopesRoutes } from './routes/scopes';
+import { visibilityRoutes } from './routes/visibility';
 
 // [Issue-888] Bindings must stay in sync with envSchema in config.ts.
 // All string env vars that envSchema declares must appear here so c.env.X
@@ -184,6 +185,8 @@ type Bindings = {
   // Two-stage convergence freeze gate (maintenance.ts). Default 'false'.
   MAINTENANCE_READONLY?: string;
   MAINTENANCE_BLOCK_INNGEST?: string;
+  // S5 managed visibility tier. Default 'false'.
+  MANAGED_TIER_ACTIVE?: string;
 
   // KV Namespaces — runtime objects, not env strings; listed separately
   SUBSCRIPTION_KV?: KVNamespace;
@@ -196,6 +199,7 @@ type Variables = {
   account: Account;
   profileId: string;
   profileMeta: ProfileMeta | undefined;
+  callerPersonId: string | undefined;
   subscriptionId: string;
   subscriptionTier: SubscriptionTier | undefined;
   llmTier: LLMTier;
@@ -384,6 +388,7 @@ const routes = api
   .route('/support', supportRoutes)
   .route('/', librarySearchRoutes)
   .route('/', scopesRoutes)
+  .route('/', visibilityRoutes)
   .route('/', nowRoutes)
   .route('/', challengeRoundRoutes);
 

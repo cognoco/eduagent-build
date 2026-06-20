@@ -80,7 +80,13 @@ const INNGEST_BUILTIN_PREFIXES = ['inngest/'];
  * inverse-orphan event not in this set fails CI immediately. DO NOT add to this
  * list without a written rationale + a tracked owner for re-wiring or removal.
  *
- * Currently empty. The original entry — `app/exchange.empty_reply_fallback` —
+ * `app/person.graduated` is S5's consumer for the identity-owned graduation /
+ * consent-gate-lifts event. The producer is intentionally owned by the
+ * identity-foundation flip/convergence path, not this trust-layer slice; keep
+ * the consumer registered so the S5 contract-restamp projection is ready when
+ * that producer lands.
+ *
+ * The original entry — `app/exchange.empty_reply_fallback` —
  * was resolved in [BUG-796]: the dispatcher was re-wired via safeSend() from
  * the streaming fallback path in routes/sessions.ts (option (a) of the
  * resolution noted below), so the observability terminus
@@ -89,7 +95,7 @@ const INNGEST_BUILTIN_PREFIXES = ['inngest/'];
  * `every event-triggered handler has a production dispatcher` test below passes
  * directly and the entry was removed from this set.
  */
-const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>([]);
+const KNOWN_PENDING_INVERSE_ORPHANS = new Set<string>(['app/person.graduated']);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');

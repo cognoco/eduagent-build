@@ -71,6 +71,8 @@ function deepLinkFor(kind: CandidateKind, id: string) {
       });
     case 'ledger_moment':
       return resolveDeepLink('journal', {});
+    case 'support_hub_pointer':
+      return resolveDeepLink('support.hub', {});
   }
 }
 

@@ -21,6 +21,7 @@ export * from './assessments';
 export * from './activity-ledger';
 export * from './now-feed';
 export * from './scope';
+export * from './visibility-contract';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';

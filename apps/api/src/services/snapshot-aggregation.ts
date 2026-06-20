@@ -1256,7 +1256,6 @@ async function writeMilestoneLedgerMoments(
       kind: 'milestone_reached',
       templateKey: 'ledger.milestone_reached.default',
       params: buildMilestoneLedgerParams(milestone),
-      visibility: 'self',
     });
   }
 }

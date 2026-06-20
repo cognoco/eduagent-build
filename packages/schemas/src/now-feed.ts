@@ -10,6 +10,7 @@ export const nowCardKindSchema = z.enum([
   'needs_deepening',
   'challenge_ready',
   'ledger_moment',
+  'support_hub_pointer',
 ]);
 export type NowCardKind = z.infer<typeof nowCardKindSchema>;
 
@@ -20,6 +21,7 @@ export const nowDeepLinkRouteSchema = z.enum([
   'retention.review',
   'challenge.start',
   'journal',
+  'support.hub',
 ]);
 export type NowDeepLinkRoute = z.infer<typeof nowDeepLinkRouteSchema>;
 
