@@ -15,6 +15,7 @@ import {
 } from './SubjectHubSearchFilter';
 import { SubjectHubChapterSection } from './SubjectHubChapterSection';
 import { SubjectHubNextUp } from './SubjectHubNextUp';
+import { SubjectHubNotesSection } from './SubjectHubNotesSection';
 import { SubjectHubProgressSummary } from './SubjectHubProgressSummary';
 import { TopicDetailSheet } from './TopicDetailSheet';
 
@@ -106,23 +107,7 @@ export function SubjectHub({
           </Text>
         )}
 
-        {showNotes ? (
-          <View className="mt-5 rounded-card bg-surface p-4">
-            <Text className="text-caption font-semibold uppercase text-text-secondary">
-              {t('subjectHub.notes.heading')}
-            </Text>
-            {data.notes.map((note) => (
-              <View key={note.id} className="mt-3 border-t border-border pt-3">
-                <Text className="text-caption font-semibold text-text-secondary">
-                  {note.authorLabel}
-                </Text>
-                <Text className="mt-1 text-body-sm text-text-primary">
-                  {note.content}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        {showNotes ? <SubjectHubNotesSection notes={data.notes} /> : null}
       </ScrollView>
 
       <TopicDetailSheet

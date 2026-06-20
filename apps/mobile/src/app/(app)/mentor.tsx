@@ -7,12 +7,14 @@ import type { NowCard, NowResponse } from '@eduagent/schemas';
 import {
   ColdStartCard,
   LightPracticeAffordance,
+  MentorCelebration,
   MentorInputBar,
   NowCardStack,
   OnTrackBadge,
   RewardReceiptCard,
   getNowCardDismissKey,
   type LightPracticeRoute,
+  type NowCardArcState,
   type RewardReceipt,
 } from '../../components/mentor';
 import { ErrorFallback } from '../../components/common';
@@ -66,6 +68,16 @@ export default function MentorScreen(): React.ReactElement {
   const nowFeed = useNowFeed();
   const subjectsIndex = useSubjectsIndex();
   const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(new Set());
+  const [cardArcStates, setCardArcStates] = useState<
+    Record<string, NowCardArcState>
+  >({});
+  const [completionCelebration, setCompletionCelebration] = useState<{
+    eventId: string;
+    messageKey: 'mentorHome.celebration.ownChoice';
+  } | null>(null);
+  const [seenCelebrationEventIds, setSeenCelebrationEventIds] = useState<
+    Set<string>
+  >(new Set());
   const [showOverflow, setShowOverflow] = useState(false);
   const [showLightPractice, setShowLightPractice] = useState(false);
   const overflow = useNowOverflow(showOverflow);
@@ -77,7 +89,16 @@ export default function MentorScreen(): React.ReactElement {
   const rewardReceipt = rewardReceiptFromFeed(feed);
   const reviewsDue = countReviewsDue(feed);
 
+  const setArcState = (card: NowCard, arcState: NowCardArcState): void => {
+    const key = getNowCardDismissKey(card);
+    setCardArcStates((current) => ({ ...current, [key]: arcState }));
+  };
+
+  const getArcState = (card: NowCard): NowCardArcState | undefined =>
+    cardArcStates[getNowCardDismissKey(card)];
+
   const handleContinue = (card: NowCard): void => {
+    setArcState(card, 'advancing');
     pushNowDeepLink(router, card.deepLink, {
       subjectHubTarget: 'v2-subject-hub',
     });
@@ -90,6 +111,23 @@ export default function MentorScreen(): React.ReactElement {
       return next;
     });
     setShowLightPractice(true);
+  };
+
+  const handleCompleted = (card: NowCard): void => {
+    const key = getNowCardDismissKey(card);
+    setCardArcStates((current) => ({ ...current, [key]: 'mastered' }));
+    setCompletionCelebration({
+      eventId: `mentor-completed:${key}`,
+      messageKey: 'mentorHome.celebration.ownChoice',
+    });
+  };
+
+  const handleCelebrationSeen = (eventId: string): void => {
+    setSeenCelebrationEventIds((current) => {
+      const next = new Set(current);
+      next.add(eventId);
+      return next;
+    });
   };
 
   const handleSubmitText = (text: string): void => {
@@ -180,8 +218,11 @@ export default function MentorScreen(): React.ReactElement {
           feed={feed}
           overflow={overflow.data}
           dismissedKeys={dismissedKeys}
+          anchorArcState="due"
+          getArcState={getArcState}
           onContinue={handleContinue}
           onDecline={handleDecline}
+          onCompleted={handleCompleted}
           onShowOverflow={() => setShowOverflow(true)}
         />
       </>
@@ -205,6 +246,14 @@ export default function MentorScreen(): React.ReactElement {
 
         <View className="gap-3">
           {renderedFeed}
+          {completionCelebration ? (
+            <MentorCelebration
+              eventId={completionCelebration.eventId}
+              messageKey={completionCelebration.messageKey}
+              seenEventIds={seenCelebrationEventIds}
+              onMarkSeen={handleCelebrationSeen}
+            />
+          ) : null}
           {rewardReceipt ? <RewardReceiptCard receipt={rewardReceipt} /> : null}
           {showLightPractice || (feed?.cards.length ?? 0) <= 1 ? (
             <LightPracticeAffordance

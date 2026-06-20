@@ -60,6 +60,8 @@ import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 import { languagePromptsFlow } from './flows/language-prompts';
 import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
 import { nowParkReturnFlow } from './flows/now-park-return';
+import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
+import { parkAndReturnReweaveFlow } from './flows/park-and-return-reweave';
 import { appHelpV2Flow } from './flows/app-help-v2';
 import {
   listFlows,
@@ -124,6 +126,8 @@ const FLOWS: FlowDefinition[] = [
   languagePromptsFlow as FlowDefinition,
   adaptiveTeachingFlow as FlowDefinition,
   nowParkReturnFlow as FlowDefinition,
+  parkAndReturnRankingFlow as FlowDefinition,
+  parkAndReturnReweaveFlow as FlowDefinition,
   appHelpV2Flow as FlowDefinition,
 ];
 

@@ -844,6 +844,10 @@
       "stopRecording": "Aufnahme stoppen"
     },
     "expiredSystemMessage": "Sitzung abgelaufen. Starte eine neue, um weiterzumachen.",
+    "firstWrap": {
+      "recap": "Du hast einen echten Lernschritt abgeschlossen.",
+      "recapWithSubject": "Du hast einen echten Lernschritt zu {{subject}} abgeschlossen."
+    },
     "errorBoundary": {
       "crashTitle": "Sitzungsbildschirm abgestürzt",
       "unknownError": "Unbekannter Fehler",
@@ -3902,7 +3906,8 @@
       "chipHomework": "Hilf mir bei den Hausaufgaben",
       "chipLearn": "Bring mir etwas Neues bei",
       "chipAsk": "Ich habe eine Frage",
-      "homeworkReply": "Nutze die Kamera, um das Problem zu erfassen, oder tippe es hier ein."
+      "homeworkReply": "Nutze die Kamera, um das Problem zu erfassen, oder tippe es hier ein.",
+      "firstSessionTeach": "Ich merke mir, was du hier schreibst, damit der nächste Schritt näher bei dir beginnt."
     },
     "title": "Mentor",
     "subtitle": "Ein paar nützliche nächste Schritte und ein Ort, an dem du alles fragen oder festhalten kannst.",

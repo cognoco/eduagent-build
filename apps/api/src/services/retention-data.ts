@@ -58,8 +58,8 @@ import { stampMasteryOnVerify } from './retention-mastery';
 import {
   applyRetentionUpdate,
   insertRetentionCardIfAbsent,
+  syncRewardStatusFromRetention,
 } from './apply-retention-update';
-import { syncXpLedgerStatus } from './xp';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
@@ -922,7 +922,12 @@ export async function processRecallTest(
   // handled at insert time by insertSessionXpEntry (post-sunset, 5fed808e9).
   // No-op when no ledger row exists (topic never completed a session).
   if (result.xpChange === 'decayed') {
-    await syncXpLedgerStatus(db, profileId, input.topicId, 'decayed');
+    await syncRewardStatusFromRetention({
+      db,
+      profileId,
+      topicId: input.topicId,
+      status: 'decayed',
+    });
   }
 
   await stampMasteryOnVerify(db, {

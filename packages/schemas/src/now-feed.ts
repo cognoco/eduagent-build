@@ -19,6 +19,7 @@ export const nowDeepLinkRouteSchema = z.enum([
   'subject.hub',
   'retention.review',
   'challenge.start',
+  'journal',
 ]);
 export type NowDeepLinkRoute = z.infer<typeof nowDeepLinkRouteSchema>;
 

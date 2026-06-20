@@ -177,4 +177,14 @@ describe('MentorScreen', () => {
       params: { activityType: 'capitals', returnTo: 'mentor' },
     });
   });
+
+  it('advances the anchor arc and shows the mentor celebration when a card is completed', () => {
+    render(<MentorScreen />);
+
+    screen.getByText('Ready to pick back up');
+    fireEvent.press(screen.getByTestId('now-card-complete'));
+
+    screen.getByText('Session wrapped');
+    screen.getByText('You chose the next step.');
+  });
 });

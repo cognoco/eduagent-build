@@ -1,5 +1,6 @@
 import { and, eq, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import { retentionCards, type Database } from '@eduagent/database';
+import { syncXpLedgerStatus } from './xp';
 
 export interface RetentionCardSet {
   easeFactor?: number;
@@ -163,4 +164,18 @@ export async function resetRetentionCardForRelearn({
         eq(retentionCards.profileId, profileId),
       ),
     );
+}
+
+export async function syncRewardStatusFromRetention({
+  db,
+  profileId,
+  topicId,
+  status,
+}: {
+  db: Database;
+  profileId: string;
+  topicId: string;
+  status: 'verified' | 'decayed';
+}): Promise<boolean> {
+  return syncXpLedgerStatus(db, profileId, topicId, status);
 }

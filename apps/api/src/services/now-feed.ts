@@ -71,6 +71,7 @@ export const ROUTE_CATALOG = {
     params: ['subjectId', 'topicId'],
     chain: ['subject.hub'],
   },
+  journal: { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,
   { params: readonly string[]; chain: readonly NowDeepLinkRoute[] }
@@ -692,6 +693,13 @@ function resolveLedgerDeepLink(
   }
   if (sessionId) {
     return resolveDeepLink('session.resume', { sessionId });
+  }
+  // The new subject/session-less kinds route to the journal as a catch-all.
+  // Other kinds keep their prior behavior: a row with no usable params is
+  // excluded from the feed (caller drops candidates whose deepLink is null)
+  // rather than masquerading behind a journal link.
+  if (kind === 'milestone_reached' || kind === 'reward_receipt') {
+    return resolveDeepLink('journal', {});
   }
   return null;
 }

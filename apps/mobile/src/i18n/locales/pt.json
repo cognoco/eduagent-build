@@ -871,6 +871,10 @@
       "stopRecording": "Parar de gravar"
     },
     "expiredSystemMessage": "Sessão expirada. Comece uma nova para continuar.",
+    "firstWrap": {
+      "recap": "Você concluiu uma troca real de aprendizagem.",
+      "recapWithSubject": "Você concluiu uma troca real de aprendizagem sobre {{subject}}."
+    },
     "errorBoundary": {
       "crashTitle": "O ecrã da sessão falhou",
       "unknownError": "Erro desconhecido",
@@ -3902,7 +3906,8 @@
       "chipHomework": "Ajude-me com o dever de casa",
       "chipLearn": "Ensine-me algo novo",
       "chipAsk": "Eu tenho uma pergunta",
-      "homeworkReply": "Use a câmera para capturar o problema ou digite-o aqui."
+      "homeworkReply": "Use a câmera para capturar o problema ou digite-o aqui.",
+      "firstSessionTeach": "Vou lembrar o que você escrever aqui para que o próximo passo comece mais perto de você."
     },
     "title": "Mentor",
     "subtitle": "Alguns próximos passos úteis, além de um lugar para perguntar ou anotar qualquer coisa.",

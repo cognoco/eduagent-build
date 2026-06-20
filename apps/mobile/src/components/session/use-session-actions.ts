@@ -100,6 +100,11 @@ export interface UseSessionActionsOptions {
   ) => Promise<void>;
   fetchFastCelebrations: () => Promise<PendingCelebration[]>;
   showConfirmation: (message: string) => void;
+  onSessionClosed?: (event: {
+    sessionId: string;
+    wallClockSeconds: number;
+    fastCelebrations: PendingCelebration[];
+  }) => boolean;
   router: Router;
   returnTo?: string;
 }
@@ -149,6 +154,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
+    onSessionClosed,
     router,
     returnTo,
   } = opts;
@@ -364,6 +370,22 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               if (timeoutId) {
                 clearTimeout(timeoutId);
               }
+              if (
+                onSessionClosed?.({
+                  sessionId: activeSessionId,
+                  wallClockSeconds: result.wallClockSeconds,
+                  fastCelebrations: [],
+                })
+              ) {
+                closedSessionRef.current = {
+                  wallClockSeconds: result.wallClockSeconds,
+                  fastCelebrations: [],
+                };
+                await clearSessionRecoveryMarker(activeProfileId);
+                setIsClosing(false);
+                return;
+              }
+
               const fastCelebrations = await fetchFastCelebrations();
               await clearSessionRecoveryMarker(activeProfileId);
 
@@ -437,6 +459,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     milestonesReached,
     effectiveMode,
     navigateToSummary,
+    onSessionClosed,
     returnTo,
     router,
     setIsClosing,

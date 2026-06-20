@@ -69,6 +69,13 @@ const baseData: SubjectHubData = {
       origin: 'self',
       authorLabel: 'Me',
     },
+    {
+      id: 'note-2',
+      topicId: 'topic-2',
+      content: 'Mentor saved the light reaction example.',
+      origin: 'mentor',
+      authorLabel: 'Saved from mentor',
+    },
   ],
   showSearchFilter: true,
   canStudy: true,
@@ -95,6 +102,13 @@ describe('SubjectHub', () => {
     screen.getByText('subjectHub.nextUp.heading');
     screen.getByText('Core');
     screen.getByText('Cells split in phases.');
+    expect(
+      screen.queryByText('Mentor saved the light reaction example.'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('subject-hub-notes-mentor'));
+    screen.getByText('Mentor saved the light reaction example.');
+    expect(screen.queryByText('Cells split in phases.')).toBeNull();
 
     fireEvent.press(screen.getByTestId('search-mic'));
     expect(onSearchVoice).toHaveBeenCalledWith({

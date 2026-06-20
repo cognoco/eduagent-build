@@ -1,4 +1,4 @@
-> **STATUS: P0 ISSUE MAP + RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, and WI-853; WI-859 replaced the QA-03/QA-04 closure proof with deterministic jest coverage. WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now mapped to Cosmo items WI-854 through WI-865.
+> **STATUS: P0 RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, WI-853, WI-854, WI-855, WI-856, WI-858, WI-861, WI-863, WI-864, and WI-865; WI-859 replaced the QA-03/QA-04 closure proof with deterministic jest coverage. WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now WI-857/QA-02 and WI-862/QUIZ-16; WI-873 tracks the registry-smoke infrastructure timeout seen during this rerun.
 
 # Mobile App Flow Revision Plan
 
@@ -22,9 +22,13 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 
 **Remediation update 2026-06-19 (WI-822):** BILLING-08 family-pool removal path fixed and rerun in Chrome/Playwright. The `mentor-audit-family-pool-members` seed now lands the owner in family context, the family-pool flow exercises a removable child row, and the browser regression confirms confirm/remove/list-refresh behavior.
 
-**P0 issue-map update 2026-06-19:** BILLING-13 is resolved by `WI-853`; the remaining 22 P0 pass-with-issues rows are grouped into 12 Cosmo issue clusters so shared blockers are visible before further implementation: `WI-854` HOME-15, `WI-855` SUBJECT-20, `WI-856` ACCOUNT-32/38, `WI-857` QA-02/15, `WI-858` SUBJECT-06/22, `WI-859` QA-03/04, `WI-860` QA-05/06/07, `WI-861` HOMEWORK-08/09, `WI-862` QUIZ-02/16, `WI-863` DICT-03/05/06, `WI-864` LEARN-50, and `WI-865` CC-05.
+**P0 issue-map update 2026-06-19:** BILLING-13 is resolved by `WI-853`; the then-remaining 22 P0 pass-with-issues rows were grouped into 12 Cosmo issue clusters so shared blockers were visible before further implementation: `WI-854` HOME-15, `WI-855` SUBJECT-20, `WI-856` ACCOUNT-32/38, `WI-857` QA-02/15, `WI-858` SUBJECT-06/22, `WI-859` QA-03/04, `WI-860` QA-05/06/07, `WI-861` HOMEWORK-08/09, `WI-862` QUIZ-02/16, `WI-863` DICT-03/05/06, `WI-864` LEARN-50, and `WI-865` CC-05.
+
+**P0 rerun update 2026-06-19 (after `origin/main` merge):** deterministic reruns cleared WI-854, WI-855, WI-856, WI-858, WI-861, WI-863, WI-864, and WI-865. WI-857 is partially cleared: QA-15 preview/onboarding unit evidence passed, but QA-02's mentor-audit registry smoke did not execute because Expo web export stalled twice on Windows; new Cosmo bug `WI-873` tracks that test-infrastructure timeout. WI-862 is partially cleared: QUIZ-02 passed in Chrome/Playwright, but QUIZ-16 still needs a forced seed because the rerun clicked a higher-priority resume card instead of the quiz-discovery card.
 
 **P1 issue-map update 2026-06-19:** Remaining V2-primary P1 pass-with-issues rows are grouped into three Cosmo issue clusters under Flow Remediation: `WI-870` AUTH-03/05/06/08/09 auth-provider handoffs, `WI-871` ACCOUNT-17/19/20/21/22/24/25/26/27 + QA-09/12 consent handoffs, and `WI-872` PARENT-01/02/03/14/16/17/22/24/25 + QA-08 parent/family branch coverage.
+
+**Remaining issue-map update 2026-06-20:** the 12 pass-with-issues rows that had no tracker are now mapped. New Cosmo items: `WI-874` ACCOUNT-06/09/10/11 account-settings provider/native branches, `WI-875` ACCOUNT-08/CC-07 accommodation picker/badge branches, and `WI-876` SUBJECT-21 curriculum retry evidence. Existing clusters absorbed related rows: `WI-870` QA-13, `WI-871` ACCOUNT-07/23/50, and `WI-872` CC-17.
 
 ## Purpose
 
@@ -234,12 +238,12 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-03 | Add child profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-04 | Profile switching via `/profiles` modal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-05 | Profile-limit / family-plan gating for add-child | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
-| ACCOUNT-06 | More hub | ⚠️ | Pass w/ issues |  |  | Profile-edit UI reached; avatar/media branch remains native-dependent. |
-| ACCOUNT-07 | Notifications sub-screen | ⚠️ | Pass w/ issues |  |  | Add-child flow reached; some external parent email handoff branches were source-checked. |
-| ACCOUNT-08 | Accommodation picker | ⚠️ | Pass w/ issues |  |  | Archived profile controls covered; restore edge case source-checked. |
-| ACCOUNT-09 | Account security | ⚠️ | Pass w/ issues |  |  | Birthday/age copy covered; age-gate boundary branches source-checked. |
-| ACCOUNT-10 | Export my data | ⚠️ | Pass w/ issues |  |  | Regional eligibility branch covered through seeded/source checks; no live regional provider event. |
-| ACCOUNT-11 | Delete account: initial → confirming | ⚠️ | Pass w/ issues |  |  | Consent status surfaces covered; email-delivery branch covered separately as blocked. |
+| ACCOUNT-06 | More hub | ⚠️ | Pass w/ issues | WI-874 | ✅ 2026-06-20 | Issue mapped: profile-edit UI reached; avatar/media branch remains native-dependent. |
+| ACCOUNT-07 | Notifications sub-screen | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-20 | Issue mapped with consent handoff cluster: add-child flow reached; some external parent email handoff branches were source-checked. |
+| ACCOUNT-08 | Accommodation picker | ⚠️ | Pass w/ issues | WI-875 | ✅ 2026-06-20 | Issue mapped: archived profile controls covered; restore edge case source-checked. |
+| ACCOUNT-09 | Account security | ⚠️ | Pass w/ issues | WI-874 | ✅ 2026-06-20 | Issue mapped with account-settings cluster: birthday/age copy covered; age-gate boundary branches source-checked. |
+| ACCOUNT-10 | Export my data | ⚠️ | Pass w/ issues | WI-874 | ✅ 2026-06-20 | Issue mapped with account-settings cluster: regional eligibility branch covered through seeded/source checks; no live regional provider event. |
+| ACCOUNT-11 | Delete account: initial → confirming | ⚠️ | Pass w/ issues | WI-874 | ✅ 2026-06-20 | Issue mapped with account-settings cluster: consent status surfaces covered; email-delivery branch covered separately as blocked. |
 | ACCOUNT-12 | Scheduled-deletion state: Keep account | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-13 | Privacy policy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-14 | Terms of service | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -251,7 +255,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-20 | Child → parent handoff phases on `/consent` | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/consent.test.tsx` covers child→parent→success phase transitions (`consent-handoff-button` → `consent-parent-view` → `consent-success`), fade safety timer, and reduced-motion. Real mailbox handoff is external. |
 | ACCOUNT-21 | Parent email entry / resend / change email | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentPendingGate.test.tsx` (resend POSTs `/consent/resend` with NO email; change-email POSTs `/consent/request` with new recipient; same-as-child guard). Live delivery is external. |
 | ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentPendingGate.test.tsx` (PENDING send-to-parent CTA vs REQUESTED masked-email waiting UI + Check-again). Reminder-email automation stays in ACCOUNT-40 (Blocked). |
-| ACCOUNT-23 | Consent withdrawn gate | ⚠️ | Pass w/ issues |  |  | Consent expired/cleanup state source-checked; timer-driven expiry not accelerated in browser. |
+| ACCOUNT-23 | Consent withdrawn gate | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-20 | Issue mapped with consent lifecycle cluster: consent expired/cleanup state source-checked; timer-driven expiry not accelerated in browser. |
 | ACCOUNT-24 | Post-approval landing | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_hooks/use-post-approval-landing.test.ts` covers the audience discriminators (child + teen-owner w/ parental flow show; adult-owner + impersonating-parent suppressed; per-profile SecureStore once-only; existing-subjects veto; dismiss persists). |
 | ACCOUNT-25 | Parent consent management: withdraw | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentWithdrawnGate.test.tsx` (child-side withdrawn gate: deletion-pending messaging, refresh re-check, sign-out reachable). Real email return path is external. |
 | ACCOUNT-26 | Regional consent variants | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/consent.test.tsx` asserts the single GDPR-everywhere path — every consent request carries `consentType: 'GDPR'` (mobile hardcode); profile-not-found + signed-out deep-link guards covered. COPPA enum stays dormant (no live writer). |
@@ -260,13 +264,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-29 | Mentor language row | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-30 | More under parent-proxy: tab removed ENTIRELY in both nav systems; residual route renders locked panel ONLY | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-31 | Celebration-level prefs | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-32 | Consent-gate "while you wait" previews: `PreviewSubjectBrowser` + `PreviewSampleCoaching` fully replace the pending gate; stati… | ⚠️ | Pass w/ issues | WI-856 | ✅ 2026-06-19 | Issue mapped: deterministic Chrome coverage needed for preview replacement branches. |
+| ACCOUNT-32 | Consent-gate "while you wait" previews: `PreviewSubjectBrowser` + `PreviewSampleCoaching` fully replace the pending gate; stati… | ✅ | Pass | WI-856 | ✅ 2026-06-19 | Rerun passed in Chrome/Playwright J-23: pending gate renders the preview subject browser and sample coaching replacement branches. |
 | ACCOUNT-33 | Pre-auth audience carrier → parent fast-path | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-34 | Post-OAuth save wizard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-35 | Profile-limit upgrade gate: `POST /profiles` 402 `PROFILE_LIMIT_EXCEEDED` → "Upgrade required" alert → "See plans" → `/(app)/su… | ✅ | Pass | WI-824 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: profile-limit create-profile returned PROFILE_LIMIT_EXCEEDED, showed the upgrade alert, and routed to subscription after See plans. |
 | ACCOUNT-36 | Create-profile access-blocked screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-37 | Rename profile | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-38 | Consent-gate profile-switch escape: shown ONLY for 18+ adults sharing account with ≥1 minor | ⚠️ | Pass w/ issues | WI-856 | ✅ 2026-06-19 | Issue mapped with ACCOUNT-32: add deterministic adult profile-switch eligibility coverage. |
+| ACCOUNT-38 | Consent-gate profile-switch escape: shown ONLY for 18+ adults sharing account with ≥1 minor | ✅ | Pass | WI-856 | ✅ 2026-06-19 | Rerun evidence: `consent-gate-helpers.test.ts` covers eligible 18+ adult-with-minor profiles and rejects minor, solo-adult, and adult-only account shapes. |
 | ACCOUNT-39 | `/consent` deep-link guards: signed-out → sign-in redirect; foreign `profileId` → `consent-profile-not-found` + go-back | ✅ | Pass | WI-826 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: after consent withdrawal, Home showed the withdrawal countdown banner and Reverse CTA for the child. |
 | ACCOUNT-40 | Consent reminder cascade + day-30 auto-delete | 🚫 | Blocked |  |  | Requires timer/email cascade through day-30 deletion automation; not responsibly testable in one Chrome session. |
 | ACCOUNT-41 | Withdrawal countdown banner on Home: per-child warning during 7-day grace with one-tap "Reverse" restore | ✅ | Pass | WI-826 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome passed: after consent withdrawal, Home showed the withdrawal countdown banner and Reverse CTA for the child. |
@@ -277,7 +281,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-46 | Change email + Add password | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-48 | Help & Feedback: support mailto + "Report a problem" via `FeedbackProvider.openFeedback` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-49 | Owner SELF memory-consent prompt: `MemoryConsentPrompt` inline on `/(app)/mentor-memory` when own status pending; "Use memory"… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| ACCOUNT-50 | Child mentor-memory consent-withdrawn dead-end gate: whole screen replaced by `child-mentor-memory-consent-withdrawn` + Back; r… | ⚠️ | Pass w/ issues |  |  | Consent-withdrawn mentor-memory gate covered; deeper withdrawn-account lifecycle source-checked. |
+| ACCOUNT-50 | Child mentor-memory consent-withdrawn dead-end gate: whole screen replaced by `child-mentor-memory-consent-withdrawn` + Back; r… | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-20 | Issue mapped with consent lifecycle cluster: consent-withdrawn mentor-memory gate covered; deeper withdrawn-account lifecycle source-checked. |
 | ACCOUNT-51 | Parent memory export: "Export memory summary" → share sheet / web `.txt` download; SELF export endpoint exists but mobile-dormant | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | ACCOUNT-52 | Parent correction escape hatch | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
@@ -304,7 +308,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOME-12 | Parent-proxy shell | ➖ | Removed |  |  | Parent-proxy shell is not reachable as a current end-user browser flow; inventory appears stale. |
 | HOME-13 | `/dashboard` legacy redirect → `/(app)/home`, preserving `returnTo` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | HOME-14 | Learner home degraded states: subjects-load error | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| HOME-15 | Home overlays: post-grace consent notice toast | ⚠️ | Pass w/ issues | WI-854 | ✅ 2026-06-19 | Issue mapped: pending notices may be hidden when empty-child dashboard falls back to demo data. |
+| HOME-15 | Home overlays: post-grace consent notice toast | ✅ | Pass | WI-854 | ✅ 2026-06-19 | Rerun evidence: dashboard hook preserves empty-child dashboards with pending notices, and Home renders `post-grace-notice-toast` plus the delayed seen-ack POST. |
 | HOME-16 | EarlyAdopterCard | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-01 | Create subject from learner home | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-02 | Create subject from library | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
@@ -319,8 +323,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-17 | Pronouns picker | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | SUBJECT-18 | First-subject "Ready" recap interstitial | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: J-09 now asserts first focused subject lands on `/ready` before session. |
 | SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
-| SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ⚠️ | Pass w/ issues | WI-855 | ✅ 2026-06-19 | Issue mapped: replace message-regex recovery with typed subject-limit error contract. |
-| SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues |  |  | Covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
+| SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ✅ | Pass | WI-855 | ✅ 2026-06-19 | Rerun evidence: route/service/mobile tests cover typed `SUBJECT_LIMIT_EXCEEDED` recovery and reject message-regex spoofing. |
+| SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues | WI-876 | ✅ 2026-06-20 | Issue mapped: covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
 | SUBJECT-22 | Pick-book degraded/recovery states: missing-param guard; cycling loading + slow hint | ✅ | Pass | WI-858 | ✅ 2026-06-19 | WI-858 resolved: degraded-state proof added/refreshed in `(app)/pick-book/[subjectId].test.tsx` — new narrow tests for the missing-param guard (renders + back→library) and the BUG-539 slow-loading hint (`pick-book-loading-slow` at `SLOW_LOADING_HINT_MS`=5000ms, red-green proven); existing tests cover classified hard-error fallback (500/404 → inline error + manual entry), BUG-318 auto-open custom input on empty, and the 8s filing-skip overlay. PARKED pick-book Maestro flows noted in the inventory. |
 
 ---
@@ -403,7 +407,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PRACTICE-04 | "All caught up": next-review countdown or complete-a-topic copy + "Browse topics" → library; review card stays tappable at 0 ov… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PRACTICE-05 | Assessment readiness row: "N topics ready" when eligible; otherwise a non-pressable locked hint with adaptive copy | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-01 | Activity picker: Capitals, per-language vocab cards | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QUIZ-02 | Round generation loading: rotating copy, 20s soft hint, **30s hard timeout → ErrorFallback w/ re-armed retry** | ⚠️ | Pass w/ issues | WI-862 | ✅ 2026-06-19 | Issue mapped: add intercepted Chrome coverage for soft/hard timeout and retry re-arming. |
+| QUIZ-02 | Round generation loading: rotating copy, 20s soft hint, **30s hard timeout → ErrorFallback w/ re-armed retry** | ✅ | Pass | WI-862 | ✅ 2026-06-19 | Rerun passed in Chrome/Playwright J-26: intercepted soft/hard timeout and retry re-arming branches completed. |
 | QUIZ-03 | Play | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-04 | Guess Who progressive clue reveal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-05 | Mid-round quit modal | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -417,15 +421,15 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QUIZ-13 | Answer-check failure: assumes wrong + inline banner + platformAlert + Sentry; flag cleared per question | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-14 | Difficulty-bump challenge banner: `round.difficultyBump` → full-screen banner requiring explicit Start | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-15 | Final-question auto-save: immediate round submit; "saving" panel → See Results / One More; navigation queued if save in flight;… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⚠️ | Pass w/ issues | WI-862 | ✅ 2026-06-19 | Issue mapped with QUIZ-02: force quiz discovery card and mark-surfaced branch in Chrome. |
+| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⚠️ | Pass w/ issues | WI-862 | ✅ 2026-06-19 | Rerun still issue-bearing: Chrome/Playwright clicked a higher-priority resume card instead of the forced quiz-discovery card; WI-862 has the failure note and artifacts. |
 | QUIZ-17 | Quiz index load-error retry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-18 | Play no-round guard | ✅ | Pass | WI-820 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: cold `/quiz/play` with no round renders `quiz-play-no-round`, Retry, and Go Home recovery controls; focused unit regression passed. |
 | DICT-01 | Choice screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | DICT-02 | Text preview + edit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| DICT-03 | "Surprise me" generation | ⚠️ | Pass w/ issues | WI-863 | ✅ 2026-06-19 | Issue mapped: add deterministic dictation generation coverage with controlled response. |
+| DICT-03 | "Surprise me" generation | ✅ | Pass | WI-863 | ✅ 2026-06-19 | Rerun evidence: dictation choice/index unit coverage passed for controlled Surprise Me generation and playback routing. |
 | DICT-04 | Playback | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| DICT-05 | Mid-dictation exit: hardware back AND visible Exit button → in-app Modal | ⚠️ | Pass w/ issues | WI-863 | ✅ 2026-06-19 | Issue mapped with DICT-03/06: cover visible Exit and native-safe hardware-back modal path. |
-| DICT-06 | Completion: "I'm done" → result POST → practice; "Check my writing" → DICT-07; review spinner + cancel + 20s timeout; blur mark… | ⚠️ | Pass w/ issues | WI-863 | ✅ 2026-06-19 | Issue mapped with DICT-03/05: cover completion/review timeout and stale-context guard. |
+| DICT-05 | Mid-dictation exit: hardware back AND visible Exit button → in-app Modal | ✅ | Pass | WI-863 | ✅ 2026-06-19 | Rerun evidence: playback unit coverage passed for visible Exit and hardware-back in-app confirmation modal. |
+| DICT-06 | Completion: "I'm done" → result POST → practice; "Check my writing" → DICT-07; review spinner + cancel + 20s timeout; blur mark… | ✅ | Pass | WI-863 | ✅ 2026-06-19 | Rerun evidence: completion unit coverage passed for result POST payload, missing-context guard, review spinner/cancel, timeout, and stale-navigation guard. |
 | DICT-07 | Photo review of handwriting: camera | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
 | DICT-08 | Sentence-level remediation | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
 | DICT-09 | Perfect-score celebration | 🚫 | Blocked |  |  | Requires native camera/gallery/media or E2E gallery seam; not testable in Chrome-only browser sweep. |
@@ -450,8 +454,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOMEWORK-05 | Gallery import | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-06 | Image pass-through to vision | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-07 | Camera permission onboarding: auto OS prompt on undetermined; denied keyed on `!canAskAgain`; Settings redirect; AppState-resum… | 🚫 | Blocked |  |  | Native camera permission/viewfinder/capture branch cannot be completed in Chrome-only sweep. |
-| HOMEWORK-08 | Image-attach failure fallback: base64 fail/timeout → text-only auto-send + VISIBLE system message + analytics event | ⚠️ | Pass w/ issues | WI-861 | ✅ 2026-06-19 | Issue mapped: harden fallback coverage for visible system message and analytics event. |
-| HOMEWORK-09 | Subject resolution in result phase: auto-classify once per image; confident → "Looks like {subject}" + Change; LLM-suggestion +… | ⚠️ | Pass w/ issues | WI-861 | ✅ 2026-06-19 | Issue mapped with HOMEWORK-08: harden subject-resolution and reclassification coverage. |
+| HOMEWORK-08 | Image-attach failure fallback: base64 fail/timeout → text-only auto-send + VISIBLE system message + analytics event | ✅ | Pass | WI-861 | ✅ 2026-06-19 | Rerun evidence: homework mobile/API batch passed for OCR/base64 fallback behavior, visible system messaging, and homework session persistence. |
+| HOMEWORK-09 | Subject resolution in result phase: auto-classify once per image; confident → "Looks like {subject}" + Change; LLM-suggestion +… | ✅ | Pass | WI-861 | ✅ 2026-06-19 | Rerun evidence: homework mobile/API batch passed for result-phase subject resolution, OCR hook state, problem-card editing, and prepare-homework service behavior. |
 | HOMEWORK-10 | Per-problem voice dictation: mic per problem card → `useSpeechRecognition`, transcript appends; on-device, second OS permission… | 🚫 | Blocked |  |  | Requires camera/gallery/OCR or microphone/native media path. |
 | HOMEWORK-11 | Problem-card editing: OCR split into cards; dropped low-confidence fragments restorable via chip; add/remove cards; 8000-char U… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | HOMEWORK-12 | Close/back semantics: always `router.replace(homeHrefForReturnTo)` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -516,7 +520,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | QA-01 | Quick smoke check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QA-02 | Post-auth comprehensive smoke | ⚠️ | Pass w/ issues | WI-857 | ✅ 2026-06-19 | Issue mapped: align smoke manifest/status with current Chrome/deep-link coverage. |
+| QA-02 | Post-auth comprehensive smoke | ⚠️ | Pass w/ issues | WI-857 / WI-873 | ✅ 2026-06-19 | Rerun did not reach flow execution: mentor-audit registry smoke stalled during Expo web export twice on Windows. New infra bug WI-873 tracks the timeout. |
 | QA-03 | Chat classifier regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage replaces live-LLM evidence: route + service tests pin the classifier miss/suggestion shape (multi-candidate + `suggestedSubjectName` passthrough; proxy-mode 403 guard on classify/resolve). YAML flow is smoke/historical only. |
 | QA-04 | Chat subject picker regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage forces the picker branch: hook tests cover single-subject auto-match, multi-candidate picker (learner picks the intended subject, no silent first-subject fallback), and resolve fallback; the session-screen integration test covers the no-enrolled-subjects create-new escape hatch. YAML flow is smoke/historical only. |
 | QA-05 | Return to chat after subject create | ✅ | Pass | WI-860 | ✅ 2026-06-19 | Reconciled — already covered, no new test needed. `create-subject.test.tsx` [BUG-236] asserts `returnTo=chat` after creation routes to `/(app)/session` (freeform, NOT picker), and the no-`returnTo` default routes to `/(app)/pick-book/[subjectId]` (NOT session) — both branches, default behavior unchanged. |
@@ -527,9 +531,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-10 | Dictation full-flow regression | 🚫 | Blocked |  |  | Requires full native dictation camera/audio path. |
 | QA-11 | Quiz full-flow regression | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QA-12 | Consent deny-confirmation | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/api/src/routes/consent-web.test.ts` covers `POST /consent-page/confirm` deny-confirmation (approved=false → denial landing; approved=true → approval landing; missing/invalid token; #868 strict-enum guard). Supersedes the placeholder Maestro yaml — API route/integration tests are authoritative. |
-| QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues |  |  | Covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-20 | Issue mapped with auth-provider handoff cluster: covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
 | QA-14 | SSE reconnect | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
-| QA-15 | Preview/onboarding regression cluster | ⚠️ | Pass w/ issues | WI-857 | ✅ 2026-06-19 | Issue mapped with QA-02: update preview/onboarding coverage away from hidden CTA assumptions. |
+| QA-15 | Preview/onboarding regression cluster | ✅ | Pass | WI-857 | ✅ 2026-06-19 | Rerun evidence: preview/onboarding unit batch passed for preview layout, value-prop/topic/intent/both routes, seed-preview-state, and signed-out first-open routing. |
 
 ---
 
@@ -544,9 +548,9 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | CC-02 | Greeting-aware classification | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-03 | Animation polish: `BrandCelebration`, `CelebrationAnimation`, session celebrations wired via `useCelebration` w/ learner celebr… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-04 | `goBackOrReplace` universal back pattern | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| CC-05 | Continue-where-you-left-off: SecureStore recovery marker takes priority; else server resume target; else overdue review | ⚠️ | Pass w/ issues | WI-865 | ✅ 2026-06-19 | Issue mapped: document native boundary or add priority-collision coverage. |
+| CC-05 | Continue-where-you-left-off: SecureStore recovery marker takes priority; else server resume target; else overdue review | ✅ | Pass | WI-865 | ✅ 2026-06-19 | Rerun evidence: LearnerScreen priority-collision tests passed for fresh recovery marker over resume/overdue and resume target over overdue review. |
 | CC-06 | Top-up purchase confidence: two-stage polling progress + confident timeout copy | 🚫 | Blocked |  |  | Top-up purchase confidence depends on native store purchase completion. |
-| CC-07 | Accommodation badge surfaces: non-deletable badge on mentor-memory; selector on child settings + self settings; role-gated capt… | ⚠️ | Pass w/ issues |  |  | Cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-07 | Accommodation badge surfaces: non-deletable badge on mentor-memory; selector on child settings + self settings; role-gated capt… | ⚠️ | Pass w/ issues | WI-875 | ✅ 2026-06-20 | Issue mapped with accommodation branch cluster: cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
 | CC-08 | Parent-facing metric vocabulary canon | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-09 | Opaque web layout backgrounds | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-10 | Quiz streak/XP recording is server-side inside round completion | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -556,7 +560,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | CC-14 | Envelope-strip render guard at chat-bubble boundary | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-15 | RN Web stale-send block in ChatShell | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ⚠️ | Pass w/ issues |  |  | Cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-20 | Issue mapped with parent/profile-lens branch cluster: cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
 | CC-18 | Stable FlatList refs | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-19 | Mode-navigation contract controls tab shape + route access | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-20 | Parent bridge provenance + return targets | ❌ | Fail | WI-823 |  | Parent bridge provenance/return targets failed with missing bridge surfaces. |
@@ -581,15 +585,15 @@ Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 rerun
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | Auth and Access | 18 | ⚠️ | Rerun updated 2026-06-19: 12 ✅, 5 ⚠️, 0 ❌, 1 🚫. |
-| 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-18: 30 ✅, 19 ⚠️, 0 ❌, 2 🚫. |
-| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-18: 26 ✅, 5 ⚠️, 1 ➖. |
-| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ⚠️ | Rerun updated 2026-06-18: 51 ✅, 1 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
-| 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 27 ✅, 5 ⚠️, 0 ❌, 4 🚫. |
-| 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-18: 16 ✅, 11 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
+| 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-19: 32 ✅, 17 ⚠️, 0 ❌, 2 🚫. |
+| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-19: 30 ✅, 1 ⚠️, 1 ➖. |
+| 4 | Learning, Chat, Library, Retention, and Progress | 55 | ✅ | Rerun updated 2026-06-19: 52 ✅, 0 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
+| 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 31 ✅, 1 ⚠️, 0 ❌, 4 🚫. |
+| 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-19: 18 ✅, 9 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
 | 7 | Billing and Monetization | 16 | ✅ | Rerun updated 2026-06-19: 12 ✅, 0 ⚠️, 0 ❌, 4 🚫. |
-| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-19: 5 ✅, 9 ⚠️, 0 ❌, 1 🚫 (QA-03/QA-04 → deterministic jest, WI-859). |
-| 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-18: 16 ✅, 3 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 195 pass, 58 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
+| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-19: 9 ✅, 5 ⚠️, 0 ❌, 1 🚫 (QA-03/QA-04 → deterministic jest, WI-859; QA-15 rerun green; QA-02 infra timeout tracked by WI-873). |
+| 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-19: 17 ✅, 2 ⚠️, 1 ❌, 1 🚫. |
+| **Total** | | **280** | ❌ | 213 pass, 40 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 

@@ -135,4 +135,24 @@ describe('NowCardStack', () => {
       'module',
     );
   });
+
+  it('threads anchor arc state and completion events into actionable cards', () => {
+    const onCompleted = jest.fn();
+    const anchor = card('retention_due', 'topic-1');
+    const { getByTestId, getByText } = render(
+      <NowCardStack
+        feed={feed([anchor])}
+        dismissedKeys={new Set()}
+        anchorArcState="advancing"
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onCompleted={onCompleted}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByText('Getting stronger')).toBeTruthy();
+    fireEvent.press(getByTestId('now-card-complete'));
+    expect(onCompleted).toHaveBeenCalledWith(anchor);
+  });
 });
