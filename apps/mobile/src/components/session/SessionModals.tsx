@@ -15,6 +15,7 @@ import type {
   useAddParkingLotItem,
 } from '../../hooks/use-sessions';
 import type { useCurriculum } from '../../hooks/use-curriculum';
+import { useThemeColors } from '../../lib/theme';
 
 // ─── ParkingLotModal ─────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ export function ParkingLotModal({
   insetsBottom,
 }: ParkingLotModalProps) {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   return (
     <Modal
       visible={visible}
@@ -90,7 +92,7 @@ export function ParkingLotModal({
           >
             {addParkingLotItem.isPending ? (
               <ActivityIndicator
-                color="white"
+                color={colors.textInverse}
                 accessibilityLabel={t('common.loading')}
               />
             ) : (

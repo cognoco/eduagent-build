@@ -20,6 +20,7 @@ import {
 } from '../../../lib/navigation';
 import { firstParam } from '../../../lib/route-params';
 import { formatRelativeDate } from '../../../lib/format-relative-date';
+import { useThemeColors } from '../../../lib/theme';
 
 export default function RecapDetailScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -29,6 +30,7 @@ export default function RecapDetailScreen(): React.ReactElement {
   const navigationContract = useNavigationContract();
   const recapQuery = useRecap(recapId);
   const { t } = useTranslation();
+  const colors = useThemeColors();
 
   if (!navigationContract.canEnter('recaps/[recapId]')) {
     return <Redirect href="/(app)/home" />;
@@ -71,7 +73,7 @@ export default function RecapDetailScreen(): React.ReactElement {
             accessibilityLabel={t('recaps.backLabel')}
             testID="recap-detail-back"
           >
-            <Ionicons name="arrow-back" size={24} />
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </Pressable>
           <Text className="flex-1 text-h2 font-bold text-text-primary">
             {t('recaps.detailHeading')}

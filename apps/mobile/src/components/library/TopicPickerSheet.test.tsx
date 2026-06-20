@@ -147,6 +147,19 @@ describe('TopicPickerSheet', () => {
     expect(screen.queryByTestId('topic-picker-topic-3')).toBeNull();
   });
 
+  it('shows an actionable empty state when no topics are available', () => {
+    const onClose = jest.fn();
+    render(
+      <TopicPickerSheet {...defaultProps} topics={[]} onClose={onClose} />,
+    );
+
+    screen.getByTestId('topic-picker-empty');
+    expect(screen.queryByTestId('topic-picker-topic-1')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('topic-picker-empty-close'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('includes chapter in accessibilityLabel when present', () => {
     render(<TopicPickerSheet {...defaultProps} />);
     const rowWithChapter = screen.getByTestId('topic-picker-topic-1');

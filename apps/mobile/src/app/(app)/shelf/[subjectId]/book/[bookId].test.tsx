@@ -297,6 +297,21 @@ describe('BookScreen', () => {
     getByTestId('book-loading');
   });
 
+  it('uses a localized loading fallback instead of the raw book id', () => {
+    mockUseBooks.mockReturnValue({ data: [], isLoading: false });
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: undefined,
+        isLoading: true,
+      }),
+    );
+
+    const { getByText, queryByText } = render(<BookScreen />);
+
+    getByText('Book');
+    expect(queryByText('book-1')).toBeNull();
+  });
+
   it('keeps cached book content visible during a background refetch', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({

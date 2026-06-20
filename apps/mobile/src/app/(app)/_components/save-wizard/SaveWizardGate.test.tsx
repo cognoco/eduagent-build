@@ -8,6 +8,7 @@ import {
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SaveWizardGate } from './SaveWizardGate';
+import { getPreviewState } from '../../../../lib/preview-onboarding-state';
 
 // [WI-824 Gate-2] Gate-level propagation test: proves the upgrade CTA's
 // wizard-exit signal travels CTA → ProfileBasicsStep → SaveWizardGate →
@@ -172,5 +173,18 @@ describe('SaveWizardGate — PROFILE_LIMIT upgrade CTA exits the wizard (WI-824 
     // "See plans" must fire it so the inline gate unmounts, AND route to plans.
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+  });
+
+  it('shows a visible loading state while preview state is being probed', () => {
+    (getPreviewState as jest.Mock).mockReturnValueOnce(
+      new Promise(() => undefined),
+    );
+
+    render(<SaveWizardGate onComplete={jest.fn()} onStart={jest.fn()} />, {
+      wrapper: Wrapper,
+    });
+
+    screen.getByTestId('save-wizard-loading');
+    screen.getByText('Loading your saved preview...');
   });
 });

@@ -201,9 +201,7 @@ describe('SessionDetailScreen (summary-only)', () => {
       ).toBeTruthy(),
     );
     screen.getByText('Practiced equivalent fractions');
-    // EngagementChip routes its label through t(); under the key-passthrough
-    // mock the rendered text is the key, not the English "Focused".
-    screen.getByText('home.engagementChip.focused');
+    screen.getByTestId('engagement-chip-focused');
     expect(
       screen.getByText('Which fraction felt easiest to compare today?'),
     ).toBeTruthy();

@@ -159,6 +159,7 @@ export default function ChildCurriculumScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const params = useLocalSearchParams<{ profileId?: string | string[] }>();
   const profileId = firstParam(params.profileId);
   const navigationContract = useNavigationContract();
@@ -286,7 +287,7 @@ export default function ChildCurriculumScreen(): React.ReactElement {
         accessibilityLabel={t('common.goBack')}
         testID="child-curriculum-back"
       >
-        <Ionicons name="arrow-back" size={24} />
+        <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
       </Pressable>
       <View className="flex-1">
         <Text className="text-h2 font-bold text-text-primary">

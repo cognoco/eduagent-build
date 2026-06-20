@@ -41,6 +41,7 @@ export function SuggestionCard({
             }
           : {}),
       })}
+      accessible
       accessibilityRole="button"
       accessibilityLabel={
         addLabel

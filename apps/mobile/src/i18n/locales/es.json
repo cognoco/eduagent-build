@@ -413,14 +413,6 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} elementos",
       "opensActivityHint": "Abre esta actividad"
-    },
-    "engagementChip": {
-      "curious": "Curiosidad",
-      "stuck": "Atascado",
-      "breezing": "Fácil",
-      "focused": "Concentrado",
-      "scattered": "Disperso",
-      "a11yLabel": "Interacción: {{label}}"
     }
   },
   "family": {
@@ -1580,7 +1572,9 @@
     },
     "searchResult": {
       "a11y": "{{title}}, {{subtitle}}"
-    }
+    },
+    "topicPickerEmptyTitle": "Aún no hay temas",
+    "topicPickerEmptyDescription": "Este libro todavía no tiene temas para elegir."
   },
   "topic": {
     "relevance": {
@@ -2545,7 +2539,17 @@
       "sessionSummary": "Resumen de la sesión",
       "noSummaryBody": "No se generó ningún resumen para esta sesión",
       "openTopicWithTitle": "Abrir {{title}}",
-      "backToChildProfile": "Volver al perfil del niño"
+      "backToChildProfile": "Volver al perfil del niño",
+      "engagementChip": {
+        "accessibilityLabel": "Interacción: {{label}}",
+        "labels": {
+          "curious": "Curiosidad",
+          "stuck": "Resolviéndolo",
+          "breezing": "Fácil",
+          "focused": "Concentrado",
+          "scattered": "Concentrándome"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Materia no encontrada",
@@ -3356,7 +3360,9 @@
     "signingOutAll": "Cerrando sesión en otros dispositivos...",
     "signOutAllTitle": "¿Cerrar sesión en los demás dispositivos?",
     "signOutAllConfirm": "Esto cerrará {{count}} sesiones más. La sesión en este dispositivo permanecerá activa.",
-    "signOutAllConfirmButton": "Cerrar todas"
+    "signOutAllConfirmButton": "Cerrar todas",
+    "emptyBackLabel": "Volver a ajustes de la cuenta",
+    "emptyBackButton": "Volver a la cuenta"
   },
   "changePassword": {
     "errorCurrentRequired": "Introduce tu contraseña actual",
@@ -3583,7 +3589,9 @@
     "hub": {
       "sessionsSubtitle": "Conversaciones que tuviste",
       "notesSubtitle": "Cosas que apuntaste",
-      "bookmarksSubtitle": "Respuestas del tutor que guardaste"
+      "bookmarksSubtitle": "Respuestas del tutor que guardaste",
+      "countLoading": "Cargando",
+      "countUnavailable": "No disponible"
     },
     "unknownSubject": "Materia desconocida",
     "searchSessions": "Buscar sesiones",
@@ -3660,7 +3668,8 @@
     "childNamePlaceholder": "Su nombre o apodo",
     "childBirthYearPlaceholder": "Año de nacimiento",
     "a11yBack": "Volver al paso anterior",
-    "a11yCancel": "Cancelar y salir"
+    "a11yCancel": "Cancelar y salir",
+    "loading": "Cargando tu vista previa guardada..."
   },
   "pickBook": {
     "subjectFallback": "Tema",

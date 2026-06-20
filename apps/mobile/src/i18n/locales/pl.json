@@ -419,14 +419,6 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} elementów",
       "opensActivityHint": "Otwiera tę aktywność"
-    },
-    "engagementChip": {
-      "curious": "Ciekawy",
-      "stuck": "Zablokowany",
-      "breezing": "Idzie gładko",
-      "focused": "Skupiony",
-      "scattered": "Rozproszony",
-      "a11yLabel": "Zaangażowanie: {{label}}"
     }
   },
   "nudge": {
@@ -1655,7 +1647,9 @@
     },
     "searchResult": {
       "a11y": "{{title}}, {{subtitle}}"
-    }
+    },
+    "topicPickerEmptyTitle": "Brak tematów",
+    "topicPickerEmptyDescription": "Ta książka nie ma jeszcze tematów do wyboru."
   },
   "topic": {
     "relevance": {
@@ -2694,7 +2688,17 @@
       "sessionSummary": "Podsumowanie sesji",
       "noSummaryBody": "Dla tej sesji nie wygenerowano podsumowania",
       "openTopicWithTitle": "Otwórz {{title}}",
-      "backToChildProfile": "Wróć do profilu dziecka"
+      "backToChildProfile": "Wróć do profilu dziecka",
+      "engagementChip": {
+        "accessibilityLabel": "Zaangażowanie: {{label}}",
+        "labels": {
+          "curious": "Ciekawość",
+          "stuck": "Pracuję nad tym",
+          "breezing": "Idzie gładko",
+          "focused": "Skupienie",
+          "scattered": "Szukam skupienia"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Nie znaleziono przedmiotu",
@@ -3502,7 +3506,9 @@
     "signingOutAll": "Wylogowywanie pozostałych urządzeń...",
     "signOutAllTitle": "Wylogować wszystkie inne urządzenia?",
     "signOutAllConfirm": "Spowoduje to zakończenie {{count}} innych sesji. To urządzenie pozostanie zalogowane.",
-    "signOutAllConfirmButton": "Wyloguj wszystkie"
+    "signOutAllConfirmButton": "Wyloguj wszystkie",
+    "emptyBackLabel": "Wróć do ustawień konta",
+    "emptyBackButton": "Wróć do konta"
   },
   "changePassword": {
     "errorCurrentRequired": "Wprowadź aktualne hasło",
@@ -3729,7 +3735,9 @@
     "hub": {
       "sessionsSubtitle": "Twoje rozmowy",
       "notesSubtitle": "Twoje notatki",
-      "bookmarksSubtitle": "Zapisane odpowiedzi tutora"
+      "bookmarksSubtitle": "Zapisane odpowiedzi tutora",
+      "countLoading": "Ładowanie",
+      "countUnavailable": "Niedostępne"
     },
     "unknownSubject": "Nieznany przedmiot",
     "searchSessions": "Szukaj w sesjach",
@@ -3806,7 +3814,8 @@
     "childNamePlaceholder": "Jego/jej imię lub pseudonim",
     "childBirthYearPlaceholder": "Rok urodzenia",
     "a11yBack": "Wróć do poprzedniego kroku",
-    "a11yCancel": "Anuluj i wyjdź"
+    "a11yCancel": "Anuluj i wyjdź",
+    "loading": "Ładowanie zapisanego podglądu..."
   },
   "pickBook": {
     "subjectFallback": "Temat",

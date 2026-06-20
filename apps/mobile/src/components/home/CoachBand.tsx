@@ -74,7 +74,7 @@ export function CoachBand({
         testID="home-coach-band-dismiss"
         onPress={onDismiss}
         className="absolute top-2 right-2.5 p-1"
-        hitSlop={8}
+        hitSlop={{ top: 12, bottom: 12, left: 18, right: 18 }}
         accessibilityLabel={t('home.coachBand.a11yDismiss')}
         accessibilityRole="button"
       >

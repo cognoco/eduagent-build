@@ -435,14 +435,6 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} items",
       "opensActivityHint": "Opens this activity"
-    },
-    "engagementChip": {
-      "curious": "Curious",
-      "stuck": "Stuck",
-      "breezing": "Breezing",
-      "focused": "Focused",
-      "scattered": "Scattered",
-      "a11yLabel": "Engagement: {{label}}"
     }
   },
   "family": {
@@ -1671,7 +1663,9 @@
     },
     "searchResult": {
       "a11y": "{{title}}, {{subtitle}}"
-    }
+    },
+    "topicPickerEmptyTitle": "No topics yet",
+    "topicPickerEmptyDescription": "This book does not have topics to choose from yet."
   },
   "topic": {
     "lastStudied": "Last studied {{when}}",
@@ -2643,7 +2637,17 @@
       "sessionSummary": "Session summary",
       "noSummaryBody": "No summary was generated for this session",
       "openTopicWithTitle": "Open {{title}}",
-      "backToChildProfile": "Back to child profile"
+      "backToChildProfile": "Back to child profile",
+      "engagementChip": {
+        "accessibilityLabel": "Engagement: {{label}}",
+        "labels": {
+          "curious": "Curious",
+          "stuck": "Working through it",
+          "breezing": "Breezing",
+          "focused": "Focused",
+          "scattered": "Finding focus"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Subject not found",
@@ -3632,7 +3636,9 @@
     "signingOutAll": "Signing out other devices...",
     "signOutAllTitle": "Sign out all other devices?",
     "signOutAllConfirm": "This will end {{count}} other session(s). This device stays signed in.",
-    "signOutAllConfirmButton": "Sign out all"
+    "signOutAllConfirmButton": "Sign out all",
+    "emptyBackLabel": "Back to account settings",
+    "emptyBackButton": "Back to account"
   },
   "changePassword": {
     "errorCurrentRequired": "Enter your current password",
@@ -3862,7 +3868,8 @@
     "childNamePlaceholder": "Their name or nickname",
     "childBirthYearPlaceholder": "Birth year",
     "a11yBack": "Back to previous step",
-    "a11yCancel": "Cancel and exit"
+    "a11yCancel": "Cancel and exit",
+    "loading": "Loading your saved preview..."
   },
   "myNotes": {
     "title": "My Notes",
@@ -3892,7 +3899,9 @@
     "hub": {
       "sessionsSubtitle": "Conversations you had",
       "notesSubtitle": "Things you wrote down",
-      "bookmarksSubtitle": "Mentor replies you saved"
+      "bookmarksSubtitle": "Mentor replies you saved",
+      "countLoading": "Loading",
+      "countUnavailable": "Unavailable"
     },
     "unknownSubject": "Unknown subject",
     "searchSessions": "Search sessions",

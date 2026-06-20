@@ -236,4 +236,20 @@ describe('Screen navigation audit', () => {
       findBareRouterBackCalls('// router.back() in a comment only'),
     ).toEqual([]);
   });
+
+  it('[WI-506] back Ionicons use an explicit semantic color', () => {
+    const violations: Array<{ file: string; match: string }> = [];
+    const bareBackIcon =
+      /<Ionicons\b(?=[^>]*\bname=["'](?:arrow-back|chevron-back)["'])(?![^>]*\bcolor=)(?![^>]*\bclassName=["'][^"']*\btext-)[^>]*>/g;
+
+    for (const filePath of screenFiles) {
+      const source = fs.readFileSync(filePath, 'utf-8');
+      const relativeName = getRelativeName(filePath, appDir);
+      for (const match of source.matchAll(bareBackIcon)) {
+        violations.push({ file: relativeName, match: match[0] });
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
 });

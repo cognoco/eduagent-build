@@ -18,6 +18,10 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }),
+}));
+
 const mockMutateAsync = jest.fn();
 
 jest.mock(
@@ -169,5 +173,13 @@ describe('NudgeActionSheet', () => {
     fireEvent.press(screen.getByTestId('nudge-action-sheet-close'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('pads the sheet above the bottom safe area', () => {
+    render(<NudgeActionSheet {...defaultProps} />);
+
+    expect(screen.getByTestId('nudge-action-sheet').props.style).toMatchObject({
+      paddingBottom: 42,
+    });
   });
 });

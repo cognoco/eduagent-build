@@ -164,4 +164,19 @@ describe('SecuritySessions', () => {
       screen.getByText("We couldn't load your devices");
     });
   });
+
+  it('shows an escape action when no security sessions are listed', async () => {
+    const onBackToAccount = jest.fn();
+    mockGetSessions.mockResolvedValue([]);
+    active = renderScreen(
+      <SecuritySessions onBackToAccount={onBackToAccount} />,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('security-sessions-empty');
+    });
+
+    fireEvent.press(screen.getByTestId('security-sessions-empty-back'));
+    expect(onBackToAccount).toHaveBeenCalledTimes(1);
+  });
 });
