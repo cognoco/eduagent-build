@@ -19,10 +19,9 @@ function targetScreen(page: Page, mode: AppMode): Locator {
 }
 
 function selectedModeTab(page: Page, mode: AppMode): Locator {
-  return page.getByRole('tab', {
-    name: mode === 'study' ? 'My Learning' : 'Family',
-    selected: true,
-  });
+  return page
+    .getByTestId('tab-home')
+    .filter({ hasText: mode === 'study' ? 'My Learning' : 'Family' });
 }
 
 async function modeIsVisible(page: Page, mode: AppMode): Promise<boolean> {
