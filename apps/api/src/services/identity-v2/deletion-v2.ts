@@ -15,7 +15,7 @@
 //   2. re-home each consent_grant for every person in the org → consent_receipt
 //   2a. tear down guardianship + supportership edges incident to the org's persons
 //       (WI-849 Gap 3 — both directions; cross-org edges drop the edge, not the
-//        counterpart person). See MMT-ADR-0025.
+//        counterpart person). See MMT-ADR-0026.
 //   G1. DELETE subscription WHERE organization_id = $org (WI-849 Gap 1). Satisfies
 //       payer_person_id + organization_id RESTRICT before person/org drops.
 //       subscription_payers cascade off the subscription row automatically.
@@ -418,7 +418,7 @@ export async function executeDeletionV2(
     // persons, so every relationship anchored on those persons ceases to exist;
     // the edge rows must go with them. (Canon: data-model.md §3.2/§6.1 say these
     // edges SURVIVE a single-person delete — that is the person-granularity path;
-    // the whole-org erasure path tears them down. See MMT-ADR-0025.)
+    // the whole-org erasure path tears them down. See MMT-ADR-0026.)
     //
     // CROSS-ORG EDGES: an edge may reference a person OUTSIDE this org (a guardian
     // in another org; a supporter who supports an in-org charge). We delete an

@@ -1,4 +1,4 @@
-# MMT-ADR-0025 — Whole-org erasure tears down the otherwise-surviving relationship edges
+# MMT-ADR-0026 — Whole-org erasure tears down the otherwise-surviving relationship edges
 
 **Status:** Accepted · 2026-06-20 · *(pre-live: edited in place; human-Architecture sign-off accepted — MMT-ADR-0000 Part II override)* · **Class:** Architecture — data model / GDPR erasure · **Scope:** Identity Foundation — `executeDeletionV2` whole-org/whole-account deletion path · **Deciders:** drafted by Claude (WI-849); **Architecture sign-off: Accepted by operator Jorn 2026-06-20** · **Builds on:** MMT-ADR-0007 (person/edge model), MMT-ADR-0008 (guardianship global edge), MMT-ADR-0011/0020 (data-model realization) · **Relates:** WI-849 (this build), WI-885 (subscription store-cancellation, deferred)
 

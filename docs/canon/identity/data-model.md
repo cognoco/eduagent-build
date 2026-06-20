@@ -362,7 +362,7 @@ person on (at least) one end is gone — so the erasure **tears down every `guar
 persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
 row** removed; the out-of-org counterpart person and their org are untouched. `subscription` DB rows are **torn down** in the same erasure transaction (Step G1, WI-849 Gap 1), so a
 *subscribed* org's erasure now succeeds. The Stripe/RC store-cancellation is deferred to WI-885. See
-**MMT-ADR-0025** (and §6.1).
+**MMT-ADR-0026** (and §6.1).
 
 ---
 
@@ -489,12 +489,12 @@ active row drops, the receipt moves to the retain-tier, the audit row is written
 | **Active person → parent-initiated delete (under-age)** | Guardian exercises the child-erasure right. | Age-appropriate confirm + grace window. | Same path; the `deleted_by` on the `deletion_audit` is the guardian. A forward-only receipt-preservation guard verifies the receipt survives. |
 | **Active person → abandonment (dormancy window elapsed)** | Daily sweep detects `last_activity_at` older than the counsel-set threshold; grace window elapsed with no return. | Pre-deletion notice + grace; final silent cleanup. | Same re-home pattern; the `reason` on the `deletion_audit` is `abandonment`. A forward-only ratchet verifies. |
 | **`consent_grant` row blocked from delete by RESTRICT** | A delete attempt on a `person` with active grants. | The delete *fails* — by design. | The re-home transaction is a single atomic step; a half-done delete is not a valid state. The RESTRICT is the schema's way of saying "you forgot to move the records first." |
-| **Whole-org / whole-account erasure** (GDPR Art-17; `executeDeletionV2`) | User/guardian deletes the whole account, or the abandonment sweep erases it. | Account and all its persons erased after the grace window. | Removes the `organization` + every `person`. Before the person drops, **tears down every `guardianship` + `supportership` edge incident to the org's persons** (both directions) and **deletes the org's `subscription` row(s)** (Step G1, WI-849 Gap 1) so all RESTRICT FKs are satisfied; a **cross-org** edge drops only its edge row, never the out-of-org counterpart person. Consent grants re-home as in the per-person path. `subscription_payers` cascade off the deleted subscription automatically. Stripe/RC store-cancellation deferred to WI-885. See **MMT-ADR-0025**. |
+| **Whole-org / whole-account erasure** (GDPR Art-17; `executeDeletionV2`) | User/guardian deletes the whole account, or the abandonment sweep erases it. | Account and all its persons erased after the grace window. | Removes the `organization` + every `person`. Before the person drops, **tears down every `guardianship` + `supportership` edge incident to the org's persons** (both directions) and **deletes the org's `subscription` row(s)** (Step G1, WI-849 Gap 1) so all RESTRICT FKs are satisfied; a **cross-org** edge drops only its edge row, never the out-of-org counterpart person. Consent grants re-home as in the per-person path. `subscription_payers` cascade off the deleted subscription automatically. Stripe/RC store-cancellation deferred to WI-885. See **MMT-ADR-0026**. |
 
 The forward-only ratchet installs against the new baseline: it cannot regress to a
 `consent_states`-shape column because that table does not exist.
 
-> **Two deletion granularities (MMT-ADR-0025).** The "consent_grant blocked by RESTRICT" row above is the
+> **Two deletion granularities (MMT-ADR-0026).** The "consent_grant blocked by RESTRICT" row above is the
 > *person-granularity* contract — the RESTRICT FKs on `guardianship`/`supportership`/`subscription` are
 > load-bearing and a single-person delete leaves those edges intact. The *whole-org erasure* row is the
 > second granularity: it removes the org and all its persons, so the incident relationship edges are torn
