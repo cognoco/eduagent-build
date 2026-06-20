@@ -679,7 +679,7 @@ describe('Integration: session service', () => {
     const persistedFresh = await loadSession(freshSession.id);
     const staleSummary = await loadSummary(staleSession.id);
     const freshSummary = await loadSummary(freshSession.id);
-    const scopedResults = results.filter(
+    const scopedResults = results.sessions.filter(
       (result) =>
         result.profileId === first.profile.id ||
         result.profileId === second.profile.id,

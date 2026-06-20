@@ -102,6 +102,16 @@ function createClosedSession(
   };
 }
 
+// closeStaleSessions now returns a plain { sessions, failures } object (not an
+// array) so `failures` survives the Inngest step.run JSON boundary. Wrap the
+// fixture sessions in that shape; `failures` defaults to empty.
+function staleBatch(
+  sessions: ReturnType<typeof createClosedSession>[],
+  failures: Array<{ profileId: string; sessionId: string; error: string }> = [],
+) {
+  return { sessions, failures };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -141,7 +151,7 @@ describe('session-stale-cleanup Inngest function', () => {
   });
 
   it('passes a 30-minute cutoff to closeStaleSessions', async () => {
-    mockCloseStaleSessions.mockResolvedValue([]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([]));
 
     const before = Date.now();
     await executeHandler();
@@ -174,7 +184,7 @@ describe('session-stale-cleanup Inngest function', () => {
       topicId: 'topic-2',
       subjectId: 'subject-2',
     });
-    mockCloseStaleSessions.mockResolvedValue([session1, session2]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session1, session2]));
 
     const { sendEventCalls } = await executeHandler();
 
@@ -210,7 +220,7 @@ describe('session-stale-cleanup Inngest function', () => {
       sessionType: 'homework',
       verificationType: 'teach_back',
     });
-    mockCloseStaleSessions.mockResolvedValue([session]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
 
     const { sendEventCalls } = await executeHandler();
 
@@ -232,7 +242,7 @@ describe('session-stale-cleanup Inngest function', () => {
       topicId: null,
       interleavedTopicIds: ['topic-a', 'topic-b'],
     });
-    mockCloseStaleSessions.mockResolvedValue([session]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
 
     const { sendEventCalls } = await executeHandler();
 
@@ -249,7 +259,7 @@ describe('session-stale-cleanup Inngest function', () => {
   });
 
   it('dispatches no events when no sessions are stale', async () => {
-    mockCloseStaleSessions.mockResolvedValue([]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([]));
 
     const { result, sendEventCalls } = await executeHandler();
 
@@ -261,7 +271,7 @@ describe('session-stale-cleanup Inngest function', () => {
     // closeStaleSessions internally skips sessions that were resumed between
     // the read and write (BD-05 in session-crud.ts). Those sessions are NOT
     // included in the result array. The function should handle this gracefully.
-    mockCloseStaleSessions.mockResolvedValue([]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([]));
 
     const { result, sendEventCalls } = await executeHandler();
 
@@ -276,7 +286,7 @@ describe('session-stale-cleanup Inngest function', () => {
     // 2 were actually closed and returned.
     const closed1 = createClosedSession({ sessionId: 'session-1' });
     const closed2 = createClosedSession({ sessionId: 'session-3' });
-    mockCloseStaleSessions.mockResolvedValue([closed1, closed2]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([closed1, closed2]));
 
     const { result, sendEventCalls } = await executeHandler();
 
@@ -289,7 +299,7 @@ describe('session-stale-cleanup Inngest function', () => {
 
   it('returns status with closedCount and timestamp', async () => {
     const session = createClosedSession();
-    mockCloseStaleSessions.mockResolvedValue([session]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
 
     const before = new Date().toISOString();
     const { result } = await executeHandler();
@@ -304,8 +314,34 @@ describe('session-stale-cleanup Inngest function', () => {
     expect(result.timestamp <= after).toBe(true);
   });
 
+  it('surfaces failedCount when closeStaleSessions reports per-session failures', async () => {
+    // Error-isolation contract: a session that throws during close is captured
+    // into the `failures` channel (not dropped, not aborting the batch), and the
+    // cron surfaces its count so partial-failure runs are observable. Every other
+    // test uses an empty failures list, so this is the only case that exercises
+    // the `failedCount: closedSessions.failures.length` surfacing with a nonzero
+    // value.
+    // Asymmetric counts (1 closed, 2 failed) so the assertion pins
+    // failedCount to `failures.length`, not `sessions.length`.
+    const closed = createClosedSession({ sessionId: 'session-ok' });
+    mockCloseStaleSessions.mockResolvedValue(
+      staleBatch(
+        [closed],
+        [
+          { profileId: 'profile-1', sessionId: 'session-bad-1', error: 'boom' },
+          { profileId: 'profile-2', sessionId: 'session-bad-2', error: 'boom' },
+        ],
+      ),
+    );
+
+    const { result } = await executeHandler();
+
+    expect(result.closedCount).toBe(1);
+    expect(result.failedCount).toBe(2);
+  });
+
   it('calls abandonStaleQuizRounds with a 2-hour cutoff', async () => {
-    mockCloseStaleSessions.mockResolvedValue([]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([]));
     mockAbandonStaleQuizRounds.mockResolvedValue(3);
 
     const before = Date.now();
@@ -335,7 +371,7 @@ describe('session-stale-cleanup Inngest function', () => {
     // reason, but stale cleanup still needs this reason so unattended closes
     // do not count toward streak activity.
     const session = createClosedSession();
-    mockCloseStaleSessions.mockResolvedValue([session]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
 
     const { sendEventCalls } = await executeHandler();
 
@@ -365,7 +401,7 @@ describe('session-stale-cleanup Inngest function', () => {
       sessionId: 'session-2',
       topicId: 'topic-2',
     });
-    mockCloseStaleSessions.mockResolvedValue([session1, session2]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session1, session2]));
 
     const { sendEventCalls } = await executeHandler();
 
@@ -386,7 +422,7 @@ describe('session-stale-cleanup Inngest function', () => {
   // from this handler. If anyone reverts to inngest.send, this test fires.
   it('[BUG-696 / J-7] never calls bare inngest.send — uses memoized step.sendEvent only', async () => {
     const session = createClosedSession();
-    mockCloseStaleSessions.mockResolvedValue([session]);
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
 
     const { sendEventCalls } = await executeHandler();
 
