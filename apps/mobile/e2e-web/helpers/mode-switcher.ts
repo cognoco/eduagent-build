@@ -111,13 +111,27 @@ async function waitForSwitchOutcome(
 async function waitForModePersisted(
   page: Page,
   timeout: number,
-): Promise<void> {
-  if (timeout <= 0) return;
-  await page
+): Promise<boolean> {
+  if (timeout <= 0) return false;
+  return page
     .waitForResponse(
       (response) =>
         /\/profiles\/[^/]+\/app-context(?:[/?]|$)/.test(response.url()) &&
         response.request().method() === 'PATCH' &&
+        response.ok(),
+      { timeout },
+    )
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function waitForProfilesRead(page: Page, timeout: number): Promise<void> {
+  if (timeout <= 0) return;
+  await page
+    .waitForResponse(
+      (response) =>
+        /\/profiles(?:[/?]|$)/.test(response.url()) &&
+        response.request().method() === 'GET' &&
         response.ok(),
       { timeout },
     )
@@ -159,7 +173,9 @@ export async function switchAppMode(
       // reload derives the switched mode from the persisted profile, not a
       // stale pre-switch default. No-op (times out harmlessly) on the
       // transient V0 path where no PATCH is sent.
-      await persisted;
+      if (await persisted) {
+        await waitForProfilesRead(page, Math.min(deadline - Date.now(), 5_000));
+      }
       return;
     }
 
@@ -183,7 +199,12 @@ export async function switchAppMode(
         );
 
         if (retryOutcome === 'success') {
-          await retryPersisted;
+          if (await retryPersisted) {
+            await waitForProfilesRead(
+              page,
+              Math.min(deadline - Date.now(), 5_000),
+            );
+          }
           return;
         }
       }

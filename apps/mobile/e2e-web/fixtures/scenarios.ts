@@ -105,7 +105,7 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-post-approval-steady-state',
     email: buildSeedEmail('mentor-audit-post-approval-steady-state'),
     landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingTestId: 'parent-home-screen',
   },
   deletionScheduledOwner: {
     key: 'mentor-audit-deletion-scheduled-owner',
@@ -119,7 +119,7 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-family-at-profile-limit',
     email: buildSeedEmail('mentor-audit-family-at-profile-limit'),
     landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingTestId: 'parent-home-screen',
   },
   postApprovalRedirect: {
     key: 'mentor-audit-post-approval-redirect',
@@ -251,6 +251,6 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-bridge-backstack',
     email: buildSeedEmail('mentor-audit-bridge-backstack'),
     landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingTestId: 'parent-home-screen',
   },
 } as const satisfies Record<string, MentorAuditScenario>;

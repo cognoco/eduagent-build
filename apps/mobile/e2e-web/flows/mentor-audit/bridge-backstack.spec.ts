@@ -121,10 +121,9 @@ test.describe('Mentor audit BRIDGE-04 — bridge backstack contract', () => {
   // across surfaces would pollute the adult library after the first
   // Add-to-my-learning click, so the second + third surfaces would silently
   // exercise the "already exists" toast branch instead of the "new clone"
-  // branch this contract cares about. Splitting also unconditionally
-  // re-asserts the Family-mode prerequisite per surface — `page.goto()`
-  // resets transient client state, and a single pre-loop `switchAppMode`
-  // would not survive a future change to mode-state persistence.
+  // branch this contract cares about. Splitting also re-asserts the Family-mode
+  // prerequisite per surface. The local seed now persists Family mode, while
+  // deployed staging can still land in Study until that seed change ships.
   for (const surface of ENTRY_SURFACES) {
     test(`Add-to-my-learning → Open → goBack lands on the originating ${surface.key} surface`, async ({
       page,
@@ -136,15 +135,17 @@ test.describe('Mentor audit BRIDGE-04 — bridge backstack contract', () => {
         // Per-surface alias prevents Clerk email collisions when the project
         // runs serially (fullyParallel: false on this Playwright project).
         alias: `${scenario.key}-${surface.key}`,
-        landingTestId: scenario.landingTestId,
+        landingTestId: ['parent-home-screen', 'learner-screen'],
         landingPath: scenario.landingPath,
       });
 
-      // Bridge UI gates on Family mode (showLearnThisToo). The seed
-      // intentionally creates the owner WITHOUT `defaultAppContext: 'family'`
-      // (see seedMentorAuditBridgeBackstack docstring), so each test must
-      // switch into Family before deep-linking to the child surfaces.
-      await switchAppMode(page, 'family');
+      if (!(await page.getByTestId('parent-home-screen').isVisible())) {
+        await switchAppMode(page, 'family');
+      }
+      await page.goto('/home', { waitUntil: 'commit' });
+      await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+        timeout: 60_000,
+      });
 
       await exerciseBridgeBackstack(page, surface, seeded.ids);
     });

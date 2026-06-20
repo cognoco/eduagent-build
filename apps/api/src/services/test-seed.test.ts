@@ -1192,6 +1192,9 @@ describe('mentor-audit seed pack returns required IDs', () => {
     );
     expect(profileRow).toBeDefined();
     expect(profileRow?.residenceJurisdiction).toBe('US');
+    expect(profileRow?.birthDate).toBe(
+      `${new Date().getFullYear() - 13}-01-01`,
+    );
   });
 
   it('family-at-profile-limit creates exactly maxProfiles family profiles', async () => {
@@ -1474,6 +1477,11 @@ describe('mentor-audit seed pack returns required IDs', () => {
     expect(childSubjects).toHaveLength(1);
     expect(ownerSubjects[0]?.name).not.toBe(childSubjects[0]?.name);
     expect(childSubjects[0]?.name).toBe(result.ids.childSubjectName);
+
+    const ownerRow = captured.find(
+      (row) => row.id === result.ids.ownerProfileId,
+    );
+    expect(ownerRow?.defaultAppContext).toBe('family');
 
     // recapId === sessionId per recaps service contract — the seed must
     // mirror that or the Playwright probe would deep-link to a missing recap.
