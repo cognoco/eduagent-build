@@ -490,7 +490,9 @@
       "pushMissingServer": "Slå på push-varsler her.",
       "pushMissingToken": "Registrer denne enheten for push-varsler.",
       "openSettingsTitle": "Åpne innstillinger",
-      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene."
+      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene.",
+      "loadErrorTitle": "Vi kunne ikke laste inn varslingsinnstillingene dine",
+      "loadErrorMessage": "Prøv igjen. Innstillingene dine er ikke endret."
     },
     "account": {
       "sectionHeader": "Konto",

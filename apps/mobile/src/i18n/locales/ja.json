@@ -490,7 +490,9 @@
       "pushMissingServer": "ここでプッシュ通知をオンにしてください。",
       "pushMissingToken": "このデバイスをプッシュ通知に登録してください。",
       "openSettingsTitle": "設定を開く",
-      "openSettingsDescription": "このアプリの通知はブロックされています。システム設定でオンにしてください。"
+      "openSettingsDescription": "このアプリの通知はブロックされています。システム設定でオンにしてください。",
+      "loadErrorTitle": "通知設定を読み込めませんでした",
+      "loadErrorMessage": "もう一度お試しください。設定は変更されていません。"
     },
     "account": {
       "sectionHeader": "アカウント",

@@ -490,7 +490,9 @@
       "pushMissingServer": "Activa las notificaciones push aquí.",
       "pushMissingToken": "Registra este dispositivo para notificaciones push.",
       "openSettingsTitle": "Abrir Ajustes",
-      "openSettingsDescription": "Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema."
+      "openSettingsDescription": "Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema.",
+      "loadErrorTitle": "No pudimos cargar la configuración de tus notificaciones",
+      "loadErrorMessage": "Inténtalo de nuevo. Tus preferencias no han cambiado."
     },
     "account": {
       "sectionHeader": "Cuenta",
