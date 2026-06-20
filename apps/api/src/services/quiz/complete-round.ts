@@ -245,6 +245,24 @@ export async function checkQuizAnswerWithCorrect(
   const existingResults = Array.isArray(round.results)
     ? (round.results as RecordedQuestionResult[])
     : [];
+
+  // [BUG-852] Bound the per-questionIndex append history. Without this guard,
+  // `appendRecordedAttempt` blindly `jsonb ||`-appends every /check submission,
+  // so a client can replay /check unbounded for one question to inflate the row
+  // — and, for guess_who, send finalAttempt:false repeatedly then a single
+  // finalAttempt:true with cluesUsed:0 to claim full XP. Reject once the question
+  // is already final, and cap the number of non-final probe attempts.
+  const indexResults = existingResults.filter(
+    (r) => r.questionIndex === questionIndex,
+  );
+  if (indexResults.some(isFinalRecordedAttempt)) {
+    // A final answer is already on record for this question; no further /check.
+    throw new ConflictError('Question already answered');
+  }
+  if (indexResults.length >= QUIZ_CONFIG.maxProbeAttemptsPerQuestion) {
+    throw new ConflictError('Too many attempts for this question');
+  }
+
   const now = new Date();
   const isFinalAttempt =
     question.type === 'guess_who' ? correct || finalAttempt !== false : true;
