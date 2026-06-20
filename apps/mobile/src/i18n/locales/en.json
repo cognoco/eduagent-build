@@ -88,7 +88,6 @@
     "alreadyCompleted": "You've already finished this. Head back and pick something new.",
     "validationFailed": "Something didn't look right. Please check what you entered and try again.",
     "timedOut": "That reply took too long. Tap reconnect to try again.",
-    "clerkGeneric": "Something didn't go through. Please try again.",
     "emailNotVerified": "Please verify your email address, then try again.",
     "quotaExceeded": "Quota exceeded",
     "resourceNotFound": "Resource not found",

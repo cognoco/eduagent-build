@@ -72,7 +72,6 @@
     "alreadyCompleted": "Du hast das bereits abgeschlossen. Geh zurück und wähle etwas Neues.",
     "validationFailed": "Etwas schien nicht zu stimmen. Bitte überprüfe deine Eingabe und versuche es erneut.",
     "timedOut": "Die Antwort hat zu lange gedauert. Tippe auf „Erneut verbinden“, um es nochmal zu versuchen.",
-    "clerkGeneric": "Das hat leider nicht geklappt. Bitte versuche es erneut.",
     "emailNotVerified": "Bitte bestätige deine E-Mail-Adresse und versuche es dann erneut.",
     "quotaExceeded": "Kontingent überschritten",
     "resourceNotFound": "Ressource nicht gefunden",

@@ -72,7 +72,6 @@
     "alreadyCompleted": "Ya has terminado esto. Vuelve atrás y elige algo nuevo.",
     "validationFailed": "Algo no parecía correcto. Revisa lo que ingresaste e inténtalo de nuevo.",
     "timedOut": "Esa respuesta tardó demasiado. Toca reconectar para intentarlo de nuevo.",
-    "clerkGeneric": "Algo no pudo completarse. Inténtalo de nuevo.",
     "emailNotVerified": "Verifica tu dirección de correo electrónico y vuelve a intentarlo.",
     "quotaExceeded": "Cuota excedida",
     "resourceNotFound": "Recurso no encontrado",

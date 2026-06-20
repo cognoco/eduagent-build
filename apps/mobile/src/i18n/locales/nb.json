@@ -72,7 +72,6 @@
     "alreadyCompleted": "Du har allerede fullført dette. Gå tilbake og velg noe nytt.",
     "validationFailed": "Noe så ikke riktig ut. Sjekk det du skrev inn og prøv igjen.",
     "timedOut": "Det svaret tok for lang tid. Trykk på koble til på nytt for å prøve igjen.",
-    "clerkGeneric": "Noe gikk ikke gjennom. Prøv igjen.",
     "emailNotVerified": "Bekreft e-postadressen din, og prøv deretter igjen.",
     "quotaExceeded": "Kvoten er overskredet",
     "resourceNotFound": "Ressurs ikke funnet",
