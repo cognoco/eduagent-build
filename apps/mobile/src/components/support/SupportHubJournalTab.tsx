@@ -1,11 +1,33 @@
 import { ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { ScopeDescriptor } from '@eduagent/schemas';
+import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
+
+import { SharedRecordView } from '../visibility';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 interface SupportHubJournalTabProps {
   personScopes: readonly PersonScope[];
+}
+
+function emptySharedRecord(scope: PersonScope, headline: string): SharedRecord {
+  return {
+    supportershipId: scope.edgeId,
+    generatedAt: new Date().toISOString(),
+    factIds: [],
+    supporterView: {
+      audience: 'supporter',
+      factIds: [],
+      headline,
+      facts: [],
+    },
+    supporteeView: {
+      audience: 'supportee',
+      factIds: [],
+      headline: 'There are no shareable updates yet.',
+      facts: [],
+    },
+  };
 }
 
 export function SupportHubJournalTab({
@@ -39,6 +61,16 @@ export function SupportHubJournalTab({
             <Text className="mt-1 text-body-sm text-text-secondary">
               {t('supportHub.journal.personHint')}
             </Text>
+            <View className="mt-3">
+              <SharedRecordView
+                record={emptySharedRecord(
+                  scope,
+                  t('visibility.sharedRecord.emptyForPerson', {
+                    name: scope.displayName,
+                  }),
+                )}
+              />
+            </View>
           </View>
         ))}
       </View>

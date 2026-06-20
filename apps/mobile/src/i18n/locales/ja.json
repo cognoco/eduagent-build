@@ -4132,5 +4132,51 @@
       "personPlaceholderTitle": "共有記録はS5に届きます",
       "personPlaceholderMessage": "現時点では、このスコープでは学習者のメモ、チャット、プライベートなジャーナルの成果物は非表示になっています。"
     }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "保護者",
+      "sibling": "兄弟姉妹",
+      "teacher": "先生",
+      "other": "サポーター"
+    },
+    "contract": {
+      "title": "共有設定の同意",
+      "supporterFallback": "あなたのサポーター",
+      "supporteeFallback": "この学習者",
+      "supporterLine": "あなたは{{supporteeName}}さんをサポートするようリクエストしています。",
+      "supporteeLine": "{{supporterName}}さんがあなたの{{relation}}として、あなたをサポートしたがっています。",
+      "reportableKinds": "サポーターは、習熟度、努力、学習への取り組み状況を確認できます。",
+      "artifactWall": "プライベートなチャット、メモ、ジャーナルの内容は非公開のままです。",
+      "renderEquivalence": "双方が同じ情報を、それぞれの役割に合わせて見ることができます。",
+      "safetyException": "安全上の問題は、引き続き適切な大人に報告されます。",
+      "accept": "契約に同意する",
+      "accepted": "承諾済み"
+    },
+    "sharedRecord": {
+      "emptyTitle": "共有記録はまだありません",
+      "emptyForPerson": "{{name}}: 共有記録はまだありません。",
+      "structuralOnly": "構造的な情報のみ。メモやチャットの原文は含まれません。",
+      "errorTitle": "共有記録を読み込めませんでした",
+      "errorMessage": "しばらくしてからもう一度お試しください。",
+      "retry": "再試行"
+    },
+    "appeal": {
+      "label": "アテンションレポートをリクエスト"
+    },
+    "revocation": {
+      "title": "共有が終了しました",
+      "message": "このサポートリンクは終了します。猶予期間は{{graceEndsAt}}に終了します。"
+    },
+    "graduation": {
+      "title": "あなたのスペースが変更されます",
+      "message": "このサポーターに何を見せるかを選択できるようになりました。",
+      "version": "契約バージョン {{version}}"
+    },
+    "coLearning": {
+      "title": "任意の説明返し",
+      "fill": "返信を入力",
+      "dismiss": "閉じる"
+    }
   }
 }

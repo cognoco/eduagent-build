@@ -4132,5 +4132,51 @@
       "personPlaceholderTitle": "Los registros compartidos llegan en S5",
       "personPlaceholderMessage": "Por ahora, este ámbito mantiene ocultas las notas del estudiante, los chats y los elementos privados del diario."
     }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "Padre/Madre",
+      "sibling": "Hermano/a",
+      "teacher": "Profesor/a",
+      "other": "Persona de apoyo"
+    },
+    "contract": {
+      "title": "Contrato de visibilidad",
+      "supporterFallback": "Tu persona de apoyo",
+      "supporteeFallback": "este estudiante",
+      "supporterLine": "Estás solicitando apoyar a {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} quiere apoyarte como tu {{relation}}.",
+      "reportableKinds": "Quienes te apoyan pueden ver tu dominio, esfuerzo y participación observable.",
+      "artifactWall": "Los chats privados, las notas y los elementos del diario permanecen ocultos.",
+      "renderEquivalence": "Ambas partes ven los mismos datos, adaptados a su rol.",
+      "safetyException": "Las alertas de seguridad llegan a los adultos correspondientes.",
+      "accept": "Aceptar contrato",
+      "accepted": "Aceptado"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Aún no hay registro compartido",
+      "emptyForPerson": "{{name}}: aún no hay registro compartido.",
+      "structuralOnly": "Solo datos estructurales. Sin notas ni textos de chat en bruto.",
+      "errorTitle": "No se pudo cargar el registro compartido",
+      "errorMessage": "Inténtalo de nuevo en un momento.",
+      "retry": "Reintentar"
+    },
+    "appeal": {
+      "label": "Solicitar informe de atención"
+    },
+    "revocation": {
+      "title": "Se dejó de compartir",
+      "message": "Este enlace de apoyo está por terminar. El período de gracia finaliza el {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Tu espacio está cambiando",
+      "message": "Ahora tú eliges lo que esta persona de apoyo puede ver.",
+      "version": "Versión del contrato {{version}}"
+    },
+    "coLearning": {
+      "title": "Explicación opcional",
+      "fill": "Completar respuesta",
+      "dismiss": "Descartar"
+    }
   }
 }

@@ -4132,5 +4132,51 @@
       "personPlaceholderTitle": "Delte oppføringer kommer i S5",
       "personPlaceholderMessage": "Foreløpig holder dette omfanget elevnotater, chatter og private loggelementer skjult."
     }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "forelder",
+      "sibling": "søsken",
+      "teacher": "lærer",
+      "other": "støttespiller"
+    },
+    "contract": {
+      "title": "Synlighetskontrakt",
+      "supporterFallback": "Din støttespiller",
+      "supporteeFallback": "denne eleven",
+      "supporterLine": "Du ber om å støtte {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} ønsker å støtte deg som din {{relation}}.",
+      "reportableKinds": "Støttespillere kan se mestring, innsats og observerbart engasjement.",
+      "artifactWall": "Private chatter, notater og journalartefakter forblir skjult.",
+      "renderEquivalence": "Begge parter ser de samme faktaene, tilpasset sin rolle.",
+      "safetyException": "Sikkerhetsvarsler når fortsatt de rette voksne.",
+      "accept": "Godta kontrakt",
+      "accepted": "Godtatt"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Ingen delt oversikt ennå",
+      "emptyForPerson": "{{name}}: ingen delt oversikt ennå.",
+      "structuralOnly": "Kun strukturelle fakta. Ingen rånotater eller chattetekst.",
+      "errorTitle": "Kunne ikke laste den delte oversikten",
+      "errorMessage": "Prøv igjen om et øyeblikk.",
+      "retry": "Prøv igjen"
+    },
+    "appeal": {
+      "label": "Be om oppmerksomhetsrapport"
+    },
+    "revocation": {
+      "title": "Deling avsluttet",
+      "message": "Denne støttelenken avsluttes. Fristen utløper {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Ditt område endres",
+      "message": "Du velger nå hva denne støttespilleren kan se.",
+      "version": "Kontraktversjon {{version}}"
+    },
+    "coLearning": {
+      "title": "Valgfri gjenfortelling",
+      "fill": "Fyll inn svar",
+      "dismiss": "Avvis"
+    }
   }
 }

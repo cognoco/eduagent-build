@@ -3887,6 +3887,52 @@
       "personPlaceholderMessage": "For now, this scope keeps learner notes, chats and private journal artifacts hidden."
     }
   },
+  "visibility": {
+    "relation": {
+      "parent": "parent",
+      "sibling": "sibling",
+      "teacher": "teacher",
+      "other": "supporter"
+    },
+    "contract": {
+      "title": "Visibility contract",
+      "supporterFallback": "Your supporter",
+      "supporteeFallback": "this learner",
+      "supporterLine": "You are asking to support {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} wants to support you as your {{relation}}.",
+      "reportableKinds": "Supporters can see mastery, effort and observable engagement.",
+      "artifactWall": "Private chats, notes and journal artifacts stay hidden.",
+      "renderEquivalence": "Both sides see the same facts, framed for their role.",
+      "safetyException": "Safety escalations still reach the right adults.",
+      "accept": "Accept contract",
+      "accepted": "Accepted"
+    },
+    "sharedRecord": {
+      "emptyTitle": "No shared record yet",
+      "emptyForPerson": "{{name}}: no shared record yet.",
+      "structuralOnly": "Structural facts only. No raw notes or chat text.",
+      "errorTitle": "Couldn't load the shared record",
+      "errorMessage": "Try again in a moment.",
+      "retry": "Try again"
+    },
+    "appeal": {
+      "label": "Request attention report"
+    },
+    "revocation": {
+      "title": "Sharing ended",
+      "message": "This support link is ending. The grace window closes on {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Your space is changing",
+      "message": "You now choose what this supporter can see.",
+      "version": "Contract version {{version}}"
+    },
+    "coLearning": {
+      "title": "Optional explain-back",
+      "fill": "Fill reply",
+      "dismiss": "Dismiss"
+    }
+  },
   "modeSwitcher": {
     "switchError": "Couldn't switch. Tap to try again.",
     "a11yRetry": "Retry mode switch"

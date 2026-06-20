@@ -4132,5 +4132,51 @@
       "personPlaceholderTitle": "Registos partilhados chegam no S5",
       "personPlaceholderMessage": "Por enquanto, este âmbito mantém ocultas as notas do aluno, conversas e artefactos privados do diário."
     }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "pai/mãe",
+      "sibling": "irmão/irmã",
+      "teacher": "professor(a)",
+      "other": "apoiador(a)"
+    },
+    "contract": {
+      "title": "Contrato de visibilidade",
+      "supporterFallback": "Seu apoiador",
+      "supporteeFallback": "este aprendiz",
+      "supporterLine": "Você está pedindo para apoiar {{supporteeName}}.",
+      "supporteeLine": "{{supporterName}} quer te apoiar como seu/sua {{relation}}.",
+      "reportableKinds": "Apoiadores podem ver o domínio, esforço e engajamento observável.",
+      "artifactWall": "Conversas privadas, notas e artefatos do diário permanecem ocultos.",
+      "renderEquivalence": "Ambos os lados veem os mesmos fatos, enquadrados para seu papel.",
+      "safetyException": "Alertas de segurança ainda chegam aos adultos responsáveis.",
+      "accept": "Aceitar contrato",
+      "accepted": "Aceito"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Nenhum registro compartilhado ainda",
+      "emptyForPerson": "{{name}}: nenhum registro compartilhado ainda.",
+      "structuralOnly": "Apenas fatos estruturais. Sem notas brutas ou texto de chat.",
+      "errorTitle": "Erro ao carregar registro compartilhado",
+      "errorMessage": "Tente novamente em um instante.",
+      "retry": "Tentar novamente"
+    },
+    "appeal": {
+      "label": "Solicitar relatório de atenção"
+    },
+    "revocation": {
+      "title": "Acesso encerrado",
+      "message": "Este link de apoio está terminando. O período de carência termina em {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Seu espaço está mudando",
+      "message": "Agora você escolhe o que este apoiador pode ver.",
+      "version": "Versão do contrato {{version}}"
+    },
+    "coLearning": {
+      "title": "Explicação opcional",
+      "fill": "Preencher resposta",
+      "dismiss": "Dispensar"
+    }
   }
 }

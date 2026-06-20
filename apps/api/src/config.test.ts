@@ -3,6 +3,7 @@ import {
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
+  isManagedTierActive,
   isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionBindings,
@@ -346,6 +347,25 @@ describe('validateEnv', () => {
     expect(enabledEnv.MODE_NAV_V2_ENABLED).toBe('true');
   });
 
+  it('MANAGED_TIER_ACTIVE defaults to "false" and parses with strict helper semantics', () => {
+    const defaultEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(defaultEnv.MANAGED_TIER_ACTIVE).toBe('false');
+    expect(isManagedTierActive(defaultEnv.MANAGED_TIER_ACTIVE)).toBe(false);
+
+    const enabledEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MANAGED_TIER_ACTIVE: 'true',
+    });
+    expect(enabledEnv.MANAGED_TIER_ACTIVE).toBe('true');
+    expect(isManagedTierActive('true')).toBe(true);
+    expect(isManagedTierActive('false')).toBe(false);
+    expect(isManagedTierActive(undefined)).toBe(false);
+  });
+
   it('MEMORY_FACTS_RELEVANCE_RETRIEVAL defaults to "false" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -606,6 +626,7 @@ describe('validateProductionBindings', () => {
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
     MODE_NAV_V2_ENABLED: 'false',
+    MANAGED_TIER_ACTIVE: 'false',
     IDENTITY_V2_ENABLED: 'false',
     MAINTENANCE_READONLY: 'false',
     MAINTENANCE_BLOCK_INNGEST: 'false',

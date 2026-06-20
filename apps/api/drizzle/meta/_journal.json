@@ -834,6 +834,13 @@
       "when": 1781985150939,
       "tag": "0120_s4_supporter_feed",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1781988139654,
+      "tag": "0121_s5_visibility_contract",
+      "breakpoints": true
     }
   ]
 }

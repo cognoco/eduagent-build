@@ -136,6 +136,30 @@ export type BillingProfileQuotaExhaustedEvent = z.infer<
   typeof billingProfileQuotaExhaustedEventSchema
 >;
 
+// ---------------------------------------------------------------------------
+// S5 visibility contract events
+// ---------------------------------------------------------------------------
+
+// PII egress: supportership revocation/graduation events carry opaque ids and
+// timestamps only. Display names are resolved from first-party DB when notices
+// render, never serialized into Inngest's third-party event store.
+export const supportershipUnlinkedEventSchema = z.object({
+  supportershipId: z.string().uuid(),
+  contractId: z.string().uuid().optional(),
+  supporteePersonId: z.string().uuid(),
+  supporterPersonId: z.string().uuid(),
+  revokedAt: isoDateField,
+});
+export type SupportershipUnlinkedEvent = z.infer<
+  typeof supportershipUnlinkedEventSchema
+>;
+
+export const personGraduatedEventSchema = z.object({
+  personId: z.string().uuid(),
+  occurredAt: isoDateField,
+});
+export type PersonGraduatedEvent = z.infer<typeof personGraduatedEventSchema>;
+
 // PII egress: No raw `learnerMessage` / `topicTitle` fields: Inngest persists
 // event payloads in its third-party event store. The payload carries an opaque
 // reference (`learnerMessageEventId`, the session_events row id of the

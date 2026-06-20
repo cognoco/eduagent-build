@@ -4132,5 +4132,51 @@
       "personPlaceholderTitle": "Geteilte Einträge kommen in S5 an",
       "personPlaceholderMessage": "Vorerst hält dieser Bereich Notizen, Chats und private Journaleinträge von Lernenden verborgen."
     }
+  },
+  "visibility": {
+    "relation": {
+      "parent": "Elternteil",
+      "sibling": "Geschwister",
+      "teacher": "Lehrkraft",
+      "other": "Unterstützer"
+    },
+    "contract": {
+      "title": "Sichtbarkeitsvertrag",
+      "supporterFallback": "Dein Unterstützer",
+      "supporteeFallback": "dieser Lernende",
+      "supporterLine": "Du bittest darum, {{supporteeName}} zu unterstützen.",
+      "supporteeLine": "{{supporterName}} möchte dich als {{relation}} unterstützen.",
+      "reportableKinds": "Unterstützer können Kenntnisstand, Einsatz und sichtbares Engagement sehen.",
+      "artifactWall": "Private Chats, Notizen und Journaleinträge bleiben verborgen.",
+      "renderEquivalence": "Beide Seiten sehen die gleichen Fakten, aufbereitet für ihre Rolle.",
+      "safetyException": "Sicherheitsmeldungen erreichen weiterhin die zuständigen Erwachsenen.",
+      "accept": "Vertrag annehmen",
+      "accepted": "Angenommen"
+    },
+    "sharedRecord": {
+      "emptyTitle": "Noch kein gemeinsamer Bericht",
+      "emptyForPerson": "{{name}}: noch kein gemeinsamer Bericht.",
+      "structuralOnly": "Nur strukturelle Fakten. Keine Roh-Notizen oder Chat-Texte.",
+      "errorTitle": "Gemeinsamer Bericht konnte nicht geladen werden",
+      "errorMessage": "Gleich erneut versuchen.",
+      "retry": "Erneut versuchen"
+    },
+    "appeal": {
+      "label": "Aufmerksamkeitsbericht anfordern"
+    },
+    "revocation": {
+      "title": "Teilen beendet",
+      "message": "Dieser Unterstützungslink endet. Die Übergangsfrist endet am {{graceEndsAt}}."
+    },
+    "graduation": {
+      "title": "Dein Bereich ändert sich",
+      "message": "Du entscheidest jetzt, was dieser Unterstützer sehen kann.",
+      "version": "Vertragsversion {{version}}"
+    },
+    "coLearning": {
+      "title": "Optionale Rückerklärung",
+      "fill": "Antwort ausfüllen",
+      "dismiss": "Schließen"
+    }
   }
 }
