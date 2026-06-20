@@ -3922,6 +3922,11 @@
       "message": "Du kan prøve på nytt eller bla gjennom emner direkte.",
       "subjects": "Bla gjennom emner"
     },
+    "homework": {
+      "imageAlt": "Bilde av fotograferte lekser",
+      "helpMeSolve": "Hjelp meg å løse denne",
+      "checkMyAnswer": "Sjekk svaret mitt"
+    },
     "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen."
   },
   "subjectsBrowse": {
