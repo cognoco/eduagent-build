@@ -1049,6 +1049,11 @@ describe('account routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[Issue 901] no-header auto-resolve must not confer owner privileges', () => {
+    // [Issue 901 / CONSIDER] makeAuthHeaders() here represents ANY account-level
+    // JWT (owner OR child) — the vulnerability is header ABSENCE, not caller
+    // identity: any authenticated caller who omits X-Profile-Id is auto-resolved
+    // to the owner. The non-owner-CALLER path (a child's own JWT omitting the
+    // header) is covered by the account-deletion integration negative test.
     beforeEach(() => {
       jest.clearAllMocks();
       mockUpdateAccountEmailFromClerk.mockClear();

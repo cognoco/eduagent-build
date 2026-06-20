@@ -96,6 +96,12 @@ function buildProfileMeta(args: {
   conversationLanguage: string | null;
   isOwner: boolean;
   consentStatus: ConsentStatus | null;
+  // [Issue 901] REQUIRED — every caller must state how the identity was
+  // resolved so the owner-only gates can refuse auto-synthesized owners. Making
+  // this a required parameter (no defaulted placeholder) makes TypeScript flag
+  // any future caller that forgets it, instead of silently mis-tagging an
+  // explicit owner as 'auto'.
+  resolvedVia: 'auto' | 'explicit-header';
 }): ProfileMeta {
   return {
     birthYear: birthYearFromDate(args.birthDate),
@@ -104,11 +110,7 @@ function buildProfileMeta(args: {
     hasPremiumLlm: deriveHasPremiumLlm(),
     conversationLanguage: args.conversationLanguage,
     isOwner: args.isOwner,
-    // [Issue 901] Placeholder — callers (profileScopeMiddleware) always spread
-    // this meta and override resolvedVia with the correct 'auto' | 'explicit-header'
-    // value. This default satisfies the required field type; the middleware
-    // overwrite ensures the gate never reads a stale value from here.
-    resolvedVia: 'auto' as const,
+    resolvedVia: args.resolvedVia,
   };
 }
 
@@ -158,6 +160,11 @@ export async function findOwnerPersonScope(
       conversationLanguage: owner.conversationLanguage,
       isOwner: owner.roles.includes('admin'),
       consentStatus,
+      // [Issue 901] This is the auto-resolve (no X-Profile-Id header) path —
+      // the owner identity is synthesized. profileScopeMiddleware also spreads
+      // resolvedVia:'auto' over this meta; we bake the correct value here so the
+      // owner-only gates refuse it even if a future caller forgets to override.
+      resolvedVia: 'auto',
     }),
   };
 }
@@ -382,6 +389,11 @@ export async function getPersonScope(
       conversationLanguage: found.conversationLanguage,
       isOwner: found.roles.includes('admin'),
       consentStatus,
+      // [Issue 901] This is the explicit X-Profile-Id verification path — the
+      // caller actively selected this profile and it was verified to belong to
+      // the org. profileScopeMiddleware also spreads resolvedVia:'explicit-header'
+      // over this meta; we bake the correct value here as the single source.
+      resolvedVia: 'explicit-header',
     }),
   };
 }

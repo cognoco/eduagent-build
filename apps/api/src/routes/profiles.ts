@@ -164,7 +164,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
         // assertProfileCreationAllowed — flag-on its profileMeta-absent fallback
         // counts the EMPTY legacy `profiles` table → 0 → fails OPEN; and an
         // add-child is provably never a first-profile bootstrap.
-        if (input.kind === 'child' && c.get('profileMeta')?.isOwner !== true) {
+        // [Issue 901] Require an explicitly selected owner profile, not an
+        // auto-synthesized one. profileScopeMiddleware auto-resolves the account
+        // OWNER (isOwner:true) when no X-Profile-Id header is sent — so a
+        // non-owner caller could omit the header to satisfy the isOwner check.
+        if (
+          input.kind === 'child' &&
+          (c.get('profileMeta')?.isOwner !== true ||
+            c.get('profileMeta')?.resolvedVia !== 'explicit-header')
+        ) {
           return apiError(
             c,
             403,
@@ -347,7 +355,14 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
-      if (profileMeta?.isOwner !== true && id !== activeProfileId) {
+      // [Issue 901] An auto-resolved owner (no X-Profile-Id header) must not be
+      // able to edit OTHER profiles. A legit self-update sends the profile's own
+      // header → id === activeProfileId branch still allows it.
+      if (
+        (profileMeta?.isOwner !== true ||
+          profileMeta?.resolvedVia !== 'explicit-header') &&
+        id !== activeProfileId
+      ) {
         return apiError(
           c,
           403,
@@ -393,7 +408,14 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // so a non-owner can still update their own displayName/avatar/colorScheme.
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
-      if (profileMeta?.isOwner !== true && id !== activeProfileId) {
+      // [Issue 901] An auto-resolved owner (no X-Profile-Id header) must not be
+      // able to edit OTHER profiles (IDOR). A legit self-update sends the
+      // profile's own header → id === activeProfileId branch still allows it.
+      if (
+        (profileMeta?.isOwner !== true ||
+          profileMeta?.resolvedVia !== 'explicit-header') &&
+        id !== activeProfileId
+      ) {
         return apiError(
           c,
           403,

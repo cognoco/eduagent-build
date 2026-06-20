@@ -144,6 +144,12 @@ function makeApp(overrides?: {
             location: null,
             consentStatus: null,
             hasPremiumLlm: false,
+            // [Issue 901] Default to the explicit-header path — the real mobile
+            // client ALWAYS sends X-Profile-Id (api-client.ts:209), so every
+            // legitimate request resolves via 'explicit-header'. Break tests
+            // pass an explicit profileMeta with resolvedVia:'auto' to exercise
+            // the headerless auto-resolve attack.
+            resolvedVia: 'explicit-header',
           } as ProfileMeta));
     c.set('profileMeta', profileMeta);
     await next();
@@ -595,6 +601,48 @@ describe('POST /v1/profiles', () => {
     expect(createChildProfileV2Mock).not.toHaveBeenCalled();
   });
 
+  // [BREAK / Issue 901] An auto-resolved owner (no X-Profile-Id header) is
+  // isOwner:true, so it passes the isOwner check — but profileScopeMiddleware
+  // synthesized that identity for a HEADERLESS caller (a child on the account,
+  // or anyone holding the account JWT). Before the explicit-header requirement,
+  // such a caller could omit X-Profile-Id and add a child. The add-child gate
+  // must reject resolvedVia:'auto' even though isOwner is true and an owner
+  // exists. Red-green: drop the resolvedVia clause in profiles.ts → flips to 201.
+  it('[BREAK][Issue 901] returns 403 when an auto-resolved owner (no X-Profile-Id) adds a child (flag-on)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(
+      makeProfileRow({ id: PROFILE_ID_A, isOwner: true }),
+    );
+
+    const res = await makeApp({
+      profileMeta: {
+        isOwner: true,
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'auto',
+      } as ProfileMeta,
+    }).request(
+      '/v1/profiles',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Sibling',
+          birthYear: 2010,
+          location: 'EU',
+          kind: 'child',
+        }),
+      },
+      { IDENTITY_V2_ENABLED: 'true' },
+    );
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    expect(createChildProfileV2Mock).not.toHaveBeenCalled();
+  });
+
   // [WI-811 review / SHOULD_FIX] Route-layer coverage for the new child-create
   // arms: the HTTP translation of each orchestrator outcome (the integration
   // tests cover the orchestrator throwing; these cover the route mapping).
@@ -918,6 +966,54 @@ describe('PATCH /v1/profiles/:id', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     // Service must not be called — gate fires before the DB write.
+    expect(updateProfileMock).not.toHaveBeenCalled();
+  });
+
+  // [BREAK][Issue 901] An auto-resolved owner (no X-Profile-Id header) is
+  // isOwner:true but its identity was synthesized for a headerless caller. It
+  // must NOT be able to edit a DIFFERENT profile id. The active profileId is the
+  // auto-resolved owner (PROFILE_ID_A); the target is PROFILE_ID_B (a sibling),
+  // so id !== activeProfileId AND resolvedVia:'auto' → 403. Red-green: drop the
+  // resolvedVia clause in profiles.ts → the owner branch passes → 200/404.
+  it('[BREAK][Issue 901] returns 403 when an auto-resolved owner (no X-Profile-Id) edits another profile', async () => {
+    const appAutoOwner = new Hono<TestEnv>();
+    appAutoOwner.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', {
+        id: ACCOUNT_ID,
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Account);
+      // Auto-resolved owner: active profile is the OWNER (PROFILE_ID_A), but
+      // resolvedVia:'auto' (no X-Profile-Id header was sent).
+      c.set('profileId', PROFILE_ID_A);
+      c.set('profileMeta', {
+        isOwner: true,
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'auto',
+      } as ProfileMeta);
+      await next();
+    });
+    appAutoOwner.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    appAutoOwner.route('/v1', profileRoutes);
+
+    // Edit a DIFFERENT profile (PROFILE_ID_B) — must return 403.
+    const res = await appAutoOwner.request(`/v1/profiles/${PROFILE_ID_B}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'Hacked' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     expect(updateProfileMock).not.toHaveBeenCalled();
   });
 
