@@ -38,7 +38,14 @@ test('J-21 parent manages child consent from child detail', async ({
   const seed = await seedAndSignIn(page, {
     scenario: 'parent-multi-child',
     alias: 'j21',
-    landingTestId: 'learner-screen',
+    // [WI-879] Under V1 nav an adult owner with linked children resolves as a
+    // guardian and lands directly on FamilyHome (`parent-home-screen`) — the
+    // `seedParentMultiChild` parent is seeded with `defaultAppContext: 'family'`
+    // (test-seed.ts), so there is no intermediate Study/learner-screen step.
+    // The prior `learner-screen` readiness contract encoded the stale V0 flow
+    // (land on learner-screen, switch to family). Mirrors the WI-801 fix to the
+    // `ownerWithChildren` auth scenario (fixtures/scenarios.ts).
+    landingTestId: 'parent-home-screen',
     landingPath: '/home',
   });
   const childProfileId = seed.ids.child1ProfileId;
