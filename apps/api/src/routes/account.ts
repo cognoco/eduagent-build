@@ -136,7 +136,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [CR-2026-05-19-H1] Only the account owner can schedule account deletion.
     assertOwnerProfile(c, 'Only the account owner can delete the account.');
 
-    const { gracePeriodEnds, scheduledNow } = await scheduleDeletionV2(db, account.id);
+    const { gracePeriodEnds, scheduledNow } = await scheduleDeletionV2(
+      db,
+      account.id,
+    );
 
     try {
       const profileIds = await getPersonIdsForOrganizationV2(db, account.id);
@@ -180,7 +183,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
             extra: {
               surface: 'account.deletion.orphan_recovered',
               accountId: account.id,
-              identityVersion: v2 ? 'v2' : 'v1',
+              identityVersion: 'v2',
             },
           });
         } catch {
