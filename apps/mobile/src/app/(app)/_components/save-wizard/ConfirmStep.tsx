@@ -11,6 +11,7 @@ import {
   type SaveTarget,
 } from '../../../../lib/preview-onboarding-state';
 import { track } from '../../../../lib/analytics';
+import { useThemeColors } from '../../../../lib/theme';
 
 /**
  * Step 3 of the save wizard: confirmation screen + landing handoff.
@@ -38,6 +39,7 @@ export function ConfirmStep({
   onComplete: () => void; // [HIGH-A2] layout-level wizard-done signal
 }): React.ReactElement {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { switchProfile } = useProfile();
   const [landing, setLanding] = React.useState(false);
   const [landingError, setLandingError] = React.useState<string | null>(null);
@@ -122,7 +124,7 @@ export function ConfirmStep({
       >
         {landing ? (
           <ActivityIndicator
-            color="white"
+            color={colors.textInverse}
             accessibilityLabel={t('common.loading')}
           />
         ) : (

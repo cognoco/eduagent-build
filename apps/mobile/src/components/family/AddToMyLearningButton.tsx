@@ -9,6 +9,7 @@ import {
 } from '../../hooks/use-clone-from-child';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { useProfile } from '../../lib/profile';
+import { useThemeColors } from '../../lib/theme';
 
 type Props = {
   childProfileId: string;
@@ -99,6 +100,7 @@ export function AddToMyLearningButton({
   const navigationContract = useNavigationContract();
   const { activeProfile } = useProfile();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { cloneFromChild, isCloningFor, toast, dismissToast } =
     useCloneFromChild();
   const [tipState, setTipState] = useState<'pending' | 'show' | 'hide'>(
@@ -207,7 +209,7 @@ export function AddToMyLearningButton({
       >
         {isCloning ? (
           <ActivityIndicator
-            color="white"
+            color={colors.textInverse}
             accessibilityLabel={t('common.loading')}
           />
         ) : (

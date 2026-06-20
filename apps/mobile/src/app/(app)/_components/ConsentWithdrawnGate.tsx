@@ -14,6 +14,7 @@ import {
   canSwitchFromConsentGate,
   buildSwitchProfileConfirmation,
 } from '../_lib/consent-gate-helpers';
+import { useThemeColors } from '../../../lib/theme';
 
 /**
  * Gate shown when a parent has withdrawn consent.
@@ -26,6 +27,7 @@ export function ConsentWithdrawnGate(): React.ReactElement {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { profiles, activeProfile, switchProfile } = useProfile();
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -96,7 +98,7 @@ export function ConsentWithdrawnGate(): React.ReactElement {
           {refreshing ? (
             <ActivityIndicator
               size="small"
-              color="white"
+              color={colors.textInverse}
               accessibilityLabel={t('common.loading')}
             />
           ) : (

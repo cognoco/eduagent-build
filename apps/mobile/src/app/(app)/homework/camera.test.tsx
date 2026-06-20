@@ -682,6 +682,26 @@ describe('CameraScreen', () => {
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
+  it('renders the error-phase close affordance as an icon button', () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 0,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    expect(getByTestId('close-button').props.accessibilityLabel).toBe('Close');
+    getByText('close');
+  });
+
   it('close button replaces to returnTo target when set', () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       subjectId: 'sub-123',
