@@ -487,13 +487,13 @@ footer .warn{color:var(--amber)}
   </div>
   <div class="hdr-right">
     <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐ theme</button>
-    <div class="stamp">snapshot <b>2026-06-14</b><br>14 initiatives · ~53 bundles · 5 gates<br>view · not a source of truth</div>
+    <div class="stamp">snapshot <b>2026-06-18</b><br>16 initiatives · ~58 bundles · 5 gates<br>view · not a source of truth</div>
   </div>
 </header>
 
 <div class="nowbar">
   <span class="dot"></span>
-  <span class="txt"><b>Right now:</b> <b>PRG-10 (API security &amp; PII) GRADUATED 06-14</b> — all 27 original findings + all 6 fast-follow WIs (WI-734–739, incl. WI-739 CONSIDER activated by operator) Closed/Done; OIDC gate-gap closed; prod `0116` migration rides next deploy · <b>PRG-14 (agent instructions) GRADUATED 06-14</b> — all 6 WIs (WI-741–746) Closed/Done; docs-PR ci.yml fix landed (`d790e04eb`); skill content gate cleared; carry-forwards (gha-hardening eval-inventory nit + lean-pointer rework) deferred to Stream 2 · <b>PRG-11 (architecture) Tiers 1+2 done</b> — WI-717–720 done 06-13; WI-724–729 done 06-14; Tier 3 (9 findings) deferred post-WI-586; lane NOT graduated · <b>BUG-12 CLOSED</b> — prod IDEMPOTENCY_KV binding live; prod /v1/health 200; caveat: RESEND/REVENUECAT_WEBHOOK_SECRET are placeholders, real values = pre-launch blocker (2 Captured WIs) · <b>IF CUTOVER NEXT</b> — all CUT blockers closed as of 06-14 (WI-586 blocked-by set: 0 open); staging cutover handoff written; staging is the first cutover; WI-586 Ready + Assisted · <b>PRG-03 WI-587 COMPLETE</b> — all 19 ruled+executed on main (7cc8a9a8d); only /cosmo:review close remains · graduated: PRG-10 + PRG-14 (06-14) · PRG-17 (06-13) · PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11).</span>
+  <span class="txt"><b>Right now:</b> <b>IDENTITY CUTOVER LANDED 06-18</b> — #8 flag flip + §3 repoint + #11 legacy-table drop applied on prod (v2-only, verified; pre-launch/empty → 0-row blast radius). <b>WI-765/586/828 (incl. P5 #11 drop) Closed</b>; soak-fix batch WI-821/824/826 Closed. <b>PRG-01 GRADUATED 06-15</b> (foundation build) — cutover completion delivered by <b>PRG-06</b>. <b>G5 FIRED</b> → PRG-20 ungated; PRG-11 Tier 3 newly eligible (gate “WI-586 closed + post-flip rescan” now met). <b>Post-drop cleanup (PRG-06):</b> WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) Executing; WI-779 (flag/twin removal) + WI-817 (lane make-required) gated behind 805; WI-827 folded. <b>PRG-18 Flow Remediation STOOD UP 06-18</b> (Zuzka lane, non-Quartet). <b>new-llm 2nd integration on the horizon</b> — branch diverged again (V2-shell), preliminary sweep done. Graduated: PRG-01 + PRG-10 + PRG-14 (06-14/15) · PRG-17 (06-13) · PRG-13 + PRG-12 (06-12) · PRG-15 + PRG-02 (06-11).</span>
 </div>
 
 <nav>
@@ -529,14 +529,14 @@ footer .warn{color:var(--amber)}
 <!-- ================= FIELD GUIDE ================= -->
 <section class="view" id="v-guide">
   <div class="guide">
-    <p class="lede">A program this size feels unmanageable when you watch it at the wrong altitude. This page exists so two people can run fourteen initiatives <em>without holding any of it in their heads.</em></p>
+    <p class="lede">A program this size feels unmanageable when you watch it at the wrong altitude. This page exists so two people can run sixteen initiatives <em>without holding any of it in their heads.</em></p>
 
     <div class="gsec">
       <h2><span class="no">01</span>The shape: four altitudes, watch one</h2>
       <p>All work in the program lives in a four-level hierarchy. The trick: each level is somebody else's job to track, except one.</p>
       <div class="altitude">
         <div class="alt-row"><span class="lvl">Program</span><span class="what">The umbrella</span><span class="who">1 of these. The roster + queue. Jorn steers.</span></div>
-        <div class="alt-row"><span class="lvl">Initiative</span><span class="what">PRG-NN rows</span><span class="who">11 of these. A coherent body of work with one outcome and one gate.</span></div>
+        <div class="alt-row"><span class="lvl">Initiative</span><span class="what">PRG-NN rows</span><span class="who">16 of these. A coherent body of work with one outcome and one gate.</span></div>
         <div class="alt-row hot"><span class="lvl">Bundle</span><span class="what">Clusters of work</span><span class="who">~50 of these. Thematic chunks inside an initiative — “the string sweep”, “the auth fixes”. <b>This is your altitude.</b></span></div>
         <div class="alt-row"><span class="lvl">Work item</span><span class="what">Cosmo WIs</span><span class="who">Dozens. Agents claim, execute, and close them. You never need the list.</span></div>
       </div>
@@ -573,7 +573,7 @@ footer .warn{color:var(--amber)}
     </div>
 
     <div class="gsec">
-      <h2><span class="no">05</span>Fourteen initiatives in one breath</h2>
+      <h2><span class="no">05</span>Sixteen initiatives in one breath</h2>
       <ul>
         <li><b>Two big builds:</b> the Identity Foundation rewrite (PRG-01, the centerpiece — everything else schedules around its waves) and the Harness Hygiene pipeline rework (PRG-02, effectively done — merging).</li>
         <li><b>Six audit clean-outs:</b> waves of verified findings from the May full-audit, clustered by surface — UI language &amp; accessibility (12), API security (10), architecture (11), background-job security (13), error handling (15), agent instructions (14). Each waits behind the identity wave that touches the same files — the parallel-safe ones don't wait at all.</li>
@@ -602,7 +602,7 @@ footer .warn{color:var(--amber)}
 </section>
 
 <footer>
-  <div>Generated <b>2026-06-14</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
+  <div>Generated <b>2026-06-18</b> from <code>program-roster.md</code> + <code>activation-planning.md</code> + initiative trackers.<br>
   <span class="warn">⚠ View, not a home.</span> Live work-item state: Cosmo · rules: <code>planning-reference.md</code> · regenerate at umbrella touches.</div>
   <div style="text-align:right">Keys: <code>1 2 3</code> views · <code>t</code> theme · <code>esc</code> close<br>Prototype input to <code>PRG-04 / WI-590</code> (Cosmo top-down layer)</div>
 </footer>
@@ -612,17 +612,18 @@ footer .warn{color:var(--amber)}
 <aside class="drawer" id="drawer" aria-label="Initiative detail"></aside>
 
 <script>
-/* =============== DATA — derived from roster + charters, 2026-06-10 =============== */
+/* =============== DATA — derived from roster + charters, 2026-06-18 =============== */
 const GATES = [
   {id:"G1", name:"HH merge", state:"fired", what:"Harness-Hygiene PR #832 MERGED 2026-06-11 09:27Z. Formal WI-530/533 closes are mechanical follow-up.", unlocks:["PRG-02 residue batch — LIVE","formal WI-530 close"], status:"fired 06-11"},
   {id:"G2", name:"Pipeline proven", state:"fired", what:"FIRED 06-11: the whole W0+W1 set went claim → build → review → close cleanly (8 items Closed/Done).", unlocks:["PRG-12 — ✓ ACTIVATED 06-11","PRG-10 safe subset — gate met"], status:"fired 06-11"},
   {id:"G3", name:"IF W1 landed", state:"fired", what:"FIRED 06-11: all four W1 units Closed/Done (schema, spine, authority-graph, inngest-wiring).", unlocks:["PRG-11 moot-by-refactor scan — unlocked","PRG-13 (part; W3 still pending)"], status:"fired 06-11"},
   {id:"G4", name:"IF W2/W3 landed", state:"fired", what:"FIRED 06-11 late: every W2 + W3 unit Closed — authority model, PII + envelope/router hardening all landed. The rewrite proper is built.", unlocks:["PRG-10 auth/PII remainder — gate met","PRG-13 — gate met","clean-cut tail ungated"], status:"fired 06-11"},
-  {id:"G5", name:"IF tail done", state:"cold", what:"Legacy identity deleted, data re-seeded. Clean cut complete.", unlocks:["PRG-20 bulk"], status:"waiting"}
+  {id:"G5", name:"IF tail done", state:"fired", what:"FIRED 06-18: #8 flip + §3 repoint + #11 legacy-table drop landed on prod (v2-only); WI-586 + WI-828 (P5) Closed. Clean cut complete.", unlocks:["PRG-20 bulk — ungated","PRG-11 Tier 3 — newly eligible","PRG-06 close (terminal cleanup)"], status:"fired 06-18"}
 ];
 const TRIGGERS = [
   {glyph:"✦", name:"Product trigger", body:"<b>PRG-21</b> fires when learning-domain feature work begins (notes / cards / mastery / learning-loop) OR the glossary is scheduled for deletion — whichever first."},
-  {glyph:"◎", name:"Dogfood pull", body:"<b>PRG-04</b> fires by deliberate pull once one full initiative cycle has run on the pattern — the evidence the design needs."}
+  {glyph:"◎", name:"Dogfood pull", body:"<b>PRG-04</b> fires by deliberate pull once one full initiative cycle has run on the pattern — the evidence the design needs."},
+  {glyph:"⟳", name:"new-llm 2nd integration", body:"<b>new-llm</b> (V2-shell + LLM eval) has diverged from main again post-PRG-17 — last rebase 06-17, ~129 code files. A second integration fires when the branch is signalled merge-ready; preliminary sweep done (additive to identity, single-file overlap)."}
 ];
 const QUEUE = [
   ["1","PRG-12","UI language & accessibility","✓ GRADUATED 06-12 — 8/8 WPs, ratchet 361 → 12"],
@@ -636,12 +637,14 @@ const QUEUE = [
   ["9","PRG-04","Cosmo top-down layer","Dogfood pull — one full initiative cycle observed"],
   ["10","PRG-20","Estate-canon drain","IF clean-cut tail done (G5), or a named pull-forward earlier"],
   ["11","PRG-21","Learning-domain canon","Product trigger — Zuzka starts learning-feature work"],
-  ["12","PRG-17","new-llm integration","✓ GRADUATED 06-13 — fifth graduation (first integration lane); merged 105b39ac0, deploy green"]
+  ["12","PRG-17","new-llm integration","✓ GRADUATED 06-13 — fifth graduation (first integration lane); merged 105b39ac0, deploy green"],
+  ["13","PRG-06","Identity Cutover","✓ CUTOVER LANDED 06-18 — #8 flip + #11 drop on prod (v2-only); WI-765/586/828 Closed; soak batch WI-821/824/826 Closed. Terminal cleanup: WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) Executing; WI-779/817 gated behind 805; WI-827 folded"],
+  ["14","PRG-18","Flow Remediation","✓ STOOD UP 06-18 — WS-20; non-identity post-cutover mop-up (WI-818/819/820/822/825 + WI-782). Zuzka-executed (non-Quartet); drop-orthogonal"]
 ];
 const INIT = [
-{ id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"executing", q:"—",
+{ id:"PRG-01", name:"Identity Foundation", accent:"var(--teal)", lane:"now", status:"✓ graduated", q:"—",
   tagline:"The centerpiece: clean-cut rewrite of identity, tenancy, roles & consent. Everything else schedules around its waves.",
-  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED v1.7. ALL CUT BLOCKERS CLOSED as of 06-14 (WI-689/691/692/693 + WI-722/723 all Closed). WI-586 (convergence/drop) Ready+Assisted — zero open code-side blockers. BUG-12 CLOSED (prod IDEMPOTENCY_KV live; prod 0108–0116 applied; placeholder webhook secrets = pre-launch blocker). Staging cutover handoff written (586-staging-cutover-handoff.md); staging is the NEXT cutover. G5 still cold.",
+  owner:"Jorn + runway agents", gate:"W0–W4 closed (G2+G3+G4 fired). Cutover plan RATIFIED v1.7. ALL CUT BLOCKERS CLOSED as of 06-14 (WI-689/691/692/693 + WI-722/723 all Closed). WI-586 (convergence/drop) Ready+Assisted — zero open code-side blockers. BUG-12 CLOSED (prod IDEMPOTENCY_KV live; prod 0108–0116 applied; placeholder webhook secrets = pre-launch blocker). Staging cutover handoff written (586-staging-cutover-handoff.md); staging is the NEXT cutover. Cutover completion handed to PRG-06 — LANDED 06-18; G5 FIRED.",
   outcome:"The app's identity bedrock replaced outright before launch: 8-table schema, 6-persona capability model, policy engine + model router, three-axis age model. Build direct, re-seed, delete legacy — no dual-running.",
   exports:"Exports gates G3 (W1), G4 (W2/W3), G5 (tail) to the rest of the program.",
   bundles:[
@@ -650,9 +653,37 @@ const INIT = [
     {n:"W2 · Identity / consent / proxy / age", s:"3 WPs", m:"human", st:"done", note:"All three CLOSED 06-11 (scope-RLS #875, proxy-authority #882, consent-deletion #888)."},
     {n:"W3 · PII + envelope/router hardening", s:"6 units", m:"mixed", st:"done", note:"All six CLOSED 06-11 — fired G4 (and the envelope-router boundary event for PRG-15)."},
     {n:"W4 · Billing, credits & remaining", s:"2 units", m:"mixed", st:"done", note:"Both CLOSED 06-11 (billing-credits 583, accommodation fallback 584)."},
-    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"go", note:"ALL CUT BLOCKERS CLOSED 06-14: CUT-A (WI-689) · CUT-B1 (WI-691) · CUT-B2 consent/family (WI-692) · CUT-B3 billing/webhooks (WI-693) · WI-722/723 all Closed. WI-586 (convergence runbook: freeze→reseed→re-point→flip→soak→drop) Ready+Assisted — zero open blockers. Staging cutover is NEXT. Fires G5."}
+    {n:"Clean-cut tail · cutover + drop", s:"6 units (WI-689–693 + shrunk WI-586)", m:"human", st:"done", note:"Now owned by PRG-06 — CUTOVER LANDED 06-18 (#8 flip + #11 drop on prod; WI-586/828 Closed). Build-phase status was: ALL CUT BLOCKERS CLOSED 06-14: CUT-A (WI-689) · CUT-B1 (WI-691) · CUT-B2 consent/family (WI-692) · CUT-B3 billing/webhooks (WI-693) · WI-722/723 all Closed. WI-586 (convergence runbook: freeze→reseed→re-point→flip→soak→drop) Ready+Assisted — zero open blockers. Staging cutover is NEXT. Fires G5."}
   ],
   homes:["_wip/identity-foundation/execution-tracker.md","Cosmo · Workstream “Identity Foundation” (21 units, WI-569–586 + W0 trio)"]},
+
+{ id:"PRG-06", name:"Identity Cutover", accent:"var(--teal)", lane:"now", status:"active · cutover landed", q:"#13",
+  tagline:"The WI-586 code half: app reads/writes the new identity model end-to-end per canon, then legacy deleted. CUTOVER LANDED 06-18 — terminal cleanup in flight.",
+  owner:"Jorn (+ PRG-06 shepherd; separate reviewer)", gate:"Cutover EXECUTED 06-18 — #8 flag flip + §3 repoint + #11 legacy-table drop applied on prod (v2-only, verified; pre-launch/empty so drop blast-radius = 0 rows). WI-765 (enumeration) + WI-586 (convergence runbook) + WI-828 (P5 #11 drop) Closed; soak-fix batch WI-821/824/826 Closed. Fires G5. NOT graduated — terminal cleanup (WI-805/814/779/817) still open.",
+  outcome:"App on the v2 identity model end-to-end per canon (S0–S6 reconciled to canon, not inherited); legacy identity tables dropped; IDENTITY_V2_ENABLED removed (pending WI-779); WI-586 closed.",
+  bundles:[
+    {n:"WP-1 · breaking reader/writer enumeration (WI-765)", s:"1 WP", m:"agent", st:"done", note:"Closed — enumerated the v2 reader/writer cutover set."},
+    {n:"v2 reader/writer cutover + #8 flip (S0–S6 → canon)", s:"code half", m:"human", st:"done", note:"App flipped to v2 reads/writes; reconciled to canon, not inherited from S0–S6."},
+    {n:"WI-586 · convergence runbook", s:"freeze→reseed→repoint→flip→soak→drop", m:"human", st:"done", note:"Closed 06-18 — atomic convergence + verified irreversible drop."},
+    {n:"WI-828 · P5 — #11 legacy-table drop", s:"P5 milestone", m:"human", st:"done", note:"Closed 06-18 — prod v2-only, verified. Rollback only via Neon PITR."},
+    {n:"Soak-fix batch (WI-821/824/826)", s:"3 v2-read-path bugs", m:"mixed", st:"done", note:"Closed 06-18 — recaps forward, save-wizard CTA, dashboard-v2 consent. Caught pre-launch (prod empty)."},
+    {n:"Post-drop cleanup (WI-805/814/779/817)", s:"4 items", m:"mixed", st:"go", note:"WI-805 (drop legacy subscriptions + ~18-site billing sweep) + WI-814 (staging reseed) Executing; WI-779 (remove IDENTITY_V2_ENABLED + twins) + WI-817 (flag-on lane green + make-required) gated behind 805; WI-827 folded (dup → 779)."}
+  ],
+  homes:["_wip/identity-cutover/execution-tracker.md","Cosmo · Workstream “Identity Cutover” (WS-18, WI-765/586/828 + cleanup)"]},
+
+{ id:"PRG-18", name:"Flow Remediation", accent:"var(--amber)", lane:"now", status:"active · Zuzka lane (non-Quartet)", q:"#14",
+  tagline:"Catch-all for post-cutover mop-up NOT tied to identity — the 2026-06-17 flow-revision sweep's pre-existing/non-identity defects. Drop-orthogonal, parallel-safe.",
+  owner:"Zuzka (own ZDX + agents); orchestrator owns ordering/deps only", gate:"STOOD UP 06-18 — WS-20 created. NON-Quartet: Zuzka executes via her own capture→refine→execute; done-signal = PR merged refs WI-NNN; close = autonomous Gate-2 reviewer (ours vs hers TBD). None gate P5.",
+  outcome:"All non-identity post-cutover sweep defects resolved; ongoing intake home for future non-identity findings. (The v2-read-path bugs stay in PRG-06.)",
+  bundles:[
+    {n:"WI-819 · LEARN lost-connection (SSE idle-timeout + submit hang)", s:"P1 · ~M", m:"human", st:"hold", note:"Pre-existing (red 2026-05-15). Two failure modes; ½-day spike then 2–4 eng-days."},
+    {n:"WI-818 · AUTH expired/revoked re-entry banners", s:"P1", m:"human", st:"hold", note:"Pre-existing Clerk auth; flag-agnostic."},
+    {n:"WI-822 · BILLING family-pool remove controls", s:"P1", m:"human", st:"hold", note:"Non-regression — control renders; e2e-coverage gap only, no code change expected."},
+    {n:"WI-820 · QUIZ no-round → ISR", s:"P2", m:"human", st:"hold", note:"Web static-export SSR guard (direct-nav without state)."},
+    {n:"WI-825 · SUBJECT topic-interest doc/test drift", s:"P3 · Doc", m:"agent", st:"hold", note:"Product added a step after May; docs/tests drifted."},
+    {n:"WI-782 · V2-shell S4/S5 visibility-contract rework", s:"Task · parked", m:"human", st:"hold", note:"MMT-ADR-0022 read-time relationship-derived. Feature-rework holding pen; re-home if a V2-shell initiative activates."}
+  ],
+  homes:["_wip/flow-remediation/execution-tracker.md","Cosmo · Workstream “Flow Remediation” (WS-20, WI-818/819/820/822/825 + WI-782)"]},
 
 { id:"PRG-17", name:"new-llm integration", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#12",
   tagline:"Zuzka's V2-shell + bugfix branch, audited (four adversarial passes) and ruled: merge FIRST, then run the identity cutover on merged main. OUTCOME MET — fifth graduation, first integration lane.",
@@ -719,17 +750,17 @@ const INIT = [
   ],
   homes:["_wip/l10n-a11y/execution-tracker.md (THE entry point)","Cosmo Workstream: L10n & A11y Mobile","L-gap-delta.md (per-finding)"]},
 
-{ id:”PRG-10”, name:”API security & PII”, accent:”var(--green)”, lane:”now”, status:”✓ graduated”, q:”#7”,
-  tagline:”27 original findings + 6 fast-follow WIs (WI-734–739) ALL Closed/Done 06-14. OIDC gate-gap closed. OUTCOME MET — eighth graduation.”,
-  owner:”Mixed; human review on auth & CI permissions”, gate:”GRADUATED 06-14 — all 27 original findings (PRs #1108/1109/1111/1114/1121/1122) + all 6 fast-follow WIs (WI-734–739, 2 MUST_FIX + 3 SHOULD + 1 CONSIDER operator-activated) Closed/Done via the strict gate (claude-review genuinely green end-to-end). OIDC gate-gap demonstrably closed. Caveat: prod migration 0116 rides next deploy (operator-owned); prod webhook secrets placeholders (pre-launch blocker, 2 Captured WIs). Shepherd stood down; channel POC complete.”,
-  outcome:”Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized, CONSIDER hygiene swept. All 33 items (27 original + 6 fast-follow) remediated.”,
+{ id:"PRG-10", name:"API security & PII", accent:"var(--green)", lane:"now", status:"✓ graduated", q:"#7",
+  tagline:"27 original findings + 6 fast-follow WIs (WI-734–739) ALL Closed/Done 06-14. OIDC gate-gap closed. OUTCOME MET — eighth graduation.",
+  owner:"Mixed; human review on auth & CI permissions", gate:"GRADUATED 06-14 — all 27 original findings (PRs #1108/1109/1111/1114/1121/1122) + all 6 fast-follow WIs (WI-734–739, 2 MUST_FIX + 3 SHOULD + 1 CONSIDER operator-activated) Closed/Done via the strict gate (claude-review genuinely green end-to-end). OIDC gate-gap demonstrably closed. Caveat: prod migration 0116 rides next deploy (operator-owned); prod webhook secrets placeholders (pre-launch blocker, 2 Captured WIs). Shepherd stood down; channel POC complete.",
+  outcome:"Access-control vectors closed, PII leaks patched, validation gaps filled, CI permissions right-sized, CONSIDER hygiene swept. All 33 items (27 original + 6 fast-follow) remediated.",
   bundles:[
-    {n:”WI-698–704 · original 7 units”, s:”27 findings”, m:”mixed”, st:”done”, note:”All 7 Closed/Done 06-13 (PRs #1108/1109/1111/1114/1121/1122). Two rework loops (child-evidence / stale-branch invariant) — no code defects.”},
-    {n:”WI-734/735 · MUST_FIX (meter/hard-stop + cap problems array)”, s:”M1+M2”, m:”mixed”, st:”done”, note:”CLOSED 06-14 (bf94cdf19 / f031a15b9). Red-green break tests verified. claude-review genuinely green (OIDC fix confirmed).”},
-    {n:”WI-736/737/738 · SHOULD trio (GHA + CAS + correctness)”, s:”S1–S9,C3,C7”, m:”mixed”, st:”done”, note:”CLOSED 06-14 (#1165/1166/1167 + #1176 checker-gap rework). Gate breach on #1165 ratified post-remediation (claude-review re-ran green).”},
-    {n:”WI-739 · Defense-in-depth hygiene (CONSIDER)”, s:”C1,C2,C5,C6,C8,C9”, m:”agent”, st:”done”, note:”CLOSED 06-14 (#1181, 788f9a2f). Operator-activated after original push. claude-review APPROVED 0 findings.”}
+    {n:"WI-698–704 · original 7 units", s:"27 findings", m:"mixed", st:"done", note:"All 7 Closed/Done 06-13 (PRs #1108/1109/1111/1114/1121/1122). Two rework loops (child-evidence / stale-branch invariant) — no code defects."},
+    {n:"WI-734/735 · MUST_FIX (meter/hard-stop + cap problems array)", s:"M1+M2", m:"mixed", st:"done", note:"CLOSED 06-14 (bf94cdf19 / f031a15b9). Red-green break tests verified. claude-review genuinely green (OIDC fix confirmed)."},
+    {n:"WI-736/737/738 · SHOULD trio (GHA + CAS + correctness)", s:"S1–S9,C3,C7", m:"mixed", st:"done", note:"CLOSED 06-14 (#1165/1166/1167 + #1176 checker-gap rework). Gate breach on #1165 ratified post-remediation (claude-review re-ran green)."},
+    {n:"WI-739 · Defense-in-depth hygiene (CONSIDER)", s:"C1,C2,C5,C6,C8,C9", m:"agent", st:"done", note:"CLOSED 06-14 (#1181, 788f9a2f). Operator-activated after original push. claude-review APPROVED 0 findings."}
   ],
-  homes:[“_wip/security-pii-api/execution-tracker.md”,”Cosmo · Workstream “API Security & PII” (WI-698–704 + fast-follow WI-734–739)”,”L-gap-delta.md (per-finding)”]},
+  homes:["_wip/security-pii-api/execution-tracker.md","Cosmo · Workstream “API Security & PII” (WI-698–704 + fast-follow WI-734–739)","L-gap-delta.md (per-finding)"]},
 
 { id:"PRG-11", name:"Architecture Clean-Out", accent:"var(--teal)", lane:"now", status:"active · Tiers 1+2 done", q:"#8",
   tagline:"Tier 1 COMPLETE 06-13 (WI-717–720). Tier 2 COMPLETE 06-14 (WI-724–729 all Closed/Done). Tier 3 deferred post-WI-586. Lane NOT graduated.",
