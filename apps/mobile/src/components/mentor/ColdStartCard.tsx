@@ -1,14 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+
+import type { TranslateKey } from '../../i18n';
 
 export interface ColdStartCardProps {
   onFill: (text: string) => void;
   onSubmitText: (text: string) => void;
   onOpenCamera: () => void;
+  /** Rotation cadence for the placeholder examples (ms). Test seam. */
+  placeholderRotationIntervalMs?: number;
 }
 
 const EQUAL_WEIGHT_TOKEN = 'mentorHome.coldStart.equalWeight';
+
+// Rotating placeholder examples teach that the box both ASKS and GOES PLACES —
+// `.three` is the navigational example ("Try: show my progress"). Deterministic
+// rotation: index advances on a fixed interval, cycling the catalog.
+const PLACEHOLDER_KEYS = [
+  'mentorHome.coldStart.placeholderRotation.one',
+  'mentorHome.coldStart.placeholderRotation.two',
+  'mentorHome.coldStart.placeholderRotation.three',
+] as const;
+
+const DEFAULT_PLACEHOLDER_ROTATION_MS = 4000;
 
 const CHIPS = [
   {
@@ -29,10 +44,21 @@ export function ColdStartCard({
   onFill,
   onSubmitText,
   onOpenCamera,
+  placeholderRotationIntervalMs = DEFAULT_PLACEHOLDER_ROTATION_MS,
 }: ColdStartCardProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
   const [showHomeworkReply, setShowHomeworkReply] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIndex((current) => (current + 1) % PLACEHOLDER_KEYS.length);
+    }, placeholderRotationIntervalMs);
+    return () => clearInterval(timer);
+  }, [placeholderRotationIntervalMs]);
+
+  const placeholder = t(PLACEHOLDER_KEYS[placeholderIndex] as TranslateKey);
 
   const fill = (chip: (typeof CHIPS)[number]): void => {
     const text = t(chip.key);
@@ -64,7 +90,7 @@ export function ColdStartCard({
         value={value}
         onChangeText={setValue}
         onSubmitEditing={submit}
-        placeholder={t('mentorHome.coldStart.placeholderRotation.one')}
+        placeholder={placeholder}
         className="mt-3 min-h-11 rounded-xl border border-border px-3 text-text-primary"
         returnKeyType="send"
       />

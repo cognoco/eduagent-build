@@ -140,6 +140,23 @@ describe('SubjectHub', () => {
     expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
   });
 
+  it('surfaces the notes empty-state add affordance when the learner can study but has no notes', () => {
+    render(
+      <SubjectHub
+        data={{ ...baseData, notes: [] }}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={jest.fn()}
+      />,
+    );
+
+    // The section renders even with zero notes (canStudy=true), so the empty
+    // state and its add affordance are reachable rather than gated out.
+    screen.getByText('subjectHub.notes.heading');
+    screen.getByTestId('subject-hub-notes-empty');
+    screen.getByTestId('subject-hub-notes-input');
+  });
+
   it('opens topic details as sheet state rather than route state', () => {
     render(
       <SubjectHub

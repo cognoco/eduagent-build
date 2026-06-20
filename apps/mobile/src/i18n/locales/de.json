@@ -3900,7 +3900,9 @@
       "caption": "Woran möchtest du arbeiten?",
       "equalWeight": "Beispiel-Anfrage",
       "placeholderRotation": {
-        "one": "Gib eine Frage ein oder füge Hausaufgaben ein ..."
+        "one": "Gib eine Frage ein oder füge Hausaufgaben ein ...",
+        "two": "Bitte mich, etwas zu erklären...",
+        "three": "Versuch: Zeig meinen Fortschritt"
       },
       "orJustType": "Oder beginne mit einem davon.",
       "chipHomework": "Hilf mir bei den Hausaufgaben",
@@ -3912,13 +3914,15 @@
     "title": "Mentor",
     "subtitle": "Ein paar nützliche nächste Schritte und ein Ort, an dem du alles fragen oder festhalten kannst.",
     "fallback": {
-      "cached": "Zuletzt gespeicherter Feed wird angezeigt, während wir neu verbinden."
+      "cached": "Zuletzt gespeicherter Feed wird angezeigt, während wir neu verbinden.",
+      "continue": "Mach da weiter, wo du aufgehört hast"
     },
     "error": {
       "title": "Wir konnten deine nächsten Schritte nicht laden",
       "message": "Versuche es erneut oder durchsuche direkt die Themen.",
       "subjects": "Themen durchsuchen"
-    }
+    },
+    "homeworkPrompt": "Hast du heute Hausaufgaben? Mach ein Foto und wir gehen sie zusammen durch."
   },
   "subjectsBrowse": {
     "title": "Fächer",
@@ -3969,7 +3973,10 @@
     "notes": {
       "heading": "Notizen",
       "authorSelf": "Meine Notizen",
-      "authorMentor": "Vom Tutor gespeichert"
+      "authorMentor": "Vom Tutor gespeichert",
+      "addNote": "Notiz hinzufügen",
+      "micLabel": "Notiz per Sprache hinzufügen",
+      "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
     },
     "sheet": {
       "close": "Schließen",
@@ -3986,7 +3993,8 @@
       "later": "Später",
       "done": "Fertig",
       "mastered": "Gemeistert"
-    }
+    },
+    "linkLabel": "Themen-Hub öffnen"
   },
   "journal": {
     "title": "Journal",
@@ -4023,15 +4031,18 @@
     "reports": {
       "error": "Deine Berichte konnten nicht geladen werden."
     },
-    "notes": {
-      "sessions": "Letzte Lernsitzungen",
-      "notes": "Deine gespeicherten Lernnotizen",
-      "bookmarks": "Gespeicherte Tutor-Antworten"
-    },
     "memory": {
       "title": "Steuerung des Tutor-Gedächtnisses",
       "body": "Überprüfe, bearbeite, verberge, exportiere oder lösche, was dein Tutor sich merkt, im vollständigen Gedächtnis-Bildschirm.",
       "open": "Gedächtnis-Steuerung öffnen"
+    },
+    "notes": {
+      "error": "Deine Notizen konnten nicht geladen werden.",
+      "searchPlaceholder": "Notizen suchen",
+      "searchEmpty": "Keine Notizen entsprechen dieser Suche.",
+      "empty": "Gespeicherte Notizen und markierte Antworten vom Mentor erscheinen hier.",
+      "authorshipMentor": "Vom Mentor",
+      "authorshipMine": "Meine Notiz"
     }
   },
   "accountAdmin": {
