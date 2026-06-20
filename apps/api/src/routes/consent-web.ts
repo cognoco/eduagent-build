@@ -176,7 +176,13 @@ function pageLayout(title: string, body: string): string {
  * Moving to a Workers-durable backing store is tracked separately and is out
  * of scope here.
  */
-function consentPageRateLimit(c: Context): Response | null {
+function consentPageRateLimit(
+  c: Context,
+  // 'submit' (the POST mutation) tells the parent they sent too many
+  // responses; 'view' (the GET page loads) must NOT imply a submission —
+  // a parent merely reloading the page has submitted nothing.
+  reason: 'view' | 'submit' = 'submit',
+): Response | null {
   const ipKey = resolveRateLimitIp(
     c.req.header('cf-connecting-ip'),
     c.req.header('x-forwarded-for'),
@@ -186,11 +192,15 @@ function consentPageRateLimit(c: Context): Response | null {
   }
   const retryAfterSecs = Math.ceil(CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000);
   c.header('Retry-After', String(retryAfterSecs));
+  const bodyMessage =
+    reason === 'view'
+      ? 'Too many requests to this page. Please try again in a little while.'
+      : 'You have submitted too many consent responses. Please try again later.';
   return c.html(
     pageLayout(
       'Too Many Requests',
       `<h1 class="error">Too many requests</h1>
-       <p>You have submitted too many consent responses. Please try again later.</p>
+       <p>${bodyMessage}</p>
        ${errorActionHtml()}`,
     ),
     429,
@@ -224,7 +234,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
   .get('/consent-page', async (c) => {
     // Unauthenticated token lookup — rate-limit before the DB read so the
     // endpoint can't be hammered for token enumeration / DoS.
-    const limited = consentPageRateLimit(c);
+    const limited = consentPageRateLimit(c, 'view');
     if (limited) return limited;
 
     const token = c.req.query('token');
@@ -293,7 +303,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
   .get('/consent-page/deny-confirm', async (c) => {
     // Unauthenticated token lookup — same per-IP rate limit as the decision
     // page; gate before the DB read.
-    const limited = consentPageRateLimit(c);
+    const limited = consentPageRateLimit(c, 'view');
     if (limited) return limited;
 
     const token = c.req.query('token');

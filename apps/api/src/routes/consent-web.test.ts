@@ -406,6 +406,13 @@ describe('GET /consent-page — rate limiting on unauthenticated lookups', () =>
     expect(blocked.headers.get('Retry-After')).toBe('3600');
     const html = await blocked.text();
     expect(html).toContain('Too many requests');
+    // GET is a page VIEW, not a submission — the parent merely reloaded the
+    // page and has submitted nothing. The body must use view-appropriate copy
+    // and must NOT imply a submission (the POST-only "submitted" wording).
+    expect(html).toContain(
+      'Too many requests to this page. Please try again in a little while.',
+    );
+    expect(html).not.toContain('submitted too many consent responses');
   });
 
   it('blocks GET /consent-page/deny-confirm on the same per-IP budget', async () => {
@@ -425,6 +432,11 @@ describe('GET /consent-page — rate limiting on unauthenticated lookups', () =>
     );
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get('Retry-After')).toBe('3600');
+    const html = await blocked.text();
+    expect(html).toContain(
+      'Too many requests to this page. Please try again in a little while.',
+    );
+    expect(html).not.toContain('submitted too many consent responses');
   });
 
   it('does not affect a different IP — the limiter is per source IP', async () => {
