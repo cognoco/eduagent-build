@@ -68,6 +68,37 @@ function shouldRefreshRevenuecatKv(
 }
 
 // ---------------------------------------------------------------------------
+// isFamilyShareBlocked (v2 — local copy of the module-private legacy helper)
+// ---------------------------------------------------------------------------
+
+/**
+ * [Issue 836] Apple Family Sharing entitlement block. See the legacy handler's
+ * isFamilyShareBlocked for the full product rationale. v2 re-implements it
+ * locally (the legacy copy is module-private) so the guard is identical across
+ * both handler files. is_family_share is UNRELATED to the com.eduagent.family.*
+ * product IDs — only the shared-copy flag is blocked.
+ */
+function isFamilyShareBlocked(event: RevenueCatEvent): boolean {
+  if (event.is_family_share !== true) return false;
+
+  captureMessage(
+    '[revenuecat] entitlement skipped — is_family_share shared copy (steer to Family plan)',
+    {
+      level: 'warning',
+      extra: {
+        eventId: event.id,
+        eventType: event.type,
+        appUserId: event.app_user_id,
+        productId: event.product_id,
+        category: 'revenuecat.family_share_blocked',
+      },
+      tags: { surface: 'billing.revenuecat.family_share' },
+    },
+  );
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // resolveAccountId (v2 seam): app_user_id → login → membership → organization.
 // Returns organization.id (= accounts.id by the reseed) or null.
 // ---------------------------------------------------------------------------
@@ -101,6 +132,9 @@ export async function handleInitialPurchaseV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 
@@ -151,6 +185,9 @@ export async function handleRenewalV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 
@@ -508,6 +545,9 @@ export async function handleProductChangeV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 

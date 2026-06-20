@@ -72,10 +72,12 @@ import {
   handleCancellation,
   handleBillingIssue,
   handleNonRenewingPurchase,
+  handleProductChange,
 } from './revenuecat-webhook-handler';
 import {
   getSubscriptionByAccountId,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   purchaseTopUpCredits,
 } from '../billing';
@@ -435,5 +437,127 @@ describe('[BUG-793] handleNonRenewingPurchase free-tier rejection', () => {
     // handleNonRenewingPurchase returns null on the granted/idempotent paths.
     expect(result).toBeNull();
     expect(captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [Issue 836] Apple Family Sharing block. PRODUCT DECISION (owner): a Family
+// Sharing MEMBER using a SHARED copy of a paid subscription must NOT receive
+// entitlement — only the original purchaser does; families are steered to the
+// dedicated paid Family plan PRODUCT instead. RevenueCat surfaces a shared
+// copy via `is_family_share === true` (UNRELATED to the com.eduagent.family.*
+// product IDs, which map to tier 'family' and ARE granted).
+//
+// The guard sits at the top of every grant-bearing handler in BOTH the legacy
+// and v2 handler files. When is_family_share === true it must:
+//   1. NOT write any paid entitlement (no activate / update-and-quota call),
+//   2. escalate via the structured Sentry boundary (silent recovery is banned
+//      in billing code — AGENTS.md), and
+//   3. let the route ack 200 (handlers return void; the route already returns
+//      { received: true }) so RevenueCat does not retry indefinitely.
+//
+// These are the red-green guard tests: with the guard reverted, the true-case
+// assertions fail because the grant functions ARE called. The control cases
+// (false / absent) prove normal grants still flow through.
+// ---------------------------------------------------------------------------
+describe('[Issue 836] Apple Family Sharing entitlement block', () => {
+  describe('handleInitialPurchase', () => {
+    it('does NOT activate entitlement and escalates when is_family_share is true', async () => {
+      await handleInitialPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({ is_family_share: true }),
+      );
+
+      expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+      expect(safeRefreshKvCache).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family_share'),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            category: 'revenuecat.family_share_blocked',
+            eventId: 'evt_rc_1',
+          }),
+        }),
+      );
+    });
+
+    it('activates normally when is_family_share is false (control)', async () => {
+      (activateSubscriptionFromRevenuecat as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        accountId: 'acc-1',
+      });
+
+      await handleInitialPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({ is_family_share: false }),
+      );
+
+      expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledTimes(1);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('activates normally when is_family_share is absent (control)', async () => {
+      (activateSubscriptionFromRevenuecat as jest.Mock).mockResolvedValue({
+        id: 'sub-internal-1',
+        accountId: 'acc-1',
+      });
+
+      await handleInitialPurchase(mockDb, mockKv, baseEvent());
+
+      expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledTimes(1);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleRenewal', () => {
+    it('does NOT update entitlement and escalates when is_family_share is true', async () => {
+      await handleRenewal(
+        mockDb,
+        mockKv,
+        baseEvent({ type: 'RENEWAL', is_family_share: true }),
+      );
+
+      expect(getSubscriptionByAccountId).not.toHaveBeenCalled();
+      expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+      expect(
+        updateSubscriptionAndQuotaFromRevenuecatWebhook,
+      ).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family_share'),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            category: 'revenuecat.family_share_blocked',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('handleProductChange', () => {
+    it('does NOT update entitlement and escalates when is_family_share is true', async () => {
+      await handleProductChange(
+        mockDb,
+        mockKv,
+        baseEvent({
+          type: 'PRODUCT_CHANGE',
+          new_product_id: 'com.eduagent.pro.monthly',
+          is_family_share: true,
+        }),
+      );
+
+      expect(
+        updateSubscriptionAndQuotaFromRevenuecatWebhook,
+      ).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family_share'),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            category: 'revenuecat.family_share_blocked',
+          }),
+        }),
+      );
+    });
   });
 });

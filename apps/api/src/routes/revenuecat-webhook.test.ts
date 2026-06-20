@@ -743,6 +743,46 @@ describe('INITIAL_PURCHASE', () => {
     expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
   });
 
+  it('[Issue 836] does NOT activate and acks 200 when is_family_share is true', async () => {
+    // Apple Family Sharing shared copy: only the original purchaser is entitled.
+    // The webhook must NOT grant, must ack 200 (so RevenueCat stops retrying),
+    // and must escalate (silent recovery banned in billing code).
+    mockCaptureMessage.mockClear();
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      is_family_share: true,
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('family_share'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.family_share_blocked',
+        }),
+      }),
+    );
+  });
+
+  it('[Issue 836 control] DOES activate the Family PLAN product (com.eduagent.family.*) — not a shared copy', async () => {
+    // The dedicated paid Family plan product maps to tier 'family' and is
+    // UNRELATED to is_family_share. With no shared-copy flag it grants normally.
+    const payload = makeWebhookPayload('INITIAL_PURCHASE', {
+      product_id: 'com.eduagent.family.yearly',
+    });
+
+    const res = await makeRequest(payload);
+    expect(res.status).toBe(200);
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'family',
+      expect.any(String),
+      expect.anything(),
+    );
+  });
+
   it('handles unknown clerk user gracefully', async () => {
     (findAccountByClerkId as jest.Mock).mockResolvedValue(null);
     mockCaptureException.mockClear();

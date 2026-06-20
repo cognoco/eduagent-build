@@ -144,6 +144,47 @@ function shouldRefreshRevenuecatKv(
 }
 
 /**
+ * [Issue 836] Apple Family Sharing entitlement block.
+ *
+ * PRODUCT DECISION (owner): a Family Sharing MEMBER using a SHARED copy of a
+ * paid subscription must NOT receive entitlement — only the original purchaser
+ * does. Families are steered to the dedicated paid Family plan PRODUCT instead.
+ *
+ * RevenueCat surfaces a shared copy via `is_family_share === true`. This is
+ * UNRELATED to the `com.eduagent.family.*` product IDs (which map to tier
+ * 'family' via PRODUCT_TIER_MAP and ARE granted normally) — do not conflate
+ * the two.
+ *
+ * Called at the top of every grant-bearing handler. When the event is a shared
+ * copy it returns `true`, the caller skips the entitlement write entirely, and
+ * the route still acks 200 so RevenueCat does not retry indefinitely.
+ *
+ * Silent recovery is banned in billing/webhook code (AGENTS.md) — the skip is
+ * escalated via a structured Sentry message carrying the fields ops needs to
+ * confirm the user was correctly NOT granted access (no DSN in dev/test, so it
+ * is a no-op there).
+ */
+function isFamilyShareBlocked(event: RevenueCatEvent): boolean {
+  if (event.is_family_share !== true) return false;
+
+  captureMessage(
+    '[revenuecat] entitlement skipped — is_family_share shared copy (steer to Family plan)',
+    {
+      level: 'warning',
+      extra: {
+        eventId: event.id,
+        eventType: event.type,
+        appUserId: event.app_user_id,
+        productId: event.product_id,
+        category: 'revenuecat.family_share_blocked',
+      },
+      tags: { surface: 'billing.revenuecat.family_share' },
+    },
+  );
+  return true;
+}
+
+/**
  * Resolves a RevenueCat app_user_id to an internal account ID.
  * RevenueCat app_user_id is set to the Clerk user ID via Purchases.logIn().
  *
@@ -171,6 +212,9 @@ export async function handleInitialPurchase(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
@@ -229,6 +273,9 @@ export async function handleRenewal(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
@@ -703,6 +750,9 @@ export async function handleProductChange(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
