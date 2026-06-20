@@ -4279,6 +4279,8 @@
       "personHint": "Otwórz strukturalny widok przedmiotów.",
       "structuralOnly": "Tylko struktura przedmiotów, rozdziałów i tematów.",
       "bookCount": "{{count}} książka",
+      "bookCount_few": "{{count}} książki",
+      "bookCount_many": "{{count}} książek",
       "bookCount_other": "{{count}} książek",
       "errorTitle": "Nie udało się wczytać przedmiotów",
       "errorMessage": "Spróbuj ponownie za chwilę."
