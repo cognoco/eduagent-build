@@ -699,14 +699,28 @@ export async function configureLanguageSubject(
     throw new SubjectNotLanguageLearningError();
   }
 
-  await setNativeLanguage(db, profileId, subjectId, input.nativeLanguage);
-  await regenerateLanguageCurriculum(
-    db,
-    profileId,
-    subjectId,
-    subject.languageCode,
-    input.startingLevel,
-  );
+  // Wrap both writes in ONE transaction so the subject is never left
+  // half-configured: native-language set but curriculum un-regenerated (or
+  // vice versa). If regenerateLanguageCurriculum fails — or the request dies
+  // between the two writes — the setNativeLanguage upsert rolls back with it.
+  // Both inner writes run on the tx handle; regenerateLanguageCurriculum opens
+  // its own transaction by default, so `inTransaction: true` makes it run on
+  // this one instead (neon-serverless throws on / degrades nested
+  // transactions). The non-null `languageCode` is guaranteed by the
+  // four_strands guard above.
+  const languageCode = subject.languageCode;
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    await setNativeLanguage(txDb, profileId, subjectId, input.nativeLanguage);
+    await regenerateLanguageCurriculum(
+      txDb,
+      profileId,
+      subjectId,
+      languageCode,
+      input.startingLevel,
+      { inTransaction: true },
+    );
+  });
 
   return subject;
 }
