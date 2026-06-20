@@ -21,18 +21,20 @@
  * Payload keys that must never cross the Inngest trust boundary carrying
  * raw learner content.
  *
- * Deliberately NOT listed (yet): `learnerMessage` / `topicTitle`. The
- * `app/review.calibration.requested` event still legitimately carries them
- * to its consumer (`review-calibration-grade`) — that site is the same
- * leak class but sits outside the event-payload unit's audited finding set
- * and is tracked as its own work item. Add both keys here when that
- * dispatch is converted to the reference-and-rehydrate pattern.
+ * `learnerMessage` / `topicTitle` (WI-620): the `app/review.calibration.requested`
+ * dispatch was converted to the reference-and-rehydrate pattern (it now carries
+ * an opaque `learnerMessageEventId` and the consumer rehydrates from the DB
+ * scoped by profileId), so these keys no longer have a legitimate carrier.
+ * Listing them makes the middleware a runtime ratchet against any future
+ * regression that re-introduces the raw fields.
  */
 export const INNGEST_PII_PAYLOAD_KEYS: readonly string[] = [
   'sessionTranscript',
   'classifyInput',
   'transcript',
   'exchangeHistory',
+  'learnerMessage',
+  'topicTitle',
 ];
 
 /**

@@ -1,5 +1,12 @@
-import { eq } from 'drizzle-orm';
-import { createScopedRepository, retentionCards } from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import {
+  createScopedRepository,
+  curriculumBooks,
+  curriculumTopics,
+  retentionCards,
+  sessionEvents,
+  subjects,
+} from '@eduagent/database';
 import { reviewCalibrationRequestedEventSchema } from '@eduagent/schemas';
 import type { ReviewCalibrationRequestedEvent } from '@eduagent/schemas';
 import { inngest } from '../client';
@@ -34,7 +41,7 @@ export async function handleReviewCalibrationGrade({
     return { skipped: 'invalid_payload' };
   }
 
-  const { profileId, sessionId, topicId, learnerMessage, topicTitle } = payload;
+  const { profileId, sessionId, topicId, learnerMessageEventId } = payload;
   const eventAt = new Date(payload.timestamp);
 
   const card = await step.run('load-retention-card', async () => {
@@ -96,8 +103,64 @@ export async function handleReviewCalibrationGrade({
     return { skipped: 'cooldown_claim_lost', sessionId };
   }
 
+  // PII egress: rehydrate the learner's calibration answer and topic title from
+  // the DB by the event's opaque `learnerMessageEventId` / `topicId` — the raw
+  // text never rides in the event payload. Both are scoped by profileId (the
+  // message via the session_events row, the title via the
+  // curriculum_topics → curriculum_books → subjects parent chain). A missing
+  // row (transcript purged / topic changed since dispatch) skips grading
+  // rather than guessing. [WI-620, mirrors topic-probe-extract rehydration]
+  const rehydrated = await step.run(
+    'rehydrate-calibration-inputs',
+    async (): Promise<{
+      learnerMessage: string;
+      topicTitle: string;
+    } | null> => {
+      const db = getStepDatabase();
+      const [topic] = await db
+        .select({ title: curriculumTopics.title })
+        .from(curriculumTopics)
+        .innerJoin(
+          curriculumBooks,
+          eq(curriculumBooks.id, curriculumTopics.bookId),
+        )
+        .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+        .where(
+          and(
+            eq(curriculumTopics.id, topicId),
+            eq(subjects.profileId, profileId),
+          ),
+        )
+        .limit(1);
+      if (!topic?.title) return null;
+
+      const [learnerMessageRow] = await db
+        .select({ content: sessionEvents.content })
+        .from(sessionEvents)
+        .where(
+          and(
+            eq(sessionEvents.id, learnerMessageEventId),
+            eq(sessionEvents.profileId, profileId),
+            eq(sessionEvents.sessionId, sessionId),
+            eq(sessionEvents.eventType, 'user_message'),
+          ),
+        )
+        .limit(1);
+      if (!learnerMessageRow?.content) return null;
+
+      return {
+        learnerMessage: learnerMessageRow.content,
+        topicTitle: topic.title,
+      };
+    },
+  );
+
+  if (!rehydrated) {
+    return { skipped: 'rehydration_failed', sessionId };
+  }
+
   const quality = await step.run('grade-recall-quality', () =>
-    evaluateRecallQuality(learnerMessage, topicTitle),
+    evaluateRecallQuality(rehydrated.learnerMessage, rehydrated.topicTitle),
   );
   const result = processRecallResult(state, quality, eventAt.toISOString());
 

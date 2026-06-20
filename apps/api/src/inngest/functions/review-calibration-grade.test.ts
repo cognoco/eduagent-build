@@ -35,15 +35,24 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
 const CARD_ID = '00000000-0000-4000-8000-000000000004';
+const LEARNER_MESSAGE_EVENT_ID = '00000000-0000-4000-8000-000000000005';
 const EVENT_TS = '2026-01-15T12:00:00.000Z';
+
+// [WI-620] Default rehydration result: the consumer rehydrates the learner's
+// answer + topic title from the DB (opaque `learnerMessageEventId` → DB row),
+// so the raw text never rides in the event payload.
+const REHYDRATED = {
+  learnerMessage: 'Plants turn sunlight into food.',
+  topicTitle: 'Photosynthesis',
+};
 
 function makeValidPayload(overrides: Record<string, unknown> = {}) {
   return {
     profileId: PROFILE_ID,
     sessionId: SESSION_ID,
     topicId: TOPIC_ID,
-    learnerMessage: 'Plants turn sunlight into food.',
-    topicTitle: 'Photosynthesis',
+    // [WI-620] Opaque reference — no raw learnerMessage / topicTitle in payload.
+    learnerMessageEventId: LEARNER_MESSAGE_EVENT_ID,
     timestamp: EVENT_TS,
     ...overrides,
   };
@@ -89,8 +98,7 @@ describe('reviewCalibrationGrade', () => {
       profileId: PROFILE_ID,
       sessionId: SESSION_ID,
       topicId: TOPIC_ID,
-      learnerMessage: 'Plants turn sunlight into food.',
-      topicTitle: 'Photosynthesis',
+      learnerMessageEventId: LEARNER_MESSAGE_EVENT_ID,
       // Missing timestamp: every durable app event payload must carry one.
     });
 
@@ -136,6 +144,7 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [{ id: CARD_ID }],
+        'rehydrate-calibration-inputs': REHYDRATED,
         'grade-recall-quality': 4,
         'finalize-retention-update': undefined,
         'stamp-mastery-on-verify': undefined,
@@ -148,15 +157,46 @@ describe('reviewCalibrationGrade', () => {
       quality: 4,
       passed: true,
     });
-    expect(runCalls).toHaveLength(5);
+    expect(runCalls).toHaveLength(6);
     // F-174: the cooldown claim MUST precede the paid LLM grade step.
+    // [WI-620] rehydration sits between the claim and the grade so the raw
+    // learner text/title are fetched from the DB (scoped by profileId), never
+    // carried in the event payload.
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
       'claim-cooldown-slot',
+      'rehydrate-calibration-inputs',
       'grade-recall-quality',
       'finalize-retention-update',
       'stamp-mastery-on-verify',
     ]);
+  });
+
+  // [WI-620] Rehydration fails (transcript purged / topic changed since
+  // dispatch) → grading is skipped rather than guessing, and the paid LLM
+  // grade step never runs.
+  it('[WI-620] returns rehydration_failed and skips grading when the DB lookup yields null', async () => {
+    const { result, runCalls } = await executeHandlerWithResults(
+      makeValidPayload(),
+      {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'rehydrate-calibration-inputs': null,
+        // Safety net — must NOT be reached when rehydration fails.
+        'grade-recall-quality': 4,
+      },
+    );
+
+    expect(result).toEqual({
+      skipped: 'rehydration_failed',
+      sessionId: SESSION_ID,
+    });
+    expect(runCalls.map((c) => c.name)).toEqual([
+      'load-retention-card',
+      'claim-cooldown-slot',
+      'rehydrate-calibration-inputs',
+    ]);
+    expect(runCalls.map((c) => c.name)).not.toContain('grade-recall-quality');
   });
 
   it('returns cooldown_claim_lost when CAS update matches 0 rows', async () => {
@@ -213,6 +253,7 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
+      'rehydrate-calibration-inputs': REHYDRATED,
       'grade-recall-quality': 0, // quality 0 → processRecallResult yields xpChange:'decayed'
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
@@ -240,6 +281,7 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
+      'rehydrate-calibration-inputs': REHYDRATED,
       'grade-recall-quality': 5, // quality 5 → processRecallResult yields xpChange:'verified'
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
