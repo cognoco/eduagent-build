@@ -26,9 +26,12 @@ jest.mock('./celebrations' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./activity-ledger' /* gc1-allow: pattern-a conversion */, () => ({
-  writeActivityMoment: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  './activity-ledger' /* gc1-allow: writeActivityMoment persists to the real DB; this suite runs against a fully-mocked dependency graph with no DB, so the real implementation cannot be exercised here */,
+  () => ({
+    writeActivityMoment: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 jest.mock('./language-curriculum' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(

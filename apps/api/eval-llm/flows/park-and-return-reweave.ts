@@ -161,7 +161,10 @@ function deterministicIssues(
   const system = context.messages.system;
   const input = context.input;
 
-  if (!system.includes(input.context.resumeContext ?? '')) {
+  if (
+    input.context.resumeContext &&
+    !system.includes(input.context.resumeContext)
+  ) {
     issues.push(
       qualityError(
         'park-return.resume-context-missing',

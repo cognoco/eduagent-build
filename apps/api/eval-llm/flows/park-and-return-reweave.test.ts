@@ -1,5 +1,5 @@
 const mockRunHarnessLlm = jest.fn();
-jest.mock('../runner/llm-client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../runner/llm-client', () => {
   const actual = jest.requireActual(
     '../runner/llm-client',
   ) as typeof import('../runner/llm-client');
