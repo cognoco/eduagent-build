@@ -57,6 +57,15 @@ The smoke project is independent of `solo-learner` / `owner-with-children`
 storage states; a single mentor-audit failure cannot poison the rest of the
 suite.
 
+On Windows, the static web wrapper bounds `expo export --platform web --clear`
+with `PLAYWRIGHT_WEB_EXPORT_TIMEOUT_MS` before Playwright's generic
+`webServer.timeout` fires. The default is 180000ms, below the Playwright
+240000ms app-server wait, so a stalled cold export or warm retry should fail
+with an Expo export preflight error instead of a raw webServer timeout. Raise the
+export timeout only when collecting local evidence from an intentionally slow
+machine; the wrapper still restores the temporary E2E env files and terminates
+the export process tree before exiting.
+
 ## Safety
 
 - Shared staging seed calls fail closed when `PLAYWRIGHT_TEST_SEED_SECRET` or `TEST_SEED_SECRET` is missing. Use Doppler config `stg`.
