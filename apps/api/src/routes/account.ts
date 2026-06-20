@@ -36,8 +36,7 @@ import {
 import { generateExport } from '../services/export';
 import { generateExportV2 } from '../services/identity-v2/export-v2';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
-import { captureException } from '../services/sentry';
+import { captureException, captureMessage } from '../services/sentry';
 import { isIdentityV2Enabled } from '../config';
 import { NotFoundError, apiError, validationError } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
@@ -197,23 +196,20 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       // (idempotent) to recover a possible orphan — a schedule whose DB write
       // succeeded but whose durable Inngest job never queued (e.g. a prior
       // dispatch failed and skipped rollback). That recovery would otherwise be
-      // invisible, so surface it as tracked, non-core telemetry. Non-core: a
-      // telemetry-dispatch failure must never break the user's deletion, hence
-      // safeSend (captured in Sentry, never thrown) rather than a bare send.
+      // invisible, so surface it as a tracked Sentry signal. captureMessage —
+      // not a new Inngest event — because this is pure observability with no
+      // consumer: a producer-only event would be an orphan dispatch (the
+      // orphan-dispatcher guard rejects it) and would only land in the event
+      // store that nothing reads.
       if (!scheduledNow) {
-        await safeSend(
-          () =>
-            inngest.send({
-              name: 'app/account.deletion-orphan-recovered',
-              data: {
-                accountId: account.id,
-                identityVersion: v2 ? 'v2' : 'v1',
-                timestamp: new Date().toISOString(),
-              },
-            }),
-          'account.deletion-orphan-recovered',
-          { accountId: account.id },
-        );
+        captureMessage('account.deletion orphan schedule re-dispatched', {
+          level: 'warning',
+          extra: {
+            surface: 'account.deletion.orphan_recovered',
+            accountId: account.id,
+            identityVersion: v2 ? 'v2' : 'v1',
+          },
+        });
       }
     } catch (error) {
       captureException(error, {
