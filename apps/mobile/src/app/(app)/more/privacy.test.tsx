@@ -322,6 +322,7 @@ describe('PrivacyScreen', () => {
     let createObjectURLSpy: jest.Mock;
     let revokeObjectURLSpy: jest.Mock;
     let fakeAnchor: { href: string; download: string; click: jest.Mock };
+    let originalURL: typeof globalThis.URL;
 
     beforeEach(() => {
       originalOS = Platform.OS;
@@ -339,6 +340,7 @@ describe('PrivacyScreen', () => {
 
       createObjectURLSpy = jest.fn(() => 'blob:mock-url');
       revokeObjectURLSpy = jest.fn();
+      originalURL = globalThis.URL;
       (globalThis as { URL: unknown }).URL = {
         createObjectURL: createObjectURLSpy,
         revokeObjectURL: revokeObjectURLSpy,
@@ -351,6 +353,9 @@ describe('PrivacyScreen', () => {
         configurable: true,
       });
       delete (globalThis as { document?: unknown }).document;
+      // Restore the original URL global so cleanup is symmetric with the
+      // beforeEach override and no later test inherits the stub.
+      (globalThis as { URL: typeof globalThis.URL }).URL = originalURL;
     });
 
     it('triggers a JSON anchor download instead of the native share sheet', async () => {
