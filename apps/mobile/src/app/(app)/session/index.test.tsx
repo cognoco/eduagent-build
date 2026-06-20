@@ -433,6 +433,7 @@ jest.mock(
       inputMode,
       onInputModeChange,
       onSend,
+      onBackPress,
       renderMessageActions,
       rightAction,
       footer,
@@ -449,6 +450,7 @@ jest.mock(
       inputMode?: InputMode;
       onInputModeChange?: (mode: InputMode) => void;
       onSend: (text: string) => void;
+      onBackPress?: () => void;
       renderMessageActions?: (message: {
         id: string;
         role: string;
@@ -508,6 +510,9 @@ jest.mock(
             onPress={() => onSend('Solve 2x + 5 = 17')}
           >
             <Text>Send</Text>
+          </Pressable>
+          <Pressable testID="mock-back-button" onPress={() => onBackPress?.()}>
+            <Text>Back</Text>
           </Pressable>
         </View>
       );
@@ -1940,6 +1945,160 @@ describe('SessionScreen homework flow', () => {
     testScreen.getByTestId('subject-resolution-new');
     expect(mockStartSession).not.toHaveBeenCalled();
     testScreen.unmount();
+  });
+
+  // ─── T23: V2 mentor-homework round-trip (single conversation thread) ───────
+  // When a homework photo is captured from the Mentor bar (entrySource=mentor +
+  // returnTo=mentor), the learner lands back in the session thread with the
+  // captured image as their own image bubble, followed by two deterministic
+  // first-response actions — "help me solve this" / "check my answer" — and NO
+  // subject-picking preamble. returnTo=mentor returns to the Mentor tab.
+  describe('V2 mentor-homework round-trip (T23)', () => {
+    const MENTOR_HOMEWORK_PARAMS = {
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    };
+
+    it('renders the captured image as a learner bubble with deterministic help/check buttons as the first in-thread response, with no subject preamble', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_HOMEWORK_PARAMS,
+      );
+
+      const testScreen = renderSessionScreen();
+
+      // Give the screen its initial async cycle + advance past the auto-send
+      // debounce window so we can prove the auto-send is DEFERRED (the buttons
+      // are the first actionable response, not an LLM/subject turn).
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+
+      // The captured image renders as the learner's image bubble in-thread,
+      // with both deterministic buttons.
+      const accessory = testScreen.getByTestId('mock-input-accessory');
+      within(accessory).getByTestId('homework-image-bubble');
+      within(accessory).getByTestId('homework-help-me-solve');
+      within(accessory).getByTestId('homework-check-my-answer');
+
+      // First actionable response has NO subject-picking preamble and no
+      // tutoring turn has started yet — the buttons ARE the first response.
+      expect(testScreen.queryByTestId('session-subject-resolution')).toBeNull();
+      expect(mockStream).not.toHaveBeenCalled();
+      // The standard homework chips are suppressed so the two deterministic
+      // buttons are the only first response.
+      expect(testScreen.queryByTestId('homework-mode-help-me')).toBeNull();
+
+      testScreen.unmount();
+    }, 15000);
+
+    it('starts the tutoring turn with the chosen homework mode after the learner taps "help me solve"', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_HOMEWORK_PARAMS,
+      );
+
+      const testScreen = renderSessionScreen();
+
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+
+      // No turn before the learner picks a deterministic action.
+      expect(mockStream).not.toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.press(testScreen.getByTestId('homework-help-me-solve'));
+      });
+      // Picking a mode re-enables the (previously deferred) auto-send.
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+      await flushAsyncWork();
+
+      await waitFor(() => {
+        expect(mockStream).toHaveBeenCalledWith(
+          'Solve 2x + 5 = 17',
+          expect.any(Function),
+          expect.any(Function),
+          'session-1',
+          expect.objectContaining({ homeworkMode: 'help_me' }),
+        );
+      });
+
+      // Once consumed, the deterministic first-response block is gone.
+      expect(testScreen.queryByTestId('homework-help-me-solve')).toBeNull();
+
+      testScreen.unmount();
+    }, 15000);
+
+    it('returns to the Mentor tab when returnTo=mentor', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      (useLocalSearchParams as jest.Mock).mockReturnValue(
+        MENTOR_HOMEWORK_PARAMS,
+      );
+
+      const testScreen = renderSessionScreen();
+
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+
+      await act(async () => {
+        fireEvent.press(testScreen.getByTestId('mock-back-button'));
+      });
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/mentor');
+
+      testScreen.unmount();
+    }, 15000);
+
+    it('leaves the legacy homework flow unchanged when the V2 frame is off (no deterministic first-response)', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
+      (useLocalSearchParams as jest.Mock).mockReturnValue({
+        ...MENTOR_HOMEWORK_PARAMS,
+        entrySource: undefined,
+        returnTo: undefined,
+      });
+
+      const testScreen = renderSessionScreen();
+
+      await act(async () => {
+        await Promise.resolve();
+        jest.advanceTimersByTime(700);
+      });
+      await flushAsyncWork();
+
+      // No V2 deterministic first-response block.
+      expect(testScreen.queryByTestId('homework-image-bubble')).toBeNull();
+      expect(testScreen.queryByTestId('homework-help-me-solve')).toBeNull();
+
+      // Legacy auto-send still fires the OCR'd problem.
+      await waitFor(() => {
+        expect(mockStream).toHaveBeenCalledWith(
+          'Solve 2x + 5 = 17',
+          expect.any(Function),
+          expect.any(Function),
+          'session-1',
+          expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        );
+      });
+
+      testScreen.unmount();
+    }, 15000);
   });
 
   describe('post-session filing prompt', () => {
