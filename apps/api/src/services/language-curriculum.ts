@@ -351,6 +351,19 @@ export async function regenerateLanguageCurriculum(
   subjectId: string,
   languageCode: string,
   startingLevel: CefrLevel = 'A1',
+  options?: {
+    /**
+     * Set true when `db` is ALREADY a transaction handle (a `PgTransaction`
+     * cast as `Database`). The ownership-check → delete → insert → add-topics
+     * swap then runs directly on that handle instead of opening its own
+     * `db.transaction()`. neon-serverless throws on (or silently degrades)
+     * nested transactions, so a caller that needs this work to commit
+     * atomically with its OWN writes — e.g. configureLanguageSubject pairing
+     * it with setNativeLanguage — passes its tx here. Same pattern as
+     * mergeHomeSurfaceCacheData / writeHomeSurfacePendingCelebrations.
+     */
+    inTransaction?: boolean;
+  },
 ): Promise<void> {
   // Curriculum generation is a pure synchronous build (no LLM/network), so
   // compute it before opening the transaction — nothing here can fail mid-swap.
@@ -362,13 +375,10 @@ export async function regenerateLanguageCurriculum(
     ? (language.names[0] ?? languageCode).replace(/^./, (c) => c.toUpperCase())
     : languageCode;
 
-  // Transact the ownership-check → delete → insert → add-topics swap so a
-  // crash mid-sequence cannot leave the learner with a deleted-but-unreplaced
-  // curriculum, and two concurrent same-user regenerations cannot interleave
-  // into duplicate curricula rows or orphaned topics. Mirrors the transactional
-  // swap in curriculum.ts:regenerateCurriculumWithFeedback. The ownership check
-  // is inside the transaction so the check → delete window is atomic.
-  await db.transaction(async (tx) => {
+  // The ownership-check → delete → insert → add-topics swap. Runs on whatever
+  // handle the caller holds: a fresh transaction we open here, or a
+  // transaction the caller already opened (when `inTransaction` is set).
+  const runSwap = async (tx: Database): Promise<void> => {
     // [BUG-655 / L3.M3.1] Verify (subjectId, profileId) ownership BEFORE the
     // delete. Without this, a leaked subjectId from another account could
     // cascade-delete the victim's curriculum, topics, vocabulary and progress.
@@ -401,12 +411,9 @@ export async function regenerateLanguageCurriculum(
     if (!curriculum)
       throw new Error('Insert into curricula did not return a row');
     // Known Drizzle pattern: PgTransaction → Database cast (see
-    // feedback_drizzle_transaction_cast.md).
-    const bookId = await ensureDefaultBook(
-      tx as unknown as Database,
-      subjectId,
-      languageLabel,
-    );
+    // feedback_drizzle_transaction_cast.md). `tx` is already a Database here
+    // (either the real db or a cast tx handle), so pass it through directly.
+    const bookId = await ensureDefaultBook(tx, subjectId, languageLabel);
 
     await tx.insert(curriculumTopics).values(
       topics.map((topic, index) => ({
@@ -423,6 +430,24 @@ export async function regenerateLanguageCurriculum(
         targetChunkCount: topic.targetChunkCount ?? null,
       })),
     );
+  };
+
+  // Caller already holds a transaction (e.g. configureLanguageSubject pairing
+  // this swap with setNativeLanguage): run on the passed-in handle so we do not
+  // open a nested transaction on neon-serverless.
+  if (options?.inTransaction) {
+    await runSwap(db);
+    return;
+  }
+
+  // Transact the swap so a crash mid-sequence cannot leave the learner with a
+  // deleted-but-unreplaced curriculum, and two concurrent same-user
+  // regenerations cannot interleave into duplicate curricula rows or orphaned
+  // topics. Mirrors the transactional swap in
+  // curriculum.ts:regenerateCurriculumWithFeedback. The ownership check is
+  // inside the transaction so the check → delete window is atomic.
+  await db.transaction(async (tx) => {
+    await runSwap(tx as unknown as Database);
   });
 }
 
