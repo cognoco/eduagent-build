@@ -38,6 +38,7 @@ export const trialNotificationSend = inngest.createFunction(
   async ({ event, step }) => {
     const data = event.data as {
       accountId: string;
+      timestamp: string;
       title: string;
       body: string;
       step: TrialNotificationStep;

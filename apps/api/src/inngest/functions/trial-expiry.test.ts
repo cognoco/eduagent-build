@@ -511,6 +511,7 @@ describe('trialExpiry', () => {
         name: 'app/billing.trial_notification.send',
         data: {
           accountId: 'acc-3',
+          timestamp: '2025-01-15T00:00:00.000Z',
           title: 'Trial ending soon',
           body: '3 days left of your trial',
           step: 'send-trial-warnings',
@@ -557,6 +558,7 @@ describe('trialExpiry', () => {
         name: 'app/billing.trial_notification.send',
         data: {
           accountId: 'acc-4',
+          timestamp: '2025-01-15T00:00:00.000Z',
           title: 'Your trial has ended',
           body: 'giving you 15/day for 2 more weeks',
           step: 'send-soft-landing',

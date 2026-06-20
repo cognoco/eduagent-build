@@ -50,6 +50,10 @@ type TrialNotificationSendEvent = {
   name: typeof TRIAL_NOTIFICATION_SEND_EVENT;
   data: {
     accountId: string;
+    // Dispatch-time snapshot. Payload convention: events always carry a
+    // timestamp (profileId is legitimately absent — this billing-level event
+    // is keyed by accountId). Mirrors topup-expiry-reminder's `timestamp`.
+    timestamp: string;
     title: string;
     body: string;
     step: TrialNotificationStep;
@@ -394,6 +398,7 @@ export const trialExpiry = inngest.createFunction(
             name: TRIAL_NOTIFICATION_SEND_EVENT,
             data: {
               accountId: trial.accountId,
+              timestamp: nowIso,
               title: 'Trial ending soon',
               body: warningMessage,
               step: 'send-trial-warnings',
@@ -453,6 +458,7 @@ export const trialExpiry = inngest.createFunction(
               name: TRIAL_NOTIFICATION_SEND_EVENT,
               data: {
                 accountId: trial.accountId,
+                timestamp: nowIso,
                 title: 'Your trial has ended',
                 body: message,
                 step: 'send-soft-landing',
