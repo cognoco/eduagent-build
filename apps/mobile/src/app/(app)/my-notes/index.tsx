@@ -53,12 +53,24 @@ function hubSubtitle(kind: MyNotesKind, t: TFunction): string {
   }
 }
 
-function CountPill({ value }: { value: number | undefined }) {
-  if (value == null) return null;
+function CountPill({
+  value,
+  fallbackLabel,
+  testID,
+}: {
+  value: number | undefined;
+  fallbackLabel?: string;
+  testID: string;
+}) {
+  if (value == null && !fallbackLabel) return null;
   return (
-    <View className="rounded-full bg-surface-elevated px-3 py-1">
+    <View
+      className="rounded-full bg-surface-elevated px-3 py-1"
+      testID={testID}
+      accessibilityLiveRegion="polite"
+    >
       <Text className="text-caption font-semibold text-text-secondary">
-        {value}
+        {fallbackLabel ?? value}
       </Text>
     </View>
   );
@@ -78,6 +90,11 @@ export default function MyNotesHubScreen(): React.ReactElement {
   const counts: Partial<Record<MyNotesKind, number>> = {
     sessions: sessionsQuery.data?.length,
   };
+  const sessionCountFallback = sessionsQuery.isLoading
+    ? t('myNotes.hub.countLoading')
+    : sessionsQuery.isError
+      ? t('myNotes.hub.countUnavailable')
+      : undefined;
 
   return (
     <View
@@ -135,7 +152,13 @@ export default function MyNotesHubScreen(): React.ReactElement {
                   {hubSubtitle(item.kind, t)}
                 </Text>
               </View>
-              <CountPill value={counts[item.kind]} />
+              <CountPill
+                value={counts[item.kind]}
+                fallbackLabel={
+                  item.kind === 'sessions' ? sessionCountFallback : undefined
+                }
+                testID={`my-notes-${item.kind}-count`}
+              />
               <Ionicons
                 name="chevron-forward"
                 size={20}

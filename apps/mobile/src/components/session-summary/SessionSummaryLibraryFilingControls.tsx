@@ -276,7 +276,13 @@ export function SessionSummaryLibraryFilingControls({
       ) : null}
 
       {message ? (
-        <Text className="text-caption text-danger mt-2">{message}</Text>
+        <Text
+          className="text-caption text-danger mt-2"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          {message}
+        </Text>
       ) : null}
     </View>
   );

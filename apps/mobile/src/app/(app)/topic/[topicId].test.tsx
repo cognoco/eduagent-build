@@ -516,6 +516,9 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     fireEvent.press(screen.getByTestId('topic-detail-go-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
     expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('topic-detail-go-home'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('[F-009] shows loading spinner while resolving subjectId from a deep-link (no subjectId param)', async () => {

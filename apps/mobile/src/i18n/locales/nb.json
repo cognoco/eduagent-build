@@ -1358,7 +1358,9 @@
     "a11yClearSearch": "Tøm søk",
     "a11yEditNote": "Rediger notat",
     "a11yDeleteNote": "Slett notat",
-    "a11yCloseTopicPicker": "Lukk emnevelger"
+    "a11yCloseTopicPicker": "Lukk emnevelger",
+    "topicPickerEmptyTitle": "Ingen emner ennå",
+    "topicPickerEmptyDescription": "Denne boken har ingen emner å velge mellom ennå."
   },
   "topic": {
     "relevance": {
@@ -2274,7 +2276,17 @@
       "sessionSummary": "Øktsammendrag",
       "noSummaryBody": "Ingen sammendrag ble generert for denne økten",
       "openTopicWithTitle": "Åpne {{title}}",
-      "backToChildProfile": "Tilbake til barneprofil"
+      "backToChildProfile": "Tilbake til barneprofil",
+      "engagementChip": {
+        "accessibilityLabel": "Engasjement: {{label}}",
+        "labels": {
+          "curious": "Nysgjerrig",
+          "stuck": "Jobber med det",
+          "breezing": "Går lett",
+          "focused": "Fokusert",
+          "scattered": "Finner fokus"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Emne ikke funnet",
@@ -3080,7 +3092,9 @@
     "signingOutAll": "Logger ut andre enheter ...",
     "signOutAllTitle": "Logge ut alle andre enheter?",
     "signOutAllConfirm": "Dette vil avslutte {{count}} andre økt(er). Denne enheten forblir pålogget.",
-    "signOutAllConfirmButton": "Logg ut alle"
+    "signOutAllConfirmButton": "Logg ut alle",
+    "emptyBackLabel": "Tilbake til kontoinnstillinger",
+    "emptyBackButton": "Tilbake til konto"
   },
   "changePassword": {
     "errorCurrentRequired": "Skriv inn ditt nåværende passord",
@@ -3307,7 +3321,9 @@
     "hub": {
       "sessionsSubtitle": "Samtaler du hadde",
       "notesSubtitle": "Ting du skrev ned",
-      "bookmarksSubtitle": "Veiledersvar du lagret"
+      "bookmarksSubtitle": "Veiledersvar du lagret",
+      "countLoading": "Laster inn",
+      "countUnavailable": "Utilgjengelig"
     },
     "unknownSubject": "Ukjent fag",
     "searchSessions": "Søk i økter",
@@ -3380,7 +3396,8 @@
     "childNamePlaceholder": "Deres navn eller kallenavn",
     "childBirthYearPlaceholder": "Fødselsår",
     "a11yBack": "Tilbake til forrige trinn",
-    "a11yCancel": "Avbryt og avslutt"
+    "a11yCancel": "Avbryt og avslutt",
+    "loading": "Laster inn den lagrede forhåndsvisningen ..."
   },
   "pickBook": {
     "subjectFallback": "Emne",

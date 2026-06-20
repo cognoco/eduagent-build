@@ -1385,7 +1385,9 @@
     "a11yClearSearch": "Limpar busca",
     "a11yEditNote": "Editar anotação",
     "a11yDeleteNote": "Excluir anotação",
-    "a11yCloseTopicPicker": "Fechar seletor de tópicos"
+    "a11yCloseTopicPicker": "Fechar seletor de tópicos",
+    "topicPickerEmptyTitle": "Ainda não há tópicos",
+    "topicPickerEmptyDescription": "Este livro ainda não tem tópicos para escolher."
   },
   "topic": {
     "relevance": {
@@ -2301,7 +2303,17 @@
       "sessionSummary": "Resumo da sessão",
       "noSummaryBody": "Nenhum resumo foi gerado para esta sessão",
       "openTopicWithTitle": "Abrir {{title}}",
-      "backToChildProfile": "Voltar para o perfil da criança"
+      "backToChildProfile": "Voltar para o perfil da criança",
+      "engagementChip": {
+        "accessibilityLabel": "Envolvimento: {{label}}",
+        "labels": {
+          "curious": "Curioso",
+          "stuck": "Com dificuldade",
+          "breezing": "Com facilidade",
+          "focused": "Focado",
+          "scattered": "A encontrar o foco"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Matéria não encontrada",
@@ -3080,7 +3092,9 @@
     "signingOutAll": "A terminar sessão noutros dispositivos...",
     "signOutAllTitle": "Terminar sessão nos outros dispositivos?",
     "signOutAllConfirm": "Isto vai terminar {{count}} outra(s) sessão(ões). Este dispositivo mantém a sessão iniciada.",
-    "signOutAllConfirmButton": "Terminar todas"
+    "signOutAllConfirmButton": "Terminar todas",
+    "emptyBackLabel": "Voltar às definições da conta",
+    "emptyBackButton": "Voltar à conta"
   },
   "changePassword": {
     "errorCurrentRequired": "Insira sua senha atual",
@@ -3307,7 +3321,9 @@
     "hub": {
       "sessionsSubtitle": "Conversas que você teve",
       "notesSubtitle": "Coisas que você anotou",
-      "bookmarksSubtitle": "Respostas do tutor que você salvou"
+      "bookmarksSubtitle": "Respostas do tutor que você salvou",
+      "countLoading": "A carregar",
+      "countUnavailable": "Indisponível"
     },
     "unknownSubject": "Matéria desconhecida",
     "searchSessions": "Buscar sessões",
@@ -3380,7 +3396,8 @@
     "childNamePlaceholder": "Nome ou apelido",
     "childBirthYearPlaceholder": "Ano de nascimento",
     "a11yBack": "Voltar para a etapa anterior",
-    "a11yCancel": "Cancelar e sair"
+    "a11yCancel": "Cancelar e sair",
+    "loading": "A carregar a sua pré-visualização guardada..."
   },
   "pickBook": {
     "subjectFallback": "Assunto",
