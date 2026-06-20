@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-8131-8c86-e564d21e1fdd",
+  "id": "WI-867",
+  "name": "WI-779-A: Collapse IDENTITY_V2_ENABLED branches to v2-only (no deletions)",
+  "description": "Phase A of WI-779 terminal flag removal. Collapse every IDENTITY_V2_ENABLED decision branch to its v2 arm across apps/api routes, middleware, inngest functions, and services; delete the now-unreachable legacy else-arm at each site. Legacy MODULES and the flag symbol stay in place (deleted in WI-779-B) so every intermediate PR compiles and all suites stay green.",
+  "acceptanceCriteria": "Every isIdentityV2Enabled(...) / isIdentityV2EnabledInStep() / if(opts?.identityV2Enabled) DECISION branch in apps/api production code (routes/middleware/inngest/services) is collapsed to the v2 path and the legacy else-arm removed. The flag symbol (config.ts isIdentityV2Enabled, inngest/helpers isIdentityV2EnabledInStep) and ALL legacy/twin MODULE files remain present and compiling — their deletion is WI-779-B. Builder derives the exact site list FRESH from an origin/main worktree (the prior scope sweep ran behind-main and is counts-only; trust the compiler + grep, not the stale list). Verification: tsc --build clean; nx run api:test plus the 51 cross-package integration suites green; the required flag-on integration lane green with v2 as the only reachable path; grep confirms no reachable legacy-arm branch remains (the flag-symbol DEFINITION may still exist). NO module deletions and NO flag-symbol removal in this child. Premise confirmed (prd+stg flag=true, WI-805 dropped legacy subscriptions -> flip complete+irreversible; this is cleanup).",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
