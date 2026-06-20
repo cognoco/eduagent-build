@@ -314,6 +314,32 @@ describe('session-stale-cleanup Inngest function', () => {
     expect(result.timestamp <= after).toBe(true);
   });
 
+  it('surfaces failedCount when closeStaleSessions reports per-session failures', async () => {
+    // Error-isolation contract: a session that throws during close is captured
+    // into the `failures` channel (not dropped, not aborting the batch), and the
+    // cron surfaces its count so partial-failure runs are observable. Every other
+    // test uses an empty failures list, so this is the only case that exercises
+    // the `failedCount: closedSessions.failures.length` surfacing with a nonzero
+    // value.
+    // Asymmetric counts (1 closed, 2 failed) so the assertion pins
+    // failedCount to `failures.length`, not `sessions.length`.
+    const closed = createClosedSession({ sessionId: 'session-ok' });
+    mockCloseStaleSessions.mockResolvedValue(
+      staleBatch(
+        [closed],
+        [
+          { profileId: 'profile-1', sessionId: 'session-bad-1', error: 'boom' },
+          { profileId: 'profile-2', sessionId: 'session-bad-2', error: 'boom' },
+        ],
+      ),
+    );
+
+    const { result } = await executeHandler();
+
+    expect(result.closedCount).toBe(1);
+    expect(result.failedCount).toBe(2);
+  });
+
   it('calls abandonStaleQuizRounds with a 2-hour cutoff', async () => {
     mockCloseStaleSessions.mockResolvedValue(staleBatch([]));
     mockAbandonStaleQuizRounds.mockResolvedValue(3);
