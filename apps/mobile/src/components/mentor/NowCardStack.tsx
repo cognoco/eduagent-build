@@ -7,7 +7,7 @@ import type {
 } from '@eduagent/schemas';
 
 import { LedgerMomentCard } from './LedgerMomentCard';
-import { NowCard } from './NowCard';
+import { NowCard, type NowCardArcState } from './NowCard';
 
 export interface NowCardStackProps {
   feed: NowResponse;
@@ -15,6 +15,9 @@ export interface NowCardStackProps {
   dismissedKeys: Set<string>;
   onContinue: (card: NowCardData) => void;
   onDecline: (card: NowCardData) => void;
+  onCompleted?: (card: NowCardData) => void;
+  anchorArcState?: NowCardArcState;
+  getArcState?: (card: NowCardData) => NowCardArcState | undefined;
   onShowOverflow: () => void;
 }
 
@@ -36,6 +39,8 @@ function renderCard(
   variant: 'anchor' | 'module',
   onContinue: (card: NowCardData) => void,
   onDecline: (card: NowCardData) => void,
+  arcState?: NowCardArcState,
+  onCompleted?: (card: NowCardData) => void,
 ) {
   if (card.kind === 'ledger_moment') {
     return (
@@ -50,8 +55,10 @@ function renderCard(
     <NowCard
       card={card}
       variant={variant}
+      arcState={arcState}
       onContinue={onContinue}
       onDecline={onDecline}
+      onCompleted={onCompleted}
     />
   );
 }
@@ -61,6 +68,9 @@ export function NowCardStack({
   dismissedKeys,
   onContinue,
   onDecline,
+  onCompleted,
+  anchorArcState,
+  getArcState,
   onShowOverflow,
 }: NowCardStackProps) {
   const { t } = useTranslation();
@@ -93,7 +103,14 @@ export function NowCardStack({
     <View testID="now-card-stack" className="gap-3">
       {anchor ? (
         <View testID="now-card-slot-anchor" accessibilityLabel="anchor">
-          {renderCard(anchor, 'anchor', onContinue, onDecline)}
+          {renderCard(
+            anchor,
+            'anchor',
+            onContinue,
+            onDecline,
+            getArcState?.(anchor) ?? anchorArcState,
+            onCompleted,
+          )}
         </View>
       ) : null}
       {modules.map((card, index) => (
@@ -102,7 +119,14 @@ export function NowCardStack({
           testID={`now-card-slot-module-${index}`}
           accessibilityLabel="module"
         >
-          {renderCard(card, 'module', onContinue, onDecline)}
+          {renderCard(
+            card,
+            'module',
+            onContinue,
+            onDecline,
+            getArcState?.(card),
+            onCompleted,
+          )}
         </View>
       ))}
       {feed.overflowCount > 0 ? (

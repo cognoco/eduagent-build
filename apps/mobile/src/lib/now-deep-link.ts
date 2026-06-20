@@ -45,6 +45,7 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
     `/(app)/topic/${encodeURIComponent(
       requiredParam(params, 'topicId', 'challenge.start'),
     )}`,
+  journal: () => '/(app)/journal',
 };
 
 function assertSupportedRoute(

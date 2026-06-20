@@ -167,6 +167,14 @@ describe('now feed route catalog', () => {
     });
   });
 
+  it('supports profile-level journal deep links for global ledger moments', () => {
+    expect(resolveDeepLink('journal', {})).toEqual({
+      route: 'journal',
+      params: {},
+      chain: [],
+    });
+  });
+
   it('throws when a required route param is missing', () => {
     expect(() =>
       resolveDeepLink('subject.topic', {

@@ -47,6 +47,7 @@ import { captureException } from './sentry';
 import { createLogger } from './logger';
 import { withTransientDatabaseRetry } from './transient-db-retry';
 import { generateWeeklyReportData } from './weekly-report';
+import { writeActivityMoment } from './activity-ledger';
 
 const logger = createLogger();
 
@@ -1223,6 +1224,43 @@ function getMilestoneCelebrationDetail(
   }
 }
 
+function buildMilestoneLedgerParams(
+  milestone: MilestoneRecord,
+): Record<string, unknown> {
+  const metadata =
+    milestone.metadata &&
+    typeof milestone.metadata === 'object' &&
+    !Array.isArray(milestone.metadata)
+      ? (milestone.metadata as Record<string, unknown>)
+      : {};
+  return {
+    ...metadata,
+    milestoneId: milestone.id,
+    milestoneType: milestone.milestoneType,
+    threshold: milestone.threshold,
+    ...(milestone.subjectId ? { subjectId: milestone.subjectId } : {}),
+    ...(milestone.bookId ? { bookId: milestone.bookId } : {}),
+  };
+}
+
+async function writeMilestoneLedgerMoments(
+  db: Database,
+  profileId: string,
+  insertedMilestones: MilestoneRecord[],
+): Promise<void> {
+  for (const milestone of insertedMilestones) {
+    await writeActivityMoment({
+      db,
+      profileId,
+      actorJob: 'snapshot-aggregation',
+      kind: 'milestone_reached',
+      templateKey: 'ledger.milestone_reached.default',
+      params: buildMilestoneLedgerParams(milestone),
+      visibility: 'self',
+    });
+  }
+}
+
 export interface RefreshProgressSnapshotOptions {
   /**
    * Timestamp of the session completion event that triggered this refresh.
@@ -1284,6 +1322,7 @@ export async function refreshProgressSnapshot(
     profileId,
     detectMilestones(profileId, previousMetrics, metrics),
   );
+  await writeMilestoneLedgerMoments(db, profileId, insertedMilestones);
 
   // [FR234.5] Bridge newly inserted milestones to the celebration queue.
   // [FR237.6] Look up birthYear once so detail text can be age-adapted.

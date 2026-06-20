@@ -46,6 +46,82 @@ function ledgerCopyKey(card: NowCard): string {
   return `journal.moments.${kind}`;
 }
 
+function stringParam(
+  params: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = params[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function numberParam(
+  params: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = params[key];
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function renderMilestoneMomentText(card: NowCard, t: TFunction): string {
+  const milestoneType = stringParam(card.params, 'milestoneType');
+  const threshold = numberParam(card.params, 'threshold');
+  if (!milestoneType || threshold == null) {
+    return t('journal.moments.generic', card.params);
+  }
+
+  switch (milestoneType) {
+    case 'vocabulary_count':
+      return t('milestoneCard.wordCount', { count: threshold });
+    case 'topic_mastered_count':
+      return t('milestoneCard.topicCount', { count: threshold });
+    case 'session_count':
+      return t('milestoneCard.sessionCount', { count: threshold });
+    case 'learning_time':
+      return t('milestoneCard.hourCount', { count: threshold });
+    default:
+      return t('journal.moments.generic', card.params);
+  }
+}
+
+function renderRewardMomentText(card: NowCard, t: TFunction): string {
+  const receiptKind = stringParam(card.params, 'receiptKind');
+  switch (receiptKind) {
+    case 'practice_points': {
+      const amount = numberParam(card.params, 'amount');
+      const topicTitle = stringParam(card.params, 'topicTitle');
+      if (amount == null) break;
+      return topicTitle
+        ? t('mentorHome.rewards.practicePoints', { amount, topicTitle })
+        : t('mentorHome.rewards.practicePointsNoTopic', { amount });
+    }
+    case 'reflection_bonus': {
+      const multiplier = numberParam(card.params, 'multiplier');
+      const totalXp = numberParam(card.params, 'totalXp');
+      if (multiplier == null || totalXp == null) break;
+      return t('mentorHome.rewards.reflectionBonus', { multiplier, totalXp });
+    }
+    case 'quiz_personal_best': {
+      const game = stringParam(card.params, 'game');
+      const score = numberParam(card.params, 'score');
+      if (score == null) break;
+      return game === 'guess_who'
+        ? t('mentorHome.rewards.quizPersonalBestGuessWho', { score })
+        : t('mentorHome.rewards.quizPersonalBestCapitals', { score });
+    }
+    case 'mastery_delta': {
+      const mastered = numberParam(card.params, 'mastered');
+      const weeklyDelta = numberParam(card.params, 'weeklyDelta');
+      if (mastered == null) break;
+      return weeklyDelta != null
+        ? t('mentorHome.rewards.masteryDelta', { mastered, weeklyDelta })
+        : t('mentorHome.rewards.masteryDeltaNoWeekly', { mastered });
+    }
+  }
+  return t('journal.moments.generic', card.params);
+}
+
 function renderLedgerMomentText(card: NowCard, t: TFunction): string {
   switch (ledgerCopyKey(card)) {
     case 'journal.moments.session_filed':
@@ -56,6 +132,10 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
       return t('journal.moments.recap_ready', card.params);
     case 'journal.moments.snapshot_ready':
       return t('journal.moments.snapshot_ready', card.params);
+    case 'journal.moments.milestone_reached':
+      return renderMilestoneMomentText(card, t);
+    case 'journal.moments.reward_receipt':
+      return renderRewardMomentText(card, t);
     case 'journal.moments.reflection_bonus':
       return t('journal.moments.reflection_bonus', card.params);
     case 'journal.moments.quiz_personal_best':
@@ -428,6 +508,33 @@ function previewCount(value: number | undefined): string {
   return value == null ? '-' : String(value);
 }
 
+function previewText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function ArchivePreviewList({
+  values,
+}: {
+  values: string[];
+}): React.ReactElement | null {
+  if (values.length === 0) return null;
+  return (
+    <View className="mt-3 gap-2">
+      {values.slice(0, 3).map((value, index) => (
+        <Text
+          key={`${index}:${value}`}
+          className="text-body-sm text-text-primary"
+          numberOfLines={2}
+        >
+          {value}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function JournalNotesSection(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -436,26 +543,50 @@ function JournalNotesSection(): React.ReactElement {
   const notes = useAllNotes({ limit: 5 });
   const bookmarks = useBookmarks({ limit: 5 });
 
-  const sessionCount = useMemo(
-    () => sessions.data?.pages.flatMap((page) => page.sessions).length,
+  const sessionItems = useMemo(
+    () => sessions.data?.pages.flatMap((page) => page.sessions) ?? [],
     [sessions.data],
   );
-  const notesCount = useMemo(
-    () => notes.data?.pages.flatMap((page) => page.notes).length,
+  const noteItems = useMemo(
+    () => notes.data?.pages.flatMap((page) => page.notes) ?? [],
     [notes.data],
   );
-  const bookmarkCount = useMemo(
-    () => bookmarks.data?.pages.flatMap((page) => page.bookmarks).length,
+  const bookmarkItems = useMemo(
+    () => bookmarks.data?.pages.flatMap((page) => page.bookmarks) ?? [],
     [bookmarks.data],
   );
 
   const rows: Array<{
     id: 'sessions' | 'notes' | 'bookmarks';
     count: number | undefined;
+    previews: string[];
   }> = [
-    { id: 'sessions', count: sessionCount },
-    { id: 'notes', count: notesCount },
-    { id: 'bookmarks', count: bookmarkCount },
+    {
+      id: 'sessions',
+      count: sessions.data ? sessionItems.length : undefined,
+      previews: sessionItems
+        .map(
+          (session) =>
+            previewText(session.displayTitle) ??
+            previewText(session.topicTitle) ??
+            previewText(session.displaySummary),
+        )
+        .filter((value): value is string => value != null),
+    },
+    {
+      id: 'notes',
+      count: notes.data ? noteItems.length : undefined,
+      previews: noteItems
+        .map((note) => previewText(note.content))
+        .filter((value): value is string => value != null),
+    },
+    {
+      id: 'bookmarks',
+      count: bookmarks.data ? bookmarkItems.length : undefined,
+      previews: bookmarkItems
+        .map((bookmark) => previewText(bookmark.content))
+        .filter((value): value is string => value != null),
+    },
   ];
 
   return (
@@ -489,6 +620,7 @@ function JournalNotesSection(): React.ReactElement {
               </Text>
             </View>
           </View>
+          <ArchivePreviewList values={row.previews} />
         </Pressable>
       ))}
     </View>

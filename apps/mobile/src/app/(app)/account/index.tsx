@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { AccountAdminSheet } from '../../components/account/AccountAdminSheet';
-import { goBackOrReplace } from '../../lib/navigation';
+import { AccountAdminSheet } from '../../../components/account/AccountAdminSheet';
+import { goBackOrReplace } from '../../../lib/navigation';
 
 export default function AccountScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();

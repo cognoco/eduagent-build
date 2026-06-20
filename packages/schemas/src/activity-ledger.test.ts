@@ -15,6 +15,8 @@ describe('activity ledger schemas', () => {
       'needs_deepening_added',
       'recap_ready',
       'snapshot_ready',
+      'milestone_reached',
+      'reward_receipt',
     ]);
   });
 

@@ -155,6 +155,37 @@ describe('JournalTabView', () => {
             },
             scope: 'self',
           },
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.milestone_reached',
+            params: {
+              ledgerKind: 'milestone_reached',
+              milestoneType: 'session_count',
+              threshold: 3,
+            },
+            deepLink: {
+              route: 'journal',
+              params: {},
+              chain: [],
+            },
+            scope: 'self',
+          },
+          {
+            kind: 'ledger_moment',
+            templateKey: 'now.ledger_moment.reward_receipt',
+            params: {
+              ledgerKind: 'reward_receipt',
+              receiptKind: 'practice_points',
+              amount: 12,
+              topicTitle: 'Fractions',
+            },
+            deepLink: {
+              route: 'journal',
+              params: {},
+              chain: [],
+            },
+            scope: 'self',
+          },
         ],
       },
       isLoading: false,
@@ -165,8 +196,12 @@ describe('JournalTabView', () => {
     mockMonthlyReports = query([monthlyReport]);
     mockWeeklyReports = query([weeklyReport]);
     mockSessionsArchive = infiniteQuery({ sessions: [recap] });
-    mockNotes = infiniteQuery({ notes: [{ id: 'note-1' }] });
-    mockBookmarks = infiniteQuery({ bookmarks: [{ id: 'bookmark-1' }] });
+    mockNotes = infiniteQuery({
+      notes: [{ id: 'note-1', content: 'Remember phase changes.' }],
+    });
+    mockBookmarks = infiniteQuery({
+      bookmarks: [{ id: 'bookmark-1', content: 'Saved mentor explanation.' }],
+    });
   });
 
   it('renders ledger moments and defaults to the self recap section', () => {
@@ -175,6 +210,8 @@ describe('JournalTabView', () => {
     screen.getByTestId('journal-screen');
     screen.getByTestId('journal-moments-strip');
     screen.getByText('Saved Fractions to your learning record.');
+    screen.getByText('3 learning sessions completed');
+    screen.getByText('+12 practice points for Fractions');
     screen.getByTestId('journal-segmented-control');
     screen.getByTestId('journal-recaps-section');
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
@@ -213,6 +250,9 @@ describe('JournalTabView', () => {
 
     fireEvent.press(screen.getByTestId('journal-tab-notes'));
     screen.getByTestId('journal-notes-section');
+    screen.getByText('Fractions session');
+    screen.getByText('Remember phase changes.');
+    screen.getByText('Saved mentor explanation.');
     fireEvent.press(screen.getByTestId('journal-notes-notes'));
 
     expect(mockPush).toHaveBeenCalledWith({

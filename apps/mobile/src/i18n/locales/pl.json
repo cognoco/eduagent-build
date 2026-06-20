@@ -791,6 +791,10 @@
       "stopRecording": "Zatrzymaj nagrywanie"
     },
     "expiredSystemMessage": "Sesja wygasła. Rozpocznij nową, aby kontynuować.",
+    "firstWrap": {
+      "recap": "Ukończyłeś jedną prawdziwą wymianę edukacyjną.",
+      "recapWithSubject": "Ukończyłeś jedną prawdziwą wymianę edukacyjną o {{subject}}."
+    },
     "errorBoundary": {
       "crashTitle": "Ekran sesji uległ awarii",
       "unknownError": "Nieznany błąd",
@@ -3743,7 +3747,8 @@
       "chipHomework": "Pomóż mi z pracą domową",
       "chipLearn": "Naucz mnie czegoś nowego",
       "chipAsk": "Mam pytanie",
-      "homeworkReply": "Użyj aparatu, aby sfotografować zadanie, lub wpisz je tutaj."
+      "homeworkReply": "Użyj aparatu, aby sfotografować zadanie, lub wpisz je tutaj.",
+      "firstSessionTeach": "Zapamiętam to, co tu napiszesz, żeby następny krok zaczął się bliżej ciebie."
     },
     "title": "Mentor",
     "subtitle": "Kilka przydatnych kroków i jedno miejsce na pytania i notatki.",

@@ -19,6 +19,48 @@ import SessionScreen from './index';
 // needed via jest.spyOn().
 import * as sessionRecoveryModule from '../../../lib/session-recovery';
 
+type MockFeatureFlags = {
+  COACH_BAND_ENABLED: boolean;
+  MIC_IN_PILL_ENABLED: boolean;
+  I18N_ENABLED: boolean;
+  PREVIEW_ONBOARDING_ENABLED: boolean;
+  PREVIEW_ENTRY_CTA_ENABLED: boolean;
+  MODE_NAV_V0_ENABLED: boolean;
+  MODE_NAV_V1_ENABLED: boolean;
+  MODE_NAV_V2_ENABLED: boolean;
+  ADULT_OWNER_GATE_ENABLED: boolean;
+};
+
+const getMockFeatureFlags = (): MockFeatureFlags =>
+  (
+    globalThis as typeof globalThis & {
+      __sessionTestFeatureFlags: MockFeatureFlags;
+    }
+  ).__sessionTestFeatureFlags;
+
+jest.mock('../../../lib/feature-flags', () => {
+  const featureFlags: MockFeatureFlags = {
+    COACH_BAND_ENABLED: true,
+    MIC_IN_PILL_ENABLED: true,
+    I18N_ENABLED: true,
+    PREVIEW_ONBOARDING_ENABLED: true,
+    PREVIEW_ENTRY_CTA_ENABLED: false,
+    MODE_NAV_V0_ENABLED: false,
+    MODE_NAV_V1_ENABLED: false,
+    MODE_NAV_V2_ENABLED: false,
+    ADULT_OWNER_GATE_ENABLED: true,
+  };
+  (
+    globalThis as typeof globalThis & {
+      __sessionTestFeatureFlags: MockFeatureFlags;
+    }
+  ).__sessionTestFeatureFlags = featureFlags;
+
+  return {
+    FEATURE_FLAGS: featureFlags,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Boundary mocks (external / native runtime only)
 // ---------------------------------------------------------------------------
@@ -229,6 +271,7 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
+const mockSubmitSummary = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -278,6 +321,11 @@ jest.mock(
     useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
     useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
     useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
+    useSubmitSummary: () => ({
+      mutateAsync: mockSubmitSummary,
+      isPending: false,
+      isError: false,
+    }),
     useParkingLot: () => ({ data: [], isLoading: false }),
     useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
@@ -551,6 +599,7 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
     mockReadAsStringAsync.mockResolvedValue('base64-homework-image');
@@ -609,6 +658,17 @@ describe('SessionScreen homework flow', () => {
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
+    });
+    mockSubmitSummary.mockResolvedValue({
+      summary: {
+        id: 'summary-1',
+        sessionId: 'session-1',
+        content: 'I learned that equations stay balanced on both sides.',
+        aiFeedback: null,
+        status: 'accepted',
+        baseXp: 12,
+        reflectionBonusXp: 6,
+      },
     });
   });
 
@@ -1649,11 +1709,11 @@ describe('SessionScreen homework flow', () => {
      * Helper: renders a freeform session, sends a message to start it,
      * then triggers end-session via the Alert "End Session" callback.
      */
-    async function renderAndCloseFreeformSession() {
+    async function renderAndCloseFreeformSession(
+      routeParams: Record<string, string> = { mode: 'freeform' },
+    ) {
       // Use freeform mode (no subjectId) so close follows the freeform path.
-      (useLocalSearchParams as jest.Mock).mockReturnValue({
-        mode: 'freeform',
-      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue(routeParams);
       // Classify resolves without confirmation needed
       mockFetch.setRoute('/subjects/classify', {
         candidates: [
@@ -1691,17 +1751,24 @@ describe('SessionScreen homework flow', () => {
         );
       });
 
-      const buttons = alertSpy.mock.calls[0]![2] as Array<{
+      const endSessionCall = alertSpy.mock.calls.find(
+        ([title]) => title === 'End session?',
+      );
+      const buttons = endSessionCall![2] as Array<{
         text: string;
         onPress?: () => void;
       }>;
       const doneButton = buttons.find((b) => b.text === 'End Session');
+      expect(doneButton).toBeTruthy();
 
       // Invoke the "End Session" callback
       await act(async () => {
         doneButton?.onPress?.();
       });
       await flushAsyncWork();
+      await waitFor(() => {
+        expect(mockCloseSession).toHaveBeenCalled();
+      });
 
       // Advance timers to let fetchFastCelebrations polling resolve. Bounded
       // advance (the polling window is 3s of 500ms ticks) rather than
@@ -1732,6 +1799,85 @@ describe('SessionScreen homework flow', () => {
       expect(testScreen.queryByTestId('filing-prompt-accept')).toBeNull();
       expect(testScreen.queryByTestId('filing-prompt-dismiss')).toBeNull();
       expect(fetchCallsMatching(mockFetch, '/filing')).toHaveLength(0);
+      testScreen.unmount();
+    }, 15000);
+
+    it('renders the V2 first-session Mentor wrap-up and saves Your Words through the summary boundary', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        testScreen.getByTestId('first-session-wrap-up');
+      });
+
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/session-summary/session-1',
+        }),
+      );
+      expect(
+        testScreen.getByText(/I'll remember what you write here/),
+      ).toBeTruthy();
+
+      const reflection =
+        'I learned that balancing equations keeps both sides equal.';
+      fireEvent.changeText(
+        testScreen.getByTestId('first-session-reflection-input'),
+        reflection,
+      );
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(mockSubmitSummary).toHaveBeenCalledWith({
+          content: reflection,
+        });
+      });
+
+      testScreen.getByTestId('mentor-reward-receipt');
+      expect(testScreen.getByTestId('mentor-reward-value').props.children).toBe(
+        '1.5x / 18',
+      );
+      expect(
+        testScreen.getAllByText(/You chose the next step/).length,
+      ).toBeGreaterThan(0);
+      testScreen.unmount();
+    }, 15000);
+
+    it('keeps later V2 Mentor sessions on the existing summary path', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      mockFetch.setRoute('/progress/inventory', {
+        global: {
+          topicsAttempted: 0,
+          topicsMastered: 0,
+          vocabularyTotal: 0,
+          vocabularyMastered: 0,
+          totalSessions: 1,
+          totalActiveMinutes: 0,
+          totalWallClockMinutes: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+        },
+        subjects: [],
+      });
+
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/session-summary/session-1',
+          }),
+        );
+      });
+      expect(testScreen.queryByTestId('first-session-wrap-up')).toBeNull();
       testScreen.unmount();
     }, 15000);
   });

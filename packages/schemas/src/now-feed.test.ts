@@ -1,6 +1,7 @@
 import {
   nowCardKindSchema,
   nowCardSchema,
+  nowDeepLinkRouteSchema,
   nowDeepLinkSchema,
   nowResponseSchema,
   nowScopeSchema,
@@ -62,6 +63,18 @@ describe('now feed schemas', () => {
 
   it('requires deep-link routes to come from the closed catalog', () => {
     expect(nowDeepLinkSchema.parse(deepLink)).toEqual(deepLink);
+    expect(nowDeepLinkRouteSchema.options).toContain('journal');
+    expect(
+      nowDeepLinkSchema.parse({
+        route: 'journal',
+        params: {},
+        chain: [],
+      }),
+    ).toEqual({
+      route: 'journal',
+      params: {},
+      chain: [],
+    });
     expect(() =>
       nowDeepLinkSchema.parse({
         ...deepLink,

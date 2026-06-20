@@ -758,6 +758,10 @@
       "stopRecording": "Stopp opptak"
     },
     "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette.",
+    "firstWrap": {
+      "recap": "Du fullførte én ekte læringsutveksling.",
+      "recapWithSubject": "Du fullførte én ekte læringsutveksling om {{subject}}."
+    },
     "errorBoundary": {
       "crashTitle": "Øktskjermen krasjet",
       "unknownError": "Ukjent feil",
@@ -3591,7 +3595,8 @@
       "chipHomework": "Hjelp meg med lekser",
       "chipLearn": "Lær meg noe nytt",
       "chipAsk": "Jeg har et spørsmål",
-      "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her."
+      "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her.",
+      "firstSessionTeach": "Jeg husker det du skriver her, slik at neste steg starter nærmere deg."
     },
     "title": "Mentor",
     "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",

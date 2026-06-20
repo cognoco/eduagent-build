@@ -10,6 +10,8 @@ export const ledgerKindSchema = z.enum([
   'needs_deepening_added',
   'recap_ready',
   'snapshot_ready',
+  'milestone_reached',
+  'reward_receipt',
 ]);
 export type LedgerKind = z.infer<typeof ledgerKindSchema>;
 
@@ -20,6 +22,8 @@ export const ledgerTemplateKeySchema = z.enum([
   'ledger.needs_deepening_added.default',
   'ledger.recap_ready.default',
   'ledger.snapshot_ready.default',
+  'ledger.milestone_reached.default',
+  'ledger.reward_receipt.default',
 ]);
 export type LedgerTemplateKey = z.infer<typeof ledgerTemplateKeySchema>;
 

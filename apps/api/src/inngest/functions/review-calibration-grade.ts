@@ -10,8 +10,10 @@ import {
 } from '../../services/retention-data';
 import { canRetestTopic, processRecallResult } from '../../services/retention';
 import { stampMasteryOnVerify } from '../../services/retention-mastery';
-import { applyRetentionUpdate } from '../../services/apply-retention-update';
-import { syncXpLedgerStatus } from '../../services/xp';
+import {
+  applyRetentionUpdate,
+  syncRewardStatusFromRetention,
+} from '../../services/apply-retention-update';
 
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
@@ -129,7 +131,12 @@ export async function handleReviewCalibrationGrade({
     // handled at insert time by insertSessionXpEntry (post-sunset, 5fed808e9).
     // No-op when no ledger row exists (topic never completed a session).
     if (result.xpChange === 'decayed') {
-      await syncXpLedgerStatus(db, profileId, topicId, 'decayed');
+      await syncRewardStatusFromRetention({
+        db,
+        profileId,
+        topicId,
+        status: 'decayed',
+      });
     }
   });
 

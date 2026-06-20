@@ -26,6 +26,10 @@ jest.mock('./celebrations' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+jest.mock('./activity-ledger' /* gc1-allow: pattern-a conversion */, () => ({
+  writeActivityMoment: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('./language-curriculum' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     './language-curriculum',
@@ -86,6 +90,7 @@ import {
 } from './snapshot-aggregation';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { queueCelebration } from './celebrations';
+import { writeActivityMoment } from './activity-ledger';
 import { addBreadcrumb } from './sentry';
 import type {
   ProgressMetrics,
@@ -1256,6 +1261,40 @@ describe('refreshProgressSnapshot', () => {
       expect.any(String), // celebrationReason
       expect.anything(), // detail text (may be string or null)
     );
+  });
+
+  it('writes private activity ledger moments for each newly inserted milestone', async () => {
+    const detectedMilestone = {
+      id: 'new-ms-ledger',
+      profileId,
+      milestoneType: 'session_count' as const,
+      threshold: 3,
+      subjectId: null,
+      bookId: null,
+      metadata: { backfilled: false },
+      celebratedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    (storeMilestones as jest.Mock).mockResolvedValue([detectedMilestone]);
+
+    const db = createSnapshotDb({ findFirst: undefined });
+
+    await refreshProgressSnapshot(db, profileId);
+
+    expect(writeActivityMoment).toHaveBeenCalledWith({
+      db,
+      profileId,
+      actorJob: 'snapshot-aggregation',
+      kind: 'milestone_reached',
+      templateKey: 'ledger.milestone_reached.default',
+      params: {
+        milestoneId: detectedMilestone.id,
+        milestoneType: 'session_count',
+        threshold: 3,
+        backfilled: false,
+      },
+      visibility: 'self',
+    });
   });
 
   it('does not call queueCelebration when no milestones were inserted', async () => {

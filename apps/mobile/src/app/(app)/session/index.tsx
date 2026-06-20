@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
@@ -40,6 +40,7 @@ import {
   useFlagSessionContent,
   useParkingLot,
   useAddParkingLotItem,
+  useSubmitSummary,
 } from '../../../hooks/use-sessions';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useResolveSubject } from '../../../hooks/use-resolve-subject';
@@ -96,6 +97,10 @@ import {
 } from '../../../components/session/SessionModals';
 import { SessionFooter } from '../../../components/session/SessionFooter';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
+import {
+  MentorCelebration,
+  RewardReceiptCard,
+} from '../../../components/mentor';
 import { useTranslation } from 'react-i18next';
 import { track } from '../../../lib/analytics';
 import { Sentry } from '../../../lib/sentry';
@@ -129,6 +134,102 @@ function isChallengeRoundInFlight(
     round?.state === 'accepted' ||
     round?.state === 'active' ||
     round?.state === 'drafting'
+  );
+}
+
+interface FirstSessionWrapUpCardProps {
+  value: string;
+  isSubmitting: boolean;
+  hasError: boolean;
+  reflectionTotalXp: number | null;
+  celebrationEventId: string;
+  seenCelebrationEventIds: ReadonlySet<string>;
+  onChangeText: (value: string) => void;
+  onSubmit: () => void;
+  onMarkCelebrationSeen: (eventId: string) => void;
+}
+
+function FirstSessionWrapUpCard({
+  value,
+  isSubmitting,
+  hasError,
+  reflectionTotalXp,
+  celebrationEventId,
+  seenCelebrationEventIds,
+  onChangeText,
+  onSubmit,
+  onMarkCelebrationSeen,
+}: FirstSessionWrapUpCardProps) {
+  const { t } = useTranslation();
+  const canSubmit = value.trim().length >= 10 && !isSubmitting;
+
+  return (
+    <View
+      testID="first-session-wrap-up"
+      className="mx-4 mb-3 rounded-xl border border-border bg-surface p-4"
+    >
+      <Text className="text-xs font-semibold text-text-secondary">
+        {t('sessionSummary.yourWords')}
+      </Text>
+      <Text className="mt-1 text-sm text-text-primary">
+        {t('sessionSummary.writePrompt')}
+      </Text>
+      <TextInput
+        testID="first-session-reflection-input"
+        accessibilityLabel={t('sessionSummary.yourWords')}
+        multiline
+        value={value}
+        onChangeText={onChangeText}
+        editable={!isSubmitting}
+        className="mt-3 min-h-20 rounded-xl border border-border px-3 py-2 text-text-primary"
+      />
+      {hasError ? (
+        <Text className="mt-2 text-xs text-danger">
+          {t('sessionSummary.saveError')}
+        </Text>
+      ) : null}
+      <Pressable
+        testID="first-session-wrap-submit"
+        accessibilityRole="button"
+        accessibilityLabel={t('sessionSummary.submitSummary')}
+        disabled={!canSubmit}
+        onPress={onSubmit}
+        className={`mt-3 rounded-xl px-4 py-3 ${
+          canSubmit ? 'bg-primary' : 'bg-surface-elevated'
+        }`}
+      >
+        <Text
+          className={`text-center font-semibold ${
+            canSubmit ? 'text-text-inverse' : 'text-text-secondary'
+          }`}
+        >
+          {isSubmitting
+            ? t('common.saving')
+            : t('sessionSummary.submitSummary')}
+        </Text>
+      </Pressable>
+      {reflectionTotalXp != null ? (
+        <View testID="first-session-wrap-receipt" className="mt-3">
+          <RewardReceiptCard
+            receipt={{
+              kind: 'reflection_bonus',
+              multiplier: 1.5,
+              totalXp: reflectionTotalXp,
+            }}
+          />
+        </View>
+      ) : null}
+      {reflectionTotalXp != null ? (
+        <View testID="first-session-wrap-celebration" className="mt-3">
+          <MentorCelebration
+            eventId={celebrationEventId}
+            messageKey="mentorHome.celebration.ownChoice"
+            seenEventIds={seenCelebrationEventIds}
+            onMarkSeen={onMarkCelebrationSeen}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -412,6 +513,19 @@ function SessionScreenInner() {
   const [lowConfidenceMessageId, setLowConfidenceMessageId] = useState<
     string | null
   >(null);
+  const [firstSessionWrapUp, setFirstSessionWrapUp] = useState<{
+    sessionId: string;
+    wallClockSeconds: number;
+    fastCelebrations: PendingCelebration[];
+  } | null>(null);
+  const [firstSessionReflectionText, setFirstSessionReflectionText] =
+    useState('');
+  const [firstSessionReflectionError, setFirstSessionReflectionError] =
+    useState(false);
+  const [firstSessionReflectionTotalXp, setFirstSessionReflectionTotalXp] =
+    useState<number | null>(null);
+  const [seenFirstSessionCelebrationIds, setSeenFirstSessionCelebrationIds] =
+    useState<ReadonlySet<string>>(() => new Set<string>());
 
   const sessionNoteSavedRef = useRef(false);
   const closedSessionRef = useRef<{
@@ -432,6 +546,7 @@ function SessionScreenInner() {
     outboxEntryId?: string;
   } | null>(null);
   const challengeActionInFlightRef = useRef(false);
+  const firstSessionWrapShownRef = useRef(false);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
   const activeSession = useSession(activeSessionId ?? '');
@@ -644,6 +759,7 @@ function SessionScreenInner() {
   const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
+  const submitFirstSessionSummary = useSubmitSummary(activeSessionId ?? '');
   const { stream: streamMessage } = useStreamMessage(activeSessionId ?? '');
   const activeHomeworkProblem = homeworkProblemsState[currentProblemIndex];
   const sessionExpired =
@@ -930,6 +1046,97 @@ function SessionScreenInner() {
     normalizedOcrText,
   ]);
 
+  const shouldUseFirstSessionWrapUp = isV2MentorEntry && isFirstSession;
+  const handleFirstSessionClosed = useCallback(
+    (event: {
+      sessionId: string;
+      wallClockSeconds: number;
+      fastCelebrations: PendingCelebration[];
+    }): boolean => {
+      if (!shouldUseFirstSessionWrapUp || firstSessionWrapShownRef.current) {
+        return false;
+      }
+
+      firstSessionWrapShownRef.current = true;
+      const recapSubject = effectiveSubjectName ?? topicName ?? subjectName;
+      const recapLine = recapSubject
+        ? t('session.firstWrap.recapWithSubject', { subject: recapSubject })
+        : t('session.firstWrap.recap');
+      const mentorTurn = [
+        recapLine,
+        t('mentorHome.celebration.ownChoice'),
+        t('mentorHome.coldStart.firstSessionTeach'),
+      ].join('\n\n');
+
+      setFirstSessionWrapUp(event);
+      setFirstSessionReflectionText('');
+      setFirstSessionReflectionError(false);
+      setFirstSessionReflectionTotalXp(null);
+      setMessages((prev) =>
+        prev.some((message) => message.id === 'first-session-wrap-up-turn')
+          ? prev
+          : [
+              ...prev,
+              {
+                id: 'first-session-wrap-up-turn',
+                role: 'assistant',
+                content: mentorTurn,
+                isSystemPrompt: true,
+              },
+            ],
+      );
+      return true;
+    },
+    [
+      effectiveSubjectName,
+      shouldUseFirstSessionWrapUp,
+      subjectName,
+      t,
+      topicName,
+    ],
+  );
+
+  const handleFirstSessionCelebrationSeen = useCallback((eventId: string) => {
+    setSeenFirstSessionCelebrationIds((current) => {
+      if (current.has(eventId)) return current;
+      const next = new Set(current);
+      next.add(eventId);
+      return next;
+    });
+  }, []);
+
+  const handleFirstSessionReflectionSubmit = useCallback(async () => {
+    if (!firstSessionWrapUp || firstSessionReflectionTotalXp != null) return;
+    const content = firstSessionReflectionText.trim();
+    if (content.length < 10) return;
+
+    try {
+      setFirstSessionReflectionError(false);
+      const result = await submitFirstSessionSummary.mutateAsync({ content });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'first-session-reflection',
+          role: 'user',
+          content,
+        },
+      ]);
+      const totalXp =
+        (result.summary.baseXp ?? 0) + (result.summary.reflectionBonusXp ?? 0);
+      setFirstSessionReflectionTotalXp(totalXp > 0 ? totalXp : null);
+    } catch (err) {
+      setFirstSessionReflectionError(true);
+      Sentry.captureException(err, {
+        tags: { screen: 'session', action: 'first_session_reflection' },
+      });
+    }
+  }, [
+    firstSessionReflectionText,
+    firstSessionReflectionTotalXp,
+    firstSessionWrapUp,
+    submitFirstSessionSummary,
+  ]);
+
   const {
     handleInputModeChange,
     handleNextProblem,
@@ -981,6 +1188,7 @@ function SessionScreenInner() {
     syncHomeworkMetadata,
     fetchFastCelebrations,
     showConfirmation,
+    onSessionClosed: handleFirstSessionClosed,
     router,
     returnTo: returnTo ?? undefined,
   });
@@ -1181,6 +1389,23 @@ function SessionScreenInner() {
       />
     </View>
   ) : null;
+  const firstSessionWrapUpCard = firstSessionWrapUp ? (
+    <FirstSessionWrapUpCard
+      value={firstSessionReflectionText}
+      isSubmitting={submitFirstSessionSummary.isPending}
+      hasError={
+        firstSessionReflectionError || submitFirstSessionSummary.isError
+      }
+      reflectionTotalXp={firstSessionReflectionTotalXp}
+      celebrationEventId={`first-session-wrap-up:${firstSessionWrapUp.sessionId}`}
+      seenCelebrationEventIds={seenFirstSessionCelebrationIds}
+      onChangeText={setFirstSessionReflectionText}
+      onSubmit={() => {
+        void handleFirstSessionReflectionSubmit();
+      }}
+      onMarkCelebrationSeen={handleFirstSessionCelebrationSeen}
+    />
+  ) : null;
 
   const sessionAccessory = (
     <SessionAccessory
@@ -1252,12 +1477,15 @@ function SessionScreenInner() {
           isSubjectFlowBlockingComposer ||
           sessionExpired ||
           !!quotaError ||
+          !!firstSessionWrapUp ||
           (showFilingPrompt && !filingDismissed) ||
           // CR-6: Disable input while session close is in flight.
           isClosing
         }
         showDisabledBanner={
-          pendingClassification || !isSubjectFlowBlockingComposer
+          firstSessionWrapUp
+            ? false
+            : pendingClassification || !isSubjectFlowBlockingComposer
         }
         disabledReason={
           isOffline
@@ -1285,7 +1513,7 @@ function SessionScreenInner() {
           </>
         }
         composerAccessory={sessionToolAccessory}
-        belowInput={null}
+        belowInput={firstSessionWrapUpCard}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
         speechRecognitionLanguage={languageVoiceLocale}

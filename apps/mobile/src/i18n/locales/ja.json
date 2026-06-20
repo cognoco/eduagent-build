@@ -758,6 +758,10 @@
       "stopRecording": "録音停止"
     },
     "expiredSystemMessage": "セッションが期限切れです。新しいセッションを開始して続けてください。",
+    "firstWrap": {
+      "recap": "本物の学習のやり取りを1つ終えました。",
+      "recapWithSubject": "{{subject}}について、本物の学習のやり取りを1つ終えました。"
+    },
     "errorBoundary": {
       "crashTitle": "セッション画面がクラッシュしました",
       "unknownError": "不明なエラー",
@@ -3591,7 +3595,8 @@
       "chipHomework": "宿題を手伝って",
       "chipLearn": "新しいことを教えて",
       "chipAsk": "質問があります",
-      "homeworkReply": "カメラで問題を撮影するか、ここに入力してください。"
+      "homeworkReply": "カメラで問題を撮影するか、ここに入力してください。",
+      "firstSessionTeach": "ここに書いたことを覚えておくので、次の一歩はもっとあなたに合ったところから始められます。"
     },
     "title": "メンター",
     "subtitle": "次に役立ついくつかのステップと、質問や記録ができる場所です。",

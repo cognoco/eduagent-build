@@ -332,15 +332,14 @@ jobs:
   # the identity-v2 HTTP-route surface — which buildIntegrationEnv() never
   # sets — its first flag-on committed-migration coverage.
   #
-  # BLOCKING as of WI-817 (continue-on-error removed below). D1-D4 (WI-790/791/
-  # 792/793) and :709/FG1 defects are green, and the lane is deterministically
-  # green via `jest --forceExit` — the prior reds were a "Jest did not exit"
-  # open-handles teardown (0 test failures), not test reds.
+  # NON-BLOCKING by operator ruling (2026-06-20). This lane must keep running
+  # with IDENTITY_V2_ENABLED=true, but it is diagnostic signal and must not
+  # block unrelated PRs unless the required-check flip is explicitly re-approved.
   #
   # MAKE-REQUIRED PROCEDURE (mirrors the i18n-ratchet "advisory → required" flip):
-  #   Step 1 — Confirm defects green on this job. DONE (WI-817 diagnosis).
-  #   Step 2 — Remove `continue-on-error: true` from this job. DONE (WI-817).
-  #   Step 3 — [OPERATOR, remaining] Add "Flag-ON integration (IDENTITY_V2_ENABLED)"
+  #   Step 1 — Confirm defects green on this job.
+  #   Step 2 — Remove `continue-on-error: true` from this job.
+  #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)"
   #             to the branch-protection required-status-checks list in GitHub
   #             Settings → Branches → main → Edit → "Require status checks to
   #             pass" → search for the job name (it reports separately from
@@ -353,14 +352,12 @@ jobs:
   integration-flag-on:
     name: Flag-ON integration (IDENTITY_V2_ENABLED)
     runs-on: ubuntu-latest
-    # BLOCKING as of WI-817 — the defect WIs are green and the lane is
-    # deterministically green via `jest --forceExit` (the prior reds were a
-    # "Jest did not exit" open-handles teardown, not test failures). The
-    # remaining make-required step is operator-only: add the
-    # "Flag-ON integration (IDENTITY_V2_ENABLED)" check to branch protection.
+    # NON-BLOCKING: this is a flag-on diagnostic lane, not a merge gate.
+    # Remove this only after an explicit operator-approved required-check flip.
+    continue-on-error: true
     # WATCH (WI-789 / repoint-journaling): this lane runs the PRE-repoint
     # committed-migration schema; when the repoint migrations later journal,
-    # they MUST keep this now-required lane green (repoint-sensitive tests).
+    # they should keep this lane green (repoint-sensitive tests).
     services:
       postgres:
         image: pgvector/pgvector:pg16

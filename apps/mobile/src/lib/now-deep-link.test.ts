@@ -65,6 +65,18 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/topic/topic-1');
   });
 
+  it('pushes profile-level journal ledger moments without route params', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'journal',
+      params: {},
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/(app)/journal');
+  });
+
   it('throws before indexing a missing or unknown chain key', () => {
     const router = { push: jest.fn() };
 

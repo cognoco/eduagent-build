@@ -67,6 +67,7 @@ export const ROUTE_CATALOG = {
     params: ['subjectId', 'topicId'],
     chain: ['subject.hub'],
   },
+  journal: { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,
   { params: readonly string[]; chain: readonly NowDeepLinkRoute[] }
@@ -610,5 +611,5 @@ function resolveLedgerDeepLink(
   if (sessionId) {
     return resolveDeepLink('session.resume', { sessionId });
   }
-  return null;
+  return resolveDeepLink('journal', {});
 }

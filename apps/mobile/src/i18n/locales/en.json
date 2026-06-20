@@ -482,6 +482,10 @@
   },
   "session": {
     "expiredSystemMessage": "Session expired. Start a new one to keep going.",
+    "firstWrap": {
+      "recap": "You finished one real learning exchange.",
+      "recapWithSubject": "You finished one real learning exchange about {{subject}}."
+    },
     "challenge": {
       "offerTitle": "Up for a challenge round?",
       "tryIt": "Try it",
@@ -2733,7 +2737,8 @@
       "chipHomework": "Help me with homework",
       "chipLearn": "Teach me something new",
       "chipAsk": "I have a question",
-      "homeworkReply": "Use the camera to capture the problem, or type it here."
+      "homeworkReply": "Use the camera to capture the problem, or type it here.",
+      "firstSessionTeach": "I'll remember what you write here so the next step starts closer to you."
     }
   },
   "subjectsBrowse": {
