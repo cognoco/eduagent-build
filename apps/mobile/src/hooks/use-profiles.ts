@@ -61,7 +61,12 @@ export function useUpdateProfileName() {
       const data = (await res.json()) as { profile: Profile };
       return data.profile;
     },
-    onSuccess: () => {
+    onSuccess: (profile) => {
+      queryClient.setQueriesData<Profile[]>(
+        { queryKey: ['profiles'] },
+        (existing) =>
+          existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
+      );
       void queryClient.invalidateQueries({ queryKey: ['profiles'] });
     },
   });
@@ -93,7 +98,12 @@ export function useUpdateProfileAppContext() {
       const data = (await res.json()) as { profile: Profile };
       return data.profile;
     },
-    onSuccess: () => {
+    onSuccess: (profile) => {
+      queryClient.setQueriesData<Profile[]>(
+        { queryKey: ['profiles'] },
+        (existing) =>
+          existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
+      );
       void queryClient.invalidateQueries({ queryKey: ['profiles'] });
     },
   });

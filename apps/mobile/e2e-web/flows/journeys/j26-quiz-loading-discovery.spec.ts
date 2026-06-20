@@ -33,6 +33,8 @@ import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 const QUIZ_ROUNDS_GLOB = '**/v1/quiz/rounds**';
 const COACHING_CARD_GLOB = '**/v1/coaching-card**';
+const RESUME_TARGET_GLOB = '**/v1/progress/resume-target**';
+const REVIEW_SUMMARY_GLOB = '**/v1/progress/review-summary**';
 const MARK_SURFACED_GLOB = '**/v1/quiz/missed-items/mark-surfaced**';
 
 const TEST_UUID = '11111111-1111-4111-8111-111111111111';
@@ -71,6 +73,27 @@ async function stubQuizDiscoveryCard(
           missedItemCount: 3,
         },
         fallback: null,
+      }),
+    });
+  });
+}
+
+async function stubQuizDiscoveryPriorityBlockers(page: Page): Promise<void> {
+  await page.route(RESUME_TARGET_GLOB, async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ target: null }),
+    });
+  });
+  await page.route(REVIEW_SUMMARY_GLOB, async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        totalOverdue: 0,
+        nextReviewTopic: null,
+        nextUpcomingReviewAt: null,
       }),
     });
   });
@@ -193,6 +216,7 @@ test.describe('[QUIZ-16] quiz-discovery coaching card routing', () => {
   test('non-vocabulary (capitals) card routes to /quiz/launch and POSTs mark-surfaced with activityType', async ({
     page,
   }) => {
+    await stubQuizDiscoveryPriorityBlockers(page);
     await stubQuizDiscoveryCard(page, 'capitals');
 
     // Capture the mark-surfaced POST body, then fulfill it so the fire-and-forget
@@ -221,7 +245,13 @@ test.describe('[QUIZ-16] quiz-discovery coaching card routing', () => {
       timeout: 60_000,
     });
 
-    // The forced quiz_discovery card renders the coach band.
+    // The forced quiz_discovery card renders the coach band. Assert the title
+    // before clicking because the continue testID is shared by all coach-card
+    // branches; without this, a higher-priority resume card can mask the
+    // quiz-discovery route under test.
+    await expect(page.getByText('Try a quick capitals round')).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('home-coach-band-continue')).toBeVisible({
       timeout: 30_000,
     });
@@ -240,6 +270,7 @@ test.describe('[QUIZ-16] quiz-discovery coaching card routing', () => {
   test('vocabulary card routes to the /quiz picker (documented branch) and still POSTs mark-surfaced', async ({
     page,
   }) => {
+    await stubQuizDiscoveryPriorityBlockers(page);
     await stubQuizDiscoveryCard(page, 'vocabulary');
 
     let markSurfacedBody: { activityType?: string } | null = null;
@@ -266,6 +297,9 @@ test.describe('[QUIZ-16] quiz-discovery coaching card routing', () => {
       timeout: 60_000,
     });
 
+    await expect(page.getByText('Try a quick capitals round')).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('home-coach-band-continue')).toBeVisible({
       timeout: 30_000,
     });

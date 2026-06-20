@@ -5494,15 +5494,10 @@ async function seedMentorAuditFamilyOwnerDailyQuotaWithChild(
  *  adult library deliberately holds a *different* subject name so the bridge
  *  flow is exercising the "topic not yet in adult library" branch.
  *
- *  Caller prerequisite: the owner is created WITHOUT
- *  `defaultAppContext: 'family'` (intentionally — this seed is about the
- *  backstack contract, not about app-context defaults). Callers MUST switch
- *  the app into Family mode before deep-linking to the child surfaces,
- *  otherwise the `showLearnThisToo` navigation gate hides the
- *  Add-to-my-learning button and the bridge flow cannot be exercised. The
- *  paired probe does this via `switchAppMode(page, 'family')`; any other
- *  caller (future Chrome automation, ad-hoc Playwright) needs the equivalent
- *  step.
+ *  The owner starts in Family mode (`defaultAppContext: 'family'`) so direct
+ *  child deep-links derive their guard state from persisted profile data. The
+ *  paired Chrome probe is about bridge/backstack behavior, not whether a mode
+ *  switch can survive an immediate hard navigation.
  *
  *  Idempotency note: the account-level cleanup performed by `seedScenario`
  *  (clerk_seed_* prefix) wipes any prior adult-side copy before reseeding,
@@ -5525,6 +5520,7 @@ async function seedMentorAuditBridgeBackstack(
     isOwner: true,
     email,
     clerkUserId,
+    defaultAppContext: 'family',
   });
 
   await db.insert(consentGrant).values({
@@ -5816,7 +5812,7 @@ const SCENARIO_MAP: Record<SeedScenario, SeederFn> = {
   'mentor-audit-post-approval-redirect': seedMentorAuditPostApprovalRedirect,
   'mentor-audit-consent-us-under-threshold': makeConsentThresholdSeeder(
     'mentor-audit-consent-us-under-threshold',
-    { location: 'US', ageYears: 11 },
+    { location: 'US', ageYears: 13 },
   ),
   'mentor-audit-consent-eu-under-threshold': makeConsentThresholdSeeder(
     'mentor-audit-consent-eu-under-threshold',
