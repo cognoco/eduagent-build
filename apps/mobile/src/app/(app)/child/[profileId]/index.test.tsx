@@ -417,6 +417,30 @@ describe('ChildDetailScreen — accommodation nav row', () => {
 
     cleanup();
   });
+
+  // [WI-875] The `none` mode resolves to the "None" accommodation option, so the
+  // subtitle renders that option's title/description — the default-mode branch,
+  // distinct from the `audio-first` set-name branch above.
+  it('shows the None accommodation subtitle when the mode is none', async () => {
+    setRoutes({
+      learnerProfile: {
+        accommodationMode: 'none',
+        memoryConsentStatus: 'granted',
+        updatedAt: null,
+      },
+    });
+
+    const { result, cleanup } = renderChildDetail();
+
+    const row = await waitFor(() =>
+      result.getByTestId('child-accommodation-row-child-001'),
+    );
+    await waitFor(() => {
+      expect(row).toHaveTextContent(/None - Standard learning experience/);
+    });
+
+    cleanup();
+  });
 });
 
 describe('ChildDetailScreen — profile overview', () => {

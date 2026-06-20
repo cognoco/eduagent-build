@@ -406,6 +406,19 @@ describe('MentorMemoryScreen — accommodation badge text by age bracket', () =>
     const badge = await screen.findByTestId('accommodation-badge');
     expect(badge).toHaveTextContent(/Learning style: Audio-First/);
   });
+
+  // [WI-875] Adult bracket takes the `labels.older` branch (mentor-memory.tsx
+  // `return labels.older`), which renders the "Accommodation mode: …" copy —
+  // distinct from the adolescent "Learning style: …" copy above. Both prior
+  // tests asserted only the mid label, leaving the older branch unexercised.
+  it('shows older label for adult bracket', async () => {
+    mockActiveProfileBirthYear = new Date().getFullYear() - 30;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(/Accommodation mode: Audio-First/);
+    // Guards against the mid/older branches collapsing to the same copy.
+    expect(badge).not.toHaveTextContent(/Learning style: Audio-First/);
+  });
 });
 
 describe('MentorMemoryScreen — catch blocks use formatApiError not generic copy', () => {
