@@ -306,8 +306,10 @@ async function adultSubjectByName(
           SERVICE_OPTS,
         );
 
-        // Reused the existing subject → no ancestor subject created.
+        // Reused the existing subject → no ancestor subject created, but the
+        // clone DID create a fresh book → exercises the BOOK-delete cascade path.
         expect(clone.createdIds.subjectId).toBeUndefined();
+        expect(clone.createdIds.bookId).toBeDefined();
 
         const undo = await undoCloneFromChild(
           fixture.db,
@@ -315,6 +317,12 @@ async function adultSubjectByName(
           clone.createdIds,
         );
         expect(undo.deleted.topic).toBe(true);
+
+        // The clone-created orphan book is gone (cascade ran the book-delete path).
+        const clonedBook = await fixture.db.query.curriculumBooks.findFirst({
+          where: eq(curriculumBooks.id, clone.createdIds.bookId!),
+        });
+        expect(clonedBook).toBeUndefined();
 
         // The pre-existing subject and its own book/topic survive.
         const subject = await adultSubjectByName(
