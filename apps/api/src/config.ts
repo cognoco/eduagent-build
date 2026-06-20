@@ -285,6 +285,26 @@ export function isMaintenanceReadonly(value: string | undefined): boolean {
 }
 
 /**
+ * [BUG-875] Opt-in escape for running the maintenance *backfill* routes
+ * (memory-facts / progress-self-reports) in production. Those routes trigger
+ * full-table scans + at-scale Inngest event re-emission, so the
+ * MAINTENANCE_SECRET alone is not enough: Doppler pushes that secret to every
+ * environment, so a leaked or shared secret would otherwise let anyone fire a
+ * prod backfill (LLM token burn, queue flood, possible data corruption).
+ *
+ * The backfill routes fail-closed on production unless this flag is the literal
+ * string 'true'. Default-closed by typed-config equality, NOT JS truthiness —
+ * the string 'false' is truthy and would silently re-open the routes. Only
+ * '=== true' opts in; everything else (incl. 'false' and undefined) stays
+ * closed. development/staging are unaffected by this flag.
+ */
+export function isMaintenanceProductionEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
  * Stage-2 convergence gate. When 'true' (set only after the Inngest drain
  * reads zero), the maintenance middleware also 503s `/v1/inngest`, hard-blocking
  * any stray late delivery mid-reseed. Default-closed. Only meaningful while
