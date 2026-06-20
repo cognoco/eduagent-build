@@ -200,9 +200,8 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     it('resetDatabase tears down a WITHDRAWN consent request linked to a grant without FK violation', async () => {
-      const { accountId, prefix, clerkUserId } = await seedLinkedConsent({
-        withdrawn: true,
-      });
+      const { accountId, profileId, prefix, clerkUserId } =
+        await seedLinkedConsent({ withdrawn: true });
 
       const result = await resetDatabase(
         db,
@@ -219,9 +218,19 @@ const RUN = !!process.env.DATABASE_URL;
         .select({ id: consentRequest.id })
         .from(consentRequest)
         .where(eq(consentRequest.organizationId, accountId));
+      const personAfter = await db
+        .select({ id: person.id })
+        .from(person)
+        .where(eq(person.id, profileId));
+      const orgAfter = await db
+        .select({ id: organization.id })
+        .from(organization)
+        .where(eq(organization.id, accountId));
 
       expect(grantsAfter).toEqual([]);
       expect(requestsAfter).toEqual([]);
+      expect(personAfter).toEqual([]);
+      expect(orgAfter).toEqual([]);
     });
   },
 );
