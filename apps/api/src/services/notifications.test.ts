@@ -781,6 +781,66 @@ describe('sendEmail structured logging', () => {
       errorSpy.mockRestore();
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Bounce-suppression skip on the send path. The Resend webhook persists a
+  // permanently-dead address; sendEmail must SKIP it when a DB handle is given
+  // so we stop burning quota re-sending to dead addresses.
+  // -------------------------------------------------------------------------
+
+  /** Fake DB whose suppression lookup returns `suppressed` rows or none. */
+  function makeSuppressionLookupDb(suppressed: boolean): Database {
+    return {
+      select: (_cols: unknown) => ({
+        from: (_table: unknown) => ({
+          where: (_p: unknown) => ({
+            limit: async (_n: number) =>
+              suppressed ? [{ email: 'parent@example.com' }] : [],
+          }),
+        }),
+      }),
+    } as unknown as Database;
+  }
+
+  it('skips the send when the recipient is suppressed', async () => {
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+      db: makeSuppressionLookupDb(true),
+    });
+
+    expect(result).toEqual({ sent: false, reason: 'suppressed' });
+    // CRITICAL: the Resend API must never be called for a dead address.
+    expect(mockFetchFn).not.toHaveBeenCalled();
+  });
+
+  it('sends normally when the recipient is NOT suppressed', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-ok' }),
+    });
+
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+      db: makeSuppressionLookupDb(false),
+    });
+
+    expect(result).toEqual({ sent: true, messageId: 'msg-ok' });
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends normally when no DB is supplied (suppression check is opt-in)', async () => {
+    mockFetchFn.mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'msg-nodb' }),
+    });
+
+    const result = await sendEmail(emailPayload, {
+      resendApiKey: 're_test_key',
+    });
+
+    expect(result).toEqual({ sent: true, messageId: 'msg-nodb' });
+    expect(mockFetchFn).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------

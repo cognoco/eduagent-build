@@ -9,14 +9,33 @@
 
 import { z } from 'zod';
 
+// Resend's `email.bounced` payload carries a `bounce` sub-object whose `type`
+// distinguishes a HARD bounce (`Permanent`) from a SOFT/transient one
+// (`Transient` / `Undetermined`). Only hard bounces are permanently dead and
+// warrant suppression; transient ones may accept mail again later.
+// https://resend.com/docs/dashboard/webhooks/event-types
+export const resendBounceSchema = z
+  .object({
+    type: z.string().optional(),
+    subType: z.string().optional(),
+    message: z.string().optional(),
+  })
+  .passthrough();
+
 export const resendEmailEventDataSchema = z
   .object({
     email_id: z.string().optional(),
     from: z.string().optional(),
     to: z.string().optional(),
     subject: z.string().optional(),
+    bounce: resendBounceSchema.optional(),
   })
   .passthrough();
+
+/** True only for HARD (permanent) bounces — the suppression trigger. */
+export function isHardBounce(data: ResendEmailEventData): boolean {
+  return data.bounce?.type?.toLowerCase() === 'permanent';
+}
 
 export const resendWebhookPayloadSchema = z
   .object({

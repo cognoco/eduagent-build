@@ -23,5 +23,6 @@ export * from './nudges';
 export * from './notifications';
 export * from './practice-activity';
 export * from './webhook-idempotency';
+export * from './email-suppressions';
 export * from './challenge-round-cooldowns';
 export * from './concept-mastery';
