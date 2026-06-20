@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -117,13 +117,11 @@ jest.mock(
   }),
 );
 
-// BackHandler — stub
-jest.mock(
-  'react-native/Libraries/Utilities/BackHandler',
-  /* gc1-allow: native-boundary: BackHandler is a platform-specific native module not available in JSDOM */ () => ({
-    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-  }),
-);
+// BackHandler — spy-based capture so we can simulate hardware-back in tests.
+// We use jest.spyOn in beforeEach (after RN is loaded) rather than a
+// jest.mock factory so we can capture the registered listener into a local
+// variable that the test can call.
+// gc1-allow: native-boundary: BackHandler is a platform-specific native module not available in JSDOM
 
 const PlaybackScreen = require('./playback').default as React.ComponentType;
 
@@ -132,8 +130,25 @@ const PlaybackScreen = require('./playback').default as React.ComponentType;
 // ---------------------------------------------------------------------------
 
 describe('PlaybackScreen', () => {
+  let capturedBackHandler: (() => boolean) | null = null;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedBackHandler = null;
+
+    // Spy on BackHandler.addEventListener to capture the registered callback.
+    // This runs after RN is loaded so the spy targets the actual exported
+    // object rather than relying on a module factory that runs pre-load.
+    const { BackHandler } = jest.requireActual(
+      'react-native',
+    ) as typeof import('react-native');
+    jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_eventType, handler) => {
+        capturedBackHandler = handler as () => boolean;
+        return { remove: jest.fn() };
+      });
+
     mockPlaybackState = 'idle';
     mockDictationData = {
       completionKey: '00000000-0000-4000-8000-000000000001',
@@ -200,6 +215,29 @@ describe('PlaybackScreen', () => {
     fireEvent.press(getByTestId('playback-exit'));
     fireEvent.press(getByTestId('dictation-exit-confirm'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('[DICT-05] hardware-back opens the exit-confirmation modal', () => {
+    // The playback screen registers a BackHandler listener; simulating a
+    // hardware-back press must open the in-app exit-confirm modal (not
+    // navigate away directly) so the user can choose to confirm or cancel.
+    const { getByTestId, queryByTestId } = render(<PlaybackScreen />);
+
+    // Modal must not be visible before the back press
+    expect(queryByTestId('dictation-exit-modal-backdrop')).toBeNull();
+
+    // Simulate hardware-back press via the handler registered on mount
+    expect(capturedBackHandler).not.toBeNull();
+    act(() => {
+      capturedBackHandler!();
+    });
+
+    // Modal must now be visible with confirm and cancel buttons
+    getByTestId('dictation-exit-modal-backdrop');
+    getByTestId('dictation-exit-confirm');
+    getByTestId('dictation-exit-cancel');
+    // Navigating away must NOT have happened yet (user hasn't confirmed)
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('pressing cancel does NOT navigate away (stays in session)', () => {

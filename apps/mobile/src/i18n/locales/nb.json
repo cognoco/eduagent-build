@@ -71,7 +71,11 @@
     "profileNotFound": "Vi hadde problemer med å laste profilen din. Logg ut og inn igjen.",
     "alreadyCompleted": "Du har allerede fullført dette. Gå tilbake og velg noe nytt.",
     "validationFailed": "Noe så ikke riktig ut. Sjekk det du skrev inn og prøv igjen.",
-    "timedOut": "Det svaret tok for lang tid. Trykk på koble til på nytt for å prøve igjen."
+    "timedOut": "Det svaret tok for lang tid. Trykk på koble til på nytt for å prøve igjen.",
+    "emailNotVerified": "Bekreft e-postadressen din, og prøv deretter igjen.",
+    "quotaExceeded": "Kvoten er overskredet",
+    "resourceNotFound": "Ressurs ikke funnet",
+    "conflictState": "Forespørselen er i konflikt med gjeldende tilstand"
   },
   "errorBoundary": {
     "title": "Noe gikk galt",
@@ -137,7 +141,43 @@
       "unsupportedSsoHint": "Hvis denne kontoen også bruker Google- eller Apple-innlogging, prøv det ovenfor. Hvis det ikke fungerer, kontakt kundestøtte.",
       "unsupportedContactHint": "Kontakt kundestøtte, så hjelper vi deg med å logge inn. Nevn: {{methods}}.",
       "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>",
-      "offerBody": "Denne kontoen kan fortsette med en bekreftelseskode sendt til <id>{{identifier}}</id>. Vi sender bare koden hvis du velger å fortsette."
+      "offerBody": "Denne kontoen kan fortsette med en bekreftelseskode sendt til <id>{{identifier}}</id>. Vi sender bare koden hvis du velger å fortsette.",
+      "strategyWebauthn": "en sikkerhetsnøkkel eller passnøkkel",
+      "strategyTotp": "en autentiseringsapp",
+      "strategyPhoneCode": "en telefonbekreftelseskode",
+      "strategyEmailCode": "en e-postbekreftelseskode",
+      "unsupportedMethodGeneric": "Denne kontoen trenger en ekstra bekreftelsesmetode som ikke er tilgjengelig på mobil ennå.",
+      "unsupportedMethodSingle": "Denne kontoen krever {{method}} som ikke er tilgjengelig på mobil ennå.",
+      "unsupportedMethodMultiple": "Denne kontoen krever {{methods}} eller {{last}} som ikke er tilgjengelig på mobil ennå.",
+      "transitionTimeout": "Innloggingen tar lengre tid enn forventet. Prøv å logge inn på nytt.",
+      "sessionRevoked": "Økten din ble logget ut fra en annen enhet. Logg inn igjen for å fortsette.",
+      "sessionExpired": "Økten din er utløpt. Logg inn igjen for å fortsette å lære.",
+      "needsNewPassword": "Passordet ditt må oppdateres før du kan logge inn. Bruk Glemt passord? for å tilbakestille det.",
+      "signInNotCompleted": "Innloggingen kunne ikke fullføres. Prøv igjen.",
+      "contactSupportEmailError": "Vi kunne ikke åpne e-postappen din. Kontakt support@mentomate.app og nevn {{methods}}.",
+      "noSessionCreated": "Ingen økt ble opprettet. Prøv igjen.",
+      "authNotLoaded": "Autentisering ikke lastet. Prøv igjen.",
+      "activationFailed": "Kunne ikke aktivere økten din. Prøv igjen.",
+      "ssoSignUpIncomplete": "Registrering via {{provider}} trenger mer informasjon. Registrer deg med e-post i stedet.",
+      "authNotReady": "Autentisering ikke klar. Last inn på nytt og prøv igjen.",
+      "stuckTitle": "Logger deg fortsatt inn",
+      "stuckMessage": "Dette tar lengre tid enn forventet. Prøv igjen.",
+      "signUpLabel": "Registrer deg",
+      "enterBackupCodePlaceholder": "Skriv inn reservekode",
+      "enterSixDigitCodePlaceholder": "Skriv inn 6-sifret kode",
+      "verifyButton": "Bekreft",
+      "resendCode": "Send kode på nytt",
+      "backToSignIn": "Tilbake til innlogging",
+      "contactSupport": "Kontakt brukerstøtte",
+      "cancelSignIn": "Avbryt innlogging",
+      "continueWithGoogle": "Fortsett med Google",
+      "continueWithApple": "Fortsett med Apple",
+      "continueWithOpenAI": "Fortsett med OpenAI",
+      "emailPlaceholder": "du@eksempel.com",
+      "passwordPlaceholder": "Skriv inn passordet ditt",
+      "forgotPassword": "Glemt passord?",
+      "signInButton": "Logg inn",
+      "sendVerificationCode": "Send bekreftelseskode"
     },
     "signUp": {
       "title": "Opprett konto",
@@ -150,7 +190,19 @@
       "verifyEmailTitle": "Bekreft e-posten din",
       "verificationCodeLabel": "Bekreftelseskode",
       "agreeToTerms": "Ved å registrere deg godtar du våre <terms>vilkår for bruk</terms> og <privacy>personvernerklæring</privacy>.",
-      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>"
+      "sentCodeTo": "Vi sendte en bekreftelseskode til <email>{{email}}</email>",
+      "noSessionCreated": "Ingen økt ble opprettet. Prøv igjen.",
+      "activationFailed": "Kunne ikke aktivere økten din. Prøv igjen.",
+      "authNotReady": "Autentisering ikke klar. Last inn på nytt og prøv igjen.",
+      "ssoMissingFields": "Registrering trenger mer informasjon: {{fields}}. Registrer deg med e-post i stedet.",
+      "ssoSignUpIncomplete": "Registrering via {{provider}} trenger mer informasjon. Registrer deg med e-post i stedet.",
+      "signUpNotCompleted": "Registreringen kunne ikke fullføres. Prøv igjen.",
+      "verificationNotCompleted": "Bekreftelsen kunne ikke fullføres. Prøv igjen.",
+      "codePlaceholder": "Skriv inn 6-sifret kode",
+      "verifyButton": "Bekreft",
+      "resendCode": "Send kode på nytt",
+      "useDifferentEmail": "Bruk en annen e-post",
+      "backToSignIn": "Tilbake til innlogging"
     },
     "forgotPassword": {
       "title": "Glemt passord?",
@@ -159,7 +211,20 @@
       "resetPasswordTitle": "Tilbakestill passord",
       "resetCodeLabel": "Tilbakestillingskode",
       "newPasswordLabel": "Nytt passord",
-      "enterCodeAndPassword": "Skriv inn koden som ble sendt til <email>{{email}}</email> og ditt nye passord"
+      "enterCodeAndPassword": "Skriv inn koden som ble sendt til <email>{{email}}</email> og ditt nye passord",
+      "timeoutMessage": "Vi kunne ikke nå tilbakestillingstjenesten i tide. Sjekk tilkoblingen din og prøv igjen.",
+      "resetSuccessActivationError": "Passordet ditt ble tilbakestilt, men vi kunne ikke logge deg inn automatisk.",
+      "resetNotCompleted": "Tilbakestilling av passord kunne ikke fullføres. Prøv igjen.",
+      "retryActivationFailed": "Kan fortsatt ikke logge deg inn. Bruk lenken nedenfor for å logge inn med det nye passordet ditt.",
+      "signInWithNewPassword": "Logg inn med det nye passordet ditt",
+      "codePlaceholder": "Skriv inn 6-sifret kode",
+      "newPasswordPlaceholder": "Skriv inn nytt passord",
+      "resetPasswordButton": "Tilbakestill passord",
+      "resendCode": "Send kode på nytt",
+      "useDifferentEmail": "Bruk en annen e-post",
+      "backToSignIn": "Tilbake til innlogging",
+      "emailPlaceholder": "du@eksempel.com",
+      "sendResetCode": "Send tilbakestillingskode"
     }
   },
   "guards": {
@@ -220,7 +285,17 @@
       "subjectsLoadError": "Vi kunne ikke laste inn fagene dine akkurat nå",
       "subjectsLoadErrorHint": "Du kan fortsatt starte en økt eller prøve en annen handling.",
       "a11yOpenMyNotes": "Åpne mine notater",
-      "a11yRetrySubjects": "Prøv å laste inn emner på nytt"
+      "a11yRetrySubjects": "Prøv å laste inn emner på nytt",
+      "subjectHintPreparing": "Klargjør {{name}} ...",
+      "subjectHintOpen": "Åpne",
+      "subjectHintContinueTopic": "Fortsett {{topic}}",
+      "subjectHintContinueSubject": "Fortsett {{name}}",
+      "subjectHintQuiz": "Quiz: {{topic}}",
+      "subjectHintPractice": "Øv: {{name}}",
+      "coachBandResumeSession": "Fortsett der du slapp i {{name}}.",
+      "coachBandResumeSessionNoName": "Fortsett der du slapp i økten din.",
+      "coachBandResumeTarget": "Fortsett der du slapp i {{name}}.",
+      "coachBandRevisitTopic": "Gå tilbake til {{topic}} – det begynner å bli glemt."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -314,14 +389,19 @@
       "addLearner": {
         "title": "Legg til elev",
         "accessibilityLabel": "Legg til en elev i familien din"
-      }
+      },
+      "childProfileLabel": "{{name}}s profil",
+      "greetingFallbackName": "der"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Avvis anbefaling",
-      "a11yLoadingCard": "Laster mentorkort"
+      "a11yLoadingCard": "Laster mentorkort",
+      "thisMorning": "I MORGES",
+      "thisAfternoon": "I ETTERMIDDAG",
+      "tonight": "I KVELD"
     },
     "earlyAdopter": {
       "badge": "Tidlig bruker – din tilbakemelding former MentoMate",
@@ -329,6 +409,10 @@
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} emner"
+    },
+    "intentCard": {
+      "titleWithBadge": "{{title}}, {{count}} elementer",
+      "opensActivityHint": "Åpner denne aktiviteten"
     }
   },
   "family": {
@@ -393,7 +477,14 @@
       "weeklyEmailDigestTitle": "Ukentlig fremdrifts-e-post",
       "monthlyEmailDigestTitle": "Månedlig fremdrifts-e-post",
       "emailDigestDescription": "Sendes til e-postadressen på kontoen din.",
-      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger"
+      "updateErrorTitle": "Kunne ikke oppdatere varslingsinnstillinger",
+      "pushMissingPermission": "Tillat varsler fra enheten din.",
+      "pushMissingServer": "Slå på push-varsler her.",
+      "pushMissingToken": "Registrer denne enheten for push-varsler.",
+      "openSettingsTitle": "Åpne innstillinger",
+      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene.",
+      "loadErrorTitle": "Vi kunne ikke laste inn varslingsinnstillingene dine",
+      "loadErrorMessage": "Prøv igjen. Innstillingene dine er ikke endret."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -753,6 +844,10 @@
       "stopRecording": "Stopp opptak"
     },
     "expiredSystemMessage": "Økten er utløpt. Start en ny for å fortsette.",
+    "firstWrap": {
+      "recap": "Du fullførte én ekte læringsutveksling.",
+      "recapWithSubject": "Du fullførte én ekte læringsutveksling om {{subject}}."
+    },
     "errorBoundary": {
       "crashTitle": "Øktskjermen krasjet",
       "unknownError": "Ukjent feil",
@@ -762,7 +857,12 @@
       "wrapping": "Avslutter ...",
       "exit": "Avslutt",
       "retryClassification": "Prøv klassifisering på nytt",
-      "skipWarmup": "Hopp over oppvarmingen, sett i gang"
+      "skipWarmup": "Hopp over oppvarmingen, sett i gang",
+      "a11yWrapping": "Avslutter",
+      "a11yDone": "Jeg er ferdig",
+      "subtitleClassifying": "Finner ut hva dette handler om ...",
+      "subtitleExpired": "Økten er utløpt – start en ny.",
+      "subtitleUnreachable": "Serveren er utilgjengelig – meldinger kan mislykkes"
     },
     "inputModeToggle": {
       "text": "Tekst",
@@ -813,7 +913,8 @@
       "progressLabel_one": "Bokfremdrift: {{count}} side",
       "progressLabel_other": "Bokfremdrift: {{count}} sider",
       "pageCount_one": "{{count}} side",
-      "pageCount_other": "{{count}} sider"
+      "pageCount_other": "{{count}} sider",
+      "a11yComplete": "Boken din er klar – trykk for å fortsette"
     },
     "quickChips": {
       "hintLabel": "Hint",
@@ -847,6 +948,38 @@
       "helpful": "Holder dette tempoet.",
       "notHelpful": "Justerer forklaringen.",
       "incorrect": "Jeg retter det."
+    },
+    "disabledReason": {
+      "offline": "Du er frakoblet – inndata vil returnere når du kobler til igjen",
+      "expired": "Denne økten er avsluttet",
+      "quotaReached": "Øktgrensen din er nådd",
+      "chooseSave": "Velg hvor du vil lagre denne økten"
+    },
+    "imageAttach": {
+      "timeout": "Bildet ditt tok for lang tid å laste, så jeg starter kun med teksten. Hvis noe ser rart ut, trykk på kameraet igjen for å prøve på nytt.",
+      "failed": "Jeg kunne ikke åpne bildet ditt, så jeg starter kun med teksten. Hvis noe ser rart ut, trykk på kameraet igjen for å prøve på nytt."
+    },
+    "tellMentor": {
+      "parent": {
+        "title": "Fortell veilederen",
+        "description": "Legg til noe viktig som veilederen bør huske om dette barnet.",
+        "descriptionWithName": "Legg til noe viktig som veilederen bør huske om {{childName}}.",
+        "placeholder": "De lærer best med korte eksempler og sliter fortsatt med brøk."
+      },
+      "adult": {
+        "title": "Legg til et notat til veilederen din",
+        "description": "Legg til noe du vil at veilederen din skal huske til fremtidige økter.",
+        "placeholder": "Eksempler hjelper meg virkelig med å forstå brøk."
+      },
+      "teen": {
+        "title": "Fortell veilederen din noe",
+        "description": "Legg til hva som hjelper deg med å lære, hva du liker, eller hva som fortsatt føles vanskelig.",
+        "placeholder": "Eksempler hjelper meg virkelig med å forstå brøk."
+      }
+    },
+    "voiceToggle": {
+      "a11yMute": "Demp AI-stemme",
+      "a11yUnmute": "Slå på AI-stemme"
     }
   },
   "quiz": {
@@ -996,7 +1129,15 @@
       "youSaid": "Du sa: {{answer}}",
       "youSkipped": "Du hoppet over dette spørsmålet",
       "noAnswer": "Du svarte ikke",
-      "playAgain": "Spill igjen"
+      "playAgain": "Spill igjen",
+      "tierPerfectTitle": "Perfekt runde!",
+      "tierGreatTitle": "Flott runde!",
+      "tierNiceTitle": "God innsats!",
+      "questionFallback": "Spørsmål",
+      "a11yYouSaid": "Du sa {{answer}}",
+      "a11yYouSkipped": "Du hoppet over dette spørsmålet",
+      "a11yNoAnswer": "Du svarte ikke",
+      "a11yCorrectAnswer": "Riktig svar {{answer}}"
     },
     "guessWhoQuestion": {
       "typeAName": "Skriv et navn",
@@ -1008,7 +1149,11 @@
       "iDontKnow": "Jeg vet ikke",
       "iDontKnowLabel": "Jeg vet ikke svaret",
       "clue": "Hint {{number}}",
-      "fallbackPrompt": "Trenger du et alternativ? Velg ett:"
+      "fallbackPrompt": "Trenger du et alternativ? Velg ett:",
+      "hintWithMCAvailableWrong": "Ikke helt. Her er et nytt hint, og flervalg er nå tilgjengelig.",
+      "hintWithMCAvailable": "Her er et nytt hint. Flervalg er også tilgjengelig nå.",
+      "hintWrong": "Ikke helt. Her er et nytt hint.",
+      "hint": "Her er et nytt hint."
     }
   },
   "dictation": {
@@ -1209,7 +1354,8 @@
       "suggestionAdd": "Legg til i hyllen",
       "levelSubject": "Fag",
       "levelBook": "Bok",
-      "levelTopic": "Emne"
+      "levelTopic": "Emne",
+      "loadErrorFallback": "Kunne ikke laste denne hyllen. Prøv igjen."
     },
     "noteMenu": {
       "title": "Notatalternativer",
@@ -1271,7 +1417,11 @@
       "mastered": "Mestret",
       "strongReviewProgress": "{{strong}}/{{total}} sterke repetisjoner",
       "notesSavedCount_one": "{{count}} notat lagret for dette emnet",
-      "notesSavedCount_other": "{{count}} notater lagret for dette emnet"
+      "notesSavedCount_other": "{{count}} notater lagret for dette emnet",
+      "minTotalSuffix": " · {{minutes}} min totalt",
+      "bookmarkFromChat": "Fra chat · {{date}}",
+      "a11yAddNote": "Legg til et notat",
+      "a11yAddFirstNote": "Legg til ditt første notat for dette emnet"
     },
     "book": {
       "readyToOpen": "Klar til å åpne",
@@ -1339,7 +1489,15 @@
       "a11yBookComplete": "{{title}} fullført. {{topics}} emner studert.",
       "genericTitle": "Bok",
       "a11ySectionCollapse": "{{label}}. {{summary}}. Skjul seksjon.",
-      "a11ySectionExpand": "{{label}}. {{summary}}. Utvid seksjon."
+      "a11ySectionExpand": "{{label}}. {{summary}}. Utvid seksjon.",
+      "notesEmptySummary": "Legg til ditt første notat for denne boken",
+      "moveOnlyBookAlert": "Dette er den eneste boken på denne hyllen – det er ingen steder å flytte dette emnet.",
+      "topicFallback": "Emne",
+      "loadErrorFallback": "Kunne ikke laste denne boken.",
+      "a11yAddFirstNote": "Legg til ditt første notat for denne boken",
+      "a11yAddNote": "Legg til et notat",
+      "a11yCollapseSessions": "Skjul tidligere samtaler",
+      "a11yExpandSessions": "Vis tidligere samtaler"
     },
     "inactiveFallbackBanner": {
       "message": "Kunne ikke laste inn de pausede og arkiverte emnene dine. Trykk for å prøve igjen – de er ikke borte."
@@ -1353,7 +1511,76 @@
     "a11yClearSearch": "Tøm søk",
     "a11yEditNote": "Rediger notat",
     "a11yDeleteNote": "Slett notat",
-    "a11yCloseTopicPicker": "Lukk emnevelger"
+    "a11yCloseTopicPicker": "Lukk emnevelger",
+    "myNotes": {
+      "subtitleBookmarks_one": "1 lagret svar",
+      "subtitleBookmarks_other": "{{count}} lagrede svar",
+      "subtitleNotes_one": "1 notat",
+      "subtitleNotes_other": "{{count}} notater",
+      "subtitleSessions_one": "1 økt",
+      "subtitleSessions_other": "{{count}} økter",
+      "searchA11y": "Søk i {{kind}}"
+    },
+    "pickBook": {
+      "loadingFinding": "Finner nye bøker til deg ...",
+      "loadingPicking": "Velger bøker å foreslå ...",
+      "loadingAlmost": "Nesten der ...",
+      "emptyCooldown": "Vi prøvde nettopp å laste inn nye forslag, men de er ikke klare ennå. Prøv igjen om noen minutter, eller skriv inn en bok eller et emne for å legge til.",
+      "emptyNetworkError": "Vi kunne ikke laste inn forslag akkurat nå. Prøv igjen, eller skriv inn en bok eller et emne for å legge til.",
+      "emptyParse": "Forslagene kom ikke tydelig frem. Prøv igjen, eller skriv inn en bok eller et emne for å legge til.",
+      "emptyLockLoser": "En annen forespørsel laster allerede inn forslag. Prøv igjen om et øyeblikk.",
+      "emptyLanguageSubject": "Dette faget bruker en annen læringsflyt. Skriv inn boken eller emnet du vil studere.",
+      "emptyAllFiltered": "Vi har brukt opp de åpenbare forslagene for dette faget. Skriv inn neste bok eller emne du vil legge til.",
+      "emptyDefault": "Ingen forslag ennå. Skriv inn en bok eller et emne du vil legge til."
+    },
+    "relearn": {
+      "thisTopicFallback": "dette emnet",
+      "addedFromChildNamed": "Lagt til fra {{name}}s læring.",
+      "addedFromChild": "Lagt til fra et barns læring."
+    },
+    "collapsibleChapter": {
+      "a11yHeader": "{{title}}, {{notStarted}} av {{total}} emner ikke påbegynt"
+    },
+    "inlineNote": {
+      "a11yCollapse": "Notat for {{topic}}. {{source}}. Trykk for å skjule.",
+      "a11yExpand": "Notat for {{topic}}. {{source}}. Trykk for å vise.",
+      "a11yOpenSource": "Åpne kildeøkt for {{topic}}",
+      "a11yNoteOptions": "Notatalternativer for {{topic}}"
+    },
+    "noteInput": {
+      "placeholder": "Skriv notatet ditt ..."
+    },
+    "retentionPill": {
+      "a11y": "Hukommelsessjekk: {{label}}",
+      "a11yWithElapsed": "Hukommelsessjekk: {{label}}, {{elapsed}}"
+    },
+    "sessionRow": {
+      "a11y": "{{title}}, {{date}}",
+      "a11yWithNote": "{{title}}, har notat, {{date}}"
+    },
+    "topicStatusRow": {
+      "stateContinueNow": "Fortsett nå",
+      "stateStarted": "Påbegynt",
+      "stateUpNext": "Neste",
+      "stateDone": "Ferdig",
+      "stateLater": "Senere",
+      "a11y": "{{state}}: {{title}}",
+      "a11yWithSubtitle": "{{state}}: {{title}}, {{subtitle}}"
+    },
+    "topicPicker": {
+      "a11yTopicWithChapter": "{{name}}, {{chapter}}"
+    },
+    "topicSessionRow": {
+      "a11y": "{{type}}, {{date}}, {{duration}}"
+    },
+    "bookCard": {
+      "a11y": "{{title}}. {{status}}. {{progress}}."
+    },
+    "searchResult": {
+      "a11y": "{{title}}, {{subtitle}}"
+    },
+    "topicPickerEmptyTitle": "Ingen emner ennå",
+    "topicPickerEmptyDescription": "Denne boken har ingen emner å velge mellom ennå."
   },
   "topic": {
     "relevance": {
@@ -2027,7 +2254,32 @@
     },
     "subjectRow": {
       "hideTopics": "▴ Skjul temaer",
-      "seeTopics": "▾ Se temaer"
+      "seeTopics": "▾ Se temaer",
+      "masteredCount": "{{count}} mestret",
+      "actionContinue": "Fortsett",
+      "actionExplore": "Utforsk",
+      "a11yHintHide": "Trykk for å skjule emner",
+      "a11yHintShow": "Trykk for å vise emner",
+      "a11yOpen": "Åpne fremdrift for {{name}}",
+      "a11yExpanded": "{{name}}, utvidet",
+      "a11yCollapsed": "{{name}}, skjult"
+    },
+    "topicStatus": {
+      "notStarted": "Ikke påbegynt",
+      "mastered": "Mestret",
+      "needsReview": "Trenger repetisjon",
+      "started": "Påbegynt",
+      "covered": "Gjennomgått"
+    },
+    "milestoneCard": {
+      "streakLength": "{{count}}-dagers streak",
+      "subjectMastered": "Mestret {{subject}}",
+      "subjectMasteredFallback": "Mestret et fag",
+      "bookCompleted": "Fullført en bok",
+      "cefrLevelUp": "Språknivå økt",
+      "topicsExplored": "Utforsket {{count}} emner i {{subject}}",
+      "topicsExploredFallback": "Utforsket {{count}} emner i et fag",
+      "unknown": "Milepæl nådd"
     }
   },
   "onboarding": {
@@ -2089,12 +2341,41 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Det første emnet ditt er klart",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
     "stepIndicator": {
       "stepOf": "Steg {{current}} av {{total}}"
+    },
+    "mentorBirth": {
+      "ready": "Veilederen din er klar."
+    },
+    "saveWizard": {
+      "startLesson": "Start leksjon",
+      "openParentHome": "Åpne foreldreside",
+      "switchProfileError": "Kunne ikke bytte profil.",
+      "firstLessonReady": "Din første leksjon er klar.",
+      "firstLessonReadyWithTopic": "Din første leksjon er klar: {{topic}}."
+    },
+    "consent": {
+      "profileNotOwnedError": "Denne profilen tilhører ikke kontoen din."
+    },
+    "createProfile": {
+      "timeoutError": "Oppretting av profilen din tar for lang tid. Sjekk tilkoblingen din og prøv igjen.",
+      "displayNameTooLong": "Visningsnavn kan ikke være lengre enn 50 tegn.",
+      "childNamePlaceholder": "Skriv inn barnets navn",
+      "namePlaceholder": "Skriv inn navn",
+      "childBirthDateAccessLabel": "Barnets fødselsdato",
+      "birthDateAccessLabel": "Fødselsdato",
+      "selectChildBirthDateLabel": "Velg barnets fødselsdato",
+      "selectBirthDateLabel": "Velg fødselsdato",
+      "addChildButton": "Legg til barn"
+    },
+    "profiles": {
+      "roleParent": "Forelder",
+      "roleLearner": "Elev"
     }
   },
   "parentView": {
@@ -2265,7 +2546,17 @@
       "sessionSummary": "Øktsammendrag",
       "noSummaryBody": "Ingen sammendrag ble generert for denne økten",
       "openTopicWithTitle": "Åpne {{title}}",
-      "backToChildProfile": "Tilbake til barneprofil"
+      "backToChildProfile": "Tilbake til barneprofil",
+      "engagementChip": {
+        "accessibilityLabel": "Engasjement: {{label}}",
+        "labels": {
+          "curious": "Nysgjerrig",
+          "stuck": "Jobber med det",
+          "breezing": "Går lett",
+          "focused": "Fokusert",
+          "scattered": "Finner fokus"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Emne ikke funnet",
@@ -2502,7 +2793,13 @@
     "children": "Familie",
     "childrenLabel": "Familie",
     "recaps": "Sammendrag",
-    "recapsLabel": "Sammendrag"
+    "recapsLabel": "Sammendrag",
+    "mentor": "Veileder",
+    "mentorLabel": "Veileder",
+    "subjects": "Fag",
+    "subjectsLabel": "Fag",
+    "journal": "Journal",
+    "journalLabel": "Journal"
   },
   "subscription": {
     "trial": {
@@ -2628,7 +2925,10 @@
       "quotaResets": "Kvoten nullstilles {{date}}",
       "renews": "Abonnementet fornyes {{date}}",
       "dailyLimitHint": "Daglig grense – nullstilles ved midnatt"
-    }
+    },
+    "accessUntil": "Tilgang til {{date}}",
+    "renewsOn": "Fornyes {{date}}",
+    "memberOwnerLabel": "{{name}} (eier)"
   },
   "sessionSummary": {
     "mentorMemoryCue": {
@@ -2733,7 +3033,9 @@
       "duration_other": "{{count}} minutter – flott økt!",
       "exchanges_one": "Du jobbet deg gjennom {{count}} utveksling",
       "exchanges_other": "Du jobbet deg gjennom {{count}} utvekslinger"
-    }
+    },
+    "a11yContinueLearning": "Fortsett å lære",
+    "a11yContinueToHome": "Fortsett til hjem"
   },
   "sessionTranscript": {
     "archived": {
@@ -3065,7 +3367,9 @@
     "signingOutAll": "Logger ut andre enheter ...",
     "signOutAllTitle": "Logge ut alle andre enheter?",
     "signOutAllConfirm": "Dette vil avslutte {{count}} andre økt(er). Denne enheten forblir pålogget.",
-    "signOutAllConfirmButton": "Logg ut alle"
+    "signOutAllConfirmButton": "Logg ut alle",
+    "emptyBackLabel": "Tilbake til kontoinnstillinger",
+    "emptyBackButton": "Tilbake til konto"
   },
   "changePassword": {
     "errorCurrentRequired": "Skriv inn ditt nåværende passord",
@@ -3256,6 +3560,12 @@
       "crossContextPromptMessage": "Du er i en økt. Fullfør denne først, eller åpne oppdateringen og forlat det du holder på med.",
       "stayHere": "Bli her",
       "openUpdate": "Åpne oppdatering"
+    },
+    "guardianPrimer": {
+      "title": "Holde deg oppdatert?",
+      "message": "Vi kan sende et lite varsel når et barn trenger din oppmerksomhet. Du kan endre dette når som helst i Innstillinger.",
+      "allow": "Tillat",
+      "notNow": "Ikke nå"
     }
   },
   "myNotes": {
@@ -3286,7 +3596,9 @@
     "hub": {
       "sessionsSubtitle": "Samtaler du hadde",
       "notesSubtitle": "Ting du skrev ned",
-      "bookmarksSubtitle": "Veiledersvar du lagret"
+      "bookmarksSubtitle": "Veiledersvar du lagret",
+      "countLoading": "Laster inn",
+      "countUnavailable": "Utilgjengelig"
     },
     "unknownSubject": "Ukjent fag",
     "searchSessions": "Søk i økter",
@@ -3297,13 +3609,17 @@
   },
   "createProfile": {
     "titleChild": "Fortell oss om barnet ditt",
+    "titleParent": "Fortell oss om deg",
     "titleSelf": "Hvem er det som skal lære?",
     "displayNameLabel": "Visningsnavn",
+    "parentDisplayNameLabel": "Ditt visningsnavn",
     "childDisplayNameLabel": "Barnets visningsnavn",
     "birthDateLabel": "Fødselsdato",
+    "parentBirthDateLabel": "Din fødselsdato",
     "childBirthDateLabel": "Barnets fødselsdato",
-    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er 11 år.",
-    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er 11 år.",
+    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er {{age}} år.",
+    "parentBirthDateHint": "Dette er for den voksne som setter opp kontoen. Du kan legge til barnet ditt etterpå. Aldersgrensen er {{age}} år.",
+    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er {{age}} år.",
     "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
     "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
     "selectDob": "Velg fødselsdato",
@@ -3314,6 +3630,8 @@
     "upgradeRequiredTitle": "Oppgradering kreves",
     "upgradeRequiredBody": "Abonnementet ditt støtter ikke flere profiler. Oppgrader til Familie eller Pro.",
     "seePlans": "Se planer",
+    "minimumAgeError": "Elever må være minst {{age}} år gamle. Velg en tidligere fødselsdato.",
+    "parentAdultAgeError": "Foreldrekontoer trenger en voksen fødselsdato. Skriv inn dine egne detaljer først, og legg deretter til barnet ditt.",
     "a11yCloseDatePicker": "Lukk datovelger"
   },
   "clerkGate": {
@@ -3322,6 +3640,10 @@
     "tryAgain": "Prøv igjen",
     "continueOffline": "Fortsett uten konto",
     "connecting": "Kobler til sikkert..."
+  },
+  "scopeChip": {
+    "supportHub": "Støttehub",
+    "me": "Meg"
   },
   "modeSwitcher": {
     "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
@@ -3353,7 +3675,8 @@
     "childNamePlaceholder": "Deres navn eller kallenavn",
     "childBirthYearPlaceholder": "Fødselsår",
     "a11yBack": "Tilbake til forrige trinn",
-    "a11yCancel": "Avbryt og avslutt"
+    "a11yCancel": "Avbryt og avslutt",
+    "loading": "Laster inn den lagrede forhåndsvisningen ..."
   },
   "pickBook": {
     "subjectFallback": "Emne",
@@ -3446,7 +3769,26 @@
     "bothChildFirstLabel": "Sett opp for barnet mitt først",
     "bothChildFirstDescription": "Vi hjelper barnet ditt i gang, og kommer så tilbake til deg.",
     "bothSelfFirstLabel": "Prøv en leksjon selv først",
-    "bothSelfFirstDescription": "Se hvordan det fungerer, og sett deretter opp for barnet ditt etter registrering."
+    "bothSelfFirstDescription": "Se hvordan det fungerer, og sett deretter opp for barnet ditt etter registrering.",
+    "sampleGeographyTitle": "Geografi",
+    "sampleGeographyDescription": "Hvorfor noen steder blir til ørkener",
+    "sampleFractionsTitle": "Brøk",
+    "sampleFractionsDescription": "Sammenlign deler uten å gjette",
+    "sampleWritingTitle": "Skriving",
+    "sampleWritingDescription": "Planlegg et tydelig avsnitt",
+    "sampleGeographyMentor": "La oss prøve geografi. En ørken defineres av lite nedbør, ikke varme. Hvorfor kan land bak fjell forbli tørt?",
+    "sampleGeographyLearner": "Fordi regnet faller før luften kommer dit?",
+    "sampleGeographyFollowUp": "Akkurat. Fjell kan presse fuktighet ut på den ene siden, og etterlate tørrere luft på den andre. Det kalles en regnskygge.",
+    "sampleFractionsMentor": "La oss sammenligne brøker. Hvis to deler kommer fra samme helhet, har den største delen det minste tallet under brøkstreken.",
+    "sampleFractionsLearner": "Så 1/2 er større enn 1/3?",
+    "sampleFractionsFollowUp": "Ja. Å dele noe i to deler gjør hver del større enn å dele det i tre deler.",
+    "sampleWritingMentor": "La oss planlegge et avsnitt. Start med den ene tingen du vil at leseren skal tro på.",
+    "sampleWritingLearner": "Så jeg bør velge hovedpoenget før eksemplene?",
+    "sampleWritingFollowUp": "Riktig. Når hovedpoenget er klart, har eksemplene en funksjon i stedet for å virke tilfeldige.",
+    "sampleGenericMentorWithTopic": "La oss jobbe med {{topic}}. Jeg vil vise én idé, og deretter stille et raskt kontrollspørsmål.",
+    "sampleGenericMentor": "La oss prøve et raskt eksempel. Jeg vil vise én idé, og deretter stille et raskt kontrollspørsmål.",
+    "sampleGenericLearner": "Jeg er ikke sikker på hvordan jeg skal begynne.",
+    "sampleGenericFollowUp": "Det er et godt utgangspunkt. Vi gjør det første steget konkret, og bygger videre derfra."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} ord lært",
@@ -3457,5 +3799,297 @@
     "sessionCount_other": "{{count}} læringsøkter fullført",
     "hourCount_one": "{{count}} time med læring",
     "hourCount_other": "{{count}} timer med læring"
+  },
+  "mentorHome": {
+    "cards": {
+      "unfinished_session": {
+        "title": "Fortsett den siste økten din",
+        "cta": "Fortsett",
+        "arcDue": "Klar til å fortsette",
+        "arcAdvancing": "Du gjør fremskritt",
+        "arcMastered": "Økten er fullført"
+      },
+      "retention_due": {
+        "title": "Repeter det som forfaller",
+        "cta": "Repeter",
+        "arcDue": "Forfaller til øving",
+        "arcAdvancing": "Blir sterkere",
+        "arcMastered": "Repetisjon fullført"
+      },
+      "parked_item": {
+        "title": "Gå tilbake til et lagret spørsmål",
+        "cta": "Åpne",
+        "arcDue": "Venter på deg",
+        "arcAdvancing": "Tilbake i gang",
+        "arcMastered": "Arkivert"
+      },
+      "needs_deepening": {
+        "title": "Fordyp deg i en vanskelig idé",
+        "cta": "Jobb med det",
+        "arcDue": "Trenger en ny gjennomgang",
+        "arcAdvancing": "Forståelsen blir bedre",
+        "arcMastered": "Sitter nå"
+      },
+      "challenge_ready": {
+        "title": "Prøv en utfordringsrunde",
+        "cta": "Start utfordring",
+        "arcDue": "Klar til å testes",
+        "arcAdvancing": "Utfordring pågår",
+        "arcMastered": "Utfordring fullført"
+      },
+      "generic": {
+        "title": "Åpne ditt neste læringssteg",
+        "cta": "Åpne"
+      },
+      "complete": "Ferdig",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Læringsøyeblikk",
+      "generic": {
+        "title": "Et læringsøyeblikk ble lagret."
+      },
+      "session_filed": {
+        "title": "Lagret {{topicTitle}} i læringsloggen din."
+      },
+      "quota": {
+        "title": "Et læringsøyeblikk ble lagret."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} flere alternativer"
+    },
+    "empty": {
+      "title": "Ingenting trenger deg akkurat nå",
+      "cta": "Utforsk flere læringsalternativer"
+    },
+    "bar": {
+      "unavailable": "Veilederen er frakoblet et øyeblikk. Du kan fortsatt skrive.",
+      "cameraLabel": "Kamera",
+      "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
+      "micLabel": "Mikrofon",
+      "homeworkChip": "Lekser"
+    },
+    "onTrack": {
+      "label": "I rute",
+      "reviewsDue": "repetisjoner forfaller",
+      "dueCleared": "Ingen repetisjoner forfaller"
+    },
+    "rewards": {
+      "privateLabel": "Privat læringskvittering",
+      "practicePoints": "+{{amount}} øvingspoeng for {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} øvingspoeng",
+      "reflectionBonus": "{{multiplier}} refleksjonsbonus lagt til",
+      "quizPersonalBestCapitals": "Ny personlig rekord i hovedsteder: {{score}}",
+      "quizPersonalBestGuessWho": "Ny personlig rekord i Hvem er hvem: {{score}}",
+      "masteryDelta": "{{mastered}} mestret, +{{weeklyDelta}} denne uken",
+      "masteryDeltaNoWeekly": "{{mastered}} mestret"
+    },
+    "lightPractice": {
+      "prompt": "Foretrekker du noe lett?",
+      "fatigueReason": "Foreslått fordi denne strømmen er lett akkurat nå.",
+      "capitals": "Hovedsteder",
+      "guessWho": "Hvem er hvem",
+      "vocabulary": "Vokabular",
+      "dictation": "Diktat"
+    },
+    "celebration": {
+      "ownChoice": "Du valgte neste steg."
+    },
+    "coldStart": {
+      "caption": "Hva vil du jobbe med?",
+      "equalWeight": "Eksempelspørsmål",
+      "placeholderRotation": {
+        "one": "Skriv et spørsmål eller lim inn lekser ..."
+      },
+      "orJustType": "Eller start med en av disse.",
+      "chipHomework": "Hjelp meg med lekser",
+      "chipLearn": "Lær meg noe nytt",
+      "chipAsk": "Jeg har et spørsmål",
+      "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her.",
+      "firstSessionTeach": "Jeg husker det du skriver her, slik at neste steg starter nærmere deg."
+    },
+    "title": "Mentor",
+    "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",
+    "fallback": {
+      "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt."
+    },
+    "error": {
+      "title": "Vi kunne ikke laste inn dine neste steg",
+      "message": "Du kan prøve på nytt eller bla gjennom emner direkte.",
+      "subjects": "Bla gjennom emner"
+    }
+  },
+  "subjectsBrowse": {
+    "title": "Emner",
+    "searchPlaceholder": "Søk i emner",
+    "showEverything": "Vis meg alt",
+    "emptyTitle": "Ingen emner ennå",
+    "emptyMessage": "Opprett et emne for å begynne å bygge læringskartet ditt.",
+    "createSubject": "Opprett emne",
+    "openSubject": "Åpne emne",
+    "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
+    "reviewsDue": "{{count}} repetisjoner forfaller",
+    "errorTitle": "Vi kunne ikke laste inn emner",
+    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk."
+  },
+  "subjectHub": {
+    "loading": "Laster inn emne ...",
+    "errors": {
+      "missingSubjectTitle": "Emne ikke funnet",
+      "missingSubjectMessage": "Gå tilbake og velg et emne på nytt.",
+      "loadTitle": "Kunne ikke laste inn dette emnet",
+      "loadMessage": "Prøv igjen, eller gå tilbake til emnene dine."
+    },
+    "progress": {
+      "threeState": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
+      "reviewsDue": "{{count}} repetisjoner forfaller",
+      "noReviewsDue": "Ingen repetisjoner forfaller",
+      "weeklyDelta": "+{{count}} mestret denne uken",
+      "noWeeklyDelta": "Ingen ny mestring denne uken",
+      "practicePoints": "{{points}} øvingspoeng nylig",
+      "noPracticePoints": "Ingen nylige øvingspoeng"
+    },
+    "nextUp": {
+      "heading": "Neste",
+      "allCaughtUp": "Alt er unnagjort",
+      "resume": "Fortsett",
+      "upNext": "Studer neste emne",
+      "review": "Repeter",
+      "structuralOnly": "Studiehandlinger er private for eleven i denne visningen."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} mestret"
+    },
+    "search": {
+      "placeholder": "Søk i temaer",
+      "micLabel": "Søk med stemmen",
+      "noResults": "Ingen temaer samsvarer med søket."
+    },
+    "notes": {
+      "heading": "Notater",
+      "authorSelf": "Mine notater",
+      "authorMentor": "Lagret fra veileder"
+    },
+    "sheet": {
+      "close": "Lukk",
+      "about": "Om dette temaet",
+      "masteryLine": "Status: {{state}}",
+      "study": "Studer",
+      "review": "Repeter",
+      "seeFullTopic": "Se hele temaet"
+    },
+    "topic": {
+      "continueNow": "Fortsett nå",
+      "started": "Startet",
+      "upNext": "Neste",
+      "later": "Senere",
+      "done": "Ferdig",
+      "mastered": "Mestret"
+    }
+  },
+  "journal": {
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Din private læringssti: lagrede øyeblikk, notater, rapporter og mentor-minne."
+    },
+    "sections": {
+      "recaps": "Oppsummeringer",
+      "recapsSubtitle": "Se gjennom nylige øktsoppsummeringer.",
+      "reports": "Mine rapporter",
+      "reportsSubtitle": "Åpne ukentlige og månedlige fremdriftsrapporter.",
+      "notes": "Lagrede notater",
+      "notesSubtitle": "Bla gjennom notater, bokmerker og lagrede økter.",
+      "memory": "Mentor-minne",
+      "memorySubtitle": "Se og administrer hva mentoren din husker."
+    },
+    "moments": {
+      "title": "Nylige øyeblikk",
+      "empty": "Nye læringsøyeblikk vil vises her.",
+      "errorTitle": "Kunne ikke laste nylige øyeblikk",
+      "generic": "Et læringsøyeblikk ble lagret.",
+      "session_filed": "Lagret {{topicTitle}} i læringsloggen din.",
+      "topic_mastered": "Merket {{topicTitle}} som mestret.",
+      "recap_ready": "En oppsummering er klar.",
+      "snapshot_ready": "Et læringsøyeblikksbilde er klart.",
+      "reflection_bonus": "Refleksjonsbonus lagret.",
+      "quiz_personal_best": "Personlig rekord lagret."
+    },
+    "recaps": {
+      "empty": "Sammendragene fra dine fullførte økter vil vises her.",
+      "error": "Kunne ikke laste inn sammendragene dine.",
+      "openLabel": "Åpne sammendrag for {{title}}"
+    },
+    "reports": {
+      "error": "Kunne ikke laste inn rapportene dine."
+    },
+    "notes": {
+      "sessions": "Nylige læringsøkter",
+      "notes": "Studienotatene du lagret",
+      "bookmarks": "Lagrede veiledersvar"
+    },
+    "memory": {
+      "title": "Kontroller for veilederens minne",
+      "body": "Se gjennom, rediger, skjul, eksporter eller slett det veilederen din husker fra hele minneskjermen.",
+      "open": "Åpne minnekontroller"
+    }
+  },
+  "accountAdmin": {
+    "title": "Konto",
+    "openAccount": "Åpne kontoinnstillinger",
+    "security": "Kontosikkerhet",
+    "familySettings": "Familieinnstillinger"
+  },
+  "guardian": {
+    "couldNotEnableMemory": "Kunne ikke aktivere minne",
+    "couldNotSavePreference": "Kunne ikke lagre preferanse",
+    "completionStatus": {
+      "notStarted": "Ikke påbegynt",
+      "inProgress": "Påbegynt",
+      "completed": "Fullført",
+      "verified": "Verifisert",
+      "stable": "Stabil"
+    },
+    "subjectFallback": "Fag",
+    "latestWeekFallback": "Siste uke",
+    "learningStyle": {
+      "prefersExplanations": "Foretrekker {{types}} forklaringer",
+      "prefersStepByStep": "Foretrekker et trinn-for-trinn-tempo",
+      "prefersQuickerPace": "Foretrekker et raskere tempo",
+      "likesChallenge": "Liker en utfordring",
+      "needsEncouragement": "Trenger ekstra oppmuntring når arbeidet blir vanskelig"
+    },
+    "focusArea": {
+      "confidenceHigh": "Har dukket opp mye i det siste",
+      "confidenceMedium": "Gjentatt mønster",
+      "confidenceLow": "Tidlig signal"
+    },
+    "sourceBadge": {
+      "learner": "Du fortalte veilederen din",
+      "parent": "Lagt til av forelder"
+    },
+    "remove": "Fjern"
+  },
+  "appShell": {
+    "profileLoadErrorTitle": "Vi kunne ikke laste profilen din"
+  },
+  "analogyPicker": {
+    "noPreferenceLabel": "Ingen preferanse",
+    "noPreferenceDescription": "Bruk den analogien som passer best",
+    "cookingLabel": "Matlaging",
+    "cookingDescription": "Oppskrifter, ingredienser, kjøkkenteknikker",
+    "sportsLabel": "Sport",
+    "sportsDescription": "Kamper, lag, treningsstrategier",
+    "buildingLabel": "Bygging",
+    "buildingDescription": "Konstruksjon, arkitektur, verktøy",
+    "musicLabel": "Musikk",
+    "musicDescription": "Instrumenter, rytme, komposisjon",
+    "natureLabel": "Natur",
+    "natureDescription": "Planter, dyr, økosystemer",
+    "gamingLabel": "Spilling",
+    "gamingDescription": "Nivåer, oppdrag, spillmekanikk"
+  },
+  "usageMeter": {
+    "a11yProgressBar": "Bruk: {{used}} av {{limit}} spørsmål brukt"
   }
 }

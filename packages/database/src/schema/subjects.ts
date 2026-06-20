@@ -131,6 +131,17 @@ export const curriculumBooks = pgTable(
     emoji: text('emoji'),
     sortOrder: integer('sort_order').notNull(),
     topicsGenerated: boolean('topics_generated').notNull().default(false),
+    // [books topicsGenerated ordering] Single-flight claim marker for the
+    // SYNCHRONOUS generate-topics route. The CAS in claimBookForGeneration
+    // sets this to NOW() to win the race; `topics_generated` is reserved for
+    // "topics actually persisted" and is only flipped true by
+    // persistBookTopics AFTER the topic rows land. A worker evicted mid-LLM
+    // (before persist) therefore leaves topics_generated=false with a stamped
+    // started_at; the next claim reclaims it once started_at passes the
+    // 15-min stale window. NULL = not currently claimed.
+    topicsGenerationStartedAt: timestamp('topics_generation_started_at', {
+      withTimezone: true,
+    }),
     // [WI-125] Atomic single-flight claim flag for the
     // subject-retry-curriculum Inngest function. Set true before the LLM
     // call via a guarded UPDATE; reset false in a finally block. Prevents

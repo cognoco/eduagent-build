@@ -34,7 +34,6 @@ import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
 import { formatApiError } from '../../../lib/format-api-error';
-import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { Sentry } from '../../../lib/sentry';
 import {
@@ -46,6 +45,8 @@ import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import {
   buildHomeworkSessionParams,
   getHomeworkProblemTruncationAlertMessage,
+  homeworkReturnHrefForReturnTo,
+  normalizeHomeworkEntrySource,
 } from './_view-models/homework-session-params';
 
 type FlashMode = 'off' | 'on' | 'auto';
@@ -53,14 +54,17 @@ type FlashMode = 'off' | 'on' | 'auto';
 export default function CameraScreen(): React.ReactNode {
   const router = useRouter();
   const { t } = useTranslation();
-  const { subjectId, subjectName, returnTo } = useLocalSearchParams<{
-    subjectId?: string;
-    subjectName?: string;
-    returnTo?: string;
-  }>();
+  const { subjectId, subjectName, entrySource, returnTo } =
+    useLocalSearchParams<{
+      subjectId?: string;
+      subjectName?: string;
+      entrySource?: string;
+      returnTo?: string;
+    }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const navigationContract = useNavigationContract();
+  const homeworkEntrySource = normalizeHomeworkEntrySource(entrySource);
 
   const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [state, dispatch] = useReducer(cameraReducer, initialCameraState);
@@ -491,6 +495,7 @@ export default function CameraScreen(): React.ReactNode {
         imageUri,
         imageMimeType,
         captureSource,
+        entrySource: homeworkEntrySource,
         returnTo,
       });
 
@@ -520,7 +525,7 @@ export default function CameraScreen(): React.ReactNode {
         params,
       } as Href);
     },
-    [imageMimeType, returnTo, router, t],
+    [homeworkEntrySource, imageMimeType, returnTo, router, t],
   );
 
   const handleConfirmResult = useCallback(() => {
@@ -710,7 +715,7 @@ export default function CameraScreen(): React.ReactNode {
   // the explicit returnTo target makes close/back behavior deterministic
   // regardless of the underlying back-stack state.
   const handleClose = useCallback(() => {
-    router.replace(homeHrefForReturnTo(returnTo));
+    router.replace(homeworkReturnHrefForReturnTo(returnTo));
   }, [returnTo, router]);
 
   // Intercept Android hardware back so it routes through handleClose too;
@@ -1551,7 +1556,7 @@ export default function CameraScreen(): React.ReactNode {
           accessibilityLabel={t('common.close')}
           accessibilityRole="button"
         >
-          <Text className="text-h3 font-bold text-text-primary">X</Text>
+          <Ionicons name="close" size={28} color={colors.textPrimary} />
         </Pressable>
 
         <View className="flex-1 justify-center">

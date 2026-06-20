@@ -6,6 +6,7 @@
 const mockDb: Record<string, any> = {
   query: {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
+    person: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
     subjects: { findFirst: jest.fn().mockResolvedValue(null) },
   },
@@ -32,6 +33,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
       subjectId: col('subjectId'),
       topicsGenerated: col('topicsGenerated'),
       sortOrder: col('sortOrder'),
+    },
+    person: {
+      id: col('id'),
+      birthDate: col('birthDate'),
+      conversationLanguage: col('conversationLanguage'),
     },
     profiles: { id: col('id'), birthYear: col('birthYear') },
     subjects: { id: col('id'), profileId: col('profileId') },
@@ -139,6 +145,8 @@ function mockValidSubjectOwnership(): void {
 
 function resetMockDb(): void {
   mockDb.query.curriculumBooks.findFirst.mockReset().mockResolvedValue(null);
+  // [WI-586] v2 path reads person.findFirst; reset to null (= missing profile).
+  mockDb.query.person.findFirst.mockReset().mockResolvedValue(null);
   mockDb.query.profiles.findFirst.mockReset().mockResolvedValue(null);
   mockDb.query.subjects.findFirst.mockReset().mockResolvedValue(null);
   mockSelectChain.limit.mockReset().mockResolvedValue([]);

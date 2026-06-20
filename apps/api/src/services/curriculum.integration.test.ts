@@ -1,7 +1,6 @@
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   assessments,
   curriculumBooks,
   curricula,
@@ -10,7 +9,6 @@ import {
   generateUUIDv7,
   learningSessions,
   needsDeepeningTopics,
-  profiles,
   retentionCards,
   sessionSummaries,
   subjects,
@@ -19,9 +17,18 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  claimBookForGeneration,
   deleteTopicIfSafe,
+  persistBookTopics,
   releaseBookGenerationClaimIfEmpty,
 } from './curriculum';
+import type { GeneratedBookTopic } from '@eduagent/schemas';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -44,51 +51,73 @@ function createIntegrationDb(): Database {
 
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integration-curriculum-release-${RUN_ID}`;
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
+  await deleteLegacyAccountsForTest(database, seededAccountIds);
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 async function seedProfiles(database: Database, suffix = generateUUIDv7()) {
-  const [ownerAccount] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${suffix}-owner`,
-      email: `${CLERK_PREFIX}-${suffix}-owner@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  const [attackerAccount] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${suffix}-attacker`,
-      email: `${CLERK_PREFIX}-${suffix}-attacker@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const ownerAccountId = generateUUIDv7();
+  const attackerAccountId = generateUUIDv7();
+  const ownerProfileId = generateUUIDv7();
+  const attackerProfileId = generateUUIDv7();
+  const ownerClerkUserId = `${CLERK_PREFIX}-${suffix}-owner`;
+  const attackerClerkUserId = `${CLERK_PREFIX}-${suffix}-attacker`;
+  const ownerEmail = `${CLERK_PREFIX}-${suffix}-owner@test.invalid`;
+  const attackerEmail = `${CLERK_PREFIX}-${suffix}-attacker@test.invalid`;
 
-  const [ownerProfile] = await database
-    .insert(profiles)
-    .values({
-      accountId: ownerAccount!.id,
-      displayName: 'Claim Owner',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  const [attackerProfile] = await database
-    .insert(profiles)
-    .values({
-      accountId: attackerAccount!.id,
-      displayName: 'Claim Attacker',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  seededAccountIds.push(ownerAccountId, attackerAccountId);
+  seededProfileIds.push(ownerProfileId, attackerProfileId);
+
+  await ensureLegacyProfileAnchorForTest(database, {
+    accountId: ownerAccountId,
+    profileId: ownerProfileId,
+    clerkUserId: ownerClerkUserId,
+    email: ownerEmail,
+    displayName: 'Claim Owner',
+    birthYear: 2011,
+    isOwner: true,
+  });
+  await ensureLegacyProfileAnchorForTest(database, {
+    accountId: attackerAccountId,
+    profileId: attackerProfileId,
+    clerkUserId: attackerClerkUserId,
+    email: attackerEmail,
+    displayName: 'Claim Attacker',
+    birthYear: 2011,
+    isOwner: true,
+  });
+
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId: ownerAccountId,
+    profileId: ownerProfileId,
+    clerkUserId: ownerClerkUserId,
+    email: ownerEmail,
+    displayName: 'Claim Owner',
+    birthYear: 2011,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId: attackerAccountId,
+    profileId: attackerProfileId,
+    clerkUserId: attackerClerkUserId,
+    email: attackerEmail,
+    displayName: 'Claim Attacker',
+    birthYear: 2011,
+    isOwner: true,
+  });
 
   return {
-    ownerProfileId: ownerProfile!.id,
-    attackerProfileId: attackerProfile!.id,
+    ownerProfileId,
+    attackerProfileId,
   };
 }
 
@@ -114,6 +143,50 @@ async function seedClaimedEmptyBook(database: Database, profileId: string) {
     .returning({ id: curriculumBooks.id });
 
   return { subjectId: subject!.id, bookId: book!.id };
+}
+
+async function seedUnclaimedBook(database: Database, profileId: string) {
+  const suffix = generateUUIDv7();
+  const [subject] = await database
+    .insert(subjects)
+    .values({
+      profileId,
+      name: `Claim Ordering ${suffix}`,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning({ id: subjects.id });
+
+  const [book] = await database
+    .insert(curriculumBooks)
+    .values({
+      subjectId: subject!.id,
+      title: 'Unclaimed Book',
+      description: 'A book awaiting topic generation.',
+      sortOrder: 0,
+      topicsGenerated: false,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  return { subjectId: subject!.id, bookId: book!.id };
+}
+
+function buildGeneratedTopics(): GeneratedBookTopic[] {
+  // bookTopicGenerationResultSchema requires: ≥5 topics, ≥2 distinct chapters,
+  // strictly-increasing sortOrder, and chapters contiguous in sortOrder. Keep
+  // the two chapters grouped (3 + 3) so the contiguity refine passes.
+  return [
+    { title: 'Generated Topic 1', chapter: 'Getting started', sortOrder: 1 },
+    { title: 'Generated Topic 2', chapter: 'Getting started', sortOrder: 2 },
+    { title: 'Generated Topic 3', chapter: 'Getting started', sortOrder: 3 },
+    { title: 'Generated Topic 4', chapter: 'Core understanding', sortOrder: 4 },
+    { title: 'Generated Topic 5', chapter: 'Core understanding', sortOrder: 5 },
+    { title: 'Generated Topic 6', chapter: 'Core understanding', sortOrder: 6 },
+  ].map((topic) => ({
+    ...topic,
+    description: `Description for ${topic.title.toLowerCase()}.`,
+    estimatedMinutes: 20,
+  }));
 }
 
 async function seedFiledTopicFixture(
@@ -164,6 +237,18 @@ async function seedFiledTopicFixture(
       metadata: { effectiveMode: 'freeform' },
     })
     .returning({ id: learningSessions.id });
+
+  if (options.topicSessionId && options.topicSessionId !== session!.id) {
+    await database.insert(learningSessions).values({
+      id: options.topicSessionId,
+      profileId,
+      subjectId: subject!.id,
+      sessionType: 'learning',
+      status: 'completed',
+      exchangeCount: 3,
+      metadata: { effectiveMode: 'freeform' },
+    });
+  }
 
   const [topic] = await database
     .insert(curriculumTopics)
@@ -228,6 +313,152 @@ describeIfDb('releaseBookGenerationClaimIfEmpty (integration)', () => {
       where: eq(curriculumBooks.id, bookId),
     });
     expect(row!.topicsGenerated).toBe(true);
+  });
+});
+
+describeIfDb('claimBookForGeneration ordering (integration)', () => {
+  let db: Database;
+
+  beforeAll(async () => {
+    db = createIntegrationDb();
+    await cleanupByPrefix(db);
+  });
+
+  afterAll(async () => {
+    await cleanupByPrefix(db);
+  });
+
+  // Regression for the books topicsGenerated-ordering bug: the claim must NOT
+  // mark the book as generated. It only stamps the single-flight claim marker;
+  // topics_generated stays false until topics are actually persisted. A worker
+  // evicted mid-LLM (before persist) therefore never leaves a book stuck
+  // "generated" with zero topics.
+  it('claims without marking the book generated, so a crash before persist leaves it un-generated', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const claimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(claimed).not.toBeNull();
+
+    // The claim stamps the marker but must leave topics_generated false: at this
+    // instant zero topics exist, and a Worker eviction here would skip the
+    // catch-block release entirely.
+    const afterClaim = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(afterClaim!.topicsGenerated).toBe(false);
+    expect(afterClaim!.topicsGenerationStartedAt).not.toBeNull();
+
+    // Simulate the crash: generation throws after the claim and before persist,
+    // so persistBookTopics never runs. No catch-block release fires either
+    // (the eviction case). The book must NOT be in the dead-end
+    // topicsGenerated=true, topics=[] state.
+    const topicRows = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, bookId),
+    });
+    expect(topicRows).toHaveLength(0);
+    expect(afterClaim!.topicsGenerated).toBe(false);
+  });
+
+  it('serialises concurrent claims so only one wins and double-generation is impossible', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const [first, second] = await Promise.all([
+      claimBookForGeneration(db, ownerProfileId, subjectId, bookId),
+      claimBookForGeneration(db, ownerProfileId, subjectId, bookId),
+    ]);
+
+    const winners = [first, second].filter((r) => r !== null);
+    expect(winners).toHaveLength(1);
+  });
+
+  it('flips topics_generated true and clears the claim marker only after topics persist', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const claimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(claimed).not.toBeNull();
+
+    await persistBookTopics(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+      buildGeneratedTopics(),
+      [],
+    );
+
+    const afterPersist = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(afterPersist!.topicsGenerated).toBe(true);
+    expect(afterPersist!.topicsGenerationStartedAt).toBeNull();
+
+    const topicRows = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, bookId),
+    });
+    expect(topicRows.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('reclaims a stale (crashed) claim so the book is never permanently locked', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    // Simulate a crashed claim: marker stamped >15 min ago, topics_generated
+    // still false (the worker died before persist and before any release).
+    const staleStart = new Date(Date.now() - 20 * 60 * 1000);
+    await db
+      .update(curriculumBooks)
+      .set({ topicsGenerationStartedAt: staleStart })
+      .where(eq(curriculumBooks.id, bookId));
+
+    const reclaimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(reclaimed).not.toBeNull();
+
+    const row = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(row!.topicsGenerationStartedAt!.getTime()).toBeGreaterThan(
+      staleStart.getTime(),
+    );
+  });
+
+  it('refuses to claim while a fresh claim is in flight', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const first = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(first).not.toBeNull();
+
+    // A second request arriving within the stale window must lose the race.
+    const second = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(second).toBeNull();
   });
 });
 

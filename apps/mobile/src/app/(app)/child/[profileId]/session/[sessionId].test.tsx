@@ -201,7 +201,7 @@ describe('SessionDetailScreen (summary-only)', () => {
       ).toBeTruthy(),
     );
     screen.getByText('Practiced equivalent fractions');
-    screen.getByText('Focused');
+    screen.getByTestId('engagement-chip-focused');
     expect(
       screen.getByText('Which fraction felt easiest to compare today?'),
     ).toBeTruthy();

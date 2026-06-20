@@ -1,5 +1,10 @@
 import { Platform } from 'react-native';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { toInternalAppRedirectPath } from '../../../lib/normalize-redirect-path';
+
+export function getPostAuthDefaultPath(): string {
+  return FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/mentor' : '/(app)/home';
+}
 
 export function resolveAuthRedirectPath(pathname: string | undefined): string {
   if (Platform.OS === 'web') {
@@ -16,9 +21,12 @@ export function resolveAuthRedirectPath(pathname: string | undefined): string {
       // query, landing the user on the child detail with no mode filter.
       const search =
         typeof win.location.search === 'string' ? win.location.search : '';
-      return toInternalAppRedirectPath(`${win.location.pathname}${search}`);
+      return toInternalAppRedirectPath(
+        `${win.location.pathname}${search}`,
+        getPostAuthDefaultPath(),
+      );
     }
   }
 
-  return toInternalAppRedirectPath(pathname);
+  return toInternalAppRedirectPath(pathname, getPostAuthDefaultPath());
 }

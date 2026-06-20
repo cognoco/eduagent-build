@@ -22,8 +22,13 @@ import {
   membership,
   person,
   type Database,
+  type profiles,
 } from '@eduagent/database';
-import type { ConsentStatus, Profile } from '@eduagent/schemas';
+import type {
+  ConsentStatus,
+  Profile,
+  ProfileUpdateInput,
+} from '@eduagent/schemas';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import {
   resolveLatestConsentStatusAnyBasis,
@@ -217,6 +222,110 @@ export async function getOwnerProfileV2(
     linkCreatedAt: null,
     createdAt: owner.createdAt.toISOString(),
     updatedAt: owner.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * [WI-586 C1] v2 twin of `getProfile(db, profileId, accountId)` — returns a
+ * byte-identical `Profile` for any person in the org (owner or charge), or null
+ * when the person is not in the org / is archived. Enforces org-scoping via the
+ * membership join (IDOR guard: account.id = organization.id).
+ *
+ * Family-link context is derived from active guardianship edges (the family_links
+ * twin), matching the field derivations in listProfilesV2 / getOwnerProfileV2.
+ */
+export async function getProfileV2(
+  db: Database,
+  profileId: string,
+  organizationId: string,
+): Promise<Profile | null> {
+  const rows = await db
+    .select({
+      id: person.id,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      birthDate: person.birthDate,
+      residenceJurisdiction: person.residenceJurisdiction,
+      conversationLanguage: person.conversationLanguage,
+      pronouns: person.pronouns,
+      defaultAppContext: person.defaultAppContext,
+      createdAt: person.createdAt,
+      updatedAt: person.updatedAt,
+      roles: membership.roles,
+    })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(
+      and(
+        eq(person.id, profileId),
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+      ),
+    )
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const isOwner = row.roles.includes('admin');
+
+  // Active guardianship edges for this person — determine hasFamilyLinks and
+  // linkCreatedAt (mirrors listProfilesV2 field derivations).
+  const edges = await db
+    .select({
+      guardianPersonId: guardianship.guardianPersonId,
+      chargePersonId: guardianship.chargePersonId,
+      grantedAt: guardianship.grantedAt,
+    })
+    .from(guardianship)
+    .where(
+      and(
+        isNull(guardianship.revokedAt),
+        or(
+          eq(guardianship.guardianPersonId, profileId),
+          eq(guardianship.chargePersonId, profileId),
+        ),
+      ),
+    );
+
+  const hasFamilyLinksAsGuardian = edges.some(
+    (e) => e.guardianPersonId === profileId,
+  );
+  const chargeEdge = edges.find((e) => e.chargePersonId === profileId);
+
+  const hasFamilyLinks = isOwner
+    ? hasFamilyLinksAsGuardian
+    : chargeEdge != null;
+  const linkCreatedAt = isOwner
+    ? null
+    : (chargeEdge?.grantedAt.toISOString() ?? null);
+
+  const consentStatus = await resolveLatestConsentStatusAnyBasis(
+    db,
+    profileId,
+    organizationId,
+    DEFAULT_CONSENT_PURPOSE,
+  );
+
+  return {
+    id: row.id,
+    accountId: organizationId, // account.id = organization.id
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl ?? null,
+    birthYear: Number(row.birthDate.slice(0, 4)),
+    location: jurisdictionToLocation(row.residenceJurisdiction),
+    isOwner,
+    hasPremiumLlm: deriveHasPremiumLlm(),
+    defaultAppContext:
+      (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
+    hasFamilyLinks,
+    conversationLanguage:
+      row.conversationLanguage as Profile['conversationLanguage'],
+    pronouns: row.pronouns ?? null,
+    consentStatus,
+    linkCreatedAt,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -415,4 +524,148 @@ export async function listProfilesV2(
       updatedAt: row.updatedAt.toISOString(),
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// [WI-586 C2] updateProfileV2 — v2 twin of updateProfile(db, profileId,
+// accountId, input). Updates person-table columns for any profile within the
+// caller's org, then re-reads and returns the full byte-identical Profile.
+//
+// SECURITY: org-scoping via membership join is the IDOR guard — a caller
+// resolved to org A can never update a person in org B, because the UPDATE
+// WHERE clause requires the membership row (personId, organizationId) to exist.
+// The write is atomic: no separate ownership pre-check, no TOCTOU window.
+// Mirrors the `personInOrgExists` pattern in onboarding-v2.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 twin of `updateProfile` — updates displayName / avatarUrl /
+ * conversationLanguage / pronouns on the `person` table. Returns the
+ * refreshed full Profile (byte-identical shape), or null when the person is not
+ * in the org / is archived / does not exist. `organizationId` MUST be the
+ * caller's own resolved org (account.id = organization.id) — it is the IDOR
+ * guard, not a user-controlled parameter.
+ */
+export async function updateProfileV2(
+  db: Database,
+  profileId: string,
+  organizationId: string,
+  input: ProfileUpdateInput,
+): Promise<Profile | null> {
+  // Build only the columns the caller supplied — avoids clobbering columns
+  // that are absent from ProfileUpdateInput with undefined writes.
+  const patch: Partial<{
+    displayName: string;
+    avatarUrl: string | null;
+    conversationLanguage: string;
+    pronouns: string | null;
+    updatedAt: Date;
+  }> = { updatedAt: new Date() };
+  if (input.displayName !== undefined) patch.displayName = input.displayName;
+  if (input.avatarUrl !== undefined) patch.avatarUrl = input.avatarUrl ?? null;
+  if (input.conversationLanguage !== undefined)
+    patch.conversationLanguage = input.conversationLanguage;
+  if (input.pronouns !== undefined) patch.pronouns = input.pronouns ?? null;
+
+  // Atomic UPDATE scoped to (personId, organizationId) via EXISTS subquery —
+  // the IDOR guard is folded into the write (no TOCTOU window).
+  const updated = await db
+    .update(person)
+    .set(patch)
+    .where(
+      and(
+        eq(person.id, profileId),
+        isNull(person.archivedAt),
+        sql`EXISTS (
+          SELECT 1 FROM ${membership}
+          WHERE ${membership.personId} = ${profileId}
+            AND ${membership.organizationId} = ${organizationId}
+        )`,
+      ),
+    )
+    .returning({ id: person.id });
+
+  if (!updated[0]) return null;
+
+  // Re-read via getProfileV2 to return the full byte-identical Profile shape
+  // (consent status + guardianship meta require additional queries that are
+  // cleanly encapsulated there).
+  return getProfileV2(db, profileId, organizationId);
+}
+
+// ---------------------------------------------------------------------------
+// [WI-586] loadProfileRowByIdV2 — v2 twin of services/profile.ts::loadProfileRowById.
+//
+// The legacy reader is a self-keyed `profiles WHERE id = ? AND archived_at IS NULL`
+// lookup (no account scope — the caller already trusts the profileId). The v2
+// reader reads the equivalent `person` row + its single org `membership`, keyed
+// on person.id = profileId (person.id = profiles.id), and reconstructs a
+// byte-identical `profiles.$inferSelect` row so the in-process session cache and
+// its downstream consumers (session-exchange's resolvePromptLearnerName /
+// birthYear / conversationLanguage / pronouns / displayName reads) cannot tell
+// which store answered.
+//
+// person↔membership is 1:1 (each person has exactly one org-binding membership;
+// account.id = organization.id). guardianship is a separate edge table and does
+// not multiply membership rows, so the join + limit(1) is deterministic. Field
+// derivations mirror getProfileV2 / listProfilesV2:
+//   - isOwner       := membership.roles @> '{admin}'
+//   - birthYear     := year(person.birth_date)
+//   - location      := jurisdictionToLocation(person.residence_jurisdiction)
+//   - hasPremiumLlm := false (derived, §1.3)
+//   - accountId     := membership.organization_id (account.id = organization.id)
+// Legacy-only columns with no v2 home and no live reader (birthYearSetBy) are
+// null; archivedAt is always null because the read filters to live persons.
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 twin of `loadProfileRowById` — returns the person row reshaped as a
+ * byte-identical `profiles.$inferSelect`, or null when the person does not exist
+ * / is archived. Self-keyed on profileId (person.id = profiles.id); no org
+ * parameter, matching the legacy reader's self-trust contract.
+ */
+export async function loadProfileRowByIdV2(
+  db: Database,
+  profileId: string,
+): Promise<typeof profiles.$inferSelect | null> {
+  const rows = await db
+    .select({
+      id: person.id,
+      organizationId: membership.organizationId,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      birthDate: person.birthDate,
+      residenceJurisdiction: person.residenceJurisdiction,
+      conversationLanguage: person.conversationLanguage,
+      pronouns: person.pronouns,
+      defaultAppContext: person.defaultAppContext,
+      createdAt: person.createdAt,
+      updatedAt: person.updatedAt,
+      roles: membership.roles,
+    })
+    .from(person)
+    .innerJoin(membership, eq(membership.personId, person.id))
+    .where(and(eq(person.id, profileId), isNull(person.archivedAt)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    accountId: row.organizationId, // account.id = organization.id
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl ?? null,
+    birthYear: birthYearFromDate(row.birthDate),
+    birthYearSetBy: null,
+    location: jurisdictionToLocation(row.residenceJurisdiction),
+    isOwner: row.roles.includes('admin'),
+    hasPremiumLlm: deriveHasPremiumLlm(),
+    defaultAppContext: row.defaultAppContext ?? null,
+    conversationLanguage: row.conversationLanguage,
+    pronouns: row.pronouns ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    archivedAt: null,
+  };
 }

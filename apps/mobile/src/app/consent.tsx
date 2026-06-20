@@ -165,7 +165,7 @@ export default function ConsentScreen() {
     if (!user) return;
     if (!canSubmit || !profileId) return;
     if (!profileBelongsToAccount) {
-      setError('This profile does not belong to your account.');
+      setError(t('onboarding.consent.profileNotOwnedError'));
       return;
     }
 

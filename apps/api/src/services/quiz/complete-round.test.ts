@@ -5,7 +5,7 @@ import type {
   QuizQuestion,
   VocabularyQuestion,
 } from '@eduagent/schemas';
-import { BadRequestError } from '@eduagent/schemas';
+import { BadRequestError, ConflictError } from '@eduagent/schemas';
 
 // [CR-2026-05-19-M1] Sentry external-boundary mock — proves captureException
 // fires on mastery upsert failure. Sentry is an external boundary (Sentry SDK).
@@ -38,6 +38,7 @@ import {
   buildMissedItemText,
   calculateScore,
   calculateXp,
+  checkQuizAnswerWithCorrect,
   completeQuizRound,
   getCapitalsSm2Quality,
   getCelebrationTier,
@@ -47,6 +48,7 @@ import {
   isAnswerCorrect,
   validateResults,
 } from './complete-round';
+import { QUIZ_CONFIG } from './config';
 import type { Database } from '@eduagent/database';
 import * as database from '@eduagent/database';
 
@@ -929,5 +931,420 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
       'comet',
       ROUND_ID,
     );
+  });
+});
+
+// [BUG-852] checkQuizAnswerWithCorrect must bound unbounded duplicate appends
+// per questionIndex. A client could otherwise call /check hundreds of times for
+// one question — growing the row, or sending finalAttempt:false repeatedly then
+// a finalAttempt:true with cluesUsed:0 to claim full XP. The guard:
+//   (a) once a FINAL attempt is recorded for a questionIndex, any further /check
+//       for that index is IDEMPOTENT — it returns post-submission feedback
+//       WITHOUT appending a new attempt (covers always-final capitals/vocab
+//       second submission AND guess_who post-finalization). This bounds row
+//       growth while preserving the first-attempt-wins [BREAK/WI-163] contract
+//       (the re-check returns 200 and cannot retro-score);
+//   (b) probe (non-final) attempts per question are capped; the (cap+1)th throws
+//       ConflictError.
+describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', () => {
+  const PROFILE_ID = '00000000-0000-4000-8000-000000000010';
+  const ROUND_ID = '00000000-0000-4000-8000-000000000011';
+
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    isLibraryItem: false,
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Nice', 'Bordeaux'],
+    funFact: '',
+  };
+
+  const guessWhoQuestion: GuessWhoQuestion = {
+    type: 'guess_who',
+    canonicalName: 'Isaac Newton',
+    correctAnswer: 'Isaac Newton',
+    acceptedAliases: ['Newton'],
+    clues: ['C1', 'C2', 'C3', 'C4', 'C5'],
+    mcFallbackOptions: ['Isaac Newton', 'Einstein', 'Tesla', 'Curie'],
+    funFact: '',
+    isLibraryItem: false,
+  };
+
+  function makeRound(
+    questions: QuizQuestion[],
+    results: unknown[],
+  ): Record<string, unknown> {
+    return {
+      id: ROUND_ID,
+      profileId: PROFILE_ID,
+      status: 'active' as const,
+      activityType: 'capitals' as const,
+      total: questions.length,
+      questions,
+      libraryQuestionIndices: [],
+      subjectId: null,
+      score: null,
+      xpEarned: null,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      results,
+      metadata: null,
+    };
+  }
+
+  // Fake DB whose update().set().where().returning() resolves to one row, so a
+  // genuine first/valid append path succeeds. The Conflict guard short-circuits
+  // before reaching update(), so these tests do not depend on the SQL builder.
+  function makeUpdateDb(): Database {
+    const chain = {
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([{ id: ROUND_ID }]),
+    };
+    return {
+      update: jest.fn().mockReturnValue(chain),
+    } as unknown as Database;
+  }
+
+  function spyRepo(round: Record<string, unknown>): jest.SpyInstance {
+    const repo = {
+      quizRounds: { findById: jest.fn().mockResolvedValue(round) },
+    };
+    return jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repo as unknown as ReturnType<typeof database.createScopedRepository>,
+      );
+  }
+
+  let repoSpy: jest.SpyInstance | undefined;
+
+  afterEach(() => {
+    repoSpy?.mockRestore();
+    repoSpy = undefined;
+  });
+
+  it('[BREAK/a] is idempotent for a second /check on an already-final capitals index — returns feedback WITHOUT appending', async () => {
+    const round = makeRound(
+      [capitalsQuestion],
+      [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Paris',
+          timeMs: 1000,
+          checkedAt: new Date().toISOString(),
+          finalAttempt: true,
+        },
+      ],
+    );
+    repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
+
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Lyon',
+      'multiple_choice',
+    );
+
+    // First-attempt-wins: the re-check is not recorded — no jsonb append, so the
+    // row cannot be grown by replaying /check on a finalized question.
+    expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
+    // ...but the caller still gets honest post-submission feedback.
+    expect(result).toEqual({ correct: false, correctAnswer: 'Paris' });
+  });
+
+  it('[BREAK/a] is idempotent for a /check on an already-finalized guess_who index — a cluesUsed:0 replay is NOT appended', async () => {
+    const round = makeRound(
+      [guessWhoQuestion],
+      [
+        {
+          questionIndex: 0,
+          correct: false,
+          answerGiven: 'wrong',
+          timeMs: 1000,
+          checkedAt: new Date().toISOString(),
+          finalAttempt: true,
+          cluesUsed: 5,
+        },
+      ],
+    );
+    round.activityType = 'guess_who';
+    repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
+
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Isaac Newton',
+      'free_text',
+      true,
+      0,
+    );
+
+    // The cluesUsed:0 "full XP" replay is never recorded — first-attempt-wins
+    // keeps the original finalAttempt (cluesUsed:5, wrong) authoritative.
+    expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
+    expect(result).toEqual({ correct: true });
+  });
+
+  it('[BREAK/b] rejects probe (non-final) attempts beyond the per-question cap', async () => {
+    // Seed cap probe (finalAttempt:false) attempts already recorded.
+    const probes = Array.from(
+      { length: QUIZ_CONFIG.maxProbeAttemptsPerQuestion },
+      (_, i) => ({
+        questionIndex: 0,
+        correct: false,
+        answerGiven: `guess-${i}`,
+        timeMs: 1000,
+        checkedAt: new Date().toISOString(),
+        finalAttempt: false,
+        cluesUsed: 1,
+      }),
+    );
+    const round = makeRound([guessWhoQuestion], probes);
+    round.activityType = 'guess_who';
+    repoSpy = spyRepo(round);
+
+    // The (cap+1)th probe must be rejected.
+    await expect(
+      checkQuizAnswerWithCorrect(
+        makeUpdateDb(),
+        PROFILE_ID,
+        ROUND_ID,
+        0,
+        'still-wrong',
+        'free_text',
+        false,
+        2,
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it('[NEGATIVE] allows the first probe attempt for a question (no prior results)', async () => {
+    const round = makeRound([guessWhoQuestion], []);
+    round.activityType = 'guess_who';
+    repoSpy = spyRepo(round);
+
+    await expect(
+      checkQuizAnswerWithCorrect(
+        makeUpdateDb(),
+        PROFILE_ID,
+        ROUND_ID,
+        0,
+        'wrong-guess',
+        'free_text',
+        false,
+        1,
+      ),
+    ).resolves.toEqual({ correct: false });
+  });
+
+  it('[NEGATIVE] allows a probe attempt for one index when a DIFFERENT index is already final', async () => {
+    const round = makeRound(
+      [capitalsQuestion, guessWhoQuestion],
+      [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Paris',
+          timeMs: 1000,
+          checkedAt: new Date().toISOString(),
+          finalAttempt: true,
+        },
+      ],
+    );
+    round.activityType = 'guess_who';
+    repoSpy = spyRepo(round);
+
+    await expect(
+      checkQuizAnswerWithCorrect(
+        makeUpdateDb(),
+        PROFILE_ID,
+        ROUND_ID,
+        1,
+        'wrong-guess',
+        'free_text',
+        false,
+        1,
+      ),
+    ).resolves.toEqual({ correct: false });
+  });
+});
+
+// [BUG-854] completeQuizRound must reject with ConflictError (409) when the
+// client calls /complete without any prior /check calls, instead of silently
+// completing the round with score=0.
+describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
+  const PROFILE_ID = '00000000-0000-4000-8000-000000000011';
+  const ROUND_ID = '00000000-0000-4000-8000-000000000012';
+
+  const capitalsQuestion: CapitalsQuestion = {
+    type: 'capitals',
+    isLibraryItem: false,
+    country: 'France',
+    correctAnswer: 'Paris',
+    acceptedAliases: ['Paris'],
+    distractors: ['Lyon', 'Nice', 'Bordeaux'],
+    funFact: 'Paris is on the Seine river.',
+  };
+
+  // Round with no recorded /check results — the bug scenario.
+  const mockRoundNoResults = {
+    id: ROUND_ID,
+    profileId: PROFILE_ID,
+    status: 'active' as const,
+    activityType: 'capitals' as const,
+    total: 1,
+    questions: [capitalsQuestion],
+    libraryQuestionIndices: [],
+    subjectId: null,
+    score: null,
+    xpEarned: null,
+    completedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    // Simulates a client that skipped /check entirely — results is an empty
+    // array, so the server has no recorded attempts to score from.
+    results: [],
+    metadata: null,
+  };
+
+  function makeMockDb(): Database {
+    const self: Database = {
+      transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(self),
+      ),
+    } as unknown as Database;
+    return self;
+  }
+
+  let createScopedRepoSpy: jest.SpyInstance;
+
+  afterEach(() => {
+    createScopedRepoSpy?.mockRestore();
+  });
+
+  it('[BREAK/BUG-854] throws ConflictError when client calls /complete without any prior /check calls', async () => {
+    // Build a minimal repo spy that returns an empty-results round.
+    const repoSpy = {
+      quizRounds: {
+        findById: jest.fn().mockResolvedValue(mockRoundNoResults),
+        findByIdForUpdate: jest.fn().mockResolvedValue(mockRoundNoResults),
+        completeActive: jest.fn().mockResolvedValue(true),
+        findRecentByActivity: jest.fn().mockResolvedValue([]),
+        findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
+      },
+      quizMasteryItems: {
+        findByKey: jest.fn().mockResolvedValue(null),
+        upsertFromCorrectAnswer: jest.fn().mockResolvedValue(null),
+        updateSm2: jest.fn().mockResolvedValue(undefined),
+        findDueForProfile: jest.fn().mockResolvedValue([]),
+        incrementMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+        resetMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+      },
+      missedQuizItems: {
+        upsertMissedItems: jest.fn().mockResolvedValue(undefined),
+        softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: { findById: jest.fn().mockResolvedValue(null) },
+      subjects: { findById: jest.fn().mockResolvedValue(null) },
+      xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
+      vocabulary: {
+        findById: jest.fn().mockResolvedValue(null),
+        findByKey: jest.fn().mockResolvedValue(null),
+      },
+      vocabularyReviews: { upsert: jest.fn().mockResolvedValue(undefined) },
+    };
+
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    // Client provides results in the /complete body, but never called /check —
+    // so round.results is empty. Must reject, not silently zero-score.
+    await expect(
+      completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
+        { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+      ]),
+    ).rejects.toThrow(ConflictError);
+
+    // completeActive must NOT be called — the round must not be committed.
+    expect(repoSpy.quizRounds.completeActive).not.toHaveBeenCalled();
+  });
+
+  it('[NEGATIVE/BUG-854] resolves normally when round has recorded /check results', async () => {
+    mockQueueCelebration.mockResolvedValue([]);
+
+    // Same round but with a recorded /check result — the happy path.
+    const mockRoundWithResults = {
+      ...mockRoundNoResults,
+      results: [
+        {
+          questionIndex: 0,
+          correct: true,
+          answerGiven: 'Paris',
+          timeMs: 2000,
+          finalAttempt: true,
+        },
+      ],
+    };
+
+    const repoSpy = {
+      quizRounds: {
+        findById: jest.fn().mockResolvedValue(mockRoundWithResults),
+        findByIdForUpdate: jest.fn().mockResolvedValue(mockRoundWithResults),
+        completeActive: jest.fn().mockResolvedValue(true),
+        findRecentByActivity: jest.fn().mockResolvedValue([]),
+        findRecentCompletedByActivity: jest.fn().mockResolvedValue([]),
+      },
+      quizMasteryItems: {
+        findByKey: jest.fn().mockResolvedValue(null),
+        upsertFromCorrectAnswer: jest.fn().mockResolvedValue(null),
+        updateSm2: jest.fn().mockResolvedValue(undefined),
+        findDueForProfile: jest.fn().mockResolvedValue([]),
+        incrementMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+        resetMcSuccessCount: jest.fn().mockResolvedValue(undefined),
+      },
+      missedQuizItems: {
+        upsertMissedItems: jest.fn().mockResolvedValue(undefined),
+        softDeleteResolvedItems: jest.fn().mockResolvedValue(undefined),
+      },
+      profiles: { findById: jest.fn().mockResolvedValue(null) },
+      subjects: { findById: jest.fn().mockResolvedValue(null) },
+      xpLedger: { insert: jest.fn().mockResolvedValue(undefined) },
+      vocabulary: {
+        findById: jest.fn().mockResolvedValue(null),
+        findByKey: jest.fn().mockResolvedValue(null),
+      },
+      vocabularyReviews: { upsert: jest.fn().mockResolvedValue(undefined) },
+    };
+
+    createScopedRepoSpy = jest
+      .spyOn(database, 'createScopedRepository')
+      .mockReturnValue(
+        repoSpy as unknown as ReturnType<
+          typeof database.createScopedRepository
+        >,
+      );
+
+    const result = await completeQuizRound(makeMockDb(), PROFILE_ID, ROUND_ID, [
+      { questionIndex: 0, correct: true, answerGiven: 'Paris', timeMs: 2000 },
+    ]);
+
+    // Round completes normally with the correct score.
+    expect(result.score).toBe(1);
+    expect(repoSpy.quizRounds.completeActive).toHaveBeenCalledTimes(1);
   });
 });

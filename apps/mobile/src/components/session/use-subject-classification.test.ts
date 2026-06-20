@@ -606,6 +606,475 @@ describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', (
   });
 });
 
+describe('useSubjectClassification — V2 mentor entry [T25]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+  });
+
+  it('confident single candidate auto-picks silently AND keeps the override chip visible', async () => {
+    const classifyResult = {
+      needsConfirmation: false,
+      candidates: [{ subjectId: 's1', subjectName: 'English' }],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('analyse this passage');
+    });
+
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's1',
+      subjectName: 'English',
+    });
+    // T25: the override chip is always visible under V2 so a confident
+    // mis-commit ("analysis" -> English) can be corrected in one tap.
+    expect(opts.setShowWrongSubjectChip).toHaveBeenCalledWith(true);
+    expect(opts.setPendingSubjectResolution).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).toHaveBeenCalled();
+  });
+
+  it('multiple candidates open narrow inline disambiguation — classifier candidates, NOT the full library grid', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [
+        { subjectId: 's-math', subjectName: 'Mathematics' },
+        { subjectId: 's-eng', subjectName: 'English' },
+      ],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's-math', name: 'Mathematics' },
+        { id: 's-eng', name: 'English' },
+        { id: 's-sci', name: 'Science' },
+        { id: 's-hist', name: 'History' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('help me with analysis');
+    });
+
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'help me with analysis',
+        candidates: [
+          { subjectId: 's-math', subjectName: 'Mathematics' },
+          { subjectId: 's-eng', subjectName: 'English' },
+        ],
+      }),
+    );
+    // Narrow disambiguation, not the 4-subject library grid.
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    expect(pending.candidates).toHaveLength(2);
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('zero candidates with a suggested name silently creates the subject (no picker, no grid)', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: 'Physics',
+    };
+    const opts = createMockOpts({
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'English' },
+        { id: 's2', name: 'Chemistry' },
+      ],
+      createSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          subject: { id: 's-phys', name: 'Physics' },
+        }),
+        isPending: false,
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Tell me about the war of currents');
+    });
+
+    expect(opts.createSubject.mutateAsync).toHaveBeenCalledWith({
+      name: 'Physics',
+      rawInput: 'Tell me about the war of currents',
+    });
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's-phys',
+      subjectName: 'Physics',
+    });
+    expect(opts.setShowWrongSubjectChip).toHaveBeenCalledWith(true);
+    expect(opts.setPendingSubjectResolution).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'Tell me about the war of currents',
+      expect.objectContaining({
+        sessionSubjectId: 's-phys',
+        sessionSubjectName: 'Physics',
+      }),
+    );
+  });
+
+  it('does NOT block a follow-up message with the legacy "pick the subject first" wall — supersedes the stale disambiguation and re-resolves', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'help me with analysis',
+      prompt:
+        'This sounds like it could be Mathematics or English. Which one are we working on?',
+      candidates: [
+        { subjectId: 's-math', subjectName: 'Mathematics' },
+        { subjectId: 's-eng', subjectName: 'English' },
+      ],
+    };
+    const classifyResult = {
+      needsConfirmation: false,
+      candidates: [{ subjectId: 's-math', subjectName: 'Mathematics' }],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      isV2MentorEntry: true,
+      pendingSubjectResolution,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend(
+        'I mean mathematical analysis, derivatives',
+      );
+    });
+
+    expect(opts.showConfirmation).not.toHaveBeenCalledWith(
+      "Pick the subject first, then I'll keep going.",
+    );
+    // Stale disambiguation cleared, fresh message re-classified.
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(null);
+    expect(opts.classifySubject.mutateAsync).toHaveBeenCalledWith({
+      text: 'I mean mathematical analysis, derivatives',
+    });
+    expect(opts.continueWithMessage).toHaveBeenCalled();
+  });
+
+  it('flag OFF (V0/V1): a follow-up message while a subject pick is pending still shows the "pick the subject first" wall', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'help me with analysis',
+      prompt: 'Which one are we working on?',
+      candidates: [{ subjectId: 's-math', subjectName: 'Mathematics' }],
+    };
+    const opts = createMockOpts({
+      // isV2MentorEntry omitted -> falsy
+      pendingSubjectResolution,
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('something else');
+    });
+
+    expect(opts.showConfirmation).toHaveBeenCalledWith(
+      "Pick the subject first, then I'll keep going.",
+    );
+    expect(opts.classifySubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('flag OFF (V0/V1): zero candidates with a suggested name still opens the subject picker grid — no silent create', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: 'Physics',
+    };
+    const opts = createMockOpts({
+      // isV2MentorEntry omitted -> falsy: legacy behavior must be unchanged
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'English' },
+        { id: 's2', name: 'Chemistry' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Tell me about the war of currents');
+    });
+
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt:
+          'This sounds like Physics. Pick a subject below, or tap "+ Physics" to add it.',
+        candidates: [
+          { subjectId: 's1', subjectName: 'English' },
+          { subjectId: 's2', subjectName: 'Chemistry' },
+        ],
+        suggestedSubjectName: 'Physics',
+      }),
+    );
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('useSubjectClassification — V2 homework/camera entry [T25]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+  });
+
+  it('several equally-good candidates open narrow disambiguation chips — classifier candidates, NOT the full library grid', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [
+        { subjectId: 's-math', subjectName: 'Mathematics' },
+        { subjectId: 's-phys', subjectName: 'Physics' },
+      ],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's-math', name: 'Mathematics' },
+        { id: 's-phys', name: 'Physics' },
+        { id: 's-chem', name: 'Chemistry' },
+        { id: 's-bio', name: 'Biology' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+      });
+    });
+
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    expect(pending.candidates).toEqual([
+      { subjectId: 's-math', subjectName: 'Mathematics' },
+      { subjectId: 's-phys', subjectName: 'Physics' },
+    ]);
+    // Narrow disambiguation, not the 4-subject library grid.
+    expect(pending.candidates).toHaveLength(2);
+    // The captured image is preserved across the pick.
+    expect(pending.attachImage).toBe(true);
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('zero candidates with a suggested name opens a tap-to-create card — NO silent create (homework writes durable evidence)', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: 'Physics',
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [{ id: 's1', name: 'English' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+      });
+    });
+
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    expect(pending.suggestedSubjectName).toBe('Physics');
+    // Tap-to-create card, NOT the enrolled-subject grid.
+    expect(pending.candidates).toEqual([]);
+    expect(pending.attachImage).toBe(true);
+    // Homework never silently creates — the learner confirms the new subject.
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('tier-5 floor: zero candidates, no suggestion, resolve finds nothing -> enrolled quick-picks + type-to-create (non-blocking last resort, not a turn-1 grid gate)', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          resolvedName: null,
+          suggestions: [],
+          displayMessage: null,
+        }),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'Math' },
+        { id: 's2', name: 'History' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+      });
+    });
+
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    expect(pending.candidates).toEqual([
+      { subjectId: 's1', subjectName: 'Math' },
+      { subjectId: 's2', subjectName: 'History' },
+    ]);
+    expect(pending.prompt).toBe(
+      'Which subject is this? Pick one of yours, or type a new one.',
+    );
+    expect(pending.attachImage).toBe(true);
+    expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('tier-5 floor with no enrolled subjects -> type-to-create only (no grid to show)', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          resolvedName: null,
+          suggestions: [],
+          displayMessage: null,
+        }),
+      },
+      availableSubjects: [],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+      });
+    });
+
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    expect(pending.candidates).toEqual([]);
+    expect(pending.prompt).toBe(
+      "Which subject is this? Type it and I'll set it up.",
+    );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('a single uncertain candidate auto-picks with the override chip and preserves the image', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [{ subjectId: 's-math', subjectName: 'Mathematics' }],
+      suggestedSubjectName: null,
+    };
+    const imageAttachment = {
+      base64: 'abc',
+      mimeType: 'image/jpeg' as const,
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      isV2MentorEntry: true,
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [{ id: 's-math', name: 'Mathematics' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+        imageAttachment,
+      });
+    });
+
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's-math',
+      subjectName: 'Mathematics',
+    });
+    expect(opts.setShowWrongSubjectChip).toHaveBeenCalledWith(true);
+    expect(opts.setPendingSubjectResolution).not.toHaveBeenCalled();
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'Solve this problem',
+      expect.objectContaining({
+        sessionSubjectId: 's-math',
+        sessionSubjectName: 'Mathematics',
+        attachImage: true,
+        imageAttachment,
+      }),
+    );
+  });
+
+  it('flag OFF (V0/V1): homework zero-match with a suggestion still opens the full subject-library grid — locked, no regression', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: 'Physics',
+    };
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      // isV2MentorEntry omitted -> falsy: legacy homework behavior unchanged
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'English' },
+        { id: 's2', name: 'Chemistry' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this problem', {
+        attachImage: true,
+      });
+    });
+
+    const pending = opts.setPendingSubjectResolution.mock.calls[0][0];
+    // Legacy path shows the full enrolled-subject grid as candidates.
+    expect(pending.candidates).toEqual([
+      { subjectId: 's1', subjectName: 'English' },
+      { subjectId: 's2', subjectName: 'Chemistry' },
+    ]);
+    expect(pending.suggestedSubjectName).toBe('Physics');
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('useSubjectClassification — proxy mode write guard [WI-307]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -693,5 +1162,186 @@ describe('useSubjectClassification — proxy mode write guard [WI-307]', () => {
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
     expect(opts.resolveSubject.mutateAsync).not.toHaveBeenCalled();
     expect(opts.createSubject.mutateAsync).not.toHaveBeenCalled();
+  });
+});
+
+// [WI-859 / QA-03·QA-04] Deterministic classifier branches that the QA flows
+// previously could only exercise through live-model variance. Each forces a
+// specific classifySubject result so the picker branch under test is hit
+// reliably, with no dependency on real LLM output.
+describe('useSubjectClassification — WI-859 deterministic classifier variants', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsParentProxy = false;
+  });
+
+  // Variant (c): a single high-confidence match auto-selects with no picker.
+  it('(c) auto-matches a single high-confidence candidate without a picker', async () => {
+    const classifyResult = {
+      needsConfirmation: false,
+      candidates: [{ subjectId: 's1', subjectName: 'Math', confidence: 0.9 }],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [{ id: 's1', name: 'Math' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('solve 2x + 5 = 15');
+    });
+
+    // Auto-selected silently — no disambiguation picker.
+    expect(opts.setPendingSubjectResolution).not.toHaveBeenCalled();
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's1',
+      subjectName: 'Math',
+    });
+    // Continues straight into the session with the matched subject.
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'solve 2x + 5 = 15',
+      expect.objectContaining({
+        sessionSubjectId: 's1',
+        sessionSubjectName: 'Math',
+      }),
+    );
+  });
+
+  // Variant (d): multiple candidates must open the picker, and choosing the
+  // INTENDED subject (not the first) must drive the session — the regression
+  // that silent first-subject fallback would re-introduce.
+  it('(d) opens a multi-candidate picker and continues with the chosen subject, not the first', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [
+        { subjectId: 's1', subjectName: 'Math', confidence: 0.6 },
+        { subjectId: 's2', subjectName: 'History', confidence: 0.55 },
+      ],
+      suggestedSubjectName: null,
+    };
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'Math' },
+        { id: 's2', name: 'History' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('tell me about the Roman Empire');
+    });
+
+    // Picker is shown with both candidates — no silent auto-pick.
+    expect(opts.setClassifiedSubject).not.toHaveBeenCalled();
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'tell me about the Roman Empire',
+        prompt:
+          'This sounds like it could be Math or History. Which one are we working on?',
+        candidates: [
+          { subjectId: 's1', subjectName: 'Math' },
+          { subjectId: 's2', subjectName: 'History' },
+        ],
+      }),
+    );
+    // Early return into the picker — nothing sent yet.
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+
+    // Now the learner picks the SECOND (intended) candidate. handleResolveSubject
+    // reads pendingSubjectResolution from opts, so we feed the just-captured picker
+    // state into a fresh render — a unit-level stand-in for the user tap. The full
+    // mounted picker-open → tap → resolve state continuity is covered by the
+    // session-screen integration test (index.test.tsx). The point this asserts is
+    // that the CHOSEN candidate (s2), not availableSubjects[0] (s1), drives the
+    // session — the silent-first-subject-fallback regression the WI guards against.
+    const pendingSubjectResolution =
+      opts.setPendingSubjectResolution.mock.calls[0][0];
+    const resolveOpts = createMockOpts({
+      pendingSubjectResolution,
+      availableSubjects: [
+        { id: 's1', name: 'Math' },
+        { id: 's2', name: 'History' },
+      ],
+    });
+    const { result: resolveResult } = renderHook(() =>
+      useSubjectClassification(resolveOpts as any),
+    );
+
+    await act(async () => {
+      await resolveResult.current.handleResolveSubject({
+        subjectId: 's2',
+        subjectName: 'History',
+      });
+    });
+
+    expect(resolveOpts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's2',
+      subjectName: 'History',
+    });
+    expect(resolveOpts.continueWithMessage).toHaveBeenCalledWith(
+      'tell me about the Roman Empire',
+      expect.objectContaining({
+        sessionSubjectId: 's2',
+        sessionSubjectName: 'History',
+      }),
+    );
+  });
+
+  // Variant (f): classifier returns no candidates and no suggestion → the hook
+  // falls back to resolveSubject for richer LLM suggestions before giving up.
+  it('(f) falls back to resolveSubject when the classifier returns no candidates and no suggestion', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: null,
+    };
+    const resolveResult = {
+      resolvedName: null,
+      suggestions: [
+        { name: 'Astronomy', description: 'Study of celestial objects' },
+      ],
+      displayMessage: 'Pick a subject that fits, or create your own.',
+    };
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue(resolveResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'Math' },
+        { id: 's2', name: 'History' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('what is a nebula?');
+    });
+
+    // The resolve fallback is invoked with the raw text…
+    expect(opts.resolveSubject.mutateAsync).toHaveBeenCalledWith({
+      rawInput: 'what is a nebula?',
+    });
+    // …and the resulting suggestions are surfaced in the picker alongside the
+    // learner's existing enrolled subjects as pickable candidates.
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'what is a nebula?',
+        candidates: [
+          { subjectId: 's1', subjectName: 'Math' },
+          { subjectId: 's2', subjectName: 'History' },
+        ],
+        resolveSuggestions: resolveResult.suggestions,
+      }),
+    );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
   });
 });

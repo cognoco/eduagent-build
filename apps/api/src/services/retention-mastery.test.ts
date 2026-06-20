@@ -21,7 +21,9 @@ function createUpdateDb() {
         return {
           where: jest.fn((whereArg: unknown) => {
             call.whereArg = whereArg;
-            return Promise.resolve(undefined);
+            return {
+              returning: jest.fn(() => Promise.resolve([{ id: 'mock-id' }])),
+            };
           }),
         };
       }),

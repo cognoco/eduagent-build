@@ -2,6 +2,7 @@ import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
   closeSession,
+  closeStaleSessions,
   flagContent,
   getSessionCompletionContext,
   matchTopicByIntent,
@@ -21,12 +22,19 @@ import {
 } from './session-crud';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
+import * as profileService from '../profile';
+import * as identityV2Helpers from '../identity-v2/helpers';
+import * as bookGeneration from '../book-generation';
+import * as curriculumService from '../curriculum';
 import {
   childSessionSchema,
   MAX_EXCHANGES_PER_SESSION,
   NotFoundError,
 } from '@eduagent/schemas';
-import type { LearningSession } from '@eduagent/schemas';
+import type {
+  LearningSession,
+  BookTopicGenerationResult,
+} from '@eduagent/schemas';
 
 const PROFILE_ID = '00000000-0000-7000-8000-000000000001';
 const SUBJECT_ID = '00000000-0000-7000-8000-000000000002';
@@ -286,6 +294,7 @@ describe('startFirstCurriculumSession topic intent matcher', () => {
       PROFILE_ID,
       SUBJECT_ID,
       BOOK_ID,
+      { identityV2Enabled: undefined },
     );
     expect(findFirstAvailableTopicId).toHaveBeenCalledTimes(2);
     expect(startSession).toHaveBeenCalledWith(
@@ -740,6 +749,149 @@ describe('startFirstCurriculumSession — deadline exhaustion', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-586] materializeFocusedBookTopics learner-age v2 gating
+// ---------------------------------------------------------------------------
+//
+// materializeFocusedBookTopics resolves the learner age before generating
+// focused-book topics. It must branch between the legacy `getProfileAge` (reads
+// the soon-to-be-dropped `profiles` table) and the v2 `getPersonAge` (reads
+// person/membership) based on the `identityV2Enabled` opt threaded down from
+// the route. After migration 0118 drops `profiles`, the legacy read 500s on
+// live prod, so flag-ON must NOT touch getProfileAge. The flag reaches this
+// private function via startFirstCurriculumSession's `options.identityV2Enabled`
+// → the materialize call site → the 5th `opts` arg, so we drive the real
+// function through startFirstCurriculumSession (only the cross-cut deps are
+// stubbed; materializeFocusedBookTopics itself runs real).
+
+describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
+  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
+  let getPersonAgeSpy: jest.SpiedFunction<
+    typeof identityV2Helpers.getPersonAge
+  >;
+  let generateBookTopicsSpy: jest.SpiedFunction<
+    typeof bookGeneration.generateBookTopics
+  >;
+  let persistBookTopicsSpy: jest.SpiedFunction<
+    typeof curriculumService.persistBookTopics
+  >;
+
+  // A db whose select chain resolves to a single matching book row, satisfying
+  // the book-lookup inside the real materializeFocusedBookTopics. The same
+  // chainable stub is returned at every step so `.limit(1)` awaits to [book].
+  function makeDb(): never {
+    const bookRow = { id: BOOK_ID, title: 'Algebra', description: 'intro' };
+    const chain: Record<string, unknown> = {};
+    chain.select = jest.fn(() => chain);
+    chain.from = jest.fn(() => chain);
+    chain.innerJoin = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.orderBy = jest.fn(() => chain);
+    chain.limit = jest.fn(async () => [bookRow]);
+    return chain as never;
+  }
+
+  function stubFlowDeps(): void {
+    let topicCallCount = 0;
+    __sessionCrudTestHooks.setDependencies({
+      // First lookup: no topic → fire the materialize branch. After materialize:
+      // a topic so the loop completes via startSession.
+      findFirstAvailableTopicId: jest.fn(async () => {
+        topicCallCount++;
+        return topicCallCount >= 2 ? FALLBACK_TOPIC_ID : undefined;
+      }),
+      loadLatestCompletedDraftSignals: jest.fn(async () => undefined),
+      loadSubjectStructureType: jest.fn(async () => 'focused_book' as const),
+      // materializeFocusedBookTopics intentionally NOT stubbed — the real
+      // function runs so its getProfileAge/getPersonAge branch is exercised.
+      matchTopicByIntent: jest.fn(async () => ({
+        topicId: FALLBACK_TOPIC_ID,
+        selectedTopicId: FALLBACK_TOPIC_ID,
+        confidence: null,
+        fallbackReason: 'flag-off' as const,
+        matcherLatencyMs: 1,
+      })),
+      startSession: jest.fn(
+        async () => ({ id: 'sess-1' }) as unknown as LearningSession,
+      ),
+    });
+  }
+
+  beforeEach(() => {
+    stubFlowDeps();
+    getProfileAgeSpy = jest
+      .spyOn(profileService, 'getProfileAge')
+      .mockResolvedValue(12);
+    getPersonAgeSpy = jest
+      .spyOn(identityV2Helpers, 'getPersonAge')
+      .mockResolvedValue(12);
+    generateBookTopicsSpy = jest
+      .spyOn(bookGeneration, 'generateBookTopics')
+      .mockResolvedValue({
+        topics: [
+          {
+            title: 'Topic 1',
+            description: 'd',
+            sortOrder: 0,
+          } as unknown as BookTopicGenerationResult['topics'][number],
+        ],
+        connections: [],
+      } as unknown as BookTopicGenerationResult);
+    persistBookTopicsSpy = jest
+      .spyOn(curriculumService, 'persistBookTopics')
+      .mockResolvedValue(undefined as never);
+  });
+
+  afterEach(() => {
+    getProfileAgeSpy.mockRestore();
+    getPersonAgeSpy.mockRestore();
+    generateBookTopicsSpy.mockRestore();
+    persistBookTopicsSpy.mockRestore();
+  });
+
+  it('flag-off (omitted): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false },
+    );
+    expect(getProfileAgeSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+  });
+
+  it('flag-off (explicit false): resolves learner age via legacy getProfileAge, never getPersonAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false, identityV2Enabled: false },
+    );
+    expect(getProfileAgeSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+    );
+    expect(getPersonAgeSpy).not.toHaveBeenCalled();
+  });
+
+  it('flag-on: resolves learner age via v2 getPersonAge, never legacy getProfileAge', async () => {
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false, identityV2Enabled: true },
+    );
+    expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
+    expect(getProfileAgeSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // matchTopicByIntent — fallback and boundary paths
 // ---------------------------------------------------------------------------
 
@@ -1141,5 +1293,266 @@ describe('[WI-650] getSessionCompletionContext — typed NotFoundError for missi
     await expect(
       getSessionCompletionContext(db, 'prof-1', 'sess-missing'),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// closeStaleSessions — per-session error isolation
+//
+// Regression for the cron-batch abort bug: the inner closeSession loop had no
+// try/catch, so a single throwing session (e.g. a transient DB read error)
+// aborted the entire batch — every stale session AFTER the failing one stayed
+// status='active' until the next cron run, blocking the per-profile
+// post-session pipeline (XP, streaks, memory).
+//
+// Red-green evidence:
+//   GREEN (fix applied):  the middle session throws, the OTHER two still close,
+//     and the failure is surfaced on result.failures + escalated to Sentry.
+//   RED   (fix reverted): closeStaleSessions rejects with the middle session's
+//     error; sessions after it are never processed. This test fails because the
+//     awaited call throws instead of returning a batch.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fake Database that drives the REAL closeStaleSessions + REAL closeSession.
+ *
+ * The database is a true external boundary, so a hand-built fake (not a
+ * jest.mock of internal code) is the sanctioned substitute. It implements
+ * exactly the Drizzle surface the real close path touches:
+ *
+ *   closeStaleSessions: db.query.learningSessions.findMany (the batch query)
+ *   closeSession → getSession: db.query.learningSessions.findFirst (scoped repo)
+ *   closeSession: db.query.sessionEvents.findMany (active-time computation)
+ *   closeSession: db.transaction(fn) → tx.update().set().where().returning()
+ *   createPendingSessionSummary → findSessionSummaryRow:
+ *     db.query.sessionSummaries.findFirst (scoped repo)
+ *   createPendingSessionSummary: tx.insert().values().returning()
+ *
+ * `throwForSessionId` makes findFirst throw for ONE session — a genuine DB read
+ * failure inside the real closeSession, the exact transient-error scenario the
+ * cron must isolate. All other sessions complete the real success path.
+ */
+function makeStaleBatchDb(options: {
+  staleRows: Array<{
+    id: string;
+    profileId: string;
+    subjectId: string;
+    sessionType: string;
+  }>;
+  throwForSessionId: string;
+}) {
+  const STALE_DATE = new Date('2026-01-01T00:00:00.000Z');
+
+  function fullSessionRow(stub: {
+    id: string;
+    profileId: string;
+    subjectId: string;
+    sessionType: string;
+  }) {
+    return {
+      id: stub.id,
+      profileId: stub.profileId,
+      subjectId: stub.subjectId,
+      topicId: null,
+      sessionType: stub.sessionType,
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
+      escalationRung: 0,
+      exchangeCount: 5,
+      startedAt: STALE_DATE,
+      lastActivityAt: STALE_DATE,
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      metadata: null,
+    };
+  }
+
+  // Index the stubs by session id so findFirst resolves the right session
+  // regardless of call order. The scoped repo passes a composed `where` SQL we
+  // cannot introspect cheaply, but getSession queries by `learningSessions.id`,
+  // and Drizzle's `eq(column, value)` exposes that value as the right operand
+  // of the binary expression. We walk the composed condition tree to recover
+  // the queried id, so this fake no longer assumes one-findFirst-per-session in
+  // loop order (the previous shared-cursor coupling to closeSession internals).
+  const stubsById = new Map(options.staleRows.map((r) => [r.id, r]));
+
+  function extractQueriedSessionId(where: unknown): string | undefined {
+    // Drizzle SQL/condition objects are opaque, so scan their enumerable
+    // structure for any string that matches a known stale-session id.
+    const seen = new Set<unknown>();
+    const stack: unknown[] = [where];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (node == null || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (typeof value === 'string' && stubsById.has(value)) {
+          return value;
+        }
+        if (value != null && typeof value === 'object') {
+          stack.push(value);
+        }
+      }
+    }
+    return undefined;
+  }
+
+  const db = {
+    query: {
+      learningSessions: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(options.staleRows.map((r) => fullSessionRow(r))),
+        findFirst: jest
+          .fn()
+          .mockImplementation(async (args?: { where?: unknown }) => {
+            const sessionId = extractQueriedSessionId(args?.where);
+            const stub = sessionId ? stubsById.get(sessionId) : undefined;
+            if (!stub) return undefined;
+            if (stub.id === options.throwForSessionId) {
+              throw new Error(`DB read failed for ${stub.id}`);
+            }
+            return fullSessionRow(stub);
+          }),
+      },
+      sessionEvents: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      sessionSummaries: {
+        // No pre-existing summary → createPendingSessionSummary inserts a new one
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(txBuilder),
+      ),
+  };
+
+  // Chainable tx builder covering update(...).set(...).where(...).returning()
+  // and insert(...).values(...).returning(). Shares db.query so that
+  // createPendingSessionSummary's scoped findSessionSummaryRow(txDb, ...) read
+  // resolves through the same fake surface.
+  const txBuilder = {
+    query: db.query,
+    update: () => txBuilder,
+    set: () => txBuilder,
+    where: () => txBuilder,
+    returning: async () => [{ id: 'closed-row' }],
+    insert: () => txBuilder,
+    values: () => txBuilder,
+  };
+
+  return db as never;
+}
+
+describe('closeStaleSessions — per-session error isolation', () => {
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+
+  beforeEach(() => {
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    captureExceptionSpy.mockRestore();
+  });
+
+  it('closes the other sessions when one throws, and surfaces + escalates the failure', async () => {
+    const staleRows = [
+      {
+        id: 'sess-a',
+        profileId: 'prof-a',
+        subjectId: 'subj-a',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-b',
+        profileId: 'prof-b',
+        subjectId: 'subj-b',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-c',
+        profileId: 'prof-c',
+        subjectId: 'subj-c',
+        sessionType: 'learning',
+      },
+    ];
+    const db = makeStaleBatchDb({ staleRows, throwForSessionId: 'sess-b' });
+
+    const result = await closeStaleSessions(
+      db,
+      new Date('2026-06-01T00:00:00.000Z'),
+    );
+
+    // The batch must NOT abort: the two healthy sessions are still closed.
+    const closedIds = result.sessions.map((r) => r.sessionId).sort();
+    expect(closedIds).toEqual(['sess-a', 'sess-c']);
+
+    // The failure is surfaced on the returned batch (observable outcome).
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      sessionId: 'sess-b',
+      profileId: 'prof-b',
+    });
+    expect(result.failures[0]!.error).toContain('DB read failed for sess-b');
+
+    // Silent recovery is banned: the failure is escalated to Sentry.
+    expect(captureExceptionSpy).toHaveBeenCalledTimes(1);
+    const [, context] = captureExceptionSpy.mock.calls[0] as [
+      unknown,
+      { extra?: { sessionId?: string } },
+    ];
+    expect(context?.extra?.sessionId).toBe('sess-b');
+  });
+
+  // Regression for SHOULD_FIX #1 (the serialization bug): the cron calls
+  // closeStaleSessions INSIDE step.run(...), and Inngest JSON-serializes the
+  // step's return value for memoization. The previous shape — an array with a
+  // non-enumerable `failures` property — lost `failures` across that boundary
+  // (JSON.stringify drops non-enumerable + named non-index array properties),
+  // so the failure-surfacing channel was silently undefined in production.
+  // A plain { sessions, failures } object survives the round-trip; this test
+  // would have caught the bug.
+  it('[SHOULD_FIX #1] failures survive a JSON round-trip (Inngest step.run boundary)', async () => {
+    const staleRows = [
+      {
+        id: 'sess-a',
+        profileId: 'prof-a',
+        subjectId: 'subj-a',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-b',
+        profileId: 'prof-b',
+        subjectId: 'subj-b',
+        sessionType: 'learning',
+      },
+    ];
+    const db = makeStaleBatchDb({ staleRows, throwForSessionId: 'sess-b' });
+
+    const result = await closeStaleSessions(
+      db,
+      new Date('2026-06-01T00:00:00.000Z'),
+    );
+
+    // Pre-condition: the in-memory result carries the failure.
+    expect(result.failures).toHaveLength(1);
+
+    // Simulate the Inngest step.run memoization boundary.
+    const roundTripped = JSON.parse(JSON.stringify(result));
+    expect(roundTripped.failures).toEqual(result.failures);
+    expect(roundTripped.sessions).toEqual(result.sessions);
   });
 });

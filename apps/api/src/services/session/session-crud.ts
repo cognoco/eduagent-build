@@ -62,6 +62,7 @@ import { deleteTopicIfSafe, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
 import { getProfileAge } from '../profile';
+import { getPersonAge } from '../identity-v2/helpers';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
@@ -468,6 +469,7 @@ async function materializeFocusedBookTopics(
   profileId: string,
   subjectId: string,
   bookId: string,
+  opts: { identityV2Enabled?: boolean } = {},
 ): Promise<void> {
   const [book] = await db
     .select({
@@ -490,7 +492,9 @@ async function materializeFocusedBookTopics(
     throw new NotFoundError('Book');
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
+  const learnerAge = opts.identityV2Enabled
+    ? await getPersonAge(db, profileId)
+    : await getProfileAge(db, profileId);
   let result: BookTopicGenerationResult;
   try {
     result = await withTimeout(
@@ -862,7 +866,7 @@ export async function startFirstCurriculumSession(
   profileId: string,
   subjectId: string,
   input: FirstCurriculumSessionStartInput,
-  options: { matcherEnabled?: boolean } = {},
+  options: { matcherEnabled?: boolean; identityV2Enabled?: boolean } = {},
 ): Promise<LearningSession> {
   const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
@@ -891,6 +895,7 @@ export async function startFirstCurriculumSession(
         profileId,
         subjectId,
         input.bookId,
+        { identityV2Enabled: options.identityV2Enabled },
       );
       topicId = await sessionCrudDependencies.findFirstAvailableTopicId(
         db,
@@ -1188,28 +1193,49 @@ export async function closeSession(
   };
 }
 
+export interface StaleSessionCloseResult {
+  profileId: string;
+  sessionId: string;
+  topicId: string | null;
+  subjectId: string;
+  sessionType: string;
+  verificationType: string | null;
+  wallClockSeconds: number;
+  summaryStatus:
+    | 'pending'
+    | 'submitted'
+    | 'accepted'
+    | 'skipped'
+    | 'auto_closed';
+  interleavedTopicIds?: string[];
+  escalationRungs?: number[];
+}
+
+export interface StaleSessionCloseFailure {
+  profileId: string;
+  sessionId: string;
+  error: string;
+}
+
+/**
+ * Plain object carrying both the successfully-closed sessions and the
+ * per-session failures. It is a plain object (NOT an array with an attached
+ * property) so that the `failures` channel survives the Inngest `step.run`
+ * JSON boundary: the cron calls `closeStaleSessions` inside `step.run(...)`,
+ * whose return value Inngest JSON-serializes for memoization. `JSON.stringify`
+ * drops non-enumerable properties and named (non-index) properties of arrays,
+ * so an array-with-`failures` shape would silently lose `failures` after the
+ * step boundary. Consumers read `.sessions` and `.failures` explicitly.
+ */
+export interface StaleSessionCloseBatch {
+  sessions: StaleSessionCloseResult[];
+  failures: StaleSessionCloseFailure[];
+}
+
 export async function closeStaleSessions(
   db: Database,
   cutoff: Date,
-): Promise<
-  Array<{
-    profileId: string;
-    sessionId: string;
-    topicId: string | null;
-    subjectId: string;
-    sessionType: string;
-    verificationType: string | null;
-    wallClockSeconds: number;
-    summaryStatus:
-      | 'pending'
-      | 'submitted'
-      | 'accepted'
-      | 'skipped'
-      | 'auto_closed';
-    interleavedTopicIds?: string[];
-    escalationRungs?: number[];
-  }>
-> {
+): Promise<StaleSessionCloseBatch> {
   // Intentional cross-profile batch query: this cron scans all active sessions
   // and closes only those stale beyond the cutoff, so scoped-repo access does
   // not apply here.
@@ -1220,47 +1246,61 @@ export async function closeStaleSessions(
     ),
   });
 
-  const results: Array<{
-    profileId: string;
-    sessionId: string;
-    topicId: string | null;
-    subjectId: string;
-    sessionType: string;
-    verificationType: string | null;
-    wallClockSeconds: number;
-    summaryStatus:
-      | 'pending'
-      | 'submitted'
-      | 'accepted'
-      | 'skipped'
-      | 'auto_closed';
-    interleavedTopicIds?: string[];
-    escalationRungs?: number[];
-  }> = [];
+  const results: StaleSessionCloseResult[] = [];
+  const failures: StaleSessionCloseFailure[] = [];
 
   for (const staleSession of staleSessions) {
-    const result = await closeSession(
-      db,
-      staleSession.profileId,
-      staleSession.id,
-      {
-        reason: 'silence_timeout',
-        summaryStatus: 'auto_closed',
-      },
-    );
+    // [BUG] Per-session error isolation: a single throwing close must not
+    // abort the whole backlog. Without this try/catch, every stale session
+    // AFTER the failing one stays status='active' until the next cron run.
+    // On failure we escalate via Sentry (silent recovery is banned) and
+    // continue, surfacing the failure in the returned batch's `failures`
+    // channel so the cron's outcome is observable.
+    try {
+      const result = await closeSession(
+        db,
+        staleSession.profileId,
+        staleSession.id,
+        {
+          reason: 'silence_timeout',
+          summaryStatus: 'auto_closed',
+        },
+      );
 
-    // BD-05: Skip sessions that were resumed between read and write
-    if (result.message === 'Session already closed or resumed') {
-      continue;
+      // BD-05: Skip sessions that were resumed between read and write
+      if (result.message === 'Session already closed or resumed') {
+        continue;
+      }
+
+      results.push({
+        profileId: staleSession.profileId,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('closeStaleSessions: failed to close a stale session', {
+        profileId: staleSession.profileId,
+        sessionId: staleSession.id,
+        error: message,
+      });
+      captureException(error, {
+        tags: { area: 'session-stale-cleanup' },
+        extra: {
+          profileId: staleSession.profileId,
+          sessionId: staleSession.id,
+        },
+      });
+      failures.push({
+        profileId: staleSession.profileId,
+        sessionId: staleSession.id,
+        error: message,
+      });
     }
-
-    results.push({
-      profileId: staleSession.profileId,
-      ...result,
-    });
   }
 
-  return results;
+  // Return a plain object so `failures` survives the Inngest step.run JSON
+  // boundary (see StaleSessionCloseBatch doc above).
+  return { sessions: results, failures };
 }
 
 export async function getSessionCompletionContext(

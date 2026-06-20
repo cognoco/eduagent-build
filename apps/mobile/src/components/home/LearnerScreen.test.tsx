@@ -801,6 +801,162 @@ describe('LearnerScreen', () => {
     });
   });
 
+  // [CC-05 / WI-865] Priority-collision proof. The coach-band priority chain in
+  // LearnerScreen's `coachBand` useMemo is: fresh recovery marker > server resume
+  // target > overdue review > quiz discovery. The single-arm tests above each
+  // assert one arm in isolation; this test is the deterministic proof that a
+  // FRESH recovery marker wins when a server resume target AND overdue review
+  // topics are ALSO present at the same time — the exact collision a continuation
+  // regression would silently break. It is the unit-side proof for the parked
+  // native cold-start E2E (apps/mobile/e2e/flows/learning/resume-crash-recovery.yaml).
+  it('[CC-05] fresh recovery marker wins over resume target AND overdue review collision', async () => {
+    // Fresh recovery marker (recovery arm — priority 1).
+    mockReadSessionRecoveryMarker.mockResolvedValue({
+      sessionId: 'recovery-session',
+      subjectId: 'recovery-subject',
+      subjectName: 'Physics',
+      topicId: 'recovery-topic',
+      topicName: 'Velocity',
+      mode: 'learning',
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Server resume target ALSO present (resume arm — priority 2). Distinct
+    // sessionId so we can prove the recovery sessionId — not this one — is used.
+    mockFetch.setRoute('/progress/resume-target', {
+      target: {
+        subjectId: 'resume-subject',
+        subjectName: 'Math',
+        topicId: 'resume-topic',
+        topicTitle: 'Fractions',
+        sessionId: 'resume-session',
+        resumeFromSessionId: null,
+        resumeKind: 'active_session',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Resume Fractions',
+      },
+    });
+
+    // Overdue review ALSO present (overdue arm — priority 3).
+    mockFetch.setRoute('/progress/review-summary', {
+      totalOverdue: 3,
+      nextReviewTopic: {
+        topicId: 'overdue-topic',
+        subjectId: 'overdue-subject',
+        subjectName: 'History',
+        topicTitle: 'Algebra',
+      },
+      nextUpcomingReviewAt: null,
+    });
+
+    renderLearner();
+
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      // Recovery headline shown; resume + overdue headlines suppressed.
+      screen.getByText(/Pick up where you stopped in Velocity/);
+    });
+    expect(
+      screen.queryByText(/Pick up where you left off in Fractions/),
+    ).toBeNull();
+    expect(screen.queryByText(/Revisit Algebra/)).toBeNull();
+
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+
+    // Recovery Continue: profile-scoped marker cleared, pushes the SESSION route
+    // with the recovery sessionId/params.
+    expect(mockClearSessionRecoveryMarker).toHaveBeenCalledWith('p1');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        sessionId: 'recovery-session',
+        subjectId: 'recovery-subject',
+        subjectName: 'Physics',
+        mode: 'learning',
+        topicId: 'recovery-topic',
+        topicName: 'Velocity',
+        ...HOME_RETURN_PARAMS,
+      },
+    });
+
+    // The resume arm (pushLearningResumeTarget) seeds /(app)/home before the
+    // session push — it must NOT have run. The overdue arm pushes
+    // /(app)/topic/relearn — it must NOT have run either.
+    expect(mockPush).not.toHaveBeenCalledWith('/(app)/home');
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/topic/relearn' }),
+    );
+    // And the resume sessionId must never reach a session push.
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ sessionId: 'resume-session' }),
+      }),
+    );
+  });
+
+  // [CC-05 / WI-865] Sibling priority proof: with NO recovery marker, a server
+  // resume target beats overdue review (priority 2 > priority 3). Proves the
+  // ordering below the recovery arm, completing the collision matrix.
+  it('[CC-05] resume target wins over overdue review when no recovery marker', async () => {
+    mockReadSessionRecoveryMarker.mockResolvedValue(null);
+
+    mockFetch.setRoute('/progress/resume-target', {
+      target: {
+        subjectId: 'resume-subject',
+        subjectName: 'Math',
+        topicId: 'resume-topic',
+        topicTitle: 'Fractions',
+        sessionId: 'resume-session',
+        resumeFromSessionId: null,
+        resumeKind: 'active_session',
+        lastActivityAt: '2026-02-15T09:00:00.000Z',
+        reason: 'Resume Fractions',
+      },
+    });
+    mockFetch.setRoute('/progress/review-summary', {
+      totalOverdue: 3,
+      nextReviewTopic: {
+        topicId: 'overdue-topic',
+        subjectId: 'overdue-subject',
+        subjectName: 'History',
+        topicTitle: 'Algebra',
+      },
+      nextUpcomingReviewAt: null,
+    });
+
+    renderLearner();
+
+    await waitFor(() => {
+      screen.getByTestId('home-coach-band');
+      screen.getByText(/Pick up where you left off in Fractions/);
+    });
+    expect(screen.queryByText(/Revisit Algebra/)).toBeNull();
+
+    fireEvent.press(screen.getByTestId('home-coach-band-continue'));
+
+    // Resume arm ran (pushLearningResumeTarget seeds /(app)/home FIRST, then the
+    // session). Assert ordered calls so a sequencing regression — pushing the
+    // session before seeding the ancestor /(app)/home (the cross-tab back-stack
+    // rule) — is caught, not just that both pushes happened.
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 'resume-subject',
+        subjectName: 'Math',
+        topicId: 'resume-topic',
+        topicName: 'Fractions',
+        sessionId: 'resume-session',
+        ...HOME_RETURN_PARAMS,
+      },
+    });
+    // Overdue arm did NOT run.
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/topic/relearn' }),
+    );
+  });
+
   it('silently clears stale markers without showing coach band', async () => {
     mockReadSessionRecoveryMarker.mockResolvedValue({
       sessionId: 'session-1',

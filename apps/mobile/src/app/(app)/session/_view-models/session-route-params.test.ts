@@ -102,6 +102,36 @@ describe('session-route-params', () => {
     expect(params.chatBackFallback).toBe('/(app)/shelf/subject-1');
   });
 
+  it('keeps V2 mentor homework entry separate from camera source and maps back to Mentor', () => {
+    const params = getSessionRouteParams({
+      mode: 'homework',
+      returnTo: 'mentor',
+      entrySource: 'mentor',
+      captureSource: 'camera',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      problemText: 'Solve 2x + 5 = 17',
+    });
+
+    expect(params).toMatchObject({
+      homeworkEntrySource: 'mentor',
+      homeworkCaptureSource: 'camera',
+      homeBackHref: '/(app)/mentor',
+      chatBackFallback: '/(app)/mentor',
+      mentorHomeworkWrapUpFrame: 'mentor-homework',
+    });
+  });
+
+  it('ignores unsupported homework entry sources', () => {
+    const params = getSessionRouteParams({
+      mode: 'homework',
+      returnTo: 'mentor',
+      entrySource: 'camera',
+    });
+
+    expect(params.homeworkEntrySource).toBeUndefined();
+    expect(params.mentorHomeworkWrapUpFrame).toBeUndefined();
+  });
+
   it('keeps object return targets out of ChatShell backFallback', () => {
     const params = getSessionRouteParams({
       returnTo: 'family-recaps',

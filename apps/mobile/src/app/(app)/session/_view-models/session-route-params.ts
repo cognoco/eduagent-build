@@ -1,8 +1,12 @@
 import type { HomeworkCaptureSource, HomeworkProblem } from '@eduagent/schemas';
 
 import { parseHomeworkProblems } from '../../../../components/homework/problem-cards';
-import { homeHrefForReturnTo } from '../../../../lib/navigation';
 import { firstParam } from '../../../../lib/route-params';
+import {
+  homeworkReturnHrefForReturnTo,
+  normalizeHomeworkEntrySource,
+  type HomeworkEntrySource,
+} from '../../homework/_view-models/homework-session-params';
 
 export interface RawSessionRouteParams {
   mode?: string | string[];
@@ -11,6 +15,7 @@ export interface RawSessionRouteParams {
   homeworkProblems?: string | string[];
   ocrText?: string | string[];
   captureSource?: string | string[];
+  entrySource?: string | string[];
   gaps?: string | string[];
   returnTo?: string | string[];
   returnId?: string | string[];
@@ -27,10 +32,12 @@ export interface SessionRouteParams {
   gaps: string[] | undefined;
   normalizedOcrText: string | undefined;
   homeworkCaptureSource: HomeworkCaptureSource | undefined;
+  homeworkEntrySource: HomeworkEntrySource | undefined;
   initialHomeworkProblems: HomeworkProblem[];
   initialProblemText: string | undefined;
-  homeBackHref: ReturnType<typeof homeHrefForReturnTo>;
+  homeBackHref: ReturnType<typeof homeworkReturnHrefForReturnTo>;
   chatBackFallback: string | undefined;
+  mentorHomeworkWrapUpFrame: 'mentor-homework' | undefined;
 }
 
 function parseGaps(
@@ -69,7 +76,10 @@ export function getSessionRouteParams(
   const returnId = firstParam(rawParams.returnId);
   const effectiveMode = firstParam(rawParams.mode) ?? 'freeform';
   const problemText = firstParam(rawParams.problemText);
-  const homeBackHref = homeHrefForReturnTo(returnTo, returnId);
+  const homeBackHref = homeworkReturnHrefForReturnTo(returnTo, returnId);
+  const homeworkEntrySource = normalizeHomeworkEntrySource(
+    rawParams.entrySource,
+  );
   const initialHomeworkProblems =
     effectiveMode === 'homework'
       ? parseHomeworkProblems(rawParams.homeworkProblems, problemText)
@@ -86,6 +96,7 @@ export function getSessionRouteParams(
     homeworkCaptureSource: normalizeHomeworkCaptureSource(
       rawParams.captureSource,
     ),
+    homeworkEntrySource,
     initialHomeworkProblems,
     initialProblemText: initialHomeworkProblems[0]?.text ?? problemText,
     homeBackHref,
@@ -95,6 +106,12 @@ export function getSessionRouteParams(
         : undefined
       : subjectId
         ? `/(app)/shelf/${subjectId}`
+        : undefined,
+    mentorHomeworkWrapUpFrame:
+      effectiveMode === 'homework' &&
+      homeworkEntrySource === 'mentor' &&
+      returnTo === 'mentor'
+        ? 'mentor-homework'
         : undefined,
   };
 }

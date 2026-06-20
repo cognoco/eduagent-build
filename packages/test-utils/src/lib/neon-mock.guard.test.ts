@@ -9,7 +9,9 @@
 //   - the helper's own source (`neon-mock.ts`)
 //   - the test-utils barrel export (`index.ts`) and its README
 //   - the API test-utils factory (`apps/api/src/test-utils/database-module.ts`)
-//   - everything under `docs/`, `.claude/`, `node_modules/`, `dist/`
+//   - everything under `docs/`, `.claude/`, `_wip/`, `node_modules/`, `dist/`
+//     (`_wip/` holds working notes / handoff docs / plans — prose that may name
+//     `createMockDb` when describing a past debugging session; never production code)
 //
 // If you find yourself wanting to add an exception here, instead refactor the
 // production import to use `createIntegrationDb` or a fixture-aware factory.
@@ -71,6 +73,7 @@ describe('[CR-2026-05-21-183] createMockDb import guard', () => {
             ':(exclude)**/*.test.jsx',
             ':(exclude)docs/**',
             ':(exclude).claude/**',
+            ':(exclude)_wip/**',
             ':(exclude)node_modules/**',
             ':(exclude)**/node_modules/**',
             ':(exclude)**/dist/**',

@@ -212,6 +212,23 @@ export async function generateCategorizedBookSuggestions(
         return { kind: 'short_circuit', outcome: 'lock_loser' };
       }
 
+      const [freshSubject] = await tx
+        .select({
+          lastAttemptedAt: subjects.bookSuggestionsLastGenerationAttemptedAt,
+        })
+        .from(subjects)
+        .where(
+          and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+        )
+        .limit(1);
+      if (!freshSubject) {
+        return { kind: 'short_circuit', outcome: 'no_subject' };
+      }
+      const freshLast = freshSubject.lastAttemptedAt;
+      if (freshLast && Date.now() - freshLast.getTime() < COOLDOWN_MS) {
+        return { kind: 'short_circuit', outcome: 'cooldown' };
+      }
+
       const unpickedNow = await tx
         .select({ id: bookSuggestions.id })
         .from(bookSuggestions)
@@ -285,8 +302,8 @@ export async function generateCategorizedBookSuggestions(
   );
 
   if (phase1.kind === 'short_circuit') {
-    if (phase1.outcome === 'lock_loser') {
-      emitFailureMetric(profileId, subjectId, 'lock_loser');
+    if (phase1.outcome !== 'success') {
+      emitFailureMetric(profileId, subjectId, phase1.outcome);
     }
     return phase1.outcome;
   }
@@ -321,6 +338,24 @@ export async function generateCategorizedBookSuggestions(
   } catch (error) {
     const reason = classifyError(error);
     emitFailureMetric(profileId, subjectId, reason);
+    // [BUG-861] Only genuine transient infra blips (network/timeout) reset the
+    // cooldown stamp so the learner can retry immediately. quota and unknown
+    // keep the stamp — see isTransientFailure() for the full rationale. Reset
+    // errors are swallowed: the primary failure reason is still returned, and
+    // the stamp falling through on a reset failure is acceptable (cooldown
+    // expires naturally).
+    if (isTransientFailure(reason)) {
+      try {
+        await db
+          .update(subjects)
+          .set({ bookSuggestionsLastGenerationAttemptedAt: null })
+          .where(
+            and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
+          );
+      } catch {
+        // Swallow reset errors — the original failure reason is the signal.
+      }
+    }
     return reason;
   }
 
@@ -346,24 +381,12 @@ export async function generateCategorizedBookSuggestions(
   // claimed the cooldown after we released the lock).
   // ---------------------------------------------------------------------
   return db.transaction(async (tx): Promise<GenerationOutcome> => {
-    const lockResult = await tx.execute(
-      sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
+    // Phase 3 has no external work, so it can wait for the short lock. A
+    // try-lock loser here may only be racing a cooldown-only caller, not an
+    // inserter, and returning success would drop all generated suggestions.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
     );
-    const rows =
-      (lockResult as unknown as { rows?: Array<{ got: boolean }> }).rows ??
-      (lockResult as unknown as Array<{ got: boolean }>);
-    if (!Array.isArray(rows) || typeof rows[0]?.got !== 'boolean') {
-      throw new Error(
-        'pg_try_advisory_xact_lock returned an unexpected Drizzle result shape — ' +
-          'driver may have been upgraded. Inspect the shape and update the cast in ' +
-          'book-suggestion-generation.ts.',
-      );
-    }
-    if (!rows[0].got) {
-      // Another writer is mid-insert with the same lock. The unique index on
-      // (subject_id, lower(title)) will dedupe; treat as success.
-      return 'success';
-    }
 
     const unpickedNow = await tx
       .select({ id: bookSuggestions.id })
@@ -540,6 +563,19 @@ function classifyError(error: unknown): FailureReason {
   if (lower.includes('json') || lower.includes('parse')) return 'parse';
   if (lower.includes('network') || lower.includes('fetch')) return 'network';
   return 'unknown';
+}
+
+/**
+ * [BUG-861] Only genuine transient infra blips (network/timeout) reset the
+ * cooldown stamp. 'quota' is excluded: retrying immediately hammers an
+ * already-exhausted provider and the integration test encodes this invariant
+ * (cooldown must still block the second call after a quota failure). 'unknown'
+ * is a catch-all that must conservatively KEEP the cooldown rather than open
+ * the door to unbounded retries on unclassified errors. Deterministic failures
+ * (parse, all_filtered) also keep the stamp.
+ */
+function isTransientFailure(reason: FailureReason): boolean {
+  return reason === 'network' || reason === 'timeout';
 }
 
 function getLanguageDisplayName(languageCode: string): string | null {

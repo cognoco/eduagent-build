@@ -1119,6 +1119,40 @@ describe('getProfileDisplayName — archived-profile guard', () => {
 
 describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch', () => {
   /**
+   * Minimal person row for v2 updateProfileAppContext tests.
+   * Only includes fields the implementation reads from person/update.returning().
+   */
+  function mockPersonRow(
+    overrides?: Partial<{
+      id: string;
+      birthDate: string;
+      isOwner: boolean;
+      defaultAppContext: 'study' | 'family' | null;
+      displayName: string;
+    }>,
+  ) {
+    const isOwner = overrides?.isOwner ?? false;
+    return {
+      id: overrides?.id ?? 'person-1',
+      birthDate:
+        overrides?.birthDate ?? (isOwner ? '1985-01-01' : '2012-05-15'),
+      displayName: overrides?.displayName ?? 'Test Person',
+      avatarUrl: null as string | null,
+      residenceJurisdiction: null as string | null,
+      conversationLanguage: 'en',
+      pronouns: null as string | null,
+      defaultAppContext: overrides?.defaultAppContext ?? null,
+      archivedAt: null as Date | null,
+      createdAt: NOW,
+      updatedAt: NOW,
+      // membership roles (for the membership mock)
+      _roles: isOwner
+        ? (['admin', 'learner'] as string[])
+        : (['learner'] as string[]),
+    };
+  }
+
+  /**
    * A DB stub that exercises the REAL v2 helpers (no module mock):
    *  - owner branch → getChargePersonIds → db.query.guardianship.findMany
    *  - non-owner branch → db.query.guardianship.findFirst (direct read)
@@ -1129,7 +1163,7 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
    * findFirst (non-owner path). Both default to "no active edges".
    */
   function makeV2Db(
-    ownerRow: ReturnType<typeof mockProfileRow>,
+    personData: ReturnType<typeof mockPersonRow>,
     opts: {
       chargeRows?: Array<{ chargePersonId: string }>;
       guardianshipEdge?: { grantedAt: Date };
@@ -1137,18 +1171,25 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   ) {
     const findMany = jest.fn().mockResolvedValue(opts.chargeRows ?? []);
     const findFirst = jest.fn().mockResolvedValue(opts.guardianshipEdge);
+    const { _roles, ...personRow } = personData;
     return {
       query: {
-        profiles: {
-          findFirst: jest.fn().mockResolvedValue(ownerRow),
+        person: {
+          findFirst: jest.fn().mockResolvedValue(personRow),
         },
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({ roles: _roles }),
+        },
+        // consent tables: return no grant/request → null consentStatus
+        consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
         // No familyLinks — post-M-DROP simulation
         guardianship: { findMany, findFirst },
       },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([ownerRow]),
+            returning: jest.fn().mockResolvedValue([personRow]),
           }),
         }),
       }),
@@ -1156,13 +1197,12 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   }
 
   it('[WI-803][BREAK] flag-on owner: reads guardianship (real getChargePersonIds), NOT familyLinks (post-M-DROP safe)', async () => {
-    const ownerRow = mockProfileRow({
+    const personData = mockPersonRow({
       id: 'owner-1',
-      birthYear: 1985,
       isOwner: true,
       defaultAppContext: 'study',
     });
-    const db = makeV2Db(ownerRow, {
+    const db = makeV2Db(personData, {
       chargeRows: [{ chargePersonId: 'child-person-1' }],
     });
 
@@ -1185,13 +1225,12 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   });
 
   it('[WI-803][BREAK] flag-on owner with no charges: hasFamilyLinks = false (post-M-DROP safe)', async () => {
-    const ownerRow = mockProfileRow({
+    const personData = mockPersonRow({
       id: 'owner-2',
-      birthYear: 1985,
       isOwner: true,
       defaultAppContext: 'study',
     });
-    const db = makeV2Db(ownerRow, { chargeRows: [] });
+    const db = makeV2Db(personData, { chargeRows: [] });
 
     const result = await updateProfileAppContext(
       db,
@@ -1209,14 +1248,14 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   });
 
   it('[WI-803][BREAK] flag-on non-owner: reads guardianship edge, NOT familyLinks (post-M-DROP safe)', async () => {
-    const childRow = mockProfileRow({
+    const personData = mockPersonRow({
       id: 'child-1',
-      birthYear: 2012,
+      birthDate: '2012-05-15',
       isOwner: false,
       defaultAppContext: 'study',
     });
     const grantedAt = new Date('2026-02-03T04:05:06.000Z');
-    const db = makeV2Db(childRow, { guardianshipEdge: { grantedAt } });
+    const db = makeV2Db(personData, { guardianshipEdge: { grantedAt } });
 
     const result = await updateProfileAppContext(
       db,
@@ -1237,13 +1276,13 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
   });
 
   it('[WI-803][BREAK] flag-on non-owner with no active edge: hasFamilyLinks = false, linkCreatedAt = null', async () => {
-    const childRow = mockProfileRow({
+    const personData = mockPersonRow({
       id: 'child-2',
-      birthYear: 2012,
+      birthDate: '2012-05-15',
       isOwner: false,
       defaultAppContext: 'study',
     });
-    const db = makeV2Db(childRow, { guardianshipEdge: undefined });
+    const db = makeV2Db(personData, { guardianshipEdge: undefined });
 
     const result = await updateProfileAppContext(
       db,

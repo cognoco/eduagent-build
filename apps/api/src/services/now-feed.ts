@@ -19,11 +19,14 @@ import {
   mentorActivityLedger,
   needsDeepeningTopics,
   parkingLotItems,
+  person,
   retentionCards,
   subjects,
+  supportership,
   type Database,
 } from '@eduagent/database';
 import {
+  ForbiddenError,
   ledgerKindSchema,
   parseLedgerParams,
   type NowCard,
@@ -32,6 +35,7 @@ import {
   type NowDeepLinkRoute,
   type NowOverflowItem,
   type NowOverflowResponse,
+  type NowQuery,
   type NowResponse,
   type NowScope,
 } from '@eduagent/schemas';
@@ -67,6 +71,7 @@ export const ROUTE_CATALOG = {
     params: ['subjectId', 'topicId'],
     chain: ['subject.hub'],
   },
+  journal: { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,
   { params: readonly string[]; chain: readonly NowDeepLinkRoute[] }
@@ -81,6 +86,8 @@ export interface NowFeedCandidate {
   params: Record<string, unknown>;
   deepLink: NowDeepLink;
   scope: NowScope;
+  personId?: string;
+  edgeId?: string;
   ledgerId?: string;
 }
 
@@ -189,6 +196,8 @@ function toCard(candidate: NowFeedCandidate): NowCard {
     params: candidate.params,
     deepLink: candidate.deepLink,
     scope: candidate.scope,
+    ...(candidate.personId ? { personId: candidate.personId } : {}),
+    ...(candidate.edgeId ? { edgeId: candidate.edgeId } : {}),
   };
 }
 
@@ -225,20 +234,34 @@ export function buildNowOverflowFromCandidates(
 export async function buildNowFeed(
   db: Database,
   profileId: string,
-  scope: NowScope = 'self',
+  query: NowScope | NowQuery = 'self',
 ): Promise<NowResponse> {
   const now = new Date();
-  const candidates = await collectNowCandidates(db, profileId, scope, now);
+  const request = normalizeNowQuery(query);
+  const target = await resolveNowTarget(db, profileId, request);
+  const candidates =
+    request.scope === 'supporter-hub'
+      ? []
+      : await collectNowCandidates(
+          db,
+          target.personId,
+          request.scope,
+          now,
+          request.scope === 'self' ? 'self' : 'supporter',
+          target.edgeId,
+        );
   const sorted = rankCandidates(candidates, now);
   const ledgerIds = sorted
     .slice(0, 3)
     .map((candidate) => candidate.ledgerId)
     .filter((id): id is string => typeof id === 'string');
 
-  await markMomentSurfaced(db, profileId, ledgerIds);
+  if (request.scope === 'self') {
+    await markMomentSurfaced(db, profileId, ledgerIds);
+  }
 
   return {
-    scope,
+    scope: request.scope,
     cards: sorted.slice(0, 3).map(toCard),
     overflowCount: Math.max(0, sorted.length - 3),
     generatedAt: now.toISOString(),
@@ -248,11 +271,62 @@ export async function buildNowFeed(
 export async function buildNowOverflow(
   db: Database,
   profileId: string,
-  scope: NowScope = 'self',
+  query: NowScope | NowQuery = 'self',
 ): Promise<NowOverflowResponse> {
   const now = new Date();
-  const candidates = await collectNowCandidates(db, profileId, scope, now);
-  return buildNowOverflowFromCandidates(candidates, scope, now);
+  const request = normalizeNowQuery(query);
+  const target = await resolveNowTarget(db, profileId, request);
+  const candidates =
+    request.scope === 'supporter-hub'
+      ? []
+      : await collectNowCandidates(
+          db,
+          target.personId,
+          request.scope,
+          now,
+          request.scope === 'self' ? 'self' : 'supporter',
+          target.edgeId,
+        );
+  return buildNowOverflowFromCandidates(candidates, request.scope, now);
+}
+
+function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
+  return typeof query === 'string' ? { scope: query } : query;
+}
+
+async function resolveNowTarget(
+  db: Database,
+  profileId: string,
+  query: NowQuery,
+): Promise<{ personId: string; edgeId?: string }> {
+  if (query.scope !== 'person') {
+    return { personId: profileId };
+  }
+
+  if (!query.personId) {
+    throw new ForbiddenError('Person scope requires a personId.');
+  }
+
+  const rows = await db
+    .select({ edgeId: supportership.id })
+    .from(supportership)
+    .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .where(
+      and(
+        eq(supportership.supporterPersonId, profileId),
+        eq(supportership.supporteePersonId, query.personId),
+        isNull(supportership.revokedAt),
+        isNull(person.archivedAt),
+      ),
+    )
+    .limit(1);
+
+  const edgeId = rows[0]?.edgeId;
+  if (!edgeId) {
+    throw new ForbiddenError('You do not have access to this person.');
+  }
+
+  return { personId: query.personId, edgeId };
 }
 
 async function collectNowCandidates(
@@ -260,6 +334,8 @@ async function collectNowCandidates(
   profileId: string,
   scope: NowScope,
   now: Date,
+  visibility: 'self' | 'supporter' = 'self',
+  edgeId?: string,
 ): Promise<NowFeedCandidate[]> {
   const [
     unfinished,
@@ -273,8 +349,12 @@ async function collectNowCandidates(
     collectRetentionDueCandidates(db, profileId, scope, now),
     collectNeedsDeepeningCandidates(db, profileId, scope, now),
     collectChallengeReadyCandidates(db, profileId, scope),
-    collectParkedItemCandidates(db, profileId, scope),
-    collectLedgerMomentCandidates(db, profileId, scope),
+    visibility === 'self'
+      ? collectParkedItemCandidates(db, profileId, scope)
+      : Promise.resolve([]),
+    visibility === 'self'
+      ? collectLedgerMomentCandidates(db, profileId, scope)
+      : Promise.resolve([]),
   ]);
 
   return [
@@ -284,7 +364,11 @@ async function collectNowCandidates(
     ...challengeReady,
     ...parked,
     ...ledgerMoments,
-  ];
+  ].map((candidate) => ({
+    ...candidate,
+    ...(scope === 'person' ? { personId: profileId } : {}),
+    ...(edgeId ? { edgeId } : {}),
+  }));
 }
 
 async function collectUnfinishedSessionCandidates(
@@ -609,6 +693,13 @@ function resolveLedgerDeepLink(
   }
   if (sessionId) {
     return resolveDeepLink('session.resume', { sessionId });
+  }
+  // The new subject/session-less kinds route to the journal as a catch-all.
+  // Other kinds keep their prior behavior: a row with no usable params is
+  // excluded from the feed (caller drops candidates whose deepLink is null)
+  // rather than masquerading behind a journal link.
+  if (kind === 'milestone_reached' || kind === 'reward_receipt') {
+    return resolveDeepLink('journal', {});
   }
   return null;
 }

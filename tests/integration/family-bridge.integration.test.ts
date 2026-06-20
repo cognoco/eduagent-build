@@ -6,13 +6,23 @@ import {
   curriculumBooks,
   curriculumTopics,
   familyLinks,
+  generateUUIDv7,
+  guardianship,
   learningSessions,
+  login,
+  membership,
   needsDeepeningTopics,
+  organization,
+  person,
   profiles,
   subjects,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import {
   cloneTopicFromChild,
   undoCloneFromChild,
@@ -24,8 +34,93 @@ type IntegrationDb = ReturnType<typeof createIntegrationDb>;
 const EMAIL = 'family-bridge@integration.test';
 const CLERK_USER_ID = 'integration-family-bridge-user';
 
+// [WI-586] These tests call the family-bridge service directly (not via HTTP),
+// so they must thread the identity-v2 flag the route layer would otherwise set.
+// Flag-ON the parent-access guard reads `guardianship`; flag-OFF `family_links`.
+const SERVICE_OPTS = { identityV2Enabled: isIdentityV2Enabled() };
+
 async function seedFamily() {
   const db = createIntegrationDb();
+
+  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP):
+  // legacy accounts/profiles/family_links are gone. Seed the v2 graph with the
+  // reseed alignment organization.id == accountId, person.id == profileId, and
+  // express the parent->child relationship via guardianship (not family_links).
+  if (isIdentityV2Enabled()) {
+    const accountId = generateUUIDv7();
+    const adultId = generateUUIDv7();
+    const childId = generateUUIDv7();
+    await db
+      .insert(organization)
+      .values({ id: accountId, name: `Family org ${accountId.slice(0, 8)}` });
+    await db.insert(person).values([
+      {
+        id: adultId,
+        displayName: 'Parent',
+        birthDate: '1985-01-01',
+        residenceJurisdiction: 'US',
+      },
+      {
+        id: childId,
+        displayName: 'Ada',
+        birthDate: '2013-01-01',
+        residenceJurisdiction: 'US',
+      },
+    ]);
+    await db.insert(login).values({
+      personId: adultId,
+      clerkUserId: CLERK_USER_ID,
+      email: EMAIL,
+    });
+    await db.insert(membership).values([
+      { personId: adultId, organizationId: accountId, roles: ['admin'] },
+      { personId: childId, organizationId: accountId, roles: ['learner'] },
+    ]);
+    await db.insert(guardianship).values({
+      guardianPersonId: adultId,
+      chargePersonId: childId,
+    });
+    // [WI-808] Dual-write: subjects.profile_id and profiles.account_id still FK
+    // to profiles and accounts respectively (M-DROP/M-REPOINT not yet committed).
+    // Insert stub accounts + profiles rows so seedLearningTree's subjects insert
+    // and the profiles FK chain are satisfied.
+    await db.insert(accounts).values({
+      id: accountId,
+      clerkUserId: CLERK_USER_ID,
+      email: EMAIL,
+    });
+    await db.insert(profiles).values([
+      {
+        id: adultId,
+        accountId,
+        displayName: 'Parent',
+        birthYear: 1985,
+        isOwner: true,
+      },
+      {
+        id: childId,
+        accountId,
+        displayName: 'Ada',
+        birthYear: 2013,
+        isOwner: false,
+      },
+    ]);
+
+    const account = { id: accountId, clerkUserId: CLERK_USER_ID, email: EMAIL };
+    const adult = { id: adultId, accountId, displayName: 'Parent' };
+    const child = { id: childId, accountId, displayName: 'Ada' };
+
+    const childLearning = await seedLearningTree(db, {
+      profileId: child.id,
+      subjectName: 'Mathematics',
+      bookTitle: 'Numbers That Matter',
+      topicTitle: 'Fractions',
+      topicDescription: 'Child version of fractions.',
+    });
+
+    return { db, account, adult, child, childLearning };
+  }
+
   const [account] = await db
     .insert(accounts)
     .values({
@@ -195,11 +290,16 @@ describe('family bridge integration', () => {
   it('creates a parent bridge topic with child provenance', async () => {
     const fixture = await seedFamily();
 
-    const result = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const result = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     expect(result).toMatchObject({
       subjectId: expect.any(String),
@@ -232,11 +332,16 @@ describe('family bridge integration', () => {
       topicDescription: 'Old adult version.',
     });
 
-    const result = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const result = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     expect(result).toMatchObject({
       topicId: adultLearning.topic.id,
@@ -275,11 +380,16 @@ describe('family bridge integration', () => {
       source: 'integration-test',
     });
 
-    const result = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const result = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     expect(result).toMatchObject({
       topicId: adultLearning.topic.id,
@@ -316,11 +426,16 @@ describe('family bridge integration', () => {
       escalationRung: 1,
     });
 
-    const result = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const result = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     expect(result).toMatchObject({
       topicId: adultLearning.topic.id,
@@ -341,12 +456,17 @@ describe('family bridge integration', () => {
       topicDescription: 'Adult existing version.',
     });
 
-    const result = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-      forceCopy: true,
-    });
+    const result = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+        forceCopy: true,
+      },
+      SERVICE_OPTS,
+    );
 
     expect(result).toMatchObject({
       alreadyExisted: false,
@@ -367,16 +487,26 @@ describe('family bridge integration', () => {
     const fixture = await seedFamily();
     const requestId = randomUUID();
 
-    const first = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId,
-    });
-    const second = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId,
-    });
+    const first = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId,
+      },
+      SERVICE_OPTS,
+    );
+    const second = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId,
+      },
+      SERVICE_OPTS,
+    );
 
     expect(second).toEqual(first);
     expect(
@@ -386,16 +516,22 @@ describe('family bridge integration', () => {
 
   it('undo deletes a newly cloned bridge topic before learning starts', async () => {
     const fixture = await seedFamily();
-    const clone = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const clone = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     const undo = await undoCloneFromChild(
       fixture.db,
       fixture.adult.id,
       clone.createdIds,
+      SERVICE_OPTS,
     );
 
     expect(undo).toEqual({ deleted: { topic: true } });
@@ -407,11 +543,16 @@ describe('family bridge integration', () => {
 
   it('undo refuses to delete a bridge topic once a session references it', async () => {
     const fixture = await seedFamily();
-    const clone = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const clone = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
     await fixture.db.insert(learningSessions).values({
       profileId: fixture.adult.id,
       subjectId: clone.subjectId,
@@ -426,6 +567,7 @@ describe('family bridge integration', () => {
       fixture.db,
       fixture.adult.id,
       clone.createdIds,
+      SERVICE_OPTS,
     );
 
     expect(undo).toEqual({
@@ -457,11 +599,16 @@ describe('family bridge integration', () => {
   it('clone via bridge → startRelearn creates session and needs_deepening row', async () => {
     const fixture = await seedFamily();
 
-    const clone = await cloneTopicFromChild(fixture.db, fixture.adult.id, {
-      childProfileId: fixture.child.id,
-      topicId: fixture.childLearning.topic.id,
-      requestId: randomUUID(),
-    });
+    const clone = await cloneTopicFromChild(
+      fixture.db,
+      fixture.adult.id,
+      {
+        childProfileId: fixture.child.id,
+        topicId: fixture.childLearning.topic.id,
+        requestId: randomUUID(),
+      },
+      SERVICE_OPTS,
+    );
 
     expect(clone.topicState).toBe('unstarted');
 

@@ -150,6 +150,9 @@ const mockMonthlyReportDb = createTransactionalMockDb({
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
     },
+    guardianship: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
@@ -163,6 +166,12 @@ const mockMonthlyReportDb = createTransactionalMockDb({
     // Consent gate added by email digest channel spec (2026-05-08).
     // Default: null row → no restriction (pre-consent-flow accounts, CONSENTED presumed).
     consentStates: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    membership: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    login: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     // Learning profile struggles: default empty (no watch-line).
@@ -540,11 +549,13 @@ function makeGenerateEvent(
 // ---------------------------------------------------------------------------
 
 const NOW = new Date('2026-04-01T10:00:00.000Z');
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers({ now: NOW });
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  delete process.env['IDENTITY_V2_ENABLED'];
 
   // Reset the mock chains to their default resolved values
   mockSelectDistinctWhere.mockResolvedValue([]);
@@ -557,6 +568,9 @@ beforeEach(() => {
   (
     mockMonthlyReportDb.query.familyLinks.findFirst as jest.Mock
   ).mockResolvedValue({ id: 'link-1' });
+  (
+    mockMonthlyReportDb.query.guardianship.findFirst as jest.Mock
+  ).mockResolvedValue(null);
   // [L7-F3] select(...).from(familyLinks).where(...) — derives from
   // familyLinks.findMany AND intersects with the selectDistinct result
   // (active children), mirroring the real `inArray(childProfileId,
@@ -623,6 +637,12 @@ beforeEach(() => {
     mockMonthlyReportDb.query.consentStates.findFirst as jest.Mock
   ).mockResolvedValue(null);
   (
+    mockMonthlyReportDb.query.membership.findFirst as jest.Mock
+  ).mockResolvedValue(null);
+  (mockMonthlyReportDb.query.login.findFirst as jest.Mock).mockResolvedValue(
+    null,
+  );
+  (
     mockMonthlyReportDb.query.learningProfiles.findFirst as jest.Mock
   ).mockResolvedValue({ struggles: [] });
   (
@@ -647,6 +667,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers();
   delete process.env['DATABASE_URL'];
+  restoreIdentityV2Flag(ORIGINAL_IDENTITY_V2_ENABLED);
 });
 
 // ---------------------------------------------------------------------------
@@ -1014,6 +1035,28 @@ describe('monthlyReportGenerate', () => {
       expect(result).toEqual(
         expect.objectContaining({ status: 'skipped', reason: 'child_missing' }),
       );
+    });
+
+    it('[WI-777] v2 self report treats a missing membership as no consent restriction', async () => {
+      const prev = process.env['IDENTITY_V2_ENABLED'];
+      process.env['IDENTITY_V2_ENABLED'] = 'true';
+      try {
+        const { result } = await executeGenerateSteps(
+          makeGenerateEvent({
+            parentId: '11111111-1111-4111-8111-111111111111',
+            childId: '11111111-1111-4111-8111-111111111111',
+          }),
+        );
+
+        expect(result).toEqual(
+          expect.objectContaining({
+            status: 'skipped',
+            reason: 'child_missing',
+          }),
+        );
+      } finally {
+        restoreIdentityV2Flag(prev);
+      }
     });
 
     it('does not call getSnapshotsInRange when child is missing', async () => {
@@ -2005,6 +2048,76 @@ describe('monthlyReportGenerate', () => {
       expect(mockSendEmail).toHaveBeenCalledWith(
         expect.objectContaining({ to: 'parent@example.test' }),
         expect.anything(),
+      );
+    });
+
+    // [BUG-841] send-monthly-push step must surface the real sendPushNotification
+    // result rather than always returning {sent:true, reason:undefined}.
+    //
+    // Assertion strategy: wrap step.run to record each step's actual return
+    // value (what the function returns from the step callback), then assert the
+    // memoized value for 'send-monthly-push' matches the real push outcome.
+    it('[BUG-841] send-monthly-push step returns real result when push has no token (not hardcoded sent:true)', async () => {
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: false,
+        reason: 'no_push_token',
+      });
+
+      const runner = createInngestStepRunner();
+      const stepReturnValues: Record<string, unknown> = {};
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          stepReturnValues[name] = value;
+          return value;
+        },
+      };
+
+      const handler = (monthlyReportGenerate as any).fn;
+      await handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: recordingStep,
+      });
+
+      // The 'send-monthly-push' step result must reflect sent:false with the
+      // real reason — not the pre-fix hardcoded {sent:true, reason:undefined}.
+      expect(stepReturnValues['send-monthly-push']).toEqual(
+        expect.objectContaining({ sent: false, reason: 'no_push_token' }),
+      );
+    });
+
+    it('[BUG-841] send-monthly-push step returns sent:true + ticketId when push delivers', async () => {
+      mockSendPushNotification.mockResolvedValueOnce({
+        sent: true,
+        ticketId: 'expo-ticket-123',
+      });
+
+      const runner = createInngestStepRunner();
+      const stepReturnValues: Record<string, unknown> = {};
+      const recordingStep = {
+        ...runner.step,
+        run: async (name: string, cb: () => Promise<unknown>) => {
+          const value = await runner.step.run(name, cb);
+          stepReturnValues[name] = value;
+          return value;
+        },
+      };
+
+      const handler = (monthlyReportGenerate as any).fn;
+      await handler({
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
+        step: recordingStep,
+      });
+
+      expect(stepReturnValues['send-monthly-push']).toEqual(
+        expect.objectContaining({ sent: true, ticketId: 'expo-ticket-123' }),
       );
     });
   });

@@ -968,6 +968,7 @@ export default function ChildDetailScreen(): React.ReactElement {
           onPress={() =>
             restoreConsentForScreen.mutate({ childProfileId: profileId })
           }
+          disabled={restoreConsentForScreen.isPending}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('consent.withdrawn.requestCta')}

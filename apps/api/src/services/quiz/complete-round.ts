@@ -245,6 +245,32 @@ export async function checkQuizAnswerWithCorrect(
   const existingResults = Array.isArray(round.results)
     ? (round.results as RecordedQuestionResult[])
     : [];
+
+  // [BUG-852] Bound the per-questionIndex append history. Without this guard,
+  // `appendRecordedAttempt` blindly `jsonb ||`-appends every /check submission,
+  // so a client can replay /check unbounded for one question to inflate the row
+  // — and, for guess_who, send finalAttempt:false repeatedly then a single
+  // finalAttempt:true with cluesUsed:0 to claim full XP. Once the question is
+  // already final, re-checks are idempotent (feedback, no append); non-final
+  // probe attempts are capped.
+  const indexResults = existingResults.filter(
+    (r) => r.questionIndex === questionIndex,
+  );
+  if (indexResults.some(isFinalRecordedAttempt)) {
+    // [BUG-852/BREAK/WI-163] A final answer is already on record for this
+    // question. Re-checking is idempotent: return post-submission feedback
+    // WITHOUT appending another attempt. This bounds the jsonb `results` row
+    // (852's anti-bloat goal) while preserving the first-attempt-wins contract
+    // — the re-check can neither retro-score nor grow the row.
+    return {
+      correct,
+      ...(!correct ? { correctAnswer: question.correctAnswer } : {}),
+    };
+  }
+  if (indexResults.length >= QUIZ_CONFIG.maxProbeAttemptsPerQuestion) {
+    throw new ConflictError('Too many attempts for this question');
+  }
+
   const now = new Date();
   const isFinalAttempt =
     question.type === 'guess_who' ? correct || finalAttempt !== false : true;
@@ -511,6 +537,19 @@ export async function completeQuizRound(
     const recordedResults = Array.isArray(round.results)
       ? (round.results as RecordedQuestionResult[])
       : [];
+
+    // [BUG-854] Guard: the completion scoring pipeline reads from
+    // `recordedResults` (persisted by /check calls). If the client calls
+    // /complete without any prior /check, recordedResults is empty → the
+    // round would silently complete with score=0 and xpEarned=0. Reject with
+    // a 409 so the client regression is detected immediately rather than
+    // silently zeroing the user's score.
+    if (recordedResults.length === 0) {
+      throw new ConflictError(
+        'No recorded answers found. Call /check for each question before calling /complete.',
+      );
+    }
+
     const finalRecordedResults = recordedResults.filter(isFinalRecordedAttempt);
     const completionSourceResults = finalRecordedResults;
     const validatedResults = validateResults(

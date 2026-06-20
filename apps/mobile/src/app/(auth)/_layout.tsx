@@ -18,6 +18,7 @@ import {
   peekPendingAuthRedirect,
   rememberPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
+import { getPostAuthDefaultPath } from '../(app)/_lib/auth-redirect';
 
 export default function AuthRoutesLayout() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -46,7 +47,7 @@ export default function AuthRoutesLayout() {
     browserRedirectTarget ?? localRedirectTarget ?? globalRedirectTarget;
   const resolvedRedirectTarget = toInternalAppRedirectPath(
     redirectTarget ?? undefined,
-    '/(app)/home',
+    getPostAuthDefaultPath(),
   );
   // [F-175] Initialize ref without calling rememberPendingAuthRedirect (storage
   // write). The useEffect below handles persistence on mount and on changes.

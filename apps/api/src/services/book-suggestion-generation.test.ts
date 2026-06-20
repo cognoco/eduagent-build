@@ -78,6 +78,8 @@ function makeSuggestion(
  */
 function makeTx(opts: {
   lockGot?: boolean;
+  freshSubjectFound?: boolean;
+  freshSubjectLastAttemptedAt?: Date | null;
   unpicked?: Array<{ id: string }>;
   existingBookTitles?: string[];
   existingSuggestionTitles?: string[];
@@ -88,6 +90,8 @@ function makeTx(opts: {
 }) {
   const {
     lockGot = true,
+    freshSubjectFound = true,
+    freshSubjectLastAttemptedAt = null,
     unpicked = [],
     existingBookTitles = [],
     existingSuggestionTitles = [],
@@ -97,15 +101,17 @@ function makeTx(opts: {
 
   // [WI-194] The service now invokes db.transaction() twice — once before
   // the LLM call (Phase 1: lock + reserve + read prompt inputs) and once
-  // after (Phase 3: re-lock + re-check + insert). Phase 1 makes 4 select
+  // after (Phase 3: re-lock + re-check + insert). Phase 1 makes 5 select
   // calls; Phase 3 makes 1 select call (the unpicked re-check). All select
   // calls go through this single tx mock so we feed the script in order.
-  //   1. Phase 1: unpicked bookSuggestions check
-  //   2. Phase 1: existingBookTitles (curriculumBooks)
-  //   3. Phase 1: existingSuggestionTitles (bookSuggestions)
-  //   4. Phase 1: studiedTopics (learningSessions join chain)
-  //   5. Phase 3: unpicked re-check
+  //   1. Phase 1: fresh subject cooldown re-read
+  //   2. Phase 1: unpicked bookSuggestions check
+  //   3. Phase 1: existingBookTitles (curriculumBooks)
+  //   4. Phase 1: existingSuggestionTitles (bookSuggestions)
+  //   5. Phase 1: studiedTopics (learningSessions join chain)
+  //   6. Phase 3: unpicked re-check
   const selectResults = [
+    freshSubjectFound ? [{ lastAttemptedAt: freshSubjectLastAttemptedAt }] : [],
     unpicked,
     existingBookTitles.map((title) => ({ title })),
     existingSuggestionTitles.map((title) => ({ title })),
@@ -210,6 +216,15 @@ function makeDb(
       ? jest.fn<typeof txCallback>().mockImplementation(txCallback)
       : jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
+  // [BUG-861] db.update() is called directly (outside any transaction) to
+  // reset the cooldown stamp on transient LLM failures. Expose it so tests
+  // can assert on it.
+  const dbUpdateChain = {
+    set: jest.fn().mockReturnThis(),
+    where: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  };
+  const dbUpdateMock = jest.fn().mockReturnValue(dbUpdateChain);
+
   return {
     db: {
       query: {
@@ -220,8 +235,11 @@ function makeDb(
         },
       },
       transaction: transactionMock,
+      update: dbUpdateMock,
     } as never,
     transactionMock,
+    dbUpdateMock,
+    dbUpdateChain,
   };
 }
 
@@ -268,6 +286,33 @@ describe('generateCategorizedBookSuggestions', () => {
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        'book_suggestion_generation_failed',
+        expect.objectContaining({ reason: 'cooldown' }),
+      );
+    });
+
+    it('re-checks cooldown after acquiring the lock before calling the LLM', async () => {
+      const staleInitialRead = new Date(Date.now() - COOLDOWN_MS - 1_000);
+      const freshLockedRead = new Date(Date.now() - COOLDOWN_MS + 10_000);
+      const subject = makeSubject({
+        bookSuggestionsLastGenerationAttemptedAt: staleInitialRead,
+      });
+      const { tx, mocks } = makeTx({
+        freshSubjectLastAttemptedAt: freshLockedRead,
+      });
+      const { db } = makeDb(subject, async (cb) => cb(tx));
+
+      const outcome = await generateCategorizedBookSuggestions(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+      );
+
+      expect(outcome).toBe('cooldown');
+      expect(routeAndCallMock).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.insert).not.toHaveBeenCalled();
       expect(loggerWarnMock).toHaveBeenCalledWith(
         'book_suggestion_generation_failed',
         expect.objectContaining({ reason: 'cooldown' }),
@@ -737,6 +782,157 @@ describe('generateCategorizedBookSuggestions', () => {
       await expect(
         generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID),
       ).rejects.toThrow('connection lost');
+    });
+
+    // -------------------------------------------------------------------------
+    // [BUG-861] Transient LLM failure must reset cooldown stamp to NULL
+    // -------------------------------------------------------------------------
+    describe('[BUG-861] cooldown stamp reset on transient failures', () => {
+      it('resets bookSuggestionsLastGenerationAttemptedAt to null on network error', async () => {
+        const subject = makeSubject();
+        routeAndCallMock.mockRejectedValue(new Error('fetch failed'));
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateMock, dbUpdateChain } = makeDb(
+          subject,
+          async (cb) => cb(tx),
+        );
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('network');
+        // The reset must have been called: db.update(subjects).set({...null...}).where(...)
+        expect(dbUpdateMock).toHaveBeenCalledTimes(1);
+        expect(dbUpdateChain.set).toHaveBeenCalledWith(
+          expect.objectContaining({
+            bookSuggestionsLastGenerationAttemptedAt: null,
+          }),
+        );
+        expect(dbUpdateChain.where).toHaveBeenCalledTimes(1);
+      });
+
+      it('resets cooldown on timeout error', async () => {
+        const subject = makeSubject();
+        routeAndCallMock.mockRejectedValue(new Error('request timed out'));
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateMock } = makeDb(subject, async (cb) => cb(tx));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('timeout');
+        expect(dbUpdateMock).toHaveBeenCalledTimes(1);
+      });
+
+      it('does NOT reset cooldown on quota error (retrying hammers an out-of-quota provider)', async () => {
+        const subject = makeSubject();
+        routeAndCallMock.mockRejectedValue(new Error('quota exceeded'));
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateMock } = makeDb(subject, async (cb) => cb(tx));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('quota');
+        // Stamp must REMAIN — quota exhaustion is not a retry-now blip;
+        // the cooldown gate must still block the next call (integration test
+        // encodes this invariant).
+        expect(dbUpdateMock).not.toHaveBeenCalled();
+      });
+
+      it('does NOT reset cooldown on unknown error (conservative catch-all keeps the stamp)', async () => {
+        const subject = makeSubject();
+        routeAndCallMock.mockRejectedValue(new Error('something unexpected'));
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateMock } = makeDb(subject, async (cb) => cb(tx));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('unknown');
+        // Stamp must REMAIN — 'unknown' is a catch-all; resetting would open
+        // the door to unbounded retries on unclassified errors.
+        expect(dbUpdateMock).not.toHaveBeenCalled();
+      });
+
+      it("does NOT reset cooldown on parse error (deterministic — retry won't help)", async () => {
+        const subject = makeSubject();
+        // Valid JSON but wrong shape — missing `suggestions` key; triggers 'parse' outcome
+        routeAndCallMock.mockResolvedValue({
+          response: JSON.stringify({ wrong_key: [] }),
+        });
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateMock } = makeDb(subject, async (cb) => cb(tx));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('parse');
+        // No cooldown reset — deterministic failure; stamp must stay
+        expect(dbUpdateMock).not.toHaveBeenCalled();
+      });
+
+      it('does NOT reset cooldown on all_filtered (deterministic — LLM ran, no new content)', async () => {
+        const subject = makeSubject();
+        // All suggestions are duplicates — triggers 'all_filtered' outcome
+        routeAndCallMock.mockResolvedValue(
+          makeLlmResult([makeSuggestion('Existing Book One')]),
+        );
+
+        const { tx } = makeTx({
+          existingBookTitles: ['Existing Book One'],
+        });
+        const { db, dbUpdateMock } = makeDb(subject, async (cb) => cb(tx));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        expect(outcome).toBe('all_filtered');
+        // No cooldown reset — deterministic failure; stamp must stay
+        expect(dbUpdateMock).not.toHaveBeenCalled();
+      });
+
+      it('still returns the classified outcome even if the reset db.update() itself throws', async () => {
+        const subject = makeSubject();
+        routeAndCallMock.mockRejectedValue(new Error('fetch failed'));
+
+        const { tx } = makeTx({});
+        const { db, dbUpdateChain } = makeDb(subject, async (cb) => cb(tx));
+        // Simulate the reset failing (e.g. DB connection dropped)
+        dbUpdateChain.where.mockRejectedValue(new Error('DB connection lost'));
+
+        const outcome = await generateCategorizedBookSuggestions(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+        );
+
+        // Must still return the primary failure reason; the reset error is swallowed
+        expect(outcome).toBe('network');
+      });
     });
   });
 

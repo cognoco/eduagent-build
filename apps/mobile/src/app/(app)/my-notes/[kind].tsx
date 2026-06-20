@@ -85,16 +85,18 @@ function searchPlaceholderForKind(kind: MyNotesKind, t: TFunction): string {
   }
 }
 
-function subtitleForKind(kind: MyNotesKind, count: number): string {
-  const label =
-    count === 1
-      ? kind === 'bookmarks'
-        ? 'saved reply'
-        : kind.slice(0, -1)
-      : kind === 'bookmarks'
-        ? 'saved replies'
-        : kind;
-  return `${count} ${label}`;
+function subtitleForKind(
+  kind: MyNotesKind,
+  count: number,
+  t: TFunction,
+): string {
+  if (kind === 'bookmarks') {
+    return t('library.myNotes.subtitleBookmarks', { count });
+  }
+  if (kind === 'notes') {
+    return t('library.myNotes.subtitleNotes', { count });
+  }
+  return t('library.myNotes.subtitleSessions', { count });
 }
 
 function formatInlineDate(iso: string): string {
@@ -472,7 +474,7 @@ export default function MyNotesListScreen(): React.ReactElement {
                   {titleForKind(kind, t)}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-0.5">
-                  {subtitleForKind(kind, rawItems.length)}
+                  {subtitleForKind(kind, rawItems.length, t)}
                 </Text>
               </View>
             </View>
@@ -489,7 +491,9 @@ export default function MyNotesListScreen(): React.ReactElement {
                 onChangeText={setQuery}
                 placeholder={searchPlaceholderForKind(kind, t)}
                 placeholderTextColor={colors.textSecondary}
-                accessibilityLabel={`Search ${titleForKind(kind, t).toLowerCase()}`}
+                accessibilityLabel={t('library.myNotes.searchA11y', {
+                  kind: titleForKind(kind, t).toLowerCase(),
+                })}
                 className="flex-1 text-body text-text-primary"
                 testID="my-notes-search"
               />

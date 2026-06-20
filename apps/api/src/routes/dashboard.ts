@@ -147,7 +147,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const summary = await getProgressSummary(
       db,
@@ -317,7 +319,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const projection = await getMemoryProjection(db, childProfileId, {
       memoryFactsReadEnabled: isMemoryFactsReadEnabled(
@@ -415,7 +419,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const reports = await listWeeklyReportsForParentChild(
       db,
@@ -436,7 +442,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
 
     const report = await getWeeklyReportForParentChild(
       db,
@@ -463,7 +471,9 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
       });
-      await assertChildDashboardDataVisible(db, childProfileId);
+      await assertChildDashboardDataVisible(db, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
 
       await markWeeklyReportViewed(
         db,

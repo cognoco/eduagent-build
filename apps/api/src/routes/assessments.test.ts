@@ -19,7 +19,7 @@ jest.mock(
     return {
       ...actual,
       getActiveAssessmentForTopic: jest.fn(),
-      createAssessment: jest.fn(),
+      createAssessmentIfNoneActive: jest.fn(),
       getAssessment: jest.fn(),
       updateAssessment: jest.fn(),
       evaluateAssessmentAnswer: jest.fn(),
@@ -111,6 +111,10 @@ jest.mock(
     return {
       ...actual,
       safeRefundQuota: jest.fn().mockResolvedValue({ refunded: true }),
+      // [BUG-821] The route now calls refundQuotaOrEscalate (the gate that
+      // escalates a decrement-without-subscriptionId instead of silently
+      // dropping the refund). Mock it as the boundary the route actually calls.
+      refundQuotaOrEscalate: jest.fn().mockResolvedValue({ refunded: true }),
     };
   },
 );
@@ -122,7 +126,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   getActiveAssessmentForTopic,
-  createAssessment,
+  createAssessmentIfNoneActive,
   getAssessment,
   updateAssessment,
   evaluateAssessmentAnswer,
@@ -135,7 +139,7 @@ import {
 import { getSession } from '../services/session';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
-import { safeRefundQuota } from '../services/billing';
+import { refundQuotaOrEscalate } from '../services/billing';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 
@@ -274,7 +278,9 @@ function makeStubDb(): Partial<Database> {
 const getActiveAssessmentForTopicMock = jest.mocked(
   getActiveAssessmentForTopic,
 );
-const createAssessmentMock = jest.mocked(createAssessment);
+const createAssessmentIfNoneActiveMock = jest.mocked(
+  createAssessmentIfNoneActive,
+);
 const getAssessmentMock = jest.mocked(getAssessment);
 const updateAssessmentMock = jest.mocked(updateAssessment);
 const evaluateAssessmentAnswerMock = jest.mocked(evaluateAssessmentAnswer);
@@ -290,7 +296,7 @@ const lockAssessmentForAnswerSubmissionMock = jest.mocked(
 );
 const updateRetentionFromSessionMock = jest.mocked(updateRetentionFromSession);
 const insertSessionXpEntryMock = jest.mocked(insertSessionXpEntry);
-const safeRefundQuotaMock = jest.mocked(safeRefundQuota);
+const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -322,26 +328,19 @@ beforeEach(() => {
 describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
   const path = `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/assessments`;
 
-  it('returns 201 with the active assessment when one already exists', async () => {
-    const existing = makeAssessmentRecord();
-    getActiveAssessmentForTopicMock.mockResolvedValue(existing);
+  it('returns 201 with the assessment the race-safe get-or-create returns', async () => {
+    // Get-or-create is now serialized inside the service
+    // (createAssessmentIfNoneActive); the route only delegates. The
+    // race semantics (exactly one in_progress row under concurrency) are
+    // covered by the integration test + service unit tests.
+    createAssessmentIfNoneActiveMock.mockResolvedValue(makeAssessmentRecord());
 
     const res = await makeApp().request(path, { method: 'POST' });
 
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toMatchObject({ assessment: { id: ASSESSMENT_ID } });
-    expect(createAssessmentMock).not.toHaveBeenCalled();
-  });
-
-  it('creates a new assessment when none is active', async () => {
-    getActiveAssessmentForTopicMock.mockResolvedValue(null);
-    createAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-
-    const res = await makeApp().request(path, { method: 'POST' });
-
-    expect(res.status).toBe(201);
-    expect(createAssessmentMock).toHaveBeenCalledWith(
+    expect(createAssessmentIfNoneActiveMock).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID,
       SUBJECT_ID,
@@ -356,7 +355,7 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(createAssessmentMock).not.toHaveBeenCalled();
+    expect(createAssessmentIfNoneActiveMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when profileId is absent (missing profile context)', async () => {
@@ -718,8 +717,8 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
       // Quota refund WAS called — the learner must not be charged for a
       // no-LLM response.
-      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
-      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
         expect.anything(),
         SUBSCRIPTION_ID,
         expect.objectContaining({ route: 'assessments.answer.app_help' }),
@@ -736,7 +735,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     // app-help turn.
     it('[WI-776] threads identityV2=true into the refund under flag-on', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: true });
+      refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: true });
 
       const res = await makeMeteredApp({ identityV2: true }).request(
         path,
@@ -745,7 +744,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
 
       expect(res.status).toBe(200);
       expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
-      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
         expect.anything(),
         SUBSCRIPTION_ID,
         expect.objectContaining({
@@ -762,7 +761,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     // no-LLM turn. Revert (set quotaRefunded unconditionally) → this goes red.
     it('[WI-776] does NOT mark quotaRefunded when the refund did not complete', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: false });
+      refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: false });
 
       let capturedQuotaRefunded: boolean | undefined = 'sentinel' as never;
       const app = new Hono<
@@ -806,7 +805,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
 
       expect(res.status).toBe(200);
-      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
       // The refund failed → quotaRefunded must remain unset so the failure is
       // visible (and the user is not falsely treated as refunded).
       expect(capturedQuotaRefunded).toBeUndefined();
@@ -829,19 +828,33 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       expect(res.status).toBe(200);
       expect(evaluateAssessmentAnswerMock).toHaveBeenCalled();
       // No refund — the LLM ran, the quota decrement was legitimate.
-      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
+      expect(refundQuotaOrEscalateMock).not.toHaveBeenCalled();
     });
 
-    it('[BREAK] skips the refund when subscriptionId is absent (unmetered call)', async () => {
+    it('[BUG-821] routes the refund through refundQuotaOrEscalate when subscriptionId is absent but a decrement happened', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
 
-      // Make an app that does NOT inject subscriptionId (simulates unmetered).
+      // App that injects quotaDecrementSource (a decrement HAPPENED) but NOT a
+      // subscriptionId — the exact BUG-821 condition. Previously the route's
+      // bare `if (subscriptionId)` gate silently dropped the refund with no
+      // Sentry/log/metric, charging the user for a no-LLM turn. The route now
+      // delegates to refundQuotaOrEscalate so the gate can escalate the skip.
       const app = makeMeteredApp({ omitSubscriptionId: true });
       const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
 
       expect(res.status).toBe(200);
-      // No subscription context — refund is a no-op; function must not throw.
-      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
+      // The gate MUST be invoked (not silently bypassed), and it must receive
+      // the missing subscriptionId alongside the decrement source so its
+      // internal escalation (quota.refund.skipped_no_subscription) can fire.
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
+        expect.anything(),
+        undefined,
+        expect.objectContaining({
+          route: 'assessments.answer.app_help',
+          source: 'monthly',
+        }),
+      );
     });
 
     it('[F-146 / WI-701] sets quotaRefunded=true on the 200 early-return so the metering middleware can invalidate KV', async () => {
@@ -914,6 +927,18 @@ describe('PATCH /v1/assessments/:assessmentId/decline-refresh', () => {
   it('returns 200 when the assessment is in a terminal state', async () => {
     getAssessmentMock.mockResolvedValue(
       makeAssessmentRecord({ status: 'passed' }),
+    );
+
+    const res = await makeApp().request(path, { method: 'PATCH' });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true });
+  });
+
+  it('[BUG-848] returns 200 when the assessment status is "failed" (terminal but was missing from allowlist)', async () => {
+    getAssessmentMock.mockResolvedValue(
+      makeAssessmentRecord({ status: 'failed' }),
     );
 
     const res = await makeApp().request(path, { method: 'PATCH' });
@@ -1048,6 +1073,7 @@ function makeAssessmentRecord(
     status: (overrides.status ?? 'in_progress') as
       | 'in_progress'
       | 'passed'
+      | 'failed'
       | 'failed_exhausted'
       | 'borderline',
     masteryScore: 0,

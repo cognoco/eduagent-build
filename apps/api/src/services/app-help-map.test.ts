@@ -30,6 +30,17 @@ interface EnglishLocale {
     family: { addChild: string };
   };
   settings: { appLanguage: string };
+  tabs: { mentor: string; subjects: string; journal: string };
+  journal: {
+    sections: {
+      recaps: string;
+      notes: string;
+      memory: string;
+      reports: string;
+    };
+    notes: { sessions: string; notes: string; bookmarks: string };
+  };
+  accountAdmin: { title: string; security: string; familySettings: string };
 }
 
 // Cross-package read: ensures the map's user-visible labels stay in sync with
@@ -373,6 +384,146 @@ describe('buildAppHelpDirectReply', () => {
     );
     expect(reply).toContain('App Language');
     expect(reply).toContain('More > Profile');
+  });
+});
+
+describe('buildAppHelpPromptBlock — V2 shell', () => {
+  const v2 = buildAppHelpPromptBlock('v2');
+
+  it('selects a distinct V2 map; default and v0 stay on the V0 map (no regression)', () => {
+    expect(buildAppHelpPromptBlock()).toBe(buildAppHelpPromptBlock('v0'));
+    expect(buildAppHelpPromptBlock('v2')).not.toBe(
+      buildAppHelpPromptBlock('v0'),
+    );
+  });
+
+  it('still tells the model it can answer internal app questions', () => {
+    expect(v2).toContain(
+      'You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it.',
+    );
+    expect(v2).toContain('Do not treat app questions as off-topic');
+    expect(v2).toContain('Do not treat app questions as assessment answers');
+  });
+
+  it('names the three V2 tabs as destinations', () => {
+    expect(en.tabs.mentor).toBe('Mentor');
+    expect(en.tabs.subjects).toBe('Subjects');
+    expect(en.tabs.journal).toBe('Journal');
+    expect(v2).toContain(en.tabs.mentor);
+    expect(v2).toContain(en.tabs.subjects);
+    expect(v2).toContain(en.tabs.journal);
+  });
+
+  it('routes notes / sessions / bookmarks / memory into the Journal tab', () => {
+    expect(en.journal.sections.notes).toBe('Saved notes');
+    expect(en.journal.notes.sessions).toBe('Recent learning sessions');
+    expect(en.journal.notes.bookmarks).toBe('Saved mentor replies');
+    expect(en.journal.sections.memory).toBe('Mentor memory');
+    expect(v2).toContain(en.journal.sections.notes);
+    expect(v2).toContain(en.journal.notes.sessions);
+    expect(v2).toContain(en.journal.notes.bookmarks);
+    expect(v2).toContain(en.journal.sections.memory);
+  });
+
+  it('routes account/settings to the Account sheet (opened from the profile picture)', () => {
+    expect(en.accountAdmin.title).toBe('Account');
+    expect(en.accountAdmin.security).toBe('Account security');
+    expect(en.accountAdmin.familySettings).toBe('Family settings');
+    expect(v2).toContain(en.accountAdmin.title);
+    expect(v2).toMatch(/profile picture/i);
+    expect(v2).toContain(en.accountAdmin.security);
+    expect(v2).toContain(en.more.account.subscription);
+    expect(v2).toContain(en.accountAdmin.familySettings);
+    expect(v2).toContain(en.more.family.addChild);
+  });
+
+  it('uses the Subjects tab for subjects/books/topics (no Library tab)', () => {
+    expect(v2).toMatch(/subjects/i);
+    expect(v2).toMatch(/books?/i);
+    expect(v2).toMatch(/topics?/i);
+  });
+
+  it('contains NONE of the deleted V0/V1 destination paths', () => {
+    expect(v2).not.toContain('My Notes');
+    expect(v2).not.toContain('More >');
+    expect(v2).not.toContain('Library >');
+    expect(v2).not.toContain('Open Progress');
+    expect(v2).not.toContain('Home >');
+  });
+
+  it('keeps the V0-parity guardrails (prices, invented screens, adaptive reviews, labels)', () => {
+    expect(v2).toMatch(/never state prices/i);
+    expect(v2).toMatch(/do not invent/i);
+    expect(v2).toMatch(/adaptive/i);
+    expect(v2).toMatch(/do not promise a specific number of days/i);
+    expect(v2).toContain('Use visible labels only.');
+  });
+
+  it('does not leak Expo routes or URLs', () => {
+    expect(v2).not.toMatch(/\/\(app\)/);
+    expect(v2).not.toMatch(/\/\(tabs\)/);
+    expect(v2).not.toMatch(/\[.*Id\]/);
+    expect(v2).not.toMatch(/https?:\/\//);
+    expect(v2).not.toMatch(/\[.*\]\(.*\)/);
+  });
+
+  it('stamps a V2 version date', () => {
+    expect(v2).toMatch(/V2 shell/);
+    expect(v2).toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
+
+describe('buildAppHelpDirectReply — V2 shell', () => {
+  it('routes notes questions into the Journal tab', () => {
+    const reply = buildAppHelpDirectReply('Where do I find my notes?', 'v2');
+    expect(reply).toMatch(/journal/i);
+    expect(reply).not.toContain('My Notes');
+    expect(reply).not.toMatch(/library >/i);
+  });
+
+  it('routes add-child to the Account sheet > Family settings (never Progress/More)', () => {
+    const reply = buildAppHelpDirectReply('How do I add a child?', 'v2');
+    expect(reply).toContain('Add a child');
+    expect(reply).toContain('Account');
+    expect(reply).not.toMatch(/more >/i);
+    expect(reply).not.toMatch(/progress/i);
+  });
+
+  it('routes billing to the Account sheet > Subscription without quoting prices', () => {
+    const reply = buildAppHelpDirectReply(
+      'How do I upgrade to get more questions?',
+      'v2',
+    );
+    expect(reply).toContain('Subscription');
+    expect(reply).toContain('Account');
+    expect(reply).not.toMatch(/free|unlimited|\$\d/i);
+    expect(reply).not.toMatch(/more >/i);
+  });
+
+  it('routes language questions to the Account sheet', () => {
+    const reply = buildAppHelpDirectReply(
+      'Where do I change the app language?',
+      'v2',
+    );
+    expect(reply).toMatch(/language/i);
+    expect(reply).toContain('Account');
+  });
+
+  it('answers capability questions without saying off-topic', () => {
+    const reply = buildAppHelpDirectReply(
+      'Can you answer internal app questions?',
+      'v2',
+    );
+    expect(reply).toContain('MentoMate');
+    expect(reply).not.toMatch(/off-topic|cannot help/i);
+  });
+
+  it('default and v0 keep the V0 replies (no regression)', () => {
+    const msg = 'Where do I find my notes about this topic or subject?';
+    expect(buildAppHelpDirectReply(msg)).toBe(
+      buildAppHelpDirectReply(msg, 'v0'),
+    );
+    expect(buildAppHelpDirectReply(msg, 'v0')).toContain('My Notes');
   });
 });
 

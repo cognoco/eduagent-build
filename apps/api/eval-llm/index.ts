@@ -59,6 +59,10 @@ import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 // hook was previously blind to. See flow files for context.
 import { languagePromptsFlow } from './flows/language-prompts';
 import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
+import { nowParkReturnFlow } from './flows/now-park-return';
+import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
+import { parkAndReturnReweaveFlow } from './flows/park-and-return-reweave';
+import { appHelpV2Flow } from './flows/app-help-v2';
 import {
   listFlows,
   parseCliArgs,
@@ -121,6 +125,10 @@ const FLOWS: FlowDefinition[] = [
   anthropicResponseFormatFlow as FlowDefinition,
   languagePromptsFlow as FlowDefinition,
   adaptiveTeachingFlow as FlowDefinition,
+  nowParkReturnFlow as FlowDefinition,
+  parkAndReturnRankingFlow as FlowDefinition,
+  parkAndReturnReweaveFlow as FlowDefinition,
+  appHelpV2Flow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
@@ -245,6 +253,12 @@ async function main(): Promise<void> {
   if (options.live) {
     console.log(`Live calls OK:      ${summary.liveCallsOk}`);
     console.log(`Live calls failed:  ${summary.liveCallsFailed}`);
+  }
+  if (
+    options.live ||
+    summary.qualityWarnings > 0 ||
+    summary.qualityFailures > 0
+  ) {
     console.log(`Quality warnings:   ${summary.qualityWarnings}`);
     console.log(`Quality failures:   ${summary.qualityFailures}`);
   }
@@ -293,7 +307,7 @@ async function main(): Promise<void> {
     console.log(`Baseline updated → ${BASELINE_PATH}`);
   }
 
-  if (options.live && summary.qualityFailures > 0) {
+  if (summary.qualityFailures > 0) {
     console.error(
       'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
     );

@@ -172,4 +172,78 @@ describe('ChildCurriculumScreen', () => {
       '/(app)/home',
     );
   });
+
+  // [PARENT-17] loading / error / empty / missing-profile branches. The happy
+  // path + dashboard fallback + not-linked gate are covered above; these pin
+  // the remaining four states the screen renders.
+
+  it('[PARENT-17] shows the loading spinner while child detail is still resolving', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({ data: { children: [] } });
+
+    render(<ChildCurriculumScreen />);
+
+    screen.getByTestId('child-curriculum-loading');
+    expect(screen.queryByTestId('child-curriculum-screen')).toBeNull();
+  });
+
+  it('[PARENT-17] shows an error state with a retry that re-fetches when detail fails and dashboard has no fallback', () => {
+    const refetch = jest.fn();
+    mockUseChildDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+    mockUseDashboard.mockReturnValue({ data: { children: [] } });
+
+    render(<ChildCurriculumScreen />);
+
+    screen.getByTestId('child-curriculum-error');
+    expect(screen.queryByTestId('child-curriculum-screen')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('child-curriculum-retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('[PARENT-17] shows the empty state when the linked child has no subjects yet', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        profileId: 'child-001',
+        displayName: 'Emma',
+        subjects: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({ data: { children: [] } });
+
+    render(<ChildCurriculumScreen />);
+
+    screen.getByTestId('child-curriculum-screen');
+    screen.getByTestId('child-curriculum-empty');
+    screen.getByText('No lesson topics yet');
+  });
+
+  it('[PARENT-17] shows the missing-profile fallback when no profileId is present', () => {
+    mockUseLocalSearchParams.mockReturnValue({});
+
+    render(<ChildCurriculumScreen />);
+
+    screen.getByTestId('child-curriculum-missing-profile');
+    expect(screen.queryByTestId('child-curriculum-screen')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('child-curriculum-missing-back'));
+    const { goBackOrReplace } = require('../../../../lib/navigation');
+    expect(goBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: mockReplace }),
+      '/(app)/home',
+    );
+  });
 });

@@ -19,7 +19,7 @@ import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   evaluateAssessmentAnswer,
   buildAssessmentAppHelpEvaluation,
-  createAssessment,
+  createAssessmentIfNoneActive,
   getAssessment,
   getActiveAssessmentForTopic,
   updateAssessment,
@@ -30,12 +30,13 @@ import {
   resolveAssessmentStatus,
   shouldEndAssessmentForReview,
   lockAssessmentForAnswerSubmission,
+  isTerminalAssessmentStatus,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
-import { safeRefundQuota } from '../services/billing';
+import { refundQuotaOrEscalate } from '../services/billing';
 import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
@@ -73,9 +74,17 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
-    const assessment =
-      (await getActiveAssessmentForTopic(db, profileId, subjectId, topicId)) ??
-      (await createAssessment(db, profileId, subjectId, topicId));
+    // Race-safe get-or-create. The read-then-create is serialized inside the
+    // service under db.transaction + SELECT ... FOR UPDATE on the parent topic
+    // row; a bare `getActive ?? create` let two concurrent POSTs both INSERT,
+    // leaving a duplicate orphaned in_progress row that still consumed quota
+    // tracking.
+    const assessment = await createAssessmentIfNoneActive(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+    );
 
     return c.json(
       createAssessmentResponseSchema.parse({
@@ -135,8 +144,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         // for a turn that consumed no LLM capacity. Mark quotaRefunded so the
         // middleware's post-handler status-based branch does not double-refund.
         const subscriptionId = c.get('subscriptionId');
-        if (subscriptionId && !c.get('quotaRefunded')) {
-          const { refunded } = await safeRefundQuota(db, subscriptionId, {
+        if (!c.get('quotaRefunded')) {
+          // [BUG-821] refundQuotaOrEscalate escalates (Sentry + structured log)
+          // when a decrement happened but subscriptionId is missing, instead of
+          // silently skipping the refund and charging the user for a no-LLM turn.
+          const { refunded } = await refundQuotaOrEscalate(db, subscriptionId, {
             route: 'assessments.answer.app_help',
             profileId,
             source: c.get('quotaDecrementSource'),
@@ -357,9 +369,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
 
     const assessment = await getAssessment(db, profileId, assessmentId);
     if (!assessment) return notFound(c, 'Assessment not found');
-    if (
-      !['passed', 'borderline', 'failed_exhausted'].includes(assessment.status)
-    ) {
+    if (!isTerminalAssessmentStatus(assessment.status)) {
       return c.json(
         {
           code: 'BAD_REQUEST',

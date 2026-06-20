@@ -79,8 +79,8 @@ export default function MentorMemoryScreen() {
   }, [isLoading]);
 
   const learningStyleRows = useMemo(
-    () => getLearningStyleRows(profile?.learningStyle ?? null),
-    [profile?.learningStyle],
+    () => getLearningStyleRows(profile?.learningStyle ?? null, t),
+    [profile?.learningStyle, t],
   );
 
   // [F-021] Check if all five data sections are empty — if so, render a

@@ -337,6 +337,37 @@ describe('autoFileSession', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [BUG-844] A malformed event payload must NOT throw out of the handler.
+  // The entry previously called sessionAutoFileRequestedEventSchema.parse,
+  // which throws a ZodError on contract drift. With retries: 2, that burned
+  // the entire retry budget (3 attempts) re-parsing a guaranteed-fail payload
+  // before onFailure could fire. The entry must safeParse and return a
+  // non-retried terminal { status: 'invalid_payload' } instead.
+  // -------------------------------------------------------------------------
+  describe('invalid payload entry guard [BUG-844]', () => {
+    it('returns a terminal invalid_payload result without throwing on contract drift', async () => {
+      const { step, sendEventCalls } = createInngestStepRunner();
+      const handler = (autoFileSession as any).fn;
+
+      const result = await handler({
+        event: {
+          name: 'app/session.auto_file_requested',
+          // Drift: missing dispatchId + bad sessionId — would throw on .parse.
+          data: { sessionId: 'not-a-uuid', profileId },
+        },
+        step,
+      });
+
+      expect(result).toMatchObject({ status: 'invalid_payload' });
+      // No claim / LLM work, and no events fan out on an unparseable payload.
+      expect(mockClaimSessionForAutoFiling).not.toHaveBeenCalled();
+      expect(mockBuildLibraryIndex).not.toHaveBeenCalled();
+      expect(mockFileToLibrary).not.toHaveBeenCalled();
+      expect(sendEventCalls).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Memoized step returns are persisted in Inngest's third-party state store;
   // auto-filing operates on a (possibly minor's) session transcript, so step
   // returns must never carry transcript content. The transcript is rehydrated

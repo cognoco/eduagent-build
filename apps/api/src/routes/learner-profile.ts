@@ -92,7 +92,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
     // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json(
       learnerProfileExportTextResponseSchema.parse({
@@ -109,7 +111,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
     // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
-    await assertChildDashboardDataVisible(db, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId, {
+      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
     const profile = await getOrCreateLearningProfile(db, childProfileId);
     return c.json(learnerProfileGetResponseSchema.parse({ profile }));
   })
@@ -352,7 +356,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
       assertNotProxyMode(c);
       const { db, profileId } = withProfile(c);
       const { text } = c.req.valid('json');
-      const result = await parseLearnerInput(db, profileId, text, 'learner');
+      const result = await parseLearnerInput(db, profileId, text, 'learner', {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       return c.json(parseLearnerInputResultSchema.parse(result));
     },
   )
@@ -367,13 +373,16 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
       });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
-      await assertChildDashboardDataVisible(db, childProfileId);
+      await assertChildDashboardDataVisible(db, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { text } = c.req.valid('json');
       const result = await parseLearnerInput(
         db,
         childProfileId,
         text,
         'parent',
+        { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
       );
       return c.json(parseLearnerInputResultSchema.parse(result));
     },
@@ -411,7 +420,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
       });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
-      await assertChildDashboardDataVisible(db, childProfileId);
+      await assertChildDashboardDataVisible(db, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { value } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await unsuppressInference(db, childProfileId, undefined, value);
@@ -465,7 +476,9 @@ export const learnerProfileRoutes = new Hono<LearnerProfileRouteEnv>()
         identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
       });
       // [WI-156] Child consent gate: blocks access when child GDPR consent is not active
-      await assertChildDashboardDataVisible(db, childProfileId);
+      await assertChildDashboardDataVisible(db, childProfileId, {
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
       const { accommodationMode } = c.req.valid('json');
       // accountId omitted: ownership verified via assertOwnerAndParentAccess (parent chain)
       await updateAccommodationMode(

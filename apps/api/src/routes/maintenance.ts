@@ -4,11 +4,18 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { apiError } from '../errors';
+import { isMaintenanceProductionEnabled } from '../config';
 
 type MaintenanceEnv = {
   Bindings: {
     ENVIRONMENT?: string;
     MAINTENANCE_SECRET?: string;
+    /**
+     * [BUG-875] Explicit opt-in to run the backfill routes in production.
+     * Default-closed: only the literal string 'true' enables them. See
+     * isMaintenanceProductionEnabled in config.ts.
+     */
+    MAINTENANCE_PRODUCTION_ENABLED?: string;
     SENTRY_DSN?: string;
   };
 };
@@ -61,6 +68,38 @@ async function verifyMaintenanceSecret(c: {
   const provided = c.req.header('X-Maintenance-Secret');
   if (!expected || !provided) return false;
   return constantTimeEqual(provided, expected);
+}
+
+/**
+ * [BUG-875] Fail-closed environment gate for the backfill routes. Mirrors the
+ * test-seed.ts `/__test/*` guard: development and staging are always allowed;
+ * production (and any unrecognised/undefined ENVIRONMENT — e.g. a partial
+ * Doppler sync) is treated as production and refused UNLESS the explicit
+ * MAINTENANCE_PRODUCTION_ENABLED='true' opt-in is set.
+ *
+ * Returns a 403 Response when the backfill must be refused, or null when the
+ * caller may proceed. The MAINTENANCE_SECRET check is a separate, additional
+ * layer applied by each route handler.
+ */
+function refuseBackfillByEnvironment(
+  c: Context<MaintenanceEnv>,
+): Response | null {
+  const environment = c.env.ENVIRONMENT;
+  // Recognised non-production environments may always run backfills.
+  if (environment === 'development' || environment === 'staging') {
+    return null;
+  }
+  // Production (and any unrecognised/undefined value) is fail-closed unless the
+  // operator has explicitly opted in for this environment.
+  if (isMaintenanceProductionEnabled(c.env.MAINTENANCE_PRODUCTION_ENABLED)) {
+    return null;
+  }
+  return apiError(
+    c,
+    403,
+    ERROR_CODES.FORBIDDEN,
+    'Maintenance backfills are disabled in production. Set MAINTENANCE_PRODUCTION_ENABLED=true to opt in.',
+  );
 }
 
 async function sendMaintenanceBackfillOrError(
@@ -130,6 +169,9 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
     });
   })
   .post('/maintenance/memory-facts-backfill', async (c) => {
+    const environmentRefusal = refuseBackfillByEnvironment(c);
+    if (environmentRefusal) return environmentRefusal;
+
     if (!(await verifyMaintenanceSecret(c))) {
       return apiError(
         c,
@@ -146,6 +188,9 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
     );
   })
   .post('/maintenance/progress-self-reports-backfill', async (c) => {
+    const environmentRefusal = refuseBackfillByEnvironment(c);
+    if (environmentRefusal) return environmentRefusal;
+
     if (!(await verifyMaintenanceSecret(c))) {
       return apiError(
         c,

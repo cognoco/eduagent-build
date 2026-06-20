@@ -91,6 +91,7 @@ import { librarySearchRoutes } from './routes/library-search';
 import { maintenanceRoutes } from './routes/maintenance';
 import { challengeRoundRoutes } from './routes/challenge-round';
 import { nowRoutes } from './routes/now';
+import { scopesRoutes } from './routes/scopes';
 
 type Bindings = {
   ENVIRONMENT: string;
@@ -325,6 +326,7 @@ const routes = api
   .route('/', feedbackRoutes)
   .route('/support', supportRoutes)
   .route('/', librarySearchRoutes)
+  .route('/', scopesRoutes)
   .route('/', nowRoutes)
   .route('/', challengeRoundRoutes);
 

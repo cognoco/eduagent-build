@@ -24,6 +24,8 @@ import {
   type QuotaExceededDetails,
   type UpgradeOption,
 } from '@eduagent/schemas';
+import { CancelledError } from '@tanstack/react-query';
+import { isQueryCancellationAbort } from './query-timeout';
 
 export {
   BadRequestError,
@@ -58,6 +60,26 @@ export class NetworkError extends Error {
   }
 }
 
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+}
+
+export function classifyFetchRejection(
+  error: unknown,
+  signal?: AbortSignal,
+): Error {
+  if (isAbortError(error) && isQueryCancellationAbort(signal)) {
+    return new CancelledError({ revert: true, silent: true });
+  }
+
+  return new NetworkError(undefined, error);
+}
+
 /**
  * [CR-2026-05-21-156] Wraps `globalThis.fetch` so network-layer rejections
  * (no response received — DNS failure, offline, timeout, abort, etc.) become
@@ -76,7 +98,7 @@ export async function fetchOrThrowNetworkError(
   try {
     return await globalThis.fetch(input, init);
   } catch (err) {
-    throw new NetworkError(undefined, err);
+    throw classifyFetchRejection(err, init?.signal);
   }
 }
 

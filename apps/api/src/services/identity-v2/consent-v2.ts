@@ -36,6 +36,7 @@ import {
   membership,
   nudges,
   person,
+  subscription as subscriptionTable,
   type Database,
 } from '@eduagent/database';
 import type { ConsentStatus, ConsentType } from '@eduagent/schemas';
@@ -437,8 +438,8 @@ export interface ProcessConsentResponseV2Result {
  * replay/expiry, then:
  *   - approve → tx: request → 'approved' + INSERT consent_grant(granted=true)
  *     + back-link consent_grant_id. (NEVER creates a guardianship edge.)
- *   - deny    → tx: request → 'denied' + cascade-delete the child person (the
- *     legacy deny-cascade; person.id = profiles.id, FK cascade unchanged).
+ *   - deny    → tx: request → 'denied' + delete payer subscription if this
+ *     person owns one + cascade-delete the person.
  *
  * The atomic status transition's WHERE prevents the TOCTOU double-submit race.
  */
@@ -548,7 +549,15 @@ export async function processConsentResponseV2(
       if (!updated) {
         throw new ConsentAlreadyProcessedError();
       }
-      // Deny cascade-deletes the child person (FK cascades handle child data).
+      // A consent-pending owner can already have the launch trial subscription;
+      // remove only rows where THIS person is the payer before deleting them.
+      // Managed children are not payers, so this is a no-op for ordinary
+      // parent-created child consent flows.
+      await tx
+        .delete(subscriptionTable)
+        .where(eq(subscriptionTable.payerPersonId, chargePersonId));
+
+      // Deny cascade-deletes the person (FK cascades handle child data).
       await tx.delete(person).where(eq(person.id, chargePersonId));
     });
   }
@@ -1005,6 +1014,38 @@ export async function getPersonDisplayNameV2(
     columns: { displayName: true },
   });
   return row?.displayName ?? null;
+}
+
+/**
+ * [WI-809] v2 org-scoped display-name read for the consent request/resend flow —
+ * the replacement for the legacy `getProfile(db, childProfileId, account.id)`
+ * gate (which collapsed existence + account-ownership + not-archived). Returns
+ * the person's display name ONLY when they are an ACTIVE (non-archived) member of
+ * `organizationId` (= the caller's account.id). Returns null for a non-member, an
+ * archived person, OR a non-existent id — a single, indistinguishable outcome, so
+ * a caller cannot (a) enumerate whether an arbitrary id is a real person,
+ * (b) target an out-of-org child, or (c) target an archived child legacy rejected.
+ * Unlike `getPersonDisplayNameV2` (global, existence-only), this preserves the
+ * legacy scoping the cutover must not weaken.
+ */
+export async function getOrgMemberDisplayNameV2(
+  db: Database,
+  personId: string,
+  organizationId: string,
+): Promise<string | null> {
+  const rows = await db
+    .select({ displayName: person.displayName })
+    .from(membership)
+    .innerJoin(person, eq(person.id, membership.personId))
+    .where(
+      and(
+        eq(membership.personId, personId),
+        eq(membership.organizationId, organizationId),
+        isNull(person.archivedAt),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.displayName ?? null;
 }
 
 /**

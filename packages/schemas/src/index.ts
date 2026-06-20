@@ -20,6 +20,7 @@ export * from './bookmarks';
 export * from './assessments';
 export * from './activity-ledger';
 export * from './now-feed';
+export * from './scope';
 
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';

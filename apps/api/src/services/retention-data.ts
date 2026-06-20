@@ -11,8 +11,6 @@ import {
   and,
   gt,
   gte,
-  or,
-  isNull,
   isNotNull,
   lt,
   inArray,
@@ -56,10 +54,13 @@ import {
   checkNeedsDeepeningCapacity,
 } from './adaptive-teaching';
 import { calculateMasteryScore } from './assessments';
-import { syncXpLedgerStatus } from './xp';
 import { stampMasteryOnVerify } from './retention-mastery';
+import {
+  applyRetentionUpdate,
+  insertRetentionCardIfAbsent,
+  syncRewardStatusFromRetention,
+} from './apply-retention-update';
 import { routeAndCall, type ChatMessage } from './llm';
-import { captureException } from './sentry';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
 import { createLogger } from './logger';
@@ -204,21 +205,7 @@ export async function ensureRetentionCard(
   });
   if (existingCard) return { card: existingCard, isNew: false };
 
-  await db
-    .insert(retentionCards)
-    .values({
-      profileId,
-      topicId,
-      easeFactor: 2.5,
-      intervalDays: 1,
-      repetitions: 0,
-      failureCount: 0,
-      consecutiveSuccesses: 0,
-      xpStatus: 'pending',
-    })
-    .onConflictDoNothing({
-      target: [retentionCards.profileId, retentionCards.topicId],
-    });
+  await insertRetentionCardIfAbsent({ db, profileId, topicId });
 
   // Read back the card (either newly created or pre-existing)
   const card = await db.query.retentionCards.findFirst({
@@ -846,27 +833,18 @@ export async function processRecallTest(
   const cooldownThreshold = new Date(Date.now() - RETEST_COOLDOWN_MS);
   const claimNow = new Date();
   if (attemptMode !== 'dont_remember') {
-    const [claimed] = await db
-      .update(retentionCards)
-      .set({
+    const { updated: claimed } = await applyRetentionUpdate({
+      db,
+      profileId,
+      cardId: effectiveCard.id,
+      set: {
         // Use claimNow for both lastReviewedAt and updatedAt so the
         // optimistic-lock check below (eq(updatedAt, claimNow)) lines up.
         lastReviewedAt: claimNow,
-        updatedAt: claimNow,
-      })
-      .where(
-        and(
-          eq(retentionCards.id, effectiveCard.id),
-          eq(retentionCards.profileId, profileId),
-          // Atomic cooldown guard: only claim if lastReviewedAt is null or
-          // older than the cooldown threshold.
-          or(
-            isNull(retentionCards.lastReviewedAt),
-            lt(retentionCards.lastReviewedAt, cooldownThreshold),
-          ),
-        ),
-      )
-      .returning({ id: retentionCards.id });
+      },
+      guard: { kind: 'cooldownClaim', cooldownThreshold },
+      updatedAt: claimNow,
+    });
 
     if (!claimed) {
       // Another concurrent request already claimed this cooldown window —
@@ -897,9 +875,11 @@ export async function processRecallTest(
   // claim above already bumped lastReviewedAt + updatedAt; we now write the
   // computed result. Use the claimNow value as the optimistic lock so a
   // late-arriving losing request cannot overwrite our just-claimed row.
-  const [persisted] = await db
-    .update(retentionCards)
-    .set({
+  const { updated: persisted } = await applyRetentionUpdate({
+    db,
+    profileId,
+    cardId: effectiveCard.id,
+    set: {
       easeFactor: result.newState.easeFactor,
       intervalDays: result.newState.intervalDays,
       repetitions: result.newState.repetitions,
@@ -909,21 +889,16 @@ export async function processRecallTest(
       nextReviewAt: result.newState.nextReviewAt
         ? new Date(result.newState.nextReviewAt)
         : null,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(retentionCards.id, effectiveCard.id),
-        eq(retentionCards.profileId, profileId),
-        // For non-dont_remember: ensure the row is still the one we claimed
-        // (defence-in-depth — the pre-claim already serialized the LLM call).
-        // For dont_remember: no pre-claim, so we don't enforce updatedAt match.
-        attemptMode === 'dont_remember'
-          ? sql`true`
-          : eq(retentionCards.updatedAt, claimNow),
-      ),
-    )
-    .returning({ id: retentionCards.id });
+    },
+    // For non-dont_remember: ensure the row is still the one we claimed
+    // (defence-in-depth — the pre-claim already serialized the LLM call).
+    // For dont_remember: no pre-claim, so we don't enforce updatedAt match.
+    guard:
+      attemptMode === 'dont_remember'
+        ? { kind: 'none' }
+        : { kind: 'updatedAtEquals', updatedAt: claimNow },
+    updatedAt: new Date(),
+  });
 
   if (!persisted && attemptMode !== 'dont_remember') {
     // The post-LLM write lost an optimistic-lock race against another writer
@@ -941,6 +916,18 @@ export async function processRecallTest(
       cooldownActive: true,
       cooldownEndsAt: new Date(Date.now() + RETEST_COOLDOWN_MS).toISOString(),
     };
+  }
+
+  // [WI-848] Mirror decay to xp_ledger.status. The verified write is already
+  // handled at insert time by insertSessionXpEntry (post-sunset, 5fed808e9).
+  // No-op when no ledger row exists (topic never completed a session).
+  if (result.xpChange === 'decayed') {
+    await syncRewardStatusFromRetention({
+      db,
+      profileId,
+      topicId: input.topicId,
+      status: 'decayed',
+    });
   }
 
   await stampMasteryOnVerify(db, {
@@ -981,32 +968,6 @@ export async function processRecallTest(
     'retention.recall',
     { profileId, topicId: input.topicId },
   );
-
-  // Sync xp_ledger to match the retention card's new xpStatus (best-effort —
-  // XP bookkeeping should not abort the recall test response)
-  if (result.xpChange === 'verified' || result.xpChange === 'decayed') {
-    try {
-      await syncXpLedgerStatus(db, profileId, input.topicId, result.xpChange);
-    } catch (err) {
-      // [AUDIT-SILENT-FAIL] Non-fatal for the recall response, but must be
-      // visible — XP ledger drift silently accumulates across sessions if we
-      // only console.error. Escalate so the fallback is queryable in Sentry.
-      // [logging sweep] structured logger so PII fields land as JSON context
-      logger.error('[processRecallTest] XP sync failed (non-fatal)', {
-        topicId: input.topicId,
-        xpChange: result.xpChange,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      captureException(err, {
-        profileId,
-        extra: {
-          site: 'processRecallTest.syncXpLedgerStatus',
-          topicId: input.topicId,
-          xpChange: result.xpChange,
-        },
-      });
-    }
-  }
 
   const response: RecallTestResponse = {
     passed: result.passed,
@@ -1518,41 +1479,37 @@ export async function updateRetentionFromSession(
     },
   });
 
-  const updateResult = await db
-    .update(retentionCards)
-    .set({
+  const updateResult = await applyRetentionUpdate({
+    db,
+    profileId,
+    cardId: card.id,
+    set: {
       easeFactor: result.card.easeFactor,
       intervalDays: result.card.interval,
       repetitions: result.card.repetitions,
       lastReviewedAt: new Date(result.card.lastReviewedAt),
       nextReviewAt: new Date(result.card.nextReviewAt),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(retentionCards.id, card.id),
-        eq(retentionCards.profileId, profileId),
-        // [B73] Optimistic lock: only update if the card hasn't been modified
-        // since we read it. Prevents silent overwrites from concurrent sessions.
-        // Skip the lock for newly-created cards — no concurrent write is possible.
-        // Use a strict equality match for existing cards: every writer in this
-        // service is JS (Drizzle ORM via `new Date()` / `Date.now()`), so
-        // `updatedAt` values are always millisecond-aligned and round-trip
-        // through PostgreSQL `timestamptz` losslessly at JS precision. The
-        // previous ±1ms tolerance window was justified by a "PostgreSQL
-        // microsecond truncation" claim that doesn't apply to JS-only writers
-        // — it silently allowed concurrent writes that happened within 1ms of
-        // each other to overwrite stale reads. If a non-JS writer (raw SQL,
-        // background job in another language, etc.) is ever introduced, revisit
-        // this comparison rather than re-widening it blindly.
-        ...(ensured.isNew
-          ? []
-          : [eq(retentionCards.updatedAt, card.updatedAt)]),
-      ),
-    )
-    .returning();
+    },
+    // [B73] Optimistic lock: only update if the card hasn't been modified
+    // since we read it. Prevents silent overwrites from concurrent sessions.
+    // Skip the lock for newly-created cards — no concurrent write is possible.
+    // Use a strict equality match for existing cards: every writer in this
+    // service is JS (Drizzle ORM via `new Date()` / `Date.now()`), so
+    // `updatedAt` values are always millisecond-aligned and round-trip
+    // through PostgreSQL `timestamptz` losslessly at JS precision. The
+    // previous ±1ms tolerance window was justified by a "PostgreSQL
+    // microsecond truncation" claim that doesn't apply to JS-only writers
+    // — it silently allowed concurrent writes that happened within 1ms of
+    // each other to overwrite stale reads. If a non-JS writer (raw SQL,
+    // background job in another language, etc.) is ever introduced, revisit
+    // this comparison rather than re-widening it blindly.
+    guard: ensured.isNew
+      ? { kind: 'none' }
+      : { kind: 'optimisticLock', updatedAt: card.updatedAt },
+    updatedAt: new Date(),
+  });
 
-  if (updateResult.length === 0) {
+  if (!updateResult.updated) {
     // Another session updated the card concurrently — our update was
     // based on stale data. Log and skip rather than silently overwriting.
     // [logging sweep] structured logger so PII fields land as JSON context

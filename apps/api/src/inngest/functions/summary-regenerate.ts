@@ -275,11 +275,21 @@ export const sessionSummaryRegenerate = inngest.createFunction(
     const result = await step.run('regenerate-summary', async () => {
       const db = getStepDatabase();
       // i18n Phase 1 — load conversation_language for the regenerated summary.
-      const [regenerateProfile] = await db
-        .select({ conversationLanguage: profiles.conversationLanguage })
-        .from(profiles)
-        .where(eq(profiles.id, payload.profileId))
-        .limit(1);
+      // [WI-586 C6] v2 seam: person.conversation_language (mirrors summaryRegenerate
+      // and sessionSummaryCreate gating in the same file).
+      let regenerateConversationLanguage: string | null | undefined;
+      if (isIdentityV2EnabledInStep()) {
+        const ctx = await getPersonLlmContext(db, payload.profileId);
+        regenerateConversationLanguage = ctx?.conversationLanguage;
+      } else {
+        const [regenerateProfile] = await db
+          .select({ conversationLanguage: profiles.conversationLanguage })
+          .from(profiles)
+          .where(eq(profiles.id, payload.profileId))
+          .limit(1);
+        regenerateConversationLanguage =
+          regenerateProfile?.conversationLanguage;
+      }
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,
         profileId: payload.profileId,
@@ -288,7 +298,7 @@ export const sessionSummaryRegenerate = inngest.createFunction(
         topicId: payload.topicId ?? null,
         // DB returns string | null; parse to union before passing to LLM call.
         conversationLanguage: parseConversationLanguage(
-          regenerateProfile?.conversationLanguage,
+          regenerateConversationLanguage,
         ),
       });
 

@@ -79,8 +79,23 @@ export function AppContextProvider({
     return familyCapable ? 'family' : 'study';
   }, [activeProfile, familyCapable, isLoading]);
 
+  // Invalidate any in-flight mode switch only on a genuine identity change.
+  // `defaultAppContext` is deliberately excluded: an in-flight switch's own
+  // confirming refetch lands the target context here, and bumping the seq on
+  // that self-induced change would falsely mark the switch's success as stale
+  // (WI-816 race -> "Couldn't switch" despite a 200).
   useEffect(() => {
     modeRequestSeq.current += 1;
+  }, [
+    activeProfile?.id,
+    activeProfile?.isOwner,
+    activeProfile?.birthYear,
+    activeProfile?.hasFamilyLinks,
+  ]);
+
+  // Clear the transient override whenever the persisted context (or identity)
+  // changes, so the derived mode is authoritative once the server agrees.
+  useEffect(() => {
     setModeOverride(null);
   }, [
     activeProfile?.id,

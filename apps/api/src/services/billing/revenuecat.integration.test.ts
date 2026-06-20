@@ -16,7 +16,8 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import {
-  accounts,
+  generateUUIDv7,
+  organization,
   quotaPools,
   subscriptions,
   createDatabase,
@@ -32,6 +33,11 @@ import {
   activateSubscriptionFromRevenuecat,
 } from './revenuecat';
 import { getTierConfig } from '../subscription';
+import {
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+} from '../../test-utils/legacy-identity-anchors';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection, same pattern as trial.integration.test.ts
@@ -57,7 +63,8 @@ function createIntegrationDb(): Database {
 // Seed helpers — unique prefix so parallel test runs don't collide
 // ---------------------------------------------------------------------------
 
-const PREFIX = 'integration-revenuecat';
+const RUN_ID = generateUUIDv7();
+const PREFIX = `integration-revenuecat-${RUN_ID}`;
 const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-01`, email: `${PREFIX}-01@integration.test` },
   { clerkUserId: `${PREFIX}-02`, email: `${PREFIX}-02@integration.test` },
@@ -66,17 +73,38 @@ const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-05`, email: `${PREFIX}-05@integration.test` },
   { clerkUserId: `${PREFIX}-06`, email: `${PREFIX}-06@integration.test` },
 ];
-const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
+const seededAccountIds: string[] = [];
+const legacyRevenuecatIntegrationEnabled =
+  process.env.IDENTITY_V2_ENABLED !== 'true';
+const legacyDescribe = legacyRevenuecatIntegrationEnabled
+  ? describe
+  : describe.skip;
 
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
   const account = TEST_ACCOUNTS[index]!;
-  const [row] = await db
-    .insert(accounts)
-    .values({ clerkUserId: account.clerkUserId, email: account.email })
-    .returning();
-  return row!;
+  const accountId = generateUUIDv7();
+  seededAccountIds.push(accountId);
+
+  await db
+    .insert(organization)
+    .values({
+      id: accountId,
+      name: `RevenueCat ${index}`,
+    })
+    .onConflictDoNothing();
+
+  await ensureLegacyProfileAnchorForTest(db, {
+    accountId,
+    profileId: generateUUIDv7(),
+    clerkUserId: account.clerkUserId,
+    email: account.email,
+    displayName: `RevenueCat ${index}`,
+    birthYear: 1990,
+    isOwner: true,
+  });
+
+  return { id: accountId };
 }
 
 async function seedSubscription(
@@ -140,23 +168,32 @@ async function loadQuotaPool(subscriptionId: string) {
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
-  });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
+  const ids = [...new Set(seededAccountIds)];
   if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+    const subscriptionRows = await db.query.subscriptions.findMany({
+      where: inArray(subscriptions.accountId, ids),
+      columns: { id: true },
+    });
+    const subscriptionIds = subscriptionRows.map((row) => row.id);
+    if (subscriptionIds.length > 0) {
+      await db
+        .delete(quotaPools)
+        .where(inArray(quotaPools.subscriptionId, subscriptionIds));
+    }
+    await db.delete(subscriptions).where(inArray(subscriptions.accountId, ids));
+    await deleteLegacyAccountsForTest(db, ids);
+    await deleteV2IdentitiesForTest(db, { accountIds: ids });
   }
+  seededAccountIds.length = 0;
 }
 
 beforeEach(async () => {
+  if (!legacyRevenuecatIntegrationEnabled) return;
   await cleanupTestAccounts();
 });
 
 afterAll(async () => {
+  if (!legacyRevenuecatIntegrationEnabled) return;
   await cleanupTestAccounts();
 });
 
@@ -164,7 +201,7 @@ afterAll(async () => {
 // isRevenuecatEventProcessed
 // ---------------------------------------------------------------------------
 
-describe('isRevenuecatEventProcessed (integration)', () => {
+legacyDescribe('isRevenuecatEventProcessed (integration)', () => {
   it('returns false when no subscription exists', async () => {
     const account = await seedAccount(0);
     const db = createIntegrationDb();
@@ -247,359 +284,365 @@ describe('isRevenuecatEventProcessed (integration)', () => {
 // updateSubscriptionFromRevenuecatWebhook
 // ---------------------------------------------------------------------------
 
-describe('updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]', () => {
-  it('returns null when no subscription exists', async () => {
-    const account = await seedAccount(1);
-    const db = createIntegrationDb();
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      { eventId: 'evt-no-sub', eventTimestampMs: Date.now() },
-    );
-    expect(result).toBeNull();
-  });
+legacyDescribe(
+  'updateSubscriptionFromRevenuecatWebhook (integration) [BD-01]',
+  () => {
+    it('returns null when no subscription exists', async () => {
+      const account = await seedAccount(1);
+      const db = createIntegrationDb();
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        { eventId: 'evt-no-sub', eventTimestampMs: Date.now() },
+      );
+      expect(result).toBeNull();
+    });
 
-  it('writes lastRevenuecatEventId and lastRevenuecatEventTimestampMs (BD-01)', async () => {
-    const account = await seedAccount(1);
-    await seedSubscription(account.id);
-    const db = createIntegrationDb();
-    const eventId = 'evt-bd01-write';
-    const eventTimestampMs = 1_710_000_000_000;
+    it('writes lastRevenuecatEventId and lastRevenuecatEventTimestampMs (BD-01)', async () => {
+      const account = await seedAccount(1);
+      await seedSubscription(account.id);
+      const db = createIntegrationDb();
+      const eventId = 'evt-bd01-write';
+      const eventTimestampMs = 1_710_000_000_000;
 
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      { eventId, eventTimestampMs },
-    );
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        { eventId, eventTimestampMs },
+      );
 
-    expect(result).not.toBeNull();
+      expect(result).not.toBeNull();
 
-    const row = await loadSubscription(account.id);
-    expect(row!.lastRevenuecatEventId).toBe(eventId);
-    expect(row!.lastRevenuecatEventTimestampMs).toBe(String(eventTimestampMs));
-  });
+      const row = await loadSubscription(account.id);
+      expect(row!.lastRevenuecatEventId).toBe(eventId);
+      expect(row!.lastRevenuecatEventTimestampMs).toBe(
+        String(eventTimestampMs),
+      );
+    });
 
-  it('updates tier and status fields when provided', async () => {
-    const account = await seedAccount(1);
-    await seedSubscription(account.id, { tier: 'plus', status: 'active' });
-    const db = createIntegrationDb();
+    it('updates tier and status fields when provided', async () => {
+      const account = await seedAccount(1);
+      await seedSubscription(account.id, { tier: 'plus', status: 'active' });
+      const db = createIntegrationDb();
 
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      {
-        eventId: 'evt-update-fields',
-        tier: 'family',
-        currentPeriodStart: '2026-05-01T00:00:00.000Z',
-        currentPeriodEnd: '2026-06-01T00:00:00.000Z',
-      },
-    );
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        {
+          eventId: 'evt-update-fields',
+          tier: 'family',
+          currentPeriodStart: '2026-05-01T00:00:00.000Z',
+          currentPeriodEnd: '2026-06-01T00:00:00.000Z',
+        },
+      );
 
-    expect(result!.tier).toBe('family');
-    expect(result!.currentPeriodStart).toBe('2026-05-01T00:00:00.000Z');
-    expect(result!.currentPeriodEnd).toBe('2026-06-01T00:00:00.000Z');
-  });
+      expect(result!.tier).toBe('family');
+      expect(result!.currentPeriodStart).toBe('2026-05-01T00:00:00.000Z');
+      expect(result!.currentPeriodEnd).toBe('2026-06-01T00:00:00.000Z');
+    });
 
-  it('writes without eventTimestampMs when it is omitted', async () => {
-    const account = await seedAccount(1);
-    await seedSubscription(account.id);
-    const db = createIntegrationDb();
-    const eventId = 'evt-no-ts';
+    it('writes without eventTimestampMs when it is omitted', async () => {
+      const account = await seedAccount(1);
+      await seedSubscription(account.id);
+      const db = createIntegrationDb();
+      const eventId = 'evt-no-ts';
 
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      { eventId },
-    );
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        { eventId },
+      );
 
-    expect(result).not.toBeNull();
-    const row = await loadSubscription(account.id);
-    expect(row!.lastRevenuecatEventId).toBe(eventId);
-    // Timestamp column should remain null (not set when omitted)
-    expect(row!.lastRevenuecatEventTimestampMs).toBeNull();
-  });
+      expect(result).not.toBeNull();
+      const row = await loadSubscription(account.id);
+      expect(row!.lastRevenuecatEventId).toBe(eventId);
+      // Timestamp column should remain null (not set when omitted)
+      expect(row!.lastRevenuecatEventTimestampMs).toBeNull();
+    });
 
-  // [BUG-447] BREAK TEST: invalid status transition must throw so callers
-  // (handleRenewal, handleProductChange) do NOT proceed to updateQuotaPoolLimit.
-  // Pre-fix, the function returned the existing row (callers treated it as
-  // success). Post-fix, it throws — callers catch the error via their own
-  // error boundary or the webhook 500 path, and quota pool is never updated.
-  it('[BUG-447] throws on invalid status transition so quota pool stays coherent', async () => {
-    const account = await seedAccount(1);
-    // 'expired' → 'trial' is invalid per the state machine. (Note: expired ->
-    // active / past_due are now VALID reactivations per fix #4, so this test
-    // uses expired -> trial, which remains an illegitimate transition.)
-    const { subscription } = await seedSubscriptionWithQuota(
-      account.id,
-      'plus',
-      {
-        status: 'expired',
-      },
-    );
-    const db = createIntegrationDb();
+    // [BUG-447] BREAK TEST: invalid status transition must throw so callers
+    // (handleRenewal, handleProductChange) do NOT proceed to updateQuotaPoolLimit.
+    // Pre-fix, the function returned the existing row (callers treated it as
+    // success). Post-fix, it throws — callers catch the error via their own
+    // error boundary or the webhook 500 path, and quota pool is never updated.
+    it('[BUG-447] throws on invalid status transition so quota pool stays coherent', async () => {
+      const account = await seedAccount(1);
+      // 'expired' → 'trial' is invalid per the state machine. (Note: expired ->
+      // active / past_due are now VALID reactivations per fix #4, so this test
+      // uses expired -> trial, which remains an illegitimate transition.)
+      const { subscription } = await seedSubscriptionWithQuota(
+        account.id,
+        'plus',
+        {
+          status: 'expired',
+        },
+      );
+      const db = createIntegrationDb();
 
-    const poolBefore = await loadQuotaPool(subscription.id);
-    const limitBefore = poolBefore!.monthlyLimit;
+      const poolBefore = await loadQuotaPool(subscription.id);
+      const limitBefore = poolBefore!.monthlyLimit;
 
-    // Must throw — callers must NOT proceed to updateQuotaPoolLimit
-    await expect(
-      updateSubscriptionFromRevenuecatWebhook(db, account.id, {
-        eventId: 'evt-bad-transition',
-        tier: 'family', // attempting tier+status change
-        status: 'trial', // expired -> trial is invalid
-      }),
-    ).rejects.toThrow(/Invalid subscription transition/);
+      // Must throw — callers must NOT proceed to updateQuotaPoolLimit
+      await expect(
+        updateSubscriptionFromRevenuecatWebhook(db, account.id, {
+          eventId: 'evt-bad-transition',
+          tier: 'family', // attempting tier+status change
+          status: 'trial', // expired -> trial is invalid
+        }),
+      ).rejects.toThrow(/Invalid subscription transition/);
 
-    // Status must remain 'expired' — the invalid transition was refused
-    const row = await loadSubscription(account.id);
-    expect(row!.status).toBe('expired');
+      // Status must remain 'expired' — the invalid transition was refused
+      const row = await loadSubscription(account.id);
+      expect(row!.status).toBe('expired');
 
-    // Quota pool must remain at the original limit — the throw prevented any
-    // updateQuotaPoolLimit call that a caller would have made for 'family' tier
-    const poolAfter = await loadQuotaPool(subscription.id);
-    expect(poolAfter!.monthlyLimit).toBe(limitBefore);
-  });
+      // Quota pool must remain at the original limit — the throw prevented any
+      // updateQuotaPoolLimit call that a caller would have made for 'family' tier
+      const poolAfter = await loadQuotaPool(subscription.id);
+      expect(poolAfter!.monthlyLimit).toBe(limitBefore);
+    });
 
-  // [#4 MEDIUM — expired->active reactivation BREAK TEST] A RevenueCat RENEWAL
-  // delivers status='active' for an already-expired account (a successful
-  // re-charge after lapse). Pre-fix, isValidTransition('expired','active') was
-  // false → applySubscriptionUpdateFromRevenuecat threw → the webhook 500'd and
-  // RevenueCat retried for ~3 days while the customer stayed downgraded despite
-  // paying. Post-fix the reactivation succeeds: no throw, status becomes active.
-  it('[#4] expired account receiving a RENEWAL (status=active) reactivates without throwing', async () => {
-    const account = await seedAccount(1);
-    const { subscription } = await seedSubscriptionWithQuota(
-      account.id,
-      'plus',
-      { status: 'expired' },
-    );
-    const db = createIntegrationDb();
+    // [#4 MEDIUM — expired->active reactivation BREAK TEST] A RevenueCat RENEWAL
+    // delivers status='active' for an already-expired account (a successful
+    // re-charge after lapse). Pre-fix, isValidTransition('expired','active') was
+    // false → applySubscriptionUpdateFromRevenuecat threw → the webhook 500'd and
+    // RevenueCat retried for ~3 days while the customer stayed downgraded despite
+    // paying. Post-fix the reactivation succeeds: no throw, status becomes active.
+    it('[#4] expired account receiving a RENEWAL (status=active) reactivates without throwing', async () => {
+      const account = await seedAccount(1);
+      const { subscription } = await seedSubscriptionWithQuota(
+        account.id,
+        'plus',
+        { status: 'expired' },
+      );
+      const db = createIntegrationDb();
 
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      {
-        eventId: 'evt-expired-renewal-reactivation',
-        status: 'active',
-      },
-    );
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        {
+          eventId: 'evt-expired-renewal-reactivation',
+          status: 'active',
+        },
+      );
 
-    // Must NOT throw and must apply the reactivation.
-    expect(result).not.toBeNull();
-    expect(result!.webhookApplied).toBe(true);
-    expect(result!.status).toBe('active');
+      // Must NOT throw and must apply the reactivation.
+      expect(result).not.toBeNull();
+      expect(result!.webhookApplied).toBe(true);
+      expect(result!.status).toBe('active');
 
-    const row = await loadSubscription(account.id);
-    expect(row!.status).toBe('active');
-    expect(row!.id).toBe(subscription.id);
-  });
+      const row = await loadSubscription(account.id);
+      expect(row!.status).toBe('active');
+      expect(row!.id).toBe(subscription.id);
+    });
 
-  // [CR-2026-05-19-M3] SITE 4: SQL-level WHERE guard smoke test.
-  // The UPDATE WHERE clause now includes `AND status = existing.status` when
-  // a status transition is being applied. This closes the storage-layer gap
-  // where the JS validation passed (correct transition based on read) but the
-  // row was concurrently mutated before the UPDATE landed (READ COMMITTED +
-  // savepoint scenarios).
-  //
-  // Smoke test: a valid transition succeeds (WHERE matches), and confirms
-  // the guard is in place by verifying the returned row reflects the new status.
-  it('[CR-2026-05-19-M3 SITE 4] valid status transition succeeds with SQL WHERE guard in place', async () => {
-    const account = await seedAccount(1);
-    // Seed with status='active' (trial → active is valid per the state machine)
-    await seedSubscription(account.id, { tier: 'plus', status: 'active' });
+    // [CR-2026-05-19-M3] SITE 4: SQL-level WHERE guard smoke test.
+    // The UPDATE WHERE clause now includes `AND status = existing.status` when
+    // a status transition is being applied. This closes the storage-layer gap
+    // where the JS validation passed (correct transition based on read) but the
+    // row was concurrently mutated before the UPDATE landed (READ COMMITTED +
+    // savepoint scenarios).
+    //
+    // Smoke test: a valid transition succeeds (WHERE matches), and confirms
+    // the guard is in place by verifying the returned row reflects the new status.
+    it('[CR-2026-05-19-M3 SITE 4] valid status transition succeeds with SQL WHERE guard in place', async () => {
+      const account = await seedAccount(1);
+      // Seed with status='active' (trial → active is valid per the state machine)
+      await seedSubscription(account.id, { tier: 'plus', status: 'active' });
 
-    const db = createIntegrationDb();
+      const db = createIntegrationDb();
 
-    // active → cancelled is a valid transition
-    const result = await updateSubscriptionFromRevenuecatWebhook(
-      db,
-      account.id,
-      {
-        eventId: 'evt-where-guard-valid',
-        status: 'cancelled',
-      },
-    );
+      // active → cancelled is a valid transition
+      const result = await updateSubscriptionFromRevenuecatWebhook(
+        db,
+        account.id,
+        {
+          eventId: 'evt-where-guard-valid',
+          status: 'cancelled',
+        },
+      );
 
-    expect(result).not.toBeNull();
-    expect(result!.status).toBe('cancelled');
+      expect(result).not.toBeNull();
+      expect(result!.status).toBe('cancelled');
 
-    // The SQL WHERE guard applied: row was updated (guard didn't block it)
-    const row = await loadSubscription(account.id);
-    expect(row!.status).toBe('cancelled');
-  });
+      // The SQL WHERE guard applied: row was updated (guard didn't block it)
+      const row = await loadSubscription(account.id);
+      expect(row!.status).toBe('cancelled');
+    });
 
-  // [BREAK CR-2026-05-19-M3 SITE 4] SQL WHERE guard blocks phantom write.
-  // Demonstrates the guard pattern directly: an UPDATE with
-  // `WHERE id = X AND status = 'expired'` against a row that is actually 'active'
-  // returns 0 rows. Without the guard the UPDATE omits the status clause and
-  // writes regardless — the guard closes that gap.
-  it('[BREAK CR-2026-05-19-M3 SITE 4] SQL WHERE guard causes 0-row update when status mismatches', async () => {
-    const account = await seedAccount(1);
-    const sub = await seedSubscription(account.id, { status: 'active' });
+    // [BREAK CR-2026-05-19-M3 SITE 4] SQL WHERE guard blocks phantom write.
+    // Demonstrates the guard pattern directly: an UPDATE with
+    // `WHERE id = X AND status = 'expired'` against a row that is actually 'active'
+    // returns 0 rows. Without the guard the UPDATE omits the status clause and
+    // writes regardless — the guard closes that gap.
+    it('[BREAK CR-2026-05-19-M3 SITE 4] SQL WHERE guard causes 0-row update when status mismatches', async () => {
+      const account = await seedAccount(1);
+      const sub = await seedSubscription(account.id, { status: 'active' });
 
-    const db = createIntegrationDb();
+      const db = createIntegrationDb();
 
-    // Directly run the guarded pattern: WHERE id = X AND status = 'expired'
-    // but actual status is 'active' → 0 rows.
-    const [updatedRow] = await db
-      .update(subscriptions)
-      .set({ status: 'cancelled', updatedAt: new Date() })
-      .where(
-        and(
-          eq(subscriptions.id, sub.id),
-          eq(subscriptions.status, 'expired'), // wrong — actual is 'active'
+      // Directly run the guarded pattern: WHERE id = X AND status = 'expired'
+      // but actual status is 'active' → 0 rows.
+      const [updatedRow] = await db
+        .update(subscriptions)
+        .set({ status: 'cancelled', updatedAt: new Date() })
+        .where(
+          and(
+            eq(subscriptions.id, sub.id),
+            eq(subscriptions.status, 'expired'), // wrong — actual is 'active'
+          ),
+        )
+        .returning();
+
+      // 0 rows updated because status clause doesn't match
+      expect(updatedRow).toBeUndefined();
+
+      // Row is unchanged
+      const row = await loadSubscription(account.id);
+      expect(row!.status).toBe('active');
+    });
+
+    // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same event ID
+    // must result in exactly ONE write. Pre-fix: both calls could race past the
+    // isRevenuecatEventProcessed() read (both saw "not processed") and both
+    // attempt the UPDATE — divergent billing state if they differ on setValues.
+    // Post-fix: the idempotency check + UPDATE are inside a single db.transaction(),
+    // and the partial unique index on (accountId, lastRevenuecatEventId) provides
+    // the storage-layer guarantee. The second writer's UPDATE is rejected.
+    it('[BREAK CR-2026-05-19-M11] concurrent same-event deliveries write only once', async () => {
+      const account = await seedAccount(1);
+      await seedSubscription(account.id, { tier: 'plus', status: 'active' });
+      const eventId = 'evt-concurrent-dedup-001';
+
+      // Fire two identical event deliveries concurrently
+      const [r1, r2] = await Promise.all([
+        updateSubscriptionFromRevenuecatWebhook(
+          createIntegrationDb(),
+          account.id,
+          {
+            eventId,
+            tier: 'family',
+            eventTimestampMs: 1_710_000_000_000,
+          },
         ),
-      )
-      .returning();
+        updateSubscriptionFromRevenuecatWebhook(
+          createIntegrationDb(),
+          account.id,
+          {
+            eventId,
+            tier: 'family',
+            eventTimestampMs: 1_710_000_000_000,
+          },
+        ),
+      ]);
 
-    // 0 rows updated because status clause doesn't match
-    expect(updatedRow).toBeUndefined();
+      // Both must succeed (return non-null) — the second is an idempotent return
+      expect(r1).not.toBeNull();
+      expect(r2).not.toBeNull();
 
-    // Row is unchanged
-    const row = await loadSubscription(account.id);
-    expect(row!.status).toBe('active');
-  });
+      // Exactly one write happened — the event stamp matches the eventId
+      const row = await loadSubscription(account.id);
+      expect(row!.lastRevenuecatEventId).toBe(eventId);
+      expect(row!.tier).toBe('family');
 
-  // [BREAK CR-2026-05-19-M11] Two concurrent deliveries of the same event ID
-  // must result in exactly ONE write. Pre-fix: both calls could race past the
-  // isRevenuecatEventProcessed() read (both saw "not processed") and both
-  // attempt the UPDATE — divergent billing state if they differ on setValues.
-  // Post-fix: the idempotency check + UPDATE are inside a single db.transaction(),
-  // and the partial unique index on (accountId, lastRevenuecatEventId) provides
-  // the storage-layer guarantee. The second writer's UPDATE is rejected.
-  it('[BREAK CR-2026-05-19-M11] concurrent same-event deliveries write only once', async () => {
-    const account = await seedAccount(1);
-    await seedSubscription(account.id, { tier: 'plus', status: 'active' });
-    const eventId = 'evt-concurrent-dedup-001';
+      // Only one subscription row exists for this account
+      const db = createIntegrationDb();
+      const rows = await db.query.subscriptions.findMany({
+        where: eq(subscriptions.accountId, account.id),
+      });
+      expect(rows).toHaveLength(1);
+    });
 
-    // Fire two identical event deliveries concurrently
-    const [r1, r2] = await Promise.all([
-      updateSubscriptionFromRevenuecatWebhook(
-        createIntegrationDb(),
+    it('sets cancelledAt when cancelledAt is provided', async () => {
+      const account = await seedAccount(1);
+      await seedSubscription(account.id, { status: 'active' });
+      const db = createIntegrationDb();
+      const cancelledAt = '2026-06-01T12:00:00.000Z';
+
+      await updateSubscriptionFromRevenuecatWebhook(db, account.id, {
+        eventId: 'evt-cancel',
+        cancelledAt,
+      });
+
+      const row = await loadSubscription(account.id);
+      expect(row!.cancelledAt?.toISOString()).toBe(cancelledAt);
+    });
+
+    it('clears cancelledAt when cancelledAt is null', async () => {
+      const account = await seedAccount(1);
+      const cancelledDate = new Date('2026-05-01T00:00:00.000Z');
+      await seedSubscription(account.id, { cancelledAt: cancelledDate });
+      const db = createIntegrationDb();
+
+      await updateSubscriptionFromRevenuecatWebhook(db, account.id, {
+        eventId: 'evt-uncancel',
+        cancelledAt: null,
+      });
+
+      const row = await loadSubscription(account.id);
+      expect(row!.cancelledAt).toBeNull();
+    });
+  },
+);
+
+legacyDescribe(
+  'updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 review]',
+  () => {
+    it('stamps the RevenueCat event and updates quota in one billing helper call', async () => {
+      const account = await seedAccount(1);
+      const { subscription } = await seedSubscriptionWithQuota(
+        account.id,
+        'plus',
+      );
+      const db = createIntegrationDb();
+      const familyConfig = getTierConfig('family');
+
+      const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
+        db,
         account.id,
         {
-          eventId,
+          eventId: 'evt-atomic-quota',
+          eventTimestampMs: 1_800_000_000_000,
           tier: 'family',
-          eventTimestampMs: 1_710_000_000_000,
+          status: 'active',
         },
-      ),
-      updateSubscriptionFromRevenuecatWebhook(
-        createIntegrationDb(),
-        account.id,
         {
-          eventId,
-          tier: 'family',
-          eventTimestampMs: 1_710_000_000_000,
+          monthlyQuota: familyConfig.monthlyQuota,
+          dailyLimit: familyConfig.dailyLimit,
         },
-      ),
-    ]);
+      );
 
-    // Both must succeed (return non-null) — the second is an idempotent return
-    expect(r1).not.toBeNull();
-    expect(r2).not.toBeNull();
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: subscription.id,
+          tier: 'family',
+          webhookApplied: true,
+        }),
+      );
 
-    // Exactly one write happened — the event stamp matches the eventId
-    const row = await loadSubscription(account.id);
-    expect(row!.lastRevenuecatEventId).toBe(eventId);
-    expect(row!.tier).toBe('family');
+      const row = await loadSubscription(account.id);
+      expect(row!.tier).toBe('family');
+      expect(row!.lastRevenuecatEventId).toBe('evt-atomic-quota');
+      expect(row!.lastRevenuecatEventTimestampMs).toBe('1800000000000');
 
-    // Only one subscription row exists for this account
-    const db = createIntegrationDb();
-    const rows = await db.query.subscriptions.findMany({
-      where: eq(subscriptions.accountId, account.id),
-    });
-    expect(rows).toHaveLength(1);
-  });
-
-  it('sets cancelledAt when cancelledAt is provided', async () => {
-    const account = await seedAccount(1);
-    await seedSubscription(account.id, { status: 'active' });
-    const db = createIntegrationDb();
-    const cancelledAt = '2026-06-01T12:00:00.000Z';
-
-    await updateSubscriptionFromRevenuecatWebhook(db, account.id, {
-      eventId: 'evt-cancel',
-      cancelledAt,
+      const pool = await loadQuotaPool(subscription.id);
+      expect(pool!.monthlyLimit).toBe(familyConfig.monthlyQuota);
+      expect(pool!.dailyLimit).toBe(familyConfig.dailyLimit);
     });
 
-    const row = await loadSubscription(account.id);
-    expect(row!.cancelledAt?.toISOString()).toBe(cancelledAt);
-  });
+    it('recreates a missing quota row while applying the webhook update', async () => {
+      const account = await seedAccount(1);
+      const { subscription } = await seedSubscriptionWithQuota(
+        account.id,
+        'plus',
+      );
+      const db = createIntegrationDb();
+      const familyConfig = getTierConfig('family');
 
-  it('clears cancelledAt when cancelledAt is null', async () => {
-    const account = await seedAccount(1);
-    const cancelledDate = new Date('2026-05-01T00:00:00.000Z');
-    await seedSubscription(account.id, { cancelledAt: cancelledDate });
-    const db = createIntegrationDb();
+      await db
+        .delete(quotaPools)
+        .where(eq(quotaPools.subscriptionId, subscription.id));
 
-    await updateSubscriptionFromRevenuecatWebhook(db, account.id, {
-      eventId: 'evt-uncancel',
-      cancelledAt: null,
-    });
-
-    const row = await loadSubscription(account.id);
-    expect(row!.cancelledAt).toBeNull();
-  });
-});
-
-describe('updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 review]', () => {
-  it('stamps the RevenueCat event and updates quota in one billing helper call', async () => {
-    const account = await seedAccount(1);
-    const { subscription } = await seedSubscriptionWithQuota(
-      account.id,
-      'plus',
-    );
-    const db = createIntegrationDb();
-    const familyConfig = getTierConfig('family');
-
-    const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
-      db,
-      account.id,
-      {
-        eventId: 'evt-atomic-quota',
-        eventTimestampMs: 1_800_000_000_000,
-        tier: 'family',
-        status: 'active',
-      },
-      {
-        monthlyQuota: familyConfig.monthlyQuota,
-        dailyLimit: familyConfig.dailyLimit,
-      },
-    );
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        id: subscription.id,
-        tier: 'family',
-        webhookApplied: true,
-      }),
-    );
-
-    const row = await loadSubscription(account.id);
-    expect(row!.tier).toBe('family');
-    expect(row!.lastRevenuecatEventId).toBe('evt-atomic-quota');
-    expect(row!.lastRevenuecatEventTimestampMs).toBe('1800000000000');
-
-    const pool = await loadQuotaPool(subscription.id);
-    expect(pool!.monthlyLimit).toBe(familyConfig.monthlyQuota);
-    expect(pool!.dailyLimit).toBe(familyConfig.dailyLimit);
-  });
-
-  it('rolls back the subscription update when the quota row is missing', async () => {
-    const account = await seedAccount(1);
-    const { subscription } = await seedSubscriptionWithQuota(
-      account.id,
-      'plus',
-    );
-    const db = createIntegrationDb();
-    const familyConfig = getTierConfig('family');
-
-    await db
-      .delete(quotaPools)
-      .where(eq(quotaPools.subscriptionId, subscription.id));
-
-    await expect(
-      updateSubscriptionAndQuotaFromRevenuecatWebhook(
+      const result = await updateSubscriptionAndQuotaFromRevenuecatWebhook(
         db,
         account.id,
         {
@@ -612,20 +655,39 @@ describe('updateSubscriptionAndQuotaFromRevenuecatWebhook (integration) [WI-78 r
           monthlyQuota: familyConfig.monthlyQuota,
           dailyLimit: familyConfig.dailyLimit,
         },
-      ),
-    ).rejects.toThrow('quota pool');
+      );
 
-    const row = await loadSubscription(account.id);
-    expect(row!.tier).toBe('plus');
-    expect(row!.lastRevenuecatEventId).not.toBe('evt-missing-quota');
-  });
-});
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: subscription.id,
+          tier: 'family',
+          webhookApplied: true,
+        }),
+      );
+
+      const row = await loadSubscription(account.id);
+      expect(row!.tier).toBe('family');
+      expect(row!.lastRevenuecatEventId).toBe('evt-missing-quota');
+      expect(row!.lastRevenuecatEventTimestampMs).toBe('1800000000000');
+
+      const pool = await loadQuotaPool(subscription.id);
+      expect(pool).toEqual(
+        expect.objectContaining({
+          monthlyLimit: familyConfig.monthlyQuota,
+          dailyLimit: familyConfig.dailyLimit,
+          usedThisMonth: 0,
+          usedToday: 0,
+        }),
+      );
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // activateSubscriptionFromRevenuecat
 // ---------------------------------------------------------------------------
 
-describe('activateSubscriptionFromRevenuecat (integration)', () => {
+legacyDescribe('activateSubscriptionFromRevenuecat (integration)', () => {
   it('creates a new subscription + quota pool when none exists', async () => {
     const account = await seedAccount(2);
     const db = createIntegrationDb();

@@ -38,7 +38,7 @@ import {
 
 type StaleSessionResult = Awaited<
   ReturnType<typeof closeStaleSessions>
->[number];
+>['sessions'][number];
 
 // ---------------------------------------------------------------------------
 // DB setup — loads DATABASE_URL from .env.development.local in local dev,
@@ -551,7 +551,9 @@ describe('Session lifecycle (integration)', () => {
     const closed = await closeStaleSessions(db, cutoff);
 
     // The stale session should appear in closed results
-    const closedIds = closed.map((r: StaleSessionResult) => r.sessionId);
+    const closedIds = closed.sessions.map(
+      (r: StaleSessionResult) => r.sessionId,
+    );
     expect(closedIds).toContain(staleSession.id);
     expect(closedIds).not.toContain(recentSession.id);
 

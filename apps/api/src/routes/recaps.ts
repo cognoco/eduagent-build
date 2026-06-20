@@ -13,9 +13,14 @@ const recapParamsSchema = z.object({ recapId: z.string().uuid() });
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { withProfile } from '../route-utils/route-context';
 import { notFound } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
-import { getRecapForParent, listRecapsForParent } from '../services/recaps';
+import {
+  getRecapForParent,
+  listRecapsForParent,
+  listRecapsForProfile,
+} from '../services/recaps';
 import { isIdentityV2Enabled } from '../config';
 
 type RecapsRouteEnv = {
@@ -44,6 +49,19 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
       childProfileId: query.childProfileId,
       limit: query.limit,
       identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+    });
+    return c.json(recapsResponseSchema.parse({ recaps }));
+  })
+  .get('/recaps/self', zValidator('query', recapsQuerySchema), async (c) => {
+    // Self-scoped: lists the caller's OWN recaps via their own profileId, so
+    // (unlike the parent-scoped /recaps and /recaps/:recapId routes, which read
+    // another profile's data and therefore call assertOwnerProfile) no owner
+    // guard is needed here — there is no other profile to authorize against.
+    const { db, profileId } = withProfile(c);
+    const query = c.req.valid('query');
+
+    const recaps = await listRecapsForProfile(db, profileId, {
+      limit: query.limit,
     });
     return c.json(recapsResponseSchema.parse({ recaps }));
   })

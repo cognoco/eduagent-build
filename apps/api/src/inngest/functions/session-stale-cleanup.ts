@@ -36,10 +36,10 @@ export const sessionStaleCleanup = inngest.createFunction(
     // retry replays this single call atomically rather than re-emitting
     // the first 5 events that already succeeded. Bare inngest.send inside
     // step.run was the duplicate-event source.
-    if (closedSessions.length > 0) {
+    if (closedSessions.sessions.length > 0) {
       await step.sendEvent(
         'dispatch-session-completed',
-        closedSessions.map((session) => ({
+        closedSessions.sessions.map((session) => ({
           name: 'app/session.completed' as const,
           data: {
             profileId: session.profileId,
@@ -90,7 +90,10 @@ export const sessionStaleCleanup = inngest.createFunction(
 
     return {
       status: 'completed',
-      closedCount: closedSessions.length,
+      closedCount: closedSessions.sessions.length,
+      // Surface the per-session isolation outcome: how many stale sessions
+      // failed to close (each captured to Sentry inside closeStaleSessions).
+      failedCount: closedSessions.failures.length,
       abandonedQuizRounds: abandonedRounds,
       cutoff: returnMeta.cutoff,
       timestamp: returnMeta.timestamp,

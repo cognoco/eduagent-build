@@ -90,8 +90,8 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/lib/app-context.tsx',
     category: 'boundary',
     reason:
-      'boundary: app-context owns V0 mode state and the MODE_NAV_V0/MODE_NAV_V1 short-circuits.',
-    expectedFindings: { 'profile-owner-read': 2 },
+      'boundary: app-context owns V0 mode state and the MODE_NAV_V0/MODE_NAV_V1 short-circuits. The mode-seq effect is split (identity-only seq-bump + full-set override-reset, WI-816), so isOwner is read in both dep arrays.',
+    expectedFindings: { 'profile-owner-read': 3 },
   },
   {
     file: 'apps/mobile/src/lib/profile.ts',
@@ -139,7 +139,7 @@ const BOUNDARY_FILES: readonly LegitimateRawNavigationGateFile[] = [
     reason:
       'boundary: push-token registration reads raw proxy state to avoid registering proxied child sessions on the parent device. Auxiliary to the canonical 8 — the test harness for this hook does not wire AppContext/QueryClient, so reading via useNavigationContract is not currently viable.',
     expectedFindings: {
-      'proxy-state-read': 2,
+      'proxy-state-read': 1,
       'raw-hook-call': 1,
       'raw-hook-import': 1,
     },

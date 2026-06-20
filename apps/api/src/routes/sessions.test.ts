@@ -94,6 +94,68 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [WI-586 flip-safety] identity-v2 helpers — stub the person-based age-bracket
+// reader so the evaluate-depth flag-split (v2 person vs legacy profiles) can be
+// asserted without a real DB.
+jest.mock(
+  '../services/identity-v2/helpers' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/identity-v2/helpers',
+    ) as typeof import('../services/identity-v2/helpers');
+    return {
+      ...actual,
+      getPersonAgeBracket: jest.fn().mockResolvedValue('teen'),
+    };
+  },
+);
+
+// [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
+// identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
+// without an unmocked DB (resolver itself is covered by identity integration tests).
+jest.mock(
+  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  () => ({
+    resolveIdentityV2: jest.fn().mockResolvedValue({
+      account: {
+        id: 'test-account-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      personId: 'test-profile-id',
+      organizationId: 'test-account-id',
+      isOwner: true,
+      roles: ['admin'],
+    }),
+  }),
+);
+
+// [WI-586 flip-safety] v2 profile-scope resolver — so the profile-scope
+// middleware's owner derivation (roles.includes('admin')) does not hit the
+// unmocked DB under flag-ON.
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  () => {
+    const ownerScope = {
+      profileId: 'test-profile-id',
+      meta: {
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    };
+    return {
+      findOwnerPersonScope: jest.fn().mockResolvedValue(ownerScope),
+      getPersonScope: jest.fn().mockResolvedValue(ownerScope),
+    };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
 // ---------------------------------------------------------------------------
@@ -123,6 +185,23 @@ const mockSafeRefundQuota = jest.fn(
     await mockIncrementQuota(db, subscriptionId);
     return { refunded: true };
   },
+);
+// [BUG-821] Routes now call refundQuotaOrEscalate (the gate that escalates a
+// decrement-without-subscriptionId instead of silently dropping the refund).
+// Minimal faithful delegate: when subscriptionId is present, delegate to
+// safeRefundQuota; otherwise no-op refund. The real refundQuotaOrEscalate has
+// no try/catch around its delegate — safeRefundQuota catches internally and
+// never propagates — so re-implementing a throw-swallow branch here would model
+// an impossible path.
+const mockRefundQuotaOrEscalate = jest.fn(
+  async (
+    db: unknown,
+    subscriptionId: string | undefined,
+    ctx?: { source?: string },
+  ) =>
+    subscriptionId
+      ? mockSafeRefundQuota(db, subscriptionId, ctx)
+      : { refunded: false },
 );
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
@@ -172,9 +251,60 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) =>
       mockSafeRefundQuota(args[0], args[1] as string, args[2]),
+    refundQuotaOrEscalate: (...args: unknown[]) =>
+      mockRefundQuotaOrEscalate(
+        args[0],
+        args[1] as string | undefined,
+        args[2] as { source?: string } | undefined,
+      ),
     createSubscription: jest.fn(),
   };
 });
+
+// [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the metering middleware reads
+// the billing-v2 store twins instead of the legacy billing reads. Stub them with
+// the same shapes so a metered route (evaluate-depth) authorises under flag-ON
+// without an unmocked DB. The v2 twins themselves are covered by the billing-v2
+// integration suites.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
+      getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
+        subscription: mockSubscription,
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
+      }),
+      getQuotaPoolV2: jest.fn().mockResolvedValue({
+        id: 'qp-1',
+        subscriptionId: 'sub-1',
+        monthlyLimit: 500,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      }),
+    };
+  },
+);
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -526,6 +656,8 @@ import { app } from '../index';
 import { sessionRoutes } from './sessions';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
+import { getProfileAgeBracket } from '../services/profile';
+import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -674,7 +806,9 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: false },
+        // [WI-586] route forwards the identity-v2 flag into the service opts;
+        // flag-OFF under TEST_ENV.
+        { matcherEnabled: false, identityV2Enabled: false },
       );
     });
 
@@ -698,7 +832,7 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: true },
+        { matcherEnabled: true, identityV2Enabled: false },
       );
     });
   });
@@ -924,6 +1058,14 @@ describe('session routes', () => {
   });
 
   describe('POST /v1/sessions/:sessionId/evaluate-depth', () => {
+    // [WI-586] The age-bracket reader mocks are module-level jest.fn()s that
+    // accumulate calls across tests; clear their call history per test so the
+    // flag-OFF / flag-ON "not.toHaveBeenCalled()" assertions are order-independent.
+    beforeEach(() => {
+      (getProfileAgeBracket as jest.Mock).mockClear();
+      (getPersonAgeBracket as jest.Mock).mockClear();
+    });
+
     it('returns 410 with SESSION_ARCHIVED when transcript has been purged', async () => {
       (getSessionTranscript as jest.Mock).mockResolvedValueOnce({
         archived: true,
@@ -954,6 +1096,48 @@ describe('session routes', () => {
           message: 'Session transcript has been archived',
         }),
       );
+    });
+
+    // [WI-586 flip-safety] The age-bracket reader must be flag-gated: flag-OFF
+    // reads `profiles` (getProfileAgeBracket), flag-ON reads `person`
+    // (getPersonAgeBracket) since `profiles` is dropped post-#8. Breaking the
+    // route wiring (reverting to an unconditional getProfileAgeBracket) makes
+    // the flag-ON assertion fail.
+    it('flag-OFF: reads the age bracket from the legacy profiles path', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(getProfileAgeBracket).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
+      expect(getPersonAgeBracket).not.toHaveBeenCalled();
+    });
+
+    // [WI-586 flip-safety] evaluate-depth is a METERED route, so under flag-ON the
+    // metering middleware reads the billing-v2 store twins (ensureFreeSubscriptionV2 /
+    // getQuotaPoolV2 / getEffectiveAccessForSubscriptionV2 /
+    // getOrProvisionProfileQuotaUsageV2), mocked above. With those stubbed the
+    // flag-ON request reaches the handler and the age-bracket read routes to the
+    // v2 person path. Inverting the route wiring back to an unconditional
+    // getProfileAgeBracket makes this assertion fail (the break-restore guard).
+    it('flag-ON: reads the age bracket from the v2 person path', async () => {
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
+        { method: 'POST', headers: AUTH_HEADERS },
+        { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' },
+      );
+
+      expect(res.status).toBe(200);
+      expect(getPersonAgeBracket).toHaveBeenCalledWith(
+        expect.anything(),
+        'test-profile-id',
+      );
+      expect(getProfileAgeBracket).not.toHaveBeenCalled();
     });
   });
 
@@ -2399,12 +2583,15 @@ describe('session routes', () => {
       );
     });
 
-    // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
-    // the fallback frame and done frame must still be emitted so the client
-    // is never left with a truncated stream.
-    it('[M-3] emits fallback and done frames even when safeRefundQuota throws in fallback path', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] In the BUG-941 fallback path the route routes the refund through the
+    // refundQuotaOrEscalate gate (which never throws — it escalates internally),
+    // then emits the fallback + done frames. Assert that boundary contract: the
+    // gate is invoked with the fallback route tag and the frames still emit. (The
+    // previous version configured safeRefundQuota to throw to "prove" frame
+    // emission survives a refund throw, but the real gate never propagates a
+    // throw to the route, so that was an impossible path.)
+    it('[M-3] routes the fallback-path refund through refundQuotaOrEscalate and still emits fallback + done frames', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
         stream: (async function* () {
@@ -2434,28 +2621,26 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Fallback frame must be written regardless of the refund failure.
+      // Refund is routed through the gate with the fallback route tag.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.fallback' }),
+      );
+      // Fallback frame is written, then the done frame.
       expect(body).toContain('"type":"fallback"');
       expect(body).toContain('"reason":"malformed_envelope"');
-      // Done frame must follow.
       expect(body).toContain('"type":"done"');
-      // The refund error must be escalated to Sentry.
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
-      );
     });
 
-    // [M-3] If safeRefundQuota throws in the onComplete catch path, the SSE
-    // error frame must still be written.
-    it('[M-3] emits error frame even when safeRefundQuota throws in onComplete catch', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] When onComplete itself throws, the route routes the refund through
+    // the refundQuotaOrEscalate gate (never throws — escalates internally) and
+    // then writes the SSE error frame. Assert that boundary contract: the gate is
+    // invoked with the onComplete route tag and the error frame still emits. (The
+    // previous version configured safeRefundQuota to throw — an impossible path,
+    // since the real gate never propagates a throw to the route.)
+    it('[M-3] routes the onComplete-catch refund through refundQuotaOrEscalate and still emits the error frame', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       const onCompleteErr = new Error('envelope parse failed');
       (streamMessage as jest.Mock).mockResolvedValueOnce({
@@ -2478,18 +2663,14 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Error frame must be written regardless of the refund failure.
-      expect(body).toContain('"type":"error"');
-      // captureException should be called at least once (for the refund throw).
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
+      // Refund is routed through the gate with the onComplete route tag.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.onComplete' }),
       );
+      // Error frame is written.
+      expect(body).toContain('"type":"error"');
     });
   });
 

@@ -79,7 +79,7 @@ function getTopicHeadline(
   // alphabet stable and lets users compare subjects at a glance. Time and
   // session count remain in the subline for both branches.
   return {
-    headline: `${t('progress.subject.startedTopicsCount', { count: startedCount })} · ${subject.topics.mastered} mastered`,
+    headline: `${t('progress.subject.startedTopicsCount', { count: startedCount })} · ${t('progress.subjectRow.masteredCount', { count: subject.topics.mastered })}`,
     progressValue: subject.topics.mastered,
     progressMax: Math.max(1, subject.topics.total ?? 1),
     subline,
@@ -87,10 +87,13 @@ function getTopicHeadline(
   };
 }
 
-const ACTION_LABEL: Record<SubjectProgressRowAction, string> = {
-  continue: 'Continue',
-  explore: 'Explore',
-};
+function getActionLabel(
+  action: SubjectProgressRowAction,
+  t: Translate,
+): string {
+  if (action === 'continue') return t('progress.subjectRow.actionContinue');
+  return t('progress.subjectRow.actionExplore');
+}
 
 export function SubjectProgressRow({
   subject,
@@ -173,11 +176,11 @@ export function SubjectProgressRow({
                 onAction(action);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${ACTION_LABEL[action]} ${subject.subjectName}`}
+              accessibilityLabel={`${getActionLabel(action, t)} ${subject.subjectName}`}
               testID={testID ? `${testID}-action` : `subject-card-action`}
             >
               <Text className="text-body-sm font-semibold text-primary">
-                {ACTION_LABEL[action]}
+                {getActionLabel(action, t)}
               </Text>
             </Pressable>
           ) : null}
@@ -208,11 +211,19 @@ export function SubjectProgressRow({
         onPress={handleToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded }}
-        accessibilityLabel={`${subject.subjectName}, ${
-          expanded ? 'expanded' : 'collapsed'
-        }`}
+        accessibilityLabel={
+          expanded
+            ? t('progress.subjectRow.a11yExpanded', {
+                name: subject.subjectName,
+              })
+            : t('progress.subjectRow.a11yCollapsed', {
+                name: subject.subjectName,
+              })
+        }
         accessibilityHint={
-          expanded ? 'Tap to hide topics' : 'Tap to show topics'
+          expanded
+            ? t('progress.subjectRow.a11yHintHide')
+            : t('progress.subjectRow.a11yHintShow')
         }
         testID={testID}
       >
@@ -227,7 +238,9 @@ export function SubjectProgressRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${subject.subjectName} progress`}
+      accessibilityLabel={t('progress.subjectRow.a11yOpen', {
+        name: subject.subjectName,
+      })}
       testID={testID}
     >
       {content}

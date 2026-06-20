@@ -269,6 +269,45 @@ describe('DictationChoiceScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it('[DICT-03] Surprise Me success: setData receives full payload and router pushes to playback', async () => {
+    // Verify the complete data handoff: completionKey (UUID v4), sentences,
+    // language, title, topic, mode='surprise' — and that playback is then
+    // opened via router.push.
+    mockGenerateMutateAsync.mockResolvedValueOnce({
+      sentences: [{ text: 'Die Katze sitzt auf der Matte.' }],
+      language: 'de',
+      title: 'German dictation',
+      topic: 'animals',
+    });
+
+    const { getByTestId } = render(<DictationChoiceScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('dictation-surprise'));
+      await Promise.resolve();
+    });
+
+    // Flush the setTimeout(0) that defers router.push
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+
+    expect(mockSetData).toHaveBeenCalledTimes(1);
+    const payload = mockSetData.mock.calls[0][0] as Record<string, unknown>;
+    // completionKey must be a UUID v4 (randomUUID output)
+    expect(typeof payload.completionKey).toBe('string');
+    expect((payload.completionKey as string).length).toBeGreaterThan(0);
+    expect(payload.sentences).toEqual([
+      { text: 'Die Katze sitzt auf der Matte.' },
+    ]);
+    expect(payload.language).toBe('de');
+    expect(payload.title).toBe('German dictation');
+    expect(payload.topic).toBe('animals');
+    expect(payload.mode).toBe('surprise');
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dictation/playback');
+  });
+
   it('[WI-78 DS-178] blocks duplicate generation while the first attempt is in flight', async () => {
     let resolveFirst!: (v: unknown) => void;
     mockGenerateMutateAsync.mockReturnValueOnce(

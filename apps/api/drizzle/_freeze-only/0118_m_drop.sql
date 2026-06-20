@@ -1,0 +1,50 @@
+-- @freeze-only
+-- =============================================================================
+-- M-DROP — drop 4 legacy identity tables + their 3 orphaned enum types.
+-- WI-586 convergence runbook §4 step 8 (AFTER the flip + 24h soak; the final,
+-- irreversible step). Pairs with m-repoint.sql (§4 step 6).
+--
+-- [WI-586 drop-4 reshape] `subscriptions` is RETAINED here. Its drop, and the
+-- repoint of the 4 quota tables (quota_pools / profile_quota_usage /
+-- top_up_credits / usage_events) off legacy `subscriptions` onto v2
+-- `subscription`, are a coupled billing subsystem owned by WI-805. Accordingly
+-- this migration drops 4 tables (not 5) and 3 enum types (not 5): the
+-- `subscription_status` / `subscription_tier` enums are KEPT because the
+-- retained `subscriptions` table still uses them (billing.ts).
+--
+-- STATUS: FREEZE-ONLY DRAFT — NOT AUTO-APPLIED. Lives in
+-- apps/api/drizzle/_freeze-only/ but is deliberately NOT registered in
+-- meta/_journal.json, so drizzle-kit migrate never sees it and it cannot
+-- auto-apply on a deploy (the `-- @freeze-only` marker on line 1 records this).
+-- At the freeze it is promoted to the next free migration number per
+-- cutover-plan §1, AFTER m-repoint has landed and the flip has soaked, then
+-- reviewed + applied. NOTE: 0117 is now taken by a journaled migration
+-- (0117_fix_family_preferences_rls_guc, WI-794), so m-repoint/m-drop promote to
+-- the next free numbers at freeze (e.g. 0118/0119), NOT 0117/0118.
+--
+-- PRECONDITION (enforced by Postgres, not by this file): M-REPOINT must have run
+-- first. Every live (non-legacy) FK must already point at person/organization —
+-- otherwise the plain DROP TABLE below fails loud on the dangling dependency
+-- (this is intentional: no CASCADE, so an un-repointed FK BLOCKS the drop rather
+-- than being silently dropped). The single multi-table DROP TABLE statement
+-- resolves the intra-legacy FKs among the 4 tables as a set.
+--
+-- The 4 tables:
+--   consent_states, family_links, profiles, accounts
+-- The 3 orphaned enum types (legacy-only; unused once the tables are gone):
+--   consent_status, consent_type, location_type
+--   (subscription_status / subscription_tier are RETAINED — see reshape note.)
+--
+-- ## Rollback
+-- IMPOSSIBLE in place. Once these tables drop, the legacy system-of-record rows
+-- are gone. Recovery is ONLY a Neon PITR rewind of the whole branch to the
+-- pre-cutover marker created at §4 step 2 (§4.2 "impossible post-drop"). This is
+-- why M-DROP runs only after the flip has soaked 24h with the new model live and
+-- verified. Do NOT promote/apply M-DROP until the §4 step-8 STOP gate is cleared
+-- by the operator. IF EXISTS is present only so a rehearsal re-run is a clean
+-- no-op — it is NOT a substitute for the PITR marker.
+-- =============================================================================
+
+DROP TABLE IF EXISTS consent_states, family_links, profiles, accounts;
+
+DROP TYPE IF EXISTS consent_status, consent_type, location_type;

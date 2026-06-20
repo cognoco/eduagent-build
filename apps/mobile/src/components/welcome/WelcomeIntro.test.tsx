@@ -130,6 +130,17 @@ describe('<WelcomeIntro audience="learner" />', () => {
     expect(screen.getByTestId('welcome-card-3-scene')).toBeTruthy();
   });
 
+  it('lets each card scroll vertically on short screens', () => {
+    render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
+    const card = screen.getByTestId('welcome-card-1');
+    expect(StyleSheet.flatten(card.props.contentContainerStyle)).toEqual(
+      expect.objectContaining({
+        minHeight: '100%',
+        paddingVertical: 24,
+      }),
+    );
+  });
+
   it('frames each learner scene as a mini app screen', () => {
     render(<WelcomeIntro audience="learner" onComplete={jest.fn()} />);
     expect(screen.getByTestId('welcome-card-1-scene-frame')).toBeTruthy();

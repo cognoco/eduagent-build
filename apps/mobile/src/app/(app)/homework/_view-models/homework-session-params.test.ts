@@ -4,6 +4,7 @@ import i18next from 'i18next';
 import {
   buildHomeworkSessionParams,
   getHomeworkProblemTruncationAlertMessage,
+  homeworkReturnHrefForReturnTo,
 } from './homework-session-params';
 
 function problem(id: string, text: string): HomeworkProblem {
@@ -44,6 +45,28 @@ describe('buildHomeworkSessionParams', () => {
     });
     expect(result.params.homeworkProblems).toContain('"id":"p1"');
     expect(result.truncation).toBeNull();
+  });
+
+  it('keeps capture source separate from V2 mentor entry and return params', () => {
+    const result = buildHomeworkSessionParams({
+      subjectId: 'math',
+      subjectName: 'Math',
+      problemText: '2 + 2',
+      captureSource: 'camera',
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+      maxParamLength: 400,
+    });
+
+    expect(result.params).toMatchObject({
+      mode: 'homework',
+      subjectId: 'math',
+      subjectName: 'Math',
+      problemText: '2 + 2',
+      captureSource: 'camera',
+      entrySource: 'mentor',
+      returnTo: 'mentor',
+    });
   });
 
   it('drops trailing problems until the serialized payload fits', () => {
@@ -105,6 +128,15 @@ describe('buildHomeworkSessionParams', () => {
 
     expect(result.params.homeworkProblems).toBeUndefined();
     expect(result.truncation).toBeNull();
+  });
+});
+
+describe('homeworkReturnHrefForReturnTo', () => {
+  it('maps V2 mentor returns back to the Mentor tab', () => {
+    expect(homeworkReturnHrefForReturnTo('mentor')).toBe('/(app)/mentor');
+    expect(homeworkReturnHrefForReturnTo(['mentor', 'home'])).toBe(
+      '/(app)/mentor',
+    );
   });
 });
 

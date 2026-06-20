@@ -21,6 +21,11 @@ import {
   type SupportedSSOStrategy,
 } from '../../lib/clerk-sso';
 import { extractClerkError } from '../../lib/clerk-error';
+import {
+  CLERK_REQUEST_TIMEOUT_MS,
+  isClerkRequestTimeoutError,
+  withClerkTimeout,
+} from '../../lib/clerk-timeout';
 import { PasswordInput } from '../../components/common';
 import { Button } from '../../components/common/Button';
 import { useKeyboardScroll } from '../../hooks/use-keyboard-scroll';
@@ -80,13 +85,33 @@ export default function SignUpScreen() {
     setActivationFailureContext(null);
   }, []);
 
+  const formatSignUpError = useCallback(
+    (err: unknown): string => {
+      if (isClerkRequestTimeoutError(err)) {
+        Sentry.addBreadcrumb({
+          category: 'auth',
+          message: 'sign-up: Clerk request timed out',
+          level: 'warning',
+          data: {
+            operation: err.operation,
+            timeoutMs: CLERK_REQUEST_TIMEOUT_MS,
+          },
+        });
+        return t('accountSecurity.timeoutMessage');
+      }
+
+      return extractClerkError(err);
+    },
+    [t],
+  );
+
   const activateCreatedSession = useCallback(
     async (
       sessionId: string | null,
       context: 'oauth' | 'verification',
     ): Promise<boolean> => {
       if (!sessionId || !setActive) {
-        setError('No session was created. Please try again.');
+        setError(t('auth.signUp.noSessionCreated'));
         return false;
       }
 
@@ -98,7 +123,7 @@ export default function SignUpScreen() {
       } catch {
         setPendingSessionActivationId(sessionId);
         setActivationFailureContext(context);
-        setError('Could not activate your session. Please try again.');
+        setError(t('auth.signUp.activationFailed'));
         return false;
       }
     },
@@ -110,7 +135,7 @@ export default function SignUpScreen() {
       return;
     }
     if (!isLoaded || !setActive) {
-      setError('Authentication not ready. Please reload and try again.');
+      setError(t('auth.signUp.authNotReady'));
       return;
     }
 
@@ -215,23 +240,21 @@ export default function SignUpScreen() {
         // (e.g. username, phone) are missing. Surface what is needed.
         if (ssoSignUp?.missingFields && ssoSignUp.missingFields.length > 0) {
           const fields = (ssoSignUp.missingFields as string[]).join(', ');
-          setError(
-            `Sign-up needs more information: ${fields}. Please sign up with email instead.`,
-          );
+          setError(t('auth.signUp.ssoMissingFields', { fields }));
           return;
         }
 
         // Sign-up object exists but in an unexpected incomplete state.
         if (ssoSignUp?.status && ssoSignUp.status !== 'complete') {
           setError(
-            `Sign-up via ${
-              strategy === 'oauth_google' ? 'Google' : 'SSO'
-            } needs additional information. Please sign up with email instead.`,
+            t('auth.signUp.ssoSignUpIncomplete', {
+              provider: strategy === 'oauth_google' ? 'Google' : 'SSO',
+            }),
           );
           return;
         }
 
-        setError('Sign-up could not be completed. Please try again.');
+        setError(t('auth.signUp.signUpNotCompleted'));
       } catch (err: unknown) {
         if (__DEV__) console.warn('[AUTH-DEBUG] sign-up SSO threw:', err);
         setError(extractClerkError(err));
@@ -239,7 +262,13 @@ export default function SignUpScreen() {
         setOauthLoading(null);
       }
     },
-    [activateCreatedSession, clearActivationFailure, isLoaded, startSSOFlow],
+    [
+      activateCreatedSession,
+      clearActivationFailure,
+      isLoaded,
+      router,
+      startSSOFlow,
+    ],
   );
 
   const onSignUpPress = useCallback(async () => {
@@ -254,19 +283,25 @@ export default function SignUpScreen() {
         console.log(
           `[AUTH-DEBUG] signUp.create → email=${emailAddress.trim()}`,
         );
-      await signUp.create({ emailAddress, password });
+      await withClerkTimeout(
+        signUp.create({ emailAddress, password }),
+        'signUp.create',
+      );
       if (__DEV__)
         console.log(
           `[AUTH-DEBUG] signUp.create → status=${signUp.status}` +
             ` | createdSessionId=${signUp.createdSessionId ?? 'null'}`,
         );
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      await withClerkTimeout(
+        signUp.prepareEmailAddressVerification({ strategy: 'email_code' }),
+        'signUp.prepareEmailAddressVerification',
+      );
       if (__DEV__)
         console.log('[AUTH-DEBUG] prepareEmailAddressVerification → OK');
       setPendingVerification(true);
     } catch (err: unknown) {
       if (__DEV__) console.warn('[AUTH-DEBUG] signUp flow threw:', err);
-      setError(extractClerkError(err));
+      setError(formatSignUpError(err));
     } finally {
       setLoading(false);
     }
@@ -277,6 +312,7 @@ export default function SignUpScreen() {
     signUp,
     emailAddress,
     password,
+    formatSignUpError,
   ]);
 
   const onVerifyPress = useCallback(async () => {
@@ -300,7 +336,7 @@ export default function SignUpScreen() {
         }
         // Auth layout guard handles navigation once isSignedIn propagates.
       } else {
-        setError('Verification could not be completed. Please try again.');
+        setError(t('auth.signUp.verificationNotCompleted'));
       }
     } catch (err: unknown) {
       setError(
@@ -390,7 +426,7 @@ export default function SignUpScreen() {
             </Text>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-              placeholder="Enter 6-digit code"
+              placeholder={t('auth.signUp.codePlaceholder')}
               placeholderTextColor={colors.muted}
               keyboardType="number-pad"
               value={code}
@@ -403,7 +439,7 @@ export default function SignUpScreen() {
 
           <Button
             variant="primary"
-            label="Verify"
+            label={t('auth.signUp.verifyButton')}
             onPress={onVerifyPress}
             disabled={!canSubmitCode}
             loading={loading}
@@ -416,7 +452,7 @@ export default function SignUpScreen() {
               <Button
                 variant="secondary"
                 size="small"
-                label="Try Again"
+                label={t('common.tryAgain')}
                 onPress={() => void retrySessionActivation()}
                 disabled={loading}
                 testID="sign-up-retry-activation"
@@ -428,7 +464,7 @@ export default function SignUpScreen() {
             <Button
               variant="tertiary"
               size="small"
-              label="Resend code"
+              label={t('auth.signUp.resendCode')}
               onPress={onResendCode}
               loading={resending}
               testID="sign-up-resend-code"
@@ -439,7 +475,7 @@ export default function SignUpScreen() {
             <Button
               variant="tertiary"
               size="small"
-              label="Use a different email"
+              label={t('auth.signUp.useDifferentEmail')}
               onPress={onBackFromVerification}
               testID="sign-up-back-from-verify"
             />
@@ -449,7 +485,7 @@ export default function SignUpScreen() {
             <Button
               variant="tertiary"
               size="small"
-              label="Back to sign in"
+              label={t('auth.signUp.backToSignIn')}
               onPress={() => router.replace('/(auth)/sign-in')}
               testID="verify-back-to-sign-in"
             />

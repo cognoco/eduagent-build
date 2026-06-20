@@ -11,6 +11,9 @@ import type { AppMode } from './app-context';
 export type NavigationAppContext = AppMode;
 export type NavigationShape = 'study' | 'family';
 export type TabKey =
+  | 'mentor'
+  | 'subjects'
+  | 'journal'
   | 'home'
   | 'own-learning'
   | 'library'
@@ -19,6 +22,9 @@ export type TabKey =
   | 'more';
 
 export type RouteKey =
+  | 'mentor'
+  | 'subjects'
+  | 'journal'
   | 'home'
   | 'own-learning'
   | 'library'

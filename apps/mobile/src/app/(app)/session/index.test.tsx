@@ -19,6 +19,55 @@ import SessionScreen from './index';
 // needed via jest.spyOn().
 import * as sessionRecoveryModule from '../../../lib/session-recovery';
 
+// Real analytics module; the homework-image-attach-dropped tests spy on the
+// real `track` export via jest.spyOn (NOT a jest.mock of an internal module —
+// GC1/GC6-clean). `track` calls Sentry.addBreadcrumb, which is globally mocked
+// in test-setup.ts, so the real implementation runs without side effects.
+import * as analyticsModule from '../../../lib/analytics';
+
+type MockFeatureFlags = {
+  COACH_BAND_ENABLED: boolean;
+  MIC_IN_PILL_ENABLED: boolean;
+  I18N_ENABLED: boolean;
+  PREVIEW_ONBOARDING_ENABLED: boolean;
+  PREVIEW_ENTRY_CTA_ENABLED: boolean;
+  MODE_NAV_V0_ENABLED: boolean;
+  MODE_NAV_V1_ENABLED: boolean;
+  MODE_NAV_V2_ENABLED: boolean;
+  ADULT_OWNER_GATE_ENABLED: boolean;
+};
+
+const getMockFeatureFlags = (): MockFeatureFlags =>
+  (
+    globalThis as typeof globalThis & {
+      __sessionTestFeatureFlags: MockFeatureFlags;
+    }
+  ).__sessionTestFeatureFlags;
+
+jest.mock('../../../lib/feature-flags', () => {
+  const featureFlags: MockFeatureFlags = {
+    COACH_BAND_ENABLED: true,
+    MIC_IN_PILL_ENABLED: true,
+    I18N_ENABLED: true,
+    PREVIEW_ONBOARDING_ENABLED: true,
+    PREVIEW_ENTRY_CTA_ENABLED: false,
+    MODE_NAV_V0_ENABLED: false,
+    MODE_NAV_V1_ENABLED: false,
+    MODE_NAV_V2_ENABLED: false,
+    ADULT_OWNER_GATE_ENABLED: true,
+  };
+  (
+    globalThis as typeof globalThis & {
+      __sessionTestFeatureFlags: MockFeatureFlags;
+    }
+  ).__sessionTestFeatureFlags = featureFlags;
+
+  return {
+    ...jest.requireActual('../../../lib/feature-flags'),
+    FEATURE_FLAGS: featureFlags,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Boundary mocks (external / native runtime only)
 // ---------------------------------------------------------------------------
@@ -229,6 +278,7 @@ const mockRecordSystemPrompt = jest.fn();
 const mockRecordSessionEvent = jest.fn();
 const mockSetSessionInputMode = jest.fn();
 const mockFlagSessionContent = jest.fn();
+const mockSubmitSummary = jest.fn();
 const mockReplace = jest.fn();
 const mockSetParams = jest.fn();
 
@@ -278,6 +328,11 @@ jest.mock(
     useRecordSessionEvent: () => ({ mutateAsync: mockRecordSessionEvent }),
     useSetSessionInputMode: () => ({ mutateAsync: mockSetSessionInputMode }),
     useFlagSessionContent: () => ({ mutateAsync: mockFlagSessionContent }),
+    useSubmitSummary: () => ({
+      mutateAsync: mockSubmitSummary,
+      isPending: false,
+      isError: false,
+    }),
     useParkingLot: () => ({ data: [], isLoading: false }),
     useAddParkingLotItem: () => ({ mutateAsync: jest.fn(), isPending: false }),
   }),
@@ -551,6 +606,7 @@ describe('SessionScreen homework flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    getMockFeatureFlags().MODE_NAV_V2_ENABLED = false;
     mockFetch.mockClear();
     mockUseSessionTranscript.mockReturnValue({ data: null });
     mockReadAsStringAsync.mockResolvedValue('base64-homework-image');
@@ -609,6 +665,17 @@ describe('SessionScreen homework flow', () => {
     });
     mockFlagSessionContent.mockResolvedValue({
       message: 'Content flagged for review. Thank you!',
+    });
+    mockSubmitSummary.mockResolvedValue({
+      summary: {
+        id: 'summary-1',
+        sessionId: 'session-1',
+        content: 'I learned that equations stay balanced on both sides.',
+        aiFeedback: null,
+        status: 'accepted',
+        baseXp: 12,
+        reflectionBonusXp: 6,
+      },
     });
   });
 
@@ -812,7 +879,12 @@ describe('SessionScreen homework flow', () => {
   // degrade to text-only. The learner sees a system message explaining the
   // photo was dropped, and the auto-send proceeds with attachImage=false.
   it('surfaces a system message and sends text-only when image conversion fails', async () => {
-    jest.useRealTimers();
+    // Fake timers + explicit advance past the 500ms auto-send debounce. Under
+    // real timers this test relied on the 500ms setTimeout firing inside
+    // waitFor's 1000ms budget, which races (and intermittently fails) under
+    // full-suite CPU load. Driving the debounce deterministically — mirroring
+    // the timeout-branch test below and the [BUG-689] block — removes the flake.
+    jest.useFakeTimers();
     mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'homework',
@@ -831,6 +903,13 @@ describe('SessionScreen homework flow', () => {
     });
 
     const testScreen = renderSessionScreen();
+
+    // Flush the rejected-read microtask so imageAttachmentStatus -> 'failed',
+    // then advance past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      await Promise.resolve();
+      jest.advanceTimersByTime(600);
+    });
 
     // System message tells the learner the photo was dropped.
     await waitFor(() => {
@@ -854,6 +933,108 @@ describe('SessionScreen homework flow', () => {
       | undefined;
     expect(streamOpts?.imageBase64).toBeUndefined();
     expect(streamOpts?.imageMimeType).toBeUndefined();
+  });
+
+  // [HOMEWORK-08] On image-read failure the screen MUST emit a structured
+  // `homework_image_attach_dropped` analytics event with reason='failed',
+  // the capture source, and whether OCR text was present. Silent fallback is
+  // banned by AGENTS.md "Fix Development Rules"; this pins the emission and
+  // every field so a refactor can't drop the telemetry or a field.
+  it('[HOMEWORK-08] emits homework_image_attach_dropped with reason/captureSource/hasOcrText when the image read fails', async () => {
+    // Fake timers (the suite default) + explicit advance past the 500ms
+    // auto-send debounce, mirroring the failed-case copy test above. Under
+    // real timers this raced waitFor's 1000ms budget and failed intermittently
+    // under full-suite CPU load.
+    const trackSpy = jest.spyOn(analyticsModule, 'track');
+    mockReadAsStringAsync.mockRejectedValueOnce(new Error('read failed'));
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      captureSource: 'camera',
+      ocrText: 'Solve 2x + 5 = 17',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+
+    renderSessionScreen();
+
+    // Flush the rejected-read microtask so imageAttachmentStatus -> 'failed',
+    // then advance past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      await Promise.resolve();
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(trackSpy).toHaveBeenCalledWith('homework_image_attach_dropped', {
+        reason: 'failed',
+        captureSource: 'camera',
+        hasOcrText: true,
+      });
+    });
+
+    trackSpy.mockRestore();
+  });
+
+  // [HOMEWORK-08] The 2.5s image-read timeout is a DISTINCT branch from a read
+  // rejection: it surfaces timeout-specific copy ("took too long to load") and
+  // emits the analytics event with reason='timeout'. Without this test the
+  // timeout path (useImageBase64 IMAGE_READ_TIMEOUT_MS) is uncovered and could
+  // silently regress to the failed copy or drop the distinct reason.
+  it('[HOMEWORK-08] surfaces timeout-specific copy and emits reason=timeout when the image read exceeds the 2.5s budget', async () => {
+    jest.useFakeTimers();
+    const trackSpy = jest.spyOn(analyticsModule, 'track');
+    // Never resolves — forces useImageBase64 into the 2.5s timeout branch.
+    mockReadAsStringAsync.mockImplementationOnce(
+      () => new Promise(() => undefined),
+    );
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      captureSource: 'gallery',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        { id: 'problem-1', text: 'Solve 2x + 5 = 17', source: 'ocr' },
+      ]),
+    });
+
+    const testScreen = renderSessionScreen();
+
+    // Advance past the 2.5s read budget so imageAttachmentStatus -> 'timeout',
+    // then past the 500ms auto-send debounce so the fallback effect runs.
+    await act(async () => {
+      jest.advanceTimersByTime(2_600);
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(
+        testScreen.getByText(
+          /took too long to load, so I'm starting with the text only/i,
+        ),
+      ).toBeTruthy();
+    });
+    expect(trackSpy).toHaveBeenCalledWith('homework_image_attach_dropped', {
+      reason: 'timeout',
+      captureSource: 'gallery',
+      hasOcrText: false,
+    });
+
+    trackSpy.mockRestore();
+    // The mocked read never resolves; clear any queued fake-timer callbacks
+    // before the suite afterEach swaps back to real timers, so no pending
+    // debounce bleeds into the next test (e.g. the WI-859 resolution flow).
+    jest.clearAllTimers();
   });
 
   // ---------------------------------------------------------------------
@@ -1282,6 +1463,123 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('skips a drafted note without writing it to /notes', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    // Skip path: handleSkipDraftedNote clears state + calls the no-op
+    // challengeRoundActions.skipNote(); it must NOT POST to /notes.
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Here is your note draft.');
+        await onDone({
+          exchangeCount: 3,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-draft-skip',
+          challengeRound: {
+            state: 'drafting',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 2,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          draftedNote: {
+            id: 'draft-skip-1',
+            body: 'Linear equations stay balanced when you do the same thing to both sides.',
+            sourceAnswerEventIds: ['answer-event-1'],
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('drafted-note-review');
+    });
+
+    fireEvent.press(testScreen.getByTestId('drafted-note-skip'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(testScreen.queryByTestId('drafted-note-review')).toBeNull();
+    });
+    expect(fetchCallsMatching(mockFetch, '/notes')).toHaveLength(0);
+  });
+
+  it('renders the fallback composer when the server emits an ungrounded draft (body=null)', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Linear equations',
+    });
+    // Server-side buildValidatedDraft falls back to body=null + fallbackPrompt
+    // when validateNoteDraft rejects the LLM draft (grounding failed). The
+    // mobile surface must show the write-your-own composer, not an LLM note.
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Write a note in your own words.');
+        await onDone({
+          exchangeCount: 3,
+          escalationRung: 1,
+          aiEventId: 'event-challenge-draft-fallback',
+          challengeRound: {
+            state: 'drafting',
+            topicId: '11111111-1111-4111-8111-111111111111',
+            questionIndex: 2,
+            totalQuestions: 3,
+            offerCount: 1,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+          draftedNote: {
+            id: 'draft-fallback-1',
+            body: null,
+            sourceAnswerEventIds: [],
+            fallbackPrompt:
+              'Write a short note in your own words from the parts you can explain clearly.',
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('drafted-note-review');
+      testScreen.getByTestId('drafted-note-fallback-prompt');
+      testScreen.getByText(
+        'Write a short note in your own words from the parts you can explain clearly.',
+      );
+    });
+    // body=null starts the review in editing mode (composer), not a read-only
+    // preview of an LLM-authored note.
+    testScreen.getByTestId('drafted-note-input');
+    expect(testScreen.queryByTestId('drafted-note-preview')).toBeNull();
+  });
+
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'learning',
@@ -1600,16 +1898,60 @@ describe('SessionScreen homework flow', () => {
     testScreen.unmount();
   });
 
+  // [WI-859 / QA-04] No enrolled subjects: the classifier returns nothing to
+  // pick and the learner has no subjects to fall back to. The screen must reach
+  // the resolve-backed create-new escape hatch instead of silently starting a
+  // session against a phantom subject. Deterministic — classify + resolve are
+  // both stubbed via mockFetch, no live model involved.
+  it('[WI-859] shows the create-new escape hatch when the learner has no enrolled subjects', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+    });
+    // Learner has zero enrolled subjects.
+    mockFetch.setRoute('/subjects', { subjects: [] });
+    // Classifier can't match anything and offers no suggestion.
+    mockFetch.setRoute('/subjects/classify', {
+      candidates: [],
+      needsConfirmation: true,
+      suggestedSubjectName: null,
+    });
+    // Resolve returns rich suggestions so the picker has create options.
+    mockFetch.setRoute('/subjects/resolve', {
+      resolvedName: null,
+      suggestions: [
+        { name: 'Astronomy', description: 'Study of celestial objects' },
+      ],
+      displayMessage: 'Pick a subject that fits, or create your own.',
+    });
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    // The resolve fallback was consulted with the learner's text…
+    expect(
+      fetchCallsMatching(mockFetch, '/subjects/resolve').length,
+    ).toBeGreaterThan(0);
+    // …and the resolution surface opens with the resolve-backed suggestion plus
+    // the new-subject option, not a silent session start against no subject.
+    testScreen.getByTestId('session-subject-resolution');
+    testScreen.getByTestId('subject-resolution-resolve-Astronomy');
+    testScreen.getByTestId('subject-resolution-new');
+    expect(mockStartSession).not.toHaveBeenCalled();
+    testScreen.unmount();
+  });
+
   describe('post-session filing prompt', () => {
     /**
      * Helper: renders a freeform session, sends a message to start it,
      * then triggers end-session via the Alert "End Session" callback.
      */
-    async function renderAndCloseFreeformSession() {
+    async function renderAndCloseFreeformSession(
+      routeParams: Record<string, string> = { mode: 'freeform' },
+    ) {
       // Use freeform mode (no subjectId) so close follows the freeform path.
-      (useLocalSearchParams as jest.Mock).mockReturnValue({
-        mode: 'freeform',
-      });
+      (useLocalSearchParams as jest.Mock).mockReturnValue(routeParams);
       // Classify resolves without confirmation needed
       mockFetch.setRoute('/subjects/classify', {
         candidates: [
@@ -1647,17 +1989,24 @@ describe('SessionScreen homework flow', () => {
         );
       });
 
-      const buttons = alertSpy.mock.calls[0]![2] as Array<{
+      const endSessionCall = alertSpy.mock.calls.find(
+        ([title]) => title === 'End session?',
+      );
+      const buttons = endSessionCall![2] as Array<{
         text: string;
         onPress?: () => void;
       }>;
       const doneButton = buttons.find((b) => b.text === 'End Session');
+      expect(doneButton).toBeTruthy();
 
       // Invoke the "End Session" callback
       await act(async () => {
         doneButton?.onPress?.();
       });
       await flushAsyncWork();
+      await waitFor(() => {
+        expect(mockCloseSession).toHaveBeenCalled();
+      });
 
       // Advance timers to let fetchFastCelebrations polling resolve. Bounded
       // advance (the polling window is 3s of 500ms ticks) rather than
@@ -1688,6 +2037,85 @@ describe('SessionScreen homework flow', () => {
       expect(testScreen.queryByTestId('filing-prompt-accept')).toBeNull();
       expect(testScreen.queryByTestId('filing-prompt-dismiss')).toBeNull();
       expect(fetchCallsMatching(mockFetch, '/filing')).toHaveLength(0);
+      testScreen.unmount();
+    }, 15000);
+
+    it('renders the V2 first-session Mentor wrap-up and saves Your Words through the summary boundary', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        testScreen.getByTestId('first-session-wrap-up');
+      });
+
+      expect(mockReplace).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/session-summary/session-1',
+        }),
+      );
+      expect(
+        testScreen.getByText(/I'll remember what you write here/),
+      ).toBeTruthy();
+
+      const reflection =
+        'I learned that balancing equations keeps both sides equal.';
+      fireEvent.changeText(
+        testScreen.getByTestId('first-session-reflection-input'),
+        reflection,
+      );
+      fireEvent.press(testScreen.getByTestId('first-session-wrap-submit'));
+
+      await waitFor(() => {
+        expect(mockSubmitSummary).toHaveBeenCalledWith({
+          content: reflection,
+        });
+      });
+
+      testScreen.getByTestId('mentor-reward-receipt');
+      expect(testScreen.getByTestId('mentor-reward-value').props.children).toBe(
+        '1.5x / 18',
+      );
+      expect(
+        testScreen.getAllByText(/You chose the next step/).length,
+      ).toBeGreaterThan(0);
+      testScreen.unmount();
+    }, 15000);
+
+    it('keeps later V2 Mentor sessions on the existing summary path', async () => {
+      getMockFeatureFlags().MODE_NAV_V2_ENABLED = true;
+      mockFetch.setRoute('/progress/inventory', {
+        global: {
+          topicsAttempted: 0,
+          topicsMastered: 0,
+          vocabularyTotal: 0,
+          vocabularyMastered: 0,
+          totalSessions: 1,
+          totalActiveMinutes: 0,
+          totalWallClockMinutes: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+        },
+        subjects: [],
+      });
+
+      const testScreen = await renderAndCloseFreeformSession({
+        mode: 'freeform',
+        entrySource: 'mentor',
+        returnTo: 'mentor',
+      });
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(
+          expect.objectContaining({
+            pathname: '/session-summary/session-1',
+          }),
+        );
+      });
+      expect(testScreen.queryByTestId('first-session-wrap-up')).toBeNull();
       testScreen.unmount();
     }, 15000);
   });

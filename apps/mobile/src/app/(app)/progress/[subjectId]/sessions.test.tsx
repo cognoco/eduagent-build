@@ -154,7 +154,7 @@ describe('SubjectSessionsScreen', () => {
     screen.getByText('No conversations yet');
   });
 
-  it('[BUG-679] empty state exposes a Start-a-session CTA that routes home', () => {
+  it('[BUG-679] empty state exposes a Start-a-session CTA that keeps subject context', () => {
     mockUseSubjectSessions.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -165,9 +165,14 @@ describe('SubjectSessionsScreen', () => {
     render(<SubjectSessionsScreen />);
     const cta = screen.getByTestId('subject-sessions-empty-start');
     fireEvent.press(cta);
-    // Tab-switch intent — replace, not push, so the home tab keeps its
-    // back-stack independent of the progress tab's deep route.
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: {
+        mode: 'learning',
+        subjectId: 's1',
+        subjectName: 'Math',
+      },
+    });
   });
 
   it('renders error state with retry that calls refetch', () => {

@@ -490,7 +490,7 @@ describe('createNudge', () => {
   // ── Rate limiting ─────────────────────────────────────────────────────────
 
   describe('rate limiting', () => {
-    it('[BREAK] throws RateLimitedError when nudge count has reached the limit (4)', async () => {
+    it('[PARENT-16][BREAK] throws RateLimitedError when nudge count has reached the limit (4)', async () => {
       const db = makeDb({ nudgeCount: 4 });
 
       await expect(

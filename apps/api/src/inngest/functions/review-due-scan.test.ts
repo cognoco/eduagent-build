@@ -20,6 +20,8 @@ import { person, profiles, consentStates } from '@eduagent/database';
 
 import { reviewDueScan } from './review-due-scan';
 
+const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
+
 function buildChainableDb(
   rows: Array<{
     profileId: string;
@@ -52,10 +54,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockInngestTransport.clear();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  delete process.env['IDENTITY_V2_ENABLED'];
 });
 
 afterEach(() => {
   delete process.env['DATABASE_URL'];
+  restoreFlag(ORIGINAL_IDENTITY_V2_ENABLED);
 });
 
 describe('reviewDueScan — find-overdue-profiles step DB path', () => {

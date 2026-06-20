@@ -1,7 +1,9 @@
 import {
   nowCardKindSchema,
   nowCardSchema,
+  nowDeepLinkRouteSchema,
   nowDeepLinkSchema,
+  nowQuerySchema,
   nowResponseSchema,
   nowScopeSchema,
 } from './now-feed.js';
@@ -27,8 +29,31 @@ function card(id: string) {
 }
 
 describe('now feed schemas', () => {
-  it('serves only self scope in S0', () => {
-    expect(nowScopeSchema.options).toEqual(['self']);
+  it('defines self and S4 supporter scopes', () => {
+    expect(nowScopeSchema.options).toEqual(['self', 'supporter-hub', 'person']);
+  });
+
+  it('requires personId only for person-scope queries', () => {
+    expect(nowQuerySchema.parse({})).toEqual({ scope: 'self' });
+    expect(nowQuerySchema.parse({ scope: 'supporter-hub' })).toEqual({
+      scope: 'supporter-hub',
+    });
+    expect(
+      nowQuerySchema.parse({
+        scope: 'person',
+        personId: '00000000-0000-4000-8000-000000000001',
+      }),
+    ).toEqual({
+      scope: 'person',
+      personId: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(() => nowQuerySchema.parse({ scope: 'person' })).toThrow();
+    expect(() =>
+      nowQuerySchema.parse({
+        scope: 'self',
+        personId: '00000000-0000-4000-8000-000000000001',
+      }),
+    ).toThrow();
   });
 
   it('defines every S0 card kind', () => {
@@ -62,6 +87,18 @@ describe('now feed schemas', () => {
 
   it('requires deep-link routes to come from the closed catalog', () => {
     expect(nowDeepLinkSchema.parse(deepLink)).toEqual(deepLink);
+    expect(nowDeepLinkRouteSchema.options).toContain('journal');
+    expect(
+      nowDeepLinkSchema.parse({
+        route: 'journal',
+        params: {},
+        chain: [],
+      }),
+    ).toEqual({
+      route: 'journal',
+      params: {},
+      chain: [],
+    });
     expect(() =>
       nowDeepLinkSchema.parse({
         ...deepLink,

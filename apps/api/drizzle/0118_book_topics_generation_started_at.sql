@@ -1,0 +1,23 @@
+-- 0118_book_topics_generation_started_at.sql
+-- [books topicsGenerated ordering] Add a dedicated single-flight claim marker
+-- for the synchronous generate-topics route so `topics_generated` can mean
+-- strictly "topics exist". Previously claimBookForGeneration's compare-and-set
+-- used `topics_generated` itself as the concurrency claim and flipped it true
+-- BEFORE the LLM call + persist; a worker evicted mid-LLM (Cloudflare eviction,
+-- OOM, panic) skipped the catch-block release and left the book stuck
+-- topics_generated=true with zero topics — a dead-end "generated" book.
+--
+-- The new nullable timestamp is set NOW() by the claim CAS and reclaimed once
+-- it passes the 15-min stale window; `topics_generated` is now flipped true
+-- only by persistBookTopics after the topic rows land. Mirrors the existing
+-- retry_claimed_at single-flight pattern on this same table (WI-125).
+--
+-- Additive, nullable, no default — backfill is unnecessary (NULL = unclaimed),
+-- and existing rows are unaffected.
+--
+-- ## Rollback
+-- Trivially reversible and lossless: `ALTER TABLE "curriculum_books" DROP
+-- COLUMN "topics_generation_started_at";`. The column carries only transient
+-- in-flight claim state, never durable user data.
+
+ALTER TABLE "curriculum_books" ADD COLUMN "topics_generation_started_at" timestamp with time zone;

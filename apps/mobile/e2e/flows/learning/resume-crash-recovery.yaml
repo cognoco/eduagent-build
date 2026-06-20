@@ -14,9 +14,14 @@
 #     flow is not deterministic.
 # The crash-recovery marker logic (30-min freshness, SecureStore key, the
 # AppState 'background' write) is covered by unit tests in
-# lib/session-recovery.ts / use-session-recovery.ts. Re-enable this E2E flow
-# only once a deterministic cold-start foreground path exists on the emulator,
-# or a server-side recovery marker is introduced.
+# lib/session-recovery.ts / use-session-recovery.ts. The home coach-band
+# CONTINUATION PRIORITY — fresh recovery marker wins over a server resume
+# target AND overdue review when all three collide — is covered
+# deterministically by the [CC-05] tests in
+# components/home/LearnerScreen.test.tsx (WI-865), which is the unit-side proof
+# for the cold-start path this flow cannot exercise on the emulator.
+# Re-enable this E2E flow only once a deterministic cold-start foreground path
+# exists on the emulator, or a server-side recovery marker is introduced.
 #
 # Validates (intended): after entering a session, backgrounding the app (which
 #            triggers the AppState 'background' listener writing the recovery

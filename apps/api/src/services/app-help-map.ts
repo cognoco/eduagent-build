@@ -10,9 +10,20 @@ import type {
 // and assert important hardcoded labels explicitly.
 // If a screen is renamed, update the map and the tests together.
 //
-// Map version: 2026-05-30
+// Map version: 2026-05-30 (V0/V1 shell) · 2026-06-14 (V2 shell)
+//
+// Two shells coexist while the mentor-is-the-app V2 redesign strangles the
+// legacy nav (see docs/plans/v2-plan/). The V0 map describes the shipped
+// production shell (Home / Library / More / Progress). The V2 map describes
+// the three-tab Mentor / Subjects / Journal shell + the account sheet, live on
+// dev/preview builds behind MODE_NAV_V2_ENABLED. `buildAppHelpPromptBlock` and
+// `buildAppHelpDirectReply` select by `shell`, defaulting to 'v0' so every
+// existing caller (and production) is byte-identical until the S6 cutover flips
+// V2 to the default and T13 deletes the V0 variant.
 
-const APP_HELP_MAP = `APP HELP (map version 2026-05-30):
+export type AppShell = 'v0' | 'v2';
+
+const APP_HELP_MAP_V0 = `APP HELP (map version 2026-05-30):
 This section means the current learner message is an internal MentoMate app question. You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it. Do not say you cannot help with the app. Do not treat app questions as off-topic. Do not treat app questions as assessment answers. Answer in plain chat text using the visible destination labels below.
 
 Use this map only for internal MentoMate app questions: where to find things, how to change settings, what app modes mean, or how to use app features. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer to one or two sentences, then return to the learning thread if one was active. When answering in a non-English conversation, keep destination labels exactly as shown in this map; translate only the surrounding explanation. Never state prices, plan costs, quota numbers, daily limits, or claim the app is free or unlimited — you do not have that information. For any question about cost, billing, plans, upgrades, or usage limits, point to the subscription destination below (and to "More > Help & feedback" for billing problems) without quoting any numbers. Never invent a fixed review schedule or "every N days" cadence — reviews are adaptive; describe the concept and point to where reviews live, but do not promise a number.
@@ -44,8 +55,48 @@ Destinations:
 If you do not know a destination, say so and suggest "More > Help & feedback".
 Do not output internal route paths, Expo routes, markdown links, or URLs.`;
 
-export function buildAppHelpPromptBlock(): string {
-  return APP_HELP_MAP;
+// V2 three-tab shell (Mentor / Subjects / Journal + account sheet). Every
+// destination label below is the exact string rendered by the delivered V2
+// surfaces (`mentor.tsx`, `subjects.tsx` → SubjectsBrowse, `journal.tsx` →
+// JournalTabView, `account.tsx` → AccountAdminSheet, opened from AccountAvatar
+// in the top-right). app-help-map.test.ts cross-reads mobile en.json and
+// asserts these labels — if a V2 screen is renamed, update the map and the test
+// together.
+const APP_HELP_MAP_V2 = `APP HELP (map version 2026-06-14, V2 shell):
+This section means the current learner message is an internal MentoMate app question. You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it. Do not say you cannot help with the app. Do not treat app questions as off-topic. Do not treat app questions as assessment answers. Answer in plain chat text using the visible destination labels below.
+
+Use this map only for internal MentoMate app questions: where to find things, how to change settings, what app modes mean, or how to use app features. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer to one or two sentences, then return to the learning thread if one was active. When answering in a non-English conversation, keep destination labels exactly as shown in this map; translate only the surrounding explanation. Never state prices, plan costs, quota numbers, daily limits, or claim the app is free or unlimited — you do not have that information. For any question about cost, billing, plans, upgrades, or usage limits, point to the Subscription destination below (and to "Account, then Help & feedback" for billing problems) without quoting any numbers. Never invent a fixed review schedule or "every N days" cadence — reviews are adaptive; describe the concept and point to where reviews live, but do not promise a number.
+
+The app has three tabs along the bottom — Mentor, Subjects, and Journal — plus your Account, which opens from your profile picture in the top-right corner.
+
+Destinations:
+- Getting started / what to do: Open the Mentor tab. Tap one of the suggested cards, or type or say what you need in the bar at the bottom. Use the camera or Homework button on that bar for help with an assignment.
+- Help with an assignment / homework: Mentor tab, then the camera or Homework button on the bottom bar.
+- Practice / reviews: Mentor tab — review and practice cards appear in your feed when something is due, and you can pick a lighter practice activity from the feed. Reviews are adaptive, so they appear when the mentor judges you are due rather than on a fixed schedule.
+- How the Subjects tab is organised (subjects, books, topics): Open the Subjects tab to see your subjects; open a subject to see its books and topics. A "topic" is the smallest unit you study; a "book" is a collection of topics; a "subject" groups books.
+- All notes / study notes you saved: Journal tab, then Saved notes (Study notes you saved).
+- Past conversations / learning sessions: Journal tab, then Saved notes (Recent learning sessions).
+- Saved explanations / bookmarks: Journal tab, then Saved notes (Saved mentor replies).
+- Recaps of past sessions: Journal tab, then Recaps.
+- Reports: Journal tab, then My reports.
+- Mentor memory (what the mentor remembers about you): Journal tab, then Mentor memory. (It is also reachable from your Account.)
+- Profile / account: Tap your profile picture (top-right) to open Account, then Profile.
+- Account security: Tap your profile picture (top-right) to open Account, then Account security.
+- Subscription, plan, upgrade, or billing (account owner): Tap your profile picture (top-right) to open Account, then Subscription. Do not quote any prices, tiers, or limits.
+- App or mentor language: Tap your profile picture (top-right) to open Account, then Mentor language. This also sets the mentor's language.
+- Notifications: Tap your profile picture (top-right) to open Account, then Notifications.
+- Privacy & data / export / account deletion: Tap your profile picture (top-right) to open Account, then Privacy & data.
+- Help & feedback: Tap your profile picture (top-right) to open Account, then Help & feedback.
+- Preferences / learning accommodation: Tap your profile picture (top-right) to open Account, then Preferences.
+- Challenge Round: An optional in-session check the mentor offers when the learner shows mastery. The learner accepts or declines per round; there is no global "mode" to toggle.
+- Adding a child (parent / adult account owner): Tap your profile picture (top-right) to open Account, then Family settings, then Add a child.
+- How often to review (review cadence): Reviews are adaptive — MentoMate brings a topic back when it judges you are due, based on how well you remembered it, rather than on a fixed "every N days" schedule. Review cards appear on your Mentor tab when something is due. Do not promise a specific number of days.
+
+If you do not know a destination, say so and suggest opening your Account (profile picture, top-right), then Help & feedback.
+Do not output internal route paths, Expo routes, markdown links, or URLs.`;
+
+export function buildAppHelpPromptBlock(shell: AppShell = 'v0'): string {
+  return shell === 'v2' ? APP_HELP_MAP_V2 : APP_HELP_MAP_V0;
 }
 
 // Specific multi-word phrases that are unambiguously about app navigation.
@@ -92,7 +143,116 @@ export function isAppHelpQuery(userMessage: string): boolean {
   );
 }
 
-export function buildAppHelpDirectReply(userMessage: string): string {
+export function buildAppHelpDirectReply(
+  userMessage: string,
+  shell: AppShell = 'v0',
+): string {
+  return shell === 'v2'
+    ? buildAppHelpDirectReplyV2(userMessage)
+    : buildAppHelpDirectReplyV0(userMessage);
+}
+
+function buildAppHelpDirectReplyV2(userMessage: string): string {
+  const text = userMessage.toLowerCase();
+
+  if (
+    /\b(add (a |my |another )?(child|kid|son|daughter)|create (a |another )?(child|kid)('?s)? (profile|account))\b/.test(
+      text,
+    )
+  ) {
+    return 'You can add a child by tapping your profile picture (top-right) to open Account, then Family settings, then Add a child (you need to be the adult account owner).';
+  }
+
+  if (
+    /\b(upgrade|subscription|subscribe|billing|payment method|paid plan|free plan|more questions|out of questions|run out of questions|daily limit|question limit|usage limit|is (this |the )?(app|it|mentomate) free|is it free|do i (have to |need to )?pay (for|to use)|does (the app|this app|mentomate) cost|how much (does|is) (the app|this app|mentomate))\b/.test(
+      text,
+    )
+  ) {
+    return "Your plan and upgrade options are in your Account — tap your profile picture (top-right), then Subscription. For billing problems, open Account, then Help & feedback. I can't quote prices or limits here.";
+  }
+
+  if (
+    /\b(app language|mentor language|(change|switch|set) (the )?(app |mentor |ui )?language)\b/.test(
+      text,
+    )
+  ) {
+    return "You can change the language by tapping your profile picture (top-right) to open Account, then Mentor language. This also sets your mentor's language.";
+  }
+
+  if (
+    /\bspaced repetition\b|\breviews? (schedule|cadence|frequency|interval)\b|\bhow (often|frequently|much)[^.?!]{0,25}\breviews?\b|\bwhen (is|will|do|does|should)[^.?!]{0,20}\b(next review|review due|i review)\b/.test(
+      text,
+    )
+  ) {
+    return "Reviews are adaptive — MentoMate brings a topic back when it judges you're due, rather than on a fixed schedule. Review cards appear on your Mentor tab when something is due.";
+  }
+
+  if (/\bnotes?\b/.test(text)) {
+    return 'You can find your saved notes in the Journal tab, under Saved notes. Notes tied to a specific subject, book, or topic appear there too.';
+  }
+
+  if (/\b(saved|bookmarks?|saved replies|saved explanations)\b/.test(text)) {
+    return 'Saved explanations are in the Journal tab, under Saved notes (Saved mentor replies).';
+  }
+
+  if (/\b(past|old|previous|sessions?|conversations?)\b/.test(text)) {
+    return 'Past conversations are in the Journal tab, under Saved notes (Recent learning sessions).';
+  }
+
+  if (
+    /\b(library|shelf|shelves|subjects?|books?|topics?|chapters?)\b/.test(text)
+  ) {
+    return 'Open the Subjects tab to see your subjects; open a subject to see its books and topics (sometimes grouped into chapters).';
+  }
+
+  if (/\b(preferences?|accommodation|learning accommodation)\b/.test(text)) {
+    return 'Preferences are in your Account — tap your profile picture (top-right), then Preferences. Your learning accommodation is in the same place.';
+  }
+
+  if (/\b(challenge round)\b/.test(text)) {
+    return 'A Challenge Round is an optional check the mentor offers in a session when you show mastery — you accept or decline each one, and a "ready for a challenge" card can also appear on your Mentor tab. There is no global mode to switch on or off.';
+  }
+
+  if (/\b(memory|remember)\b/.test(text)) {
+    return 'You can see what the mentor remembers in the Journal tab, under Mentor memory.';
+  }
+
+  if (/\b(profile|account)\b/.test(text)) {
+    return 'Profile and account details are in your Account — tap your profile picture (top-right).';
+  }
+
+  if (/\b(notifications?)\b/.test(text)) {
+    return 'Notification settings are in your Account — tap your profile picture (top-right), then Notifications.';
+  }
+
+  if (/\b(privacy|data|export|delete)\b/.test(text)) {
+    return 'Privacy, data export, and account deletion are in your Account — tap your profile picture (top-right), then Privacy & data.';
+  }
+
+  if (/\b(help|feedback)\b/.test(text)) {
+    return 'Help and feedback are in your Account — tap your profile picture (top-right), then Help & feedback.';
+  }
+
+  if (/\b(homework|assignment)\b/.test(text)) {
+    return 'For homework, open the Mentor tab and use the camera or Homework button on the bottom bar.';
+  }
+
+  if (/\b(practice|review|test yourself|knowledge check)\b/.test(text)) {
+    return 'For practice and reviews, open the Mentor tab — review and practice cards appear in your feed when something is due.';
+  }
+
+  if (/\b(progress|child|parent)\b/.test(text)) {
+    return 'Family settings are in your Account — tap your profile picture (top-right), then Family settings.';
+  }
+
+  if (APP_HELP_GENERAL.test(userMessage)) {
+    return 'Yes - I can answer questions about where things are in MentoMate. Start on the Mentor tab, then use the Subjects and Journal tabs, or tap your profile picture (top-right) to open your Account.';
+  }
+
+  return 'I can answer app questions from the MentoMate app map. For anything not listed there, open your Account (profile picture, top-right), then Help & feedback.';
+}
+
+function buildAppHelpDirectReplyV0(userMessage: string): string {
   const text = userMessage.toLowerCase();
 
   if (

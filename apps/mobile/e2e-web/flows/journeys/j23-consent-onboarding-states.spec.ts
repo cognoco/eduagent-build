@@ -27,9 +27,18 @@
  * ALSO COVERED:
  *   ACCOUNT-20 solo variant: consent-withdrawn-solo (learner is the account
  *   owner, no parent to switch to).  Ensures the gate copy differs.
+ *
+ *   ACCOUNT-32: consent-gate "while you wait" previews. The waiting gate
+ *               (PARENTAL_CONSENT_REQUESTED) exposes "Browse Subjects" and
+ *               "Sample Coaching" launchers. Each preview screen fully replaces
+ *               the gate (early return in ConsentPendingGate), and "Back"
+ *               returns to the gate. Static showcases, no API.
+ *               → Uses the 'consent-pending' scenario (same waiting gate j13
+ *                 drives) and exercises the real preview components.
  */
 
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 // ---------------------------------------------------------------------------
@@ -150,5 +159,74 @@ test.describe('[ACCOUNT-26] pre-profile onboarding gate', () => {
     await expect(page.getByTestId('create-profile-name')).toBeVisible({
       timeout: 30_000,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ACCOUNT-32: consent-gate "while you wait" previews
+// ---------------------------------------------------------------------------
+
+test.describe('[ACCOUNT-32] consent-gate while-you-wait previews', () => {
+  test('Browse Subjects preview replaces the gate and Back returns to it', async ({
+    page,
+  }) => {
+    await seedAndSignIn(page, {
+      scenario: 'consent-pending',
+      alias: 'a32-subj',
+      landingTestId: 'consent-pending-gate',
+      landingPath: '/home',
+    });
+
+    // The waiting gate exposes the preview launchers (REQUESTED branch).
+    await expect(page.getByTestId('consent-pending-gate')).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId('preview-browse-subjects')).toBeVisible();
+
+    // Launching the subject preview fully replaces the gate.
+    await pressableClick(page.getByTestId('preview-browse-subjects'));
+    await expect(page.getByTestId('preview-subject-browser')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('consent-pending-gate')).not.toBeVisible();
+
+    // Back returns to the consent gate.
+    await pressableClick(page.getByRole('button', { name: 'Back' }).first());
+    await expect(page.getByTestId('consent-pending-gate')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('preview-subject-browser')).not.toBeVisible();
+  });
+
+  test('Sample Coaching preview replaces the gate and Back returns to it', async ({
+    page,
+  }) => {
+    await seedAndSignIn(page, {
+      scenario: 'consent-pending',
+      alias: 'a32-coach',
+      landingTestId: 'consent-pending-gate',
+      landingPath: '/home',
+    });
+
+    await expect(page.getByTestId('consent-pending-gate')).toBeVisible({
+      timeout: 60_000,
+    });
+    // The coaching launcher shares its testID with the preview container, so
+    // discriminate states by gate-only / preview-only affordances instead.
+    await expect(page.getByTestId('preview-sample-coaching')).toBeVisible();
+
+    await pressableClick(page.getByTestId('preview-sample-coaching'));
+
+    // On the preview screen the gate's check-again action is gone and a Back
+    // button is present — the preview has fully replaced the gate.
+    const back = page.getByRole('button', { name: 'Back' });
+    await expect(back).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('consent-check-again')).not.toBeVisible();
+
+    await pressableClick(back.first());
+    await expect(page.getByTestId('consent-pending-gate')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('consent-check-again')).toBeVisible();
   });
 });

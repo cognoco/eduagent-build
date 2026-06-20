@@ -1,44 +1,25 @@
 import { Hono } from 'hono';
+import type { Database } from '@eduagent/database';
 
 import { nowRoutes } from './now';
+import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 
 jest.mock(
-  '../services/now-feed' /* gc1-allow: route delegates to service */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/now-feed',
-    ) as typeof import('../services/now-feed');
-    return {
-      ...actual,
-      buildNowFeed: jest.fn(async () => ({
-        scope: 'self',
-        cards: [],
-        overflowCount: 0,
-        generatedAt: '2026-06-11T12:00:00.000Z',
-      })),
-      buildNowOverflow: jest.fn(async () => ({
-        scope: 'self',
-        items: [],
-      })),
-    };
-  },
+  '../services/now-feed' /* gc1-allow: route unit test - service has direct unit coverage */,
+  () => ({
+    buildNowFeed: jest.fn(),
+    buildNowOverflow: jest.fn(),
+  }),
 );
 
-type TestEnv = {
-  Variables: {
-    db: unknown;
-    profileId: string | undefined;
-    profileMeta: undefined;
-    user: unknown;
-  };
-};
+const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 
-function makeApp(profileId = 'profile-1') {
-  const app = new Hono<TestEnv>();
+function makeApp() {
+  const app = new Hono();
   app.use('*', async (c, next) => {
-    c.set('db', { kind: 'db' });
-    c.set('profileId', profileId);
-    c.set('profileMeta', undefined);
+    c.set('db' as never, { marker: 'db' } as unknown as Database);
+    c.set('profileId' as never, PROFILE_ID);
     await next();
   });
   app.route('/v1', nowRoutes);
@@ -46,31 +27,59 @@ function makeApp(profileId = 'profile-1') {
 }
 
 describe('now routes', () => {
-  it('serves the self now feed', async () => {
-    const res = await makeApp().request('/v1/now?scope=self');
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(buildNowFeed).mockResolvedValue({
       scope: 'self',
       cards: [],
       overflowCount: 0,
-      generatedAt: '2026-06-11T12:00:00.000Z',
+      generatedAt: '2026-06-20T00:00:00.000Z',
     });
-  });
-
-  it('serves now overflow', async () => {
-    const res = await makeApp().request('/v1/now/overflow');
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
+    jest.mocked(buildNowOverflow).mockResolvedValue({
       scope: 'self',
       items: [],
     });
   });
 
-  it('rejects non-self scope in S0', async () => {
+  it('returns 400 when person scope omits personId', async () => {
     const res = await makeApp().request('/v1/now?scope=person');
 
     expect(res.status).toBe(400);
+    expect(buildNowFeed).not.toHaveBeenCalled();
+  });
+
+  it('passes personId through to buildNowFeed for person scope', async () => {
+    jest.mocked(buildNowFeed).mockResolvedValue({
+      scope: 'person',
+      cards: [],
+      overflowCount: 0,
+      generatedAt: '2026-06-20T00:00:00.000Z',
+    });
+
+    const res = await makeApp().request(
+      `/v1/now?scope=person&personId=${CHILD_ID}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(buildNowFeed).toHaveBeenCalledWith(expect.anything(), PROFILE_ID, {
+      scope: 'person',
+      personId: CHILD_ID,
+    });
+  });
+
+  it('passes supporter-hub scope through without personId', async () => {
+    jest.mocked(buildNowFeed).mockResolvedValue({
+      scope: 'supporter-hub',
+      cards: [],
+      overflowCount: 0,
+      generatedAt: '2026-06-20T00:00:00.000Z',
+    });
+
+    const res = await makeApp().request('/v1/now?scope=supporter-hub');
+
+    expect(res.status).toBe(200);
+    expect(buildNowFeed).toHaveBeenCalledWith(expect.anything(), PROFILE_ID, {
+      scope: 'supporter-hub',
+    });
   });
 });

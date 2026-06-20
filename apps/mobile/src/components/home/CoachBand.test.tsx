@@ -41,6 +41,17 @@ describe('CoachBand', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the dismiss control at least a 44px touch target', () => {
+    const { getByTestId } = render(<CoachBand {...baseProps} />);
+
+    expect(getByTestId('home-coach-band-dismiss').props.hitSlop).toEqual({
+      top: 12,
+      bottom: 12,
+      left: 18,
+      right: 18,
+    });
+  });
+
   it('renders explicit eyebrow text', () => {
     const { getByText } = render(<CoachBand {...baseProps} />);
     expect(getByText(/TONIGHT/));

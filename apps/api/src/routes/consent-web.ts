@@ -3,6 +3,9 @@ import type { Database } from '@eduagent/database';
 import {
   processConsentResponse,
   getChildNameByToken,
+  ConsentTokenNotFoundError,
+  ConsentAlreadyProcessedError,
+  ConsentTokenExpiredError,
 } from '../services/consent';
 import { isIdentityV2Enabled } from '../config';
 import {
@@ -423,18 +426,52 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         ),
       );
     } catch (error) {
-      if (error instanceof Error && error.message === 'Invalid consent token') {
+      // [BUG-870] Classify on the error CLASS, not the message string.
+      // processConsentResponse (and its v2 twin) throws three distinct known
+      // errors; each maps to its own actionable friendly page. The previous
+      // `error.message === 'Invalid consent token'` check only caught
+      // ConsentTokenNotFoundError — ConsentAlreadyProcessedError and
+      // ConsentTokenExpiredError fell through and re-threw, surfacing a raw
+      // 500 to the parent instead of an actionable page.
+      if (error instanceof ConsentTokenNotFoundError) {
         return c.html(
           pageLayout(
             'Link Expired',
             `<h1 class="error">Link expired or invalid</h1>
-             <p>This consent link has expired or has already been used.</p>
+             <p>This consent link is no longer valid.</p>
              <p>Ask your child to resend the consent request from the app.</p>
              ${errorActionHtml()}`,
           ),
           404,
         );
       }
+
+      if (error instanceof ConsentTokenExpiredError) {
+        return c.html(
+          pageLayout(
+            'Link Expired',
+            `<h1 class="error">This link has expired</h1>
+             <p>Consent links are valid for a limited time and this one has now expired.</p>
+             <p>Ask your child to resend the consent request from the app.</p>
+             ${errorActionHtml()}`,
+          ),
+          410,
+        );
+      }
+
+      if (error instanceof ConsentAlreadyProcessedError) {
+        return c.html(
+          pageLayout(
+            'Already Responded',
+            `<h1>This request has already been processed</h1>
+             <p>A response for this consent request has already been recorded, so there is nothing more to do here.</p>
+             <p>If you did not expect this, your child can send a new consent request from the app.</p>
+             ${errorActionHtml()}`,
+          ),
+          409,
+        );
+      }
+
       throw error;
     }
   });

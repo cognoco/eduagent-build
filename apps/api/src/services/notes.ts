@@ -492,6 +492,7 @@ async function selectAllNoteRows(
       subjectName: subjects.name,
       sessionId: noteSessionIdSelection(includeSessionId),
       content: topicNotes.content,
+      origin: sql<'self'>`'self'`,
       createdAt: topicNotes.createdAt,
       updatedAt: topicNotes.updatedAt,
     })

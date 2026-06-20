@@ -37,6 +37,15 @@ export interface UseSubjectClassificationOptions {
   subjectId: string | undefined;
   effectiveMode: string;
 
+  // T25: V2 "mentor-is-the-app" entry. When true (flag on + mentor entry,
+  // freeform OR homework/camera), turn-1 subject resolution never opens the
+  // full subject-library grid and never blocks: confident picks keep the
+  // override chip visible, ambiguous picks show narrow inline disambiguation.
+  // Freeform creates a classifier suggestion silently; homework (durable
+  // evidence + OCR-misread risk) instead offers a tap-to-create card and only
+  // falls back to enrolled quick-picks + type-to-create as a last resort.
+  isV2MentorEntry: boolean;
+
   // Data
   availableSubjects: Array<{ id: string; name: string }>;
 
@@ -97,6 +106,7 @@ export function useSubjectClassification(
     setResumedBanner,
     subjectId,
     effectiveMode,
+    isV2MentorEntry,
     availableSubjects,
     classifySubject,
     resolveSubject,
@@ -432,8 +442,14 @@ export function useSubjectClassification(
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
       if (isStreaming || pendingClassification || quotaError) return;
       if (pendingSubjectResolution) {
-        showConfirmation("Pick the subject first, then I'll keep going.");
-        return;
+        if (!isV2MentorEntry) {
+          showConfirmation("Pick the subject first, then I'll keep going.");
+          return;
+        }
+        // T25: V2 is non-blocking — a fresh message supersedes the pending
+        // disambiguation. Clear it and let the new message re-resolve the
+        // subject below instead of gating on the prior prompt.
+        setPendingSubjectResolution(null);
       }
 
       setMessages((prev) => [
@@ -504,6 +520,44 @@ export function useSubjectClassification(
       let sessionSubjectId: string | undefined;
       let sessionSubjectName: string | undefined;
 
+      // T25: V2 silent subject creation. Creates the subject, sets it as the
+      // session subject, posts a tentative ack, and keeps the override chip
+      // visible — then lets the caller fall through to continueWithMessage.
+      // Returns false (and surfaces a confirmation) only if creation failed.
+      const silentlyCreateSubject = async (
+        name: string,
+        rawInputText: string,
+      ): Promise<boolean> => {
+        try {
+          const created = await createSubject.mutateAsync({
+            name,
+            rawInput: rawInputText,
+          });
+          setClassifiedSubject({
+            subjectId: created.subject.id,
+            subjectName: created.subject.name,
+          });
+          setShowWrongSubjectChip(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createLocalMessageId('ai'),
+              role: 'assistant',
+              content: `Looks like ${created.subject.name}.`,
+              isSystemPrompt: true,
+            },
+          ]);
+          sessionSubjectId = created.subject.id;
+          sessionSubjectName = created.subject.name;
+          return true;
+        } catch {
+          showConfirmation(
+            `Could not create ${name}. Pick a subject and we'll keep going.`,
+          );
+          return false;
+        }
+      };
+
       // Recitation mode: silently auto-pick the first available subject.
       // No classification prompt — the child named a poem, not a subject.
       if (
@@ -535,7 +589,9 @@ export function useSubjectClassification(
               subjectId: candidate.subjectId,
               subjectName: candidate.subjectName,
             });
-            setShowWrongSubjectChip(false);
+            // T25: V2 keeps the override chip visible so a confident
+            // mis-commit (e.g. "analysis" -> English) is one tap to fix.
+            setShowWrongSubjectChip(isV2MentorEntry);
             sessionSubjectId = candidate.subjectId;
             sessionSubjectName = candidate.subjectName;
             setMessages((prev) => [
@@ -581,7 +637,43 @@ export function useSubjectClassification(
               sessionSubjectName = best.subjectName;
             }
             const suggested = result.suggestedSubjectName ?? null;
-            if (!best && suggested) {
+            if (!best && isV2MentorEntry) {
+              // T25: V2 never opens the full subject-library grid on a mentor
+              // turn. Resolve a subject silently; fall back to narrow
+              // new-subject suggestion cards (not the grid) only when there is
+              // nothing concrete to create.
+              if (suggested) {
+                const created = await silentlyCreateSubject(suggested, text);
+                if (!created) return;
+              } else {
+                try {
+                  const resolveResult = await resolveSubject.mutateAsync({
+                    rawInput: text,
+                  });
+                  if (resolveResult.resolvedName) {
+                    const created = await silentlyCreateSubject(
+                      resolveResult.resolvedName,
+                      text,
+                    );
+                    if (!created) return;
+                  } else if (resolveResult.suggestions.length > 0) {
+                    openSubjectResolutionForTurn(
+                      text,
+                      resolveResult.displayMessage ||
+                        'Pick a subject that fits, or create your own.',
+                      [],
+                      null,
+                      resolveResult.suggestions,
+                    );
+                    return;
+                  }
+                  // No resolved name and no suggestions — proceed without a
+                  // subject rather than gating on a grid.
+                } catch {
+                  // Both classifiers failed — fall through to no-subject chat.
+                }
+              }
+            } else if (!best && suggested) {
               openSubjectResolutionForTurn(
                 text,
                 `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`,
@@ -592,8 +684,7 @@ export function useSubjectClassification(
                 suggested,
               );
               return;
-            }
-            if (!best) {
+            } else if (!best) {
               try {
                 const resolveResult = await resolveSubject.mutateAsync({
                   rawInput: text,
@@ -618,6 +709,107 @@ export function useSubjectClassification(
               } catch {
                 // Fall through to no-subject chat only when both classifiers fail.
               }
+            }
+          } else if (isV2MentorEntry) {
+            // T25 (homework/camera): a mentor-entry homework turn never opens
+            // the full subject-library grid and never blocks. Homework writes
+            // durable evidence and OCR can misread, so — unlike freeform — we
+            // never create a subject silently: a zero-match suggestion is a
+            // tap-to-create card, and the genuine no-signal floor offers the
+            // learner's own subjects plus type-to-create.
+            const suggested = result.suggestedSubjectName ?? null;
+
+            if (result.candidates.length > 1) {
+              // Several subjects are an equally good bet — narrow chips.
+              const narrowCandidates = result.candidates
+                .slice(0, 3)
+                .map((candidate) => ({
+                  subjectId: candidate.subjectId,
+                  subjectName: candidate.subjectName,
+                }));
+              setShowWrongSubjectChip(false);
+              openSubjectResolutionForTurn(
+                text,
+                `This sounds like it could be ${narrowCandidates
+                  .map((candidate) => candidate.subjectName)
+                  .join(' or ')}. Which one are we working on?`,
+                narrowCandidates,
+              );
+              return;
+            }
+
+            const best = result.candidates[0];
+            if (best) {
+              // A single enrolled-subject match — auto-pick, keep the override
+              // chip so a mis-match is one tap to fix.
+              setClassifiedSubject({
+                subjectId: best.subjectId,
+                subjectName: best.subjectName,
+              });
+              setShowWrongSubjectChip(true);
+              sessionSubjectId = best.subjectId;
+              sessionSubjectName = best.subjectName;
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: createLocalMessageId('ai'),
+                  role: 'assistant',
+                  content: `Looks like ${best.subjectName}.`,
+                  isSystemPrompt: true,
+                },
+              ]);
+              // Fall through to continueWithMessage below.
+            } else {
+              setShowWrongSubjectChip(false);
+              if (suggested) {
+                // Zero match but a concrete name — narrow tap-to-create card
+                // (no grid, no silent create).
+                openSubjectResolutionForTurn(
+                  text,
+                  `This looks like ${suggested}. Tap "+ ${suggested}" to add it, or pick one of yours.`,
+                  [],
+                  suggested,
+                );
+                return;
+              }
+              // Zero match and no name — ask the richer resolver for
+              // new-subject cards before falling to the floor.
+              try {
+                const resolveResult = await resolveSubject.mutateAsync({
+                  rawInput: text,
+                });
+                if (
+                  resolveResult.resolvedName ||
+                  resolveResult.suggestions.length > 0
+                ) {
+                  openSubjectResolutionForTurn(
+                    text,
+                    resolveResult.displayMessage ||
+                      'Pick a subject that fits, or create your own.',
+                    [],
+                    resolveResult.resolvedName,
+                    resolveResult.suggestions ?? [],
+                  );
+                  return;
+                }
+              } catch {
+                // Fall through to the floor when the resolver also fails.
+              }
+              // Tier-5 floor: no signal at all. Offer the learner's own
+              // subjects as quick-picks plus type-to-create — non-blocking,
+              // and only as a last resort, never the turn-1 default. With no
+              // enrolled subjects this collapses to type-to-create only.
+              openSubjectResolutionForTurn(
+                text,
+                availableSubjects.length > 0
+                  ? 'Which subject is this? Pick one of yours, or type a new one.'
+                  : "Which subject is this? Type it and I'll set it up.",
+                availableSubjects.map((candidate) => ({
+                  subjectId: candidate.id,
+                  subjectName: candidate.name,
+                })),
+              );
+              return;
             }
           } else {
             const subjectCandidates =
@@ -772,13 +964,16 @@ export function useSubjectClassification(
       // CR-1: quotaError added so the callback re-creates when quota state changes.
       quotaError,
       pendingSubjectResolution,
+      setPendingSubjectResolution,
       createLocalMessageId,
       subjectId,
       classifiedSubject,
       userMessageCount,
       effectiveMode,
+      isV2MentorEntry,
       classifySubject,
       resolveSubject,
+      createSubject,
       availableSubjects,
       continueWithMessage,
       openSubjectResolution,

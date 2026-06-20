@@ -30,16 +30,21 @@ const MILESTONE_COPY: Record<
   },
   streak_length: {
     icon: '🔥',
-    label: (threshold, _t) => `${threshold}-day streak`,
+    label: (threshold, t) =>
+      t('progress.milestoneCard.streakLength', { count: threshold }),
   },
   subject_mastered: {
     icon: '🏁',
-    label: (_threshold, _t, metadata) =>
-      `Mastered ${String(metadata?.['subjectName'] ?? 'a subject')}`,
+    label: (_threshold, t, metadata) =>
+      metadata?.['subjectName']
+        ? t('progress.milestoneCard.subjectMastered', {
+            subject: String(metadata['subjectName']),
+          })
+        : t('progress.milestoneCard.subjectMasteredFallback'),
   },
   book_completed: {
     icon: '📖',
-    label: (_threshold, _t) => 'Completed a book',
+    label: (_threshold, t) => t('progress.milestoneCard.bookCompleted'),
   },
   learning_time: {
     icon: '⏱',
@@ -47,14 +52,19 @@ const MILESTONE_COPY: Record<
   },
   cefr_level_up: {
     icon: '🗣',
-    label: (_threshold, _t) => 'Language level increased',
+    label: (_threshold, t) => t('progress.milestoneCard.cefrLevelUp'),
   },
   topics_explored: {
     icon: '🧠',
-    label: (threshold, _t, metadata) =>
-      `Explored ${threshold} topics in ${String(
-        metadata?.['subjectName'] ?? 'a subject',
-      )}`,
+    label: (threshold, t, metadata) =>
+      metadata?.['subjectName']
+        ? t('progress.milestoneCard.topicsExplored', {
+            count: threshold,
+            subject: String(metadata['subjectName']),
+          })
+        : t('progress.milestoneCard.topicsExploredFallback', {
+            count: threshold,
+          }),
   },
 };
 
@@ -66,8 +76,35 @@ export function MilestoneCard({
   milestone,
 }: MilestoneCardProps): React.ReactElement {
   const { t } = useTranslation();
-  const config = MILESTONE_COPY[milestone.milestoneType];
+  // The milestone_type DB column is free-text (no CHECK constraint), so an
+  // unrecognized value can reach this component. Guard the MILESTONE_COPY
+  // lookup so an unknown type renders a generic milestone card instead of
+  // crashing the render (config.icon would throw on undefined).
+  const config = MILESTONE_COPY[milestone.milestoneType] as
+    | (typeof MILESTONE_COPY)[MilestoneRecord['milestoneType']]
+    | undefined;
   const createdAt = new Date(milestone.createdAt);
+
+  if (!config) {
+    return (
+      <View className="bg-surface rounded-card p-4">
+        <View className="flex-row items-start">
+          <Text className="text-xl me-3">{'🎯'}</Text>
+          <View className="flex-1">
+            <Text className="text-body font-semibold text-text-primary">
+              {t('progress.milestoneCard.unknown')}
+            </Text>
+            <Text className="text-caption text-text-secondary mt-1">
+              {createdAt.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View className="bg-surface rounded-card p-4">

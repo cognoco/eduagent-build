@@ -180,7 +180,9 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
     };
     const update = jest.fn().mockReturnValue({
       set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+        }),
       }),
     });
     mockGetStepDatabase.mockReturnValue({ select: () => chain, update });
@@ -310,7 +312,9 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
       };
       const update = jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue(undefined),
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+          }),
         }),
       });
       mockGetStepDatabase.mockReturnValue({
@@ -375,7 +379,9 @@ describe('topicProbeExtract onFailure', () => {
   });
 
   it('[WI-78 review] does not overwrite completed topic-probe extraction status with failed', async () => {
-    const where = jest.fn().mockResolvedValue(undefined);
+    const where = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([{ id: 'mock-id' }]),
+    });
     const set = jest.fn().mockReturnValue({ where });
     const update = jest.fn().mockReturnValue({ set });
     mockGetStepDatabase.mockReturnValue({ update });

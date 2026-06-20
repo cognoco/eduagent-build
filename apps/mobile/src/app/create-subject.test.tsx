@@ -22,6 +22,12 @@ let subjectsListIsError = false;
 let createSubjectResponse: unknown = null;
 let createSubjectShouldError = false;
 let createSubjectErrorMessage = '';
+// [WI-855] Typed error fields for the create POST. When set, the mock returns
+// `status` with a flat `{ code, message }` body so the screen can branch on the
+// stable code (errorHasCode) rather than regexing the message. Default status
+// 400 with no code preserves the prior generic-error behavior.
+let createSubjectErrorCode: string | undefined;
+let createSubjectErrorStatus = 400;
 
 // Placeholder — replaced before each test by beforeEach (see describe block).
 // createRoutedMockFetch requires an initial entry so the map has the right key order.
@@ -190,8 +196,14 @@ function defaultSubjectsHandler(url: string, init?: RequestInit): unknown {
   if (init?.method === 'POST') {
     if (createSubjectShouldError) {
       return new Response(
-        JSON.stringify({ message: createSubjectErrorMessage }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } },
+        JSON.stringify({
+          message: createSubjectErrorMessage,
+          ...(createSubjectErrorCode ? { code: createSubjectErrorCode } : {}),
+        }),
+        {
+          status: createSubjectErrorStatus,
+          headers: { 'Content-Type': 'application/json' },
+        },
       );
     }
     return (
@@ -234,6 +246,8 @@ describe('CreateSubjectScreen', () => {
     createSubjectResponse = null;
     createSubjectShouldError = false;
     createSubjectErrorMessage = '';
+    createSubjectErrorCode = undefined;
+    createSubjectErrorStatus = 400;
     mockCanGoBackValue = true;
     // Restore routes to defaults so per-test setRoute overrides don't leak.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
@@ -1007,8 +1021,12 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
+    // [WI-855] The API now signals the limit via a stable 409 typed code, not
+    // the English message; the screen branches on errorHasCode, not a regex.
     createSubjectErrorMessage =
       'You have reached the subject limit for your plan';
+    createSubjectErrorCode = 'SUBJECT_LIMIT_EXCEEDED';
+    createSubjectErrorStatus = 409;
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
     await enterSubjectName('Math');
@@ -1054,8 +1072,12 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
+    // [WI-855] The API now signals the limit via a stable 409 typed code, not
+    // the English message; the screen branches on errorHasCode, not a regex.
     createSubjectErrorMessage =
       'You have reached the subject limit for your plan';
+    createSubjectErrorCode = 'SUBJECT_LIMIT_EXCEEDED';
+    createSubjectErrorStatus = 409;
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -1084,8 +1106,12 @@ describe('CreateSubjectScreen', () => {
       displayMessage: 'Math works.',
     });
     createSubjectShouldError = true;
+    // [WI-855] The API now signals the limit via a stable 409 typed code, not
+    // the English message; the screen branches on errorHasCode, not a regex.
     createSubjectErrorMessage =
       'You have reached the subject limit for your plan';
+    createSubjectErrorCode = 'SUBJECT_LIMIT_EXCEEDED';
+    createSubjectErrorStatus = 409;
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
@@ -1099,6 +1125,70 @@ describe('CreateSubjectScreen', () => {
     fireEvent.press(screen.getByTestId('manage-subjects-button'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('[WI-855] typed SUBJECT_LIMIT_EXCEEDED shows delete-first guidance + manage button', async () => {
+    mockSearchParams = {};
+
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    createSubjectShouldError = true;
+    // Message deliberately does NOT contain "subject limit"/"too many subjects" —
+    // the recovery UI must key off the typed code, not message text.
+    createSubjectErrorMessage = 'Request could not be completed.';
+    createSubjectErrorCode = 'SUBJECT_LIMIT_EXCEEDED';
+    createSubjectErrorStatus = 409;
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    // Recovery CTA appears...
+    await waitFor(() => {
+      screen.getByTestId('manage-subjects-button');
+    });
+    // ...and the delete-first guidance is appended to the error copy. Regex =
+    // substring match (the node also holds the server message before it).
+    expect(screen.getByTestId('create-subject-error')).toHaveTextContent(
+      /Delete an old subject first to make room\./,
+    );
+  });
+
+  it('[WI-855] non-limit error containing "subject limit" in its MESSAGE does NOT show recovery UI', async () => {
+    mockSearchParams = {};
+
+    setResolveResponse({
+      status: 'direct_match',
+      resolvedName: 'Math',
+      suggestions: [],
+      displayMessage: 'Math works.',
+    });
+    createSubjectShouldError = true;
+    // The OLD regex (`/subject limit|too many subjects/i` on err.message) would
+    // have FALSE-POSITIVED on this generic 400 and shown the manage/delete CTA.
+    // With typed-code branching there is no code, so recovery UI must stay hidden.
+    createSubjectErrorMessage =
+      'The mentor mentioned a subject limit and too many subjects, but this is a generic failure.';
+    createSubjectErrorCode = undefined;
+    createSubjectErrorStatus = 400;
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+    await enterSubjectName('Math');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    // The generic error still surfaces...
+    await waitFor(() => {
+      screen.getByTestId('create-subject-error');
+    });
+    // ...but the subject-limit recovery affordances must NOT appear.
+    expect(screen.queryByTestId('manage-subjects-button')).toBeNull();
+    expect(screen.getByTestId('create-subject-error')).not.toHaveTextContent(
+      'Delete an old subject first to make room.',
+    );
   });
 
   it('[BUG-236] returns to chat session when returnTo=chat after subject creation', async () => {
@@ -1551,6 +1641,56 @@ describe('CreateSubjectScreen', () => {
     expect(screen.getByTestId('subject-suggestion-accept'));
     expect(screen.getByText('Accept'));
   });
+
+  it('[WI-508] Accept/Edit Pressables have disabled={isBusy} and are unreachable while creating', async () => {
+    // Resolve to a confident single match so the confident card shows.
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Italian',
+      suggestions: [{ name: 'Italian', description: 'Italian language' }],
+      displayMessage: 'Italian works well.',
+    });
+    // Stall the create POST so the screen stays in `creating` phase (isBusy=true).
+    mockFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return new Promise(() => undefined /* never resolves */);
+      }
+      return { subjects: subjectsListData };
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    await enterSubjectName('italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    const acceptBtn = screen.getByTestId('subject-suggestion-accept');
+    const editBtn = screen.getByTestId('subject-suggestion-edit');
+
+    // Before the accept press, both buttons must be enabled (isBusy=false when
+    // suggestion card is shown, so disabled prop evaluates to false).
+    expect(acceptBtn.props.disabled).not.toBe(true);
+    expect(editBtn.props.disabled).not.toBe(true);
+
+    fireEvent.press(acceptBtn);
+
+    // Pressing accept sets phase to 'creating' (isBusy=true). The suggestion
+    // card unmounts because it is gated on `phase === 'suggestion'`.
+    // The loading indicator appears. Both action Pressables are unreachable —
+    // a rapid second tap cannot fire a duplicate create request.
+    await waitFor(() => {
+      screen.getByTestId('subject-book-loading', {
+        includeHiddenElements: true,
+      });
+    });
+
+    expect(screen.queryByTestId('subject-confident-card')).toBeNull();
+    expect(screen.queryByTestId('subject-suggestion-accept')).toBeNull();
+    expect(screen.queryByTestId('subject-suggestion-edit')).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1580,6 +1720,8 @@ describe('CreateSubjectScreen — [BUG-520] resolve timeout cleanup', () => {
     createSubjectResponse = null;
     createSubjectShouldError = false;
     createSubjectErrorMessage = '';
+    createSubjectErrorCode = undefined;
+    createSubjectErrorStatus = 400;
     mockCanGoBackValue = true;
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute(
@@ -1854,6 +1996,8 @@ describe('CreateSubjectScreen — keyboard avoiding behavior', () => {
     createSubjectResponse = null;
     createSubjectShouldError = false;
     createSubjectErrorMessage = '';
+    createSubjectErrorCode = undefined;
+    createSubjectErrorStatus = 400;
     // Restore routes to defaults so per-test overrides don't leak between suites.
     mockFetch.setRoute('/subjects/resolve', defaultResolveHandler);
     mockFetch.setRoute('/subjects', defaultSubjectsHandler);

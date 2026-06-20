@@ -13,6 +13,7 @@ import {
   markPreAuthIntroSeenSync,
   preAuthIntroSecureStoreKey,
 } from '../lib/intro-state';
+import { getPostAuthDefaultPath } from './(app)/_lib/auth-redirect';
 
 // Pre-auth routing destinations for the first-open probe. See
 // docs/plans/2026-05-27-pre-auth-welcome-flow.md for the decision table.
@@ -174,7 +175,7 @@ export default function Index() {
   }
 
   if (isSignedIn) {
-    return <Redirect href="/(app)/home" />;
+    return <Redirect href={getPostAuthDefaultPath()} />;
   }
 
   if (probe.status === 'loading') {

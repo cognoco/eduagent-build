@@ -79,7 +79,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   done
 
   if [[ "$remote_sha" == "$ZERO_SHA" ]]; then
-    base="origin/main"
+    # New remote branch: default to origin/main, but honor an existing local
+    # upstream when the work branched from an integration branch such as
+    # origin/new-llm. Otherwise the first push validates the entire integration
+    # branch delta instead of this branch's actual change set.
+    upstream_base="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+    if [[ -n "$upstream_base" ]]; then
+      base="$upstream_base"
+    else
+      base="origin/main"
+    fi
   else
     base="$remote_sha"
   fi
@@ -186,7 +195,7 @@ else
       echo ""
       echo "── jest [${project_dir}] ──────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/$project_dir" && pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/$project_dir" && IDENTITY_V2_ENABLED=false pnpm exec jest --findRelatedTests $abs_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     }
@@ -208,14 +217,14 @@ else
 
     # Mobile with memory bump
     if [[ -n "$MOBILE_FILES" ]]; then
-      abs_mobile_files=""
+      mobile_files_for_jest=""
       for f in $MOBILE_FILES; do
-        abs_mobile_files="$abs_mobile_files $WORKSPACE_ROOT/$f"
+        mobile_files_for_jest="$mobile_files_for_jest ${f#apps/mobile/}"
       done
       echo ""
       echo "── jest [apps/mobile] ─────────────────────────────────────────"
       # shellcheck disable=SC2086
-      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $abs_mobile_files --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
+      if ! (cd "$WORKSPACE_ROOT/apps/mobile" && NODE_OPTIONS='--max-old-space-size=6144' pnpm exec jest --findRelatedTests $mobile_files_for_jest --no-coverage --bail --passWithNoTests --forceExit --testPathIgnorePatterns='\.integration\.test\.'); then
         JEST_FAILED=1
       fi
     fi

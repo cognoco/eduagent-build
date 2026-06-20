@@ -1,5 +1,7 @@
 # Master Directory Pages
 
+> **STATUS: PARKED — revive after V2 cutover (decided 2026-06-18).** Only 21 of ~168 flows have detail pages (~12.5%), and the existing pages are framed against the V0/V1 nav model (Family/Study mode, proxy, Recaps tab) that V2 ("mentor-is-the-app", `docs/plans/v2-plan/`) retires. Finishing them against the old shell would be throwaway work. **Revive plan:** after the V2 S6 cutover, rebuild these pages V2-shell-aware. The existing 21 pages are kept as reference + revival seed; their "Sources" headers cite `student-flow-access-inventory.md` / `mentor-flow-access-inventory.md`, which are parked alongside this system for the same reason. Do not delete.
+
 This directory contains one durable detail page per product flow.
 
 The flow pages are not execution logs. They should stay useful after a revision pass finishes by recording:

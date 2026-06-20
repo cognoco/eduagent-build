@@ -20,17 +20,22 @@ import { resolve } from 'path';
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import {
   accounts,
+  consentGrant,
   consentStates,
   createDatabase,
   familyLinks,
   generateUUIDv7,
+  guardianship,
+  membership,
   nudges,
   notificationPreferences,
+  organization,
+  person,
   profiles,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { RateLimitedError } from '@eduagent/schemas';
+import { ConsentRequiredError, RateLimitedError } from '@eduagent/schemas';
 
 import {
   clearFetchCalls,
@@ -49,6 +54,17 @@ loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+// [WI-809] The v2 consent-gate suite seeds person ids directly (no legacy
+// accounts/profiles), so it can only run on a POST-M-DROP DB where the
+// nudges/notification_preferences FK→profiles has been dropped. On a pre-drop DB
+// (current CI integration branch — 0117/0118 are de-journaled/freeze-only) those
+// inserts would FK-violate. Gate on IDENTITY_POST_DROP=1 so the suite runs only
+// against a post-drop DB (e.g. staging post-cutover); it auto-activates on CI
+// once M-DROP lands. Proven green on the post-drop staging DB during WI-809.
+const describeIfPostDrop =
+  hasDatabaseUrl && process.env.IDENTITY_POST_DROP === '1'
+    ? describe
+    : describe.skip;
 
 const RUN_ID = generateUUIDv7();
 
@@ -281,7 +297,7 @@ describeIfDb('nudge service (integration)', () => {
 
   // ── 3. Per-recipient dimension (I1 spec: max 4/day per child, any sender) ─
 
-  it('[BREAK] parent B cannot send when child has received 4 nudges from any parent', async () => {
+  it('[PARENT-16][BREAK] parent B cannot send when child has received 4 nudges from any parent', async () => {
     const now = new Date();
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
@@ -320,7 +336,7 @@ describeIfDb('nudge service (integration)', () => {
   //          succeeds; rows stays <= 4.
   //          Verified GREEN: all 6 integration tests pass (2026-05-11).
 
-  it('[BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
+  it('[PARENT-16][BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
     const now = new Date();
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
@@ -406,5 +422,176 @@ describeIfDb('nudge service (integration)', () => {
         and(eq(nudges.toProfileId, childXProfileId), isNull(nudges.readAt)),
       );
     expect(unread.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ===========================================================================
+// [WI-809] createNudge consent gate — v2 flag-ON path (real DB)
+//
+// Post-M-DROP the legacy `consent_states` table is gone, so flag-on createNudge
+// must route the consent decision through the GDPR-pinned v2 gate
+// (isGdprProcessingAllowedV2) instead of legacy getConsentStatus. This suite
+// seeds ONLY the v2 graph (organization / person / membership / guardianship /
+// consent_grant) and NEVER seeds a legacy consent_states row for the child, so:
+//   • a WITHDRAWN GDPR grant blocks the nudge with ConsentRequiredError, and
+//   • a CONSENTED grant lets it through end-to-end.
+// RED/GREEN: revert the nudge.ts flag branch (flag-on falls back to legacy
+// getConsentStatus reading the empty consent_states) → the child resolves to
+// null (no row) → "allowed" → the [BLOCK] case no longer throws → it FAILS.
+//
+// AGENTS.md rule: no internal jest.mock() in integration tests.
+// ===========================================================================
+
+const V2_RUN = generateUUIDv7();
+
+describeIfPostDrop('createNudge v2 consent gate (integration)', () => {
+  let v2db: Database;
+  let orgId: string;
+  let guardianPersonId: string;
+  let childPersonId: string;
+
+  beforeAll(async () => {
+    installFetchInterceptor();
+    mockExpoPush();
+    v2db = createDatabase(process.env.DATABASE_URL!);
+
+    const [org] = await v2db
+      .insert(organization)
+      .values({ name: `nudge-v2-${V2_RUN}` })
+      .returning({ id: organization.id });
+    orgId = org!.id;
+
+    const [guardian] = await v2db
+      .insert(person)
+      .values({
+        displayName: 'Guardian V2',
+        birthDate: '1980-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning({ id: person.id });
+    guardianPersonId = guardian!.id;
+
+    const [child] = await v2db
+      .insert(person)
+      .values({
+        displayName: 'Child V2',
+        birthDate: '2015-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning({ id: person.id });
+    childPersonId = child!.id;
+
+    // org resolution for isGdprProcessingAllowedV2 hangs off the child's membership
+    await v2db.insert(membership).values({
+      personId: childPersonId,
+      organizationId: orgId,
+      roles: ['learner'],
+    });
+    // assertParentAccess (v2) requires an ACTIVE guardianship edge
+    await v2db.insert(guardianship).values({
+      guardianPersonId,
+      chargePersonId: childPersonId,
+      revokedAt: null,
+    });
+    // push delivery for the ALLOW case (notification_preferences is keyed by
+    // profileId = person.id and is NOT one of the dropped tables)
+    await v2db.insert(notificationPreferences).values({
+      profileId: childPersonId,
+      pushEnabled: true,
+      expoPushToken: `ExponentPushToken[nudge-v2-${V2_RUN}]`,
+    });
+  });
+
+  afterAll(async () => {
+    // FK-safe order: edges/leaves before person/org.
+    await v2db.delete(nudges).where(eq(nudges.toProfileId, childPersonId));
+    await v2db
+      .delete(notificationPreferences)
+      .where(eq(notificationPreferences.profileId, childPersonId));
+    await v2db
+      .delete(consentGrant)
+      .where(eq(consentGrant.chargePersonId, childPersonId));
+    await v2db
+      .delete(guardianship)
+      .where(eq(guardianship.chargePersonId, childPersonId));
+    await v2db.delete(membership).where(eq(membership.personId, childPersonId));
+    await v2db.delete(person).where(eq(person.id, childPersonId));
+    await v2db.delete(person).where(eq(person.id, guardianPersonId));
+    await v2db.delete(organization).where(eq(organization.id, orgId));
+    restoreFetch();
+  });
+
+  beforeEach(async () => {
+    clearFetchCalls();
+    await v2db.delete(nudges).where(eq(nudges.toProfileId, childPersonId));
+    await v2db
+      .delete(consentGrant)
+      .where(eq(consentGrant.chargePersonId, childPersonId));
+  });
+
+  // Midday UTC keeps the push out of quiet hours (org timezone is null → UTC).
+  function middayUtc(): Date {
+    const d = new Date();
+    d.setUTCHours(14, 0, 0, 0);
+    return d;
+  }
+
+  it('[BLOCK] flag-on: a WITHDRAWN GDPR grant blocks the nudge via the v2 gate (no legacy consent_states row exists)', async () => {
+    await v2db.insert(consentGrant).values({
+      chargePersonId: childPersonId,
+      organizationId: orgId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+      grantedAt: new Date(),
+      withdrawnAt: new Date(),
+    });
+
+    await expect(
+      createNudge(
+        v2db,
+        {
+          fromProfileId: guardianPersonId,
+          toProfileId: childPersonId,
+          template: 'you_got_this',
+          now: middayUtc(),
+        },
+        { identityV2Enabled: true },
+      ),
+    ).rejects.toThrow(ConsentRequiredError);
+
+    // No nudge row was written.
+    const rows = await v2db
+      .select()
+      .from(nudges)
+      .where(eq(nudges.toProfileId, childPersonId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('flag-on: a CONSENTED GDPR grant lets the nudge through end-to-end', async () => {
+    await v2db.insert(consentGrant).values({
+      chargePersonId: childPersonId,
+      organizationId: orgId,
+      purpose: 'platform_use',
+      lawfulBasis: 'gdpr_parental_consent',
+      granted: true,
+      grantedAt: new Date(),
+    });
+
+    const result = await createNudge(
+      v2db,
+      {
+        fromProfileId: guardianPersonId,
+        toProfileId: childPersonId,
+        template: 'you_got_this',
+        now: middayUtc(),
+      },
+      { identityV2Enabled: true },
+    );
+
+    expect(result.nudge.toProfileId).toBe(childPersonId);
+    expect(result.nudge.fromDisplayName).toBe('Guardian V2');
+    expect(result.pushSent).toBe(true);
+    expect(getFetchCalls('exp.host/--/api/v2/push/send')).toHaveLength(1);
   });
 });

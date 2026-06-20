@@ -64,6 +64,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.
   (id) => sanitizeSecureStoreKey(`notificationFirstAskShown_${id}`),
+  // use-guardian-notification-ask.ts — one-shot parent-home notification primer flag.
+  (id) => sanitizeSecureStoreKey(`guardianNotificationAskShown_${id}`),
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.
@@ -72,6 +74,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
   // ParentTransitionNotice.tsx — show the parent-home orientation cue once per profile.
   (id) => sanitizeSecureStoreKey(`mentomate_parent_home_seen_${id}`),
+  // scope-context.tsx — last active relationship-lens scope per profile.
+  (id) => sanitizeSecureStoreKey(`scope.last-active-${id}`),
 ];
 
 // AsyncStorage keys cleared at sign-out (account-scoped, not device-scoped).

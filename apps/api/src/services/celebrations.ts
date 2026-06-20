@@ -189,9 +189,22 @@ export async function getPendingCelebrations(
   // Opportunistically clean out expired/invalid entries only.
   // Use viewer: 'child' (no seenAt) to strip just expired entries — child sees
   // everything, so this avoids spurious writes caused by viewer/seen filtering.
-  const pruned = filterPendingCelebrations(pending, { viewer: 'child', now });
-  if (pruned.length !== pending.length) {
-    await writeHomeSurfacePendingCelebrations(db, profileId, pruned);
+  //
+  // [BUG-866] The prune must run against the row read UNDER the row lock, not
+  // the stale pre-lock snapshot above. If a queueCelebration commits a new
+  // entry between this GET's unlocked read and its prune-write, writing back the
+  // stale `pending` would clobber that newly-queued entry and lose the
+  // celebration permanently. The reducer recomputes the prune from the locked
+  // row's CURRENT value, so a concurrent append survives. We still gate the
+  // write on the unlocked snapshot having expired/invalid entries to avoid
+  // spurious writes when nothing needs pruning.
+  const staleHasExpired =
+    filterPendingCelebrations(pending, { viewer: 'child', now }).length !==
+    pending.length;
+  if (staleHasExpired) {
+    await writeHomeSurfacePendingCelebrations(db, profileId, (lockedPending) =>
+      filterPendingCelebrations(lockedPending, { viewer: 'child', now }),
+    );
   }
 
   return filtered;

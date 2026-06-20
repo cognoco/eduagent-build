@@ -20,6 +20,7 @@ import {
   notifyAccountSecurityEvent,
   updateAccountEmailFromClerk,
 } from '../services/account';
+import { updateLoginEmailFromClerk } from '../services/identity-v2/account-v2';
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -35,7 +36,7 @@ import {
 import { generateExport } from '../services/export';
 import { generateExportV2 } from '../services/identity-v2/export-v2';
 import { inngest } from '../inngest/client';
-import { captureException } from '../services/sentry';
+import { captureException, captureMessage } from '../services/sentry';
 import { isIdentityV2Enabled } from '../config';
 import { NotFoundError, apiError, validationError } from '../errors';
 import { assertOwnerProfile } from '../services/family-access';
@@ -119,7 +120,8 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   })
   .patch('/account/email', async (c) => {
     const db = c.get('db');
-    requireAccount(c.get('account'));
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     assertOwnerProfile(c, 'Only the account owner can change account email.');
 
     const body = await c.req.json().catch(() => null);
@@ -128,11 +130,22 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       return validationError(c, parsed.error.issues);
     }
 
-    const updated = await updateAccountEmailFromClerk(db, {
-      clerkUserId: c.get('user').userId,
-      requestedEmail: parsed.data.email,
-      clerkSecretKey: c.env.CLERK_SECRET_KEY,
-    });
+    // [WI-586 C4] v2 seam: updateLoginEmailFromClerk writes login.email instead
+    // of accounts.email. Most-severe flip-critical reader — ownership is
+    // guaranteed at the route level (assertOwnerProfile + requireAccount) before
+    // this call. Flag-off unchanged.
+    const updated = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
+      ? await updateLoginEmailFromClerk(db, {
+          clerkUserId: c.get('user').userId,
+          requestedEmail: parsed.data.email,
+          organizationId: account.id,
+          clerkSecretKey: c.env.CLERK_SECRET_KEY,
+        })
+      : await updateAccountEmailFromClerk(db, {
+          clerkUserId: c.get('user').userId,
+          requestedEmail: parsed.data.email,
+          clerkSecretKey: c.env.CLERK_SECRET_KEY,
+        });
 
     return c.json(
       accountEmailUpdateResponseSchema.parse({ email: updated.email }),
@@ -177,6 +190,36 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
           timestamp: new Date().toISOString(),
         },
       });
+
+      // [orphan-schedule] scheduledNow === false means a prior schedule already
+      // existed when this request ran. We re-dispatched the core handoff above
+      // (idempotent) to recover a possible orphan — a schedule whose DB write
+      // succeeded but whose durable Inngest job never queued (e.g. a prior
+      // dispatch failed and skipped rollback). That recovery would otherwise be
+      // invisible, so surface it as a tracked Sentry signal. captureMessage —
+      // not a new Inngest event — because this is pure observability with no
+      // consumer: a producer-only event would be an orphan dispatch (the
+      // orphan-dispatcher guard rejects it) and would only land in the event
+      // store that nothing reads.
+      if (!scheduledNow) {
+        // Fault-isolated: this signal is pure observability and must never
+        // affect the user's deletion. Without its own try/catch, a Sentry SDK
+        // throw would be caught by the outer catch below and — because the
+        // rollback path only fires when scheduledNow === true — convert a
+        // successfully (re-)dispatched schedule into a 503.
+        try {
+          captureMessage('account.deletion orphan schedule re-dispatched', {
+            level: 'warning',
+            extra: {
+              surface: 'account.deletion.orphan_recovered',
+              accountId: account.id,
+              identityVersion: v2 ? 'v2' : 'v1',
+            },
+          });
+        } catch {
+          // Observability failure is non-fatal; swallow it.
+        }
+      }
     } catch (error) {
       captureException(error, {
         extra: {

@@ -29,6 +29,7 @@ export const FEATURE_FLAGS = {
 
   MODE_NAV_V0_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV === 'true',
   MODE_NAV_V1_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V1 === 'true',
+  MODE_NAV_V2_ENABLED: process.env.EXPO_PUBLIC_ENABLE_MODE_NAV_V2 === 'true',
 
   // [OPT-C] Independent adult-owner gate flag — toggles the 18+ requirement
   // for a parent creating a child profile. Defense-in-depth: paired with the

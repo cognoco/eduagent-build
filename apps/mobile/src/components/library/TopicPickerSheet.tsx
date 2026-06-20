@@ -57,49 +57,74 @@ export function TopicPickerSheet({
             {t('library.chooseTopic')}
           </Text>
 
-          <ScrollView
-            style={{ maxHeight: 320 }}
-            showsVerticalScrollIndicator={false}
-          >
-            {topics.map((topic) => {
-              const isSelected = topic.topicId === defaultTopicId;
-              return (
-                <Pressable
-                  key={topic.topicId}
-                  testID={`topic-picker-${topic.topicId}`}
-                  onPress={() => onSelect(topic.topicId)}
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    topic.chapter
-                      ? `${topic.name}, ${topic.chapter}`
-                      : topic.name
-                  }
-                  accessibilityState={{ selected: isSelected }}
-                  className="rounded-card px-4 py-3 mb-2"
-                  style={{
-                    backgroundColor: isSelected
-                      ? colors.primarySoft
-                      : colors.surface,
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 15 }}
-                    className="font-semibold text-text-primary"
+          {topics.length === 0 ? (
+            <View className="items-center py-6" testID="topic-picker-empty">
+              <Text className="text-body font-semibold text-text-primary text-center">
+                {t('library.topicPickerEmptyTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary text-center mt-2">
+                {t('library.topicPickerEmptyDescription')}
+              </Text>
+              <Pressable
+                onPress={onClose}
+                className="mt-5 min-h-[44px] rounded-button bg-primary px-5 py-3 items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('common.close')}
+                testID="topic-picker-empty-close"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('common.close')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView
+              style={{ maxHeight: 320 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {topics.map((topic) => {
+                const isSelected = topic.topicId === defaultTopicId;
+                return (
+                  <Pressable
+                    key={topic.topicId}
+                    testID={`topic-picker-${topic.topicId}`}
+                    onPress={() => onSelect(topic.topicId)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      topic.chapter
+                        ? t('library.topicPicker.a11yTopicWithChapter', {
+                            name: topic.name,
+                            chapter: topic.chapter,
+                          })
+                        : topic.name
+                    }
+                    accessibilityState={{ selected: isSelected }}
+                    className="rounded-card px-4 py-3 mb-2"
+                    style={{
+                      backgroundColor: isSelected
+                        ? colors.primarySoft
+                        : colors.surface,
+                    }}
                   >
-                    {topic.name}
-                  </Text>
-                  {topic.chapter !== null && (
                     <Text
-                      style={{ fontSize: 12 }}
-                      className="text-text-secondary mt-1"
+                      style={{ fontSize: 15 }}
+                      className="font-semibold text-text-primary"
                     >
-                      {topic.chapter}
+                      {topic.name}
                     </Text>
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                    {topic.chapter !== null && (
+                      <Text
+                        style={{ fontSize: 12 }}
+                        className="text-text-secondary mt-1"
+                      >
+                        {topic.chapter}
+                      </Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
         </Pressable>
       </Pressable>
     </Modal>

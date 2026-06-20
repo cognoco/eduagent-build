@@ -127,6 +127,16 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
 
+function birthDateOneDayYoungerThanMinimumAge(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear() - 13, now.getMonth(), now.getDate() + 1);
+}
+
+function birthDateAtMinimumAge(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear() - 13, now.getMonth(), now.getDate());
+}
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -220,9 +230,9 @@ describe('CreateProfileScreen', () => {
       ).toBeNull();
     });
 
-    it('shows minimum age 11 hint up front', () => {
+    it('shows minimum age 13 hint up front', () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
-      screen.getByText(/Minimum age is 11/);
+      screen.getByText(/Minimum age is 13/);
     });
 
     it('uses "Tell us about your child" as the page title', () => {
@@ -240,7 +250,7 @@ describe('CreateProfileScreen', () => {
     });
   });
 
-  it('uses child-referent copy when opened with ?for=child even before parent state resolves', () => {
+  it('[QA-08] uses child-referent copy when opened with ?for=child even before parent state resolves', () => {
     mockSearchParams = { for: 'child' };
 
     render(<CreateProfileScreen />, { wrapper: Wrapper });
@@ -411,7 +421,7 @@ describe('CreateProfileScreen', () => {
       accountId: 'a1',
       displayName: 'Kid',
       avatarUrl: null,
-      birthYear: 2014,
+      birthYear: birthDateAtMinimumAge().getFullYear(),
       location: null,
       isOwner: false,
       hasPremiumLlm: false,
@@ -428,10 +438,10 @@ describe('CreateProfileScreen', () => {
 
     fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
 
-    // Open date picker and select a date (12-year-old → consent required)
+    // Open date picker and select a 13-year-old date → consent required.
     fireEvent.press(screen.getByTestId('create-profile-birthdate'));
     await act(() => {
-      datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+      datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
     });
 
     fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -493,6 +503,27 @@ describe('CreateProfileScreen', () => {
     await waitFor(() => {
       screen.getByTestId('create-profile-error');
     });
+  });
+
+  it('[age-floor] shows specific error and does not POST when the learner is under 13 by exact birth date', async () => {
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Zuzka');
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.(
+        { type: 'set' },
+        birthDateOneDayYoungerThanMinimumAge(),
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    screen.getByText(
+      'Learners must be at least 13 years old. Please choose an earlier birth date.',
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
   });
 
   // [BUG-947] 402 PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.
@@ -603,6 +634,56 @@ describe('CreateProfileScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
 
     // No inline error banner — alert is the surface.
+    expect(screen.queryByTestId('create-profile-error')).toBeNull();
+  });
+
+  // [WI-824] ACCOUNT-05/35 coverage gap: the existing BUG-947 test exercises the
+  // default (isAddingChild=false / solo first-profile) path. This test covers the
+  // isAddingChild=true path (?for=child param) so the same upgrade-alert branch is
+  // verified for parent-adds-child flows opened via create-profile.tsx.
+  // The catch block is shared, so this is defense-in-depth rather than a new code
+  // path, but it anchors the ?for=child entry point explicitly.
+  it('[WI-824] surfaces upgrade alert on PROFILE_LIMIT_EXCEEDED when opened with ?for=child', async () => {
+    mockSearchParams = { for: 'child' };
+    const upgradeMessage =
+      'Your subscription does not support additional profiles. Please upgrade to Family or Pro.';
+    const { UpstreamError } = require('../lib/api-errors');
+    mockFetch.mockImplementationOnce(() => {
+      throw new UpstreamError(upgradeMessage, 'PROFILE_LIMIT_EXCEEDED', 402);
+    });
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('create-profile-name'),
+      'Test Child',
+    );
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2013, 4, 1));
+    });
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+    });
+
+    const alertCall = (Alert.alert as jest.Mock).mock.calls[0];
+    expect(alertCall[0]).toBe('Upgrade required');
+    expect(alertCall[1]).toBe(upgradeMessage);
+    const buttons = alertCall[2] as Array<{
+      text?: string;
+      style?: string;
+      onPress?: () => void;
+    }>;
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]?.text).toBe('Not now');
+    expect(buttons[0]?.style).toBe('cancel');
+    expect(buttons[1]?.text).toBe('See plans');
+
+    buttons[1]?.onPress?.();
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
+
     expect(screen.queryByTestId('create-profile-error')).toBeNull();
   });
 
@@ -1118,7 +1199,7 @@ describe('CreateProfileScreen', () => {
       accountId: 'a1',
       displayName: 'Lily',
       avatarUrl: null,
-      birthYear: 2014,
+      birthYear: birthDateAtMinimumAge().getFullYear(),
       location: null,
       isOwner: false,
       hasPremiumLlm: false,
@@ -1135,7 +1216,7 @@ describe('CreateProfileScreen', () => {
       });
     });
 
-    it('shows confirmation alert and does NOT switch profile when parent adds child', async () => {
+    it('[QA-08] shows confirmation alert and does NOT switch profile when parent adds child', async () => {
       mockFetch.mockResolvedValueOnce(
         new Response(JSON.stringify({ profile: childProfile }), {
           status: 200,
@@ -1147,7 +1228,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1184,7 +1265,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1208,7 +1289,7 @@ describe('CreateProfileScreen', () => {
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Lily');
       fireEvent.press(screen.getByTestId('create-profile-birthdate'));
       await act(() => {
-        datePickerOnChange?.({ type: 'set' }, new Date(2014, 5, 15));
+        datePickerOnChange?.({ type: 'set' }, birthDateAtMinimumAge());
       });
 
       fireEvent.press(screen.getByTestId('create-profile-submit'));
@@ -1424,6 +1505,18 @@ describe('CreateProfileScreen', () => {
       expect(screen.queryByTestId('create-profile-intent-picker')).toBeNull();
     });
 
+    it('parent audience asks for the adult account holder, not the learner', () => {
+      mockAudience = 'parent';
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByText('Tell us about you');
+      screen.getByText('Your display name');
+      screen.getByText('Your birth date');
+      screen.getByText(/You can add your child next/);
+      expect(screen.queryByText("Who's the learner?")).toBeNull();
+    });
+
     it('enables submit for an adult first-profile with no intent tap', async () => {
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
@@ -1513,16 +1606,8 @@ describe('CreateProfileScreen', () => {
       });
     });
 
-    it('parent audience with a minor birth date: falls back to solo (no PATCH, no redirect)', async () => {
+    it('parent audience with a minor birth date: shows adult-account error and does not create a solo learner', async () => {
       mockAudience = 'parent';
-      const minorOwner = {
-        ...adultOwner,
-        id: 'minor-id',
-        birthYear: 2014,
-      };
-      mockFetch.mockResolvedValueOnce(
-        new Response(JSON.stringify({ profile: minorOwner }), { status: 200 }),
-      );
 
       render(<CreateProfileScreen />, { wrapper: Wrapper });
       fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Kid');
@@ -1532,11 +1617,11 @@ describe('CreateProfileScreen', () => {
       });
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalled();
-      });
-      // A minor cannot guardian — no family PATCH, no add-child redirect.
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      screen.getByText(
+        'Parent accounts need an adult birth date. Enter your own details first, then add your child next.',
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(mockSwitchProfile).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalledWith({
         pathname: '/create-profile',
         params: { for: 'child' },

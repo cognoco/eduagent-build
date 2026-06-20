@@ -4,6 +4,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 import { useNotifyParentChildCap } from '../../hooks/use-child-cap-notifications';
+import { useThemeColors } from '../../lib/theme';
 
 export interface QuotaExceededCardProps {
   details: QuotaExceededDetails;
@@ -21,6 +22,7 @@ export function QuotaExceededCard({
 }: QuotaExceededCardProps): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const notifyParent = useNotifyParentChildCap();
   const [notifyState, setNotifyState] = useState<
     'idle' | 'sending' | 'sent' | 'failed'
@@ -139,7 +141,7 @@ export function QuotaExceededCard({
           >
             {notifyState === 'sending' ? (
               <ActivityIndicator
-                color="white"
+                color={colors.textInverse}
                 accessibilityLabel={t('common.loading')}
               />
             ) : (

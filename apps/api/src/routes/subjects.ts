@@ -30,6 +30,7 @@ import {
   deleteSubject,
   retryCurriculumForSubject,
   SubjectNotLanguageLearningError,
+  SubjectLimitError,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
@@ -37,9 +38,14 @@ import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile } from '../route-utils/route-context';
+import { isIdentityV2Enabled } from '../config';
 
 type SubjectRouteEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    IDENTITY_V2_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -105,12 +111,30 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
     // as generic 500s, making them invisible in Sentry.
     // i18n Phase 1 — thread conversation_language into subject-structure LLM.
     const subjectProfileMeta = c.get('profileMeta');
-    const result = await createSubjectWithStructure(db, profileId, input, {
-      conversationLanguage: parseConversationLanguage(
-        subjectProfileMeta?.conversationLanguage,
-      ),
-    });
-    return c.json(createSubjectWithStructureResponseSchema.parse(result), 201);
+    try {
+      const result = await createSubjectWithStructure(db, profileId, input, {
+        conversationLanguage: parseConversationLanguage(
+          subjectProfileMeta?.conversationLanguage,
+        ),
+        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+      });
+      return c.json(
+        createSubjectWithStructureResponseSchema.parse(result),
+        201,
+      );
+    } catch (err) {
+      // [WI-855 / SUBJECT-20] Typed code replaces the old message regex on
+      // mobile. 409 Conflict: a flat per-profile hard cap, not a payment gate.
+      if (err instanceof SubjectLimitError) {
+        return apiError(
+          c,
+          409,
+          ERROR_CODES.SUBJECT_LIMIT_EXCEEDED,
+          err.message,
+        );
+      }
+      throw err;
+    }
   })
   .put(
     '/subjects/:id/language-setup',

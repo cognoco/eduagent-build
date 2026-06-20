@@ -41,6 +41,7 @@ import {
 } from './language-curriculum';
 import { createLogger } from './logger';
 import { getProfileAge } from './profile';
+import { getPersonAge } from './identity-v2/helpers';
 import { setNativeLanguage } from './retention-data';
 import { safeSend } from './safe-non-core';
 
@@ -57,6 +58,69 @@ export class SubjectNotLanguageLearningError extends Error {
     super('Subject is not configured for language learning');
     this.name = 'SubjectNotLanguageLearningError';
   }
+}
+
+/**
+ * [WI-855 / SUBJECT-20] Thrown when a profile is at the hard subject cap and the
+ * request would create a net-new subject. The route maps this to HTTP 409
+ * Conflict with the stable `SUBJECT_LIMIT_EXCEEDED` code (see ERROR_CODES) so
+ * mobile branches on the typed code instead of regexing the message.
+ *
+ * PRD (docs/PRD.md "Subject Limits") defines TWO limits:
+ *  - Soft limit (10 active): a non-blocking prompt/override flow — OUT OF SCOPE
+ *    here, tracked as a separate WI.
+ *  - Hard limit (25 total active+paused+archived): the BLOCKING gate this class
+ *    enforces — "Must archive or delete before creating new".
+ */
+export class SubjectLimitError extends Error {
+  constructor(
+    message = 'You have reached the maximum number of subjects. Delete or archive one before creating a new subject.',
+  ) {
+    super(message);
+    this.name = 'SubjectLimitError';
+  }
+}
+
+/**
+ * [WI-855] PRD hard limit: 25 total subjects per profile across ALL statuses
+ * (active + paused + archived). The soft limit (10 active) is a separate,
+ * non-blocking prompt and is intentionally not enforced here.
+ */
+export const MAX_TOTAL_SUBJECTS = 25;
+
+/**
+ * [WI-855] Single normalization path for "is this row the same subject as the
+ * requested name?" — used by BOTH the hard-limit reuse-exemption and
+ * `findExistingSubjectByName` so the two can never drift (the
+ * findExistingSubjectByName SQL is `LOWER(name) = LOWER(:name)` over the
+ * trimmed input). Keeping one helper avoids the gate silently blocking valid
+ * reuses (or permitting net-new inserts at the cap) if normalization changes.
+ */
+function subjectNameMatches(rowName: string, inputName: string): boolean {
+  return rowName.toLowerCase() === inputName.trim().toLowerCase();
+}
+
+/**
+ * [WI-855] Authoritative hard-cap assertion: counts ALL subjects for the
+ * profile and throws `SubjectLimitError` when a net-new insert would breach
+ * `MAX_TOTAL_SUBJECTS`. MUST be called while holding the per-profile cap
+ * advisory lock so two concurrent creates cannot both pass a stale count and
+ * each insert (the TOCTOU the cheap pre-check alone cannot close).
+ */
+async function assertSubjectCapNotReached(
+  db: Database,
+  profileId: string,
+): Promise<void> {
+  const repo = createScopedRepository(db, profileId);
+  const all = await repo.subjects.findMany();
+  if (all.length >= MAX_TOTAL_SUBJECTS) {
+    throw new SubjectLimitError();
+  }
+}
+
+/** Advisory-lock key serialising all net-new subject inserts for a profile. */
+function subjectCapLockKey(profileId: string): string {
+  return `subject-cap:${profileId}`;
 }
 
 const logger = createLogger();
@@ -232,6 +296,16 @@ export async function createSubject(
   db: Database,
   profileId: string,
   input: SubjectCreateInput,
+  options?: {
+    /**
+     * [WI-855] When true the caller already holds the per-profile cap advisory
+     * lock inside an open transaction (the focused-book path), so this function
+     * must NOT open its own transaction/lock — it only re-asserts the cap and
+     * inserts on the passed-in `db`/`tx`. When false/omitted, this function
+     * opens its own cap-locked transaction (broad / narrow / language paths).
+     */
+    alreadyCapLocked?: boolean;
+  },
 ): Promise<Subject> {
   const detectedLanguage =
     input.pedagogyMode === 'four_strands' && input.languageCode
@@ -241,20 +315,40 @@ export async function createSubject(
         }
       : await detectLanguageSubject(input.rawInput ?? input.name);
 
-  const [row] = await db
-    .insert(subjects)
-    .values({
-      profileId,
-      name: input.name,
-      rawInput: input.rawInput ?? null,
-      status: 'active',
-      pedagogyMode:
-        detectedLanguage?.pedagogyMode ?? input.pedagogyMode ?? 'socratic',
-      languageCode: detectedLanguage?.code ?? input.languageCode ?? null,
-    })
-    .returning();
-  if (!row) throw new Error('Insert subject did not return a row');
-  return mapSubjectRow(row);
+  const insertRow = async (txDb: Database): Promise<Subject> => {
+    const [row] = await txDb
+      .insert(subjects)
+      .values({
+        profileId,
+        name: input.name,
+        rawInput: input.rawInput ?? null,
+        status: 'active',
+        pedagogyMode:
+          detectedLanguage?.pedagogyMode ?? input.pedagogyMode ?? 'socratic',
+        languageCode: detectedLanguage?.code ?? input.languageCode ?? null,
+      })
+      .returning();
+    if (!row) throw new Error('Insert subject did not return a row');
+    return mapSubjectRow(row);
+  };
+
+  // [WI-855] Caller already holds the cap lock + has re-asserted the cap inside
+  // its transaction — just insert on the provided handle.
+  if (options?.alreadyCapLocked) {
+    return insertRow(db);
+  }
+
+  // [WI-855] Net-new insert paths (broad / narrow / language): take the
+  // per-profile cap lock, re-assert the count under it, then insert — closing
+  // the TOCTOU window where two concurrent creates both pass a stale count.
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${subjectCapLockKey(profileId)}))`,
+    );
+    await assertSubjectCapNotReached(txDb, profileId);
+    return insertRow(txDb);
+  });
 }
 
 export interface CreatedSubjectWithStructure {
@@ -318,7 +412,10 @@ export async function createSubjectWithStructure(
   db: Database,
   profileId: string,
   input: SubjectCreateInput,
-  options?: { conversationLanguage?: ConversationLanguage },
+  options?: {
+    conversationLanguage?: ConversationLanguage;
+    identityV2Enabled?: boolean;
+  },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),
   // the rawInput IS the focus even if the client didn't send it explicitly.
@@ -329,6 +426,32 @@ export async function createSubjectWithStructure(
       ? input.rawInput
       : undefined);
   const effectiveFocusDescription = input.focusDescription ?? undefined;
+
+  // [WI-855 / SUBJECT-20] Hard-limit gate (PRD: 25 total subjects across all
+  // statuses: active + paused + archived). This is a CHEAP PRE-CHECK that
+  // fast-paths the obvious over-cap case before any LLM/structure work. The
+  // AUTHORITATIVE, race-free enforcement happens under the per-profile cap
+  // advisory lock at the actual insert (createSubject / the focused-book
+  // net-new branch) — see assertSubjectCapNotReached. Two concurrent creates
+  // can both pass THIS pre-check, but only one passes the in-lock re-count.
+  //
+  // Exemption: the focused-book path (effectiveFocus set) re-uses an existing
+  // active same-name subject via findExistingSubjectByName, inserting NO net-new
+  // subject row — so it is allowed even at the cap. Every other path (broad,
+  // narrow, language) always inserts a new subject, so no exemption applies.
+  const repo = createScopedRepository(db, profileId);
+  const allSubjects = await repo.subjects.findMany();
+  if (allSubjects.length >= MAX_TOTAL_SUBJECTS) {
+    const reusesExistingSubject =
+      effectiveFocus !== undefined &&
+      allSubjects.some(
+        (row) =>
+          row.status === 'active' && subjectNameMatches(row.name, input.name),
+      );
+    if (!reusesExistingSubject) {
+      throw new SubjectLimitError();
+    }
+  }
 
   // Focused book path: input combines a broad subject with a specific focus area
   if (effectiveFocus) {
@@ -344,12 +467,26 @@ export async function createSubjectWithStructure(
         profileId,
         normalizedSubjectName,
       );
-      return (
-        existingSubject ??
-        (await createSubject(txDb, profileId, {
+      if (existingSubject) {
+        // Reuse — no net-new row, so the cap does not apply.
+        return existingSubject;
+      }
+      // [WI-855] Net-new focused subject: take the per-profile cap lock and
+      // re-assert the count under it (authoritative, race-free), then insert.
+      // createSubject is told the cap lock is already held so it does not open
+      // a nested transaction.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${subjectCapLockKey(profileId)}))`,
+      );
+      await assertSubjectCapNotReached(txDb, profileId);
+      return createSubject(
+        txDb,
+        profileId,
+        {
           name: normalizedSubjectName,
           rawInput: input.rawInput,
-        }))
+        },
+        { alreadyCapLocked: true },
       );
     });
 
@@ -436,7 +573,9 @@ export async function createSubjectWithStructure(
     };
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
+  const learnerAge = options?.identityV2Enabled
+    ? await getPersonAge(db, profileId)
+    : await getProfileAge(db, profileId);
   const { detectSubjectType } = await import('./book-generation');
   const subject = await createSubject(db, profileId, input);
   let classificationFailed = false;

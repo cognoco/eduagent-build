@@ -22,6 +22,7 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
+import { computeAgeBracket, type AgeBracket } from '@eduagent/schemas';
 
 /**
  * (ii) The owner person id for an organization — membership with the 'admin'
@@ -97,6 +98,20 @@ export async function getPersonAge(
   const birthYear = await getPersonBirthYear(db, profileId);
   const currentYear = new Date().getUTCFullYear();
   return birthYear ? Math.max(5, currentYear - birthYear) : 12;
+}
+
+/**
+ * (iii-bracket) The AgeBracket for a person — the v2 `getProfileAgeBracket`
+ * replacement (reads person.birth_date instead of profiles.birth_year). Mirrors
+ * the legacy default exactly: returns 'adult' (the conservative minor-safe
+ * default) when the person / birthYear is absent.
+ */
+export async function getPersonAgeBracket(
+  db: Database,
+  profileId: string,
+): Promise<AgeBracket> {
+  const birthYear = await getPersonBirthYear(db, profileId);
+  return birthYear ? computeAgeBracket(birthYear) : 'adult';
 }
 
 /**

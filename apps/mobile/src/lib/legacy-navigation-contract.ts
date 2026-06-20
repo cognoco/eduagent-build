@@ -39,11 +39,13 @@ export type LegacyTabShape = 'guardian' | 'learner';
 
 export type ShellHomeTabPresentation = {
   titleKey:
+    | 'tabs.mentor'
     | 'tabs.children'
     | 'tabs.familyHub'
     | 'tabs.home'
     | 'tabs.myLearning';
   accessibilityLabelKey:
+    | 'tabs.mentorLabel'
     | 'tabs.childrenLabel'
     | 'tabs.familyHubLabel'
     | 'tabs.homeLabel'

@@ -36,9 +36,19 @@ const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
 const mockTabs = Object.assign(
-  ({ children }: { children?: React.ReactNode }) => {
+  ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    screenOptions?: unknown;
+  }) => {
     const { View } = require('react-native');
-    return <View testID="tabs">{children}</View>;
+    return (
+      <View testID="tabs" {...props}>
+        {children}
+      </View>
+    );
   },
   {
     Screen: () => null,
@@ -55,8 +65,9 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: mockReplace }),
 }));
 
+let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -175,6 +186,7 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
+const { HIDDEN_TAB_ROUTES } = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
@@ -289,6 +301,7 @@ describe('AppLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -846,6 +859,41 @@ describe('AppLayout', () => {
     screen.getByText('The profile you were viewing has been removed.');
   });
 
+  it('keeps v2 top and bottom chrome outside system navigation overlays when reported insets are zero', async () => {
+    const flags = require('../../lib/feature-flags') as {
+      FEATURE_FLAGS: { MODE_NAV_V2_ENABLED: boolean };
+    };
+    const original = flags.FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    try {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = true;
+      mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+      renderLayout();
+
+      expect(await screen.findByTestId('account-avatar-shell')).toHaveStyle({
+        top: 32,
+      });
+      const tabs = await screen.findByTestId('tabs');
+      const screenOptions = tabs.props.screenOptions as ({
+        route,
+      }: {
+        route: { name: string };
+      }) => { tabBarStyle: { height?: number; paddingBottom?: number } };
+      expect(screenOptions({ route: { name: 'mentor' } }).tabBarStyle).toEqual(
+        expect.objectContaining({
+          height: 104,
+          paddingBottom: 48,
+        }),
+      );
+    } finally {
+      (
+        flags.FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+      ).MODE_NAV_V2_ENABLED = original;
+    }
+  });
+
   it('shows proxy banner and switches back to the owner profile', async () => {
     const switchProfile = jest.fn();
     mockUseProfile.mockReturnValue({
@@ -1372,6 +1420,44 @@ describe('computeVisibleTabs', () => {
     const tabs = computeVisibleTabs('learner', true);
     expect(tabs).toEqual(new Set(['home', 'library', 'progress']));
     expect(tabs.has('more')).toBe(false);
+  });
+});
+
+// [QA-07 / WI-860] Tab-bar leak regression (Bug 763). Dynamic / nested-layout
+// routes (shelf/[subjectId], subject/[subjectId], pick-book/[subjectId],
+// child/[profileId], etc.) are auto-discovered by Expo Router on web and can
+// surface in the tab bar / debug-link list as /shelf/undefined,
+// /subject/undefined, etc. The belt-and-braces guard is an explicit
+// `<Tabs.Screen name={route} options={{ href: null }} />` per non-tab route,
+// driven by the HIDDEN_TAB_ROUTES list. This asserts the load-bearing dynamic
+// routes from Bug 763 are members of that list so they cannot leak.
+describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
+  it('hides every dynamic / non-tab route that Bug 763 surfaced into the tab bar', () => {
+    const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
+    for (const route of [
+      'shelf',
+      'subject',
+      'subject-hub',
+      'pick-book',
+      'child',
+      'session',
+      'quiz',
+      'homework',
+      'dictation',
+      'practice',
+      'vocabulary',
+      'topic',
+      'my-notes',
+    ]) {
+      expect(hidden.has(route)).toBe(true);
+    }
+  });
+
+  it('does not list any of the five real tab routes as hidden', () => {
+    const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
+    for (const tab of ['home', 'own-learning', 'library', 'progress', 'more']) {
+      expect(hidden.has(tab)).toBe(false);
+    }
   });
 });
 

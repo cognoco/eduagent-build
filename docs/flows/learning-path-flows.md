@@ -6,7 +6,7 @@ Complete, code-true trace of every learning path in MentoMate — from the first
 >
 > **Correction pass (2026-06-09).** A follow-up 14-agent re-verification corrected the topic-probe failure semantics (Path 0), the `needs_deepening_topics` writer set (Notes / Path 5), the recall-test inbound path (Path 5), the Assessment create endpoint, the freeform overlay-eligibility row, the completion dispatch-site count, and added several previously-missing entry surfaces and branches. Each correction is flagged inline with a **[was: …]** note.
 >
-> **Correction pass (2026-06-11).** Applied the learning-flow simplification deepdive patch list and first small implementation slice: review SM-2 calibration is live-but-not-guaranteed, Challenge drafted-note save is not guarded today, Recall Bridge is skip-path-only, `gap_fill` has dedicated chrome, topicless note prompts are suppressed, quiz completion queues a persistent celebration, locked Assessment is non-pressable, recitation skips the filing wait, and the home subject carousel opens the shelf. Each correction is flagged inline where it replaces a stale claim.
+> **Correction pass (2026-06-11).** Applied the learning-flow simplification deepdive patch list and first small implementation slice: review SM-2 calibration is live-but-not-guaranteed, the Challenge drafted note is grounding-checked by `validateNoteDraft` server-side at emission (`buildValidatedDraft`, `session-exchange.ts:556`) [corrected 2026-06-20 WI-864 — was "drafted-note save is not guarded today"], Recall Bridge is skip-path-only, `gap_fill` has dedicated chrome, topicless note prompts are suppressed, quiz completion queues a persistent celebration, locked Assessment is non-pressable, recitation skips the filing wait, and the home subject carousel opens the shelf. Each correction is flagged inline where it replaces a stale claim.
 
 ---
 
@@ -505,8 +505,10 @@ Finalize (decideMasteryAndReview):
   │   [recorded via INSERT, not UPDATE]
   ├─ partial/misconception → needs_deepening_topics (source 'challenge_round', 7-day expiry)
   ├─ all missing → reteach (no mastery)
-  └─ solid evidence → DraftedNoteReview (intended lexical-overlap guard exists, but the
-     current save route does not call `validateNoteDraft`; do not treat Save as guarded)
+  └─ solid evidence → server finalization (`buildValidatedDraft`, `session-exchange.ts:556`)
+     runs `validateNoteDraft()` BEFORE emitting the drafted note; on grounding failure it
+     falls back to a `body:null` + `fallbackPrompt` write-your-own draft (`:562`), and only
+     emits the LLM-authored `body` when validation passes (`:572`) → DraftedNoteReview
 ```
 
 - **LLM rung floor IS in source** (`resolveChallengeRoundLlmRoutingRung`, `session-exchange.ts:260-275`) — floors accepted/active/drafting turns to the advanced rung. [CLAUDE.md says "mechanism planned, not yet in source" — that note is stale.]
@@ -548,10 +550,10 @@ Notes are topic-bound. All four creation routes converge on `topic_notes` via `i
 1. **Manual note** — "Add note" tool chip (shows in `teaching` stage, not topic-gated) → `NoteInput` → `POST /subjects/:s/topics/:t/notes`.
 2. **LLM `note_prompt`** — `ui_hints.note_prompt.show` renders a "Write note" affordance only when `topicId` is present; `.post_session` opens `NoteInput` near session end under the same topic gate. Emitted for all non-recitation sessions, but topicless sessions suppress the CTA.
 3. **Reflection auto-note** — "Your Words" reflection is copied verbatim into a topic note when `session.topicId` is set (cap conflict non-fatal).
-4. **Challenge drafted note** — LLM-authored from solid answers only. `validateNoteDraft()` exists and is used in the Challenge signal path, but the current note-save route does not call it before `DraftedNoteReview` Save/Skip [was: save was described as guarded].
+4. **Challenge drafted note** — LLM-authored from solid answers only. Server finalization (`buildValidatedDraft`, `session-exchange.ts:556`) runs `validateNoteDraft()` on the LLM draft BEFORE emitting it; if grounding fails (or any source answer is not solid) it emits a `body:null` + `fallbackPrompt` write-your-own draft instead (`:562`). So the drafted note that reaches `DraftedNoteReview` is already grounding-checked at emission time. The downstream client note-save route (`notes.ts`) does not itself re-run the guard — it persists the already-validated draft text [was: "save was described as guarded" → "save route does not call validateNoteDraft" — both stale; the guard runs server-side at emission, `session-exchange.ts:556`].
 
 ### Corrections
-- **There is NO LLM review of a learner-authored note.** The only LLM evaluation nearby is `evaluateSummary()` on the *reflection* (route 3's source text), which gates reflection-bonus XP and "Mate feedback". The Challenge draft (route 4) is LLM *authoring*; its deterministic guard exists but is not wired into the current save route.
+- **There is NO LLM review of a learner-authored note.** The only LLM evaluation nearby is `evaluateSummary()` on the *reflection* (route 3's source text), which gates reflection-bonus XP and "Mate feedback". The Challenge draft (route 4) is LLM *authoring*; its deterministic lexical-overlap guard (`validateNoteDraft`) IS wired in — at the server emission point (`buildValidatedDraft`, `session-exchange.ts:556`), before the draft is ever sent to the client, with a `body:null` write-your-own fallback when it rejects [was: "deterministic guard exists but is not wired into the current save route" — stale; the guard runs server-side at emission].
 - **Freeform topicless notes are CTA-suppressed** — the prompt signal can arrive, but `SessionFooter` suppresses both the CTA and editor when `topicId` is missing [was: save-time alert].
 - **`signals.needs_deepening` does NOT write a `needs_deepening_topics` row** — it is stored only in `session_events.metadata.needsDeepening` (telemetry). There are **two** production writers of `needs_deepening_topics`: the Challenge Round (`source='challenge_round'`, `challenge-round/persistence.ts:254` / `session-exchange.ts:777`) and the **relearn flow** (`retention-data.ts:1104-1109`, no explicit source → schema default `source='system_signal'`) [was: "the only writer is the Challenge Round; the `system_signal` default is unused" — refuted; the relearn path relies on the `system_signal` default].
 

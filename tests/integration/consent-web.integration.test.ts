@@ -6,9 +6,18 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { consentStates, profiles } from '@eduagent/database';
+import {
+  consentRequest,
+  consentStates,
+  person,
+  profiles,
+} from '@eduagent/database';
 
-import { buildIntegrationEnv, cleanupAccounts } from './helpers';
+import {
+  buildIntegrationEnv,
+  cleanupAccounts,
+  isIdentityV2Enabled,
+} from './helpers';
 import {
   createProfileViaRoute,
   getIntegrationDb,
@@ -33,7 +42,7 @@ function postConfirm(body: Record<string, string>) {
       },
       body: new URLSearchParams(body).toString(),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 }
 
@@ -52,6 +61,36 @@ async function createProfileWithConsentToken(token: string) {
   });
 
   return profile.id;
+}
+
+async function readConsentState(profileId: string) {
+  const db = getIntegrationDb();
+  if (isIdentityV2Enabled()) {
+    const request = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, profileId),
+    });
+    if (!request) return undefined;
+    return {
+      status:
+        request.status === 'approved'
+          ? 'CONSENTED'
+          : request.status === 'denied'
+            ? 'DENIED'
+            : 'PARENTAL_CONSENT_REQUESTED',
+      respondedAt: request.respondedAt,
+    };
+  }
+
+  return db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, profileId),
+  });
+}
+
+async function readProfileRecord(profileId: string) {
+  const db = getIntegrationDb();
+  return isIdentityV2Enabled()
+    ? db.query.person.findFirst({ where: eq(person.id, profileId) })
+    : db.query.profiles.findFirst({ where: eq(profiles.id, profileId) });
 }
 
 beforeEach(async () => {
@@ -82,7 +121,7 @@ describe('Integration: GET /v1/consent-page', () => {
     const res = await app.request(
       '/v1/consent-page?token=invalid-token',
       {},
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -96,17 +135,17 @@ describe('Integration: GET /v1/consent-page', () => {
     const res = await app.request(
       '/v1/consent-page?token=valid-token',
       {},
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
     expect(res.headers.get('x-frame-options')).toBe('DENY');
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
     expect(res.headers.get('referrer-policy')).toBe(
-      'strict-origin-when-cross-origin'
+      'strict-origin-when-cross-origin',
     );
     expect(res.headers.get('content-security-policy')).toContain(
-      "script-src 'none'"
+      "script-src 'none'",
     );
 
     const html = await res.text();
@@ -124,7 +163,7 @@ describe('Integration: GET /v1/consent-page/deny-confirm', () => {
     const res = await app.request(
       '/v1/consent-page/deny-confirm',
       {},
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -137,7 +176,7 @@ describe('Integration: GET /v1/consent-page/deny-confirm', () => {
     const res = await app.request(
       '/v1/consent-page/deny-confirm?token=deny-token',
       {},
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -175,13 +214,8 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
     expect(html).toContain('mentomate://home');
     expect(html).toContain('mentomate://onboarding');
 
-    const db = getIntegrationDb();
-    const consent = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, profileId),
-    });
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-    });
+    const consent = await readConsentState(profileId);
+    const profile = await readProfileRecord(profileId);
 
     expect(consent?.status).toBe('CONSENTED');
     expect(consent?.respondedAt).not.toBeNull();
@@ -201,13 +235,8 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Consent declined');
     expect(html).toContain("Emma's account will be removed");
 
-    const db = getIntegrationDb();
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-    });
-    const consent = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, profileId),
-    });
+    const profile = await readProfileRecord(profileId);
+    const consent = await readConsentState(profileId);
 
     expect(profile).toBeUndefined();
     expect(consent).toBeUndefined();

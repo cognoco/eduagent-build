@@ -200,7 +200,7 @@ export default function SessionDetailScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
         >
-          <Ionicons name="arrow-back" size={24} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
 
         <Text className="text-text-primary text-xl font-bold">
@@ -355,7 +355,10 @@ export default function SessionDetailScreen() {
       <View className="mx-4 mt-4">
         <AddToMyLearningButton
           childProfileId={profileId ?? ''}
-          childDisplayName={childDetailQuery.data?.displayName ?? 'your child'}
+          childDisplayName={
+            childDetailQuery.data?.displayName ??
+            t('parentView.index.yourChild')
+          }
           subjectName={session.subjectName}
           topicId={session.topicId}
           topicTitle={session.topicTitle}

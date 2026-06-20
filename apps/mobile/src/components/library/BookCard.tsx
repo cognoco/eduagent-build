@@ -66,7 +66,11 @@ export function BookCard({
           : undefined
       }
       accessibilityRole="button"
-      accessibilityLabel={`${book.title}. ${statusLabel}. ${progressLabel}.`}
+      accessibilityLabel={t('library.bookCard.a11y', {
+        title: book.title,
+        status: statusLabel,
+        progress: progressLabel,
+      })}
       testID={`book-card-${book.id}`}
     >
       <View className="flex-row items-start">

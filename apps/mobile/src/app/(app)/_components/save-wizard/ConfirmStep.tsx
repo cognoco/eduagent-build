@@ -11,6 +11,7 @@ import {
   type SaveTarget,
 } from '../../../../lib/preview-onboarding-state';
 import { track } from '../../../../lib/analytics';
+import { useThemeColors } from '../../../../lib/theme';
 
 /**
  * Step 3 of the save wizard: confirmation screen + landing handoff.
@@ -38,6 +39,7 @@ export function ConfirmStep({
   onComplete: () => void; // [HIGH-A2] layout-level wizard-done signal
 }): React.ReactElement {
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { switchProfile } = useProfile();
   const [landing, setLanding] = React.useState(false);
   const [landingError, setLandingError] = React.useState<string | null>(null);
@@ -46,7 +48,9 @@ export function ConfirmStep({
     target === 'self' ||
     (target === 'both' && previewState.bothPriority === 'self_first');
 
-  const cta = isSelfBranch ? 'Start lesson' : 'Open parent home';
+  const cta = isSelfBranch
+    ? t('onboarding.saveWizard.startLesson')
+    : t('onboarding.saveWizard.openParentHome');
 
   const onLand = React.useCallback(async () => {
     if (landing) return;
@@ -54,7 +58,9 @@ export function ConfirmStep({
     try {
       const sw = await switchProfile(created.parent.id);
       if (!sw.success) {
-        setLandingError(sw.error ?? 'Could not switch profile.');
+        setLandingError(
+          sw.error ?? t('onboarding.saveWizard.switchProfileError'),
+        );
         return;
       }
 
@@ -105,7 +111,11 @@ export function ConfirmStep({
     <View>
       <Text className="text-h3 font-semibold text-text-primary mb-2">
         {isSelfBranch
-          ? `Your first lesson is ready${previewState.topicText ? `: ${previewState.topicText}` : ''}.`
+          ? previewState.topicText
+            ? t('onboarding.saveWizard.firstLessonReadyWithTopic', {
+                topic: previewState.topicText,
+              })
+            : t('onboarding.saveWizard.firstLessonReady')
           : t('saveWizard.confirmChildReady')}
       </Text>
       {landingError && (
@@ -122,7 +132,7 @@ export function ConfirmStep({
       >
         {landing ? (
           <ActivityIndicator
-            color="white"
+            color={colors.textInverse}
             accessibilityLabel={t('common.loading')}
           />
         ) : (

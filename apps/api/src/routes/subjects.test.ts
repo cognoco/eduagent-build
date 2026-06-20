@@ -82,6 +82,7 @@ import {
   getSubject,
   updateSubject,
   retryCurriculumForSubject,
+  SubjectLimitError,
 } from '../services/subject';
 import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
@@ -101,7 +102,7 @@ const OTHER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000099';
 // ---------------------------------------------------------------------------
 
 type TestEnv = {
-  Bindings: { DATABASE_URL: string };
+  Bindings: { DATABASE_URL: string; IDENTITY_V2_ENABLED?: string };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -233,7 +234,27 @@ describe('POST /v1/subjects', () => {
       expect.anything(),
       PROFILE_ID,
       expect.objectContaining({ name: 'Chemistry' }),
-      { conversationLanguage: undefined },
+      { conversationLanguage: undefined, identityV2Enabled: false },
+    );
+  });
+
+  it('threads identityV2Enabled: true into the service when the v2 flag is on', async () => {
+    createSubjectWithStructureMock.mockResolvedValue({
+      subject: makeSubjectRecord(),
+      structureType: 'narrow',
+    });
+
+    const res = await makeApp().request('/v1/subjects', validCreateBody(), {
+      DATABASE_URL: 'postgres://test',
+      IDENTITY_V2_ENABLED: 'true',
+    });
+
+    expect(res.status).toBe(201);
+    expect(createSubjectWithStructureMock).toHaveBeenCalledWith(
+      expect.anything(),
+      PROFILE_ID,
+      expect.objectContaining({ name: 'Chemistry' }),
+      { conversationLanguage: undefined, identityV2Enabled: true },
     );
   });
 
@@ -264,6 +285,19 @@ describe('POST /v1/subjects', () => {
     const res = await makeApp().request('/v1/subjects', validCreateBody());
 
     expect(res.status).toBe(500);
+  });
+
+  it('[WI-855] returns 409 SUBJECT_LIMIT_EXCEEDED when the service throws SubjectLimitError', async () => {
+    createSubjectWithStructureMock.mockRejectedValue(new SubjectLimitError());
+
+    const res = await makeApp().request('/v1/subjects', validCreateBody());
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: ERROR_CODES.SUBJECT_LIMIT_EXCEEDED,
+      message: expect.any(String),
+    });
   });
 });
 
@@ -535,6 +569,47 @@ describe('POST /v1/subjects/classify', () => {
     });
   });
 
+  // [WI-859 / QA-03] Deterministic proof that the classifier's miss/suggestion
+  // shape (zero/low-confidence candidates that need confirmation, plus a
+  // suggestedSubjectName for the no-match case) survives the route's
+  // subjectClassifyResultSchema.parse() and reaches the client intact. The
+  // service is stubbed, so this never depends on live model variance — it
+  // pins the route contract the in-chat picker relies on.
+  it('[WI-859] passes multi-candidate + suggestedSubjectName through the result schema', async () => {
+    classifySubjectMock.mockResolvedValue({
+      candidates: [
+        { subjectId: SUBJECT_ID, subjectName: 'History', confidence: 0.55 },
+        {
+          subjectId: 'a0000000-0000-4000-a000-000000000011',
+          subjectName: 'Religious Studies',
+          confidence: 0.45,
+        },
+      ],
+      needsConfirmation: true,
+      suggestedSubjectName: 'Cultural Studies',
+    });
+
+    const res = await makeApp().request('/v1/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'please teach me about Easter' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      candidates: Array<{ subjectName: string }>;
+      needsConfirmation: boolean;
+      suggestedSubjectName: string | null;
+    };
+    expect(body.needsConfirmation).toBe(true);
+    expect(body.candidates).toHaveLength(2);
+    expect(body.candidates.map((candidate) => candidate.subjectName)).toEqual([
+      'History',
+      'Religious Studies',
+    ]);
+    expect(body.suggestedSubjectName).toBe('Cultural Studies');
+  });
+
   it('returns 400 when text is missing', async () => {
     const res = await makeApp().request('/v1/subjects/classify', {
       method: 'POST',
@@ -666,5 +741,37 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
       body: JSON.stringify({ name: 'updated' }),
     });
     expect(res.status).toBe(403);
+  });
+
+  // [WI-859 / QA-04] The in-chat classifier and resolver are LLM-metered write
+  // endpoints; both carry assertNotProxyMode (subjects.ts). A parent proxying a
+  // child must not be able to drive the child's subject classification — assert
+  // the guard fires (403 PROXY_MODE) BEFORE the service runs, deterministically,
+  // not via live model behavior.
+  it('[WI-859] POST /subjects/classify returns 403 PROXY_MODE in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subjects/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'what is an atom?' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe('PROXY_MODE');
+    // Guard must short-circuit before the classifier service is invoked.
+    expect(classifySubjectMock).not.toHaveBeenCalled();
+  });
+
+  it('[WI-859] POST /subjects/resolve returns 403 PROXY_MODE in proxy mode', async () => {
+    const res = await makeProxyApp().request('/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { code?: string };
+    expect(body.code).toBe('PROXY_MODE');
+    expect(resolveSubjectNameMock).not.toHaveBeenCalled();
   });
 });

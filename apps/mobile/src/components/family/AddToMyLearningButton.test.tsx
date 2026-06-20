@@ -74,7 +74,7 @@ describe('AddToMyLearningButton', () => {
     expect(screen.queryByTestId('add-to-my-learning')).toBeNull();
   });
 
-  it('renders the affordance and clones with the source context', async () => {
+  it('[PARENT-14] renders the affordance and clones with the source context', async () => {
     render(
       <AddToMyLearningButton
         childProfileId="child-id"

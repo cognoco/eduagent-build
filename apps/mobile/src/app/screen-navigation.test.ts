@@ -48,6 +48,9 @@ const EXEMPT_SCREENS: string[] = [
   '(app)/own-learning.tsx', // Visible bottom tab (parent's "My Learning" tab)
   '(app)/library.tsx',
   '(app)/recaps/index.tsx', // Visible bottom tab (Family V1 recaps tab)
+  '(app)/mentor.tsx', // Visible bottom tab (V2 mentor tab — see use-navigation-contract.ts V2_TABS)
+  '(app)/subjects.tsx', // Visible bottom tab (V2 subjects tab — see use-navigation-contract.ts V2_TABS)
+  '(app)/journal.tsx', // Visible bottom tab (V2 journal tab — see use-navigation-contract.ts V2_TABS)
   '(app)/more/index.tsx',
   '(app)/more/notifications.tsx', // Native Stack header provides back
   '(app)/more/account.tsx', // Native Stack header provides back
@@ -232,5 +235,21 @@ describe('Screen navigation audit', () => {
     expect(
       findBareRouterBackCalls('// router.back() in a comment only'),
     ).toEqual([]);
+  });
+
+  it('[WI-506] back Ionicons use an explicit semantic color', () => {
+    const violations: Array<{ file: string; match: string }> = [];
+    const bareBackIcon =
+      /<Ionicons\b(?=[^>]*\bname=["'](?:arrow-back|chevron-back)["'])(?![^>]*\bcolor=)(?![^>]*\bclassName=["'][^"']*\btext-)[^>]*>/g;
+
+    for (const filePath of screenFiles) {
+      const source = fs.readFileSync(filePath, 'utf-8');
+      const relativeName = getRelativeName(filePath, appDir);
+      for (const match of source.matchAll(bareBackIcon)) {
+        violations.push({ file: relativeName, match: match[0] });
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 });

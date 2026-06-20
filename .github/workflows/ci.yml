@@ -332,26 +332,19 @@ jobs:
   # the identity-v2 HTTP-route surface — which buildIntegrationEnv() never
   # sets — its first flag-on committed-migration coverage.
   #
-  # LANDS NON-BLOCKING (continue-on-error: true). Expected to surface reds
-  # while WI-790/791/792/793 (D1-D4) and :709/FG1 defects exist. Reds here
-  # are diagnostic signal, not CI failures for unrelated PRs.
+  # NON-BLOCKING by operator ruling (2026-06-20). This lane must keep running
+  # with IDENTITY_V2_ENABLED=true, but it is diagnostic signal and must not
+  # block unrelated PRs unless the required-check flip is explicitly re-approved.
   #
-  # HOW TO FLIP THIS TO REQUIRED (WI-586/WP-FLAG close gate):
-  #   Mirrors the i18n-ratchet pattern used for "pnpm audit (High+, advisory)"
-  #   and "sync-skills orphan check (advisory)" — both land continue-on-error
-  #   and are flipped to required by removing that flag once the blocking reds
-  #   are resolved.
-  #
-  #   Step 1 — Confirm D1-D4/FG1/:709 are all green on this job (watch the
-  #             "Flag-ON integration" check in the PR checks list — it reports
-  #             separately from `main` because it's a separate job).
+  # MAKE-REQUIRED PROCEDURE (mirrors the i18n-ratchet "advisory → required" flip):
+  #   Step 1 — Confirm defects green on this job.
   #   Step 2 — Remove `continue-on-error: true` from this job.
-  #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)" to the branch
-  #             protection required-status-checks list in GitHub Settings →
-  #             Branches → main → Edit → "Require status checks to pass" →
-  #             search for the job name and add it.
-  #   Step 4 — This job then becomes the WI-586/WP-FLAG close gate: WI-586
-  #             cannot close until this check is green and required.
+  #   Step 3 — Add "Flag-ON integration (IDENTITY_V2_ENABLED)"
+  #             to the branch-protection required-status-checks list in GitHub
+  #             Settings → Branches → main → Edit → "Require status checks to
+  #             pass" → search for the job name (it reports separately from
+  #             `main` because it's a separate job) and add it.
+  #   Step 4 — This job then becomes the WP-FLAG close gate.
   #
   # The job name intentionally ends with a parenthetical so it is distinct
   # from the `main` job in the required-check picker.
@@ -359,10 +352,12 @@ jobs:
   integration-flag-on:
     name: Flag-ON integration (IDENTITY_V2_ENABLED)
     runs-on: ubuntu-latest
-    # NON-BLOCKING: allowed-red while D1-D4/FG1/:709 defect WIs exist.
-    # Remove this line (and add to branch-protection required checks) once
-    # those WIs are green — see HOW TO FLIP above.
+    # NON-BLOCKING: this is a flag-on diagnostic lane, not a merge gate.
+    # Remove this only after an explicit operator-approved required-check flip.
     continue-on-error: true
+    # WATCH (WI-789 / repoint-journaling): this lane runs the PRE-repoint
+    # committed-migration schema; when the repoint migrations later journal,
+    # they should keep this lane green (repoint-sensitive tests).
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -417,6 +412,19 @@ jobs:
       # signal this lane exists to surface. They do NOT fail the `main` job.
       - name: API integration tests (flag-ON)
         run: pnpm exec nx run api:test:integration
+
+      # WI-808: the apps/api co-located integration tests
+      # (apps/api/src/**/*.integration.test.ts — incl the H8 RLS-coverage suite
+      # and the WI-794 GUC drift-guard) are globbed ONLY by the dash target's
+      # config (apps/api/jest.integration.config.cjs). The colon target above
+      # globs only tests/integration/**, so before this step those suites ran in
+      # NO CI lane (ic-orch-124). This lane's DB is built via drizzle-kit migrate,
+      # so RLS policies (0066+0117) exist and the H8/WI-794 catalog guards are
+      # non-vacuous here. if: always() so it runs even though the colon step
+      # above is expected-red; allowed-red with the rest of this job.
+      - name: API co-located integration tests (flag-ON, apps/api/src)
+        if: always()
+        run: pnpm exec nx run api:test-integration
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)
@@ -507,6 +515,7 @@ jobs:
           EXPO_PUBLIC_GIT_SHA: ${{ github.sha }}
           EXPO_PUBLIC_ENABLE_MODE_NAV: 'true'
           EXPO_PUBLIC_ENABLE_MODE_NAV_V1: 'true'
+          EXPO_PUBLIC_ENABLE_MODE_NAV_V2: 'true'
           # [M4 / config-secrets] RevenueCat public keys — excluded from eas.json
           # via EAS_JSON_DENYLIST but must be baked into every OTA bundle so
           # Purchases.configure() receives non-empty strings. Missing → silent

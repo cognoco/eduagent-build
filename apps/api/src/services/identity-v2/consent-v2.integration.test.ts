@@ -38,6 +38,7 @@ import {
 import {
   createDirectConsentGrant,
   createPendingConsentRequest,
+  getOrgMemberDisplayNameV2,
   processConsentResponseV2,
   requestConsentV2,
   restoreConsentV2,
@@ -319,14 +320,15 @@ const COPPA = 'coppa_parental_consent';
       it('GREEN: the basis-explicit family/dashboard seam reports the GDPR status (CONSENTED), unmasked', async () => {
         const { orgId, childId } = await seedDualBasisNewerCoppa();
         // Single-child seam (dashboard getLatestConsentStatus re-point).
-        expect(await getChildGdprConsentStatusV2(db, childId)).toBe(
+        // [WI-826] getChildGdprConsentStatusV2 now returns { status, withdrawnAt }.
+        expect((await getChildGdprConsentStatusV2(db, childId))?.status).toBe(
           'CONSENTED',
         );
         // Batched seam (dashboard getChildrenForParent re-point).
         const batch = await getChildrenGdprConsentStatusesV2(db, orgId, [
           childId,
         ]);
-        expect(batch.get(childId)).toBe('CONSENTED');
+        expect(batch.get(childId)?.status).toBe('CONSENTED');
       });
     });
 
@@ -977,6 +979,55 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(personRow).toBeTruthy();
         expect(personRow?.archivedAt).toBeNull();
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-809] getOrgMemberDisplayNameV2 — the consent request/resend name gate.
+    // Replaces the global existence-only getPersonDisplayNameV2 so flag-on does
+    // not weaken the legacy getProfile(account.id) scoping. Cases 2 + 3 are the
+    // non-vacuous security assertions: they would PASS with the old global helper
+    // and FAIL without the org-membership / not-archived scoping.
+    // -------------------------------------------------------------------------
+    describe('[WI-809] getOrgMemberDisplayNameV2 — org-scoped + not-archived name gate', () => {
+      it('returns the display name for an ACTIVE member of the org', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId, { displayName: 'Org Child' });
+        expect(await getOrgMemberDisplayNameV2(db, childId, orgId)).toBe(
+          'Org Child',
+        );
+      });
+
+      it('[security] returns null for a person who is NOT a member of the given org (no cross-org target / existence oracle)', async () => {
+        const orgA = await seedOrg();
+        const orgB = await seedOrg();
+        const childInB = await seedPerson(orgB, {
+          displayName: 'Other Org Child',
+        });
+        expect(await getOrgMemberDisplayNameV2(db, childInB, orgA)).toBeNull();
+      });
+
+      it('[security] returns null for an ARCHIVED member (legacy getProfile filtered archivedAt IS NULL)', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId, {
+          displayName: 'Archived Child',
+        });
+        await db
+          .update(person)
+          .set({ archivedAt: new Date() })
+          .where(eq(person.id, childId));
+        expect(await getOrgMemberDisplayNameV2(db, childId, orgId)).toBeNull();
+      });
+
+      it('returns null for a non-existent person id', async () => {
+        const orgId = await seedOrg();
+        expect(
+          await getOrgMemberDisplayNameV2(
+            db,
+            '00000000-0000-4000-8000-000000000000',
+            orgId,
+          ),
+        ).toBeNull();
       });
     });
   },

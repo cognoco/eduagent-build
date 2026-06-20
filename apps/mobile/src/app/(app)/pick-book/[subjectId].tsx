@@ -8,6 +8,7 @@ import type {
   BookSuggestion,
   BookSuggestionsTopupOutcome,
 } from '@eduagent/schemas';
+import type { Translate } from '../../../i18n';
 import { useBookSuggestions } from '../../../hooks/use-book-suggestions';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStickyLoading } from '../../../hooks/use-sticky-loading';
@@ -29,11 +30,11 @@ import { platformAlert } from '../../../lib/platform-alert';
 
 // [BUG-539] Cycling messages mirror the quiz/launch.tsx pattern so users
 // see visual activity during the Neon + Worker cold-start window.
-const LOADING_MESSAGES = [
-  'Finding fresh books for you...',
-  'Picking books to suggest...',
-  'Almost there...',
-];
+const LOADING_MESSAGE_KEYS = [
+  'library.pickBook.loadingFinding',
+  'library.pickBook.loadingPicking',
+  'library.pickBook.loadingAlmost',
+] as const;
 
 const SLOW_LOADING_HINT_MS = 5_000;
 
@@ -43,29 +44,30 @@ const SLOW_LOADING_HINT_MS = 5_000;
 // switch to typing a topic, and (b) avoids over-promising recovery.
 function emptyStateMessage(
   outcome: BookSuggestionsTopupOutcome | undefined,
+  t: Translate,
 ): string {
   switch (outcome) {
     case 'cooldown':
-      return "We just tried to load fresh suggestions and they're not ready yet. Try again in a few minutes, or type a book or topic to add.";
+      return t('library.pickBook.emptyCooldown');
     case 'quota':
     case 'network':
     case 'timeout':
     case 'unknown':
-      return "We couldn't load suggestions right now. Try again, or type a book or topic to add.";
+      return t('library.pickBook.emptyNetworkError');
     case 'parse':
-      return "Suggestions didn't come through cleanly. Try again, or type a book or topic to add.";
+      return t('library.pickBook.emptyParse');
     case 'lock_loser':
-      return 'Another request is already loading suggestions. Try again in a moment.';
+      return t('library.pickBook.emptyLockLoser');
     case 'language_subject':
-      return 'This subject uses a different learning flow. Type the book or topic you want to study.';
+      return t('library.pickBook.emptyLanguageSubject');
     case 'all_filtered':
-      return "We've used up the obvious suggestions for this subject. Type the next book or topic you want to add.";
+      return t('library.pickBook.emptyAllFiltered');
     case 'no_subject':
     case 'skipped':
     case 'not_needed':
     case 'success':
     default:
-      return 'No suggestions yet. Type a book or topic you want to add.';
+      return t('library.pickBook.emptyDefault');
   }
 }
 
@@ -144,7 +146,7 @@ export default function PickBookScreen(): React.ReactElement {
   useEffect(() => {
     if (!suggestionsQuery.isLoading) return;
     const interval = setInterval(() => {
-      setLoadingMessageIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+      setLoadingMessageIndex((i) => (i + 1) % LOADING_MESSAGE_KEYS.length);
     }, 1500);
     return () => clearInterval(interval);
   }, [suggestionsQuery.isLoading]);
@@ -340,7 +342,7 @@ export default function PickBookScreen(): React.ReactElement {
           testID="pick-book-loading-animation"
         />
         <Text className="text-body text-text-secondary mt-4">
-          {LOADING_MESSAGES[loadingMessageIndex]}
+          {t(LOADING_MESSAGE_KEYS[loadingMessageIndex]!)}
         </Text>
         {loadingSlow ? (
           <Text
@@ -559,7 +561,7 @@ export default function PickBookScreen(): React.ReactElement {
             testID="pick-book-empty"
           >
             <Text className="text-body text-text-secondary text-center">
-              {emptyStateMessage(suggestionsData?.topupOutcome)}
+              {emptyStateMessage(suggestionsData?.topupOutcome, t)}
             </Text>
             {suggestionsData?.topupOutcome &&
             isRetriableTopupOutcome(suggestionsData.topupOutcome) ? (

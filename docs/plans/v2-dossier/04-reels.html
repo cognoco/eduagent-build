@@ -239,10 +239,12 @@
   <button class="nav" data-f="s3-staleidle" onclick="go('s3-staleidle')">3.6 If he stalls: de-escalation</button>
 
   <h2>Scene 4 — Petra · week one <span class="tag s45">S4–S5</span></h2>
-  <button class="nav" data-f="s4-hub" onclick="go('s4-hub')">4.1 Support hub feed</button>
-  <button class="nav" data-f="s4-jmentor" onclick="go('s4-jmentor')">4.2 Jakub scope — ask the mentor</button>
-  <button class="nav" data-f="s4-jsubjects" onclick="go('s4-jsubjects')">4.3 Jakub scope — masked hub</button>
-  <button class="nav" data-f="s4-jjournal" onclick="go('s4-jjournal')">4.4 The shared record</button>
+  <button class="nav" data-f="s4-hub" onclick="go('s4-hub')">4.1 Support hub — Mentor</button>
+  <button class="nav" data-f="s4-hub-subjects" onclick="go('s4-hub-subjects')">4.2 Support hub — Subjects</button>
+  <button class="nav" data-f="s4-hub-journal" onclick="go('s4-hub-journal')">4.3 Support hub — Journal</button>
+  <button class="nav" data-f="s4-jmentor" onclick="go('s4-jmentor')">4.4 Jakub scope — ask the mentor</button>
+  <button class="nav" data-f="s4-jsubjects" onclick="go('s4-jsubjects')">4.5 Jakub scope — masked hub</button>
+  <button class="nav" data-f="s4-jjournal" onclick="go('s4-jjournal')">4.6 The shared record</button>
 
   <div id="note"></div>
 </div>
@@ -807,12 +809,61 @@
     </div>
     <div class="tabbar">
       <button class="on"><span class="ticon">💬</span>Mentor</button>
-      <button onclick="go('s4-jsubjects')"><span class="ticon">📚</span>Subjects</button>
-      <button onclick="go('s4-jjournal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+      <button onclick="go('s4-hub-subjects')"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('s4-hub-journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
     </div>
   </div>
 
-  <!-- ========== SCENE 4.2 — Jakub scope, mentor ========== -->
+  <!-- ========== SCENE 4.2 — support hub, subjects ========== -->
+  <div class="frame" id="s4-hub-subjects">
+    <div class="hdr"><span class="htitle">Subjects</span><button class="avatar parent">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip on">Support hub</button>
+      <button class="scopechip" onclick="go('s4-jsubjects')">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="card">
+        <div class="kicker">Jakub</div>
+        <div class="ctitle" style="font-size:14px;">Math · Algebra</div>
+        <div class="csub">4 / 6 topics solid · fractions are wobbly · next up: Quadratic intro.</div>
+        <div class="cta"><button class="btn ghost" onclick="go('s4-jsubjects')">View Jakub</button><button class="btn warm">Learn alongside</button></div>
+      </div>
+      <div class="card">
+        <div class="kicker">Jakub</div>
+        <div class="ctitle" style="font-size:14px;">Science · Cells</div>
+        <div class="csub">2 reviews due · recent recap has a good "try tonight" question.</div>
+        <div class="cta"><button class="btn ghost">Try tonight</button></div>
+      </div>
+      <div class="caption">Bottom tabs keep the Support hub scope. A child scope opens only when Petra taps the Jakub chip or an explicit row.</div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s4-hub')"><span class="ticon">💬</span>Mentor</button>
+      <button class="on"><span class="ticon">📚</span>Subjects</button>
+      <button onclick="go('s4-hub-journal')"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.3 — support hub, journal ========== -->
+  <div class="frame" id="s4-hub-journal">
+    <div class="hdr"><span class="htitle"><span class="jname">Journal</span></span><button class="avatar parent">P</button></div>
+    <div class="scopechips">
+      <button class="scopechip on">Support hub</button>
+      <button class="scopechip" onclick="go('s4-jjournal')">Jakub</button>
+    </div>
+    <div class="content">
+      <div class="card"><div class="kicker">weekly recap · Jakub</div><div class="csub">3 sessions, ~70 minutes. Equations holding; fractions need patience.</div></div>
+      <div class="card"><div class="kicker">conversation starter · Jakub</div><div class="csub">"Can you show me the denominator trick you used today?"</div></div>
+      <div class="card"><div class="kicker">co-learning receipt</div><div class="csub">Petra learned Fractions in equations too. Optional chip available: "Mum learned this too — want to explain it back?"</div></div>
+      <div class="caption">This is Petra's support record grouped by person — not Jakub's private notes, chats, or mentor memory.</div>
+    </div>
+    <div class="tabbar">
+      <button onclick="go('s4-hub')"><span class="ticon">💬</span>Mentor</button>
+      <button onclick="go('s4-hub-subjects')"><span class="ticon">📚</span>Subjects</button>
+      <button class="on"><span class="ticon">📓</span><span class="jname">Journal</span></button>
+    </div>
+  </div>
+
+  <!-- ========== SCENE 4.4 — Jakub scope, mentor ========== -->
   <div class="frame" id="s4-jmentor">
     <div class="hdr"><span class="htitle">Mentor</span><button class="avatar parent">P</button></div>
     <div class="scopechips">
@@ -836,7 +887,7 @@
     </div>
   </div>
 
-  <!-- ========== SCENE 4.3 — Jakub scope, masked hub ========== -->
+  <!-- ========== SCENE 4.5 — Jakub scope, masked hub ========== -->
   <div class="frame" id="s4-jsubjects">
     <div class="hdr"><span class="htitle">Jakub · Math</span><button class="avatar parent">P</button></div>
     <div class="scopechips">
@@ -866,7 +917,7 @@
     </div>
   </div>
 
-  <!-- ========== SCENE 4.4 — shared record ========== -->
+  <!-- ========== SCENE 4.6 — shared record ========== -->
   <div class="frame" id="s4-jjournal">
     <div class="hdr"><span class="htitle"><span class="jname">Journal</span> · Jakub</span><button class="avatar parent">P</button></div>
     <div class="scopechips">
@@ -940,7 +991,9 @@ const NOTES = {
   's3-lifecycle':`<div class="ntitle">One morphing card per child — the Wizz flight-card pattern</div>Step through the lifecycle: the same live object advances invite → approve → kickstart → warm feed. Never a pile of cards, never three screens. Urgency lives on the card ("Jakub's waiting"); deliberateness lives in the ceremony.<div class="cite">Spec §3.2 · ruling 14</div>`,
   's3-kickstart':`<span class="prop">PROPOSAL — gap 6 (his-side rendering)</span><div class="ntitle">Kickstart creates a chip, not a subject</div>Petra's encouragement lands in Jakub's cold-start card as one more fillable chip — warm tint, her name, top position (this rendering is the proposal; the spec gives it one line). Tapping types the words into HIS input for HIM to send. Rate limits unchanged (4/24h, quiet hours).<div class="cite">Spec §3.2 kickstart · gap register #6</div>`,
   's3-staleidle':`<div class="ntitle">De-escalation, never escalation</div>Step through her visits. The card redirects the screen's energy to <b>her</b> — start together, try it yourself, learn something — and never pressures him through her. Binary state only: she never learns he opened-and-bounced. The "we'll tell you the moment he starts" push genuinely fires.<div class="cite">Spec §3.2 stale-idle arc · ruling 18</div>`,
-  's4-hub':`<div class="ntitle">The Support hub — everything addressed to HER</div>Attention items, milestones, recaps across all her people. Note the scope chip: hub vs Jakub are different lenses, same three tabs. Declining an attention item only snoozes it — it re-surfaces while the condition persists (EU-8). With 2+ children, per-edge fairness guarantees each child representation (EU-3).<div class="cite">Spec §4 · §6.3 · S4</div>`,
+  's4-hub':`<div class="ntitle">The Support hub — everything addressed to HER</div>Attention items, milestones, recaps across all her people. Note the scope chip: hub vs Jakub are different lenses, same three tabs. Bottom tabs preserve the active scope; Jakub opens only from the chip or an explicit child row. Declining an attention item only snoozes it — it re-surfaces while the condition persists (EU-8). With 2+ children, per-edge fairness guarantees each child representation (EU-3).<div class="cite">Spec §4 · §6.3 · S4</div>`,
+  's4-hub-subjects':`<div class="ntitle">Support hub Subjects — grouped by child</div>This is not Jakub's subject hub. Petra stays in Support hub and sees subjects across her people, grouped by name, with explicit deep links into each person scope plus co-learning / conversation affordances.<div class="cite">Spec §6.3 · S4 scope-preserving tabs</div>`,
+  's4-hub-journal':`<div class="ntitle">Support hub Journal — Petra's support record</div>Reports, recaps, conversation starters, nudges and co-learning receipts delivered to Petra, grouped by child. No child private notes, chats or mentor memory render here.<div class="cite">Spec §6.3 · S4/S5 artifact wall</div>`,
   's4-jmentor':`<div class="ntitle">Her mentor, about him — interpretation, not exhaust</div>The bar in Jakub's scope talks to HER mentor about him. Curated, pedagogically framed, actionable — never his words, never his confided feelings (sealed class: never reported in the first place). The appeal affordance is the release valve for a parent who doesn't trust "fine."<div class="cite">Spec §6.1 EU-1/EU-2 · S5</div>`,
   's4-jsubjects':`<div class="ntitle">The masked structural hub — the privacy contract made visible</div>The same hub component Jakub sees, read live from his data through a server mask: chapters, mastery, activity — no notes, no chat, no artifacts. Not hidden client-side; <b>no read path exists</b>. Compare with the free-roam Subject hub.<div class="cite">Spec §6.1/§6.3 · S4</div>`,
   's4-jjournal':`<div class="ntitle">The shared record — two-way transparency</div>Every report ever made to her about Jakub, with his-side mirror shown in green: same facts, rendered for each audience. Nothing is said about him behind his back — and because confided affect is never reported at all, transparency can't chill his confessions.<div class="cite">Spec §6.1/§6.3 · S5 · the second Bet-Sheet observable</div>`

@@ -32,6 +32,8 @@ export const MASCOT_COLORS = {
   crease: '#0a5d55',
   /** Eye whites */
   white: '#ffffff',
+  /** Cream text on dark brand surfaces */
+  cream: '#faf5ee',
   /** Milestone dots (the "juggling balls" — same trio as the logo) */
   dotPink: '#f472b6',
   dotViolet: '#a78bfa',

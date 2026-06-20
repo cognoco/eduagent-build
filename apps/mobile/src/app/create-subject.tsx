@@ -28,6 +28,7 @@ import { BookPageFlipAnimation } from '../components/common/BookPageFlipAnimatio
 import { MagicPenAnimation } from '../components/common/MagicPenAnimation';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError, extractApiErrorCode } from '../lib/format-api-error';
+import { errorHasCode } from '../components/session/session-types';
 import { homeHrefForReturnTo, goBackOrReplace } from '../lib/navigation';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
@@ -398,14 +399,13 @@ function CreateSubjectScreenAuthenticated() {
       } catch (err: unknown) {
         // [BUG-692] Don't show error alert if user already navigated away.
         if (cancelledRef.current) return;
-        const rawMsg = err instanceof Error ? err.message : '';
-        // TODO(typed-error): The API does not yet return a typed error code for
-        // subject limits (no SUBJECT_LIMIT_EXCEEDED code in subjects.ts route).
-        // Replace with `errorHasCode(err, 'SUBJECT_LIMIT_EXCEEDED')` once the
-        // API adds a typed code — matching the create-profile.tsx pattern at line 238.
-        setIsSubjectLimitError(
-          /subject limit|max subjects|too many subjects/i.test(rawMsg),
-        );
+        // [WI-855 / SUBJECT-20] Branch on the stable typed code, never the
+        // English message. The API now returns 409 { code:
+        // 'SUBJECT_LIMIT_EXCEEDED' } at the hard cap; assertOk surfaces it as
+        // err.code, which errorHasCode reads — matching the create-profile.tsx
+        // PROFILE_LIMIT_EXCEEDED pattern. The old message regex was coupled to
+        // copy the API never produced, so the recovery UI was effectively dead.
+        setIsSubjectLimitError(errorHasCode(err, 'SUBJECT_LIMIT_EXCEEDED'));
         setError(formatApiError(err));
         setResolveState({ phase: 'idle' });
       }
@@ -1033,6 +1033,7 @@ function CreateSubjectScreenAuthenticated() {
             )}
             <Pressable
               onPress={onEditSuggestion}
+              disabled={isBusy}
               className="py-3 items-center mt-2"
               testID="subject-no-match-edit"
               accessibilityRole="button"
@@ -1062,6 +1063,7 @@ function CreateSubjectScreenAuthenticated() {
             <View className="flex-row gap-3">
               <Pressable
                 onPress={onAcceptSuggestion}
+                disabled={isBusy}
                 className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
                 testID="subject-suggestion-accept"
                 accessibilityRole="button"
@@ -1075,6 +1077,7 @@ function CreateSubjectScreenAuthenticated() {
               </Pressable>
               <Pressable
                 onPress={onEditSuggestion}
+                disabled={isBusy}
                 className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
                 testID="subject-suggestion-edit"
                 accessibilityRole="button"
@@ -1115,6 +1118,7 @@ function CreateSubjectScreenAuthenticated() {
               <View className="flex-row gap-3">
                 <Pressable
                   onPress={onAcceptSuggestion}
+                  disabled={isBusy}
                   className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
                   testID="subject-suggestion-accept"
                   accessibilityRole="button"
@@ -1126,6 +1130,7 @@ function CreateSubjectScreenAuthenticated() {
                 </Pressable>
                 <Pressable
                   onPress={onEditSuggestion}
+                  disabled={isBusy}
                   className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
                   testID="subject-suggestion-edit"
                   accessibilityRole="button"

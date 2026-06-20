@@ -152,6 +152,7 @@ describe('Integration: POST /v1/profiles', () => {
       user: PROFILE_USER,
       displayName: 'Second Profile',
       birthYear: 2010,
+      kind: 'child',
     });
 
     const res = await app.request(
@@ -163,6 +164,7 @@ describe('Integration: POST /v1/profiles', () => {
           email: PROFILE_USER.email,
         }),
         body: JSON.stringify({
+          kind: 'child',
           displayName: 'Third Profile',
           birthYear: 2012,
         }),
@@ -339,6 +341,14 @@ describe('Integration: POST /v1/profiles/switch', () => {
   });
 
   it('returns 400 for non-UUID profileId', async () => {
+    await createProfileViaRoute({
+      app,
+      env: TEST_ENV,
+      user: PROFILE_USER,
+      displayName: 'Switch Validator',
+      birthYear: 2008,
+    });
+
     const res = await app.request(
       '/v1/profiles/switch',
       {

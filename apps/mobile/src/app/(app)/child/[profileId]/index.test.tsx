@@ -492,7 +492,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('shows a lean overview with subjects, raw input, and recent sessions', async () => {
+  it('[PARENT-03] shows a lean overview with subjects, raw input, and recent sessions', async () => {
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -566,7 +566,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('uses a raw-input mentor note when a subject has no session recap yet', async () => {
+  it('[PARENT-03] uses a raw-input mentor note when a subject has no session recap yet', async () => {
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -631,7 +631,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('shows only child progress when opened from the Progress action', async () => {
+  it('[PARENT-03] shows only child progress when opened from the Progress action (?mode=progress)', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
 
     const { result, cleanup } = renderChildDetail();
@@ -1239,6 +1239,33 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
       const calls = fetchCallsMatching(mockFetch, '/consent/child-001/restore');
       expect(calls.length).toBeGreaterThanOrEqual(1);
       expect(calls[0]?.init?.method).toBe('PUT');
+    });
+
+    cleanup();
+  });
+
+  it('[WI-508] consent-restore CTA is disabled while the mutation is in-flight', async () => {
+    // Stall the restore endpoint so isPending stays true after the first press.
+    mockFetch.setRoute(
+      '/consent/child-001/restore',
+      () => new Promise(() => undefined /* never resolves */),
+    );
+
+    const { result, cleanup } = renderChildDetail();
+
+    const cta = await waitFor(() =>
+      result.getByTestId('consent-withdrawn-request-cta'),
+    );
+
+    // Before the first press the CTA must be enabled.
+    expect(cta.props.accessibilityState?.disabled).not.toBe(true);
+
+    fireEvent.press(cta);
+
+    // While the mutation is in-flight (restore endpoint stalled), the CTA
+    // must be disabled so a rapid second tap cannot fire a duplicate request.
+    await waitFor(() => {
+      expect(cta.props.accessibilityState?.disabled).toBe(true);
     });
 
     cleanup();

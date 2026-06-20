@@ -171,3 +171,23 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     timeout: 30_000,
   });
 });
+
+test('J-10 / QUIZ-18 cold quiz play route shows no-round recovery', async ({
+  page,
+}) => {
+  await seedAndSignIn(page, {
+    scenario: 'onboarding-complete',
+    alias: 'j10-no-round',
+    landingTestId: 'learner-screen',
+    landingPath: '/home',
+  });
+
+  await page.goto('/quiz/play', { waitUntil: 'commit' });
+
+  await expect(page.getByTestId('quiz-play-no-round')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId('quiz-play-no-round-retry')).toBeVisible();
+  await expect(page.getByTestId('quiz-play-no-round-home')).toBeVisible();
+  await expect(page.getByText('Internal Server Error')).toBeHidden();
+});

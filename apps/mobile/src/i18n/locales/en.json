@@ -87,7 +87,11 @@
     "profileNotFound": "We had trouble loading your profile. Please sign out and back in.",
     "alreadyCompleted": "You've already finished this. Head back and pick something new.",
     "validationFailed": "Something didn't look right. Please check what you entered and try again.",
-    "timedOut": "That reply took too long. Tap reconnect to try again."
+    "timedOut": "That reply took too long. Tap reconnect to try again.",
+    "emailNotVerified": "Please verify your email address, then try again.",
+    "quotaExceeded": "Quota exceeded",
+    "resourceNotFound": "Resource not found",
+    "conflictState": "Request conflicts with current state"
   },
   "errorBoundary": {
     "title": "Something went wrong",
@@ -104,6 +108,12 @@
     "appLanguage": "App Language",
     "languageChangeFailedTitle": "Couldn't change language",
     "languageChangeFailedMessage": "We couldn't switch the app language. Please try again."
+  },
+  "accountAdmin": {
+    "title": "Account",
+    "openAccount": "Open account settings",
+    "security": "Account security",
+    "familySettings": "Family settings"
   },
   "friendlyErrors": {
     "notLanguageLearning": "This subject isn't set up for language learning. Try the standard learning path instead.",
@@ -153,7 +163,43 @@
       "newHere": "New here?",
       "tryMentomate": "Try MentoMate",
       "unsupportedSsoHint": "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support.",
-      "unsupportedContactHint": "Contact support and we'll help you sign in. Mention: {{methods}}."
+      "unsupportedContactHint": "Contact support and we'll help you sign in. Mention: {{methods}}.",
+      "strategyWebauthn": "a security key or passkey",
+      "strategyTotp": "an authenticator app",
+      "strategyPhoneCode": "a phone verification code",
+      "strategyEmailCode": "an email verification code",
+      "unsupportedMethodGeneric": "This account needs an additional verification method that is not available on mobile yet.",
+      "unsupportedMethodSingle": "This account requires {{method}} which isn't available on mobile yet.",
+      "unsupportedMethodMultiple": "This account requires {{methods}} or {{last}} which isn't available on mobile yet.",
+      "transitionTimeout": "Sign-in is taking longer than expected. Please try signing in again.",
+      "sessionRevoked": "Your session was signed out from another device. Sign in again to continue.",
+      "sessionExpired": "Your session expired. Sign in again to continue learning.",
+      "needsNewPassword": "Your password needs to be updated before you can sign in. Use Forgot password? to reset it.",
+      "signInNotCompleted": "Sign-in could not be completed. Please try again.",
+      "contactSupportEmailError": "We couldn't open your email app. Please contact support@mentomate.app and mention {{methods}}.",
+      "noSessionCreated": "No session was created. Please try again.",
+      "authNotLoaded": "Authentication not loaded. Please try again.",
+      "activationFailed": "Could not activate your session. Please try again.",
+      "ssoSignUpIncomplete": "Sign-up via {{provider}} needs additional information. Please sign up with email instead.",
+      "authNotReady": "Authentication not ready. Please reload and try again.",
+      "stuckTitle": "Still signing you in",
+      "stuckMessage": "This is taking longer than expected. Try again.",
+      "signUpLabel": "Sign up",
+      "enterBackupCodePlaceholder": "Enter backup code",
+      "enterSixDigitCodePlaceholder": "Enter 6-digit code",
+      "verifyButton": "Verify",
+      "resendCode": "Resend code",
+      "backToSignIn": "Back to sign in",
+      "contactSupport": "Contact support",
+      "cancelSignIn": "Cancel sign-in",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithApple": "Continue with Apple",
+      "continueWithOpenAI": "Continue with OpenAI",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Enter your password",
+      "forgotPassword": "Forgot password?",
+      "signInButton": "Sign in",
+      "sendVerificationCode": "Send verification code"
     },
     "signUp": {
       "title": "Create account",
@@ -166,7 +212,19 @@
       "agreeToTerms": "By signing up, you agree to our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>.",
       "verifyEmailTitle": "Verify your email",
       "sentCodeTo": "We sent a verification code to <email>{{email}}</email>",
-      "verificationCodeLabel": "Verification code"
+      "verificationCodeLabel": "Verification code",
+      "noSessionCreated": "No session was created. Please try again.",
+      "activationFailed": "Could not activate your session. Please try again.",
+      "authNotReady": "Authentication not ready. Please reload and try again.",
+      "ssoMissingFields": "Sign-up needs more information: {{fields}}. Please sign up with email instead.",
+      "ssoSignUpIncomplete": "Sign-up via {{provider}} needs additional information. Please sign up with email instead.",
+      "signUpNotCompleted": "Sign-up could not be completed. Please try again.",
+      "verificationNotCompleted": "Verification could not be completed. Please try again.",
+      "codePlaceholder": "Enter 6-digit code",
+      "verifyButton": "Verify",
+      "resendCode": "Resend code",
+      "useDifferentEmail": "Use a different email",
+      "backToSignIn": "Back to sign in"
     },
     "forgotPassword": {
       "title": "Forgot password?",
@@ -175,7 +233,20 @@
       "resetPasswordTitle": "Reset password",
       "enterCodeAndPassword": "Enter the code sent to <email>{{email}}</email> and your new password",
       "resetCodeLabel": "Reset code",
-      "newPasswordLabel": "New password"
+      "newPasswordLabel": "New password",
+      "timeoutMessage": "We couldn't reach the reset service in time. Check your connection and try again.",
+      "resetSuccessActivationError": "Your password was reset but we could not sign you in automatically.",
+      "resetNotCompleted": "Password reset could not be completed. Please try again.",
+      "retryActivationFailed": "Still unable to sign you in. Use the link below to sign in with your new password.",
+      "signInWithNewPassword": "Sign in with your new password",
+      "codePlaceholder": "Enter 6-digit code",
+      "newPasswordPlaceholder": "Enter new password",
+      "resetPasswordButton": "Reset password",
+      "resendCode": "Resend code",
+      "useDifferentEmail": "Use a different email",
+      "backToSignIn": "Back to sign in",
+      "emailPlaceholder": "you@example.com",
+      "sendResetCode": "Send reset code"
     }
   },
   "guards": {
@@ -236,7 +307,17 @@
       "subjectsLoadError": "We couldn't load your subjects right now",
       "subjectsLoadErrorHint": "You can still start a session or try another action.",
       "a11yOpenMyNotes": "Open My Notes",
-      "a11yRetrySubjects": "Retry loading subjects"
+      "a11yRetrySubjects": "Retry loading subjects",
+      "subjectHintPreparing": "Setting up {{name}}...",
+      "subjectHintOpen": "Open",
+      "subjectHintContinueTopic": "Continue {{topic}}",
+      "subjectHintContinueSubject": "Continue {{name}}",
+      "subjectHintQuiz": "Quiz: {{topic}}",
+      "subjectHintPractice": "Practice: {{name}}",
+      "coachBandResumeSession": "Pick up where you stopped in {{name}}.",
+      "coachBandResumeSessionNoName": "Pick up where you stopped in your session.",
+      "coachBandResumeTarget": "Pick up where you left off in {{name}}.",
+      "coachBandRevisitTopic": "Revisit {{topic}} — it's starting to fade."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -330,14 +411,19 @@
       "addLearner": {
         "title": "Add a learner",
         "accessibilityLabel": "Add a learner to your family"
-      }
+      },
+      "childProfileLabel": "{{name}} profile",
+      "greetingFallbackName": "there"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Dismiss recommendation",
-      "a11yLoadingCard": "Loading mentor card"
+      "a11yLoadingCard": "Loading mentor card",
+      "thisMorning": "THIS MORNING",
+      "thisAfternoon": "THIS AFTERNOON",
+      "tonight": "TONIGHT"
     },
     "earlyAdopter": {
       "badge": "Early user — your feedback shapes MentoMate",
@@ -345,6 +431,10 @@
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} topics"
+    },
+    "intentCard": {
+      "titleWithBadge": "{{title}}, {{count}} items",
+      "opensActivityHint": "Opens this activity"
     }
   },
   "family": {
@@ -413,7 +503,14 @@
       "weeklyEmailDigestTitle": "Weekly progress email",
       "monthlyEmailDigestTitle": "Monthly progress email",
       "emailDigestDescription": "Sent to your account email.",
-      "updateErrorTitle": "Could not update notification settings"
+      "updateErrorTitle": "Could not update notification settings",
+      "pushMissingPermission": "Allow notifications from your device.",
+      "pushMissingServer": "Turn on push notifications here.",
+      "pushMissingToken": "Register this device for push notifications.",
+      "openSettingsTitle": "Open Settings",
+      "openSettingsDescription": "Notifications are blocked for this app. Turn them on in system settings.",
+      "loadErrorTitle": "We couldn't load your notification settings",
+      "loadErrorMessage": "Please try again. Your preferences haven't changed."
     },
     "privacy": {
       "privacyAndData": "Privacy & data",
@@ -471,6 +568,10 @@
   },
   "session": {
     "expiredSystemMessage": "Session expired. Start a new one to keep going.",
+    "firstWrap": {
+      "recap": "You finished one real learning exchange.",
+      "recapWithSubject": "You finished one real learning exchange about {{subject}}."
+    },
     "challenge": {
       "offerTitle": "Up for a challenge round?",
       "tryIt": "Try it",
@@ -778,7 +879,12 @@
       "wrapping": "Wrapping...",
       "exit": "Exit",
       "retryClassification": "Retry classification",
-      "skipWarmup": "Skip the warm-up, jump in"
+      "skipWarmup": "Skip the warm-up, jump in",
+      "a11yWrapping": "Wrapping up",
+      "a11yDone": "I'm done",
+      "subtitleClassifying": "Figuring out what this is about...",
+      "subtitleExpired": "Session expired - start a new one.",
+      "subtitleUnreachable": "Server unreachable - messages may fail"
     },
     "inputModeToggle": {
       "text": "Text",
@@ -829,7 +935,8 @@
       "progressLabel_one": "Book progress: {{count}} page",
       "progressLabel_other": "Book progress: {{count}} pages",
       "pageCount_one": "{{count}} page",
-      "pageCount_other": "{{count}} pages"
+      "pageCount_other": "{{count}} pages",
+      "a11yComplete": "Your book is ready — tap to continue"
     },
     "quickChips": {
       "hintLabel": "Hint",
@@ -863,6 +970,38 @@
       "helpful": "Keeping this pace.",
       "notHelpful": "Adjusting the explanation.",
       "incorrect": "I'll correct that."
+    },
+    "disabledReason": {
+      "offline": "You're offline — input will return when you reconnect",
+      "expired": "This session has ended",
+      "quotaReached": "Your session limit has been reached",
+      "chooseSave": "Choose where to save this session"
+    },
+    "imageAttach": {
+      "timeout": "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
+      "failed": "I couldn't open your photo, so I'm starting with the text only. If something looks off, tap the camera again to retry."
+    },
+    "tellMentor": {
+      "parent": {
+        "title": "Tell the Mentor",
+        "description": "Add something important for the mentor to remember about this child.",
+        "descriptionWithName": "Add something important for the mentor to remember about {{childName}}.",
+        "placeholder": "They do best with short examples and still get stuck on fractions."
+      },
+      "adult": {
+        "title": "Add a Note for Your Mentor",
+        "description": "Add something you want your mentor to remember for future sessions.",
+        "placeholder": "Examples really help me understand fractions."
+      },
+      "teen": {
+        "title": "Tell Your Mentor Something",
+        "description": "Add what helps you learn, what you enjoy, or what still feels tricky.",
+        "placeholder": "Examples really help me understand fractions."
+      }
+    },
+    "voiceToggle": {
+      "a11yMute": "Mute AI voice",
+      "a11yUnmute": "Unmute AI voice"
     }
   },
   "quiz": {
@@ -897,7 +1036,11 @@
       "iDontKnow": "I don't know",
       "iDontKnowLabel": "I don't know the answer",
       "clue": "Clue {{number}}",
-      "fallbackPrompt": "Need a fallback? Pick one:"
+      "fallbackPrompt": "Need a fallback? Pick one:",
+      "hintWithMCAvailableWrong": "Not quite. Here's another clue, and multiple choice is now available.",
+      "hintWithMCAvailable": "Here's another clue. Multiple choice is now available too.",
+      "hintWrong": "Not quite. Here's another clue.",
+      "hint": "Here's another clue."
     },
     "launch": {
       "loadingShuffling": "Shuffling questions...",
@@ -1024,7 +1167,15 @@
       "youSaid": "You said: {{answer}}",
       "youSkipped": "You skipped this question",
       "noAnswer": "You didn't answer",
-      "playAgain": "Play Again"
+      "playAgain": "Play Again",
+      "tierPerfectTitle": "Perfect round!",
+      "tierGreatTitle": "Great round!",
+      "tierNiceTitle": "Nice effort!",
+      "questionFallback": "Question",
+      "a11yYouSaid": "You said {{answer}}",
+      "a11yYouSkipped": "You skipped this question",
+      "a11yNoAnswer": "You didn't answer",
+      "a11yCorrectAnswer": "Correct answer {{answer}}"
     }
   },
   "practiceHub": {
@@ -1324,7 +1475,8 @@
       "organizing": "Organizing your library...",
       "skip": "Skip — start learning anyway",
       "skipAccessibilityLabel": "Skip and start learning anyway",
-      "filingErrorTitle": "Couldn't add that book"
+      "filingErrorTitle": "Couldn't add that book",
+      "loadErrorFallback": "Unable to load this shelf. Please try again."
     },
     "noteMenu": {
       "title": "Note options",
@@ -1359,7 +1511,11 @@
       },
       "covers": "This topic covers",
       "mastered": "Mastered",
-      "strongReviewProgress": "{{strong}}/{{total}} strong reviews"
+      "strongReviewProgress": "{{strong}}/{{total}} strong reviews",
+      "minTotalSuffix": " · {{minutes}} min total",
+      "bookmarkFromChat": "From chat · {{date}}",
+      "a11yAddNote": "Add a note",
+      "a11yAddFirstNote": "Add your first note for this topic"
     },
     "book": {
       "readyToOpen": "Ready to open",
@@ -1427,7 +1583,15 @@
       "a11yBookComplete": "{{title}} complete. {{topics}} topics studied.",
       "genericTitle": "Book",
       "a11ySectionCollapse": "{{label}}. {{summary}}. Collapse section.",
-      "a11ySectionExpand": "{{label}}. {{summary}}. Expand section."
+      "a11ySectionExpand": "{{label}}. {{summary}}. Expand section.",
+      "notesEmptySummary": "Add your first note for this book",
+      "moveOnlyBookAlert": "This is the only book on this shelf — there is nowhere to move this topic.",
+      "topicFallback": "Topic",
+      "loadErrorFallback": "Couldn't load this book.",
+      "a11yAddFirstNote": "Add your first note for this book",
+      "a11yAddNote": "Add a note",
+      "a11yCollapseSessions": "Collapse past conversations",
+      "a11yExpandSessions": "Expand past conversations"
     },
     "notStartedCount": "{{notStarted}} / {{total}} not started",
     "chooseTopic": "Choose a topic",
@@ -1438,7 +1602,76 @@
     "a11yClearSearch": "Clear search",
     "a11yEditNote": "Edit note",
     "a11yDeleteNote": "Delete note",
-    "a11yCloseTopicPicker": "Close topic picker"
+    "a11yCloseTopicPicker": "Close topic picker",
+    "myNotes": {
+      "subtitleBookmarks_one": "1 saved reply",
+      "subtitleBookmarks_other": "{{count}} saved replies",
+      "subtitleNotes_one": "1 note",
+      "subtitleNotes_other": "{{count}} notes",
+      "subtitleSessions_one": "1 session",
+      "subtitleSessions_other": "{{count}} sessions",
+      "searchA11y": "Search {{kind}}"
+    },
+    "pickBook": {
+      "loadingFinding": "Finding fresh books for you...",
+      "loadingPicking": "Picking books to suggest...",
+      "loadingAlmost": "Almost there...",
+      "emptyCooldown": "We just tried to load fresh suggestions and they're not ready yet. Try again in a few minutes, or type a book or topic to add.",
+      "emptyNetworkError": "We couldn't load suggestions right now. Try again, or type a book or topic to add.",
+      "emptyParse": "Suggestions didn't come through cleanly. Try again, or type a book or topic to add.",
+      "emptyLockLoser": "Another request is already loading suggestions. Try again in a moment.",
+      "emptyLanguageSubject": "This subject uses a different learning flow. Type the book or topic you want to study.",
+      "emptyAllFiltered": "We've used up the obvious suggestions for this subject. Type the next book or topic you want to add.",
+      "emptyDefault": "No suggestions yet. Type a book or topic you want to add."
+    },
+    "relearn": {
+      "thisTopicFallback": "this topic",
+      "addedFromChildNamed": "Added from {{name}}'s learning.",
+      "addedFromChild": "Added from a child's learning."
+    },
+    "collapsibleChapter": {
+      "a11yHeader": "{{title}}, {{notStarted}} of {{total}} topics not started"
+    },
+    "inlineNote": {
+      "a11yCollapse": "Note for {{topic}}. {{source}}. Tap to collapse.",
+      "a11yExpand": "Note for {{topic}}. {{source}}. Tap to expand.",
+      "a11yOpenSource": "Open source session for {{topic}}",
+      "a11yNoteOptions": "Note options for {{topic}}"
+    },
+    "noteInput": {
+      "placeholder": "Write your note..."
+    },
+    "retentionPill": {
+      "a11y": "Memory check: {{label}}",
+      "a11yWithElapsed": "Memory check: {{label}}, {{elapsed}}"
+    },
+    "sessionRow": {
+      "a11y": "{{title}}, {{date}}",
+      "a11yWithNote": "{{title}}, has note, {{date}}"
+    },
+    "topicStatusRow": {
+      "stateContinueNow": "Continue now",
+      "stateStarted": "Started",
+      "stateUpNext": "Up next",
+      "stateDone": "Done",
+      "stateLater": "Later",
+      "a11y": "{{state}}: {{title}}",
+      "a11yWithSubtitle": "{{state}}: {{title}}, {{subtitle}}"
+    },
+    "topicPicker": {
+      "a11yTopicWithChapter": "{{name}}, {{chapter}}"
+    },
+    "topicSessionRow": {
+      "a11y": "{{type}}, {{date}}, {{duration}}"
+    },
+    "bookCard": {
+      "a11y": "{{title}}. {{status}}. {{progress}}."
+    },
+    "searchResult": {
+      "a11y": "{{title}}, {{subtitle}}"
+    },
+    "topicPickerEmptyTitle": "No topics yet",
+    "topicPickerEmptyDescription": "This book does not have topics to choose from yet."
   },
   "topic": {
     "lastStudied": "Last studied {{when}}",
@@ -2119,7 +2352,32 @@
     },
     "subjectRow": {
       "hideTopics": "▴ Hide topics",
-      "seeTopics": "▾ See topics"
+      "seeTopics": "▾ See topics",
+      "masteredCount": "{{count}} mastered",
+      "actionContinue": "Continue",
+      "actionExplore": "Explore",
+      "a11yHintHide": "Tap to hide topics",
+      "a11yHintShow": "Tap to show topics",
+      "a11yOpen": "Open {{name}} progress",
+      "a11yExpanded": "{{name}}, expanded",
+      "a11yCollapsed": "{{name}}, collapsed"
+    },
+    "topicStatus": {
+      "notStarted": "Not started",
+      "mastered": "Mastered",
+      "needsReview": "Needs review",
+      "started": "Started",
+      "covered": "Covered"
+    },
+    "milestoneCard": {
+      "streakLength": "{{count}}-day streak",
+      "subjectMastered": "Mastered {{subject}}",
+      "subjectMasteredFallback": "Mastered a subject",
+      "bookCompleted": "Completed a book",
+      "cefrLevelUp": "Language level increased",
+      "topicsExplored": "Explored {{count}} topics in {{subject}}",
+      "topicsExploredFallback": "Explored {{count}} topics in a subject",
+      "unknown": "Milestone reached"
     }
   },
   "onboarding": {
@@ -2181,12 +2439,41 @@
       "intro": "Here's what's set up:",
       "rowTone": "Your mentor will talk to you the right way",
       "rowSubject": "Starting with {{subject}}",
+      "rowSubjectNoSubject": "Your first topic is ready",
       "rowPace": "Pace stays at your speed — never rushed",
       "reassurance": "Most learners feel the difference in the first session.",
       "cta": "Let's start"
     },
+    "mentorBirth": {
+      "ready": "Your mentor is ready."
+    },
     "stepIndicator": {
       "stepOf": "Step {{current}} of {{total}}"
+    },
+    "saveWizard": {
+      "startLesson": "Start lesson",
+      "openParentHome": "Open parent home",
+      "switchProfileError": "Could not switch profile.",
+      "firstLessonReady": "Your first lesson is ready.",
+      "firstLessonReadyWithTopic": "Your first lesson is ready: {{topic}}."
+    },
+    "consent": {
+      "profileNotOwnedError": "This profile does not belong to your account."
+    },
+    "createProfile": {
+      "timeoutError": "Creating your profile is taking too long. Check your connection and try again.",
+      "displayNameTooLong": "Display name must be 50 characters or fewer.",
+      "childNamePlaceholder": "Enter your child's name",
+      "namePlaceholder": "Enter name",
+      "childBirthDateAccessLabel": "Child's birth date",
+      "birthDateAccessLabel": "Birth date",
+      "selectChildBirthDateLabel": "Select child's birth date",
+      "selectBirthDateLabel": "Select birth date",
+      "addChildButton": "Add child"
+    },
+    "profiles": {
+      "roleParent": "Parent",
+      "roleLearner": "Learner"
     }
   },
   "parentView": {
@@ -2357,7 +2644,17 @@
       "sessionSummary": "Session summary",
       "noSummaryBody": "No summary was generated for this session",
       "openTopicWithTitle": "Open {{title}}",
-      "backToChildProfile": "Back to child profile"
+      "backToChildProfile": "Back to child profile",
+      "engagementChip": {
+        "accessibilityLabel": "Engagement: {{label}}",
+        "labels": {
+          "curious": "Curious",
+          "stuck": "Working through it",
+          "breezing": "Breezing",
+          "focused": "Focused",
+          "scattered": "Finding focus"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Subject not found",
@@ -2581,6 +2878,12 @@
     },
     "home": "Home",
     "homeLabel": "Home",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
+    "subjects": "Subjects",
+    "subjectsLabel": "Subjects",
+    "journal": "Journal",
+    "journalLabel": "Journal",
     "familyHub": "Family Hub",
     "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
@@ -2595,6 +2898,240 @@
     "progressLabel": "Progress",
     "more": "More",
     "moreLabel": "More"
+  },
+  "mentorHome": {
+    "title": "Mentor",
+    "subtitle": "A few useful next steps, plus one place to ask or capture anything.",
+    "fallback": {
+      "cached": "Showing the last saved feed while we reconnect."
+    },
+    "error": {
+      "title": "We could not load your next steps",
+      "message": "You can retry or browse subjects directly.",
+      "subjects": "Browse subjects"
+    },
+    "cards": {
+      "unfinished_session": {
+        "title": "Continue your last session",
+        "cta": "Continue",
+        "arcDue": "Ready to pick back up",
+        "arcAdvancing": "You are moving this forward",
+        "arcMastered": "Session wrapped"
+      },
+      "retention_due": {
+        "title": "Review what is due",
+        "cta": "Review",
+        "arcDue": "Due for practice",
+        "arcAdvancing": "Getting stronger",
+        "arcMastered": "Review cleared"
+      },
+      "parked_item": {
+        "title": "Return to a saved question",
+        "cta": "Open",
+        "arcDue": "Waiting for you",
+        "arcAdvancing": "Back in motion",
+        "arcMastered": "Filed"
+      },
+      "needs_deepening": {
+        "title": "Deepen a tricky idea",
+        "cta": "Work on it",
+        "arcDue": "Needs another pass",
+        "arcAdvancing": "Understanding is improving",
+        "arcMastered": "Solid now"
+      },
+      "challenge_ready": {
+        "title": "Try a challenge round",
+        "cta": "Start challenge",
+        "arcDue": "Ready to test",
+        "arcAdvancing": "Challenge in progress",
+        "arcMastered": "Challenge cleared"
+      },
+      "generic": {
+        "title": "Open your next learning step",
+        "cta": "Open"
+      },
+      "complete": "Done",
+      "dismissIcon": "x"
+    },
+    "ledger": {
+      "label": "Learning moment",
+      "generic": {
+        "title": "A learning moment was saved."
+      },
+      "session_filed": {
+        "title": "Saved {{topicTitle}} to your learning record."
+      },
+      "quota": {
+        "title": "A learning moment was saved."
+      }
+    },
+    "overflow": {
+      "more": "{{count}} more options"
+    },
+    "empty": {
+      "title": "Nothing needs you right now",
+      "cta": "Browse more learning options"
+    },
+    "bar": {
+      "unavailable": "The mentor is offline for a moment. You can still type.",
+      "cameraLabel": "Camera",
+      "placeholder": "Ask, paste, or describe what you want to learn.",
+      "micLabel": "Mic",
+      "homeworkChip": "Homework"
+    },
+    "onTrack": {
+      "label": "On track",
+      "reviewsDue": "reviews due",
+      "dueCleared": "No reviews due"
+    },
+    "rewards": {
+      "privateLabel": "Private learning receipt",
+      "practicePoints": "+{{amount}} practice points for {{topicTitle}}",
+      "practicePointsNoTopic": "+{{amount}} practice points",
+      "reflectionBonus": "{{multiplier}} reflection bonus applied",
+      "quizPersonalBestCapitals": "New capitals personal best: {{score}}",
+      "quizPersonalBestGuessWho": "New Guess Who personal best: {{score}}",
+      "masteryDelta": "{{mastered}} mastered, +{{weeklyDelta}} this week",
+      "masteryDeltaNoWeekly": "{{mastered}} mastered"
+    },
+    "lightPractice": {
+      "prompt": "Prefer something light?",
+      "fatigueReason": "Suggested because this feed is light right now.",
+      "capitals": "Capitals",
+      "guessWho": "Guess Who",
+      "vocabulary": "Vocabulary",
+      "dictation": "Dictation"
+    },
+    "celebration": {
+      "ownChoice": "You chose the next step."
+    },
+    "coldStart": {
+      "caption": "What do you want to work on?",
+      "equalWeight": "Example prompt",
+      "placeholderRotation": {
+        "one": "Type a question or paste homework..."
+      },
+      "orJustType": "Or start with one of these.",
+      "chipHomework": "Help me with homework",
+      "chipLearn": "Teach me something new",
+      "chipAsk": "I have a question",
+      "homeworkReply": "Use the camera to capture the problem, or type it here.",
+      "firstSessionTeach": "I'll remember what you write here so the next step starts closer to you."
+    }
+  },
+  "subjectsBrowse": {
+    "title": "Subjects",
+    "searchPlaceholder": "Search subjects",
+    "showEverything": "Show me everything",
+    "emptyTitle": "No subjects yet",
+    "emptyMessage": "Create a subject to start building your learning map.",
+    "createSubject": "Create subject",
+    "openSubject": "Open subject",
+    "errorTitle": "We could not load subjects",
+    "errorMessage": "Try again, or come back in a moment.",
+    "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+    "reviewsDue": "{{count}} reviews due"
+  },
+  "subjectHub": {
+    "loading": "Loading subject...",
+    "errors": {
+      "missingSubjectTitle": "Subject not found",
+      "missingSubjectMessage": "Go back and choose a subject again.",
+      "loadTitle": "Could not load this subject",
+      "loadMessage": "Try again, or go back to your subjects."
+    },
+    "progress": {
+      "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
+      "reviewsDue": "{{count}} reviews due",
+      "noReviewsDue": "No reviews due",
+      "weeklyDelta": "+{{count}} mastered this week",
+      "noWeeklyDelta": "No new mastery this week",
+      "practicePoints": "{{points}} practice points recently",
+      "noPracticePoints": "No recent practice points"
+    },
+    "nextUp": {
+      "heading": "Next up",
+      "allCaughtUp": "All caught up",
+      "resume": "Resume",
+      "upNext": "Study the next topic",
+      "review": "Review",
+      "structuralOnly": "Study actions are private to the learner in this view."
+    },
+    "chapter": {
+      "progress": "{{mastered}} / {{total}} mastered"
+    },
+    "search": {
+      "placeholder": "Search topics",
+      "micLabel": "Search by voice",
+      "noResults": "No topics match that search."
+    },
+    "notes": {
+      "heading": "Notes",
+      "authorSelf": "My notes",
+      "authorMentor": "Saved from mentor"
+    },
+    "sheet": {
+      "close": "Close",
+      "about": "About this topic",
+      "masteryLine": "Status: {{state}}",
+      "study": "Study",
+      "review": "Review",
+      "seeFullTopic": "See full topic"
+    },
+    "topic": {
+      "continueNow": "Continue now",
+      "started": "Started",
+      "upNext": "Up next",
+      "later": "Later",
+      "done": "Done",
+      "mastered": "Mastered"
+    }
+  },
+  "journal": {
+    "title": "Journal",
+    "trust": {
+      "privacyPromise": "Your private learning trail: saved moments, notes, reports, and mentor memory."
+    },
+    "sections": {
+      "recaps": "Recaps",
+      "recapsSubtitle": "Review recent session summaries.",
+      "reports": "My reports",
+      "reportsSubtitle": "Open weekly and monthly progress reports.",
+      "notes": "Saved notes",
+      "notesSubtitle": "Browse notes, bookmarks, and saved sessions.",
+      "memory": "Mentor memory",
+      "memorySubtitle": "See and manage what your mentor remembers."
+    },
+    "moments": {
+      "title": "Recent moments",
+      "empty": "New learning moments will appear here.",
+      "errorTitle": "Could not load recent moments",
+      "generic": "A learning moment was saved.",
+      "session_filed": "Saved {{topicTitle}} to your learning record.",
+      "topic_mastered": "Marked {{topicTitle}} as mastered.",
+      "recap_ready": "A recap is ready.",
+      "snapshot_ready": "A learning snapshot is ready.",
+      "reflection_bonus": "Reflection bonus saved.",
+      "quiz_personal_best": "Personal best saved."
+    },
+    "recaps": {
+      "empty": "Your finished session summaries will appear here.",
+      "error": "Could not load your recaps.",
+      "openLabel": "Open recap for {{title}}"
+    },
+    "reports": {
+      "error": "Could not load your reports."
+    },
+    "notes": {
+      "sessions": "Recent learning sessions",
+      "notes": "Study notes you saved",
+      "bookmarks": "Saved mentor replies"
+    },
+    "memory": {
+      "title": "Mentor memory controls",
+      "body": "Review, edit, hide, export, or clear what your mentor remembers from the full memory screen.",
+      "open": "Open memory controls"
+    }
   },
   "recaps": {
     "title": "Recaps",
@@ -2749,7 +3286,10 @@
       "quotaResets": "Quota resets {{date}}",
       "renews": "Subscription renews {{date}}",
       "dailyLimitHint": "Daily limit — resets at midnight"
-    }
+    },
+    "accessUntil": "Access until {{date}}",
+    "renewsOn": "Renews {{date}}",
+    "memberOwnerLabel": "{{name}} (owner)"
   },
   "sessionSummary": {
     "mentorMemoryCue": {
@@ -2854,7 +3394,9 @@
       "duration_other": "{{count}} minutes - great session!",
       "exchanges_one": "You worked through {{count}} exchange",
       "exchanges_other": "You worked through {{count}} exchanges"
-    }
+    },
+    "a11yContinueLearning": "Continue learning",
+    "a11yContinueToHome": "Continue to home"
   },
   "sessionTranscript": {
     "archived": {
@@ -2882,6 +3424,12 @@
       "crossContextPromptMessage": "You are in a session. Finish this first, or open the update and leave the current flow.",
       "stayHere": "Stay here",
       "openUpdate": "Open update"
+    },
+    "guardianPrimer": {
+      "title": "Stay in the loop?",
+      "message": "We can send a gentle nudge when a child needs your attention. You can change this anytime in Settings.",
+      "allow": "Allow",
+      "notNow": "Not now"
     }
   },
   "nudge": {
@@ -3096,7 +3644,9 @@
     "signingOutAll": "Signing out other devices...",
     "signOutAllTitle": "Sign out all other devices?",
     "signOutAllConfirm": "This will end {{count}} other session(s). This device stays signed in.",
-    "signOutAllConfirmButton": "Sign out all"
+    "signOutAllConfirmButton": "Sign out all",
+    "emptyBackLabel": "Back to account settings",
+    "emptyBackButton": "Back to account"
   },
   "changePassword": {
     "errorCurrentRequired": "Enter your current password",
@@ -3260,13 +3810,17 @@
   },
   "createProfile": {
     "titleChild": "Tell us about your child",
+    "titleParent": "Tell us about you",
     "titleSelf": "Who's the learner?",
     "displayNameLabel": "Display name",
+    "parentDisplayNameLabel": "Your display name",
     "childDisplayNameLabel": "Child's display name",
     "birthDateLabel": "Birth date",
+    "parentBirthDateLabel": "Your birth date",
     "childBirthDateLabel": "Child's birth date",
-    "birthDateHint": "So your mentor talks to you the right way. Minimum age is 11.",
-    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is 11.",
+    "birthDateHint": "So your mentor talks to you the right way. Minimum age is {{age}}.",
+    "parentBirthDateHint": "This is for the adult setting up the account. You can add your child next. Minimum age is {{age}}.",
+    "childBirthDateHint": "So your child's mentor talks to them the right way. Minimum age is {{age}}.",
     "webDateFormatHint": "Enter your birth date as YYYY-MM-DD.",
     "childWebDateFormatHint": "Enter your child's birth date as YYYY-MM-DD.",
     "selectDob": "Select date of birth",
@@ -3277,6 +3831,8 @@
     "upgradeRequiredTitle": "Upgrade required",
     "upgradeRequiredBody": "Your subscription does not support additional profiles. Please upgrade to Family or Pro.",
     "seePlans": "See plans",
+    "minimumAgeError": "Learners must be at least {{age}} years old. Please choose an earlier birth date.",
+    "parentAdultAgeError": "Parent accounts need an adult birth date. Enter your own details first, then add your child next.",
     "a11yCloseDatePicker": "Close date picker"
   },
   "clerkGate": {
@@ -3285,6 +3841,10 @@
     "tryAgain": "Try again",
     "continueOffline": "Continue without account",
     "connecting": "Connecting securely..."
+  },
+  "scopeChip": {
+    "supportHub": "Support hub",
+    "me": "Me"
   },
   "modeSwitcher": {
     "switchError": "Couldn't switch. Tap to try again.",
@@ -3316,7 +3876,8 @@
     "childNamePlaceholder": "Their name or nickname",
     "childBirthYearPlaceholder": "Birth year",
     "a11yBack": "Back to previous step",
-    "a11yCancel": "Cancel and exit"
+    "a11yCancel": "Cancel and exit",
+    "loading": "Loading your saved preview..."
   },
   "myNotes": {
     "title": "My Notes",
@@ -3346,7 +3907,9 @@
     "hub": {
       "sessionsSubtitle": "Conversations you had",
       "notesSubtitle": "Things you wrote down",
-      "bookmarksSubtitle": "Mentor replies you saved"
+      "bookmarksSubtitle": "Mentor replies you saved",
+      "countLoading": "Loading",
+      "countUnavailable": "Unavailable"
     },
     "unknownSubject": "Unknown subject",
     "searchSessions": "Search sessions",
@@ -3446,7 +4009,26 @@
     "bothChildFirstLabel": "Set up my child first",
     "bothChildFirstDescription": "We'll get your child going, then come back to you.",
     "bothSelfFirstLabel": "Try a lesson myself first",
-    "bothSelfFirstDescription": "See how it works, then set up your child after sign-up."
+    "bothSelfFirstDescription": "See how it works, then set up your child after sign-up.",
+    "sampleGeographyTitle": "Geography",
+    "sampleGeographyDescription": "Why some places become deserts",
+    "sampleFractionsTitle": "Fractions",
+    "sampleFractionsDescription": "Compare pieces without guessing",
+    "sampleWritingTitle": "Writing",
+    "sampleWritingDescription": "Plan a clear paragraph",
+    "sampleGeographyMentor": "Let us try geography. A desert is defined by low rainfall, not heat. Why might land behind mountains stay dry?",
+    "sampleGeographyLearner": "Because the rain falls before the air gets there?",
+    "sampleGeographyFollowUp": "Exactly. Mountains can squeeze moisture out on one side, leaving drier air on the other. That is called a rain shadow.",
+    "sampleFractionsMentor": "Let us compare fractions. If two pieces come from the same whole, the larger piece has the smaller bottom number.",
+    "sampleFractionsLearner": "So 1/2 is bigger than 1/3?",
+    "sampleFractionsFollowUp": "Yes. Splitting something into two parts makes each part bigger than splitting it into three parts.",
+    "sampleWritingMentor": "Let us plan a paragraph. Start with the one thing you want the reader to believe.",
+    "sampleWritingLearner": "So I should choose the main point before examples?",
+    "sampleWritingFollowUp": "Right. Once the main point is clear, the examples have a job instead of feeling random.",
+    "sampleGenericMentorWithTopic": "Let us work on {{topic}}. I will show one idea, then ask a quick check.",
+    "sampleGenericMentor": "Let us try a quick sample. I will show one idea, then ask a quick check.",
+    "sampleGenericLearner": "I am not sure how to start.",
+    "sampleGenericFollowUp": "That is a good starting point. We will make the first step concrete, then build from there."
   },
   "milestoneCard": {
     "wordCount_one": "{{count}} word learned",
@@ -3457,5 +4039,57 @@
     "sessionCount_other": "{{count}} learning sessions completed",
     "hourCount_one": "{{count}} hour of learning",
     "hourCount_other": "{{count}} hours of learning"
+  },
+  "guardian": {
+    "couldNotEnableMemory": "Could not enable memory",
+    "couldNotSavePreference": "Could not save preference",
+    "completionStatus": {
+      "notStarted": "Not started",
+      "inProgress": "Started",
+      "completed": "Completed",
+      "verified": "Verified",
+      "stable": "Stable"
+    },
+    "subjectFallback": "Subject",
+    "latestWeekFallback": "Latest week",
+    "learningStyle": {
+      "prefersExplanations": "Prefers {{types}} explanations",
+      "prefersStepByStep": "Prefers a step-by-step pace",
+      "prefersQuickerPace": "Prefers a quicker pace",
+      "likesChallenge": "Likes a challenge",
+      "needsEncouragement": "Needs extra encouragement when work gets difficult"
+    },
+    "focusArea": {
+      "confidenceHigh": "Showing up a lot lately",
+      "confidenceMedium": "Repeated pattern",
+      "confidenceLow": "Early signal"
+    },
+    "sourceBadge": {
+      "learner": "You told your mentor",
+      "parent": "Added by parent"
+    },
+    "remove": "Remove"
+  },
+  "appShell": {
+    "profileLoadErrorTitle": "We could not load your profile"
+  },
+  "analogyPicker": {
+    "noPreferenceLabel": "No preference",
+    "noPreferenceDescription": "Use whatever analogy fits best",
+    "cookingLabel": "Cooking",
+    "cookingDescription": "Recipes, ingredients, kitchen techniques",
+    "sportsLabel": "Sports",
+    "sportsDescription": "Games, teams, training strategies",
+    "buildingLabel": "Building",
+    "buildingDescription": "Construction, architecture, tools",
+    "musicLabel": "Music",
+    "musicDescription": "Instruments, rhythm, composition",
+    "natureLabel": "Nature",
+    "natureDescription": "Plants, animals, ecosystems",
+    "gamingLabel": "Gaming",
+    "gamingDescription": "Levels, quests, game mechanics"
+  },
+  "usageMeter": {
+    "a11yProgressBar": "Usage: {{used}} of {{limit}} questions used"
   }
 }

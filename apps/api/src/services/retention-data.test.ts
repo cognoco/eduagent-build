@@ -44,46 +44,18 @@ jest.mock(
   },
 );
 
-jest.mock(
-  './xp' /* gc1-allow: syncXpLedgerStatus makes real DB calls — DB boundary mocked; real DB covered by integration tests */,
-  () => {
-    const actual = jest.requireActual('./xp') as typeof import('./xp');
-    return {
-      ...actual,
-      syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
-
-jest.mock(
-  './sentry' /* gc1-allow: wraps @sentry/cloudflare external SDK — true external boundary */,
-  () => {
-    const actual = jest.requireActual('./sentry') as typeof import('./sentry');
-    return {
-      ...actual,
-      captureException: jest.fn(),
-      addBreadcrumb: jest.fn(),
-    };
-  },
-);
-
 import type { Database } from '@eduagent/database';
 import {
   createScopedRepository,
   curriculumBooks,
   retentionCards,
+  xpLedger,
 } from '@eduagent/database';
 import { processRecallResult, getRetentionStatus } from './retention';
 import {
   canExitNeedsDeepening,
   checkNeedsDeepeningCapacity,
 } from './adaptive-teaching';
-import { syncXpLedgerStatus } from './xp';
-import { captureException } from './sentry';
-
-const mockCaptureException = captureException as jest.MockedFunction<
-  typeof captureException
->;
 import {
   registerProvider,
   createMockProvider,
@@ -997,7 +969,7 @@ describe('processRecallTest', () => {
     expect(result.remediation).toBeUndefined();
   });
 
-  it('calls syncXpLedgerStatus with verified when delayed recall passes', async () => {
+  it('does not update xp_ledger when delayed recall passes', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -1023,11 +995,20 @@ describe('processRecallTest', () => {
       answer: 'Detailed explanation of the topic',
     });
 
-    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
-      db,
-      profileId,
-      topicId,
-      'verified',
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]) => table,
+    );
+    expect(updateTables).not.toContain(xpLedger);
+
+    const setMock = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setMock.mock.calls).toEqual(
+      expect.arrayContaining([
+        [
+          expect.objectContaining({
+            xpStatus: 'verified',
+          }),
+        ],
+      ]),
     );
   });
 
@@ -1076,7 +1057,7 @@ describe('processRecallTest', () => {
     );
   });
 
-  it('calls syncXpLedgerStatus with decayed when recall fails with decay', async () => {
+  it('[WI-848] syncs xp_ledger.status to decayed when recall result is decay', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -1103,69 +1084,33 @@ describe('processRecallTest', () => {
       answer: 'Wrong answer',
     });
 
-    expect(syncXpLedgerStatus).toHaveBeenCalledWith(
-      db,
-      profileId,
-      topicId,
-      'decayed',
+    // retention_cards must be updated with xpStatus='decayed'
+    const setMock = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setMock.mock.calls).toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ xpStatus: 'decayed' })],
+      ]),
     );
-    expect(
-      (db.update as jest.Mock).mock.calls.some(
-        ([table]) => table === curriculumBooks,
-      ),
-    ).toBe(false);
-  });
 
-  // [AUDIT-SILENT-FAIL] Break test — a silent catch on XP ledger sync
-  // failure would silently accumulate drift across sessions. Sentry
-  // escalation is how we detect this in production.
-  it('[AUDIT-SILENT-FAIL] escalates to Sentry when syncXpLedgerStatus throws', async () => {
-    const card = mockRetentionCardRow();
-    setupScopedRepo({ retentionCardFindFirst: card });
-
-    (processRecallResult as jest.Mock).mockReturnValue({
-      passed: true,
-      newState: {
-        topicId,
-        easeFactor: 2.6,
-        intervalDays: 10,
-        repetitions: 4,
-        failureCount: 0,
-        consecutiveSuccesses: 3,
-        xpStatus: 'verified',
-        nextReviewAt: '2026-02-25T10:00:00.000Z',
-        lastReviewedAt: NOW.toISOString(),
-      },
-      xpChange: 'verified',
-    });
-
-    const xpErr = new Error('XP sync DB outage');
-    (syncXpLedgerStatus as jest.Mock).mockRejectedValueOnce(xpErr);
-
-    const db = createMockDb();
-    const result = await processRecallTest(db, profileId, {
-      topicId,
-      answer: 'A detailed answer about the topic',
-    });
-
-    // Recall response itself is unaffected — XP sync is best-effort.
-    expect(result.passed).toBe(true);
-    // But the failure must be visible.
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      xpErr,
-      expect.objectContaining({
-        profileId,
-        extra: expect.objectContaining({
-          site: 'processRecallTest.syncXpLedgerStatus',
-          topicId,
-          xpChange: 'verified',
-        }),
-      }),
+    // xp_ledger.status must also be synced to 'decayed' (WI-848)
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]) => table,
+    );
+    expect(updateTables).toContain(xpLedger);
+    // book rows must not be mutated on the decay path (regression guard)
+    expect(updateTables).not.toContain(curriculumBooks);
+    const xpLedgerUpdateIdx = updateTables.indexOf(xpLedger);
+    const xpLedgerSetCalls = (db.update as jest.Mock).mock.results[
+      xpLedgerUpdateIdx
+    ]!.value.set.mock.calls;
+    expect(xpLedgerSetCalls).toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ status: 'decayed' })],
+      ]),
     );
   });
 
-  it('does not call syncXpLedgerStatus when xpChange is none', async () => {
+  it('does not update xp_ledger when xpChange is none', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });
 
@@ -1191,7 +1136,10 @@ describe('processRecallTest', () => {
       answer: 'Some answer for the first recall',
     });
 
-    expect(syncXpLedgerStatus).not.toHaveBeenCalled();
+    const updateTables = (db.update as jest.Mock).mock.calls.map(
+      ([table]) => table,
+    );
+    expect(updateTables).not.toContain(xpLedger);
   });
 
   it('D-02: returns cooldown response when atomic guard rejects update (0 rows)', async () => {

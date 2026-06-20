@@ -18,6 +18,7 @@ import {
 } from '@eduagent/database';
 import type {
   NotificationPrefsInput,
+  NotificationPrefsResponse,
   CelebrationLevel,
   WithdrawalArchivePreference,
   NotificationPayload,
@@ -39,15 +40,7 @@ export type { IdentityV2Opts };
 // Types
 // ---------------------------------------------------------------------------
 
-export interface NotificationPrefs {
-  reviewReminders: boolean;
-  dailyReminders: boolean;
-  weeklyProgressPush: boolean;
-  weeklyProgressEmail: boolean;
-  monthlyProgressEmail: boolean;
-  pushEnabled: boolean;
-  maxDailyPush: number;
-}
+export type NotificationPrefs = NotificationPrefsResponse;
 
 export interface LearningModeRecord {
   medianResponseSeconds?: number | null;
@@ -65,6 +58,7 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   weeklyProgressEmail: true,
   monthlyProgressEmail: true,
   pushEnabled: false,
+  pushTokenRegistered: false,
   maxDailyPush: 3,
 };
 
@@ -148,6 +142,7 @@ export async function getNotificationPrefs(
     weeklyProgressEmail: row.weeklyProgressEmail ?? true,
     monthlyProgressEmail: row.monthlyProgressEmail ?? true,
     pushEnabled: row.pushEnabled,
+    pushTokenRegistered: Boolean(row.expoPushToken),
     maxDailyPush: row.maxDailyPush,
   };
 }
@@ -277,6 +272,7 @@ export async function upsertNotificationPrefs(
     weeklyProgressEmail,
     monthlyProgressEmail,
     pushEnabled: input.pushEnabled,
+    pushTokenRegistered: Boolean(existing?.expoPushToken),
     maxDailyPush,
   };
 }
