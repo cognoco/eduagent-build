@@ -45,6 +45,12 @@ export function useModeSwitch(): {
   }, [mode]);
 
   useEffect(() => {
+    if (switchError !== null && mode === switchError) {
+      setSwitchError(null);
+    }
+  }, [mode, switchError]);
+
+  useEffect(() => {
     return () => {
       mountedRef.current = false;
       if (pendingTimerRef.current !== null) {

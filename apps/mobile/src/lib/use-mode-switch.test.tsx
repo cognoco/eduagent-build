@@ -109,6 +109,43 @@ function makeWrapper({
   };
 }
 
+function makeMutableProfileWrapper({
+  getActiveProfile,
+  profiles = [studyDefaultFamilyAdult, child],
+  queryClient,
+}: {
+  getActiveProfile: () => Profile | null;
+  profiles?: Profile[];
+  queryClient?: QueryClient;
+}): React.ComponentType<{ children: ReactNode }> {
+  const client =
+    queryClient ??
+    new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    const profileContext: ProfileContextValue = {
+      profiles,
+      activeProfile: getActiveProfile(),
+      isExplicitProxyMode: false,
+      switchProfile: jest.fn().mockResolvedValue({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+    };
+
+    return (
+      <QueryClientProvider client={client}>
+        <ProfileContext.Provider value={profileContext}>
+          <AppContextProvider>{children}</AppContextProvider>
+        </ProfileContext.Provider>
+      </QueryClientProvider>
+    );
+  };
+}
+
 describe('useModeSwitch', () => {
   const originalFlag = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
   const originalV1Flag = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
@@ -425,6 +462,50 @@ describe('useModeSwitch', () => {
     });
 
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale switch error when the requested mode becomes active', () => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+
+    let activeProfile = studyDefaultFamilyAdult;
+    const { result, rerender } = renderHook(
+      () => ({
+        appContext: useAppContext(),
+        modeSwitch: useModeSwitch(),
+      }),
+      {
+        wrapper: makeMutableProfileWrapper({
+          getActiveProfile: () => activeProfile,
+        }),
+      },
+    );
+
+    act(() => {
+      result.current.modeSwitch.switchMode('family');
+    });
+
+    const [, callbacks] = mockUpdateAppContextMutate.mock.calls[0] as [
+      unknown,
+      { onError: () => void },
+    ];
+    act(() => {
+      callbacks.onError();
+    });
+
+    expect(result.current.modeSwitch.switchError).toBe('family');
+
+    activeProfile = {
+      ...studyDefaultFamilyAdult,
+      defaultAppContext: 'family',
+    };
+
+    rerender(undefined);
+
+    expect(result.current.appContext.mode).toBe('family');
+    expect(result.current.modeSwitch.switchError).toBeNull();
   });
 
   it('exposes isSwitching as reactive state for UI feedback', () => {
