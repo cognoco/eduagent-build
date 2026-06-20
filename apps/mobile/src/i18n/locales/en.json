@@ -2902,8 +2902,10 @@
   "mentorHome": {
     "title": "Mentor",
     "subtitle": "A few useful next steps, plus one place to ask or capture anything.",
+    "homeworkPrompt": "Got homework tonight? Snap a photo and we'll work through it together.",
     "fallback": {
-      "cached": "Showing the last saved feed while we reconnect."
+      "cached": "Showing the last saved feed while we reconnect.",
+      "continue": "Continue where you left off"
     },
     "error": {
       "title": "We could not load your next steps",
@@ -3009,7 +3011,9 @@
       "caption": "What do you want to work on?",
       "equalWeight": "Example prompt",
       "placeholderRotation": {
-        "one": "Type a question or paste homework..."
+        "one": "Type a question or paste homework...",
+        "two": "Ask me to explain something...",
+        "three": "Try: show my progress"
       },
       "orJustType": "Or start with one of these.",
       "chipHomework": "Help me with homework",
@@ -3034,6 +3038,7 @@
   },
   "subjectHub": {
     "loading": "Loading subject...",
+    "linkLabel": "Open subject hub",
     "errors": {
       "missingSubjectTitle": "Subject not found",
       "missingSubjectMessage": "Go back and choose a subject again.",
@@ -3068,7 +3073,10 @@
     "notes": {
       "heading": "Notes",
       "authorSelf": "My notes",
-      "authorMentor": "Saved from mentor"
+      "authorMentor": "Saved from mentor",
+      "addNote": "Add a note",
+      "micLabel": "Add a note by voice",
+      "empty": "No notes yet. Capture a thought about this subject."
     },
     "sheet": {
       "close": "Close",
@@ -3123,9 +3131,12 @@
       "error": "Could not load your reports."
     },
     "notes": {
-      "sessions": "Recent learning sessions",
-      "notes": "Study notes you saved",
-      "bookmarks": "Saved mentor replies"
+      "error": "Could not load your notes.",
+      "searchPlaceholder": "Search notes",
+      "searchEmpty": "No notes match that search.",
+      "empty": "Notes you save and mentor replies you bookmark will appear here.",
+      "authorshipMentor": "From mentor",
+      "authorshipMine": "My note"
     },
     "memory": {
       "title": "Mentor memory controls",

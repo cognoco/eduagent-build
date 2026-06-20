@@ -31,6 +31,7 @@ import {
   formatApiError,
 } from '../../../../lib/format-api-error';
 import { copyRegisterFor } from '../../../../lib/copy-register';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 
 function StatCard({
   label,
@@ -321,6 +322,24 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               </Text>
             ) : null}
           </View>
+          {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/subject-hub/[subjectId]',
+                  params: { subjectId },
+                } as Href)
+              }
+              className="ms-2 py-2 pe-1"
+              accessibilityRole="button"
+              accessibilityLabel={t('subjectHub.linkLabel')}
+              testID="subject-hub-link"
+            >
+              <Text className="text-body-sm font-semibold text-primary">
+                {t('subjectHub.linkLabel')}
+              </Text>
+            </Pressable>
+          ) : null}
           {subject ? (
             <Pressable
               onPress={handlePrimarySubjectAction}
