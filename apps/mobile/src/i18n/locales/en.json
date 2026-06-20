@@ -2376,7 +2376,8 @@
       "bookCompleted": "Completed a book",
       "cefrLevelUp": "Language level increased",
       "topicsExplored": "Explored {{count}} topics in {{subject}}",
-      "topicsExploredFallback": "Explored {{count}} topics in a subject"
+      "topicsExploredFallback": "Explored {{count}} topics in a subject",
+      "unknown": "Milestone reached"
     }
   },
   "onboarding": {

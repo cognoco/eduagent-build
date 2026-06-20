@@ -76,8 +76,35 @@ export function MilestoneCard({
   milestone,
 }: MilestoneCardProps): React.ReactElement {
   const { t } = useTranslation();
-  const config = MILESTONE_COPY[milestone.milestoneType];
+  // The milestone_type DB column is free-text (no CHECK constraint), so an
+  // unrecognized value can reach this component. Guard the MILESTONE_COPY
+  // lookup so an unknown type renders a generic milestone card instead of
+  // crashing the render (config.icon would throw on undefined).
+  const config = MILESTONE_COPY[milestone.milestoneType] as
+    | (typeof MILESTONE_COPY)[MilestoneRecord['milestoneType']]
+    | undefined;
   const createdAt = new Date(milestone.createdAt);
+
+  if (!config) {
+    return (
+      <View className="bg-surface rounded-card p-4">
+        <View className="flex-row items-start">
+          <Text className="text-xl me-3">{'🎯'}</Text>
+          <View className="flex-1">
+            <Text className="text-body font-semibold text-text-primary">
+              {t('progress.milestoneCard.unknown')}
+            </Text>
+            <Text className="text-caption text-text-secondary mt-1">
+              {createdAt.toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View className="bg-surface rounded-card p-4">

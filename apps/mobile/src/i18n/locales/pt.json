@@ -2305,7 +2305,8 @@
       "bookCompleted": "Concluiu um livro",
       "cefrLevelUp": "Nível de língua aumentado",
       "topicsExplored": "Explorou {{count}} tópicos em {{subject}}",
-      "topicsExploredFallback": "Explorou {{count}} tópicos numa disciplina"
+      "topicsExploredFallback": "Explorou {{count}} tópicos numa disciplina",
+      "unknown": "Marco alcançado"
     }
   },
   "onboarding": {

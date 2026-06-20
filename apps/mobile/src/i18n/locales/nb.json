@@ -2278,7 +2278,8 @@
       "bookCompleted": "Fullført en bok",
       "cefrLevelUp": "Språknivå økt",
       "topicsExplored": "Utforsket {{count}} emner i {{subject}}",
-      "topicsExploredFallback": "Utforsket {{count}} emner i et fag"
+      "topicsExploredFallback": "Utforsket {{count}} emner i et fag",
+      "unknown": "Milepæl nådd"
     }
   },
   "onboarding": {
