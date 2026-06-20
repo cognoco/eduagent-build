@@ -1087,9 +1087,16 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     quizMissedItems: {
-      async findMany(extraWhere?: SQL) {
+      async findMany(
+        extraWhere?: SQL,
+        options?: { orderBy?: 'createdAtDesc'; limit?: number },
+      ) {
         return db.query.quizMissedItems.findMany({
           where: scopedWhere(quizMissedItems, extraWhere),
+          ...(options?.orderBy === 'createdAtDesc'
+            ? { orderBy: desc(quizMissedItems.createdAt) }
+            : {}),
+          ...(options?.limit !== undefined ? { limit: options.limit } : {}),
         });
       },
       async findFirst(extraWhere?: SQL) {

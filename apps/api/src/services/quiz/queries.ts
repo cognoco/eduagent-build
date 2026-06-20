@@ -339,8 +339,9 @@ export async function getRecentMissedItems(
         eq(quizMissedItems.surfaced, false),
         eq(quizMissedItems.convertedToTopic, false),
       ),
+      { orderBy: 'createdAtDesc', limit },
     );
-    return rows.slice(0, limit).map((r) => ({
+    return rows.map((r) => ({
       questionText: r.questionText,
       correctAnswer: r.correctAnswer,
     }));
