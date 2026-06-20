@@ -9,8 +9,9 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
@@ -48,6 +49,21 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
     }),
   };
 });
+
+// [WI-867] v2 profile-scope seam continuity mock. Mirror the pre-collapse
+// getProfile default: id 'a0000000-0000-4000-a000-000000000001'.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ profileId: 'a0000000-0000-4000-a000-000000000001' }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 jest.mock(
   '../services/vocabulary' /* gc1-allow: pattern-a conversion */,
@@ -133,7 +149,11 @@ import {
   VocabularyNotFoundError,
 } from '@eduagent/schemas';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  // [WI-867] DATABASE_URL required so databaseMiddleware sets db on the context.
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 
 const AUTH_HEADERS = makeAuthHeaders({
   'X-Profile-Id': 'a0000000-0000-4000-a000-000000000001',
@@ -154,6 +174,9 @@ describe('vocabulary routes', () => {
   beforeEach(() => {
     clearJWKSCache();
     jest.clearAllMocks();
+    // [WI-867] Restore v2 seam defaults after clearAllMocks.
+    mockFindOwnerPersonScope.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue(personScope({ profileId: 'a0000000-0000-4000-a000-000000000001' }));
   });
 
   describe('GET /v1/subjects/:subjectId/vocabulary', () => {

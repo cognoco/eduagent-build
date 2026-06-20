@@ -18,6 +18,7 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -71,6 +72,19 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
     hasPremiumLlm: false,
   }),
 }));
+
+// [WI-867] v2 profile-scope seam continuity mock.
+// findOwnerPersonScope returns owner scope (no X-Profile-Id header in this test).
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(personScope());
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Mock suggestion services — stub for route handler
