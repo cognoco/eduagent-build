@@ -570,9 +570,11 @@ describe('resetDatabase', () => {
     const result = await resetDatabase(db);
 
     expect(result).toEqual({ deletedCount: 2, clerkUsersDeleted: 0 });
-    // deleteOrganizationGraph issues 5 deletes: consentGrant, subscription,
-    // guardianship, person, organization (only organization uses .returning()).
-    expect(db.delete).toHaveBeenCalledTimes(5);
+    // deleteOrganizationGraph issues 6 deletes: consentRequest, consentGrant,
+    // subscription, guardianship, person, organization (only organization uses
+    // .returning()). consentRequest is deleted before consentGrant (WI-880) to
+    // clear the consent_request.consent_grant_id NO ACTION back-link FK.
+    expect(db.delete).toHaveBeenCalledTimes(6);
     expect(deleteReturning).toHaveBeenCalledTimes(1);
   });
 
