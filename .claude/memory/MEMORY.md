@@ -60,6 +60,7 @@
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
+- [feedback_flow_testing_from_main.md](feedback_flow_testing_from_main.md) — Flow testing/status evidence must run from `main` unless the user explicitly names another branch; use a clean `origin/main` worktree if needed.
 
 ## Android SDK & Build
 
