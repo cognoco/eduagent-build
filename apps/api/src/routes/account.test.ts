@@ -484,6 +484,84 @@ describe('account routes', () => {
       });
     });
 
+    it('[orphan-schedule] surfaces orphan-recovery telemetry when re-dispatching for an already-scheduled deletion', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      // The core durable handoff is re-dispatched (orphan recovery)...
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-scheduled',
+        data: expect.objectContaining({ accountId: 'test-account-id' }),
+      });
+      // ...and the orphan condition is surfaced as tracked telemetry so a
+      // prior orphaned schedule (DB write succeeded, durable handoff lost)
+      // is observable in Sentry rather than recovered silently.
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-orphan-recovered',
+        data: expect.objectContaining({
+          accountId: 'test-account-id',
+          identityVersion: 'v1',
+          timestamp: expect.any(String),
+        }),
+      });
+    });
+
+    it('[orphan-schedule] does not emit orphan-recovery telemetry on the normal first-schedule path', async () => {
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/account.deletion-orphan-recovered',
+        }),
+      );
+    });
+
+    it('[orphan-schedule] still returns 200 when the non-core orphan-recovery telemetry send fails', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+      // First send = core durable handoff (succeeds). Second send = non-core
+      // orphan-recovery telemetry (fails). The failure must be swallowed by
+      // safeSend and never break the user-facing deletion request.
+      (inngest.send as jest.Mock)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('telemetry unavailable'));
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.message).toBe('Deletion scheduled');
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         '/v1/account/delete',

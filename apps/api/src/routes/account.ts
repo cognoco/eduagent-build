@@ -36,6 +36,7 @@ import {
 import { generateExport } from '../services/export';
 import { generateExportV2 } from '../services/identity-v2/export-v2';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
 import { isIdentityV2Enabled } from '../config';
 import { NotFoundError, apiError, validationError } from '../errors';
@@ -190,6 +191,30 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
           timestamp: new Date().toISOString(),
         },
       });
+
+      // [orphan-schedule] scheduledNow === false means a prior schedule already
+      // existed when this request ran. We re-dispatched the core handoff above
+      // (idempotent) to recover a possible orphan — a schedule whose DB write
+      // succeeded but whose durable Inngest job never queued (e.g. a prior
+      // dispatch failed and skipped rollback). That recovery would otherwise be
+      // invisible, so surface it as tracked, non-core telemetry. Non-core: a
+      // telemetry-dispatch failure must never break the user's deletion, hence
+      // safeSend (captured in Sentry, never thrown) rather than a bare send.
+      if (!scheduledNow) {
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/account.deletion-orphan-recovered',
+              data: {
+                accountId: account.id,
+                identityVersion: v2 ? 'v2' : 'v1',
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          'account.deletion-orphan-recovered',
+          { accountId: account.id },
+        );
+      }
     } catch (error) {
       captureException(error, {
         extra: {
