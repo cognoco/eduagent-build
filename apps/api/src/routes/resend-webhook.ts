@@ -246,6 +246,8 @@ async function handleEmailBounced(
     // suppressEmail escalates its own DB failures to Sentry + structured log
     // (silent recovery is banned). It never throws, so a persistence failure
     // does not turn a verified webhook into a 500 / Svix retry storm.
+    // Return value intentionally ignored — webhook is always acked; suppressEmail
+    // escalates its own failures internally.
     await suppressEmail(db, data.to, reason, data.email_id ?? null);
   }
 

@@ -2173,7 +2173,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "email_suppressions_reason_check": {
+          "name": "email_suppressions_reason_check",
+          "value": "\"email_suppressions\".\"reason\" IN ('hard_bounce', 'complaint')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.session_embeddings": {

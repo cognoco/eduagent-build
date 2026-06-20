@@ -18,7 +18,8 @@
 // profiles (e.g. a parent's email on several child accounts).
 // ---------------------------------------------------------------------------
 
-import { pgTable, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, index, check } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const emailSuppressions = pgTable(
   'email_suppressions',
@@ -36,7 +37,16 @@ export const emailSuppressions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index('email_suppressions_created_at_idx').on(table.createdAt)],
+  (table) => [
+    index('email_suppressions_created_at_idx').on(table.createdAt),
+    // Defense-in-depth: the writer is the source of allowed values, but the DB
+    // also rejects anything outside the EmailSuppressionReason union. Keep this
+    // IN-list in lockstep with EMAIL_SUPPRESSION_REASONS below.
+    check(
+      'email_suppressions_reason_check',
+      sql`${table.reason} IN ('hard_bounce', 'complaint')`,
+    ),
+  ],
 );
 
 export type EmailSuppression = typeof emailSuppressions.$inferSelect;
