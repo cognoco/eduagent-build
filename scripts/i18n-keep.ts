@@ -299,6 +299,12 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/mentor/ColdStartCard.tsx:63',
   },
   {
+    pattern: 'mentorHome.coldStart.placeholderRotation.*',
+    reason:
+      'cycled via PLACEHOLDER_KEYS[placeholderIndex] at ' +
+      'apps/mobile/src/components/mentor/ColdStartCard.tsx:63',
+  },
+  {
     pattern: 'mentorHome.celebration.*',
     reason:
       'selected via messageKey at ' +

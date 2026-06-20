@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
-import type { NowCard, NowResponse } from '@eduagent/schemas';
+import type { NowCard, NowDeepLink, NowResponse } from '@eduagent/schemas';
 
 import {
   ColdStartCard,
@@ -23,6 +23,16 @@ import { useSubjectsIndex } from '../../hooks/use-subjects-index';
 import { matchBarIntent } from '../../lib/bar-intent-match';
 import { hasFirstRealState } from '../../lib/first-real-state';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
+import { isSchoolDayEvening } from '../../lib/school-day-evening';
+
+function resumeDeepLinkFromCache(
+  feed: NowResponse | undefined,
+): NowDeepLink | null {
+  const unfinished = feed?.cards.find(
+    (card) => card.kind === 'unfinished_session',
+  );
+  return unfinished?.deepLink ?? null;
+}
 
 function countReviewsDue(feed: NowResponse | undefined): number {
   return (
@@ -88,6 +98,7 @@ export default function MentorScreen(): React.ReactElement {
   });
   const rewardReceipt = rewardReceiptFromFeed(feed);
   const reviewsDue = countReviewsDue(feed);
+  const showHomeworkPrompt = isSchoolDayEvening() && firstRealState;
 
   const setArcState = (card: NowCard, arcState: NowCardArcState): void => {
     const key = getNowCardDismissKey(card);
@@ -202,6 +213,23 @@ export default function MentorScreen(): React.ReactElement {
       />
     );
   } else if (feed) {
+    // Error with a populated cache: keep the cached cards AND synthesize a
+    // client-side "continue where you left off" card so this branch is never a
+    // dead-end (T11b). Deep-link straight to the cached unfinished session when
+    // one exists; otherwise open the session spine via the generic fallback.
+    const resumeLink = resumeDeepLinkFromCache(feed);
+    const handleContinueFallback = (): void => {
+      if (resumeLink) {
+        pushNowDeepLink(router, resumeLink, {
+          subjectHubTarget: 'v2-subject-hub',
+        });
+        return;
+      }
+      router.push({
+        pathname: '/(app)/session',
+        params: { entrySource: 'mentor', returnTo: 'mentor' },
+      } as Href);
+    };
     renderedFeed = (
       <>
         {nowFeed.isSlowFallback ? (
@@ -213,6 +241,18 @@ export default function MentorScreen(): React.ReactElement {
               {t('mentorHome.fallback.cached')}
             </Text>
           </View>
+        ) : null}
+        {nowFeed.isError ? (
+          <Pressable
+            testID="continue-fallback-card"
+            accessibilityRole="button"
+            onPress={handleContinueFallback}
+            className="rounded-card border border-border bg-surface px-4 py-3"
+          >
+            <Text className="text-body-sm font-bold text-text-primary">
+              {t('mentorHome.fallback.continue')}
+            </Text>
+          </Pressable>
         ) : null}
         <NowCardStack
           feed={feed}
@@ -245,6 +285,18 @@ export default function MentorScreen(): React.ReactElement {
         </View>
 
         <View className="gap-3">
+          {showHomeworkPrompt ? (
+            <Pressable
+              testID="mentor-homework-prompt"
+              accessibilityRole="button"
+              onPress={() => pushMentorHomeworkCamera(router)}
+              className="rounded-card border border-border bg-surface px-4 py-3"
+            >
+              <Text className="text-body-sm text-text-secondary">
+                {t('mentorHome.homeworkPrompt')}
+              </Text>
+            </Pressable>
+          ) : null}
           {renderedFeed}
           {completionCelebration ? (
             <MentorCelebration

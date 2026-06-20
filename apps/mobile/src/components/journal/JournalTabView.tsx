@@ -1,29 +1,26 @@
-import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useRouter, type Href } from 'expo-router';
 import type { NowCard, RecapListItem } from '@eduagent/schemas';
 
+import { ErrorFallback, TimeoutLoader } from '../common';
+import { VoiceRecordButton } from '../session/VoiceRecordButton';
 import { ReportsList } from '../progress/ReportsList';
 import { useAllNotes } from '../../hooks/use-notes';
 import { useBookmarks } from '../../hooks/use-bookmarks';
 import { useJournalRecaps } from '../../hooks/use-journal-recaps';
+import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import {
   useProfileReports,
-  useProfileSessionsArchive,
   useProfileWeeklyReports,
 } from '../../hooks/use-progress';
 import { useNowFeed } from '../../hooks/use-now-feed';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
 import { useProfile } from '../../lib/profile';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
+import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 
 type JournalSectionId = 'recaps' | 'reports' | 'notes' | 'memory';
 
@@ -33,6 +30,27 @@ const JOURNAL_SECTIONS: JournalSectionId[] = [
   'notes',
   'memory',
 ];
+
+/**
+ * Builds the {primary, secondary} ErrorFallback action pair from a RAW error.
+ * Classifies the raw error first (never string-matches formatted output), then
+ * maps recovery to retry-primary / go-home-secondary per the UX Resilience
+ * rules (AGENTS.md). Screens never parse HTTP status codes.
+ */
+function useSectionErrorActions(
+  error: unknown,
+  onRetry: () => void,
+): {
+  primary?: { label: string; onPress: () => void; testID: string };
+  secondary?: { label: string; onPress: () => void; testID: string };
+} {
+  const router = useRouter();
+  const classified = classifyApiError(error);
+  return recoveryActions(classified, {
+    retry: onRetry,
+    goHome: () => router.push('/(app)/home'),
+  });
+}
 
 function ledgerKind(card: NowCard): string {
   const explicit = card.params.ledgerKind;
@@ -171,72 +189,51 @@ function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
   }
 }
 
-function notesTitle(
-  kind: 'sessions' | 'notes' | 'bookmarks',
-  t: TFunction,
-): string {
-  switch (kind) {
-    case 'sessions':
-      return t('myNotes.kinds.sessions');
-    case 'notes':
-      return t('myNotes.kinds.notes');
-    case 'bookmarks':
-      return t('myNotes.kinds.bookmarks');
-  }
-}
-
-function notesDescription(
-  kind: 'sessions' | 'notes' | 'bookmarks',
-  t: TFunction,
-): string {
-  switch (kind) {
-    case 'sessions':
-      return t('journal.notes.sessions');
-    case 'notes':
-      return t('journal.notes.notes');
-    case 'bookmarks':
-      return t('journal.notes.bookmarks');
-  }
-}
-
 function JournalMomentsStrip(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const nowFeed = useNowFeed();
   const moments =
     nowFeed.data?.cards.filter((card) => card.kind === 'ledger_moment') ?? [];
+  const errorActions = useSectionErrorActions(
+    nowFeed.error,
+    () => void nowFeed.refetch(),
+  );
 
   if (nowFeed.isLoading && !nowFeed.data) {
     return (
-      <View
+      <TimeoutLoader
+        isLoading
         testID="journal-moments-loading"
-        className="rounded-card border border-border bg-surface p-4"
-      >
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
+        loadingLabel={t('common.loading')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => void nowFeed.refetch(),
+          testID: 'journal-moments-timeout-retry',
+        }}
+      />
     );
   }
 
+  // Feed unavailable + no cached/last data: keep the paper trail retryable
+  // (spec §14 "Feed unavailable") rather than blanking the strip.
   if (nowFeed.isError && moments.length === 0) {
     return (
-      <View
+      <ErrorFallback
+        variant="card"
         testID="journal-moments-error"
-        className="rounded-card border border-border bg-surface p-4"
-      >
-        <Text className="text-body font-semibold text-text-primary">
-          {t('journal.moments.errorTitle')}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void nowFeed.refetch()}
-          testID="journal-moments-retry"
-          className="mt-3 self-start rounded-button bg-primary px-4 py-2"
-        >
-          <Text className="text-body-sm font-semibold text-text-inverse">
-            {t('common.tryAgain')}
-          </Text>
-        </Pressable>
-      </View>
+        title={t('journal.moments.errorTitle')}
+        primaryAction={
+          errorActions.primary
+            ? { ...errorActions.primary, testID: 'journal-moments-retry' }
+            : {
+                label: t('common.tryAgain'),
+                onPress: () => void nowFeed.refetch(),
+                testID: 'journal-moments-retry',
+              }
+        }
+        secondaryAction={errorActions.secondary}
+      />
     );
   }
 
@@ -334,36 +331,6 @@ function EmptyState({
   );
 }
 
-function RetryState({
-  testID,
-  title,
-  onRetry,
-}: {
-  testID: string;
-  title: string;
-  onRetry: () => void;
-}): React.ReactElement {
-  const { t } = useTranslation();
-  return (
-    <View
-      testID={testID}
-      className="rounded-card border border-border bg-surface p-4"
-    >
-      <Text className="text-body font-semibold text-text-primary">{title}</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onRetry}
-        className="mt-3 self-start rounded-button bg-primary px-4 py-2"
-        testID={`${testID}-retry`}
-      >
-        <Text className="text-body-sm font-semibold text-text-inverse">
-          {t('common.tryAgain')}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
 function RecapRow({ recap }: { recap: RecapListItem }): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
@@ -410,21 +377,42 @@ function RecapRow({ recap }: { recap: RecapListItem }): React.ReactElement {
 function JournalRecapsSection(): React.ReactElement {
   const { t } = useTranslation();
   const recaps = useJournalRecaps(10);
+  const errorActions = useSectionErrorActions(
+    recaps.error,
+    () => void recaps.refetch(),
+  );
 
   if (recaps.isLoading && !recaps.data) {
     return (
-      <View className="py-8" testID="journal-recaps-loading">
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
+      <TimeoutLoader
+        isLoading
+        testID="journal-recaps-loading"
+        loadingLabel={t('common.loading')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => void recaps.refetch(),
+          testID: 'journal-recaps-timeout-retry',
+        }}
+      />
     );
   }
 
   if (recaps.isError && !recaps.data) {
     return (
-      <RetryState
+      <ErrorFallback
+        variant="card"
         testID="journal-recaps-error"
         title={t('journal.recaps.error')}
-        onRetry={() => void recaps.refetch()}
+        primaryAction={
+          errorActions.primary
+            ? { ...errorActions.primary, testID: 'journal-recaps-error-retry' }
+            : {
+                label: t('common.tryAgain'),
+                onPress: () => void recaps.refetch(),
+                testID: 'journal-recaps-error-retry',
+              }
+        }
+        secondaryAction={errorActions.secondary}
       />
     );
   }
@@ -458,24 +446,51 @@ function JournalReportsSection(): React.ReactElement {
     (monthlyReports.isLoading && !monthlyReports.data) ||
     (weeklyReports.isLoading && !weeklyReports.data);
   const isError = monthlyReports.isError || weeklyReports.isError;
+  const errorActions = useSectionErrorActions(
+    monthlyReports.error ?? weeklyReports.error,
+    () => {
+      void monthlyReports.refetch();
+      void weeklyReports.refetch();
+    },
+  );
 
   if (isLoading) {
     return (
-      <View className="py-8" testID="journal-reports-loading">
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
+      <TimeoutLoader
+        isLoading
+        testID="journal-reports-loading"
+        loadingLabel={t('common.loading')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => {
+            void monthlyReports.refetch();
+            void weeklyReports.refetch();
+          },
+          testID: 'journal-reports-timeout-retry',
+        }}
+      />
     );
   }
 
   if (isError && !monthlyReports.data && !weeklyReports.data) {
     return (
-      <RetryState
+      <ErrorFallback
+        variant="card"
         testID="journal-reports-error"
         title={t('journal.reports.error')}
-        onRetry={() => {
-          void monthlyReports.refetch();
-          void weeklyReports.refetch();
-        }}
+        primaryAction={
+          errorActions.primary
+            ? { ...errorActions.primary, testID: 'journal-reports-error-retry' }
+            : {
+                label: t('common.tryAgain'),
+                onPress: () => {
+                  void monthlyReports.refetch();
+                  void weeklyReports.refetch();
+                },
+                testID: 'journal-reports-error-retry',
+              }
+        }
+        secondaryAction={errorActions.secondary}
       />
     );
   }
@@ -504,49 +519,39 @@ function JournalReportsSection(): React.ReactElement {
   );
 }
 
-function previewCount(value: number | undefined): string {
-  return value == null ? '-' : String(value);
-}
+// ---------------------------------------------------------------------------
+// JournalNotesArchive (T6/EU-6) — the BROWSABLE cross-subject "everything I've
+// saved" surface. One store, two origins (my notes vs saved-from-mentor), one
+// cross-subject flat list rendered browse-first; an optional search line (with
+// a transcription-only mic per spec §16) narrows the already-visible list.
+// ---------------------------------------------------------------------------
 
-function previewText(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0
-    ? value.trim()
-    : null;
-}
+type ArchiveItem = {
+  id: string;
+  authorship: 'mine' | 'mentor';
+  content: string;
+  subjectName: string | null;
+  topicTitle: string | null;
+};
 
-function ArchivePreviewList({
-  values,
-}: {
-  values: string[];
-}): React.ReactElement | null {
-  if (values.length === 0) return null;
-  return (
-    <View className="mt-3 gap-2">
-      {values.slice(0, 3).map((value, index) => (
-        <Text
-          key={`${index}:${value}`}
-          className="text-body-sm text-text-primary"
-          numberOfLines={2}
-        >
-          {value}
-        </Text>
-      ))}
-    </View>
-  );
-}
-
-function JournalNotesSection(): React.ReactElement {
+function JournalNotesArchive(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { activeProfile } = useProfile();
-  const sessions = useProfileSessionsArchive(activeProfile?.id, { limit: 5 });
-  const notes = useAllNotes({ limit: 5 });
-  const bookmarks = useBookmarks({ limit: 5 });
+  const notes = useAllNotes({ limit: 50 });
+  const bookmarks = useBookmarks({ limit: 50 });
+  const [filter, setFilter] = useState('');
 
-  const sessionItems = useMemo(
-    () => sessions.data?.pages.flatMap((page) => page.sessions) ?? [],
-    [sessions.data],
-  );
+  // Transcription-only STT — the same on-device speech primitive the session
+  // input bar uses. It dictates text into the search filter and nothing more:
+  // no tone/emotion analysis (AI Act Art 5(1)(f) compliance invariant, §16).
+  const { isListening, transcript, startListening, stopListening } =
+    useSpeechRecognition();
+
+  // Fold the recognized transcript into the search filter as it arrives.
+  useEffect(() => {
+    if (transcript) setFilter(transcript);
+  }, [transcript]);
+
   const noteItems = useMemo(
     () => notes.data?.pages.flatMap((page) => page.notes) ?? [],
     [notes.data],
@@ -556,73 +561,176 @@ function JournalNotesSection(): React.ReactElement {
     [bookmarks.data],
   );
 
-  const rows: Array<{
-    id: 'sessions' | 'notes' | 'bookmarks';
-    count: number | undefined;
-    previews: string[];
-  }> = [
-    {
-      id: 'sessions',
-      count: sessions.data ? sessionItems.length : undefined,
-      previews: sessionItems
-        .map(
-          (session) =>
-            previewText(session.displayTitle) ??
-            previewText(session.topicTitle) ??
-            previewText(session.displaySummary),
-        )
-        .filter((value): value is string => value != null),
+  const items: ArchiveItem[] = useMemo(() => {
+    const noteRows: ArchiveItem[] = noteItems.map((note) => ({
+      id: `note:${note.id}`,
+      // A note's origin is 'self' (the learner wrote it) or 'mentor'
+      // (saved from a mentor explanation). Bookmarks are always a saved
+      // mentor reply.
+      authorship: note.origin === 'mentor' ? 'mentor' : 'mine',
+      content: note.content,
+      subjectName: note.subjectName ?? null,
+      topicTitle: note.topicTitle ?? null,
+    }));
+    const bookmarkRows: ArchiveItem[] = bookmarkItems.map((bookmark) => ({
+      id: `bookmark:${bookmark.id}`,
+      authorship: 'mentor',
+      content: bookmark.content,
+      subjectName: bookmark.subjectName ?? null,
+      topicTitle: bookmark.topicTitle ?? null,
+    }));
+    return [...noteRows, ...bookmarkRows];
+  }, [noteItems, bookmarkItems]);
+
+  const normalizedFilter = filter.trim().toLowerCase();
+  const visibleItems =
+    normalizedFilter.length === 0
+      ? items
+      : items.filter((item) =>
+          [item.content, item.subjectName, item.topicTitle]
+            .filter((value): value is string => Boolean(value))
+            .some((value) => value.toLowerCase().includes(normalizedFilter)),
+        );
+
+  const isLoading =
+    (notes.isLoading && !notes.data) ||
+    (bookmarks.isLoading && !bookmarks.data);
+  const isError = notes.isError || bookmarks.isError;
+  const errorActions = useSectionErrorActions(
+    notes.error ?? bookmarks.error,
+    () => {
+      void notes.refetch();
+      void bookmarks.refetch();
     },
-    {
-      id: 'notes',
-      count: notes.data ? noteItems.length : undefined,
-      previews: noteItems
-        .map((note) => previewText(note.content))
-        .filter((value): value is string => value != null),
-    },
-    {
-      id: 'bookmarks',
-      count: bookmarks.data ? bookmarkItems.length : undefined,
-      previews: bookmarkItems
-        .map((bookmark) => previewText(bookmark.content))
-        .filter((value): value is string => value != null),
-    },
-  ];
+  );
+
+  if (isLoading) {
+    return (
+      <TimeoutLoader
+        isLoading
+        testID="journal-notes-loading"
+        loadingLabel={t('common.loading')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => {
+            void notes.refetch();
+            void bookmarks.refetch();
+          },
+          testID: 'journal-notes-timeout-retry',
+        }}
+      />
+    );
+  }
+
+  if (isError && items.length === 0) {
+    return (
+      <ErrorFallback
+        variant="card"
+        testID="journal-notes-error"
+        title={t('journal.notes.error')}
+        primaryAction={
+          errorActions.primary
+            ? { ...errorActions.primary, testID: 'journal-notes-error-retry' }
+            : {
+                label: t('common.tryAgain'),
+                onPress: () => {
+                  void notes.refetch();
+                  void bookmarks.refetch();
+                },
+                testID: 'journal-notes-error-retry',
+              }
+        }
+        secondaryAction={errorActions.secondary}
+      />
+    );
+  }
 
   return (
     <View testID="journal-notes-section" className="gap-3">
-      {rows.map((row) => (
-        <Pressable
-          key={row.id}
-          accessibilityRole="button"
-          accessibilityLabel={notesTitle(row.id, t)}
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/my-notes/[kind]',
-              params: { kind: row.id, returnTo: 'journal' },
-            } as Href)
+      {/* Optional search/filter line — narrows the already-visible browse list.
+          Carries a transcription-only mic (spec §16). */}
+      <View
+        className="flex-row items-center gap-2"
+        testID="journal-notes-search"
+      >
+        <View className="flex-1 rounded-input border border-border bg-surface px-3">
+          <TextInput
+            value={filter}
+            onChangeText={setFilter}
+            placeholder={t('journal.notes.searchPlaceholder')}
+            accessibilityLabel={t('journal.notes.searchPlaceholder')}
+            className="min-h-[44px] text-body text-text-primary"
+            testID="journal-notes-search-input"
+          />
+        </View>
+        {/* VoiceRecordButton hardcodes its own testID; wrap it so the archive
+            search line exposes the spec'd `journal-notes-mic` handle. The STT
+            primitive is transcription-only (no tone/emotion API) — §16. */}
+        <View testID="journal-notes-mic">
+          <VoiceRecordButton
+            isListening={isListening}
+            onPress={() =>
+              void (isListening ? stopListening() : startListening())
+            }
+          />
+        </View>
+      </View>
+
+      {visibleItems.length === 0 ? (
+        <EmptyState
+          testID="journal-notes-empty"
+          title={
+            normalizedFilter.length > 0
+              ? t('journal.notes.searchEmpty')
+              : t('journal.notes.empty')
           }
-          testID={`journal-notes-${row.id}`}
-          className="rounded-card border border-border bg-surface p-4"
-        >
-          <View className="flex-row items-center justify-between">
-            <View className="flex-1 pe-3">
-              <Text className="text-body font-semibold text-text-primary">
-                {notesTitle(row.id, t)}
+        />
+      ) : (
+        visibleItems.map((item) => (
+          <Pressable
+            key={item.id}
+            accessibilityRole="button"
+            testID={`journal-note-${item.id}`}
+            className="rounded-card border border-border bg-surface p-4"
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/my-notes/[kind]',
+                params: {
+                  kind: item.authorship === 'mentor' ? 'bookmarks' : 'notes',
+                  returnTo: 'journal',
+                },
+              } as Href)
+            }
+          >
+            <View className="flex-row items-center justify-between gap-2">
+              <Text
+                className="flex-1 text-body-sm text-text-secondary"
+                numberOfLines={1}
+              >
+                {[item.subjectName, item.topicTitle]
+                  .filter(Boolean)
+                  .join(' / ') || t('myNotes.unknownSubject')}
               </Text>
-              <Text className="mt-1 text-body-sm text-text-secondary">
-                {notesDescription(row.id, t)}
-              </Text>
+              <View
+                className="rounded-full bg-surface-elevated px-3 py-1"
+                testID={`journal-note-authorship-${item.authorship}`}
+              >
+                <Text className="text-caption font-semibold text-text-primary">
+                  {item.authorship === 'mentor'
+                    ? t('journal.notes.authorshipMentor')
+                    : t('journal.notes.authorshipMine')}
+                </Text>
+              </View>
             </View>
-            <View className="rounded-full bg-surface-elevated px-3 py-1">
-              <Text className="text-body-sm font-semibold text-text-primary">
-                {previewCount(row.count)}
-              </Text>
-            </View>
-          </View>
-          <ArchivePreviewList values={row.previews} />
-        </Pressable>
-      ))}
+            <Text
+              className="mt-2 text-body text-text-primary"
+              numberOfLines={3}
+            >
+              {item.content}
+            </Text>
+          </Pressable>
+        ))
+      )}
     </View>
   );
 }
@@ -668,7 +776,7 @@ function ActiveSection({
     case 'reports':
       return <JournalReportsSection />;
     case 'notes':
-      return <JournalNotesSection />;
+      return <JournalNotesArchive />;
     case 'memory':
       return <JournalMemorySection />;
   }

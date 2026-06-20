@@ -14,6 +14,7 @@ import { useBookSuggestions } from '../../../../hooks/use-book-suggestions';
 import { useBooks } from '../../../../hooks/use-books';
 import { useFiling } from '../../../../hooks/use-filing';
 import { useSubjects } from '../../../../hooks/use-subjects';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import {
   classifyApiError,
   recoveryActions,
@@ -384,6 +385,27 @@ export default function ShelfScreen() {
             </View>
           )}
         </View>
+
+        {FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? (
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/subject-hub/[subjectId]',
+                params: { subjectId },
+              } as Href)
+            }
+            className="p-2"
+            accessibilityRole="button"
+            accessibilityLabel={t('subjectHub.linkLabel')}
+            testID="subject-hub-link"
+          >
+            <Ionicons
+              name="sparkles-outline"
+              size={22}
+              color={themeColors.accent}
+            />
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={() =>
