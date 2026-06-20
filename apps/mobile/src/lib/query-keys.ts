@@ -74,6 +74,8 @@ export const queryKeys = {
       topicId: string | undefined,
       profileId: string | undefined,
       attempt?: number,
+      // ponytail: conditional spread keeps the 6-element prefix for callers that omit `attempt`
+      // (e.g. invalidateQueries in use-filing.ts) so partial-key matching still busts this query.
     ) =>
       [
         'progress',
@@ -82,7 +84,7 @@ export const queryKeys = {
         topicId,
         'resolve',
         profileId,
-        attempt,
+        ...(attempt !== undefined ? [attempt] : []),
       ] as const,
 
     reviewSummary: (mode: ModeSegment, profileId: string | undefined) =>
