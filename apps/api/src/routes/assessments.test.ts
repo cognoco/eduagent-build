@@ -923,6 +923,18 @@ describe('PATCH /v1/assessments/:assessmentId/decline-refresh', () => {
     expect(body).toMatchObject({ ok: true });
   });
 
+  it('[BUG-848] returns 200 when the assessment status is "failed" (terminal but was missing from allowlist)', async () => {
+    getAssessmentMock.mockResolvedValue(
+      makeAssessmentRecord({ status: 'failed' }),
+    );
+
+    const res = await makeApp().request(path, { method: 'PATCH' });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true });
+  });
+
   it('returns 400 when the assessment is still in progress', async () => {
     getAssessmentMock.mockResolvedValue(
       makeAssessmentRecord({ status: 'in_progress' }),
@@ -1048,6 +1060,7 @@ function makeAssessmentRecord(
     status: (overrides.status ?? 'in_progress') as
       | 'in_progress'
       | 'passed'
+      | 'failed'
       | 'failed_exhausted'
       | 'borderline',
     masteryScore: 0,
