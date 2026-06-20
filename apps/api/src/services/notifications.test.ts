@@ -13,6 +13,7 @@ import {
   type EmailPayload,
 } from './notifications';
 import type { NotificationPayload } from '@eduagent/schemas';
+import { emailSuppressions } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -792,12 +793,19 @@ describe('sendEmail structured logging', () => {
   function makeSuppressionLookupDb(suppressed: boolean): Database {
     return {
       select: (_cols: unknown) => ({
-        from: (_table: unknown) => ({
-          where: (_p: unknown) => ({
-            limit: async (_n: number) =>
-              suppressed ? [{ email: 'parent@example.com' }] : [],
-          }),
-        }),
+        from: (table: unknown) => {
+          // Gate on table identity so a future refactor that queries a
+          // different table can't silently pass this fake.
+          if (table !== emailSuppressions) {
+            throw new Error('unexpected select target in fake DB');
+          }
+          return {
+            where: (_p: unknown) => ({
+              limit: async (_n: number) =>
+                suppressed ? [{ email: 'parent@example.com' }] : [],
+            }),
+          };
+        },
       }),
     } as unknown as Database;
   }

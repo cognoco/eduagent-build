@@ -1454,10 +1454,9 @@ describe('[BUG-319] atomic DB-based webhook idempotency', () => {
 // ---------------------------------------------------------------------------
 
 import { emailSuppressions, webhookIdempotencyKeys } from '@eduagent/database';
-import {
-  suppressEmail,
-  isEmailSuppressed,
-} from '../services/email-suppression';
+// suppressEmail's direct unit contract lives in the co-located
+// services/email-suppression.test.ts; here we only need the send-path lookup.
+import { isEmailSuppressed } from '../services/email-suppression';
 
 type SuppressionRow = {
   email: string;
@@ -1682,14 +1681,10 @@ describe('hard-bounce suppression persistence', () => {
       'gone@example.com',
     );
     expect(suppressed).toBe(true);
-
-    const fresh = await isEmailSuppressed(
-      db as unknown as Database,
-      'never-bounced@example.com',
-    );
-    // Fresh address (after the fake returns all rows) — at least the suppressed
-    // one is present; assert the helper round-trips a write.
-    expect(typeof fresh).toBe('boolean');
+    // The un-suppressed (false) case is covered at the service level in
+    // services/email-suppression.test.ts, where the fake store can isolate a
+    // single address; this fake returns all rows, so a fresh-address assertion
+    // here would be vacuous.
   });
 
   it('repeated hard bounce for the same address is idempotent (no duplicate)', async () => {
@@ -1709,21 +1704,5 @@ describe('hard-bounce suppression persistence', () => {
 
     expect(db.__suppressions.size).toBe(1);
     expect(db.__suppressions.has('repeat@example.com')).toBe(true);
-  });
-
-  it('suppressEmail service writes the row directly (unit-level guarantee)', async () => {
-    const db = makeSuppressionDb();
-    const result = await suppressEmail(
-      db as unknown as Database,
-      'Direct@Example.com',
-      'hard_bounce',
-      'eid_direct',
-    );
-    expect(result).toBe('suppressed');
-    expect(db.__suppressions.get('direct@example.com')).toEqual({
-      email: 'direct@example.com',
-      reason: 'hard_bounce',
-      emailId: 'eid_direct',
-    });
   });
 });
