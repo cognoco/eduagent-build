@@ -250,14 +250,22 @@ export async function checkQuizAnswerWithCorrect(
   // `appendRecordedAttempt` blindly `jsonb ||`-appends every /check submission,
   // so a client can replay /check unbounded for one question to inflate the row
   // — and, for guess_who, send finalAttempt:false repeatedly then a single
-  // finalAttempt:true with cluesUsed:0 to claim full XP. Reject once the question
-  // is already final, and cap the number of non-final probe attempts.
+  // finalAttempt:true with cluesUsed:0 to claim full XP. Once the question is
+  // already final, re-checks are idempotent (feedback, no append); non-final
+  // probe attempts are capped.
   const indexResults = existingResults.filter(
     (r) => r.questionIndex === questionIndex,
   );
   if (indexResults.some(isFinalRecordedAttempt)) {
-    // A final answer is already on record for this question; no further /check.
-    throw new ConflictError('Question already answered');
+    // [BUG-852/BREAK/WI-163] A final answer is already on record for this
+    // question. Re-checking is idempotent: return post-submission feedback
+    // WITHOUT appending another attempt. This bounds the jsonb `results` row
+    // (852's anti-bloat goal) while preserving the first-attempt-wins contract
+    // — the re-check can neither retro-score nor grow the row.
+    return {
+      correct,
+      ...(!correct ? { correctAnswer: question.correctAnswer } : {}),
+    };
   }
   if (indexResults.length >= QUIZ_CONFIG.maxProbeAttemptsPerQuestion) {
     throw new ConflictError('Too many attempts for this question');
