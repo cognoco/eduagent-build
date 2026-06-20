@@ -1,4 +1,15 @@
-import { eq, and, desc, asc, gte, inArray, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  gte,
+  lt,
+  isNull,
+  inArray,
+  sql,
+} from 'drizzle-orm';
 import {
   curricula,
   curriculumBooks,
@@ -830,10 +841,23 @@ export async function persistNarrowTopics(
 }
 
 /**
- * Atomic compare-and-swap: claims a book for topic generation by setting
- * topicsGenerated = true WHERE it's currently false. Returns the book row
- * if the caller won the race, or null if another request already claimed it
- * (or the book doesn't exist).
+ * Atomic compare-and-swap: claims a book for topic generation.
+ *
+ * [books topicsGenerated ordering] The claim stamps a dedicated
+ * `topicsGenerationStartedAt` marker — it does NOT flip `topicsGenerated`.
+ * `topicsGenerated` is reserved for "topics actually persisted" and is set
+ * true only by persistBookTopics AFTER the rows land. This ordering means a
+ * worker evicted mid-LLM-call (Cloudflare eviction, OOM, panic) — which skips
+ * the route's catch-block release — leaves the book correctly
+ * topicsGenerated=false rather than stuck "generated" with zero topics.
+ *
+ * Single-flight + stale reclaim (mirrors the retry_in_flight/retry_claimed_at
+ * pattern, WI-125): the claim wins only when the book is not already generated
+ * AND not currently claimed — i.e. started_at is NULL or older than the 15-min
+ * stale window. A crashed claim is therefore reclaimable by the next request.
+ *
+ * Returns the book row if the caller won the race, or null if the book is
+ * already generated, a fresh claim is in flight, or the book doesn't exist.
  */
 export async function claimBookForGeneration(
   db: Database,
@@ -848,14 +872,19 @@ export async function claimBookForGeneration(
     throw new NotFoundError('Subject');
   }
 
+  const staleCutoff = new Date(Date.now() - BOOK_GENERATION_STALE_MS);
   const updated = await db
     .update(curriculumBooks)
-    .set({ topicsGenerated: true, updatedAt: new Date() })
+    .set({ topicsGenerationStartedAt: new Date(), updatedAt: new Date() })
     .where(
       and(
         eq(curriculumBooks.id, bookId),
         eq(curriculumBooks.subjectId, subjectId),
         eq(curriculumBooks.topicsGenerated, false),
+        or(
+          isNull(curriculumBooks.topicsGenerationStartedAt),
+          lt(curriculumBooks.topicsGenerationStartedAt, staleCutoff),
+        ),
       ),
     )
     .returning({
@@ -873,9 +902,18 @@ export async function releaseBookGenerationClaimIfEmpty(
   bookId: string,
   profileId: string,
 ): Promise<void> {
+  // [books topicsGenerated ordering] Clear the claim marker alongside the
+  // legacy topics_generated reset so a book whose synchronous generation threw
+  // is immediately reclaimable by the next request, rather than waiting out the
+  // 15-min stale window. (topics_generated is already false after a claim under
+  // the new ordering; resetting it stays correct for legacy repaired rows.)
   await db
     .update(curriculumBooks)
-    .set({ topicsGenerated: false, updatedAt: new Date() })
+    .set({
+      topicsGenerated: false,
+      topicsGenerationStartedAt: null,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(curriculumBooks.id, bookId),
@@ -1694,6 +1732,9 @@ export async function persistBookTopics(
             .update(curriculumBooks)
             .set({
               topicsGenerated: true,
+              // [books topicsGenerated ordering] topics now exist — clear the
+              // single-flight claim marker so the row is not seen as in-flight.
+              topicsGenerationStartedAt: null,
               updatedAt: new Date(),
             })
             .where(
@@ -1725,6 +1766,8 @@ export async function persistBookTopics(
         .update(curriculumBooks)
         .set({
           topicsGenerated: true,
+          // [books topicsGenerated ordering] clear the in-flight claim marker.
+          topicsGenerationStartedAt: null,
           updatedAt: new Date(),
         })
         .where(
@@ -1854,6 +1897,8 @@ export async function persistBookTopics(
       .update(curriculumBooks)
       .set({
         topicsGenerated: true,
+        // [books topicsGenerated ordering] clear the in-flight claim marker.
+        topicsGenerationStartedAt: null,
         updatedAt: new Date(),
       })
       .where(
