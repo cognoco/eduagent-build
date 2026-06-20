@@ -503,42 +503,35 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(html).toContain('&lt;b&gt;EvilName&lt;/b&gt;');
   });
 
-  it('returns 404 for an expired token (processConsentResponse throws ConsentTokenNotFoundError mapped to Invalid consent token)', async () => {
-    // Seed a token whose expiresAt is in the past
+  it('[BUG-870] returns 410 + a friendly "link expired" page for an expired token', async () => {
+    // Seed a token whose expiresAt is in the past.
     const { accountId, token } = await seedConsentToken({
       displayName: 'Fred',
       expiresAt: new Date(Date.now() - 1000), // already expired
     });
     seededAccountIds.push(accountId);
 
-    // processConsentResponse checks row.expiresAt < now → throws
-    // ConsentTokenExpiredError. The route catches any Error with message
-    // 'Invalid consent token' (ConsentTokenNotFoundError). But expired tokens
-    // throw ConsentTokenExpiredError which is NOT caught → 500.
-    // Let's test what the actual behavior is: expired tokens produce an error
-    // that is NOT "Invalid consent token", so we expect it to fall through.
-    // The route only catches Error.message === 'Invalid consent token'.
-    // ConsentTokenExpiredError has message 'Consent token has expired'.
-    // Expired path → 500 (falls through to global error handler).
-    // This test documents the current behaviour (not wrong — this is an edge
-    // case where the token record exists but is expired).
-    // We accept either 404 or 500 since this is a boundary condition.
+    // processConsentResponse sees row.expiresAt < now and throws
+    // ConsentTokenExpiredError. The route classifies on the error class via
+    // `instanceof` and renders a dedicated 410 page (it no longer string-matches
+    // 'Invalid consent token', which only ever covered ConsentTokenNotFoundError
+    // and left this path re-throwing as a raw 500 — the BUG-870 defect).
     const res = await postForm('/v1/consent-page/confirm', {
       token,
       approved: 'true',
     });
-    // Expired token: ConsentTokenExpiredError is NOT "Invalid consent token"
-    // so route re-throws → global onError → 500.
-    expect([404, 500]).toContain(res.status);
+    expect(res.status).toBe(410);
+    const html = await res.text();
+    expect(html).toContain('This link has expired');
   });
 
-  it('replay protection: second submission with same token returns error', async () => {
+  it('[BUG-870] replay protection: second submission with same token returns 409 + an "already processed" page', async () => {
     const { accountId, token } = await seedConsentToken({
       displayName: 'Grace',
     });
     seededAccountIds.push(accountId);
 
-    // First submission succeeds
+    // First submission succeeds.
     const res1 = await postForm('/v1/consent-page/confirm', {
       token,
       approved: 'true',
@@ -546,16 +539,16 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(res1.status).toBe(200);
 
     // Second submission: token already consumed (CONSENTED row) →
-    // processConsentResponse throws ConsentAlreadyProcessedError which has
-    // message 'This consent request has already been processed'.
-    // Route catches 'Invalid consent token' only — this falls through → 500.
+    // processConsentResponse throws ConsentAlreadyProcessedError. The route's
+    // instanceof classification renders a dedicated 409 page (previously this
+    // fell through to the global error handler and surfaced a raw 500).
     const res2 = await postForm('/v1/consent-page/confirm', {
       token,
       approved: 'true',
     });
-    // ConsentAlreadyProcessedError is not caught by the route's instanceof
-    // check, so it falls through to the global error handler → 500.
-    expect([404, 500]).toContain(res2.status);
+    expect(res2.status).toBe(409);
+    const html = await res2.text();
+    expect(html).toContain('This request has already been processed');
   });
 });
 
