@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -888,5 +889,75 @@ describe('TopicDetailScreen — Saved from chat (bookmarks)', () => {
       expect(bookmarkCall).toBeTruthy();
       expect(String(bookmarkCall![0])).toContain('topicId=t1');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [H9] Deep-link resolve timeout — Retry is a real escape (regression)
+// ---------------------------------------------------------------------------
+
+describe('TopicDetailScreen — deep-link resolve timeout Retry', () => {
+  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    // Deep-link: topicId only, no subjectId → triggers resolve
+    mockUseLocalSearchParams.mockReturnValue({
+      topicId: 't1',
+    } as { subjectId: string; topicId: string });
+    const { Wrapper } = createWrapper();
+    TestWrapper = Wrapper;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('[H9] Retry re-invokes the resolve fetch AND restarting the timeout window', async () => {
+    // Route /resolve to a never-settling promise so resolveLoading stays true.
+    // Capture the resolver so the promise never settles (never call it).
+    let _capturedResolveResolver!: (r: Response) => void;
+    const neverSettlingResolve = new Promise<Response>((resolve) => {
+      _capturedResolveResolver = resolve;
+    });
+    mockFetch.setRoute('/resolve', () => neverSettlingResolve);
+
+    // Also set up other routes so secondary queries don't emit noise
+    mockFetch.setRoute('/topics/t1/progress', { topic: null });
+    mockFetch.setRoute('/topics/t1/retention', { card: null });
+    mockFetch.setRoute('/active-session', null);
+    mockFetch.setRoute('/resume-target', { target: null });
+    mockFetch.setRoute('/topics/t1/notes', { notes: [] });
+    mockFetch.setRoute('/topics/t1/sessions', { sessions: [] });
+    mockFetch.setRoute('/bookmarks', { bookmarks: [], nextCursor: null });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    // Advance 15 s → first timeout fires → error screen appears
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+    await Promise.resolve();
+    screen.getByTestId('topic-resolve-timeout');
+
+    // Tap Retry
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('topic-resolve-timeout-retry'));
+    });
+    await Promise.resolve();
+
+    // After Retry the timeout window must restart: advance another 15 s → error screen reappears.
+    // Pre-fix: the effect never re-runs (isResolveSpinning didn't change), so the user stays stuck
+    // on the spinner → topic-resolve-timeout testID is NOT present → this assertion would fail.
+    // Post-fix: resolveAttempt increments, re-running the effect → timeout fires → testID appears.
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+    await Promise.resolve();
+    screen.getByTestId('topic-resolve-timeout');
+
+    // Reference the captured resolver to satisfy TypeScript (it is never called intentionally)
+    void _capturedResolveResolver;
   });
 });

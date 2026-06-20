@@ -287,9 +287,11 @@ export default function TopicDetailScreen() {
 
   // [F-009] Resolve subjectId when deep-linked with topicId only
   const needsResolve = !paramSubjectId && !!topicId;
-  const { data: resolved, isLoading: resolveLoading } = useResolveTopicSubject(
-    needsResolve ? topicId : undefined,
-  );
+  const {
+    data: resolved,
+    isLoading: resolveLoading,
+    refetch: refetchResolve,
+  } = useResolveTopicSubject(needsResolve ? topicId : undefined);
   const subjectId = paramSubjectId || resolved?.subjectId;
   const topicBackFallback = useMemo(
     (): Href =>
@@ -365,6 +367,8 @@ export default function TopicDetailScreen() {
 
   // [H9] Timeout escape for the deep-link resolve spinner
   const [resolveTimedOut, setResolveTimedOut] = useState(false);
+  // Incremented on Retry so the timeout effect re-runs and restarts the 15s window
+  const [resolveAttempt, setResolveAttempt] = useState(0);
   const isResolveSpinning = !!(needsResolve && resolveLoading);
   useEffect(() => {
     if (!isResolveSpinning) {
@@ -373,7 +377,7 @@ export default function TopicDetailScreen() {
     }
     const t = setTimeout(() => setResolveTimedOut(true), 15_000);
     return () => clearTimeout(t);
-  }, [isResolveSpinning]);
+  }, [isResolveSpinning, resolveAttempt]);
 
   const isCriticalLoading = progressLoading || retentionLoading;
   const retentionStatus = deriveRetentionStatus(retentionCard);
@@ -571,7 +575,11 @@ export default function TopicDetailScreen() {
           message={t('topic.resolveTimeoutMessage')}
           primaryAction={{
             label: t('common.retry'),
-            onPress: () => setResolveTimedOut(false),
+            onPress: () => {
+              setResolveTimedOut(false);
+              setResolveAttempt((n) => n + 1);
+              void refetchResolve();
+            },
             testID: 'topic-resolve-timeout-retry',
           }}
           secondaryAction={{
