@@ -31,6 +31,7 @@ import type {
   VerificationType,
   ChallengeRoundSessionState,
   TopicProbeRequestedEvent,
+  ReviewCalibrationRequestedEvent,
 } from '@eduagent/schemas';
 import {
   ConflictError,
@@ -917,14 +918,14 @@ async function applyChallengeRoundRuntimeSignals(
 
 const MAX_REVIEW_CALIBRATION_ATTEMPTS = 2;
 
-interface ReviewCalibrationDispatchPayload {
-  profileId: string;
-  sessionId: string;
-  topicId: string;
-  learnerMessage: string;
-  topicTitle: string;
-  timestamp: string;
-}
+// PII egress: Carries an opaque reference (`learnerMessageEventId`, the
+// session_events row id of the learner's calibration answer) instead of the
+// raw answer / topic title — Inngest persists event payloads in its
+// third-party event store. The consumer (review-calibration-grade) rehydrates
+// both the message content and the topic title from the DB, scoped by
+// profileId. Aliased to the schema-inferred type so the payload cannot drift
+// from `reviewCalibrationRequestedEventSchema` (@eduagent/schemas). [WI-620]
+type ReviewCalibrationDispatchPayload = ReviewCalibrationRequestedEvent;
 
 // PII egress: Carries an opaque reference (`learnerMessageEventId`)
 // instead of the learner's raw probe answer / topic title — Inngest persists
@@ -934,7 +935,10 @@ interface ReviewCalibrationDispatchPayload {
 // `topicProbeRequestedEventSchema` (@eduagent/schemas).
 type TopicProbeDispatchPayload = TopicProbeRequestedEvent;
 
-async function maybeDispatchReviewCalibration(
+// Exported for the WI-620 PII-egress break test, which asserts the dispatched
+// `app/review.calibration.requested` payload carries no raw learner text /
+// topic title — only the opaque `learnerMessageEventId`.
+export async function maybeDispatchReviewCalibration(
   db: Database,
   profileId: string,
   session: {
@@ -943,12 +947,19 @@ async function maybeDispatchReviewCalibration(
   },
   effectiveMode: string | undefined,
   conversationLanguage: ConversationLanguage | undefined,
+  // learnerMessageText / topicTitle gate the dispatch locally and are NOT
+  // placed in the event payload (third-party event store) — the payload
+  // carries the opaque `learnerMessageEventId` instead. [WI-620]
   learnerMessageText: string,
   topicTitle: string | undefined,
+  learnerMessageEventId: string | undefined,
 ): Promise<void> {
   if (effectiveMode !== 'review' && effectiveMode !== 'practice') return;
   const topicId = session.topicId;
   if (!topicId || !topicTitle) return;
+  // PII egress: Without a persisted user_message row id there is no PII-safe
+  // way to reference the learner's answer — skip the dispatch. [WI-620]
+  if (!learnerMessageEventId) return;
 
   const isSubstantive = isSubstantiveCalibrationAnswer(
     learnerMessageText,
@@ -1017,8 +1028,7 @@ async function maybeDispatchReviewCalibration(
         profileId,
         sessionId: session.id,
         topicId,
-        learnerMessage: learnerMessageText,
-        topicTitle,
+        learnerMessageEventId,
         timestamp,
       };
     },
@@ -2791,16 +2801,6 @@ export async function processMessage(
       currentUserMessageEventId,
     });
 
-  await maybeDispatchReviewCalibration(
-    db,
-    profileId,
-    { id: session.id, topicId: session.topicId },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-  );
-
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
@@ -2931,6 +2931,19 @@ export async function processMessage(
       context.isFirstEncounter === true,
       persisted.userMessageEventId,
     );
+    // [WI-620] Calibration dispatch fires AFTER the user message is persisted so
+    // it can reference the session_events row id (opaque) instead of carrying
+    // the learner's raw answer / topic title across the Inngest trust boundary.
+    await maybeDispatchReviewCalibration(
+      db,
+      profileId,
+      { id: session.id, topicId: session.topicId },
+      context.effectiveMode,
+      context.conversationLanguage,
+      input.message,
+      context.topicTitle,
+      persisted.userMessageEventId,
+    );
   }
 
   // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
@@ -3036,16 +3049,6 @@ export async function streamMessage(
       homeworkMode: input.homeworkMode,
       currentUserMessageEventId,
     });
-
-  await maybeDispatchReviewCalibration(
-    db,
-    profileId,
-    { id: session.id, topicId: session.topicId },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-  );
 
   // Compute time-to-answer before streaming begins.
   // [BUG-391] Same defensive cast as the non-streaming path above — ensure a
@@ -3269,6 +3272,20 @@ export async function streamMessage(
           input.message,
           context.topicTitle,
           context.isFirstEncounter === true,
+          persisted.userMessageEventId,
+        );
+        // [WI-620] Calibration dispatch fires AFTER the user message is
+        // persisted so it references the session_events row id (opaque) rather
+        // than carrying raw learner text / topic title across the Inngest
+        // trust boundary.
+        await maybeDispatchReviewCalibration(
+          db,
+          profileId,
+          { id: session.id, topicId: session.topicId },
+          context.effectiveMode,
+          context.conversationLanguage,
+          input.message,
+          context.topicTitle,
           persisted.userMessageEventId,
         );
       }

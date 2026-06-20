@@ -136,12 +136,19 @@ export type BillingProfileQuotaExhaustedEvent = z.infer<
   typeof billingProfileQuotaExhaustedEventSchema
 >;
 
+// PII egress: No raw `learnerMessage` / `topicTitle` fields: Inngest persists
+// event payloads in its third-party event store. The payload carries an opaque
+// reference (`learnerMessageEventId`, the session_events row id of the
+// learner's calibration answer); the consumer (review-calibration-grade)
+// rehydrates the message content and the topic title from the DB, scoped by
+// profileId. Legacy in-flight events with the raw-text shape fail safeParse and
+// are skipped by the consumer. (WI-620 — same leak class as WI-577's
+// topic-probe site, converted to reference-and-rehydrate.)
 export const reviewCalibrationRequestedEventSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
   topicId: z.string().uuid(),
-  learnerMessage: z.string().min(1),
-  topicTitle: z.string().min(1),
+  learnerMessageEventId: z.string().uuid(),
   timestamp: isoDateField,
 });
 export type ReviewCalibrationRequestedEvent = z.infer<

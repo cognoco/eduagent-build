@@ -98,6 +98,23 @@ describe('scrubPiiPayload', () => {
     expect(scrubbedPaths).toEqual(['learnerMessage']);
   });
 
+  it('[WI-620] includes learnerMessage / topicTitle in the default denylist and scrubs them', () => {
+    expect(INNGEST_PII_PAYLOAD_KEYS).toEqual(
+      expect.arrayContaining(['learnerMessage', 'topicTitle']),
+    );
+    // Default denylist (no custom keys arg) must scrub both — the
+    // app/review.calibration.requested raw-text shape is now a regression.
+    const { value, scrubbedPaths } = scrubPiiPayload({
+      profileId: 'p-1',
+      learnerMessage: KNOWN_MINOR_TEXT,
+      topicTitle: 'Fractions for Milo Janssen',
+    });
+    expect(value.learnerMessage).toBe(PII_SCRUBBED_PLACEHOLDER);
+    expect(value.topicTitle).toBe(PII_SCRUBBED_PLACEHOLDER);
+    expect(scrubbedPaths.sort()).toEqual(['learnerMessage', 'topicTitle']);
+    expect(JSON.stringify(value)).not.toContain('Milo Janssen');
+  });
+
   it('is cycle-safe', () => {
     const payload: Record<string, unknown> = {
       sessionTranscript: KNOWN_MINOR_TEXT,
