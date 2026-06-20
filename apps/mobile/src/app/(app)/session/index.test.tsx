@@ -63,6 +63,7 @@ jest.mock('../../../lib/feature-flags', () => {
   ).__sessionTestFeatureFlags = featureFlags;
 
   return {
+    ...jest.requireActual('../../../lib/feature-flags'),
     FEATURE_FLAGS: featureFlags,
   };
 });
