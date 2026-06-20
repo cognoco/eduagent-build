@@ -17,9 +17,12 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
+  claimBookForGeneration,
   deleteTopicIfSafe,
+  persistBookTopics,
   releaseBookGenerationClaimIfEmpty,
 } from './curriculum';
+import type { GeneratedBookTopic } from '@eduagent/schemas';
 import {
   deleteLegacyAccountsForTest,
   deleteV2IdentitiesForTest,
@@ -140,6 +143,50 @@ async function seedClaimedEmptyBook(database: Database, profileId: string) {
     .returning({ id: curriculumBooks.id });
 
   return { subjectId: subject!.id, bookId: book!.id };
+}
+
+async function seedUnclaimedBook(database: Database, profileId: string) {
+  const suffix = generateUUIDv7();
+  const [subject] = await database
+    .insert(subjects)
+    .values({
+      profileId,
+      name: `Claim Ordering ${suffix}`,
+      status: 'active',
+      pedagogyMode: 'socratic',
+    })
+    .returning({ id: subjects.id });
+
+  const [book] = await database
+    .insert(curriculumBooks)
+    .values({
+      subjectId: subject!.id,
+      title: 'Unclaimed Book',
+      description: 'A book awaiting topic generation.',
+      sortOrder: 0,
+      topicsGenerated: false,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  return { subjectId: subject!.id, bookId: book!.id };
+}
+
+function buildGeneratedTopics(): GeneratedBookTopic[] {
+  // bookTopicGenerationResultSchema requires: ≥5 topics, ≥2 distinct chapters,
+  // strictly-increasing sortOrder, and chapters contiguous in sortOrder. Keep
+  // the two chapters grouped (3 + 3) so the contiguity refine passes.
+  return [
+    { title: 'Generated Topic 1', chapter: 'Getting started', sortOrder: 1 },
+    { title: 'Generated Topic 2', chapter: 'Getting started', sortOrder: 2 },
+    { title: 'Generated Topic 3', chapter: 'Getting started', sortOrder: 3 },
+    { title: 'Generated Topic 4', chapter: 'Core understanding', sortOrder: 4 },
+    { title: 'Generated Topic 5', chapter: 'Core understanding', sortOrder: 5 },
+    { title: 'Generated Topic 6', chapter: 'Core understanding', sortOrder: 6 },
+  ].map((topic) => ({
+    ...topic,
+    description: `Description for ${topic.title.toLowerCase()}.`,
+    estimatedMinutes: 20,
+  }));
 }
 
 async function seedFiledTopicFixture(
@@ -266,6 +313,152 @@ describeIfDb('releaseBookGenerationClaimIfEmpty (integration)', () => {
       where: eq(curriculumBooks.id, bookId),
     });
     expect(row!.topicsGenerated).toBe(true);
+  });
+});
+
+describeIfDb('claimBookForGeneration ordering (integration)', () => {
+  let db: Database;
+
+  beforeAll(async () => {
+    db = createIntegrationDb();
+    await cleanupByPrefix(db);
+  });
+
+  afterAll(async () => {
+    await cleanupByPrefix(db);
+  });
+
+  // Regression for the books topicsGenerated-ordering bug: the claim must NOT
+  // mark the book as generated. It only stamps the single-flight claim marker;
+  // topics_generated stays false until topics are actually persisted. A worker
+  // evicted mid-LLM (before persist) therefore never leaves a book stuck
+  // "generated" with zero topics.
+  it('claims without marking the book generated, so a crash before persist leaves it un-generated', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const claimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(claimed).not.toBeNull();
+
+    // The claim stamps the marker but must leave topics_generated false: at this
+    // instant zero topics exist, and a Worker eviction here would skip the
+    // catch-block release entirely.
+    const afterClaim = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(afterClaim!.topicsGenerated).toBe(false);
+    expect(afterClaim!.topicsGenerationStartedAt).not.toBeNull();
+
+    // Simulate the crash: generation throws after the claim and before persist,
+    // so persistBookTopics never runs. No catch-block release fires either
+    // (the eviction case). The book must NOT be in the dead-end
+    // topicsGenerated=true, topics=[] state.
+    const topicRows = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, bookId),
+    });
+    expect(topicRows).toHaveLength(0);
+    expect(afterClaim!.topicsGenerated).toBe(false);
+  });
+
+  it('serialises concurrent claims so only one wins and double-generation is impossible', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const [first, second] = await Promise.all([
+      claimBookForGeneration(db, ownerProfileId, subjectId, bookId),
+      claimBookForGeneration(db, ownerProfileId, subjectId, bookId),
+    ]);
+
+    const winners = [first, second].filter((r) => r !== null);
+    expect(winners).toHaveLength(1);
+  });
+
+  it('flips topics_generated true and clears the claim marker only after topics persist', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const claimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(claimed).not.toBeNull();
+
+    await persistBookTopics(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+      buildGeneratedTopics(),
+      [],
+    );
+
+    const afterPersist = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(afterPersist!.topicsGenerated).toBe(true);
+    expect(afterPersist!.topicsGenerationStartedAt).toBeNull();
+
+    const topicRows = await db.query.curriculumTopics.findMany({
+      where: eq(curriculumTopics.bookId, bookId),
+    });
+    expect(topicRows.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('reclaims a stale (crashed) claim so the book is never permanently locked', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    // Simulate a crashed claim: marker stamped >15 min ago, topics_generated
+    // still false (the worker died before persist and before any release).
+    const staleStart = new Date(Date.now() - 20 * 60 * 1000);
+    await db
+      .update(curriculumBooks)
+      .set({ topicsGenerationStartedAt: staleStart })
+      .where(eq(curriculumBooks.id, bookId));
+
+    const reclaimed = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(reclaimed).not.toBeNull();
+
+    const row = await db.query.curriculumBooks.findFirst({
+      where: eq(curriculumBooks.id, bookId),
+    });
+    expect(row!.topicsGenerationStartedAt!.getTime()).toBeGreaterThan(
+      staleStart.getTime(),
+    );
+  });
+
+  it('refuses to claim while a fresh claim is in flight', async () => {
+    const { ownerProfileId } = await seedProfiles(db);
+    const { subjectId, bookId } = await seedUnclaimedBook(db, ownerProfileId);
+
+    const first = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(first).not.toBeNull();
+
+    // A second request arriving within the stale window must lose the race.
+    const second = await claimBookForGeneration(
+      db,
+      ownerProfileId,
+      subjectId,
+      bookId,
+    );
+    expect(second).toBeNull();
   });
 });
 
