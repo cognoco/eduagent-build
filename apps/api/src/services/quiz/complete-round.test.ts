@@ -934,13 +934,16 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
   });
 });
 
-// [BUG-852] checkQuizAnswerWithCorrect must reject unbounded duplicate appends
+// [BUG-852] checkQuizAnswerWithCorrect must bound unbounded duplicate appends
 // per questionIndex. A client could otherwise call /check hundreds of times for
 // one question — growing the row, or sending finalAttempt:false repeatedly then
 // a finalAttempt:true with cluesUsed:0 to claim full XP. The guard:
 //   (a) once a FINAL attempt is recorded for a questionIndex, any further /check
-//       for that index throws ConflictError (covers always-final capitals/vocab
-//       second submission AND guess_who post-finalization);
+//       for that index is IDEMPOTENT — it returns post-submission feedback
+//       WITHOUT appending a new attempt (covers always-final capitals/vocab
+//       second submission AND guess_who post-finalization). This bounds row
+//       growth while preserving the first-attempt-wins [BREAK/WI-163] contract
+//       (the re-check returns 200 and cannot retro-score);
 //   (b) probe (non-final) attempts per question are capped; the (cap+1)th throws
 //       ConflictError.
 describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', () => {
@@ -1023,7 +1026,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
     repoSpy = undefined;
   });
 
-  it('[BREAK/a] rejects a second /check for a questionIndex that already has a final attempt (always-final capitals)', async () => {
+  it('[BREAK/a] is idempotent for a second /check on an already-final capitals index — returns feedback WITHOUT appending', async () => {
     const round = makeRound(
       [capitalsQuestion],
       [
@@ -1038,20 +1041,25 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
       ],
     );
     repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
 
-    await expect(
-      checkQuizAnswerWithCorrect(
-        makeUpdateDb(),
-        PROFILE_ID,
-        ROUND_ID,
-        0,
-        'Lyon',
-        'multiple_choice',
-      ),
-    ).rejects.toBeInstanceOf(ConflictError);
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Lyon',
+      'multiple_choice',
+    );
+
+    // First-attempt-wins: the re-check is not recorded — no jsonb append, so the
+    // row cannot be grown by replaying /check on a finalized question.
+    expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
+    // ...but the caller still gets honest post-submission feedback.
+    expect(result).toEqual({ correct: false, correctAnswer: 'Paris' });
   });
 
-  it('[BREAK/a] rejects a /check for a guess_who index already finalized (finalAttempt:true), even if the new attempt claims cluesUsed:0', async () => {
+  it('[BREAK/a] is idempotent for a /check on an already-finalized guess_who index — a cluesUsed:0 replay is NOT appended', async () => {
     const round = makeRound(
       [guessWhoQuestion],
       [
@@ -1068,19 +1076,23 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
     );
     round.activityType = 'guess_who';
     repoSpy = spyRepo(round);
+    const db = makeUpdateDb();
 
-    await expect(
-      checkQuizAnswerWithCorrect(
-        makeUpdateDb(),
-        PROFILE_ID,
-        ROUND_ID,
-        0,
-        'Isaac Newton',
-        'free_text',
-        true,
-        0,
-      ),
-    ).rejects.toBeInstanceOf(ConflictError);
+    const result = await checkQuizAnswerWithCorrect(
+      db,
+      PROFILE_ID,
+      ROUND_ID,
+      0,
+      'Isaac Newton',
+      'free_text',
+      true,
+      0,
+    );
+
+    // The cluesUsed:0 "full XP" replay is never recorded — first-attempt-wins
+    // keeps the original finalAttempt (cluesUsed:5, wrong) authoritative.
+    expect(db.update as unknown as jest.Mock).not.toHaveBeenCalled();
+    expect(result).toEqual({ correct: true });
   });
 
   it('[BREAK/b] rejects probe (non-final) attempts beyond the per-question cap', async () => {
