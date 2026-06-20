@@ -1033,6 +1033,7 @@ function CreateSubjectScreenAuthenticated() {
             )}
             <Pressable
               onPress={onEditSuggestion}
+              disabled={isBusy}
               className="py-3 items-center mt-2"
               testID="subject-no-match-edit"
               accessibilityRole="button"
@@ -1062,6 +1063,7 @@ function CreateSubjectScreenAuthenticated() {
             <View className="flex-row gap-3">
               <Pressable
                 onPress={onAcceptSuggestion}
+                disabled={isBusy}
                 className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
                 testID="subject-suggestion-accept"
                 accessibilityRole="button"
@@ -1075,6 +1077,7 @@ function CreateSubjectScreenAuthenticated() {
               </Pressable>
               <Pressable
                 onPress={onEditSuggestion}
+                disabled={isBusy}
                 className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
                 testID="subject-suggestion-edit"
                 accessibilityRole="button"
@@ -1115,6 +1118,7 @@ function CreateSubjectScreenAuthenticated() {
               <View className="flex-row gap-3">
                 <Pressable
                   onPress={onAcceptSuggestion}
+                  disabled={isBusy}
                   className="flex-1 bg-primary rounded-button py-3 items-center min-h-[44px] justify-center"
                   testID="subject-suggestion-accept"
                   accessibilityRole="button"
@@ -1126,6 +1130,7 @@ function CreateSubjectScreenAuthenticated() {
                 </Pressable>
                 <Pressable
                   onPress={onEditSuggestion}
+                  disabled={isBusy}
                   className="flex-1 bg-surface rounded-button py-3 items-center min-h-[44px] justify-center border border-border"
                   testID="subject-suggestion-edit"
                   accessibilityRole="button"
