@@ -22,6 +22,12 @@ describe('[BUG-565] account-repository — __unscoped naming contract', () => {
     );
   });
 
+  it('exports findSubscriptionByStripeCustomerId__unscoped', () => {
+    expect(
+      typeof accountRepository.findSubscriptionByStripeCustomerId__unscoped,
+    ).toBe('function');
+  });
+
   it('exports findQuotaPool__unscoped', () => {
     expect(typeof accountRepository.findQuotaPool__unscoped).toBe('function');
   });

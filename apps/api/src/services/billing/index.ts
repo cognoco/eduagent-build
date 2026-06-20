@@ -17,6 +17,7 @@ export {
   createSubscription,
   updateSubscriptionFromWebhook,
   linkStripeCustomer,
+  getSubscriptionByStripeCustomerId,
   getQuotaPool,
   resetMonthlyQuota,
   ensureFreeSubscription,
