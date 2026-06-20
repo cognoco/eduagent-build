@@ -47,6 +47,7 @@ beforeEach(() => {
   mockValidateProductionBindings.mockReturnValue({
     missing: [],
     overrideApplied: false,
+    warnings: [],
   });
 });
 
@@ -238,6 +239,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: ['IDEMPOTENCY_KV'],
         overrideApplied: false,
+        warnings: [],
       });
 
       await envValidationMiddleware(c, next);
@@ -268,6 +270,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: [],
         overrideApplied: false,
+        warnings: [],
       });
 
       await envValidationMiddleware(c, next);
@@ -288,6 +291,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: [],
         overrideApplied: true,
+        warnings: [],
       });
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
