@@ -127,7 +127,10 @@ async function seedAccount() {
     });
   }
 
-  return account!;
+  // Return the seeded owner profileId so callers can supply X-Profile-Id, the
+  // explicit-header resolution the owner-only billing gates now require (the
+  // real mobile client always sends it). profiles.id === person.id under v2.
+  return { account: account!, ownerProfileId: profileId };
 }
 
 async function seedSubscription(
@@ -322,14 +325,17 @@ afterAll(async () => {
 
 describe('Integration: billing lifecycle routes', () => {
   it('repairs a missing subscription row with the default plus trial', async () => {
-    await seedAccount();
+    const { ownerProfileId } = await seedAccount();
     const plusTier = getTierConfig('plus');
 
     const res = await app.request(
       '/v1/subscription',
       {
         method: 'GET',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -352,7 +358,7 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('returns subscription details from the real subscription and quota rows', async () => {
-    const account = await seedAccount();
+    const { account, ownerProfileId } = await seedAccount();
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
@@ -366,7 +372,10 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription',
       {
         method: 'GET',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -384,13 +393,16 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('creates a checkout session and links the stripe customer on first checkout', async () => {
-    const account = await seedAccount();
+    const { account, ownerProfileId } = await seedAccount();
 
     const res = await app.request(
       '/v1/subscription/checkout',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
         body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
       },
       TEST_ENV,
@@ -430,7 +442,7 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('cancels a subscription and marks the local row immediately', async () => {
-    const account = await seedAccount();
+    const { account, ownerProfileId } = await seedAccount();
     const seeded = await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
@@ -442,7 +454,10 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/cancel',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -463,13 +478,16 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('returns 404 when there is no active Stripe subscription to cancel', async () => {
-    await seedAccount();
+    const { ownerProfileId } = await seedAccount();
 
     const res = await app.request(
       '/v1/subscription/cancel',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -480,7 +498,7 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('returns usage data from the real quota pool', async () => {
-    const account = await seedAccount();
+    const { account, ownerProfileId } = await seedAccount();
     await seedSubscription(account.id, {
       tier: 'plus',
       status: 'active',
@@ -494,7 +512,10 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/usage',
       {
         method: 'GET',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -512,7 +533,7 @@ describe('Integration: billing lifecycle routes', () => {
   });
 
   it('returns a customer portal url for an existing billing account', async () => {
-    const account = await seedAccount();
+    const { account, ownerProfileId } = await seedAccount();
     await seedSubscription(account.id, {
       stripeCustomerId: 'cus_portal',
     });
@@ -521,7 +542,10 @@ describe('Integration: billing lifecycle routes', () => {
       '/v1/subscription/portal',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
