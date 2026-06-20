@@ -496,6 +496,11 @@ describe('finalizeChallengeRoundIfReady — releases the claim + escalates on a 
         }),
       }),
     );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/challenge-round.finalize.failed',
+      }),
+    );
 
     // Retry completes exactly once.
     const retry = await finalizeChallengeRoundIfReady(
