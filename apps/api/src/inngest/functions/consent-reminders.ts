@@ -182,13 +182,21 @@ export const consentReminder = inngest.createFunction(
     const day7 = await step.run('refresh-day-7-token', async () => {
       const status = await getCurrentConsentRequestStatus();
       if (!status || isTerminalConsentStatus(status)) return null;
-      return refreshCurrentConsentToken();
+      // [WI-637] Memoize the freshly-minted token ONLY. Inngest persists a
+      // step's return value in its third-party state store; the parent email
+      // must not ride along, so it is re-read in the send step below
+      // (lookupConsentDetails) instead of being returned here. The mint stays
+      // its own step so it survives replay (DS-020).
+      const refreshed = await refreshCurrentConsentToken();
+      return refreshed ? { freshToken: refreshed.freshToken } : null;
     });
     if (day7) {
       await step.run('send-day-7-reminder', async () => {
+        const { parentEmail } = await lookupConsentDetails();
+        if (!parentEmail) return;
         await sendEmail(
           formatConsentReminderEmail(
-            day7.parentEmail,
+            parentEmail,
             'your child',
             23,
             buildTokenUrl(day7.freshToken),
@@ -205,13 +213,18 @@ export const consentReminder = inngest.createFunction(
     const day14 = await step.run('refresh-day-14-token', async () => {
       const status = await getCurrentConsentRequestStatus();
       if (!status || isTerminalConsentStatus(status)) return null;
-      return refreshCurrentConsentToken();
+      // [WI-637] Token-only memoized return; parent email re-read in the send
+      // step (see day-7 note).
+      const refreshed = await refreshCurrentConsentToken();
+      return refreshed ? { freshToken: refreshed.freshToken } : null;
     });
     if (day14) {
       await step.run('send-day-14-reminder', async () => {
+        const { parentEmail } = await lookupConsentDetails();
+        if (!parentEmail) return;
         await sendEmail(
           formatConsentReminderEmail(
-            day14.parentEmail,
+            parentEmail,
             'your child',
             16,
             buildTokenUrl(day14.freshToken),
