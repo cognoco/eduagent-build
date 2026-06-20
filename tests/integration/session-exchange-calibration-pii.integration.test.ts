@@ -1,24 +1,23 @@
 /**
- * WI-620 break test — the learner's raw calibration answer / topic title must
- * never land in the `app/review.calibration.requested` Inngest event payload
- * (Inngest persists payloads in its third-party event store). The dispatch was
- * converted to the WI-577 reference-and-rehydrate pattern: the payload carries
- * only an opaque `learnerMessageEventId` (a session_events row id), and the
- * consumer (review-calibration-grade) rehydrates the answer + title from the DB
- * scoped by profileId.
+ * WI-620 break test (integration) — the learner's raw calibration answer /
+ * topic title must never land in the `app/review.calibration.requested`
+ * Inngest event payload (Inngest persists payloads in its third-party event
+ * store). The dispatch was converted to the WI-577 reference-and-rehydrate
+ * pattern: the payload carries only an opaque `learnerMessageEventId` (a
+ * session_events row id); the consumer rehydrates the answer + title from the
+ * DB scoped by profileId.
  *
- * Exercises the real egress path: seeded minor profile + active review session
- * + persisted user_message row → maybeDispatchReviewCalibration → the captured
- * inngest.send payload. Red-green-REVERT: with the fix the dispatched payload
- * carries no sentinel; reverting the session-exchange.ts payload build (raw
- * text back) re-introduces the sentinel and fails this test.
+ * Exercises the real egress path against a seeded row: minor profile + active
+ * review session + persisted user_message → maybeDispatchReviewCalibration →
+ * the captured inngest.send payload. The DB-free counterpart
+ * (apps/api/src/services/session/session-exchange-calibration-pii.test.ts)
+ * carries the red-green-REVERT proof; this one pins the property end-to-end.
+ *
+ * External boundary: inngest.send is spied (the event-store HTTP boundary).
  */
-import { resolve } from 'path';
 import { and, eq, like } from 'drizzle-orm';
-import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
-  createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
@@ -27,21 +26,19 @@ import {
   profiles,
   sessionEvents,
   subjects,
-  type Database,
 } from '@eduagent/database';
-import { inngest } from '../../inngest/client';
-import { maybeDispatchReviewCalibration } from './session-exchange';
 
-loadDatabaseEnv(resolve(__dirname, '../../../../..'));
+import { createIntegrationDb } from './helpers';
+import { inngest } from '../../apps/api/src/inngest/client';
+import { maybeDispatchReviewCalibration } from '../../apps/api/src/services/session/session-exchange';
 
-const hasDatabaseUrl = !!process.env.DATABASE_URL;
-const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
-
 let seedCounter = 0;
 
+type IntegrationDb = ReturnType<typeof createIntegrationDb>;
+
 async function seedReviewSession(
-  db: Database,
+  db: IntegrationDb,
   input: { topicTitle: string; learnerMessage: string },
 ): Promise<{
   profileId: string;
@@ -54,7 +51,7 @@ async function seedReviewSession(
     .insert(accounts)
     .values({
       clerkUserId: `clerk_wi620_calib_${RUN_ID}_${idx}`,
-      email: `wi620-calib-${RUN_ID}-${idx}@test.invalid`,
+      email: `wi620-calib-${RUN_ID}-${idx}@integration.test`,
     })
     .returning({ id: accounts.id });
 
@@ -123,8 +120,8 @@ async function seedReviewSession(
     })
     .returning({ id: learningSessions.id });
 
-  // The user message is already persisted by the time the dispatch fires (the
-  // fix moved the dispatch post-persist). Seed the row and reference its id.
+  // The user message is persisted by the time the dispatch fires (the fix moved
+  // the dispatch post-persist). Seed the row and reference its id.
   const [userEvent] = await db
     .insert(sessionEvents)
     .values({
@@ -145,12 +142,12 @@ async function seedReviewSession(
   };
 }
 
-describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
-  let db: Database;
+describe('Integration: maybeDispatchReviewCalibration WI-620 PII egress', () => {
+  let db: IntegrationDb;
   let sendSpy: jest.SpyInstance;
 
   beforeAll(() => {
-    db = createDatabase(process.env.DATABASE_URL!);
+    db = createIntegrationDb();
   });
 
   beforeEach(() => {
@@ -175,7 +172,6 @@ describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
     const topicSentinel = `Photosynthesis-${RUN_ID}-title`;
     const seeded = await seedReviewSession(db, {
       topicTitle: topicSentinel,
-      // A substantive answer (>= 4 words, >= 18 chars) so the dispatch fires.
       learnerMessage: `Plants make their own food using ${learnerSentinel}`,
     });
 
@@ -190,7 +186,6 @@ describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
       seeded.learnerMessageEventId,
     );
 
-    // The dispatch must have fired exactly once for this event.
     const calibrationCalls = sendSpy.mock.calls.filter(
       ([arg]) =>
         (arg as { name?: string } | undefined)?.name ===
@@ -202,7 +197,6 @@ describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
       calibrationCalls[0]![0] as { data: Record<string, unknown> }
     ).data;
 
-    // Opaque reference present; raw text/title absent.
     expect(payload.learnerMessageEventId).toBe(seeded.learnerMessageEventId);
     expect(payload).not.toHaveProperty('learnerMessage');
     expect(payload).not.toHaveProperty('topicTitle');
@@ -210,6 +204,20 @@ describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
     const serialized = JSON.stringify(payload);
     expect(serialized).not.toContain(learnerSentinel);
     expect(serialized).not.toContain(topicSentinel);
+
+    // Sanity: the persisted row id resolves to the seeded user_message, scoped
+    // by profileId — i.e. the opaque reference is rehydratable.
+    const row = await db
+      .select({ content: sessionEvents.content })
+      .from(sessionEvents)
+      .where(
+        and(
+          eq(sessionEvents.id, seeded.learnerMessageEventId),
+          eq(sessionEvents.profileId, seeded.profileId),
+        ),
+      )
+      .limit(1);
+    expect(row[0]?.content).toContain(learnerSentinel);
   });
 
   it('[WI-620] skips the dispatch entirely when no persisted message id is available (no PII-safe reference)', async () => {
@@ -231,11 +239,12 @@ describeIfDb('maybeDispatchReviewCalibration WI-620 PII egress', () => {
       undefined,
     );
 
-    const calibrationCalls = sendSpy.mock.calls.filter(
-      ([arg]) =>
-        (arg as { name?: string } | undefined)?.name ===
-        'app/review.calibration.requested',
-    );
-    expect(calibrationCalls).toHaveLength(0);
+    expect(
+      sendSpy.mock.calls.filter(
+        ([arg]) =>
+          (arg as { name?: string } | undefined)?.name ===
+          'app/review.calibration.requested',
+      ),
+    ).toHaveLength(0);
   });
 });
