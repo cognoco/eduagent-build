@@ -33,6 +33,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     captureException: jest.fn(),
+    captureMessage: jest.fn(),
     addBreadcrumb: jest.fn(),
   };
 });
@@ -233,7 +234,7 @@ jest.mock(
 
 import { app } from '../index';
 import { inngest } from '../inngest/client';
-import { captureException } from '../services/sentry';
+import { captureException, captureMessage } from '../services/sentry';
 import {
   cancelDeletion,
   getProfileIdsForAccount,
@@ -482,6 +483,85 @@ describe('account routes', () => {
           timestamp: expect.any(String),
         }),
       });
+    });
+
+    it('[orphan-schedule] surfaces orphan-recovery telemetry when re-dispatching for an already-scheduled deletion', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      // The core durable handoff is re-dispatched (orphan recovery)...
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'app/account.deletion-scheduled',
+        data: expect.objectContaining({ accountId: 'test-account-id' }),
+      });
+      // ...and the orphan condition is surfaced as a tracked Sentry signal so a
+      // prior orphaned schedule (DB write succeeded, durable handoff lost) is
+      // observable rather than recovered silently. It is captureMessage, not a
+      // new Inngest event, because the signal has no consumer (a producer-only
+      // event would trip the orphan-dispatcher guard).
+      expect(captureMessage).toHaveBeenCalledWith(
+        'account.deletion orphan schedule re-dispatched',
+        expect.objectContaining({
+          level: 'warning',
+          extra: expect.objectContaining({
+            surface: 'account.deletion.orphan_recovered',
+            accountId: 'test-account-id',
+            identityVersion: 'v1',
+          }),
+        }),
+      );
+    });
+
+    it('[orphan-schedule] does not surface orphan-recovery telemetry on the normal first-schedule path', async () => {
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('[orphan-schedule] still returns 200 when the orphan-recovery telemetry throws', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+      // A Sentry SDK throw on the observability signal must never propagate to
+      // the outer catch and convert the successfully re-dispatched schedule
+      // into a 503 — the captureMessage call is fault-isolated.
+      (captureMessage as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('sentry transport down');
+      });
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.message).toBe('Deletion scheduled');
     });
 
     it('returns 401 without auth header', async () => {
