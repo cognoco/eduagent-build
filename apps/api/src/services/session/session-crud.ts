@@ -1218,13 +1218,19 @@ export interface StaleSessionCloseFailure {
 }
 
 /**
- * Array of successfully-closed sessions (backward-compatible: callers can read
- * `.length` / `.map` / `.filter` exactly as before) carrying a non-enumerable
- * `failures` channel so the cron's per-session error isolation is observable.
+ * Plain object carrying both the successfully-closed sessions and the
+ * per-session failures. It is a plain object (NOT an array with an attached
+ * property) so that the `failures` channel survives the Inngest `step.run`
+ * JSON boundary: the cron calls `closeStaleSessions` inside `step.run(...)`,
+ * whose return value Inngest JSON-serializes for memoization. `JSON.stringify`
+ * drops non-enumerable properties and named (non-index) properties of arrays,
+ * so an array-with-`failures` shape would silently lose `failures` after the
+ * step boundary. Consumers read `.sessions` and `.failures` explicitly.
  */
-export type StaleSessionCloseBatch = StaleSessionCloseResult[] & {
+export interface StaleSessionCloseBatch {
+  sessions: StaleSessionCloseResult[];
   failures: StaleSessionCloseFailure[];
-};
+}
 
 export async function closeStaleSessions(
   db: Database,
@@ -1292,16 +1298,9 @@ export async function closeStaleSessions(
     }
   }
 
-  // Attach `failures` as a non-enumerable property so existing array
-  // consumers (length / map / filter / spread of successes) are unaffected.
-  const batch = results as StaleSessionCloseBatch;
-  Object.defineProperty(batch, 'failures', {
-    value: failures,
-    enumerable: false,
-    writable: false,
-    configurable: false,
-  });
-  return batch;
+  // Return a plain object so `failures` survives the Inngest step.run JSON
+  // boundary (see StaleSessionCloseBatch doc above).
+  return { sessions: results, failures };
 }
 
 export async function getSessionCompletionContext(

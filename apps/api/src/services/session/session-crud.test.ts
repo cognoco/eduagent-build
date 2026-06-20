@@ -1373,11 +1373,35 @@ function makeStaleBatchDb(options: {
     };
   }
 
-  // The scoped repo passes a composed `where` SQL; we cannot introspect it
-  // cheaply, so we resolve the target session from the most recent findFirst
-  // arg by scanning the staleRows. closeSession only ever findFirst-s the
-  // session it is currently closing, in loop order, so a simple cursor works.
-  let cursor = 0;
+  // Index the stubs by session id so findFirst resolves the right session
+  // regardless of call order. The scoped repo passes a composed `where` SQL we
+  // cannot introspect cheaply, but getSession queries by `learningSessions.id`,
+  // and Drizzle's `eq(column, value)` exposes that value as the right operand
+  // of the binary expression. We walk the composed condition tree to recover
+  // the queried id, so this fake no longer assumes one-findFirst-per-session in
+  // loop order (the previous shared-cursor coupling to closeSession internals).
+  const stubsById = new Map(options.staleRows.map((r) => [r.id, r]));
+
+  function extractQueriedSessionId(where: unknown): string | undefined {
+    // Drizzle SQL/condition objects are opaque, so scan their enumerable
+    // structure for any string that matches a known stale-session id.
+    const seen = new Set<unknown>();
+    const stack: unknown[] = [where];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (node == null || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (typeof value === 'string' && stubsById.has(value)) {
+          return value;
+        }
+        if (value != null && typeof value === 'object') {
+          stack.push(value);
+        }
+      }
+    }
+    return undefined;
+  }
 
   const db = {
     query: {
@@ -1385,15 +1409,17 @@ function makeStaleBatchDb(options: {
         findMany: jest
           .fn()
           .mockResolvedValue(options.staleRows.map((r) => fullSessionRow(r))),
-        findFirst: jest.fn().mockImplementation(async () => {
-          const stub = options.staleRows[cursor];
-          cursor += 1;
-          if (!stub) return undefined;
-          if (stub.id === options.throwForSessionId) {
-            throw new Error(`DB read failed for ${stub.id}`);
-          }
-          return fullSessionRow(stub);
-        }),
+        findFirst: jest
+          .fn()
+          .mockImplementation(async (args?: { where?: unknown }) => {
+            const sessionId = extractQueriedSessionId(args?.where);
+            const stub = sessionId ? stubsById.get(sessionId) : undefined;
+            if (!stub) return undefined;
+            if (stub.id === options.throwForSessionId) {
+              throw new Error(`DB read failed for ${stub.id}`);
+            }
+            return fullSessionRow(stub);
+          }),
       },
       sessionEvents: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -1471,7 +1497,7 @@ describe('closeStaleSessions — per-session error isolation', () => {
     );
 
     // The batch must NOT abort: the two healthy sessions are still closed.
-    const closedIds = result.map((r) => r.sessionId).sort();
+    const closedIds = result.sessions.map((r) => r.sessionId).sort();
     expect(closedIds).toEqual(['sess-a', 'sess-c']);
 
     // The failure is surfaced on the returned batch (observable outcome).
@@ -1489,5 +1515,44 @@ describe('closeStaleSessions — per-session error isolation', () => {
       { extra?: { sessionId?: string } },
     ];
     expect(context?.extra?.sessionId).toBe('sess-b');
+  });
+
+  // Regression for SHOULD_FIX #1 (the serialization bug): the cron calls
+  // closeStaleSessions INSIDE step.run(...), and Inngest JSON-serializes the
+  // step's return value for memoization. The previous shape — an array with a
+  // non-enumerable `failures` property — lost `failures` across that boundary
+  // (JSON.stringify drops non-enumerable + named non-index array properties),
+  // so the failure-surfacing channel was silently undefined in production.
+  // A plain { sessions, failures } object survives the round-trip; this test
+  // would have caught the bug.
+  it('[SHOULD_FIX #1] failures survive a JSON round-trip (Inngest step.run boundary)', async () => {
+    const staleRows = [
+      {
+        id: 'sess-a',
+        profileId: 'prof-a',
+        subjectId: 'subj-a',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-b',
+        profileId: 'prof-b',
+        subjectId: 'subj-b',
+        sessionType: 'learning',
+      },
+    ];
+    const db = makeStaleBatchDb({ staleRows, throwForSessionId: 'sess-b' });
+
+    const result = await closeStaleSessions(
+      db,
+      new Date('2026-06-01T00:00:00.000Z'),
+    );
+
+    // Pre-condition: the in-memory result carries the failure.
+    expect(result.failures).toHaveLength(1);
+
+    // Simulate the Inngest step.run memoization boundary.
+    const roundTripped = JSON.parse(JSON.stringify(result));
+    expect(roundTripped.failures).toEqual(result.failures);
+    expect(roundTripped.sessions).toEqual(result.sessions);
   });
 });
