@@ -72,6 +72,7 @@ export {
   decrementQuota,
   incrementQuota,
   safeRefundQuota,
+  refundQuotaOrEscalate,
 } from './billing/metering';
 
 export { getEffectiveAccessForSubscription } from './billing/access';

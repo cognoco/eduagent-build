@@ -186,6 +186,38 @@ const mockSafeRefundQuota = jest.fn(
     return { refunded: true };
   },
 );
+// [BUG-821] Routes now call refundQuotaOrEscalate (the gate that escalates a
+// decrement-without-subscriptionId instead of silently dropping the refund).
+// Mirror the real implementation: when subscriptionId is present, delegate to
+// safeRefundQuota; if that throws, swallow + escalate to Sentry (the real
+// safeRefundQuota catches internally and never propagates), so route frame
+// emission is never interrupted. When subscriptionId is missing but a decrement
+// happened (source set), escalate under the skip tag.
+const mockRefundQuotaOrEscalate = jest.fn(
+  async (
+    db: unknown,
+    subscriptionId: string | undefined,
+    context?: { source?: string },
+  ) => {
+    if (subscriptionId) {
+      try {
+        return await mockSafeRefundQuota(db, subscriptionId, context);
+      } catch (refundErr) {
+        mockCaptureException(refundErr, {
+          extra: { context: 'metering.refund.failed' },
+        });
+        return { refunded: false };
+      }
+    }
+    if (context?.source !== undefined) {
+      mockCaptureException(
+        new Error('Quota refund skipped: decrement without subscriptionId'),
+        { tags: { surface: 'quota.refund.skipped_no_subscription' } },
+      );
+    }
+    return { refunded: false };
+  },
+);
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -234,6 +266,12 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) =>
       mockSafeRefundQuota(args[0], args[1] as string, args[2]),
+    refundQuotaOrEscalate: (...args: unknown[]) =>
+      mockRefundQuotaOrEscalate(
+        args[0],
+        args[1] as string | undefined,
+        args[2] as { source?: string } | undefined,
+      ),
     createSubscription: jest.fn(),
   };
 });

@@ -36,7 +36,7 @@ import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
-import { safeRefundQuota } from '../services/billing';
+import { refundQuotaOrEscalate } from '../services/billing';
 import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
@@ -136,8 +136,11 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
         // for a turn that consumed no LLM capacity. Mark quotaRefunded so the
         // middleware's post-handler status-based branch does not double-refund.
         const subscriptionId = c.get('subscriptionId');
-        if (subscriptionId && !c.get('quotaRefunded')) {
-          const { refunded } = await safeRefundQuota(db, subscriptionId, {
+        if (!c.get('quotaRefunded')) {
+          // [BUG-821] refundQuotaOrEscalate escalates (Sentry + structured log)
+          // when a decrement happened but subscriptionId is missing, instead of
+          // silently skipping the refund and charging the user for a no-LLM turn.
+          const { refunded } = await refundQuotaOrEscalate(db, subscriptionId, {
             route: 'assessments.answer.app_help',
             profileId,
             source: c.get('quotaDecrementSource'),
