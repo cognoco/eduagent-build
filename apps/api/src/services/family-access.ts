@@ -177,4 +177,12 @@ export function assertOwnerProfile<
   if (profileMeta?.isOwner !== true) {
     throw new ForbiddenError(message);
   }
+  // [Issue 901] Reject auto-synthesized owner identity. profileScopeMiddleware
+  // auto-resolves the account OWNER profile (isOwner:true) when no X-Profile-Id
+  // header is sent — so an authenticated NON-OWNER caller could omit the header
+  // to satisfy the isOwner check above (privilege escalation). Owner privileges
+  // require an explicitly selected, verified owner profile.
+  if (profileMeta.resolvedVia !== 'explicit-header') {
+    throw new ForbiddenError(message);
+  }
 }

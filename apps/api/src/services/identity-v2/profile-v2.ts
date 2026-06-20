@@ -104,6 +104,11 @@ function buildProfileMeta(args: {
     hasPremiumLlm: deriveHasPremiumLlm(),
     conversationLanguage: args.conversationLanguage,
     isOwner: args.isOwner,
+    // [Issue 901] Placeholder — callers (profileScopeMiddleware) always spread
+    // this meta and override resolvedVia with the correct 'auto' | 'explicit-header'
+    // value. This default satisfies the required field type; the middleware
+    // overwrite ensures the gate never reads a stale value from here.
+    resolvedVia: 'auto' as const,
   };
 }
 

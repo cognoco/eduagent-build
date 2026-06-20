@@ -91,7 +91,10 @@ function makeApp(db: FakeDb) {
   app.use('*', async (c, next) => {
     c.set('db', db as AppVariables['db']);
     c.set('profileId', PROFILE_ID);
-    c.set('profileMeta', { isOwner: true } as AppVariables['profileMeta']);
+    c.set('profileMeta', {
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    } as AppVariables['profileMeta']);
     await next();
   });
 
@@ -106,7 +109,10 @@ function makeProxyApp(db: FakeDb) {
   app.use('*', async (c, next) => {
     c.set('db', db as AppVariables['db']);
     c.set('profileId', PROFILE_ID);
-    c.set('profileMeta', { isOwner: false } as AppVariables['profileMeta']);
+    c.set('profileMeta', {
+      isOwner: false,
+      resolvedVia: 'auto',
+    } as AppVariables['profileMeta']);
     await next();
   });
 

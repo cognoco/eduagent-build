@@ -66,6 +66,8 @@ function makeApp(overrides?: {
         : (overrides?.profileMeta ??
           ({
             isOwner: overrides?.isOwner ?? true,
+            resolvedVia:
+              (overrides?.isOwner ?? true) ? 'explicit-header' : 'auto',
             birthYear: 2000,
             location: null,
             consentStatus: null,

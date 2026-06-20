@@ -40,6 +40,7 @@ const CHILD_PENDING_META: ProfileMeta = {
   consentStatus: 'PENDING',
   hasPremiumLlm: false,
   isOwner: false,
+  resolvedVia: 'explicit-header',
 };
 
 const CHILD_REQUESTED_META: ProfileMeta = {
@@ -48,6 +49,7 @@ const CHILD_REQUESTED_META: ProfileMeta = {
   consentStatus: 'PARENTAL_CONSENT_REQUESTED',
   hasPremiumLlm: false,
   isOwner: false,
+  resolvedVia: 'explicit-header',
 };
 
 const WITHDRAWN_CHILD_META: ProfileMeta = {
@@ -56,6 +58,7 @@ const WITHDRAWN_CHILD_META: ProfileMeta = {
   consentStatus: 'WITHDRAWN',
   hasPremiumLlm: false,
   isOwner: false,
+  resolvedVia: 'explicit-header',
 };
 
 const CONSENTED_CHILD_META: ProfileMeta = {
@@ -64,6 +67,7 @@ const CONSENTED_CHILD_META: ProfileMeta = {
   consentStatus: 'CONSENTED',
   hasPremiumLlm: false,
   isOwner: false,
+  resolvedVia: 'explicit-header',
 };
 
 const ADULT_META: ProfileMeta = {
@@ -72,6 +76,7 @@ const ADULT_META: ProfileMeta = {
   consentStatus: null,
   hasPremiumLlm: false,
   isOwner: true,
+  resolvedVia: 'explicit-header',
 };
 
 const WITHDRAWN_ADULT_META: ProfileMeta = {
@@ -80,6 +85,7 @@ const WITHDRAWN_ADULT_META: ProfileMeta = {
   consentStatus: 'WITHDRAWN',
   hasPremiumLlm: false,
   isOwner: true,
+  resolvedVia: 'explicit-header',
 };
 
 // ---------------------------------------------------------------------------
@@ -317,6 +323,7 @@ describe('consentMiddleware', () => {
         consentStatus,
         hasPremiumLlm: false,
         isOwner: false,
+        resolvedVia: 'explicit-header',
       };
       const app = createApp({ profileId: 'p-1', profileMeta: meta });
       const res = await app.request('/v1/subjects');

@@ -142,7 +142,24 @@ jest.mock(
         conversationLanguage: null,
         isOwner: true,
       }),
-      getProfile: jest.fn().mockResolvedValue(null),
+      getProfile: jest
+        .fn()
+        .mockImplementation(
+          (_db: unknown, profileId: string, _accountId: string) => {
+            if (profileId === 'test-profile-id') {
+              return Promise.resolve({
+                id: 'test-profile-id',
+                birthYear: 2010,
+                location: 'EU',
+                consentStatus: 'CONSENTED',
+                hasPremiumLlm: false,
+                conversationLanguage: null,
+                isOwner: true,
+              });
+            }
+            return Promise.resolve(null);
+          },
+        ),
       getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
       // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
       getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
@@ -351,7 +368,7 @@ function createFakeKV() {
 }
 
 const fakeKV = createFakeKV();
-const AUTH_HEADERS = makeAuthHeaders();
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
@@ -589,6 +606,7 @@ describe('metering middleware', () => {
         '/v1/dictation/prepare-homework',
         {
           method: 'POST',
+          // No X-Profile-Id header: exercises auto-resolve path where findOwnerProfile returns null → 400.
           headers: makeAuthHeaders(),
           body: JSON.stringify({ text: 'Hello world.' }),
         },
