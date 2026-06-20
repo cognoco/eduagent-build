@@ -27,6 +27,13 @@ interface SubjectHubNotesSectionProps {
   onNoteVoice?: (request: SubjectHubNotesVoiceRequest) => void;
 }
 
+// The add affordance (input + mic + empty-state add button) is shown only when
+// the learner can study AND a persistence handler is actually wired. Subject-hub
+// note persistence is deferred (notes are topic-scoped via useCreateNote; the hub
+// is not topic-scoped), so production renders the notes section read-only. Showing
+// an add input with no handler would silently discard what the user typed — a
+// dead-end worse than no input at all. See PR #1316 / claude-review MUST_FIX.
+
 const NOTE_ORIGINS: NoteOrigin[] = ['self', 'mentor'];
 
 function noteOriginLabel(origin: NoteOrigin) {
@@ -54,11 +61,14 @@ export function SubjectHubNotesSection({
   );
   const visibleNotes = notesByOrigin[selectedOrigin];
   const isEmpty = notes.length === 0;
+  // Only offer adding a note when something can actually persist it.
+  const canAddNote = canStudy && !!onAddNote;
 
   const submitDraft = () => {
+    if (!onAddNote) return;
     const trimmed = draft.trim();
     if (!trimmed) return;
-    onAddNote?.(trimmed);
+    onAddNote(trimmed);
     setDraft('');
   };
 
@@ -71,9 +81,11 @@ export function SubjectHubNotesSection({
         {t('subjectHub.notes.heading')}
       </Text>
 
-      {/* Add-note input + transcription-only voice mic. Only the learner Me-scope
-          (canStudy) can add notes; the masked supporter view renders neither. */}
-      {canStudy ? (
+      {/* Add-note input + transcription-only voice mic. Rendered only when the
+          learner Me-scope can study AND a persistence handler is wired; the masked
+          supporter view (canStudy=false) and the persistence-deferred hub render
+          neither. */}
+      {canAddNote ? (
         <View
           testID="subject-hub-notes-add-row"
           className="mt-3 flex-row items-center rounded-card border border-border bg-surface-elevated px-3"
@@ -120,7 +132,7 @@ export function SubjectHubNotesSection({
           <Text className="text-center text-body-sm text-text-secondary">
             {t('subjectHub.notes.empty')}
           </Text>
-          {canStudy ? (
+          {canAddNote ? (
             <Pressable
               testID="subject-hub-notes-empty-add"
               accessibilityRole="button"

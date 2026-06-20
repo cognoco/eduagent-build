@@ -140,7 +140,7 @@ describe('SubjectHub', () => {
     expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
   });
 
-  it('surfaces the notes empty-state add affordance when the learner can study but has no notes', () => {
+  it('surfaces the notes section empty state when the learner can study but has no notes', () => {
     render(
       <SubjectHub
         data={{ ...baseData, notes: [] }}
@@ -151,10 +151,12 @@ describe('SubjectHub', () => {
     );
 
     // The section renders even with zero notes (canStudy=true), so the empty
-    // state and its add affordance are reachable rather than gated out.
+    // state is reachable rather than gated out entirely. The add input is NOT
+    // shown: SubjectHub wires no onAddNote (subject-hub note persistence is
+    // deferred), and an input with no handler would silently drop what's typed.
     screen.getByText('subjectHub.notes.heading');
     screen.getByTestId('subject-hub-notes-empty');
-    screen.getByTestId('subject-hub-notes-input');
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
   });
 
   it('opens topic details as sheet state rather than route state', () => {
