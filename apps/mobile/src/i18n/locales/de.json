@@ -494,7 +494,9 @@
       "pushMissingServer": "Push-Benachrichtigungen hier aktivieren.",
       "pushMissingToken": "Dieses Gerät für Push-Benachrichtigungen registrieren.",
       "openSettingsTitle": "Einstellungen öffnen",
-      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen."
+      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen.",
+      "loadErrorTitle": "Wir konnten deine Benachrichtigungseinstellungen nicht laden.",
+      "loadErrorMessage": "Bitte versuche es erneut. Deine Einstellungen haben sich nicht geändert."
     },
     "account": {
       "sectionHeader": "Konto",

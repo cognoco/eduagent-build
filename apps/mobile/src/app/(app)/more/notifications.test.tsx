@@ -473,10 +473,11 @@ describe('NotificationsScreen', () => {
     );
   });
 
-  it('disables toggles when loading', async () => {
+  it('[WI-510] shows the loader rather than toggles when loading', async () => {
     mockNotifLoading = true;
-    const { getByTestId } = await renderNotificationsScreen();
-    expect(getByTestId('push-notifications-toggle').props.disabled).toBe(true);
+    const { getByTestId, queryByTestId } = await renderNotificationsScreen();
+    expect(queryByTestId('push-notifications-toggle')).toBeNull();
+    getByTestId('more-notifications-loading-spinner');
   });
 
   it('disables toggles when update is pending', async () => {
@@ -485,26 +486,48 @@ describe('NotificationsScreen', () => {
     expect(getByTestId('push-notifications-toggle').props.disabled).toBe(true);
   });
 
-  it('[WI-78 DS-202] disables toggles and does not submit defaults when settings are missing', async () => {
+  it('[WI-78 DS-202][WI-510] shows the error fallback instead of toggles when settings are missing', async () => {
     mockNotifPrefs = undefined;
-    const { getByTestId } = await renderNotificationsScreen();
-    expect(getByTestId('push-notifications-toggle').props.value).toBe(false);
-    expect(getByTestId('push-notifications-toggle').props.disabled).toBe(true);
+    const { getByTestId, queryByTestId } = await renderNotificationsScreen();
 
-    fireEvent(getByTestId('push-notifications-toggle'), 'valueChange', true);
-
+    // No toggle list rendered — the user is never shown a misleading all-off state.
+    expect(queryByTestId('push-notifications-toggle')).toBeNull();
+    expect(queryByTestId('weekly-digest-toggle')).toBeNull();
+    // The error fallback is shown instead, and nothing is ever submitted.
+    getByTestId('more-notifications-error');
     expect(mockUpdateMutate).not.toHaveBeenCalled();
   });
 
-  it('[WI-78 DS-202] disables toggles and does not submit defaults after load error', async () => {
+  it('[WI-78 DS-202][WI-510] shows the error fallback instead of toggles after a load error', async () => {
+    mockNotifPrefs = undefined;
+    mockNotifError = true;
+
+    const { getByTestId, queryByTestId } = await renderNotificationsScreen();
+
+    expect(queryByTestId('weekly-digest-toggle')).toBeNull();
+    expect(queryByTestId('push-notifications-toggle')).toBeNull();
+    getByTestId('more-notifications-error');
+    expect(mockUpdateMutate).not.toHaveBeenCalled();
+  });
+
+  it('[WI-510] retrying from the error fallback refetches the settings', async () => {
     mockNotifPrefs = undefined;
     mockNotifError = true;
 
     const { getByTestId } = await renderNotificationsScreen();
 
-    expect(getByTestId('weekly-digest-toggle').props.disabled).toBe(true);
-    fireEvent(getByTestId('weekly-digest-toggle'), 'valueChange', false);
+    fireEvent.press(getByTestId('more-notifications-error-retry'));
+    expect(mockRefetchNotificationSettings).toHaveBeenCalledTimes(1);
+  });
 
-    expect(mockUpdateMutate).not.toHaveBeenCalled();
+  it('[WI-510] shows the loader instead of toggles while settings are loading', async () => {
+    mockNotifLoading = true;
+    mockNotifPrefs = undefined;
+
+    const { getByTestId, queryByTestId } = await renderNotificationsScreen();
+
+    expect(queryByTestId('push-notifications-toggle')).toBeNull();
+    expect(queryByTestId('more-notifications-error')).toBeNull();
+    getByTestId('more-notifications-loading-spinner');
   });
 });

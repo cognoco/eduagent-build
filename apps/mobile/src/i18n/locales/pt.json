@@ -517,7 +517,9 @@
       "pushMissingServer": "Ative as notificações push aqui.",
       "pushMissingToken": "Registe este dispositivo para notificações push.",
       "openSettingsTitle": "Abrir Definições",
-      "openSettingsDescription": "As notificações estão bloqueadas para esta aplicação. Ative-as nas definições do sistema."
+      "openSettingsDescription": "As notificações estão bloqueadas para esta aplicação. Ative-as nas definições do sistema.",
+      "loadErrorTitle": "Não foi possível carregar as suas definições de notificação",
+      "loadErrorMessage": "Tente novamente. As suas preferências não foram alteradas."
     },
     "account": {
       "sectionHeader": "Conta",
