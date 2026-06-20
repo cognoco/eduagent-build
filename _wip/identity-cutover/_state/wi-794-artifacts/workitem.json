@@ -1,0 +1,17 @@
+{
+  "pageId": "3808bce9-1f7c-81ca-8dc0-f2748f87c8c7",
+  "id": "WI-794",
+  "name": "Post-WI-586-rebuild staging RLS verification (40/40) + family_preferences GUC fix",
+  "description": "prg06ic-023 escalation; ic-orch-022 ruling (2). Operator-owned execution; DB-integrity+security spanning staging+prod = above-lane. Awaiting prod-status finding (read-only check dispatched).",
+  "acceptanceCriteria": "FOLDED into WI-586 (per ic-orch-023): the WI-586 staging-parity rebuild-from-committed-migrations RESTORES the stripped staging RLS BY CONSTRUCTION (prod is 46/46 clean -> the committed migrations carry RLS correctly; NO patch-then-rebuild; the prod-write execution gate is MOOT — prod clean, no prod write). This WI = the POST-REBUILD VERIFICATION + a cleanup: (1) after WI-586 rebuilds staging, CONFIRM staging pg_policies = expected 40/40 isolation policies present + RLS enabled on all expected tables + profile_quota_usage carries its policy (no deny-all). (2) Fix the pre-existing family_preferences_profile_isolation GUC bug — it reads app.profile_id instead of the standard app.current_profile_id (may not bind correctly) -> align to app.current_profile_id. Context: prg06ic-023..025; staging-isolated breakage (a prohibited db:push; investigation+guard = WI-795); prod confirmed CLEAN. DoD: post-rebuild staging RLS verified (40/40 + RLS enabled); family_preferences GUC fixed.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

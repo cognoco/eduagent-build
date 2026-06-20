@@ -188,8 +188,8 @@
     <div class="here">
       <div class="dot"></div>
       <div>
-        <div style="font-weight:700; margin-bottom:3px;">Decision: <b>SPLIT (Option C)</b>. The systematic re-sweep found a whole <b>multi-table reader category</b> the profiles-only sweep missed (~6 flip-critical consent_states/family_links/export clusters, ~2–3× harder). Operator ruled: keep 586 lean + verified, carve the missed category into a <b>dedicated sibling WP</b>.</div>
-        <div class="sub"><b>586</b> keeps migrations + TASK A/B + the 5 verified profiles readers (+ its own profiles/person-domain review fixes) → re-reviews green → merges lean. <b>Sibling WP</b> (new, shepherd-instantiated) takes the consent_states/family_links/export reader-gating + dashboard GDPR resolver + export architecture decision, with its own Codex cross-check + an independent completeness audit. <b>The flip (#8) hard-gates on BOTH landing</b> — 586 can merge first; the cutover can't flip until the sibling is done + audited + the staging route-smoke passes. Same shepherd delivers both (sequential).</div>
+        <div style="font-weight:700; margin-bottom:3px;">🟢 <b>#8 FLIPPED — prod is flag-on. Now in SOAK (P4).</b> Deploy 27708451739 green (operator-approved); worker <code>api.mentomate.com</code> = 200; prod ledger 117. Proof gate (Stage 2 staging rehearsal) was MET; all identity code Cosmo-closed (586 · 809 · 810 · 811 · 800 · 794).</div>
+        <div class="sub"><b>Prod cutover done so far:</b> P1 host-assert ✓ → P2 snapshot ✓ (<code>br-solitary-glitter</code>) → P2b FK repoint ✓ → <b>P3 #8 flip ✓</b> → <b>now P4 soak</b>. <b>First soak test = fresh-owner signup</b> (confirms the repoint took + owner-bootstrap works e2e). Reversible (flag→false + redeploy) until <b>P5 #11 drop</b> (operator-only, 0 rows lost). See the <b>Live execution tracker (Stages 1–4)</b> below.</div>
       </div>
     </div>
   </section>
@@ -201,45 +201,95 @@
     <div class="rail">
       <div class="phase done">
         <div class="n">PHASE 1</div>
-        <div class="t">Build 586 core</div>
-        <div class="d">Migrations, v2 twins, flip-critical wirings, reader sweep.</div>
+        <div class="t">Identity core landed</div>
+        <div class="d">586 + 809 (reader sweep) + 810 — merged &amp; Gate-2 Cosmo-closed.</div>
+        <div class="pill"><span class="pill done">✓ Done</span></div>
+      </div>
+      <div class="phase done">
+        <div class="n">PHASE 2</div>
+        <div class="t">Pre-C0 hardening</div>
+        <div class="d">811 (v2 child-create) · 800 (sub-13 seed) · 794 (RLS GUC) — all Cosmo-closed.</div>
+        <div class="pill"><span class="pill done">✓ Done</span></div>
+      </div>
+      <div class="phase done">
+        <div class="n">PHASE 3</div>
+        <div class="t">Rehearsal prep</div>
+        <div class="d">Seed staging + flag baseline false + route-smoke JWT de-risk.</div>
+        <div class="pill"><span class="pill done">✓ Done</span></div>
+      </div>
+      <div class="phase done">
+        <div class="n">PHASE 4</div>
+        <div class="t">Staging rehearsal C0–C9</div>
+        <div class="d">The proof gate — GREEN. Full sequence ran clean; post-drop route-smoke 15/15.</div>
         <div class="pill"><span class="pill done">✓ Done</span></div>
       </div>
       <div class="phase cur">
-        <div class="n">PHASE 2</div>
-        <div class="t">Finalize 586 (lean)</div>
-        <div class="d">586 clears its own review findings → merges lean; consent/family/export readers SPLIT to a flip-gated sibling WP (Option C).</div>
-        <div class="pill"><span class="pill prog">◐ Split underway</span></div>
-      </div>
-      <div class="phase">
-        <div class="n">PHASE 3</div>
-        <div class="t">Land 586</div>
-        <div class="d">CI green → Gate-1 → merge → Gate-2 review+QA → Close.</div>
-        <div class="pill"><span class="pill pend">○ Pending</span></div>
-      </div>
-      <div class="phase">
-        <div class="n">PHASE 4</div>
-        <div class="t">Soak / burn-down</div>
-        <div class="d">Work the post-586 items: WI-808, WI-805.</div>
-        <div class="pill"><span class="pill pend">○ Pending</span></div>
-      </div>
-      <div class="phase">
         <div class="n">PHASE 5</div>
-        <div class="t">Flip #8 → Drop #11</div>
-        <div class="d">Turn flag on in prod (reversible), then drop legacy (final).</div>
+        <div class="t">Prod flip #8 → drop #11</div>
+        <div class="d">Empty pre-launch prod: host-assert → snapshot → flip (reversible) → drop (0 rows). Operator-only.</div>
         <div class="pill"><span class="pill op">◆ Operator-only</span></div>
       </div>
     </div>
   </section>
 
-  <!-- MERGE-BLOCKER HAZARD -->
+  <!-- LIVE EXECUTION TRACKER (Stages 1–4) -->
   <section>
-    <p class="eyebrow">The biggest change since the last map</p>
-    <h2>⚠️ The merge — not the flip — is now the catastrophe risk</h2>
-    <div class="alert">
-      <div class="h">Migrations 0117 + 0118 are journaled in the auto-apply path on the branch.</div>
-      <div>Merging 586 would run <code>drizzle-kit migrate</code> on deploy and <b>auto-DROP the 4 legacy identity tables in production, out of sequence, before the flip — irreversible (PITR-only)</b>. The fix (A + B) must land before merge. The <i>push</i> is safe; deploy triggers on <code>main</code>, not the feature branch.</div>
+    <p class="eyebrow">Live execution tracker · added rev 20</p>
+    <h2>Stages 1–4 — rehearsal prep → staging rehearsal → prod cutover → post-flip</h2>
+    <p class="lead">The operator-facing action list. Stage 1 (prep) + Stage 2 (the staging rehearsal C0–C9, the proof gate) are orchestrator-run; Stage 3 (prod) is operator-only on the empty pre-launch DB; Stage 4 is post-flip cleanup. Statuses live as of rev 20.</p>
+
+    <div class="phase-h">Stage 1 — Rehearsal prep <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(orchestrator · DONE)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Action</th><th style="width:150px">Owner</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">S1.1</td><td>Fresh-seed staging — 11 scenarios → <b>13 accounts / 17 profiles</b>, v2 full + 2 ownerless (disposal targets)</td><td class="g-mine">🟡 orchestrator</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">S1.2</td><td>Flag baseline <code>IDENTITY_V2_ENABLED=false</code> + propagate <small>deploy 27703680721 (also fixed staging deploy broken-at-migrate since the cutover)</small></td><td class="g-mine">🟡 orchestrator</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">S1.3</td><td>Route-smoke JWT de-risk — owner Clerk JWT mints headless (Backend API); <code>/v1/profiles</code>+<code>/v1/subjects</code> → 200</td><td class="g-mine">🟡 orchestrator</td><td class="st s-done">✓ Done</td></tr>
+    </table>
+
+    <div class="phase-h">Stage 2 — Staging rehearsal (C0–C9) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(orchestrator · THE PROOF GATE)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step</th><th style="width:150px">Gate</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">C0/C1</td><td>Freeze — documented-rehearsed, no propagation <small>(psql/neonctl bypass the worker; read-only would only break C9)</small></td><td>—</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C2</td><td>Pre-disposal Neon snapshot — <code>br-fragrant-fog-agjkun2b</code> <small>rollback for everything after C3</small></td><td>part of #6</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C3</td><td><b>STOP-1</b> ownerless disposal — DELETE accounts w/ no is_owner profile <small>2 deleted (13→11); owners + organization untouched</small></td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C4</td><td>Convergent reseed 0109 + 0115 <small>subscription_payers→4, knowledge_assertions→17 created; legacy-unbacked synthetic guardianship/consent pruned to 0 (expected test-seed artifact)</small></td><td>—</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C5</td><td>Parity — <code>verify-identity-reseed.mjs</code> <b>all 26 integrity checks green, exit 0</b> <small>reseed converged v2↔legacy cleanly</small></td><td>—</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C6</td><td>FK repoint <code>0117_m_repoint.sql</code> — catalog-driven, completeness self-check passed <small>0 true drop-blockers; DROP-TYPE precheck clear (3 enums used only by dropped tables)</small></td><td>STOP → go</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C7</td><td>Flip <code>IDENTITY_V2_ENABLED=true</code> + propagate (deploy) <small>deploy 27705428434 success; Sync-secrets verified → worker flag-on</small></td><td>—</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C8</td><td>Drop <code>0118_m_drop.sql</code> — 4 tables (consent_states, family_links, profiles, accounts) + 3 enums <small>all gone; subscriptions + person + organization RETAINED; no DROP-TYPE-in-use</small></td><td>—</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">C9</td><td><b>Post-drop route-smoke — PROOF GATE</b> <small>15/15 probes returned 200 post-drop flag-on (owner reads + a write + 7 child-detail proxy routes + progress + notifications); pmc guardianship re-injected so child path was real; <b>no legacy reader 500'd</b></small></td><td>gate</td><td class="st s-done">✓ GREEN</td></tr>
+    </table>
+
+    <div class="phase-h">Stage 3 — Prod cutover <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(OPERATOR-ONLY · empty pre-launch DB)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step</th><th style="width:150px">Gate</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">P1</td><td>Pre-flip host assertion — <s>byte-confirm GH <code>DATABASE_URL_PRODUCTION</code></s> resolved as <b>structural single-DB argument + execution-time §0 confirm</b> <small>(secret is write-only → unreadable; §0 re-ran 2026-06-17 17:18Z: host ep-holy-leaf, mig 116, 0 rows across 18 counts)</small></td><td class="g-mine">🟡 orch</td><td class="st s-done">✓ Resolved</td></tr>
+      <tr><td class="id">P2</td><td>Snapshot prod (cheap insurance even at 0 rows) <small>→ <code>prod-pre-drop-20260617</code> (<code>br-solitary-glitter-agxnlsdz</code>), CoW off br-green-pond, 2026-06-17 17:18Z</small></td><td class="g-mine">🟡 orch</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">P2b<span class="new">★</span></td><td><b>FK repoint</b> — hand-run <code>_freeze-only/0117_m_repoint.sql</code> (psql -f, single-transaction) <small>applied + verified on prod: <b>0 live FKs target the 4 dropped parents</b>; repointed 68→person / 5→organization / 5→subscription (incl. the 4 quota children off legacy subscriptions); DROP-TYPE precheck clean. Idempotent script, provenance = origin/main byte-identical.</small></td><td class="g-mine">🟡 orch (op-auth)</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">P3</td><td><b>Gate #8</b> — flip <code>IDENTITY_V2_ENABLED=true</code> + redeploy <small>operator (jojorgen) approved the <code>production</code> gate → Deploy run <b>27708451739 = success</b> (migrate ✓ [safe 0117 re-run; ledger 116→117], wrangler deploy ✓, secret-sync ✓); worker <code>api.mentomate.com/v1/health</code> = 200. Reversible (flag→false + redeploy) until P5.</small></td><td class="g-op">🔒 operator-only</td><td class="st s-done">✓ Done</td></tr>
+      <tr><td class="id">P4</td><td>Soak — hands-on app testing <small><b>FIRST test = fresh-owner signup</b> (exercises createIdentityGraph owner-bootstrap = the one path the rehearsal didn't cover; post-repoint it commits → positive confirmation the repoint took). Flag-on writes land in v2 → legacy 4 tables stay empty → P5 still 0-rows-lost. Compressible (no live traffic).</small></td><td class="g-op">🔒 operator</td><td class="st s-prog">◐ In soak</td></tr>
+      <tr><td class="id">P5</td><td><b>Gate #11</b> — drop 4 tables + 3 enums (0 rows lost) + prod route-smoke <small>gated on owner-bootstrap green + compressible soak; pre-drop snapshot <code>br-solitary-glitter</code> in place</small></td><td class="g-op">🔒 operator-only</td><td class="st s-pend">○ Not started</td></tr>
+    </table>
+
+    <div class="phase-h">Stage 4 — Post-flip cleanup <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(non-gating)</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Step</th><th style="width:150px">Owner</th><th style="width:120px">Status</th></tr>
+      <tr><td class="id">P6</td><td>WI-779 — flag removal / grep-clean (delete legacy schema/code/twins)</td><td>—</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">P7</td><td>WI-805 — subscriptions drop + 4 quota-FK repoints (billing)</td><td>—</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">P8</td><td>WI-782 — visibility-contract <small>(Parked — V2-shell orchestrator)</small></td><td>—</td><td class="st s-pend">○ Parked</td></tr>
+      <tr><td class="id">P9</td><td>Snapshot cleanup — retire <code>br-red-tooth</code>, <code>br-soft-mouse</code>, <code>br-fragrant-fog</code></td><td class="g-mine">🟡 orchestrator</td><td class="st s-pend">○ Not started</td></tr>
+    </table>
+    <div class="why">
+      <b>Gate spine:</b> Stage 2 <b>C9 is GREEN — the proof gate is MET</b>, so the operator-only prod flip (Stage 3) is now unlocked. <b>P1 resolved + P2 snapshot done (2026-06-17 17:18Z); the FK repoint (P2b) is the next step and is the precondition for #8.</b> Stage 3 (#8 / #11) is operator-only. Prod is empty (0 rows) → its data spine (P-equivalents of C3–C5) is a no-op; the full data path was proven on staging in Stage 2. Non-gating in parallel: WI-808 (flag-on burndown + nx routing fix, at orchestrator Gate-1).
     </div>
+  </section>
+
+  <!-- MERGE-BLOCKER HAZARD (historical) -->
+  <section>
+    <p class="eyebrow">Resolved hazard · historical (kept for the record)</p>
+    <h2>✓ Resolved: the merge-time auto-DROP hazard (A + B landed)</h2>
+    <div class="why">
+      <b>Was:</b> migrations 0117 + 0118 were journaled in the auto-apply path, so merging 586 would have run <code>drizzle-kit migrate</code> on deploy and auto-DROPed the 4 legacy identity tables in production, out of sequence, before the flip (PITR-only recovery). <b>Now:</b> fixed before any merge — <b>A</b> de-journaled 0117/0118 to <code>drizzle/_freeze-only/</code> (hand-run only) and <b>B</b> added a fail-closed deploy guard (<code>check-reference-only-migrations.mjs</code>). 586 merged safely (<code>ec99644</code>) and is Cosmo-closed. The drop is now a deliberate hand-run freeze-only script at C8/#11.</div>
     <div class="cols" style="margin-top:14px">
       <div class="card">
         <h3>Live-DB state <span class="pill done">✓ Verified read-only</span></h3>
@@ -286,30 +336,54 @@
       <tr><td class="id">B3a</td><td>Push-gate cross-check — orchestrator independent source read + advisor sanity-check + non-vacuous test confirmation</td><td>me</td><td class="st s-done">✓ Done</td></tr>
       <tr><td class="id">B3b</td><td>Push + green required CI <small>✓ all 4 required GREEN on da728ce (main, Playwright web smoke, API Quality Gate, Merge completeness). Expected non-required reds: billing Flag-ON (WI-805), ambient run-smoke (WI-801)</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
       <tr><td class="id">B3c</td><td>Merge-gate cross-check — fresh Codex source check <small>✓ MERGE-SAFE on the 5 profiles readers + A/B/D — but SCOPED; full-diff reviewers caught consent/family findings outside that scope (see B3d)</small></td><td>me → Codex</td><td class="st s-done">✓ Done (scoped)</td></tr>
-      <tr><td class="id">B3d<span class="new">★</span></td><td><b>586 clears its OWN review findings</b> (profiles/person-domain only, e.g. family-bridge:252 null→404) → re-review green <small>the consent_states/family_links/export category is SPLIT OUT to the sibling WP below — NOT fixed in 586 (Option C)</small></td><td>shepherd</td><td class="st s-prog">◐ In progress</td></tr>
-      <tr><td class="id">B4</td><td>Gate-1 — 586 reviews clear + I re-verify; operator pre-authorized (auto-merge on clean reviews; ping on finding) → merge lean</td><td class="g-mine">🟡 me</td><td class="st s-pend">○ Blocked by B3d</td></tr>
-      <tr><td class="id">B5★sib</td><td><b>Sibling WP — dropped-table reader-gating sweep</b> (consent_states/family_links/export) <small>~6 flip-critical clusters + dashboard GDPR resolver + export arch decision + 2 UNCLEAR; own Codex cross-check + independent completeness audit. Does NOT block 586 merge; HARD-GATES the flip (#8)</small></td><td>shepherd</td><td class="st s-prog">◐ Instantiating</td></tr>
-      <tr><td class="id">B5</td><td>Merge to main — <b>must not happen until B1 lands</b></td><td>operator / me</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">B6</td><td>Gate-2 — separate reviewer + QA → Cosmo Close</td><td>reviewer</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">B3d<span class="new">★</span></td><td><b>586 clears its OWN review findings</b> (profiles/person-domain, e.g. family-bridge:252 ruled-invalid — cols NOT NULL DEFAULT 'en') → re-review APPROVED <small>B3: the half-finished consent v2 code was already in #1210 and couldn't be cleanly reverted (interleaved with the migration core), so it merges DORMANT (flag-off) and WI-809 fixes it in-place + does the rest</small></td><td>shepherd</td><td class="st s-done">✓ Done <small>0f72f8b56</small></td></tr>
+      <tr><td class="id">B4</td><td>Gate-1 — I independently verified (required-4 green, claude-review APPROVED 0 must/should, B3 consent ledger present) → squash-merged #1210 myself (no self-merge)</td><td class="g-mine">🟡 me</td><td class="st s-done">✓ MERGED <small>ec99644 · 20:17Z</small></td></tr>
+      <tr><td class="id">B5★sib</td><td><b>WI-809 — flip-critical consent / dropped-table reader-gating sweep</b> (consent_states/family_links/export) <small>MERGED squash 5f8759e (parent ec99644). Gated all 4 dropped-table flag-on readers + consent authz-regression fix (org-scoped getOrgMemberDisplayNameV2) + export learningOnly arch. Completeness audit re-derived clean (no 3rd miss); 3 Gate-1 rounds (stale-assertion + export-untested + security). Gate-2 finalize pending</small></td><td>shepherd</td><td class="st s-done">✓ CLOSED</td></tr>
+      <tr><td class="id">B6</td><td>Gate-2 — separate reviewer + QA → <b>Cosmo CLOSED</b> (Resolution=Done) <small>DoD passed 20:44Z after the dod.5 one-line Caveats/Follow-ups fix + AC amend; gate-encoding 809-block removed so the close was not stalled</small></td><td>reviewer</td><td class="st s-done">✓ CLOSED</td></tr>
     </table>
 
-    <div class="phase-h">Phase C — Cutover execution runbook (§4) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· per env: dev → staging → prod</span></div>
+    <div class="phase-h">Pre-C0 Readiness Wave — MAIN-PATH CODE LANDED (2026-06-17) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· surfaced by the adversarial review · bridges Phase B (code landed) → Phase C (cutover exec) · live — Cosmo is source of truth</span></div>
+    <table class="seq">
+      <tr><th style="width:48px">#</th><th>Strand</th><th style="width:150px">Owner</th><th style="width:150px">Status</th></tr>
+      <tr><td class="id">P0</td><td><b>Staging PITR-rewind</b> to pre-cutover (LSN 0/4B6744C8; verified 524 acc / 509 prof; backup branch <code>staging-pre-rebuild-20260617</code>). <small>Restored DATA but NOT RLS policies (rewind target was already RLS-stripped → 3/40).</small></td><td class="g-mine">🟡 orchestrator</td><td class="st s-done">✓ DONE</td></tr>
+      <tr><td class="id">P0b</td><td><b>Staging RLS rebuild from committed migrations</b> (Option 1) — DROP public + drizzle (ledger) schemas → <code>drizzle-kit migrate</code> full chain to 0117. Restores RLS by construction. Snapshot <code>staging-pre-option1-20260617</code> (<code>br-red-tooth</code>) holds the 524/509. Staging now <b>46 policies = exact prod match</b> + family_preferences GUC fixed + profile_quota_usage policy present; <b>UNSEEDED</b> (reseed → WI-814).</td><td class="g-mine">🟡 orchestrator</td><td class="st s-done">✓ DONE</td></tr>
+      <tr><td class="id">W1</td><td><b>WI-811 — v2 child-create (CUT-B2)</b> · <b>CRITICAL PATH</b> (set C0 date). The flip blocker (flag-on <code>POST /v1/profiles</code> returned owner / 409 instead of creating a child) is FIXED. <small>MERGED <code>aff72b3c</code> + fail-closed hardening <code>b86c4124b</code>; all <b>4 Gate-2 bounces resolved</b> (guard <code>_wip</code> exclusion · flag-on-lane AC narrowed · pre-graph kind:child fail-closed reject) → Cosmo <b>CLOSED</b>.</small></td><td>shepherd / exec</td><td class="st s-done">✓ CLOSED</td></tr>
+      <tr><td class="id">W3c</td><td><b>WI-800 — sub-13 seed assessment</b> · rehearsal-hardening. <small>MERGED <code>1b7bb9f57</code> → Cosmo <b>CLOSED</b>. Assessment WI: all 3 protected seeds (trial-expired / consent-pending / post-approval-redirect) found <b>age-irrelevant</b> (consentRequest- / paywall-driven, GDPR basis) → bumped to <code>CHILD_BIRTH_YEAR</code> per AC#2; AC#3 do-not-bump did not fire.</small></td><td>shepherd (fork)</td><td class="st s-done">✓ CLOSED</td></tr>
+      <tr><td class="id">W3a</td><td><b>WI-794 — family_preferences RLS GUC fix + staging RLS verify (40/40)</b> · rehearsal-hardening. <small>Code MERGED <code>499ba67e</code>. 4 Gate-2 bounces all resolved: format · nx colon-target trap (RLS guard never ran in CI) · staging 3/40 → P0b Option-1 rebuild (46=prod) · prod still had legacy GUC → 0117 applied to prod via psql. <b>Both staging + prod now have family_preferences = app.current_profile_id, legacy_guc=0.</b></small></td><td>shepherd + orch</td><td class="st s-done">✓ CLOSED</td></tr>
+      <tr><td class="id">W3b</td><td>WI-801 — E2E auth.setup readiness · <small>rehearsal-gated: validated <b>during</b> the rehearsal (deploy-gated WI-771 interaction), no pre-C code → does NOT gate rehearsal start.</small></td><td>shepherd (fork)</td><td class="st s-pend">◐ rehearsal-gated</td></tr>
+      <tr><td class="id">W2</td><td>WI-808 — flag-on integration suite green · confidence lever, <b>NOT a C0 hard gate</b> (soak + C9 smoke = compensating control). <small>Idle-fill available now 811 merged. <b>Now also carries the systemic nx-routing finding</b>: the colon target runs in both lanes → the <code>apps/api</code> integration suite + 3 pre-existing H8 tests never run flag-on (the lane's "full integration coverage" was overstated).</small></td><td>shepherd / exec</td><td class="st s-pend">○ available (non-gating)</td></tr>
+      <tr><td class="id">W4</td><td>S1 — <code>0117_m_repoint.sql</code> / <code>0118_m_drop.sql</code> header prose fix · <small>FOLDED into WI-794's commit (no separate branch; <code>9d824f2</code> superseded).</small></td><td>shepherd</td><td class="st s-done">✓ Done</td></tr>
+    </table>
+    <div class="why">
+      <b>ALL pre-C0 strands DONE.</b> W1 (WI-811) <b>CLOSED</b> · W3c (WI-800) <b>CLOSED</b> · W3a (WI-794) <b>CLOSED</b> (staging+prod both GUC-fixed). Staging is <b>0118-exact, subscriptions-present, RLS=prod</b>, <b>UNSEEDED</b>; reseed = <b>DISCARD</b> (WI-814, ruled).<br><b>Concrete remaining steps before C0 — all gated on the operator's "go to run the rehearsal":</b> (1) fresh-seed staging (test-seed + reseed migs); (2) set staging <code>IDENTITY_V2_ENABLED=false</code> + redeploy (pre-cutover baseline); (3) orchestrator runs the C0–C9 rehearsal (the proof gate). W3b (WI-801) validates during the rehearsal. W2 (WI-808) + the nx-routing fix = <b>non-gating</b>. <b>Excluded</b> (do NOT pull forward): WI-779, WI-805, WI-782 — post-flip. <b>Meta:</b> WI-813 captured.
+    </div>
+
+    <div style="margin:18px 0;padding:14px 16px;border:2px solid var(--accent,#3b82f6);border-radius:8px;background:rgba(59,130,246,0.08)">
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:6px">⭐ OPTION A RATIFIED (2026-06-17) — production is EMPTY (pre-launch)</div>
+      <div class="sub">Verified 3 ways: prod has <b>0 rows across all 85 tables</b>, migration 116, only MentoMate Neon prod branch; runtime DB locked via GitHub <code>DATABASE_URL_PRODUCTION</code>(+<code>_HOST</code>) → next prod deploy's host-assertion is the byte-confirm. Operator confirms <b>no launch in the window</b>.</div>
+      <div class="sub" style="margin-top:8px"><b>So on PROD the data spine is a no-op:</b> freeze / disposal / reseed / parity (C1–C5) skip (0 rows), #11 drops 0 rows, #8 flips for 0 users. Prod collapses to <b>snapshot → repoint → flip → drop</b>, and <b>must land before launch</b>. The <b>full data rehearsal stays on STAGING</b> (it has data) — all rigor lives there.</div>
+      <div class="sub" style="margin-top:8px"><b>Abbreviated gate model (ratified):</b> THE proof gate = <b>staging rehearsal GREEN</b> (full sequence incl. post-drop route-smoke). Prod <b>flip #8</b> (operator): staging-green + WI-811/sweeps merged + host-assertion confirmed; <b>reversible</b> until drop; no prod freeze/parity. Prod <b>drop #11</b> (operator): pre-drop snapshot + compressible soak; 0 rows lost. <b>Dropped</b> as moot: parity-exact, abort-on-deviation, notify-each. <b>Kept:</b> snapshot. #8/#11 stay operator-only.</div>
+      <div class="sub" style="margin-top:8px"><b>Repoint is per-environment:</b> live FK catalog — <b>staging 64 / prod 65</b> FKs off the legacy tables (differ by one: <code>memberships</code>→profiles on prod) → handled automatically by <code>0117</code>'s <b>dynamic catalog-driven loop</b> (queries pg_constraint at run time + completeness assertion; self-adapts per-env, no manual re-authoring). Still required at 0 rows: WI-811 code, the rehearsal, snapshot + repoint (FK constraints exist regardless of row count).</div>
+    </div>
+
+    <div class="phase-h">Phase C — Cutover execution runbook (§4) <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· canonical step + gate reference</span></div>
+    <p class="lead" style="margin-top:6px"><b>Live staging-rehearsal statuses are in the Live execution tracker (Stages 1–4) at the top.</b> The table below is the canonical runbook reference (step definitions, gate ownership, freeze-only script names). Its statuses track the <b>PROD path</b>, which has not started — prod is empty/pre-launch (Option A), so its data spine (C1–C5) is a no-op.</p>
     <table class="seq">
       <tr><th style="width:48px">#</th><th>Step (runbook §4)</th><th style="width:140px">Gate</th><th style="width:120px">Status</th></tr>
       <tr><td class="id">C0</td><td><b>Gate #4</b> — cutover-window entry (preconditions verified)</td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">C1</td><td>Freeze — ingress gate → HTTP quiet → Inngest drain → block → merge-freeze marker</td><td>—</td><td class="st s-pend">○</td></tr>
-      <tr><td class="id">C2</td><td>Neon PITR marker + pre-drop branch snapshot</td><td>part of #6</td><td class="st s-pend">○</td></tr>
-      <tr><td class="id">C3</td><td><b>Gate #6 / STOP-1</b> — ownerless-account disposal</td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">C4</td><td>Final convergent reseed (0109 + M-RESEED2 blocks)</td><td>—</td><td class="st s-pend">○</td></tr>
-      <tr><td class="id">C5</td><td>Parity verification — <code>verify-identity-reseed.mjs</code> exit 0, empty exceptions</td><td>—</td><td class="st s-pend">○</td></tr>
-      <tr><td class="id">C6</td><td>FK re-point migration (M-REPOINT) — inside freeze, before flip</td><td>STOP → go</td><td class="st s-pend">○</td></tr>
-      <tr><td class="id">C7</td><td><b>Gate #8</b> — flip <code>IDENTITY_V2_ENABLED=true</code> + unfreeze + soak (reversible while legacy tables live) <small>★ hard-gates on BOTH 586 merged AND the sibling reader-sweep WP complete + completeness audit + step-8.5 route-smoke</small></td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">C8<span class="new">★</span></td><td><b>Post-drop flag-on route smoke</b> (step 8.5, WI-803 AC#3) — the real no-500 drop-safety net</td><td>gate before C9</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">C9</td><td><b>Gate #11 — M-DROP</b> legacy tables (irreversible; PITR-only after)</td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
-      <tr><td class="id">C10</td><td>Grep-clean — delete legacy schema/code/twins + remove the flag + docs</td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C1</td><td>Freeze — ingress gate → HTTP quiet → Inngest drain → block → merge-freeze marker <small>(Option A — prod: SKIP, no users to freeze; runs on staging)</small></td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C2</td><td>Neon PITR marker + pre-drop branch snapshot <small>(KEPT on prod — cheap insurance)</small></td><td>part of #6</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C3</td><td><b>Gate #6 / STOP-1</b> — ownerless-account disposal <small>(Option A — prod: no-op, 0 rows)</small></td><td class="g-mine">🟡 mine (delegated)</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C4</td><td>Final convergent reseed — re-run 0109 + 0114 + 0115 (idempotent; §1.5 extension landed as numbered migrations, not an unnumbered "M-RESEED2" block) <small>(Option A — prod: no-op, 0 rows; full run on staging)</small></td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C5</td><td>Parity verification — <code>verify-identity-reseed.mjs</code> exit 0, empty exceptions <small>(Option A — prod: trivial 0=0; the real parity check is on staging)</small></td><td>—</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C6</td><td>FK re-point (M-REPOINT) — inside freeze, before flip. <small>Catalog-driven (no hard-coded list); <b>hand-run freeze-only script</b> <code>_freeze-only/0117_m_repoint.sql</code> — NOT in the drizzle-kit migrate chain. KEPT on prod (FK constraints exist at 0 rows); <b>dynamic catalog-driven loop self-adapts per-env</b> (no re-authoring) — live catalog: <b>stg 64 / prod 65 FKs</b></small></td><td>STOP → go</td><td class="st s-pend">○</td></tr>
+      <tr><td class="id">C7</td><td><b>Gate #8</b> — flip <code>IDENTITY_V2_ENABLED=true</code> + redeploy <small>(Option A: prod flips for <b>0 users</b>; <b>reversible</b> flag→false until the drop; no prod freeze).</small> <small>★ gates on: 586 ✓ · WI-809 ✓ · WI-810 ✓ · <b>WI-811 ✓ MERGED + CLOSED</b> · <b>staging rehearsal GREEN</b> (the proof gate) · prod-deploy host-assertion confirmed</small></td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C8</td><td><b>Gate #11 — M-DROP</b> — <b>hand-run freeze-only</b> <code>_freeze-only/0118_m_drop.sql</code>: DROP <b>4</b> identity tables (consent_states, family_links, profiles, accounts) + 3 enums. <b>subscriptions RETAINED</b> (drop + 4 quota-FK repoints → WI-805, post-flip). <small>Option A: <b>0 rows lost</b> on prod; irreversible-schema only; pre-drop snapshot = insurance.</small></td><td class="g-op">🔒 operator</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C9<span class="new">★</span></td><td><b>Post-drop flag-on route smoke</b> (step 8.5, WI-803 AC#3) — the real no-500 drop-safety net; runs <b>AFTER</b> the drop (only env that reproduces a real post-drop 500). [order fixed rev13: smoke is post-drop, was wrongly shown before it]</td><td>gate before C10</td><td class="st s-pend">○ Not started</td></tr>
+      <tr><td class="id">C10</td><td>Grep-clean — delete legacy schema/code/twins + remove the flag + docs. <small>Carved out: flag-on integration + non-flip readers → WI-808; subscriptions/billing teardown → WI-805. WI-586 no longer owns full flag retirement</small></td><td>—</td><td class="st s-pend">○</td></tr>
     </table>
     <div class="why">
-      <b>Staging has already been through C1–C9 once</b> as a deliberate zero-customer rehearsal — that is why staging's legacy tables are gone. <b>Production is untouched and safe</b>; Phase C against prod has not begun.
+      <b>Staging ran C1–C9 once</b> (zero-customer rehearsal, 06-14). For the gating re-run it has now been <b>PITR-rewound to its pre-cutover state</b> (2026-06-17, LSN 0/4B6744C8 — 5 legacy tables incl. subscriptions back; verified 524 acc / 509 prof; prior state backed up as branch <code>staging-pre-rebuild-20260617</code>) and is READY for the C0–C9 rehearsal. <b>Production is untouched and safe</b>; Phase C against prod has not begun.
     </div>
   </section>
 
@@ -343,9 +417,9 @@
           <li><span class="mark done">✓</span><span class="step-t"><b>A: de-journal 0117/0118</b> <small>★ verified — merge-time auto-DROP hazard removed</small></span></li>
           <li><span class="mark done">✓</span><span class="step-t"><b>B: deploy-time freeze-migration guard</b> <small>★ verified — kills the class durably</small></span></li>
           <li><span class="mark done">✓</span><span class="step-t">Push-gate cross-check <small>orchestrator read + advisor + non-vacuous tests</small></span></li>
-          <li><span class="mark prog">◐</span><span class="step-t">Push #1210 → full required CI <small>491/0; clean FF; no self-merge</small></span></li>
-          <li><span class="mark pend">○</span><span class="step-t">Merge gate: fresh Codex + Gate-2 reviewer + operator nod</span></li>
-          <li><span class="mark pend">○</span><span class="step-t">Gate-1 → merge → Gate-2 (review + QA) → <b>Cosmo Close</b></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Push #1210 → required CI green <small>all 4 required green on 0f72f8b56</small></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">Gate-1 — independent verify (CI + claude-review APPROVED + B3 ledger) → <b>squash-merged ec99644</b></span></li>
+          <li><span class="mark done">✓</span><span class="step-t">586 Gate-2 → <b>Cosmo CLOSED</b> (Resolution=Done); WI-809 now the sole long pole → #8 flip</span></li>
         </ul>
       </div>
     </div>
@@ -391,12 +465,12 @@
         <div class="node">
           <div class="badge">CARVED OUT → SOAK</div>
           <h4>WI-805 · billing</h4>
-          <p>Subscriptions drop + billing reader cutover, incl. the flip-critical quota-reset cron. Separate domain.</p>
+          <p>Subscriptions drop + billing reader cutover — mostly <b>post-flip</b>, EXCEPT one <b>flip-critical sub-part that must land before #8</b>: wire the quota-reset cron to <code>resetExpiredQuotaCyclesV2</code> (else post-flip the nightly reset reads stale legacy subscriptions). Separate domain.</p>
         </div>
         <div class="node" style="border-color:var(--amber)">
           <div class="badge" style="background:var(--amber);color:#2b1f02">SPLIT OUT → FLIP-GATE</div>
           <h4>Sibling WP · dropped-table reader sweep</h4>
-          <p>consent_states / family_links / export flag-on reader-gating — ~6 flip-critical clusters the profiles-only sweep missed. Own Codex cross-check + completeness audit. Doesn't block 586 merge; <b>hard-gates the flip (#8)</b>.</p>
+          <p><b>WI-809</b> · consent_states / family_links / export flag-on reader-gating — ~6 flip-critical clusters the profiles-only sweep missed. Own Codex cross-check + completeness audit. Didn't block 586 merge; <b>hard-gates the flip (#8)</b>. Created + gate-wired; starts now 586 is on main.</p>
         </div>
       </div>
     </div>
@@ -414,15 +488,15 @@
   <!-- UNKNOWNS UNTIL CLOSE -->
   <section>
     <p class="eyebrow">Risk — scoped to the next milestone</p>
-    <h2>Unknowns between now and "586 Closed"</h2>
-    <p class="lead">These are the only things that could bite before we can start the soak-phase burn-down. Everything beyond this (prod-data, the flip itself) is soak work, listed separately below.</p>
+    <h2>Unknowns between now and the prod flip (#8)</h2>
+    <p class="lead">586-era close unknowns all resolved (586/809/810 + 811/800/794 Cosmo-closed). These are the live ones — what could bite between the running rehearsal and the operator-only prod flip.</p>
     <div class="grid3">
-      <div class="u"><div class="h"><i>01</i> Finalize as predicted</div><p>The fix really is the trivial 2-line mock, and no "green" file turns out hollow when actually exercised.</p></div>
-      <div class="u"><div class="h"><i>02</i> Full required CI</div><p>#1210 clears main / web-smoke / API Quality Gate / Merge-completeness — broader than the unit + flag-on surface we've run.</p></div>
-      <div class="u"><div class="h"><i>03</i> Clean merge</div><p>Shared <code>main</code> moves under us; a schema/fixture drift could conflict at merge.</p></div>
-      <div class="u"><div class="h"><i>04</i> Gate-2 review + QA</div><p>The separate reviewer surfaces no blocking defect in 586's actual code.</p></div>
-      <div class="u flag"><div class="h"><i>05</i> Reader-sweep completeness — <b style="color:var(--amber)">MATERIALIZED</b></div><p>This unknown <b>hit</b>: the re-audit found 5 missed flip-critical readers (above), now being fixed in 586. Residual: static analysis covers <code>apps/api/src</code> only — DI/edge paths go to the staging rehearsal.</p></div>
-      <div class="u"><div class="h"><i>06</i> Migration auto-apply hazard — <b style="color:var(--green)">FIXED + VERIFIED</b></div><p>0117/0118 would have dropped prod tables at merge. A (de-journal) + B (fail-closed deploy guard) done in e17e393b4 and verified by orchestrator read: journal tip 0116, guard exits 1 without the freeze signal. Merge is now safe on this axis.</p></div>
+      <div class="u"><div class="h"><i>01</i> C9 route-smoke — <b style="color:var(--teal)">THE GATE</b></div><p>The real catch-all: a post-drop flag-on 5xx = a missed legacy reader that static analysis couldn't see. C9 green is the only thing unlocking the prod flip.</p></div>
+      <div class="u"><div class="h"><i>02</i> C8 drop clean — <b style="color:var(--green)">PRE-CHECKED</b></div><p>DROP-TYPE precheck clear (3 enums used only by dropped tables); 0 retained-table FK blockers after the C6 repoint. Low risk.</p></div>
+      <div class="u flag"><div class="h"><i>03</i> Child proxy path — <b style="color:var(--amber)">HANDLED</b></div><p>C4 reseed pruned the synthetic guardianship (no legacy backing) — correct convergence, but it would make C9's child probe a vacuous 403. Re-inject the pmc guardianship pre-C9 so the child read path is really exercised.</p></div>
+      <div class="u"><div class="h"><i>04</i> Prod host-assertion</div><p>Byte-confirm GH <code>DATABASE_URL_PRODUCTION</code> == the empty prod DB (operator, 30s) — the last runtime-binding residual before #8.</p></div>
+      <div class="u"><div class="h"><i>05</i> <code>main</code> moves under a deploy</div><p>Staging auto-deploys <code>main</code>; a new migration merged mid-rehearsal could conflict at the C7 deploy's migrate. Checked HEAD before C7; watch WI-808 PRs.</p></div>
+      <div class="u"><div class="h"><i>06</i> Parity fidelity (accepted)</div><p>Test-seed can't reproduce real legacy-full data, so faithful messy-data parity isn't proven here — moot (prod empty) + owned by the reseed integration test. The rehearsal proves sequence + route-smoke.</p></div>
     </div>
   </section>
 
@@ -434,7 +508,7 @@
       <div class="row"><span>•</span><div><b>Prod-data migration</b> — the clean-DB proof is not a prod-data proof (orphans, nulls, duplicate emails, dual-write drift). → cutover gates.</div></div>
       <div class="row"><span>•</span><div><b>Backfill / data-readiness ordering</b> — <code>person</code>/<code>login</code> must be populated <i>before</i> the flag flips. → confirm in runbook.</div></div>
       <div class="row"><span>•</span><div><b>Real-DB / integration confidence</b> — the flag-on integration suite is red until WI-808 burns it down. → WI-808.</div></div>
-      <div class="row"><span>•</span><div><b>Staging rehearsal on prod-shaped data</b> — the main compensating control for the two items above. Staging has already been flipped + dropped once (deliberate rehearsal); the prod-shaped re-run is the gating rehearsal. → cutover gates.</div></div>
+      <div class="row"><span>•</span><div><b>Staging rehearsal — RUNNING NOW (Stage 2)</b> — the main compensating control for the two items above, and THE proof gate. C0–C7 green; C8 drop + C9 post-drop route-smoke next. → see the Live execution tracker at top.</div></div>
       <div class="rev">
         <div class="ok"><b>Flip #8 — reversible</b>While the legacy tables still exist, flag-off rolls back any flip-on breakage. Soak is the safety window.</div>
         <div class="no"><b>Drop #11 — point of no return</b>After the legacy tables are dropped, the deferred items become unrecoverable. This is where they must be forced closed.</div>
@@ -452,7 +526,7 @@
       <span><span class="g-op">🔒</span> Operator-only gate (#8, #11)</span>
       <span><span class="new">★</span> Emerged this session</span>
     </div>
-    <div style="margin-top:12px">PRG-06 Identity Cutover · status as of 2026-06-16 (rev 5 — Option C SPLIT: 586 finalizes lean; consent_states/family_links/export reader sweep → flip-gated sibling WP) · view-only snapshot — Cosmo is the source of truth</div>
+    <div style="margin-top:12px">PRG-06 Identity Cutover · status as of 2026-06-17 (rev 23 — <b>🟢 #8 FLIPPED — PROD FLAG-ON — IN SOAK</b>: operator approved Deploy run 27708451739 (success); migrate self-healed prod ledger 116→117 (safe 0117 re-run; the advisor-caught migrate-gap, handled), wrangler deploy + Doppler secret-sync green → worker <code>api.mentomate.com/v1/health</code> = 200, <code>IDENTITY_V2_ENABLED=true</code>. P2b FK repoint applied + verified (0 live FKs at the 4 dropped parents). Shepherd primary-source correction: the quota_pools→subscriptions FK is the structural pre-repoint baseline, NOT a bug → soak fresh-owner-signup is a positive repoint-confirmation, not a 500 hunt; WI-808 residual is small (test-side). Next: soak → operator-only P5 drop (snapshot <code>br-solitary-glitter</code> in place). rev 22 — <b>🟢 STAGE 3 STARTED — P2 PROD SNAPSHOT DONE + REPOINT GAP FIXED</b>: §0 pre-flight re-confirmed empty prod (host ep-holy-leaf, mig 116, 0 rows across 18 counts); P2 snapshot <code>prod-pre-drop-20260617</code> (<code>br-solitary-glitter-agxnlsdz</code>) taken CoW off br-green-pond; P1 host-assertion resolved (structural single-DB + execution-time confirm; <code>DATABASE_URL_PRODUCTION</code> is write-only). <b>Inserted P2b FK-repoint row</b> — the condensed Stage-3 table had omitted it; verified prod has <b>65 legacy-pointed FKs</b> (59 profiles + 2 accounts repointed by 0117; 4 subscriptions retained → WI-805/P7). Corrected prod sequence: snapshot → <b>repoint (next)</b> → #8 flip → soak → #11 drop. rev 21 — <b>🟢 STAGING REHEARSAL COMPLETE &amp; GREEN — PROOF GATE MET</b>: full C0–C9 ran clean on staging — C7 flag flipped (deploy 27705428434), C8 dropped 4 tables + 3 enums (subscriptions/person/org retained, no DROP-TYPE-in-use), <b>C9 post-drop route-smoke 15/15 returned 200 flag-on</b> (owner reads + app-context write + 7 child-detail proxy routes via re-injected guardianship + progress + notifications) — no legacy reader 500'd. The operator-only Stage 3 prod cutover (host-assert → snapshot → #8 flip → soak → #11 drop, empty pre-launch prod) is now unlocked. rev 20 — <b>STAGING REHEARSAL RUNNING + map brought current</b>: added the <b>Live execution tracker (Stages 1–4)</b>; refreshed the phase rail (cutover-centric: core landed → pre-C0 hardening → rehearsal prep → rehearsal C0–C9 → operator flip/drop), the "you are here" banner, the merge-hazard section (now marked RESOLVED/historical — 586 merged safely + closed), and the "unknowns" section (re-scoped to now→#8). Stage 1 DONE (seed 13acc/17prof + 2 ownerless, flag baseline false, JWT de-risk green). Stage 2 rehearsal: C0–C7 green — C2 snapshot <code>br-fragrant-fog</code>, C3 disposal (2 ownerless), C4 reseed (synthetic guardianship/consent pruned as expected; payers→4, age-assertions→17), <b>C5 parity all 26 checks green</b>, C6 repoint (0 drop-blockers), C7 flag flipped true (deploy 27705428434, Sync-secrets verified); C8 drop + C9 route-smoke pending. Prod path unchanged (operator-only, empty). rev 19 — <b>STAGING RLS REBUILT (Option 1, orchestrator-executed)</b>: WI-794 bounce #3 (staging only 3/40 RLS — the PITR-rewind restored DATA but not policies) resolved by DROP public + drizzle-ledger schemas → <code>drizzle-kit migrate</code> full chain → staging now <b>46 policies = EXACT prod (br-green-pond) match</b> + family_preferences GUC fixed + profile_quota_usage policy present; the 10 enabled-without-policy are prod-identical (canonical). Staging <b>UNSEEDED</b> (reseed deferred → WI-814; snapshot <code>br-red-tooth</code> holds the 524/509). WI-794 re-finalized with evidence → final Gate-2 re-review. New WIs: <b>WI-813</b> (Cosmo PR+Pipeline visibility, Captured) · <b>WI-814</b> (staging reseed decision, WS-18 Backlog — <b>deferrable to rehearsal-prep, not a now-gate</b>). Concrete next steps: reviewer closes 794 → (whenever ready) WI-814 reseed ruling → flag baseline false → orchestrator runs the C0–C9 rehearsal. Shepherd clear of flip-blockers. rev 18 — <b>PRE-C0 CODE WAVE LANDED</b>: WI-811 (#8 long-pole, v2 child-create) + WI-800 (sub-13 seed assessment) both <b>Cosmo-CLOSED</b>; WI-794 (family_preferences RLS GUC fix) <b>merged <code>499ba67e</code> + applied to staging</b>, Gate-2 re-review in flight after a VALID rework — the RLS regression guard never ran in CI (<b>nx colon-target trap</b>: <code>api:test:integration</code> → cross-package config excludes <code>apps/api</code> integration; also reveals the <code>apps/api</code> integration suite + 3 H8 tests don't run in the flag-on lane → folded to WI-808). Shepherd critical-path scope now = <b>WI-794 close</b>; then Phase C / staging rehearsal (needs a <b>0118-exact, subscriptions-present</b> staging DB + baseline flag reset to false). WI-801 validates during the rehearsal; WI-808 + the nx-routing fix are non-gating. #8/#11 stay operator-only. rev 17 — <b>OPTION A RATIFIED + abbreviated gates</b>: prod verified EMPTY (0 rows/85 tables, mig 116) → prod path collapses to snapshot→repoint→flip→drop, pre-launch; full rehearsal on staging; gate model = staging-rehearsal-green is THE proof gate, prod flip reversible/0-users, drop 0-rows, parity-exact/abort/notify dropped, snapshot kept, #8/#11 operator-only; runtime prod DB locked via GitHub secret; FK repoint surface stg 64 / prod 65 (per-env regen); WI-811 build complete + security red-green GREEN → adversarial review → push; wave parallelized (W3a/b/c + W4 underway, W2 held for 811). rev 16 — added live "Pre-C0 Readiness Wave" panel (W1 WI-811 building · W2/W3/W4 dispatched · staging rebuild done). rev 15 — staging rebuild ✓ DONE: PITR-rewound to pre-cutover LSN 0/4B6744C8, verified (524acc/509prof, subscriptions present), backup branch preserved, retention 7d. rev 14 — adversarial review back: crash class SAFE; one flip blocker WI-811 (v2 child-create/CUT-B2, Option A) + pre-C0 parallel wave dispatched (WI-811 critical path · WI-808 confidence · WI-794/801/800 rehearsal-hardening · S1 prose · staging rebuild [now done]). rev 13 — runbook-staleness reconciliation: Phase C is <b>drop-4</b> (subscriptions retained → WI-805), M-REPOINT/M-DROP are <b>hand-run freeze-only scripts</b> (not auto-applied), and the C8/C9 order is fixed (M-DROP precedes the post-drop smoke). Code phase (586+809+810) MERGED + Gate-2 CLOSED. Remaining to #8: staging step-8.5 rehearsal on a 0118-exact (drop-4, subscriptions-present) DB → operator-gated #8 flip + #11 drop) · view-only snapshot — Cosmo is the source of truth</div>
   </footer>
 </div>
 

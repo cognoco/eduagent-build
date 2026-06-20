@@ -1,0 +1,138 @@
+FAIL @eduagent/api src/inngest/functions/account-deletion.test.ts
+FAIL @eduagent/api src/inngest/functions/archive-cleanup.test.ts
+FAIL @eduagent/api src/inngest/functions/consent-reminders.test.ts
+FAIL @eduagent/api src/inngest/functions/consent-revocation.test.ts
+FAIL @eduagent/api src/inngest/functions/daily-reminder-scan.test.ts
+FAIL @eduagent/api src/inngest/functions/daily-reminder-send.test.ts
+FAIL @eduagent/api src/inngest/functions/daily-snapshot.test.ts
+FAIL @eduagent/api src/inngest/functions/email-digest-channel.test.ts
+FAIL @eduagent/api src/inngest/functions/freeform-filing.test.ts
+FAIL @eduagent/api src/inngest/functions/monthly-report-cron.test.ts
+FAIL @eduagent/api src/inngest/functions/notify-parent-child-cap-hit.test.ts
+FAIL @eduagent/api src/inngest/functions/post-session-suggestions.test.ts
+FAIL @eduagent/api src/inngest/functions/progress-summary.test.ts
+FAIL @eduagent/api src/inngest/functions/quota-reset.test.ts
+FAIL @eduagent/api src/inngest/functions/recall-nudge.test.ts
+FAIL @eduagent/api src/inngest/functions/review-due-scan.test.ts
+FAIL @eduagent/api src/inngest/functions/review-due-send.test.ts
+FAIL @eduagent/api src/inngest/functions/session-completed.test.ts
+FAIL @eduagent/api src/inngest/functions/subject-retry-curriculum.test.ts
+FAIL @eduagent/api src/inngest/functions/summary-regenerate.test.ts
+FAIL @eduagent/api src/inngest/functions/trial-expiry.test.ts
+FAIL @eduagent/api src/inngest/functions/weekly-progress-push.test.ts
+FAIL @eduagent/api src/inngest/functions/weekly-self-reports.test.ts
+FAIL @eduagent/api src/middleware/account.test.ts
+FAIL @eduagent/api src/middleware/database.test.ts
+FAIL @eduagent/api src/middleware/jwt.test.ts
+FAIL @eduagent/api src/middleware/metering.refund-on-throw.test.ts
+FAIL @eduagent/api src/middleware/metering.test.ts
+FAIL @eduagent/api src/middleware/profile-scope.test.ts
+FAIL @eduagent/api src/routes/account.test.ts
+FAIL @eduagent/api src/routes/billing.test.ts
+FAIL @eduagent/api src/routes/book-suggestions.test.ts
+FAIL @eduagent/api src/routes/bookmarks.test.ts
+FAIL @eduagent/api src/routes/books.test.ts
+FAIL @eduagent/api src/routes/coaching-card.test.ts
+FAIL @eduagent/api src/routes/consent.test.ts
+FAIL @eduagent/api src/routes/curriculum.test.ts
+FAIL @eduagent/api src/routes/dictation.test.ts
+FAIL @eduagent/api src/routes/feedback.test.ts
+FAIL @eduagent/api src/routes/filing.test.ts
+FAIL @eduagent/api src/routes/homework.test.ts
+FAIL @eduagent/api src/routes/learner-profile.test.ts
+FAIL @eduagent/api src/routes/library-search.test.ts
+FAIL @eduagent/api src/routes/notifications.test.ts
+FAIL @eduagent/api src/routes/nudges.test.ts
+FAIL @eduagent/api src/routes/onboarding.test.ts
+FAIL @eduagent/api src/routes/profiles.test.ts
+FAIL @eduagent/api src/routes/progress.test.ts
+FAIL @eduagent/api src/routes/quiz.test.ts
+FAIL @eduagent/api src/routes/retention.test.ts
+FAIL @eduagent/api src/routes/revenuecat-webhook.test.ts
+FAIL @eduagent/api src/routes/sessions.test.ts
+FAIL @eduagent/api src/routes/settings.test.ts
+FAIL @eduagent/api src/routes/stripe-webhook.test.ts
+FAIL @eduagent/api src/routes/topic-suggestions.test.ts
+FAIL @eduagent/api src/routes/vocabulary.test.ts
+FAIL @eduagent/api src/services/curriculum-topic-ownership.guard.test.ts
+FAIL @eduagent/api src/services/family-access.test.ts
+FAIL @eduagent/api src/services/family-bridge.test.ts
+FAIL @eduagent/api src/services/learner-profile.test.ts
+FAIL @eduagent/api src/services/llm/providers/anthropic.test.ts
+FAIL @eduagent/api src/services/llm/providers/gemini.test.ts
+FAIL @eduagent/api src/services/monthly-report.test.ts
+FAIL @eduagent/api src/services/notifications.test.ts
+FAIL @eduagent/api src/services/nudge.test.ts
+FAIL @eduagent/api src/services/profile.test.ts
+FAIL @eduagent/api src/services/settings.test.ts
+FAIL @eduagent/api src/services/snapshot-aggregation.test.ts
+FAIL @eduagent/api src/services/support/spillover.test.ts
+apps/api/src/inngest/functions/account-deletion.test.ts
+apps/api/src/inngest/functions/archive-cleanup.test.ts
+apps/api/src/inngest/functions/consent-reminders.test.ts
+apps/api/src/inngest/functions/consent-revocation.test.ts
+apps/api/src/inngest/functions/daily-reminder-scan.test.ts
+apps/api/src/inngest/functions/daily-reminder-send.test.ts
+apps/api/src/inngest/functions/daily-snapshot.test.ts
+apps/api/src/inngest/functions/email-digest-channel.test.ts
+apps/api/src/inngest/functions/freeform-filing.test.ts
+apps/api/src/inngest/functions/monthly-report-cron.test.ts
+apps/api/src/inngest/functions/notify-parent-child-cap-hit.test.ts
+apps/api/src/inngest/functions/post-session-suggestions.test.ts
+apps/api/src/inngest/functions/progress-summary.test.ts
+apps/api/src/inngest/functions/quota-reset.test.ts
+apps/api/src/inngest/functions/recall-nudge.test.ts
+apps/api/src/inngest/functions/review-due-scan.test.ts
+apps/api/src/inngest/functions/review-due-send.test.ts
+apps/api/src/inngest/functions/session-completed.test.ts
+apps/api/src/inngest/functions/subject-retry-curriculum.test.ts
+apps/api/src/inngest/functions/summary-regenerate.test.ts
+apps/api/src/inngest/functions/trial-expiry.test.ts
+apps/api/src/inngest/functions/weekly-progress-push.test.ts
+apps/api/src/inngest/functions/weekly-self-reports.test.ts
+apps/api/src/middleware/account.test.ts
+apps/api/src/middleware/database.test.ts
+apps/api/src/middleware/jwt.test.ts
+apps/api/src/middleware/metering.refund-on-throw.test.ts
+apps/api/src/middleware/metering.test.ts
+apps/api/src/middleware/profile-scope.test.ts
+apps/api/src/routes/account.test.ts
+apps/api/src/routes/billing.test.ts
+apps/api/src/routes/book-suggestions.test.ts
+apps/api/src/routes/bookmarks.test.ts
+apps/api/src/routes/books.test.ts
+apps/api/src/routes/coaching-card.test.ts
+apps/api/src/routes/consent.test.ts
+apps/api/src/routes/curriculum.test.ts
+apps/api/src/routes/dictation.test.ts
+apps/api/src/routes/feedback.test.ts
+apps/api/src/routes/filing.test.ts
+apps/api/src/routes/homework.test.ts
+apps/api/src/routes/learner-profile.test.ts
+apps/api/src/routes/library-search.test.ts
+apps/api/src/routes/notifications.test.ts
+apps/api/src/routes/nudges.test.ts
+apps/api/src/routes/onboarding.test.ts
+apps/api/src/routes/profiles.test.ts
+apps/api/src/routes/progress.test.ts
+apps/api/src/routes/quiz.test.ts
+apps/api/src/routes/retention.test.ts
+apps/api/src/routes/revenuecat-webhook.test.ts
+apps/api/src/routes/sessions.test.ts
+apps/api/src/routes/settings.test.ts
+apps/api/src/routes/stripe-webhook.test.ts
+apps/api/src/routes/topic-suggestions.test.ts
+apps/api/src/routes/vocabulary.test.ts
+apps/api/src/services/curriculum-topic-ownership.guard.test.ts
+apps/api/src/services/family-access.test.ts
+apps/api/src/services/family-bridge.test.ts
+apps/api/src/services/learner-profile.test.ts
+apps/api/src/services/llm/providers/anthropic.test.ts
+apps/api/src/services/llm/providers/gemini.test.ts
+apps/api/src/services/monthly-report.test.ts
+apps/api/src/services/notifications.test.ts
+apps/api/src/services/nudge.test.ts
+apps/api/src/services/profile.test.ts
+apps/api/src/services/settings.test.ts
+apps/api/src/services/snapshot-aggregation.test.ts
+apps/api/src/services/support/spillover.test.ts

@@ -1,0 +1,17 @@
+{
+  "pageId": "3838bce9-1f7c-8189-8575-dd82b9b6a40b",
+  "id": "WI-817",
+  "name": "Post-cutover: drive flag-on integration lane green + make-required",
+  "description": "Carved from WI-808 per orch ic-150/ic-151. Post-cutover, non-gating: apply M-REPOINT to the CI integration-flag-on (IDENTITY_V2_ENABLED=true) lane, drive it green, then make it required — a live-path guard during the flag-on soak -> flag-removal window (prod is flag-on now and stays so the whole window). Independently schedulable from flag removal (WI-779); if WI-779 lands first, close this superseded. WI-789 = closed lane enabler; WI-586 = rewrite that created the (c) class.",
+  "acceptanceCriteria": "DIAGNOSED (WI-817 read-only investigation + shepherd origin/main spot-check): current flag-on lane red = OPEN-HANDLES ONLY (0 test-assertion failures; 3/5 recent main runs red on 'Jest did not exit' from gemini-retry + Inngest safeSend timers; ambient pre-repoint schema reds GONE post WI-822/823/825/818). CI DB is STILL pre-repoint (0117_m_repoint/0118/0119 = _freeze-only; journal tip 0117_fix_family_preferences_rls_guc). No --forceExit set. AC1 (deterministic green): add --forceExit to the test-integration NX target command in apps/api/project.json. VERIFY the 'Flag-ON integration (IDENTITY_V2_ENABLED)' lane completes GREEN with 0 test-assertion failures (both steps: ~413 + 662 passed) on the fix PR run, and the intermittent 'Jest did not exit' no longer fails NX. --forceExit must NOT mask real reds (test counts unchanged; a deliberately-failing test still fails). AC2 (promote to required, code): remove 'continue-on-error: true' at .github/workflows/ci.yml:365 (integration-flag-on job). Trigger-drift VERIFIED safe: the job has NO if: gate, runs unconditionally on push + pull_request, so as a required check it always reports (no 'waiting for status' hang). AC3 (promote to required, operator handoff): add 'Flag-ON integration (IDENTITY_V2_ENABLED)' to branch-protection required status checks (GitHub repo settings = OPERATOR action, not code), only after AC1 green confirmed on main. BOUNDARY: the CI lane DB is pre-repoint; WI-817 makes it green+required on the pre-repoint schema. When the repoint later journals (post-cutover, WI-789/repoint scope), repoint-sensitive tests could break the now-required lane — out of WI-817 scope, flagged for the repoint work.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

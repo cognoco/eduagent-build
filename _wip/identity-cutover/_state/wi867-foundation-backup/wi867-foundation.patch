@@ -1,0 +1,258 @@
+diff --git a/apps/api/src/routes/dashboard.test.ts b/apps/api/src/routes/dashboard.test.ts
+index ccae4480f..3bce8be67 100644
+--- a/apps/api/src/routes/dashboard.test.ts
++++ b/apps/api/src/routes/dashboard.test.ts
+@@ -9,6 +9,7 @@ import {
+ import { clearJWKSCache } from '../middleware/jwt';
+ 
+ import { createDatabaseModuleMock } from '../test-utils/database-module';
++import { personScope } from '../test-utils/identity-v2-scope-mock';
+ 
+ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
+ const mockFindFamilyLink = jest.fn().mockResolvedValue({
+@@ -29,6 +30,10 @@ const consentStatesQuery = {
+ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
+   get(target, prop, receiver) {
+     if (prop === 'familyLinks') return familyLinksQuery;
++    // [WI-867] Post-collapse: assertParentAccess → validateGuardianChargeRelationshipV2
++    // → isGuardianOf reads db.query.guardianship (v2 edge table). Wire to the same
++    // mockFindFamilyLink so existing tests work unchanged.
++    if (prop === 'guardianship') return familyLinksQuery;
+     if (prop === 'consentStates') return consentStatesQuery;
+     return Reflect.get(target, prop, receiver);
+   },
+@@ -81,6 +86,25 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+   };
+ });
+ 
++// [WI-867] Post-collapse, profile-scope middleware resolves the caller via the
++// v2 `findOwnerPersonScope` (auto-resolve) / `getPersonScope` (X-Profile-Id)
++// seam, which uses db.select() join chains the unit mock DB can't satisfy.
++// Continuity mock — the v2 rename of the legacy `findOwnerProfile`/`getProfile`
++// mocks above. Owner by default; the non-owner suite overrides getPersonScope.
++// Mirror the legacy defaults: findOwnerProfile defaulted to null (no
++// auto-resolve owner → routes 400 on missing X-Profile-Id); getProfile
++// defaulted to the owner profile.
++const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
++const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
++jest.mock(
++  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
++  () => ({
++    ...jest.requireActual('../services/identity-v2/profile-v2'),
++    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
++    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
++  }),
++);
++
+ const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
+ const mockGetChildDetail = jest.fn().mockResolvedValue(null);
+ const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
+@@ -183,6 +207,9 @@ describe('dashboard routes', () => {
+     // queues), then restore the default.
+     mockFindConsentState.mockReset();
+     mockFindConsentState.mockResolvedValue(undefined);
++    // [WI-867] Restore the profile-scope v2 seam defaults after clearAllMocks.
++    mockFindOwnerPersonScope.mockResolvedValue(null);
++    mockGetPersonScope.mockResolvedValue(personScope());
+   });
+ 
+   // -------------------------------------------------------------------------
+@@ -881,6 +908,15 @@ describe('dashboard routes', () => {
+         hasPremiumLlm: false,
+         conversationLanguage: 'en',
+       });
++      // [WI-867] v2: profile-scope resolves X-Profile-Id via getPersonScope —
++      // return the same non-owner profile so the isOwner gate fires.
++      mockGetPersonScope.mockResolvedValue(
++        personScope({
++          profileId: NON_OWNER_PROFILE_ID,
++          birthYear: 2012,
++          isOwner: false,
++        }),
++      );
+       // Family link exists — IDOR check would pass, but isOwner gate must fire first.
+       mockFindFamilyLink.mockResolvedValue({
+         parentProfileId: NON_OWNER_PROFILE_ID,
+@@ -1004,15 +1040,8 @@ describe('dashboard routes', () => {
+     // still surfaces as 403 from this same route (mockGetProfile is reset
+     // to isOwner:true above in the beforeEach, so this test overrides it).
+     it('[BREAK] non-owner still gets 403 from snapshot route (assertOwnerProfile placement guard)', async () => {
+-      mockGetProfile.mockResolvedValueOnce({
+-        id: 'test-profile-id',
+-        birthYear: 2012,
+-        location: null,
+-        consentStatus: 'CONSENTED',
+-        isOwner: false,
+-        hasPremiumLlm: false,
+-        conversationLanguage: 'en',
+-      });
++      // [WI-867] v2: isOwner comes from getPersonScope (profile-v2), not getProfile.
++      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
+ 
+       const res = await app.request(
+         `/v1/dashboard/children/${PROFILE_ID}/topics/${TOPIC_ID}/snapshot`,
+diff --git a/apps/api/src/test-utils/database-module.ts b/apps/api/src/test-utils/database-module.ts
+index 655803502..0e6f0b571 100644
+--- a/apps/api/src/test-utils/database-module.ts
++++ b/apps/api/src/test-utils/database-module.ts
+@@ -9,6 +9,103 @@ type CreateDatabaseModuleMockOptions<TDb extends MockDatabaseRecord> = {
+   exports?: MockDatabaseRecord;
+ };
+ 
++// ---------------------------------------------------------------------------
++// v2 identity-graph seed (WI-867).
++//
++// After the IDENTITY_V2_ENABLED collapse, the account-resolve seam calls
++// `resolveIdentityV2(db, clerkUserId)` UNCONDITIONALLY. It reads exactly three
++// tables — `login` → `membership` (must be exactly one) → `organization` — and
++// returns the legacy-shaped `Account` context. Flag-off unit tests never ran
++// this path, so their mock dbs carry no `login`/`membership`/`organization`
++// query keys and the seam either throws (`db.query.login` undefined) or yields
++// a graphless context (→ 403/500).
++//
++// Seeding the canonical OWNER graph here lets the REAL `resolveIdentityV2` run
++// green across the route/function harness with no per-test mocks (GC-clean — no
++// `jest.mock` of the identity seam). A test that needs a graphless / non-owner /
++// specific identity overrides `db.query.{login,membership,organization}`
++// explicitly; those overrides win.
++//
++// Ids match the harness convention (account/org id 'test-account-id', person id
++// 'test-profile-id') so the resolved Account lines up with the legacy
++// `findOrCreateAccount` fixtures suites already assert against.
++// ---------------------------------------------------------------------------
++const V2_IDENTITY_TABLES = ['login', 'membership', 'organization'] as const;
++
++function makeV2IdentityQuery(): Record<
++  (typeof V2_IDENTITY_TABLES)[number],
++  { findFirst: jest.Mock; findMany: jest.Mock }
++> {
++  const loginRow = {
++    personId: 'test-profile-id',
++    clerkUserId: 'user_test',
++    email: 'test@example.com',
++  };
++  const membershipRow = {
++    personId: 'test-profile-id',
++    organizationId: 'test-account-id',
++    roles: ['admin', 'learner'],
++  };
++  const organizationRow = {
++    id: 'test-account-id',
++    timezone: 'UTC',
++    createdAt: new Date('2026-01-01T00:00:00.000Z'),
++    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
++  };
++  return {
++    login: {
++      findFirst: jest.fn().mockResolvedValue(loginRow),
++      findMany: jest.fn().mockResolvedValue([loginRow]),
++    },
++    // resolveIdentityV2 requires EXACTLY ONE membership (≠1 → null) — one row.
++    membership: {
++      findFirst: jest.fn().mockResolvedValue(membershipRow),
++      findMany: jest.fn().mockResolvedValue([membershipRow]),
++    },
++    organization: {
++      findFirst: jest.fn().mockResolvedValue(organizationRow),
++      findMany: jest.fn().mockResolvedValue([organizationRow]),
++    },
++  };
++}
++
++/**
++ * Wrap `db.query` so the three v2 identity tables resolve to a canonical owner
++ * graph, while every other table delegates to the test's own db unchanged.
++ * Test-provided identity keys win: on the default Proxy db (no real keys) the
++ * canonical graph is always used; on a caller-supplied plain-object db a key the
++ * test defined (e.g. to force a graphless `login`) takes precedence.
++ */
++function seedV2IdentityGraph(db: MockDatabaseRecord): void {
++  // Some suites pass a db without a `query` object (e.g. the database-middleware
++  // test). Proxy requires an object target, so fall back to `{}` — the seeded
++  // identity tables are still exposed, every other access returns undefined.
++  const originalQuery =
++    db.query && typeof db.query === 'object'
++      ? (db.query as Record<string | symbol, unknown>)
++      : ({} as Record<string | symbol, unknown>);
++  const isDefaultMockDb = (db as { __defaultMockDb?: boolean }).__defaultMockDb;
++  const graph = makeV2IdentityQuery();
++
++  db.query = new Proxy(originalQuery, {
++    get(target, prop) {
++      if (
++        typeof prop === 'string' &&
++        (V2_IDENTITY_TABLES as readonly string[]).includes(prop)
++      ) {
++        // On a real caller-supplied db, an explicitly-provided key wins so a
++        // suite can force graphless/non-owner. The default Proxy db always
++        // "has" every key, so gate that branch on the marker.
++        if (!isDefaultMockDb && prop in target) {
++          return target[prop];
++        }
++        return graph[prop as (typeof V2_IDENTITY_TABLES)[number]];
++      }
++      return target[prop];
++    },
++  });
++}
++
+ /**
+  * Shared factory for tests that still replace `@eduagent/database`.
+  *
+@@ -26,6 +123,9 @@ export function createDatabaseModuleMock<TDb extends MockDatabaseRecord>(
+   module: MockDatabaseRecord;
+ } {
+   const db = (options.db ?? (createMockDb() as TDb)) as TDb;
++  // Seed the v2 identity graph so the now-unconditional resolveIdentityV2 seam
++  // resolves the real implementation (WI-867). Idempotent / override-safe.
++  seedV2IdentityGraph(db);
+   const createDatabase = jest.fn().mockReturnValue(db);
+   const closeDatabase = jest.fn().mockResolvedValue(undefined);
+ 
+diff --git a/packages/test-utils/src/lib/neon-mock.ts b/packages/test-utils/src/lib/neon-mock.ts
+index adc067503..0bd243717 100644
+--- a/packages/test-utils/src/lib/neon-mock.ts
++++ b/packages/test-utils/src/lib/neon-mock.ts
+@@ -60,7 +60,18 @@ export function createMockDb(): unknown {
+       {},
+       {
+         get(_target, prop) {
+-          if (prop === 'then') return undefined; // prevent auto-await
++          if (prop === 'then') {
++            // [WI-867] Chain-built queries (select / insert…returning) resolve
++            // to `[]` per this mock's documented contract. Returning a real
++            // thenable (instead of `undefined`) means `await db.select()…`
++            // yields `[]` — so array consumers get a clean empty result and the
++            // "no rows" branch, instead of a truthy garbage proxy that survives
++            // an `if (!rows[0])` guard and then crashes on field access
++            // (e.g. `rows[0].roles.includes(...)`). Configure the query to
++            // return real rows when the test's subject needs data.
++            return (onFulfilled: (value: unknown) => unknown) =>
++              onFulfilled([]);
++          }
+           return chainFn();
+         },
+       },
+@@ -80,7 +91,7 @@ export function createMockDb(): unknown {
+     },
+   );
+ 
+-  return {
++  const db = {
+     query: queryProxy,
+     insert: chainFn(),
+     update: chainFn(),
+@@ -89,4 +100,13 @@ export function createMockDb(): unknown {
+     selectDistinct: chainFn(),
+     execute: jest.fn().mockResolvedValue([]),
+   };
++  // Marker so harnesses (createDatabaseModuleMock) can tell this is the
++  // configure-or-break default Proxy db — whose `query.<table>` always returns
++  // a fresh undefined/[] stub — from a caller-supplied plain-object db. Used to
++  // seed the v2 identity graph only when the test didn't bring its own.
++  Object.defineProperty(db, '__defaultMockDb', {
++    value: true,
++    enumerable: false,
++  });
++  return db;
+ }
