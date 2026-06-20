@@ -538,6 +538,32 @@ describe('account routes', () => {
       expect(captureMessage).not.toHaveBeenCalled();
     });
 
+    it('[orphan-schedule] still returns 200 when the orphan-recovery telemetry throws', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+      // A Sentry SDK throw on the observability signal must never propagate to
+      // the outer catch and convert the successfully re-dispatched schedule
+      // into a 503 — the captureMessage call is fault-isolated.
+      (captureMessage as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('sentry transport down');
+      });
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.message).toBe('Deletion scheduled');
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         '/v1/account/delete',

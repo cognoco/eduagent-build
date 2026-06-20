@@ -202,14 +202,23 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       // orphan-dispatcher guard rejects it) and would only land in the event
       // store that nothing reads.
       if (!scheduledNow) {
-        captureMessage('account.deletion orphan schedule re-dispatched', {
-          level: 'warning',
-          extra: {
-            surface: 'account.deletion.orphan_recovered',
-            accountId: account.id,
-            identityVersion: v2 ? 'v2' : 'v1',
-          },
-        });
+        // Fault-isolated: this signal is pure observability and must never
+        // affect the user's deletion. Without its own try/catch, a Sentry SDK
+        // throw would be caught by the outer catch below and — because the
+        // rollback path only fires when scheduledNow === true — convert a
+        // successfully (re-)dispatched schedule into a 503.
+        try {
+          captureMessage('account.deletion orphan schedule re-dispatched', {
+            level: 'warning',
+            extra: {
+              surface: 'account.deletion.orphan_recovered',
+              accountId: account.id,
+              identityVersion: v2 ? 'v2' : 'v1',
+            },
+          });
+        } catch {
+          // Observability failure is non-fatal; swallow it.
+        }
       }
     } catch (error) {
       captureException(error, {
