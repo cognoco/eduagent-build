@@ -347,3 +347,114 @@ describe('[QA-12] POST /consent-page/confirm — deny-confirmation + invalid han
     expect(db.update).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Rate limiting on the UNAUTHENTICATED consent-page GET endpoints
+// (Notion "consent-web: Unauthenticated GET /consent-page endpoints lack rate
+// limiting"). GET /consent-page and GET /consent-page/deny-confirm are
+// reachable by anyone holding (or guessing) a token and each fires a DB lookup
+// (dispatchGetChildNameByToken). Without rate limiting they can be hammered for
+// token enumeration / DoS of the consent DB lookups. They must share the same
+// IP-based sliding-window limiter as POST /consent-page/confirm and
+// /consent/respond (consent.ts) — the established pattern for this flow.
+// ---------------------------------------------------------------------------
+
+/** Issue a GET with explicit IP headers so the per-IP limiter buckets it. */
+async function getPageFromIp(
+  db: Database,
+  path: string,
+  ip: string,
+): Promise<Response> {
+  return mountWith(db).request(
+    path,
+    { headers: { 'cf-connecting-ip': ip } },
+    ENV,
+  );
+}
+
+describe('GET /consent-page — rate limiting on unauthenticated lookups', () => {
+  beforeEach(() => {
+    // Reset the SHARED sliding-window map (owned by consent.ts) so counts don't
+    // bleed between tests. jest.requireActual keeps this GC1/GC6-compliant —
+    // no internal jest.mock.
+    const { __resetConsentRespondRateLimit } = jest.requireActual(
+      './consent',
+    ) as {
+      __resetConsentRespondRateLimit: () => void;
+    };
+    __resetConsentRespondRateLimit();
+  });
+
+  it('allows the first 30 GET /consent-page lookups then blocks the 31st with 429 + Retry-After', async () => {
+    const ip = '203.0.113.50';
+    // First 30 unknown-token lookups reach the handler → 404 "Link expired".
+    for (let i = 0; i < 30; i++) {
+      const res = await getPageFromIp(
+        makeDb({ row: undefined }),
+        '/consent-page?token=enumerate',
+        ip,
+      );
+      expect(res.status).toBe(404);
+    }
+    // 31st from the same IP must be rate-limited BEFORE the DB lookup.
+    const blocked = await getPageFromIp(
+      makeDb({ row: undefined }),
+      '/consent-page?token=enumerate',
+      ip,
+    );
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('3600');
+    const html = await blocked.text();
+    expect(html).toContain('Too many requests');
+  });
+
+  it('blocks GET /consent-page/deny-confirm on the same per-IP budget', async () => {
+    const ip = '203.0.113.51';
+    for (let i = 0; i < 30; i++) {
+      const res = await getPageFromIp(
+        makeDb({ row: undefined }),
+        '/consent-page/deny-confirm?token=enumerate',
+        ip,
+      );
+      expect(res.status).toBe(404);
+    }
+    const blocked = await getPageFromIp(
+      makeDb({ row: undefined }),
+      '/consent-page/deny-confirm?token=enumerate',
+      ip,
+    );
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('3600');
+  });
+
+  it('does not affect a different IP — the limiter is per source IP', async () => {
+    const hammered = '203.0.113.52';
+    for (let i = 0; i < 31; i++) {
+      await getPageFromIp(
+        makeDb({ row: undefined }),
+        '/consent-page?token=enumerate',
+        hammered,
+      );
+    }
+    // A fresh IP reaches the handler → 404, never 429.
+    const other = await getPageFromIp(
+      makeDb({ row: undefined }),
+      '/consent-page?token=enumerate',
+      '198.51.100.7',
+    );
+    expect(other.status).toBe(404);
+  });
+
+  it('does not rate-limit a single legitimate consent-link open', async () => {
+    // The common case: a parent opens the link once. Must render the decision
+    // page (200), never a 429.
+    const res = await getPageFromIp(
+      makeDb({ row: makeRow(), displayName: 'Emma' }),
+      '/consent-page?token=valid-token',
+      '203.0.113.60',
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Consent required for Emma');
+  });
+});

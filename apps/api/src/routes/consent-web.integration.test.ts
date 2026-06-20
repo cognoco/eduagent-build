@@ -642,3 +642,64 @@ describe('POST /v1/consent-page/confirm — rate limiting [BUG-491]', () => {
     expect(otherRes.status).toBe(404);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Suite 5: Rate limiting on the unauthenticated consent-page GET endpoints
+// ---------------------------------------------------------------------------
+
+// The unauthenticated GET /consent-page and GET /consent-page/deny-confirm
+// token lookups must share the same per-IP 30/hr sliding-window limit as
+// POST /consent-page/confirm and /consent/respond. Without it, an attacker
+// holding (or guessing) a token can hammer these endpoints to enumerate tokens
+// or DoS the consent DB lookups. The 429 fires BEFORE any DB call, so this
+// suite needs no seeded data. jest.requireActual keeps it GC1/GC6-compliant.
+describe('GET /v1/consent-page — rate limiting [consent-web unauthenticated]', () => {
+  beforeEach(() => {
+    const { __resetConsentRespondRateLimit } = jest.requireActual(
+      './consent',
+    ) as { __resetConsentRespondRateLimit: () => void };
+    __resetConsentRespondRateLimit();
+  });
+
+  function getFromIp(path: string, ip: string): Promise<Response> {
+    return app.request(path, { headers: { 'cf-connecting-ip': ip } }, ENV);
+  }
+
+  it('allows the first 30 GET /consent-page lookups and blocks the 31st with 429 + Retry-After', async () => {
+    const ip = '203.0.113.70';
+    for (let i = 0; i < 30; i++) {
+      const res = await getFromIp('/v1/consent-page?token=enumerate', ip);
+      // Unknown token reaches the handler → 404 (proves limiter not yet tripped)
+      expect(res.status).toBe(404);
+    }
+    const blocked = await getFromIp('/v1/consent-page?token=enumerate', ip);
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('3600');
+    const html = await blocked.text();
+    expect(html).toContain('Too many requests');
+
+    // A different IP is unaffected — the limiter is per source IP.
+    const other = await getFromIp(
+      '/v1/consent-page?token=enumerate',
+      '198.51.100.71',
+    );
+    expect(other.status).toBe(404);
+  });
+
+  it('applies the same per-IP budget to GET /consent-page/deny-confirm', async () => {
+    const ip = '203.0.113.72';
+    for (let i = 0; i < 30; i++) {
+      const res = await getFromIp(
+        '/v1/consent-page/deny-confirm?token=enumerate',
+        ip,
+      );
+      expect(res.status).toBe(404);
+    }
+    const blocked = await getFromIp(
+      '/v1/consent-page/deny-confirm?token=enumerate',
+      ip,
+    );
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('3600');
+  });
+});
