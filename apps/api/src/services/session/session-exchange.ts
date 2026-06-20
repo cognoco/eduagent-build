@@ -765,6 +765,32 @@ async function claimChallengeRoundFinalization(
   });
 }
 
+/**
+ * Release a Challenge Round finalization claim by restoring the persisted
+ * session state to `drafting`.
+ *
+ * `claimChallengeRoundFinalization` commits `drafting → complete` inside its
+ * transaction, but the terminal mastery / deepening writes run AFTER it, in a
+ * separate transaction. If those writes throw (transient DB error, constraint
+ * violation), the session would be stuck `complete` with NO mastery row and NO
+ * deepening rows, and no retry path — the learner silently loses mastery
+ * credit. This is the release leg (mirroring `releaseBookGenerationClaimIfEmpty`
+ * for the book-generation claim): it writes the original pre-claim `drafting`
+ * state back through the same `FOR UPDATE` metadata mechanism the claim used, so
+ * the round is re-finalizeable on the next exchange / retry.
+ *
+ * `claimed` is the authoritative pre-transition `drafting` state returned by the
+ * winning claim, so restoring it reinstates the exact state the claim consumed.
+ */
+async function releaseChallengeRoundClaim(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  claimed: ChallengeRoundSessionState,
+): Promise<void> {
+  await persistChallengeRoundState(db, profileId, sessionId, claimed);
+}
+
 export async function finalizeChallengeRoundIfReady(
   db: Database,
   profileId: string,
@@ -792,23 +818,75 @@ export async function finalizeChallengeRoundIfReady(
   const decision = decideMasteryAndReview(evaluations);
   const now = new Date();
 
-  if (decision.markMasteryVerified) {
-    await persistChallengeRoundMasteryEvidence(
-      db,
+  // The terminal mastery / deepening writes run OUTSIDE the claim transaction.
+  // If either throws, the persisted state is already `complete` — without a
+  // compensating release the round can never re-finalize and the learner
+  // silently loses mastery credit. Release the claim back to `drafting` so the
+  // next exchange / retry re-runs, and escalate (silent recovery is banned in
+  // state-machine flows) before re-throwing so the caller's exchange does not
+  // falsely report mastery success.
+  try {
+    if (decision.markMasteryVerified) {
+      await persistChallengeRoundMasteryEvidence(
+        db,
+        profileId,
+        session,
+        topicId,
+        now,
+      );
+    } else {
+      await persistChallengeRoundReviewTargets(
+        db,
+        profileId,
+        session,
+        topicId,
+        decision,
+        now,
+      );
+    }
+  } catch (err) {
+    // Release leg: restore the pre-claim `drafting` state so the round is
+    // re-finalizeable. A release failure must not mask the original error —
+    // capture it separately but still propagate the primary failure.
+    try {
+      await releaseChallengeRoundClaim(db, profileId, session.id, claimed);
+    } catch (releaseErr) {
+      captureException(releaseErr, {
+        profileId,
+        extra: {
+          surface: 'challenge-round.finalize.release-failed',
+          sessionId: session.id,
+          topicId,
+        },
+      });
+    }
+
+    captureException(err, {
       profileId,
-      session,
-      topicId,
-      now,
+      extra: {
+        surface: 'challenge-round.finalize.terminal-write-failed',
+        sessionId: session.id,
+        topicId,
+        markMasteryVerified: decision.markMasteryVerified,
+      },
+    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/challenge-round.finalize.failed',
+          data: {
+            profileId,
+            sessionId: session.id,
+            topicId,
+            markMasteryVerified: decision.markMasteryVerified,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        }),
+      'challenge-round.finalize.failed',
+      { profileId, sessionId: session.id, topicId },
     );
-  } else {
-    await persistChallengeRoundReviewTargets(
-      db,
-      profileId,
-      session,
-      topicId,
-      decision,
-      now,
-    );
+    // Re-throw: the exchange must not report mastery success on a partial write.
+    throw err;
   }
 
   // Concept-capture is parked until the baseline reset applies the

@@ -28,6 +28,26 @@
 // re-inserts deepening rows → counts are 2.
 // GREEN (post-fix): the claim makes the second call a no-op → counts are 1.
 
+// Stub true external boundaries only so the partial-write escalation can be
+// asserted: Sentry (external SaaS) and the Inngest framework client
+// (../../inngest/client — the send() transport, not our own code). The decision
+// policy, state machine, claim/release, and persistence helpers all run for
+// real. (gc1-allow: external-boundary stubs, pattern-a conversion.)
+jest.mock('../sentry' /* gc1-allow: external boundary */, () => {
+  const actual = jest.requireActual('../sentry') as typeof import('../sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
+
+jest.mock(
+  '../../inngest/client' /* gc1-allow: Inngest framework boundary */,
+  () => ({
+    inngest: { send: jest.fn().mockResolvedValue(undefined) },
+  }),
+);
+
 import type { Database } from '@eduagent/database';
 import type {
   ChallengeRoundEvaluationItem,
@@ -36,6 +56,15 @@ import type {
 } from '@eduagent/schemas';
 
 import { finalizeChallengeRoundIfReady } from './session-exchange';
+import { captureException } from '../sentry';
+import { inngest } from '../../inngest/client';
+
+const mockCaptureException = captureException as jest.MockedFunction<
+  typeof captureException
+>;
+const mockInngestSend = inngest.send as jest.MockedFunction<
+  typeof inngest.send
+>;
 
 // ---------------------------------------------------------------------------
 // In-memory fake Database. Models only the surface finalize touches.
@@ -61,6 +90,10 @@ interface FakeDbState {
   masteryInserts: Array<Record<string, unknown>>;
   deepeningRows: DeepeningRow[];
   deepeningInsertCount: number;
+  // When set, the NEXT matching terminal insert throws — models a transient DB
+  // error / constraint violation on the post-claim mastery or deepening write.
+  failNextMasteryInsert?: boolean;
+  failNextDeepeningInsert?: boolean;
 }
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000001';
@@ -179,8 +212,16 @@ function makeFakeDb(state: FakeDbState): Database {
       values: async (vals: Record<string, unknown>) => {
         // Distinguish assessments vs needs_deepening_topics by the columns.
         if ('masteryChallengeVerifiedAt' in vals) {
+          if (state.failNextMasteryInsert) {
+            state.failNextMasteryInsert = false;
+            throw new Error('transient mastery insert failure');
+          }
           state.masteryInserts.push(vals);
         } else if ('source' in vals && vals.source === 'challenge_round') {
+          if (state.failNextDeepeningInsert) {
+            state.failNextDeepeningInsert = false;
+            throw new Error('transient deepening insert failure');
+          }
           state.deepeningInsertCount += 1;
           state.deepeningRows.push({
             id: `ndt-${state.deepeningRows.length + 1}`,
@@ -333,5 +374,140 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
     expect(state.deepeningRows).toHaveLength(1);
     // And no mastery write on the partial path.
     expect(state.masteryInserts).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Release leg: a downstream terminal write throwing AFTER a successful claim
+// must NOT leave the session permanently `complete` with no mastery / deepening
+// rows. The claim is released back to `drafting` (round re-finalizeable), the
+// partial failure is escalated (Sentry + non-core Inngest event), the error is
+// propagated (no false mastery-success), and a subsequent finalize re-runs and
+// completes exactly once.
+// ---------------------------------------------------------------------------
+
+function persistedChallengeState(
+  state: FakeDbState,
+): ChallengeRoundSessionState | undefined {
+  return state.sessionMetadata['challengeRound'] as
+    | ChallengeRoundSessionState
+    | undefined;
+}
+
+describe('finalizeChallengeRoundIfReady — releases the claim + escalates on a post-claim terminal-write failure', () => {
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+    mockInngestSend.mockClear();
+  });
+
+  it('restores drafting, escalates, and re-throws when the mastery write fails; a retry then completes exactly once', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      failNextMasteryInsert: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    // (1) The post-claim mastery insert throws — finalize must propagate it.
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow('transient mastery insert failure');
+
+    // (a) The claim was released: persisted state is back to `drafting`.
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+    // No mastery row was written on the failed attempt.
+    expect(state.masteryInserts).toHaveLength(0);
+
+    // (b) The escalation fired: Sentry capture for the terminal-write failure
+    // AND a non-core Inngest event so the partial failure is observable.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'transient mastery insert failure' }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.finalize.terminal-write-failed',
+        }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/challenge-round.finalize.failed',
+      }),
+    );
+
+    // (c) A subsequent finalize re-runs (state is drafting again) and completes
+    // exactly once — the retry succeeds because the toggle was consumed.
+    const retry = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+    expect(retry).not.toBeNull();
+    expect(persistedChallengeState(state)?.state).toBe('complete');
+    expect(state.masteryInserts).toHaveLength(1);
+  });
+
+  it('restores drafting and re-throws when the deepening write fails on a partial round', async () => {
+    const challengeRound = draftingState(PARTIAL_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      failNextDeepeningInsert: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow('transient deepening insert failure');
+
+    // Released back to drafting; no deepening row persisted on the failed write.
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+    expect(state.deepeningInsertCount).toBe(0);
+    expect(state.deepeningRows).toHaveLength(0);
+
+    // Escalated.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'transient deepening insert failure',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.finalize.terminal-write-failed',
+        }),
+      }),
+    );
+
+    // Retry completes exactly once.
+    const retry = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      null,
+    );
+    expect(retry).not.toBeNull();
+    expect(persistedChallengeState(state)?.state).toBe('complete');
+    expect(state.deepeningInsertCount).toBe(1);
+    expect(state.deepeningRows).toHaveLength(1);
   });
 });
