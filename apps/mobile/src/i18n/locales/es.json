@@ -490,7 +490,9 @@
       "pushMissingServer": "Activa las notificaciones push aquí.",
       "pushMissingToken": "Registra este dispositivo para notificaciones push.",
       "openSettingsTitle": "Abrir Ajustes",
-      "openSettingsDescription": "Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema."
+      "openSettingsDescription": "Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema.",
+      "loadErrorTitle": "No pudimos cargar la configuración de tus notificaciones",
+      "loadErrorMessage": "Inténtalo de nuevo. Tus preferencias no han cambiado."
     },
     "account": {
       "sectionHeader": "Cuenta",
@@ -2278,7 +2280,8 @@
       "bookCompleted": "Libro completado",
       "cefrLevelUp": "Nivel de idioma aumentado",
       "topicsExplored": "{{count}} temas explorados en {{subject}}",
-      "topicsExploredFallback": "{{count}} temas explorados en una materia"
+      "topicsExploredFallback": "{{count}} temas explorados en una materia",
+      "unknown": "Hito alcanzado"
     }
   },
   "onboarding": {

@@ -1243,4 +1243,31 @@ describe('ChildDetailScreen — consent-withdrawn empty state (WI-263)', () => {
 
     cleanup();
   });
+
+  it('[WI-508] consent-restore CTA is disabled while the mutation is in-flight', async () => {
+    // Stall the restore endpoint so isPending stays true after the first press.
+    mockFetch.setRoute(
+      '/consent/child-001/restore',
+      () => new Promise(() => undefined /* never resolves */),
+    );
+
+    const { result, cleanup } = renderChildDetail();
+
+    const cta = await waitFor(() =>
+      result.getByTestId('consent-withdrawn-request-cta'),
+    );
+
+    // Before the first press the CTA must be enabled.
+    expect(cta.props.accessibilityState?.disabled).not.toBe(true);
+
+    fireEvent.press(cta);
+
+    // While the mutation is in-flight (restore endpoint stalled), the CTA
+    // must be disabled so a rapid second tap cannot fire a duplicate request.
+    await waitFor(() => {
+      expect(cta.props.accessibilityState?.disabled).toBe(true);
+    });
+
+    cleanup();
+  });
 });

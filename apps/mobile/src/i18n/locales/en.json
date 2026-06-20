@@ -516,7 +516,9 @@
       "pushMissingServer": "Turn on push notifications here.",
       "pushMissingToken": "Register this device for push notifications.",
       "openSettingsTitle": "Open Settings",
-      "openSettingsDescription": "Notifications are blocked for this app. Turn them on in system settings."
+      "openSettingsDescription": "Notifications are blocked for this app. Turn them on in system settings.",
+      "loadErrorTitle": "We couldn't load your notification settings",
+      "loadErrorMessage": "Please try again. Your preferences haven't changed."
     },
     "privacy": {
       "privacyAndData": "Privacy & data",
@@ -2376,7 +2378,8 @@
       "bookCompleted": "Completed a book",
       "cefrLevelUp": "Language level increased",
       "topicsExplored": "Explored {{count}} topics in {{subject}}",
-      "topicsExploredFallback": "Explored {{count}} topics in a subject"
+      "topicsExploredFallback": "Explored {{count}} topics in a subject",
+      "unknown": "Milestone reached"
     }
   },
   "onboarding": {

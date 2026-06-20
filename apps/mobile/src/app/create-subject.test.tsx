@@ -1641,6 +1641,56 @@ describe('CreateSubjectScreen', () => {
     expect(screen.getByTestId('subject-suggestion-accept'));
     expect(screen.getByText('Accept'));
   });
+
+  it('[WI-508] Accept/Edit Pressables have disabled={isBusy} and are unreachable while creating', async () => {
+    // Resolve to a confident single match so the confident card shows.
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Italian',
+      suggestions: [{ name: 'Italian', description: 'Italian language' }],
+      displayMessage: 'Italian works well.',
+    });
+    // Stall the create POST so the screen stays in `creating` phase (isBusy=true).
+    mockFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return new Promise(() => undefined /* never resolves */);
+      }
+      return { subjects: subjectsListData };
+    });
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    await enterSubjectName('italian');
+    fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    const acceptBtn = screen.getByTestId('subject-suggestion-accept');
+    const editBtn = screen.getByTestId('subject-suggestion-edit');
+
+    // Before the accept press, both buttons must be enabled (isBusy=false when
+    // suggestion card is shown, so disabled prop evaluates to false).
+    expect(acceptBtn.props.disabled).not.toBe(true);
+    expect(editBtn.props.disabled).not.toBe(true);
+
+    fireEvent.press(acceptBtn);
+
+    // Pressing accept sets phase to 'creating' (isBusy=true). The suggestion
+    // card unmounts because it is gated on `phase === 'suggestion'`.
+    // The loading indicator appears. Both action Pressables are unreachable —
+    // a rapid second tap cannot fire a duplicate create request.
+    await waitFor(() => {
+      screen.getByTestId('subject-book-loading', {
+        includeHiddenElements: true,
+      });
+    });
+
+    expect(screen.queryByTestId('subject-confident-card')).toBeNull();
+    expect(screen.queryByTestId('subject-suggestion-accept')).toBeNull();
+    expect(screen.queryByTestId('subject-suggestion-edit')).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

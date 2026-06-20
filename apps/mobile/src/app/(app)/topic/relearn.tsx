@@ -656,6 +656,7 @@ export default function RelearnScreen() {
               <Pressable
                 key={method.id}
                 onPress={() => handleStartMethod(method.id)}
+                disabled={isSubmitting}
                 className={`mb-3 rounded-card p-4 ${
                   isPreferred
                     ? 'bg-primary/10 border border-primary'

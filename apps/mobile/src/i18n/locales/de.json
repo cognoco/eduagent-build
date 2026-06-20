@@ -494,7 +494,9 @@
       "pushMissingServer": "Push-Benachrichtigungen hier aktivieren.",
       "pushMissingToken": "Dieses Gerät für Push-Benachrichtigungen registrieren.",
       "openSettingsTitle": "Einstellungen öffnen",
-      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen."
+      "openSettingsDescription": "Benachrichtigungen für diese App sind blockiert. Aktiviere sie in den Systemeinstellungen.",
+      "loadErrorTitle": "Wir konnten deine Benachrichtigungseinstellungen nicht laden.",
+      "loadErrorMessage": "Bitte versuche es erneut. Deine Einstellungen haben sich nicht geändert."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2278,7 +2280,8 @@
       "bookCompleted": "Ein Buch abgeschlossen",
       "cefrLevelUp": "Sprachniveau erhöht",
       "topicsExplored": "{{count}} Themen in {{subject}} erkundet",
-      "topicsExploredFallback": "{{count}} Themen in einem Fach erkundet"
+      "topicsExploredFallback": "{{count}} Themen in einem Fach erkundet",
+      "unknown": "Meilenstein erreicht"
     }
   },
   "onboarding": {

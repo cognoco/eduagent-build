@@ -490,7 +490,9 @@
       "pushMissingServer": "Slå på push-varsler her.",
       "pushMissingToken": "Registrer denne enheten for push-varsler.",
       "openSettingsTitle": "Åpne innstillinger",
-      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene."
+      "openSettingsDescription": "Varsler er blokkert for denne appen. Slå dem på i systeminnstillingene.",
+      "loadErrorTitle": "Vi kunne ikke laste inn varslingsinnstillingene dine",
+      "loadErrorMessage": "Prøv igjen. Innstillingene dine er ikke endret."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2278,7 +2280,8 @@
       "bookCompleted": "Fullført en bok",
       "cefrLevelUp": "Språknivå økt",
       "topicsExplored": "Utforsket {{count}} emner i {{subject}}",
-      "topicsExploredFallback": "Utforsket {{count}} emner i et fag"
+      "topicsExploredFallback": "Utforsket {{count}} emner i et fag",
+      "unknown": "Milepæl nådd"
     }
   },
   "onboarding": {

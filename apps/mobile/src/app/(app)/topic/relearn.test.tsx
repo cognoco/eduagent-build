@@ -700,4 +700,40 @@ describe('RelearnScreen', () => {
     expect(screen.queryByTestId('relearn-topics-phase')).toBeNull();
     expect(screen.queryByTestId('relearn-method-phase')).toBeNull();
   });
+
+  it('[WI-508] method cards are disabled and unreachable while a start is in-flight', async () => {
+    // Drive the screen to the method phase via direct topic entry.
+    mockSearchParams = {
+      topicId: 'topic-1',
+      subjectId: 'sub-1',
+      topicName: 'Algebra',
+      subjectName: 'Math',
+    };
+    // mockMutate does NOT call onSettled — keeps isSubmitting=true after press.
+    mockMutate.mockImplementation(() => {
+      // intentionally a no-op: no onSuccess/onError/onSettled called
+    });
+
+    renderRelearn();
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-method-phase');
+    });
+
+    // Verify the method card is enabled before submission.
+    const card = screen.getByTestId('relearn-method-visual_diagrams');
+    expect(card.props.accessibilityState?.disabled).not.toBe(true);
+
+    fireEvent.press(card);
+
+    // After the press, isSubmitting=true → the component replaces the method
+    // phase with the loading view. The cards are no longer rendered (making
+    // them unreachable for a double-tap), and mutate was called exactly once.
+    await waitFor(() => {
+      screen.getByTestId('relearn-loading');
+    });
+
+    expect(screen.queryByTestId('relearn-method-visual_diagrams')).toBeNull();
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+  });
 });

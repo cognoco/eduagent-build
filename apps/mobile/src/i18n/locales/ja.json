@@ -490,7 +490,9 @@
       "pushMissingServer": "ここでプッシュ通知をオンにしてください。",
       "pushMissingToken": "このデバイスをプッシュ通知に登録してください。",
       "openSettingsTitle": "設定を開く",
-      "openSettingsDescription": "このアプリの通知はブロックされています。システム設定でオンにしてください。"
+      "openSettingsDescription": "このアプリの通知はブロックされています。システム設定でオンにしてください。",
+      "loadErrorTitle": "通知設定を読み込めませんでした",
+      "loadErrorMessage": "もう一度お試しください。設定は変更されていません。"
     },
     "account": {
       "sectionHeader": "アカウント",
@@ -2278,7 +2280,8 @@
       "bookCompleted": "ブックを完了しました",
       "cefrLevelUp": "言語レベルが上がりました",
       "topicsExplored": "{{subject}}で{{count}}個のトピックを探求しました",
-      "topicsExploredFallback": "科目で{{count}}個のトピックを探求しました"
+      "topicsExploredFallback": "科目で{{count}}個のトピックを探求しました",
+      "unknown": "マイルストーンを達成"
     }
   },
   "onboarding": {

@@ -869,7 +869,7 @@ export function ChatShell({
       />
 
       {/* Live transcript while recording — gives immediate visual feedback */}
-      {isVoiceEnabled && isListening && (
+      {isVoiceEnabled && isListening && !isWebDormant && (
         <View
           className="mx-4 mb-2 p-3 bg-surface-elevated rounded-xl"
           testID="voice-listening-indicator"
@@ -888,7 +888,7 @@ export function ChatShell({
       )}
 
       {/* Processing indicator — shown while STT finalises the result */}
-      {isVoiceEnabled && speechStatus === 'processing' && (
+      {isVoiceEnabled && speechStatus === 'processing' && !isWebDormant && (
         <View className="mx-4 mb-1" testID="voice-processing-indicator">
           <Text className="text-caption text-text-secondary">
             {t('session.chatShell.processing')}
@@ -898,25 +898,28 @@ export function ChatShell({
 
       {/* Inline STT error — shown below the mic area instead of only via Alert.
           L2: Tapping the error retries STT so users can escape the error state. */}
-      {isVoiceEnabled && speechStatus === 'error' && sttError && (
-        <Pressable
-          className="mx-4 mb-1 min-h-[44px] justify-center"
-          onPress={() => void startListening()}
-          testID="voice-error-indicator"
-          accessibilityRole="button"
-          accessibilityLabel={t('session.chatShell.voiceErrorTapRetry', {
-            error: sttError,
-          })}
-          accessibilityHint={t('session.chatShell.a11yVoiceErrorHint')}
-        >
-          <Text className="text-caption text-error">
-            {t('session.chatShell.voiceErrorTapRetry', { error: sttError })}
-          </Text>
-        </Pressable>
-      )}
+      {isVoiceEnabled &&
+        speechStatus === 'error' &&
+        sttError &&
+        !isWebDormant && (
+          <Pressable
+            className="mx-4 mb-1 min-h-[44px] justify-center"
+            onPress={() => void startListening()}
+            testID="voice-error-indicator"
+            accessibilityRole="button"
+            accessibilityLabel={t('session.chatShell.voiceErrorTapRetry', {
+              error: sttError,
+            })}
+            accessibilityHint={t('session.chatShell.a11yVoiceErrorHint')}
+          >
+            <Text className="text-caption text-error">
+              {t('session.chatShell.voiceErrorTapRetry', { error: sttError })}
+            </Text>
+          </Pressable>
+        )}
 
       {/* Voice transcript preview (above input, when voice enabled) */}
-      {isVoiceEnabled && pendingTranscript && !isListening && (
+      {isVoiceEnabled && pendingTranscript && !isListening && !isWebDormant && (
         <VoiceTranscriptPreview
           transcript={pendingTranscript}
           onSend={handleVoiceSend}

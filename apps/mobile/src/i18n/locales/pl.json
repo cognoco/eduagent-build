@@ -523,7 +523,9 @@
       "pushMissingServer": "Włącz tutaj powiadomienia push.",
       "pushMissingToken": "Zarejestruj urządzenie dla powiadomień push.",
       "openSettingsTitle": "Otwórz Ustawienia",
-      "openSettingsDescription": "Powiadomienia dla tej aplikacji są zablokowane. Włącz je w ustawieniach systemowych."
+      "openSettingsDescription": "Powiadomienia dla tej aplikacji są zablokowane. Włącz je w ustawieniach systemowych.",
+      "loadErrorTitle": "Nie udało się wczytać ustawień powiadomień",
+      "loadErrorMessage": "Spróbuj ponownie. Twoje preferencje nie uległy zmianie."
     },
     "account": {
       "sectionHeader": "Konto",
@@ -2411,7 +2413,8 @@
       "bookCompleted": "Ukończono książkę",
       "cefrLevelUp": "Wzrost poziomu językowego",
       "topicsExplored": "Odkryto {{count}} tematów w {{subject}}",
-      "topicsExploredFallback": "Odkryto {{count}} tematów w przedmiocie"
+      "topicsExploredFallback": "Odkryto {{count}} tematów w przedmiocie",
+      "unknown": "Kamień milowy osiągnięty"
     }
   },
   "onboarding": {
