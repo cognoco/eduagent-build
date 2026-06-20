@@ -3350,6 +3350,10 @@
     "continueOffline": "Fortsett uten konto",
     "connecting": "Kobler til sikkert..."
   },
+  "scopeChip": {
+    "supportHub": "Støttehub",
+    "me": "Meg"
+  },
   "modeSwitcher": {
     "switchError": "Kunne ikke bytte. Trykk for å prøve igjen.",
     "a11yRetry": "Prøv modusbytte på nytt"

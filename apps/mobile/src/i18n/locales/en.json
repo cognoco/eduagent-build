@@ -3552,6 +3552,10 @@
     "continueOffline": "Continue without account",
     "connecting": "Connecting securely..."
   },
+  "scopeChip": {
+    "supportHub": "Support hub",
+    "me": "Me"
+  },
   "modeSwitcher": {
     "switchError": "Couldn't switch. Tap to try again.",
     "a11yRetry": "Retry mode switch"
