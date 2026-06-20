@@ -1,0 +1,17 @@
+{
+  "pageId": "3838bce9-1f7c-817d-aca8-e7d515114f9d",
+  "id": "WI-820",
+  "name": "[QUIZ-18] Render no-round guard instead of Internal Server Error",
+  "description": "Direct Chrome navigation to the quiz play route without a round returned an Internal Server Error in static web export instead of the documented no-round recovery guard.",
+  "acceptanceCriteria": "Opening /quiz/play without a roundId renders the documented no-round guard with recovery navigation, not an Internal Server Error. Browser regression coverage asserts the guard testID.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Unset",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Completion Summary — 2026-06-19\nWhat was done:\n- Landed PR #1235 into main for WI-820.\n- Fixed the follow-up CI failures that appeared after the main retarget: flag-on identity-v2 integration cleanup and book-suggestion concurrency.\nWhat changed:\n- Book suggestions now wait for the short final advisory lock before inserting, so a cooldown-only caller cannot cause the real writer to return success with zero inserted suggestions.\n- Added a deterministic integration regression for that final-lock race.\n- Updated the v2 legacy-identity test cleanup helper to remove v2 subscription/subscription-payer rows before deleting people or organizations.\nVerification:\n- PR #1235 checks are green: main, API Quality Gate, Flag-ON integration (IDENTITY_V2_ENABLED), run-smoke, Playwright web smoke, Merge completeness check, claude-review, CodeRabbit.\n- Local targeted verification passed: book-suggestion regression red/green, book-suggestion unit suite (37 tests), failed CI co-located suites (17 tests), helper-related co-located integration set (26 passed, 28 skipped by suite conditions), tsc --build, git diff --check, api lint with pre-existing warnings only.\n- Pre-push validation passed: tsc --build plus 29 related API suites / 941 tests.\nCaveats / Follow-ups:\n- Local raw Nx/Jest full co-located collection in the Windows worktree did not collect tests without explicit globs, so the authoritative full Linux lane was the GitHub Actions flag-on integration check, which passed before merge."
+}
