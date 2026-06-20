@@ -353,6 +353,17 @@ The key asymmetry: **the live consent record moves, the receipt stays.** `consen
 row; `consent_receipt` is the durable artifact. The `charge_person_id ON DELETE RESTRICT` on
 `consent_grant` enforces "you can't hard-delete a person with active grants — re-home them first."
 
+**The "survives" column above is the *person-granularity* delete** — dropping one `person` while their
+org and the other humans on their edges live on. There is a second granularity: a **whole-org /
+whole-account erasure** (the GDPR Art-17 path, `executeDeletionV2`), which removes the `organization`
+**and every person in it**. On that path the otherwise-surviving relationship edges cannot survive — the
+person on (at least) one end is gone — so the erasure **tears down every `guardianship` and
+`supportership` edge incident to the org's persons** (both directions) in the same transaction, before the
+persons drop. A **cross-org** edge (a guardian/supporter who lives in another org) has only its **edge
+row** removed; the out-of-org counterpart person and their org are untouched. `subscription` still
+survives even a whole-org erasure today (its teardown is deferred to billing — WI-693), so a *subscribed*
+org's erasure still aborts on the subscription RESTRICT FK by design. See **MMT-ADR-0026** (and §6.1).
+
 ---
 
 ## §4 — Per-table rationale
@@ -478,9 +489,18 @@ active row drops, the receipt moves to the retain-tier, the audit row is written
 | **Active person → parent-initiated delete (under-age)** | Guardian exercises the child-erasure right. | Age-appropriate confirm + grace window. | Same path; the `deleted_by` on the `deletion_audit` is the guardian. A forward-only receipt-preservation guard verifies the receipt survives. |
 | **Active person → abandonment (dormancy window elapsed)** | Daily sweep detects `last_activity_at` older than the counsel-set threshold; grace window elapsed with no return. | Pre-deletion notice + grace; final silent cleanup. | Same re-home pattern; the `reason` on the `deletion_audit` is `abandonment`. A forward-only ratchet verifies. |
 | **`consent_grant` row blocked from delete by RESTRICT** | A delete attempt on a `person` with active grants. | The delete *fails* — by design. | The re-home transaction is a single atomic step; a half-done delete is not a valid state. The RESTRICT is the schema's way of saying "you forgot to move the records first." |
+| **Whole-org / whole-account erasure** (GDPR Art-17; `executeDeletionV2`) | User/guardian deletes the whole account, or the abandonment sweep erases it. | Account and all its persons erased after the grace window. | Removes the `organization` + every `person`. Before the person drops, **tears down every `guardianship` + `supportership` edge incident to the org's persons** (both directions) so the RESTRICT edge FKs are satisfied; a **cross-org** edge drops only its edge row, never the out-of-org counterpart person. Consent grants re-home as in the per-person path. **`subscription` teardown is NOT done here** (deferred to billing / WI-693), so a *subscribed* account's erasure still aborts on the subscription RESTRICT FK by design — free/unsubscribed accounts erase fully. See **MMT-ADR-0026**. |
 
 The forward-only ratchet installs against the new baseline: it cannot regress to a
 `consent_states`-shape column because that table does not exist.
+
+> **Two deletion granularities (MMT-ADR-0026).** The "consent_grant blocked by RESTRICT" row above is the
+> *person-granularity* contract — the RESTRICT FKs on `guardianship`/`supportership`/`subscription` are
+> load-bearing and a single-person delete leaves those edges intact. The *whole-org erasure* row is the
+> second granularity: it removes the org and all its persons, so the incident relationship edges are torn
+> down rather than preserved. The legacy `accounts`-row erasure that an earlier audit posited (WI-849
+> Gap 2) does **not** apply on the v2-live environments — the legacy `accounts`/`profiles` tables were
+> dropped by the MMT-ADR-0012 baseline reset, so there is no legacy row to leave behind on the v2 path.
 
 ### 6.2 Age-crossing protection-lowering (direction-aware gate)
 

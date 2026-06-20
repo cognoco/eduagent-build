@@ -10,14 +10,31 @@
 // makes "delete a person with live grants" fail by design until the grants are
 // re-homed. We NEVER erase grants; we migrate them to `consent_receipt`.
 //
-// executeDeletionV2 sequence (§6.1):
+// executeDeletionV2 sequence (§6.1; WI-849 adds 2a):
 //   1. pre-read login.email (memoized step input, as today's getAccountClerkUserId)
 //   2. re-home each consent_grant for every person in the org → consent_receipt
+//   2a. tear down guardianship + supportership edges incident to the org's persons
+//       (WI-849 Gap 3 — both directions; cross-org edges drop the edge, not the
+//        counterpart person). See MMT-ADR-0026.
 //   3. delete the live consent_grant rows (RESTRICT now satisfied)
 //   3b. write financial_record rows per person (tax/chargeback retain-tier)
 //   4. write a deletion_audit row per person (deleted_by per path; reason)
 //   5. DELETE person (cascade → consent_request + membership + learning data)
 //   6. erase byok_waitlist WHERE email = login.email  (D2 GDPR Art-17 leg)
+//
+// STILL DEFERRED (WI-849 Gap 1 → WI-693 / CUT-B3): subscription teardown.
+// subscription.{payer_person_id,organization_id} are ON DELETE RESTRICT, so a
+// SUBSCRIBED account still aborts at the person/org drop. Free/unsubscribed
+// accounts delete fully; subscribed-account teardown is owned by billing/WI-693.
+//
+// NOT BUILT (WI-849 Gap 2 — premise collapsed; escalated): "v2 erasure leaves the
+// legacy `accounts` row + its PII behind." On the reset environments where
+// executeDeletionV2 actually runs (staging ep-fancy-cherry, prod — MMT-ADR-0012
+// baseline reset), the legacy `accounts`/`profiles` tables DO NOT EXIST, so there
+// is no legacy PII to survive and a `DELETE FROM accounts` would throw
+// `relation "accounts" does not exist`. The Drizzle schema still declares those
+// tables for the v1 path, but they are physically absent post-reset. Gap 2 is
+// therefore a stale premise for the v2 path; see the PR body / WI-849.
 //
 // retention_period is counsel-owned (data-model.md §4.9: "counsel fills the
 // value") — the column is nullable with no default, so we re-home with NULL and
@@ -37,7 +54,18 @@
 // FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
 // ---------------------------------------------------------------------------
 
-import { and, eq, gte, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import {
   byokWaitlist,
   consentGrant,
@@ -45,11 +73,13 @@ import {
   consentRequest,
   deletionAudit,
   financialRecord,
+  guardianship,
   login,
   membership,
   organization,
   person,
   subscription,
+  supportership,
   type Database,
 } from '@eduagent/database';
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
@@ -378,6 +408,41 @@ export async function executeDeletionV2(
     });
     const personIds = memberships.map((m) => m.personId);
 
+    // Step 2a (WI-849 Gap 3) — tear down the guardianship + supportership edges
+    // INCIDENT to the persons in this org, BEFORE any person drop. Both edges'
+    // endpoint FKs are ON DELETE RESTRICT (identity.ts), so dropping a person
+    // who sits on either end of an edge — active OR revoked — aborts the whole
+    // transaction. A whole-org/whole-account erasure removes the org and all its
+    // persons, so every relationship anchored on those persons ceases to exist;
+    // the edge rows must go with them. (Canon: data-model.md §3.2/§6.1 say these
+    // edges SURVIVE a single-person delete — that is the person-granularity path;
+    // the whole-org erasure path tears them down. See MMT-ADR-0026.)
+    //
+    // CROSS-ORG EDGES: an edge may reference a person OUTSIDE this org (a guardian
+    // in another org; a supporter who supports an in-org charge). We delete an
+    // edge when EITHER endpoint is one of this org's persons (both directions),
+    // and we NEVER touch the counterpart person — their person row and their own
+    // org are untouched. Tearing down only the incident edge is correct: the
+    // relationship to an erased person no longer exists, but the other human does.
+    if (personIds.length > 0) {
+      await tx
+        .delete(guardianship)
+        .where(
+          or(
+            inArray(guardianship.guardianPersonId, personIds),
+            inArray(guardianship.chargePersonId, personIds),
+          ),
+        );
+      await tx
+        .delete(supportership)
+        .where(
+          or(
+            inArray(supportership.supporterPersonId, personIds),
+            inArray(supportership.supporteePersonId, personIds),
+          ),
+        );
+    }
+
     // Step 3b prep — snapshot the org's subscriptions ONCE (read before any
     // person drop; subscriptions outlive persons — data-model.md §3.2) for the
     // per-person financial_record payload.
@@ -433,14 +498,17 @@ export async function executeDeletionV2(
 
       // Step 5 — drop the person (cascade → consent_request, membership,
       // login, learning data). RESTRICT is now satisfied because the grants
-      // were re-homed above.
+      // were re-homed (Step 2/3) and the guardianship/supportership edges were
+      // torn down (Step 2a, WI-849 Gap 3) above.
       //
-      // Out-of-scope (WI-723): subscription teardown is NOT handled here.
-      // `subscription.payer_person_id` (and `subscription.organization_id`)
-      // are ON DELETE RESTRICT, so a person who is a payer — or the org with a
-      // live subscription — cannot be dropped while a subscription row stands.
-      // That billing-domain teardown is a pre-existing gap owned by CUT-B3 /
-      // billing, intentionally outside this WI's financial_record scope.
+      // STILL OUT OF SCOPE (WI-849 Gap 1 → WI-693 / CUT-B3 / billing):
+      // subscription teardown is NOT handled here. `subscription.payer_person_id`
+      // and `subscription.organization_id` are ON DELETE RESTRICT, so a person
+      // who is the primary payer — or the org with a live subscription row —
+      // still cannot be dropped while that subscription stands. For a SUBSCRIBED
+      // account this DELETE therefore still aborts with an FK error; that
+      // billing-domain teardown is deferred to WI-693, intentionally outside this
+      // WI's scope. (Free/unsubscribed accounts — the common case — delete fully.)
       await tx.delete(person).where(eq(person.id, personId));
     }
 
