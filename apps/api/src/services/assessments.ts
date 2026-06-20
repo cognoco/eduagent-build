@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import {
   assessments,
   curriculumTopics,
@@ -836,6 +836,103 @@ export async function createAssessment(
     .returning();
   if (!row) throw new Error('Assessment insert did not return a row');
   return mapAssessmentRow(row);
+}
+
+/**
+ * Race-safe get-or-create for a topic's active assessment.
+ *
+ * The route previously did `getActiveAssessmentForTopic ?? createAssessment`
+ * with no serialization: two near-simultaneous POSTs both observed no active
+ * row and both INSERTed, leaving two `in_progress` rows. `getActiveAssessment-
+ * ForTopic` then returns only the latest (updatedAt desc), silently orphaning
+ * the other — and the orphan still consumes quota/progress tracking.
+ *
+ * Fix mirrors the answer-submission lock (lockAssessmentForAnswerSubmission):
+ * wrap read-then-create in `db.transaction` and serialize concurrent creators
+ * on the parent topic row with `SELECT ... FOR UPDATE`. Ownership is verified
+ * through the same parent chain (curriculumTopics → curricula → subjects.
+ * profileId) the unsafe `createAssessment` used, so the lock and the
+ * authorization check are one query. The loser blocks at the locking SELECT,
+ * unblocks after the winner commits its INSERT, re-reads inside the same tx,
+ * finds the winner's active row, and returns it instead of inserting a
+ * duplicate.
+ *
+ * Locking the parent topic row (rather than an assessment row, which may not
+ * exist yet) is the standard pattern for serializing inserts that must be
+ * unique per parent. neon-serverless `db.transaction()` is genuinely
+ * interactive + ACID, so the lock is real.
+ */
+export async function createAssessmentIfNoneActive(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+  sessionId?: string,
+): Promise<AssessmentRecord> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    // (a) Verify ownership via the canonical parent-chain helper (curriculum-
+    // topic-ownership). Intentionally vague NotFound — don't reveal whether the
+    // topic exists but is unowned vs. does not exist (prevents enumeration),
+    // matching createAssessment's prior behavior.
+    const owned = await findOwnedCurriculumTopic(txDb, {
+      profileId,
+      topicId,
+      subjectId,
+    });
+    if (!owned) {
+      throw new NotFoundError('Topic');
+    }
+
+    // (b) Serialize concurrent creators for this topic. Lock the single owned
+    // parent topic row FOR UPDATE — a plain single-table SELECT, so the loser
+    // of the race blocks here until the winner commits. Locking the topic row
+    // (which exists) rather than an assessment row (which may not yet) is the
+    // standard pattern for serializing inserts that must be unique per parent.
+    await txDb
+      .select({ id: curriculumTopics.id })
+      .from(curriculumTopics)
+      .where(eq(curriculumTopics.id, topicId))
+      .for('update')
+      .limit(1);
+
+    // Re-check for an active assessment INSIDE the lock. A concurrent creator
+    // that won the lock has already committed its INSERT by the time we
+    // unblock here, so this read observes it.
+    const [existing] = await txDb
+      .select()
+      .from(assessments)
+      .where(
+        and(
+          eq(assessments.profileId, profileId),
+          eq(assessments.subjectId, subjectId),
+          eq(assessments.topicId, topicId),
+          eq(assessments.status, 'in_progress'),
+        ),
+      )
+      .orderBy(desc(assessments.updatedAt))
+      .limit(1);
+
+    if (existing) {
+      return mapAssessmentRow(existing);
+    }
+
+    const [row] = await txDb
+      .insert(assessments)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionId: sessionId ?? null,
+        verificationDepth: 'recall',
+        status: 'in_progress',
+        exchangeHistory: [],
+      })
+      .returning();
+    if (!row) throw new Error('Assessment insert did not return a row');
+    return mapAssessmentRow(row);
+  });
 }
 
 export async function getAssessment(
