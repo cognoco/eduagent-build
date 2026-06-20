@@ -73,7 +73,17 @@ export const queryKeys = {
       mode: ModeSegment,
       topicId: string | undefined,
       profileId: string | undefined,
-    ) => ['progress', mode, 'topic', topicId, 'resolve', profileId] as const,
+      attempt?: number,
+    ) =>
+      [
+        'progress',
+        mode,
+        'topic',
+        topicId,
+        'resolve',
+        profileId,
+        attempt,
+      ] as const,
 
     reviewSummary: (mode: ModeSegment, profileId: string | undefined) =>
       ['progress', mode, 'review-summary', profileId] as const,

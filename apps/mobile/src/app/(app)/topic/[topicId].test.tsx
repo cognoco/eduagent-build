@@ -7,7 +7,10 @@ import {
 } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import {
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../test-utils/mock-api-routes';
 import {
   ProfileContext,
   type Profile,
@@ -941,11 +944,21 @@ describe('TopicDetailScreen — deep-link resolve timeout Retry', () => {
     await Promise.resolve();
     screen.getByTestId('topic-resolve-timeout');
 
+    const resolveCallsBefore = fetchCallsMatching(mockFetch, '/resolve').length;
+
     // Tap Retry
     await act(async () => {
       fireEvent.press(screen.getByTestId('topic-resolve-timeout-retry'));
     });
     await Promise.resolve();
+
+    // Verify the resolve endpoint was called again (new query key forces a new network request).
+    // Pre-fix: refetch() on an in-flight query returns the existing promise (TanStack dedup);
+    //   call count is unchanged.
+    // Post-fix: resolveAttempt increments → new key → new query → new fetch.
+    expect(fetchCallsMatching(mockFetch, '/resolve').length).toBeGreaterThan(
+      resolveCallsBefore,
+    );
 
     // After Retry the timeout window must restart: advance another 15 s → error screen reappears.
     // Pre-fix: the effect never re-runs (isResolveSpinning didn't change), so the user stays stuck
