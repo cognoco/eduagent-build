@@ -71,7 +71,11 @@
     "profileNotFound": "プロフィールの読み込み中に問題が発生しました。サインアウトしてから再度サインインしてください。",
     "alreadyCompleted": "これはすでに完了しています。戻って新しいものを選んでください。",
     "validationFailed": "何かが正しくないようです。入力内容を確認して、もう一度お試しください。",
-    "timedOut": "返信に時間がかかりすぎました。タップして再接続し、もう一度お試しください。"
+    "timedOut": "返信に時間がかかりすぎました。タップして再接続し、もう一度お試しください。",
+    "emailNotVerified": "メールアドレスを確認してから、もう一度お試しください。",
+    "quotaExceeded": "クォータを超えました",
+    "resourceNotFound": "リソースが見つかりません",
+    "conflictState": "リクエストが現在の状態と競合しています"
   },
   "errorBoundary": {
     "title": "問題が発生しました",
@@ -137,7 +141,43 @@
       "unsupportedSsoHint": "このアカウントでGoogleまたはAppleサインインも使用している場合は、上記でお試しください。それでもうまくいかない場合は、サポートにお問い合わせください。",
       "unsupportedContactHint": "サポートにお問い合わせください。サインインをお手伝いします。言及：{{methods}}",
       "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました",
-      "offerBody": "このアカウントは<id>{{identifier}}</id>に送信される認証コードで続行できます。続行を選択した場合にのみ、コードを送信します。"
+      "offerBody": "このアカウントは<id>{{identifier}}</id>に送信される認証コードで続行できます。続行を選択した場合にのみ、コードを送信します。",
+      "strategyWebauthn": "セキュリティキーまたはパスキー",
+      "strategyTotp": "認証アプリ",
+      "strategyPhoneCode": "電話認証コード",
+      "strategyEmailCode": "メール認証コード",
+      "unsupportedMethodGeneric": "このアカウントには、モバイルではまだ利用できない追加の認証方法が必要です。",
+      "unsupportedMethodSingle": "このアカウントには{{method}}が必要ですが、モバイルではまだ利用できません。",
+      "unsupportedMethodMultiple": "このアカウントには{{methods}}または{{last}}が必要ですが、モバイルではまだ利用できません。",
+      "transitionTimeout": "サインインに予想以上の時間がかかっています。もう一度サインインしてください。",
+      "sessionRevoked": "別のデバイスからセッションがサインアウトされました。続行するには再度サインインしてください。",
+      "sessionExpired": "セッションの有効期限が切れました。学習を続けるには再度サインインしてください。",
+      "needsNewPassword": "サインインする前にパスワードを更新する必要があります。「パスワードをお忘れですか？」を使用してリセットしてください。",
+      "signInNotCompleted": "サインインを完了できませんでした。もう一度お試しください。",
+      "contactSupportEmailError": "メールアプリを開けませんでした。support@mentomate.app に連絡し、{{methods}}についてお伝えください。",
+      "noSessionCreated": "セッションが作成されませんでした。もう一度お試しください。",
+      "authNotLoaded": "認証が読み込まれませんでした。もう一度お試しください。",
+      "activationFailed": "セッションを有効化できませんでした。もう一度お試しください。",
+      "ssoSignUpIncomplete": "{{provider}}経由の登録には追加情報が必要です。代わりにメールで登録してください。",
+      "authNotReady": "認証の準備ができていません。リロードしてもう一度お試しください。",
+      "stuckTitle": "サインイン処理中です",
+      "stuckMessage": "予想以上に時間がかかっています。もう一度お試しください。",
+      "signUpLabel": "登録",
+      "enterBackupCodePlaceholder": "バックアップコードを入力",
+      "enterSixDigitCodePlaceholder": "6桁のコードを入力",
+      "verifyButton": "認証",
+      "resendCode": "コードを再送信",
+      "backToSignIn": "サインインに戻る",
+      "contactSupport": "サポートに連絡",
+      "cancelSignIn": "サインインをキャンセル",
+      "continueWithGoogle": "Googleで続行",
+      "continueWithApple": "Appleで続行",
+      "continueWithOpenAI": "OpenAIで続行",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "パスワードを入力",
+      "forgotPassword": "パスワードをお忘れですか？",
+      "signInButton": "サインイン",
+      "sendVerificationCode": "認証コードを送信"
     },
     "signUp": {
       "title": "アカウント作成",
@@ -150,7 +190,19 @@
       "verifyEmailTitle": "メールアドレスの認証",
       "verificationCodeLabel": "認証コード",
       "agreeToTerms": "登録すると、<terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意したことになります。",
-      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました"
+      "sentCodeTo": "<email>{{email}}</email>に認証コードを送信しました",
+      "noSessionCreated": "セッションが作成されませんでした。もう一度お試しください。",
+      "activationFailed": "セッションを有効化できませんでした。もう一度お試しください。",
+      "authNotReady": "認証の準備ができていません。リロードしてもう一度お試しください。",
+      "ssoMissingFields": "登録には追加情報が必要です: {{fields}}。代わりにメールで登録してください。",
+      "ssoSignUpIncomplete": "{{provider}}経由の登録には追加情報が必要です。代わりにメールで登録してください。",
+      "signUpNotCompleted": "登録を完了できませんでした。もう一度お試しください。",
+      "verificationNotCompleted": "認証を完了できませんでした。もう一度お試しください。",
+      "codePlaceholder": "6桁のコードを入力",
+      "verifyButton": "認証",
+      "resendCode": "コードを再送信",
+      "useDifferentEmail": "別のメールアドレスを使用",
+      "backToSignIn": "サインインに戻る"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",
@@ -159,7 +211,20 @@
       "resetPasswordTitle": "パスワードをリセット",
       "resetCodeLabel": "リセットコード",
       "newPasswordLabel": "新しいパスワード",
-      "enterCodeAndPassword": "<email>{{email}}</email>に送信されたコードと新しいパスワードを入力してください"
+      "enterCodeAndPassword": "<email>{{email}}</email>に送信されたコードと新しいパスワードを入力してください",
+      "timeoutMessage": "リセットサービスに時間内に接続できませんでした。接続を確認してもう一度お試しください。",
+      "resetSuccessActivationError": "パスワードはリセットされましたが、自動的にサインインできませんでした。",
+      "resetNotCompleted": "パスワードのリセットを完了できませんでした。もう一度お試しください。",
+      "retryActivationFailed": "まだサインインできません。以下のリンクから新しいパスワードでサインインしてください。",
+      "signInWithNewPassword": "新しいパスワードでサインイン",
+      "codePlaceholder": "6桁のコードを入力",
+      "newPasswordPlaceholder": "新しいパスワードを入力",
+      "resetPasswordButton": "パスワードをリセット",
+      "resendCode": "コードを再送信",
+      "useDifferentEmail": "別のメールアドレスを使用",
+      "backToSignIn": "サインインに戻る",
+      "emailPlaceholder": "you@example.com",
+      "sendResetCode": "リセットコードを送信"
     }
   },
   "guards": {
@@ -220,7 +285,17 @@
       "subjectsLoadError": "現在、教科を読み込めませんでした",
       "subjectsLoadErrorHint": "セッションを開始したり、他のアクションを試すことはできます。",
       "a11yOpenMyNotes": "マイノートを開く",
-      "a11yRetrySubjects": "科目の再読み込み"
+      "a11yRetrySubjects": "科目の再読み込み",
+      "subjectHintPreparing": "{{name}}を準備中...",
+      "subjectHintOpen": "開く",
+      "subjectHintContinueTopic": "{{topic}}を続ける",
+      "subjectHintContinueSubject": "{{name}}を続ける",
+      "subjectHintQuiz": "クイズ: {{topic}}",
+      "subjectHintPractice": "練習: {{name}}",
+      "coachBandResumeSession": "{{name}}で中断したところから再開しましょう。",
+      "coachBandResumeSessionNoName": "セッションで中断したところから再開しましょう。",
+      "coachBandResumeTarget": "{{name}}で中断したところから再開しましょう。",
+      "coachBandRevisitTopic": "{{topic}}を復習しましょう — 記憶が薄れ始めています。"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -314,14 +389,19 @@
       "addLearner": {
         "title": "学習者を追加",
         "accessibilityLabel": "家族に学習者を追加する"
-      }
+      },
+      "childProfileLabel": "{{name}}のプロフィール",
+      "greetingFallbackName": "こんにちは"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
     "coachBand": {
       "estimatedMinutes": "{{minutes}}分",
       "a11yDismiss": "おすすめを非表示",
-      "a11yLoadingCard": "メンターカードを読み込み中"
+      "a11yLoadingCard": "メンターカードを読み込み中",
+      "thisMorning": "今朝",
+      "thisAfternoon": "今日の午後",
+      "tonight": "今夜"
     },
     "earlyAdopter": {
       "badge": "早期ユーザー — あなたのフィードバックがMentoMateを形作ります",
@@ -329,6 +409,18 @@
     },
     "subjectTile": {
       "topicsProgress": "{{completed}}/{{total}} トピック"
+    },
+    "intentCard": {
+      "titleWithBadge": "{{title}}、{{count}}項目",
+      "opensActivityHint": "このアクティビティを開きます"
+    },
+    "engagementChip": {
+      "curious": "好奇心",
+      "stuck": "行き詰まり",
+      "breezing": "順調",
+      "focused": "集中",
+      "scattered": "散漫",
+      "a11yLabel": "エンゲージメント: {{label}}"
     }
   },
   "family": {
@@ -767,7 +859,12 @@
       "wrapping": "まとめ中...",
       "exit": "終了",
       "retryClassification": "分類を再試行",
-      "skipWarmup": "ウォームアップをスキップして開始"
+      "skipWarmup": "ウォームアップをスキップして開始",
+      "a11yWrapping": "まとめ中",
+      "a11yDone": "完了",
+      "subtitleClassifying": "内容を解析中...",
+      "subtitleExpired": "セッションが期限切れです - 新しいセッションを開始してください。",
+      "subtitleUnreachable": "サーバーに接続できません - メッセージが失敗する可能性があります"
     },
     "inputModeToggle": {
       "text": "テキスト",
@@ -818,7 +915,8 @@
       "progressLabel_one": "本の進捗：{{count}}ページ",
       "progressLabel_other": "本の進捗：{{count}}ページ",
       "pageCount_one": "{{count}}ページ",
-      "pageCount_other": "{{count}}ページ"
+      "pageCount_other": "{{count}}ページ",
+      "a11yComplete": "ブックの準備ができました — タップして続行"
     },
     "quickChips": {
       "hintLabel": "ヒント",
@@ -852,6 +950,38 @@
       "helpful": "このペースで続けます。",
       "notHelpful": "説明を調整します。",
       "incorrect": "修正します。"
+    },
+    "disabledReason": {
+      "offline": "オフラインです — 再接続すると入力が再開されます",
+      "expired": "このセッションは終了しました",
+      "quotaReached": "セッションの上限に達しました",
+      "chooseSave": "このセッションの保存先を選択してください"
+    },
+    "imageAttach": {
+      "timeout": "写真の読み込みに時間がかかりすぎたため、テキストのみで開始します。問題がある場合は、もう一度カメラをタップして再試行してください。",
+      "failed": "写真を開けなかったため、テキストのみで開始します。問題がある場合は、もう一度カメラをタップして再試行してください。"
+    },
+    "tellMentor": {
+      "parent": {
+        "title": "チューターに伝える",
+        "description": "このお子さんについて、チューターに覚えておいてほしい重要なことを追加してください。",
+        "descriptionWithName": "{{childName}}について、チューターに覚えておいてほしい重要なことを追加してください。",
+        "placeholder": "短い例で最もよく理解し、分数でまだつまずきます。"
+      },
+      "adult": {
+        "title": "チューターへのメモを追加",
+        "description": "今後のセッションでチューターに覚えておいてほしいことを追加してください。",
+        "placeholder": "例があると分数の理解にとても役立ちます。"
+      },
+      "teen": {
+        "title": "チューターに伝えよう",
+        "description": "学習の助けになること、楽しいこと、まだ難しいと感じることを追加してください。",
+        "placeholder": "例があると分数の理解にとても役立ちます。"
+      }
+    },
+    "voiceToggle": {
+      "a11yMute": "AIの音声をミュート",
+      "a11yUnmute": "AIの音声のミュートを解除"
     }
   },
   "quiz": {
@@ -1001,7 +1131,15 @@
       "youSaid": "あなたの回答: {{answer}}",
       "youSkipped": "この問題はスキップしました",
       "noAnswer": "未回答",
-      "playAgain": "もう一度プレイ"
+      "playAgain": "もう一度プレイ",
+      "tierPerfectTitle": "パーフェクトラウンド！",
+      "tierGreatTitle": "素晴らしいラウンド！",
+      "tierNiceTitle": "よく頑張りました！",
+      "questionFallback": "質問",
+      "a11yYouSaid": "あなたの回答: {{answer}}",
+      "a11yYouSkipped": "この質問をスキップしました",
+      "a11yNoAnswer": "回答しませんでした",
+      "a11yCorrectAnswer": "正解: {{answer}}"
     },
     "guessWhoQuestion": {
       "typeAName": "名前を入力",
@@ -1013,7 +1151,11 @@
       "iDontKnow": "わかりません",
       "iDontKnowLabel": "答えがわかりません",
       "clue": "ヒント {{number}}",
-      "fallbackPrompt": "別のヒントが必要ですか？1つ選んでください："
+      "fallbackPrompt": "別のヒントが必要ですか？1つ選んでください：",
+      "hintWithMCAvailableWrong": "違います。もう一つのヒントです。多肢選択式が利用可能になりました。",
+      "hintWithMCAvailable": "もう一つのヒントです。多肢選択式も利用可能になりました。",
+      "hintWrong": "違います。もう一つのヒントです。",
+      "hint": "もう一つのヒントです。"
     }
   },
   "dictation": {
@@ -1214,7 +1356,8 @@
       "suggestionAdd": "本棚に追加",
       "levelSubject": "科目",
       "levelBook": "本",
-      "levelTopic": "トピック"
+      "levelTopic": "トピック",
+      "loadErrorFallback": "この棚を読み込めませんでした。もう一度お試しください。"
     },
     "noteMenu": {
       "title": "メモのオプション",
@@ -1276,7 +1419,11 @@
       "mastered": "習得済み",
       "strongReviewProgress": "{{strong}}/{{total}}回の強い復習",
       "notesSavedCount_one": "このトピックで保存したメモ {{count}} 件",
-      "notesSavedCount_other": "このトピックで保存したメモ {{count}} 件"
+      "notesSavedCount_other": "このトピックで保存したメモ {{count}} 件",
+      "minTotalSuffix": "・合計{{minutes}}分",
+      "bookmarkFromChat": "チャットから・{{date}}",
+      "a11yAddNote": "メモを追加",
+      "a11yAddFirstNote": "このトピックに最初のメモを追加"
     },
     "book": {
       "readyToOpen": "開けます",
@@ -1344,7 +1491,15 @@
       "a11yBookComplete": "{{title}}が完了しました。{{topics}}個のトピックを学習しました。",
       "genericTitle": "ブック",
       "a11ySectionCollapse": "{{label}}。{{summary}}。セクションを折りたたむ。",
-      "a11ySectionExpand": "{{label}}。{{summary}}。セクションを展開する。"
+      "a11ySectionExpand": "{{label}}。{{summary}}。セクションを展開する。",
+      "notesEmptySummary": "このブックに最初のメモを追加",
+      "moveOnlyBookAlert": "これはこの棚で唯一のブックです — このトピックを移動できる場所はありません。",
+      "topicFallback": "トピック",
+      "loadErrorFallback": "このブックを読み込めませんでした。",
+      "a11yAddFirstNote": "このブックに最初のメモを追加",
+      "a11yAddNote": "メモを追加",
+      "a11yCollapseSessions": "過去の会話を折りたたむ",
+      "a11yExpandSessions": "過去の会話を展開する"
     },
     "inactiveFallbackBanner": {
       "message": "一時停止中・アーカイブ済みの科目を読み込めませんでした。タップして再試行 — データは消えていません。"
@@ -1358,7 +1513,74 @@
     "a11yClearSearch": "検索をクリア",
     "a11yEditNote": "ノートを編集",
     "a11yDeleteNote": "ノートを削除",
-    "a11yCloseTopicPicker": "トピック選択を閉じる"
+    "a11yCloseTopicPicker": "トピック選択を閉じる",
+    "myNotes": {
+      "subtitleBookmarks_one": "保存済みの返信1件",
+      "subtitleBookmarks_other": "保存済みの返信{{count}}件",
+      "subtitleNotes_one": "メモ1件",
+      "subtitleNotes_other": "メモ{{count}}件",
+      "subtitleSessions_one": "セッション1件",
+      "subtitleSessions_other": "セッション{{count}}件",
+      "searchA11y": "{{kind}}を検索"
+    },
+    "pickBook": {
+      "loadingFinding": "新しいブックを探しています...",
+      "loadingPicking": "おすすめのブックを選んでいます...",
+      "loadingAlmost": "もうすぐです...",
+      "emptyCooldown": "新しいおすすめを読み込もうとしましたが、まだ準備ができていません。数分後にもう一度試すか、ブックやトピックを入力して追加してください。",
+      "emptyNetworkError": "現在、おすすめを読み込めませんでした。もう一度試すか、ブックやトピックを入力して追加してください。",
+      "emptyParse": "おすすめが正常に受信されませんでした。もう一度試すか、ブックやトピックを入力して追加してください。",
+      "emptyLockLoser": "別のリクエストがすでにおすすめを読み込んでいます。しばらくしてからもう一度お試しください。",
+      "emptyLanguageSubject": "この科目は異なる学習フローを使用します。学習したいブックやトピックを入力してください。",
+      "emptyAllFiltered": "この科目に関する明白なおすすめはすべて使い果たしました。次に追加したいブックやトピックを入力してください。",
+      "emptyDefault": "まだおすすめはありません。追加したいブックやトピックを入力してください。"
+    },
+    "relearn": {
+      "thisTopicFallback": "このトピック",
+      "addedFromChildNamed": "{{name}}の学習から追加されました。",
+      "addedFromChild": "お子さんの学習から追加されました。"
+    },
+    "collapsibleChapter": {
+      "a11yHeader": "{{title}}、{{total}}トピック中{{notStarted}}トピックが未開始"
+    },
+    "inlineNote": {
+      "a11yCollapse": "{{topic}}のメモ。{{source}}。タップして折りたたむ。",
+      "a11yExpand": "{{topic}}のメモ。{{source}}。タップして展開する。",
+      "a11yOpenSource": "{{topic}}のソースセッションを開く",
+      "a11yNoteOptions": "{{topic}}のメモオプション"
+    },
+    "noteInput": {
+      "placeholder": "メモを記入..."
+    },
+    "retentionPill": {
+      "a11y": "記憶チェック: {{label}}",
+      "a11yWithElapsed": "記憶チェック: {{label}}、{{elapsed}}"
+    },
+    "sessionRow": {
+      "a11y": "{{title}}、{{date}}",
+      "a11yWithNote": "{{title}}、メモあり、{{date}}"
+    },
+    "topicStatusRow": {
+      "stateContinueNow": "今すぐ続ける",
+      "stateStarted": "開始済み",
+      "stateUpNext": "次へ",
+      "stateDone": "完了",
+      "stateLater": "後で",
+      "a11y": "{{state}}：{{title}}",
+      "a11yWithSubtitle": "{{state}}：{{title}}、{{subtitle}}"
+    },
+    "topicPicker": {
+      "a11yTopicWithChapter": "{{name}}、{{chapter}}"
+    },
+    "topicSessionRow": {
+      "a11y": "{{type}}、{{date}}、{{duration}}"
+    },
+    "bookCard": {
+      "a11y": "{{title}}。{{status}}。{{progress}}。"
+    },
+    "searchResult": {
+      "a11y": "{{title}}、{{subtitle}}"
+    }
   },
   "topic": {
     "relevance": {
@@ -2032,7 +2254,31 @@
     },
     "subjectRow": {
       "hideTopics": "▴ トピックを非表示",
-      "seeTopics": "▾ トピックを表示"
+      "seeTopics": "▾ トピックを表示",
+      "masteredCount": "{{count}}件マスター済み",
+      "actionContinue": "続ける",
+      "actionExplore": "探す",
+      "a11yHintHide": "タップしてトピックを非表示",
+      "a11yHintShow": "タップしてトピックを表示",
+      "a11yOpen": "{{name}}の進捗を開く",
+      "a11yExpanded": "{{name}}、展開済み",
+      "a11yCollapsed": "{{name}}、折りたたみ済み"
+    },
+    "topicStatus": {
+      "notStarted": "未開始",
+      "mastered": "マスター済み",
+      "needsReview": "要復習",
+      "started": "開始済み",
+      "covered": "学習済み"
+    },
+    "milestoneCard": {
+      "streakLength": "{{count}}日間のストリーク",
+      "subjectMastered": "{{subject}}をマスターしました",
+      "subjectMasteredFallback": "科目をマスターしました",
+      "bookCompleted": "ブックを完了しました",
+      "cefrLevelUp": "言語レベルが上がりました",
+      "topicsExplored": "{{subject}}で{{count}}個のトピックを探求しました",
+      "topicsExploredFallback": "科目で{{count}}個のトピックを探求しました"
     }
   },
   "onboarding": {
@@ -2104,6 +2350,31 @@
     },
     "mentorBirth": {
       "ready": "メンターの準備ができました。"
+    },
+    "saveWizard": {
+      "startLesson": "レッスンを開始",
+      "openParentHome": "保護者向けホームを開く",
+      "switchProfileError": "プロフィールを切り替えられませんでした。",
+      "firstLessonReady": "最初のレッスンの準備ができました。",
+      "firstLessonReadyWithTopic": "最初のレッスンの準備ができました: {{topic}}。"
+    },
+    "consent": {
+      "profileNotOwnedError": "このプロフィールはあなたのアカウントのものではありません。"
+    },
+    "createProfile": {
+      "timeoutError": "プロフィールの作成に時間がかかりすぎています。接続を確認してもう一度お試しください。",
+      "displayNameTooLong": "表示名は50文字以下にする必要があります。",
+      "childNamePlaceholder": "お子さんの名前を入力",
+      "namePlaceholder": "名前を入力",
+      "childBirthDateAccessLabel": "お子さんの生年月日",
+      "birthDateAccessLabel": "生年月日",
+      "selectChildBirthDateLabel": "お子さんの生年月日を選択",
+      "selectBirthDateLabel": "生年月日を選択",
+      "addChildButton": "お子さんを追加"
+    },
+    "profiles": {
+      "roleParent": "保護者",
+      "roleLearner": "学習者"
     }
   },
   "parentView": {
@@ -2643,7 +2914,10 @@
       "quotaResets": "割り当ては{{date}}にリセットされます",
       "renews": "サブスクリプションは{{date}}に更新されます",
       "dailyLimitHint": "1日の上限 — 深夜0時にリセット"
-    }
+    },
+    "accessUntil": "{{date}}までアクセス可能",
+    "renewsOn": "{{date}}に更新",
+    "memberOwnerLabel": "{{name}} (所有者)"
   },
   "sessionSummary": {
     "mentorMemoryCue": {
@@ -2748,7 +3022,9 @@
       "duration_other": "{{count}}分 - 素晴らしいセッションでした！",
       "exchanges_one": "{{count}}個のやり取りを完了",
       "exchanges_other": "{{count}}個のやり取りを完了"
-    }
+    },
+    "a11yContinueLearning": "学習を続ける",
+    "a11yContinueToHome": "ホームへ進む"
   },
   "sessionTranscript": {
     "archived": {
@@ -3477,7 +3753,26 @@
     "bothChildFirstLabel": "まず子どもの設定をする",
     "bothChildFirstDescription": "まず子どもの設定をして、その後であなたの設定をします。",
     "bothSelfFirstLabel": "まず自分でレッスンを試す",
-    "bothSelfFirstDescription": "使い方を確認してから、登録後に子どもの設定をします。"
+    "bothSelfFirstDescription": "使い方を確認してから、登録後に子どもの設定をします。",
+    "sampleGeographyTitle": "地理",
+    "sampleGeographyDescription": "なぜ砂漠になる場所があるのか",
+    "sampleFractionsTitle": "分数",
+    "sampleFractionsDescription": "推測せずに大きさを比べる",
+    "sampleWritingTitle": "作文",
+    "sampleWritingDescription": "分かりやすい段落を計画する",
+    "sampleGeographyMentor": "地理をやってみましょう。砂漠は暑さではなく、降水量の少なさで定義されます。山の裏側の土地が乾燥しているのはなぜでしょう？",
+    "sampleGeographyLearner": "空気がそこに着く前に雨が降るから？",
+    "sampleGeographyFollowUp": "その通りです。山は片側で水分を絞り出し、反対側にはより乾燥した空気を残します。これを雨蔭と呼びます。",
+    "sampleFractionsMentor": "分数を比べてみましょう。2つの数が同じ全体から来ている場合、大きい方の数は分母が小さくなります。",
+    "sampleFractionsLearner": "じゃあ、1/2は1/3より大きい？",
+    "sampleFractionsFollowUp": "はい。何かを2つに分けると、各部分は3つに分けるよりも大きくなります。",
+    "sampleWritingMentor": "段落を計画しましょう。まず、読者に信じてもらいたいことを一つ決めます。",
+    "sampleWritingLearner": "じゃあ、例を挙げる前に要点を選ぶべき？",
+    "sampleWritingFollowUp": "その通り。要点が明確になれば、例はランダムに感じられるのではなく、役割を果たします。",
+    "sampleGenericMentorWithTopic": "{{topic}}に取り組みましょう。一つのアイデアを示してから、簡単な確認をします。",
+    "sampleGenericMentor": "簡単なサンプルを試してみましょう。一つのアイデアを示してから、簡単な確認をします。",
+    "sampleGenericLearner": "どう始めたらいいかわかりません。",
+    "sampleGenericFollowUp": "それは良い出発点です。最初のステップを具体的にし、そこから積み上げていきましょう。"
   },
   "milestoneCard": {
     "wordCount_one": "単語を{{count}}個学習",
@@ -3727,5 +4022,57 @@
     "openAccount": "アカウント設定を開く",
     "security": "アカウントのセキュリティ",
     "familySettings": "ファミリー設定"
+  },
+  "guardian": {
+    "couldNotEnableMemory": "記憶を有効にできませんでした",
+    "couldNotSavePreference": "設定を保存できませんでした",
+    "completionStatus": {
+      "notStarted": "未開始",
+      "inProgress": "開始済み",
+      "completed": "完了",
+      "verified": "確認済み",
+      "stable": "安定"
+    },
+    "subjectFallback": "科目",
+    "latestWeekFallback": "最新の週",
+    "learningStyle": {
+      "prefersExplanations": "{{types}}の説明を好む",
+      "prefersStepByStep": "段階的なペースを好む",
+      "prefersQuickerPace": "速いペースを好む",
+      "likesChallenge": "挑戦が好き",
+      "needsEncouragement": "課題が難しくなると特別な励ましが必要"
+    },
+    "focusArea": {
+      "confidenceHigh": "最近よく見られる",
+      "confidenceMedium": "繰り返されるパターン",
+      "confidenceLow": "初期の兆候"
+    },
+    "sourceBadge": {
+      "learner": "あなたがチューターに伝えたこと",
+      "parent": "保護者が追加"
+    },
+    "remove": "削除"
+  },
+  "appShell": {
+    "profileLoadErrorTitle": "プロフィールを読み込めませんでした"
+  },
+  "analogyPicker": {
+    "noPreferenceLabel": "指定なし",
+    "noPreferenceDescription": "最も適したアナロジーを使用",
+    "cookingLabel": "料理",
+    "cookingDescription": "レシピ、材料、調理技術",
+    "sportsLabel": "スポーツ",
+    "sportsDescription": "試合、チーム、トレーニング戦略",
+    "buildingLabel": "建築",
+    "buildingDescription": "建設、建築、道具",
+    "musicLabel": "音楽",
+    "musicDescription": "楽器、リズム、作曲",
+    "natureLabel": "自然",
+    "natureDescription": "植物、動物、生態系",
+    "gamingLabel": "ゲーム",
+    "gamingDescription": "レベル、クエスト、ゲームの仕組み"
+  },
+  "usageMeter": {
+    "a11yProgressBar": "使用状況: {{limit}}問中{{used}}問を使用済み"
   }
 }

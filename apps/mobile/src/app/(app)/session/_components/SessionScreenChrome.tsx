@@ -45,10 +45,10 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
       testID="end-session-button"
       accessibilityLabel={
         props.isClosing
-          ? 'Wrapping up'
+          ? i18next.t('session.screenChrome.a11yWrapping')
           : props.activeSessionId
-            ? "I'm done"
-            : 'Exit'
+            ? i18next.t('session.screenChrome.a11yDone')
+            : i18next.t('session.screenChrome.exit')
       }
       accessibilityRole="button"
     >
@@ -74,15 +74,15 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
   );
 
   const subtitle = props.pendingClassification
-    ? 'Figuring out what this is about...'
+    ? i18next.t('session.screenChrome.subtitleClassifying')
     : props.classifyError
       ? props.classifyError
       : props.sessionExpired
-        ? 'Session expired - start a new one.'
+        ? i18next.t('session.screenChrome.subtitleExpired')
         : props.resumedBanner
           ? getResumeBannerCopy(props.topicName)
           : props.apiChecked && !props.isApiReachable
-            ? 'Server unreachable - messages may fail'
+            ? i18next.t('session.screenChrome.subtitleUnreachable')
             : props.modeSubtitle;
 
   const classifyErrorChip = props.classifyError ? (

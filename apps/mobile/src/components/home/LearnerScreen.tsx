@@ -273,20 +273,28 @@ export function LearnerScreen({
       const completed = progress?.topicsCompleted ?? 0;
 
       const isPreparing = s.curriculumStatus === 'preparing';
-      let hint = isPreparing ? `Setting up ${s.name}...` : 'Open';
+      let hint = isPreparing
+        ? t('home.learner.subjectHintPreparing', { name: s.name })
+        : t('home.learner.subjectHintOpen');
       if (
         !isPreparing &&
         resumeTarget?.subjectId === s.id &&
         ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
       ) {
-        hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
+        hint = resumeTarget.topicTitle
+          ? t('home.learner.subjectHintContinueTopic', {
+              topic: resumeTarget.topicTitle,
+            })
+          : t('home.learner.subjectHintContinueSubject', { name: s.name });
       } else if (
         !isPreparing &&
         reviewSummary?.nextReviewTopic?.subjectId === s.id
       ) {
-        hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
+        hint = t('home.learner.subjectHintQuiz', {
+          topic: reviewSummary.nextReviewTopic.topicTitle,
+        });
       } else if (!isPreparing && completed > 0) {
-        hint = `Practice: ${s.name}`;
+        hint = t('home.learner.subjectHintPractice', { name: s.name });
       }
 
       return {
@@ -301,18 +309,20 @@ export function LearnerScreen({
         tintSoft: tint.soft,
       };
     });
-  }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
+  }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme, t]);
 
   const coachBand = useMemo(() => {
     if (navigationProxy.active) return null;
 
     if (recoveryMarker) {
       return {
-        headline: `Pick up where you stopped in ${
-          recoveryMarker.topicName ??
-          recoveryMarker.subjectName ??
-          'your session'
-        }.`,
+        headline:
+          (recoveryMarker.topicName ?? recoveryMarker.subjectName)
+            ? t('home.learner.coachBandResumeSession', {
+                name:
+                  recoveryMarker.topicName ?? recoveryMarker.subjectName ?? '',
+              })
+            : t('home.learner.coachBandResumeSessionNoName'),
         onContinue: () => {
           void clearSessionRecoveryMarker(activeProfile?.id).catch((err) =>
             console.error(
@@ -346,9 +356,9 @@ export function LearnerScreen({
 
     if (resumeTarget) {
       return {
-        headline: `Pick up where you left off in ${
-          resumeTarget.topicTitle ?? resumeTarget.subjectName
-        }.`,
+        headline: t('home.learner.coachBandResumeTarget', {
+          name: resumeTarget.topicTitle ?? resumeTarget.subjectName,
+        }),
         onContinue: () =>
           pushLearningResumeTarget(router, resumeTarget, returnToTab),
       };
@@ -361,7 +371,9 @@ export function LearnerScreen({
     ) {
       const topic = reviewSummary.nextReviewTopic;
       return {
-        headline: `Revisit ${topic.topicTitle} — it's starting to fade.`,
+        headline: t('home.learner.coachBandRevisitTopic', {
+          topic: topic.topicTitle,
+        }),
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
@@ -413,6 +425,7 @@ export function LearnerScreen({
     returnToTab,
     router,
     reviewSummary,
+    t,
   ]);
 
   const openIntentAction = useCallback(

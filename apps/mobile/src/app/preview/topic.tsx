@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -18,29 +19,31 @@ interface SampleLesson {
   testID: string;
 }
 
-const SAMPLE_LESSONS: ReadonlyArray<SampleLesson> = [
-  {
-    id: 'geography',
-    title: 'Geography',
-    description: 'Why some places become deserts',
-    topicText: 'Geography: why deserts form',
-    testID: 'preview-topic-sample-geography',
-  },
-  {
-    id: 'fractions',
-    title: 'Fractions',
-    description: 'Compare pieces without guessing',
-    topicText: 'Fractions: compare parts',
-    testID: 'preview-topic-sample-fractions',
-  },
-  {
-    id: 'writing',
-    title: 'Writing',
-    description: 'Plan a clear paragraph',
-    topicText: 'Writing: plan a paragraph',
-    testID: 'preview-topic-sample-writing',
-  },
-];
+function buildSampleLessons(t: TFunction): ReadonlyArray<SampleLesson> {
+  return [
+    {
+      id: 'geography',
+      title: t('preview.sampleGeographyTitle'),
+      description: t('preview.sampleGeographyDescription'),
+      topicText: 'Geography: why deserts form',
+      testID: 'preview-topic-sample-geography',
+    },
+    {
+      id: 'fractions',
+      title: t('preview.sampleFractionsTitle'),
+      description: t('preview.sampleFractionsDescription'),
+      topicText: 'Fractions: compare parts',
+      testID: 'preview-topic-sample-fractions',
+    },
+    {
+      id: 'writing',
+      title: t('preview.sampleWritingTitle'),
+      description: t('preview.sampleWritingDescription'),
+      topicText: 'Writing: plan a paragraph',
+      testID: 'preview-topic-sample-writing',
+    },
+  ];
+}
 
 export default function PreviewTopicScreen() {
   const { t } = useTranslation();
@@ -88,6 +91,8 @@ export default function PreviewTopicScreen() {
     });
   };
 
+  const sampleLessons = buildSampleLessons(t);
+
   return (
     <View
       className="flex-1 bg-background px-6"
@@ -111,7 +116,7 @@ export default function PreviewTopicScreen() {
       <Text className="text-body text-text-secondary mb-6 text-center">
         {t('preview.safePreviews')}
       </Text>
-      {SAMPLE_LESSONS.map((sample) => (
+      {sampleLessons.map((sample) => (
         <Pressable
           key={sample.id}
           onPress={() => void onSelect(sample)}

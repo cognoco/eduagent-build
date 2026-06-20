@@ -398,8 +398,8 @@ export default function ChildMentorMemoryScreen() {
                     });
                   } catch {
                     platformAlert(
-                      'Could not enable memory',
-                      'Please try again.',
+                      t('guardian.couldNotEnableMemory'),
+                      t('parentView.mentorMemory.pleaseTryAgain'),
                     );
                   }
                 })()
@@ -413,8 +413,8 @@ export default function ChildMentorMemoryScreen() {
                     });
                   } catch {
                     platformAlert(
-                      'Could not save preference',
-                      'Please try again.',
+                      t('guardian.couldNotSavePreference'),
+                      t('parentView.mentorMemory.pleaseTryAgain'),
                     );
                   }
                 })()

@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { AnalogyDomain } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -24,43 +25,45 @@ interface AnalogyDomainPickerProps {
 // Domain options
 // ---------------------------------------------------------------------------
 
-const DOMAIN_OPTIONS: AnalogyDomainOption[] = [
-  {
-    value: null,
-    label: 'No preference',
-    description: 'Use whatever analogy fits best',
-  },
-  {
-    value: 'cooking',
-    label: 'Cooking',
-    description: 'Recipes, ingredients, kitchen techniques',
-  },
-  {
-    value: 'sports',
-    label: 'Sports',
-    description: 'Games, teams, training strategies',
-  },
-  {
-    value: 'building',
-    label: 'Building',
-    description: 'Construction, architecture, tools',
-  },
-  {
-    value: 'music',
-    label: 'Music',
-    description: 'Instruments, rhythm, composition',
-  },
-  {
-    value: 'nature',
-    label: 'Nature',
-    description: 'Plants, animals, ecosystems',
-  },
-  {
-    value: 'gaming',
-    label: 'Gaming',
-    description: 'Levels, quests, game mechanics',
-  },
-];
+function buildDomainOptions(t: TFunction): AnalogyDomainOption[] {
+  return [
+    {
+      value: null,
+      label: t('analogyPicker.noPreferenceLabel'),
+      description: t('analogyPicker.noPreferenceDescription'),
+    },
+    {
+      value: 'cooking',
+      label: t('analogyPicker.cookingLabel'),
+      description: t('analogyPicker.cookingDescription'),
+    },
+    {
+      value: 'sports',
+      label: t('analogyPicker.sportsLabel'),
+      description: t('analogyPicker.sportsDescription'),
+    },
+    {
+      value: 'building',
+      label: t('analogyPicker.buildingLabel'),
+      description: t('analogyPicker.buildingDescription'),
+    },
+    {
+      value: 'music',
+      label: t('analogyPicker.musicLabel'),
+      description: t('analogyPicker.musicDescription'),
+    },
+    {
+      value: 'nature',
+      label: t('analogyPicker.natureLabel'),
+      description: t('analogyPicker.natureDescription'),
+    },
+    {
+      value: 'gaming',
+      label: t('analogyPicker.gamingLabel'),
+      description: t('analogyPicker.gamingDescription'),
+    },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -73,6 +76,7 @@ export function AnalogyDomainPicker({
   disabled,
 }: AnalogyDomainPickerProps): React.JSX.Element {
   const { t } = useTranslation();
+  const domainOptions = buildDomainOptions(t);
   const handleSelect = useCallback(
     (domain: AnalogyDomain | null) => {
       if (!disabled) {
@@ -92,7 +96,7 @@ export function AnalogyDomainPicker({
 
   return (
     <View testID="analogy-domain-picker">
-      {DOMAIN_OPTIONS.map((option) => {
+      {domainOptions.map((option) => {
         const isSelected =
           value === option.value ||
           (value === undefined && option.value === null);

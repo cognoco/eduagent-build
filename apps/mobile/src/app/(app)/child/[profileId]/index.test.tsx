@@ -492,7 +492,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('shows a lean overview with subjects, raw input, and recent sessions', async () => {
+  it('[PARENT-03] shows a lean overview with subjects, raw input, and recent sessions', async () => {
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -566,7 +566,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('uses a raw-input mentor note when a subject has no session recap yet', async () => {
+  it('[PARENT-03] uses a raw-input mentor note when a subject has no session recap yet', async () => {
     setRoutes({
       childDetail: {
         displayName: 'Emma',
@@ -631,7 +631,7 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
-  it('shows only child progress when opened from the Progress action', async () => {
+  it('[PARENT-03] shows only child progress when opened from the Progress action (?mode=progress)', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
 
     const { result, cleanup } = renderChildDetail();

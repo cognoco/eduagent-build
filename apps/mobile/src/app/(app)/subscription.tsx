@@ -836,20 +836,24 @@ function SubscriptionContent(): React.ReactElement | null {
             {subscription?.currentPeriodEnd && isPaidTier && (
               <Text className="text-caption text-text-secondary mt-1">
                 {cancelAtPeriodEnd
-                  ? `Access until ${new Date(
-                      subscription.currentPeriodEnd,
-                    ).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}`
-                  : `Renews ${new Date(
-                      subscription.currentPeriodEnd,
-                    ).toLocaleDateString(undefined, {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}`}
+                  ? t('subscription.accessUntil', {
+                      date: new Date(
+                        subscription.currentPeriodEnd,
+                      ).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }),
+                    })
+                  : t('subscription.renewsOn', {
+                      date: new Date(
+                        subscription.currentPeriodEnd,
+                      ).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      }),
+                    })}
               </Text>
             )}
             {!isPaidTier &&
@@ -955,7 +959,9 @@ function SubscriptionContent(): React.ReactElement | null {
                     >
                       <Text className="text-caption text-text-secondary">
                         {member.isOwner
-                          ? `${member.displayName} (owner)`
+                          ? t('subscription.memberOwnerLabel', {
+                              name: member.displayName,
+                            })
                           : member.displayName}
                       </Text>
                       {canRemoveFamilyMember && !member.isOwner ? (

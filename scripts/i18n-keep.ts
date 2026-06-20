@@ -67,6 +67,25 @@ const raw: readonly KeepPattern[] = [
       'selected via COMPLETION_STATUS_KEYS[completionStatus] at ' +
       'apps/mobile/src/app/(app)/child/[profileId]/topic/[topicId].tsx:182',
   },
+  // i18n sweep WI-492..502 — keys reached via runtime-dynamic t(variable) dispatch.
+  {
+    pattern: 'home.engagementChip.*',
+    reason:
+      'engagement-state labels selected via CONFIG[state].labelKey at ' +
+      'apps/mobile/src/components/parent/EngagementChip.tsx:54',
+  },
+  {
+    pattern: 'library.pickBook.loading*',
+    reason:
+      'rotating loading copy selected via LOADING_MESSAGE_KEYS[loadingMessageIndex] at ' +
+      'apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:345',
+  },
+  {
+    pattern: 'library.topicStatusRow.state*',
+    reason:
+      'topic-state labels selected via STATE_I18N_KEY[state] at ' +
+      'apps/mobile/src/components/library/TopicStatusRow.tsx:159',
+  },
   // Keys referenced via react-i18next <Trans i18nKey="..."> (JSX attribute,
   // not a t() call) — the AST walker only follows t()-style call sites, so
   // Trans-only keys would otherwise be flagged as unused.

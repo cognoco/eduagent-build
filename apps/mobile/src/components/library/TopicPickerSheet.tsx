@@ -71,7 +71,10 @@ export function TopicPickerSheet({
                   accessibilityRole="button"
                   accessibilityLabel={
                     topic.chapter
-                      ? `${topic.name}, ${topic.chapter}`
+                      ? t('library.topicPicker.a11yTopicWithChapter', {
+                          name: topic.name,
+                          chapter: topic.chapter,
+                        })
                       : topic.name
                   }
                   accessibilityState={{ selected: isSelected }}

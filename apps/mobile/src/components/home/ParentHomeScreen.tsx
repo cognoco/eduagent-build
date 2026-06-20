@@ -428,7 +428,9 @@ const ChildCommandCard = memo(function ChildCommandCard({
           onPress={handleOpenProfile}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel={`${child.displayName} profile`}
+          accessibilityLabel={t('home.parent.childProfileLabel', {
+            name: child.displayName,
+          })}
           testID={`parent-home-child-profile-${child.id}`}
         >
           <View
@@ -741,7 +743,7 @@ export function ParentHomeScreen({
   );
   const firstName = activeProfile
     ? firstNameOf(activeProfile.displayName)
-    : 'there';
+    : t('home.parent.greetingFallbackName');
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
   const learnTogetherChild = linkedChildren.find(
     (child) => child.id === learnTogetherChildId,

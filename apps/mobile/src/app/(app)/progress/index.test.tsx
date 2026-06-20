@@ -110,10 +110,34 @@ jest.mock(
   }),
 );
 
+// [PARENT-25] The NudgeActionSheet's own behavior (templates, send, error
+// copy) is covered in NudgeActionSheet.test.tsx. Here we only need to prove the
+// ProgressScreen branch that mounts it, so the boundary stub renders a probe
+// with the props the screen passes plus a close affordance that drives the real
+// onClose handler (setShowProgressNudge(false)).
 jest.mock(
-  '../../../components/nudge/NudgeActionSheet' /* gc1-allow: bottom-sheet component pulls native gesture/animation deps unavailable in jest */,
+  '../../../components/nudge/NudgeActionSheet' /* gc1-allow: bottom-sheet component pulls native gesture/animation deps unavailable in jest; internals covered by NudgeActionSheet.test.tsx */,
   () => ({
-    NudgeActionSheet: () => null,
+    NudgeActionSheet: ({
+      childName,
+      childProfileId,
+      onClose,
+    }: {
+      childName: string;
+      childProfileId: string;
+      onClose: () => void;
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
+      return (
+        <View testID="nudge-action-sheet">
+          <Text testID="nudge-action-sheet-child-name">{childName}</Text>
+          <Text testID="nudge-action-sheet-child-id">{childProfileId}</Text>
+          <Pressable testID="nudge-action-sheet-close" onPress={onClose}>
+            <Text>close</Text>
+          </Pressable>
+        </View>
+      );
+    },
   }),
 );
 

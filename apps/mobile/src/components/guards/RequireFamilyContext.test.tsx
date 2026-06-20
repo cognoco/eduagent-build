@@ -8,7 +8,12 @@
 // Rule: no internal module mocks — all internal modules use real impls.
 
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { Text } from 'react-native';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -20,6 +25,11 @@ import {
   type ProfileContextValue,
 } from '../../lib/profile';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import {
+  createTestProfile,
+  renderScreen,
+} from '../../test-utils/screen-render';
+import { fetchCallsMatching } from '../../test-utils/mock-api-routes';
 import { RequireFamilyContext } from './RequireFamilyContext';
 
 // expo-router: external navigation boundary
@@ -269,5 +279,169 @@ describe('RequireFamilyContext [PARENT-03]', () => {
     // Non-capable user (shows blocked fallback)
     renderGuard(soloAdult, [soloAdult]);
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [PARENT-22] Family-route blocked gate: switch-to-family CTA (success +
+// server-rejection). The describe above uses a hand-built wrapper without an
+// API client, so it could only assert the no-silent-switch invariant and the
+// blocked fallback. These tests drive the explicit opt-in CTA end-to-end
+// through the REAL useEnterFamilyMode -> useAppContext.setMode ->
+// useUpdateProfileAppContext PATCH against a routed mock fetch (no internal
+// mocks), so the CTA's success navigation and the server-rejection error
+// surface are both exercised.
+//
+// Setup: a family-capable guardian (adult owner with a linked child and
+// hasFamilyLinks=true) whose persisted defaultAppContext is 'study'. Under V1
+// that derives study mode, so a child route is blocked and the
+// family-route-switch-cta is shown (contract.isFamilyCapable === true).
+// ---------------------------------------------------------------------------
+
+describe('RequireFamilyContext [PARENT-22] switch-to-family CTA', () => {
+  const originalV0 = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+  const originalV1 = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+
+  const CHILD_ID = 'child-22';
+
+  const studyGuardian: Profile = createTestProfile({
+    id: 'guardian-22',
+    accountId: 'account-22',
+    displayName: 'Guardian',
+    isOwner: true,
+    birthYear: 1985,
+    hasFamilyLinks: true,
+    // Persisted context is study, so derivedMode is study under V1 → child
+    // route blocked but the user is family-capable → switch CTA renders.
+    defaultAppContext: 'study',
+  });
+
+  const linkedChild22: Profile = createTestProfile({
+    id: CHILD_ID,
+    accountId: 'account-22',
+    displayName: 'Kid',
+    isOwner: false,
+    birthYear: 2014,
+    linkCreatedAt: '2026-01-02T00:00:00.000Z',
+  });
+
+  const READY_SUBSCRIPTION = {
+    subscription: {
+      tier: 'family',
+      effectiveAccessTier: 'family',
+      billingAccess: 'current',
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+      remainingQuestions: 700,
+      dailyLimit: null,
+      usedToday: 0,
+      dailyRemainingQuestions: null,
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+  });
+
+  afterEach(() => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      originalV0;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      originalV1;
+  });
+
+  function mountBlockedGuard(
+    appContextPatch: (url: string, init?: RequestInit) => unknown,
+  ) {
+    return renderScreen(
+      <RequireFamilyContext
+        route="child/[profileId]"
+        params={{ profileId: CHILD_ID }}
+      >
+        <Text testID="child-sentinel">child-content</Text>
+      </RequireFamilyContext>,
+      {
+        profile: studyGuardian,
+        profiles: [studyGuardian, linkedChild22],
+        routes: {
+          // PATCH must precede the GET so its includes() match wins for the
+          // app-context write; the subscription read resolves the contract.
+          '/app-context': appContextPatch,
+          '/subscription': READY_SUBSCRIPTION,
+        },
+      },
+    );
+  }
+
+  it('blocks a child route in study mode and offers the switch CTA for a family-capable guardian', async () => {
+    const { result, cleanup } = mountBlockedGuard(() => ({
+      profile: { ...studyGuardian, defaultAppContext: 'family' },
+    }));
+
+    await waitFor(() => {
+      result.getByTestId('family-route-blocked');
+    });
+    result.getByTestId('family-route-switch-cta');
+    result.getByTestId('family-route-back-home');
+    expect(result.queryByTestId('child-sentinel')).toBeNull();
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it('switch CTA enters family mode and navigates home on a successful app-context write', async () => {
+    const { result, routedFetch, cleanup } = mountBlockedGuard(() => ({
+      profile: { ...studyGuardian, defaultAppContext: 'family' },
+    }));
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('family-route-switch-cta')),
+    );
+
+    // The real useUpdateProfileAppContext fires a PATCH to the app-context
+    // endpoint, and on success the guard navigates home.
+    await waitFor(() => {
+      const patches = fetchCallsMatching(routedFetch, '/app-context');
+      expect(patches.length).toBeGreaterThanOrEqual(1);
+      expect(patches[0]?.init?.method).toBe('PATCH');
+    });
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+    expect(result.queryByTestId('family-route-switch-error')).toBeNull();
+
+    cleanup();
+  });
+
+  it('switch CTA surfaces an inline error and does NOT navigate when the server rejects the family-context switch', async () => {
+    const { result, cleanup } = mountBlockedGuard(
+      () =>
+        new Response(JSON.stringify({ code: 'FORBIDDEN', message: 'no' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('family-route-switch-cta')),
+    );
+
+    // Server rejected the switch: the guard stays on the blocked screen, shows
+    // the actionable error, and never silently lands the user on Home.
+    await waitFor(() => {
+      result.getByTestId('family-route-switch-error');
+    });
+    result.getByTestId('family-route-blocked');
+    expect(mockReplace).not.toHaveBeenCalled();
+
+    cleanup();
   });
 });

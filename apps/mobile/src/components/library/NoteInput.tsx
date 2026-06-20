@@ -26,10 +26,11 @@ export function NoteInput({
   onSave,
   onCancel,
   initialValue = '',
-  placeholder = 'Write your note...',
+  placeholder,
   saving = false,
 }: NoteInputProps): React.ReactElement {
   const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('library.noteInput.placeholder');
   const themeColors = useThemeColors();
   const [text, setText] = useState(initialValue);
   const { isListening, transcript, startListening, stopListening } =
@@ -67,7 +68,7 @@ export function NoteInput({
         testID="note-text-input"
         value={text}
         onChangeText={setText}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         placeholderTextColor={themeColors.textSecondary}
         multiline
         maxLength={MAX_CHARS}

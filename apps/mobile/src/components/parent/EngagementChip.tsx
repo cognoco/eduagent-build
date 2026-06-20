@@ -1,7 +1,9 @@
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import type { EngagementSignal } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
+import type { TranslateKey } from '../../i18n';
 
 export type { EngagementSignal };
 
@@ -12,49 +14,51 @@ interface EngagementChipProps {
 const CONFIG: Record<
   EngagementSignal,
   {
-    label: string;
+    labelKey: TranslateKey;
     icon: keyof typeof Ionicons.glyphMap;
     colorKey: 'info' | 'warning' | 'success' | 'primary' | 'muted';
   }
 > = {
   curious: {
-    label: 'Curious',
+    labelKey: 'home.engagementChip.curious',
     icon: 'help-circle-outline',
     colorKey: 'info',
   },
   stuck: {
-    label: 'Stuck',
+    labelKey: 'home.engagementChip.stuck',
     icon: 'alert-circle-outline',
     colorKey: 'warning',
   },
   breezing: {
-    label: 'Breezing',
+    labelKey: 'home.engagementChip.breezing',
     icon: 'flash-outline',
     colorKey: 'success',
   },
   focused: {
-    label: 'Focused',
+    labelKey: 'home.engagementChip.focused',
     icon: 'eye-outline',
     colorKey: 'primary',
   },
   scattered: {
-    label: 'Scattered',
+    labelKey: 'home.engagementChip.scattered',
     icon: 'shuffle-outline',
     colorKey: 'muted',
   },
 };
 
 export function EngagementChip({ signal }: EngagementChipProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
-  const { label, icon, colorKey } = CONFIG[signal];
+  const { labelKey, icon, colorKey } = CONFIG[signal];
   const color = colors[colorKey];
+  const label = t(labelKey);
 
   return (
     <View
       className="flex-row items-center self-start rounded-full px-3 py-2"
       style={{ backgroundColor: `${color}1A` }}
       accessibilityRole="text"
-      accessibilityLabel={`Engagement: ${label}`}
+      accessibilityLabel={t('home.engagementChip.a11yLabel', { label })}
       testID={`engagement-chip-${signal}`}
     >
       <Ionicons
