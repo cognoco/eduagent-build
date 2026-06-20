@@ -63,10 +63,36 @@ import { inngest } from '../../inngest/client';
 import { captureException } from '../sentry';
 import type Stripe from 'stripe';
 
+// [WI-618] handleSubscriptionEvent / handleSubscriptionDeleted now lock-and-read
+// the prior tier inside the tx via findSubscriptionByStripeId__unscoped +
+// lockSubscriptionById__unscoped (real @eduagent/database helpers, not the
+// mocked billing barrel) to drive F-124 top-up-credit re-attribution. This
+// mockDb provides the minimal query/select chain those helpers touch. The prior
+// tier defaults to 'plus' (per-profile); the new tier in these unit cases is
+// 'free' or 'plus' (also per-profile), so the quota model never crosses and
+// reattributeTopUpCreditsOnModelChange short-circuits to 0 without further DB
+// access. The crossing-model re-attribution behavior is exercised against a
+// real DB in stripe-webhook-handler.integration.test.ts.
 const mockDb = {
   transaction: jest
     .fn()
     .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(mockDb)),
+  query: {
+    subscriptions: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'sub-internal-1', tier: 'plus' }),
+    },
+  },
+  select: jest.fn().mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        for: jest
+          .fn()
+          .mockResolvedValue([{ id: 'sub-internal-1', tier: 'plus' }]),
+      }),
+    }),
+  }),
 } as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
 
