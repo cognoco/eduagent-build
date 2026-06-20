@@ -3922,6 +3922,11 @@
       "message": "Puedes reintentar o explorar las materias directamente.",
       "subjects": "Explorar materias"
     },
+    "homework": {
+      "imageAlt": "Foto de la tarea",
+      "helpMeSolve": "Ayúdame a resolver esto",
+      "checkMyAnswer": "Revisa mi respuesta"
+    },
     "homeworkPrompt": "¿Tienes deberes esta noche? Haz una foto y los resolveremos juntos."
   },
   "subjectsBrowse": {

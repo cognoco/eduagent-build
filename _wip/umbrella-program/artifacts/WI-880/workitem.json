@@ -1,0 +1,17 @@
+{
+  "pageId": "3858bce9-1f7c-81f5-bce8-ff9a00d38a33",
+  "id": "WI-880",
+  "name": "Fix consent test-seed reset FK ordering for consent grants",
+  "description": "Consent journey teardown can leave seeded accounts behind because resetSeededAccounts deletes consent_grant rows while consent_request still references them.",
+  "acceptanceCriteria": "Root cause: deleteOrganizationGraph deletes consent_grant before deleting consent_request rows that reference consent_request.consent_grant_id -> consent_grant.id, so teardown can fail with a FK violation after consent approval/withdrawal journeys. Variants: cleanup must handle approved consent requests linked to a grant, failed/partial J-13/J-21 runs, and repeated reseeding of the same alias without stale consent rows. Regression test: add or update test-seed cleanup coverage so resetSeededAccounts/deleteOrganizationGraph deletes or otherwise clears consent_request rows before consent_grant deletion; rerun J-13/J-21 or the focused seed-cleanup test and confirm global teardown exits cleanly even when journey assertions fail.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Image,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
@@ -342,6 +349,13 @@ export interface HomeworkModeChipsProps {
   >;
   handleNextProblem: () => Promise<void>;
   handleEndSession: () => Promise<void>;
+  /**
+   * T23: While the V2 mentor-homework deterministic first-response (image
+   * bubble + help/check buttons) is showing, suppress the standard homework
+   * chips so the two deterministic buttons are the only first actionable
+   * response (no preamble). Cleared once the learner picks help/check.
+   */
+  suppress?: boolean;
 }
 
 export function HomeworkModeChips({
@@ -353,11 +367,12 @@ export function HomeworkModeChips({
   setHomeworkMode,
   handleNextProblem,
   handleEndSession,
+  suppress = false,
 }: HomeworkModeChipsProps) {
   const { t } = useTranslation();
   const [problemExpanded, setProblemExpanded] = useState(true);
 
-  if (effectiveMode !== 'homework') return null;
+  if (effectiveMode !== 'homework' || suppress) return null;
 
   return (
     <View className="bg-surface border-t border-surface-elevated">
@@ -511,6 +526,90 @@ export function HomeworkModeChips({
   );
 }
 
+// ─── MentorHomeworkFirstResponse ─────────────────────────────────────────────
+// T23: V2 "mentor-is-the-app" homework round-trip. When the learner captures a
+// homework photo from the Mentor bar (entrySource=mentor + returnTo=mentor),
+// they land back in the same conversation thread with the captured image as
+// their own image bubble, followed by two deterministic first-response actions
+// — "help me solve this" / "check my answer" — and NO subject-picking preamble.
+// The buttons are the FIRST actionable response; tapping one starts the
+// tutoring turn with the chosen homework mode.
+
+export interface MentorHomeworkFirstResponseProps {
+  imageUri: string | undefined;
+  disabled: boolean;
+  onHelpMeSolve: () => void;
+  onCheckMyAnswer: () => void;
+}
+
+export function MentorHomeworkFirstResponse({
+  imageUri,
+  disabled,
+  onHelpMeSolve,
+  onCheckMyAnswer,
+}: MentorHomeworkFirstResponseProps) {
+  const { t } = useTranslation();
+
+  return (
+    <View
+      className="bg-surface border-t border-surface-elevated px-4 py-3"
+      testID="mentor-homework-first-response"
+    >
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri, cache: 'force-cache' }}
+          className="w-full aspect-[4/3] rounded-card mb-3"
+          resizeMode="contain"
+          accessibilityLabel={t('mentorHome.homework.imageAlt')}
+          testID="homework-image-bubble"
+        />
+      ) : (
+        <View
+          className="w-full aspect-[4/3] rounded-card bg-surface-elevated mb-3 items-center justify-center"
+          accessibilityLabel={t('mentorHome.homework.imageAlt')}
+          testID="homework-image-bubble"
+        />
+      )}
+      <View className="flex-row gap-2">
+        <Pressable
+          onPress={onHelpMeSolve}
+          disabled={disabled}
+          className={`flex-1 rounded-button py-3 items-center justify-center min-h-[44px] ${
+            disabled ? 'bg-surface-elevated' : 'bg-primary'
+          }`}
+          accessibilityRole="button"
+          accessibilityLabel={t('mentorHome.homework.helpMeSolve')}
+          accessibilityState={{ disabled }}
+          testID="homework-help-me-solve"
+        >
+          <Text
+            className={`text-body-sm font-semibold ${
+              disabled ? 'text-text-secondary' : 'text-text-inverse'
+            }`}
+          >
+            {t('mentorHome.homework.helpMeSolve')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onCheckMyAnswer}
+          disabled={disabled}
+          className={`flex-1 rounded-button py-3 items-center justify-center min-h-[44px] ${
+            disabled ? 'bg-surface-elevated' : 'bg-surface-elevated'
+          }`}
+          accessibilityRole="button"
+          accessibilityLabel={t('mentorHome.homework.checkMyAnswer')}
+          accessibilityState={{ disabled }}
+          testID="homework-check-my-answer"
+        >
+          <Text className="text-body-sm font-semibold text-text-primary">
+            {t('mentorHome.homework.checkMyAnswer')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 // ─── SessionAccessory ────────────────────────────────────────────────────────
 // Combines SubjectResolutionAccessory and HomeworkModeChips
 
@@ -541,6 +640,7 @@ export function SessionAccessory(props: SessionAccessoryProps) {
         setHomeworkMode={props.setHomeworkMode}
         handleNextProblem={props.handleNextProblem}
         handleEndSession={props.handleEndSession}
+        suppress={props.suppress}
       />
     </>
   );
