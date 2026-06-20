@@ -395,6 +395,23 @@ describe('updateVocabulary', () => {
     // The UPDATE must not have been called — the check must gate the write
     expect(db.update).not.toHaveBeenCalled();
   });
+
+  // [BUG-862] IDOR guard must be unconditional: when the vocab row does not
+  // belong to the caller (findFirst returns null) AND a non-null milestoneId is
+  // supplied, the function must return null immediately without calling db.update.
+  // Previously the guard was wrapped in `if (existing)`, silently skipping it
+  // when the ownership lookup returned null.
+  it('returns null without calling db.update when vocab not owned by caller and milestoneId is set', async () => {
+    // vocabFindFirst=null simulates the caller supplying a vocabularyId they do not own
+    const db = createMockDb({ vocabFindFirst: null });
+
+    const result = await updateVocabulary(db, PROFILE_ID, 'vocab-other-owner', {
+      milestoneId: 'milestone-1',
+    });
+
+    expect(result).toBeNull();
+    expect(db.update).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

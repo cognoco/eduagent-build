@@ -188,6 +188,8 @@ export async function updateVocabulary(
 ): Promise<Vocabulary | null> {
   // [BUG-862] When a non-null milestoneId is being set, verify it belongs to
   // this vocabulary's subject via the parent chain before writing.
+  // The ownership lookup is unconditional: if the row doesn't exist (not owned
+  // by caller) we return null immediately — the IDOR guard must never be skipped.
   if (input.milestoneId != null) {
     const existing = await db.query.vocabulary.findFirst({
       where: and(
@@ -195,9 +197,10 @@ export async function updateVocabulary(
         eq(vocabulary.profileId, profileId),
       ),
     });
-    if (existing) {
-      await verifyMilestoneOwnership(db, input.milestoneId, existing.subjectId);
+    if (!existing) {
+      return null;
     }
+    await verifyMilestoneOwnership(db, input.milestoneId, existing.subjectId);
   }
 
   const updates: Partial<typeof vocabulary.$inferInsert> & { updatedAt: Date } =
