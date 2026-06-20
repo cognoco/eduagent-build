@@ -143,8 +143,8 @@ interface TrialExpiryResult {
   date: string;
   expiredCount: number;
   extendedExpiredCount: number;
-  warningsSent: number;
-  softLandingSent: number;
+  warningsQueued: number;
+  softLandingQueued: number;
 }
 
 async function executeSteps(options?: InngestStepRunnerOptions) {
@@ -163,6 +163,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers({ now: NOW });
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
+  // Pin the identity cutover flag OFF so the suite exercises the legacy
+  // billing path these mocks target, deterministically — regardless of any
+  // IDENTITY_V2_ENABLED value leaked into the process env by the
+  // Doppler-synced .env.development.local (loadDatabaseEnv in api-setup.ts).
+  // This mirrors CI's flag-off state for these unit tests.
+  process.env['IDENTITY_V2_ENABLED'] = 'false';
   mockFindOwnerProfile.mockImplementation(
     async (_db: unknown, accountId: string) => ({
       id: `owner-${accountId}`,
@@ -173,6 +179,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.useRealTimers();
   delete process.env['DATABASE_URL'];
+  delete process.env['IDENTITY_V2_ENABLED'];
 });
 
 // ---------------------------------------------------------------------------
@@ -206,8 +213,8 @@ describe('trialExpiry', () => {
       date: '2025-01-15',
       expiredCount: expect.any(Number),
       extendedExpiredCount: expect.any(Number),
-      warningsSent: expect.any(Number),
-      softLandingSent: expect.any(Number),
+      warningsQueued: expect.any(Number),
+      softLandingQueued: expect.any(Number),
     });
   });
 
@@ -462,7 +469,13 @@ describe('trialExpiry', () => {
     });
   });
 
-  it('sends push notification for trials ending in 3 days', async () => {
+  // [TRIAL-FANOUT] The cron no longer sends pushes inline inside the
+  // send-trial-warnings step. It scans the date range and fans out ONE
+  // app/billing.trial_notification.send event per trial; the actual push
+  // (and the atomic rate-limit gate) lives in trial-notification-send. So a
+  // retry of a send replays only the failed per-trial step, not the whole
+  // loop. These tests assert the cron dispatches the correct per-trial events.
+  it('[TRIAL-FANOUT] fans out one trial_notification.send event per trial ending in 3 days', async () => {
     const trialEndingSoon = {
       id: 'sub-3',
       accountId: 'acc-3',
@@ -476,27 +489,38 @@ describe('trialExpiry', () => {
       .mockResolvedValueOnce([trialEndingSoon]) // 3-day warnings
       .mockResolvedValue([]);
 
-    const { result } = await executeSteps();
+    const { result, sendEventCalls } = await executeSteps();
 
-    expect(result.warningsSent).toBeGreaterThanOrEqual(1);
+    expect(result.warningsQueued).toBe(1);
     expect(mockFindSubscriptionsByTrialDateRange).toHaveBeenCalledWith(
       expect.anything(),
       'trial',
       expect.any(Date),
       expect.any(Date),
     );
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: 'owner-acc-3',
-        title: 'Trial ending soon',
-        body: '3 days left of your trial',
-        type: 'trial_expiry',
-      }),
+
+    // The cron does NOT send the push itself — that is the handler's job.
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+
+    const warningFanOut = sendEventCalls.filter(
+      (c) => c.name === 'fan-out-trial-warnings',
     );
+    expect(warningFanOut).toHaveLength(1);
+    expect(warningFanOut[0]!.payload).toEqual([
+      {
+        name: 'app/billing.trial_notification.send',
+        data: {
+          accountId: 'acc-3',
+          timestamp: '2025-01-15T00:00:00.000Z',
+          title: 'Trial ending soon',
+          body: '3 days left of your trial',
+          step: 'send-trial-warnings',
+        },
+      },
+    ]);
   });
 
-  it('sends push notification for recently expired trials (soft landing)', async () => {
+  it('[TRIAL-FANOUT] fans out one trial_notification.send event per recently expired trial (soft landing)', async () => {
     const recentlyExpired = {
       id: 'sub-4',
       accountId: 'acc-4',
@@ -513,48 +537,51 @@ describe('trialExpiry', () => {
       .mockResolvedValueOnce([recentlyExpired]) // soft landing day 1
       .mockResolvedValue([]);
 
-    const { result } = await executeSteps();
+    const { result, sendEventCalls } = await executeSteps();
 
-    expect(result.softLandingSent).toBeGreaterThanOrEqual(1);
+    expect(result.softLandingQueued).toBe(1);
     expect(mockFindSubscriptionsByTrialDateRange).toHaveBeenCalledWith(
       expect.anything(),
       'expired',
       expect.any(Date),
       expect.any(Date),
     );
-    expect(mockSendPushNotification).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: 'owner-acc-4',
-        title: 'Your trial has ended',
-        body: 'giving you 15/day for 2 more weeks',
-        type: 'trial_expiry',
-      }),
+
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+
+    const softLandingFanOut = sendEventCalls.filter(
+      (c) => c.name === 'fan-out-soft-landing',
     );
+    expect(softLandingFanOut).toHaveLength(1);
+    expect(softLandingFanOut[0]!.payload).toEqual([
+      {
+        name: 'app/billing.trial_notification.send',
+        data: {
+          accountId: 'acc-4',
+          timestamp: '2025-01-15T00:00:00.000Z',
+          title: 'Your trial has ended',
+          body: 'giving you 15/day for 2 more weeks',
+          step: 'send-soft-landing',
+        },
+      },
+    ]);
   });
 
-  it('skips push count when notification is not sent', async () => {
-    const trialEndingSoon = {
-      id: 'sub-7',
-      accountId: 'acc-7',
-      status: 'trial',
-      trialEndsAt: '2025-01-18T12:00:00.000Z',
-    };
-
+  it('[TRIAL-FANOUT] does NOT dispatch a fan-out event when no trials match', async () => {
     mockFindExpiredTrials.mockResolvedValueOnce([]);
-    mockFindSubscriptionsByTrialDateRange
-      .mockResolvedValueOnce([trialEndingSoon]) // 3-day warnings
-      .mockResolvedValue([]);
-    // Push notification was not sent (no token, daily cap, etc.)
-    mockSendPushNotification.mockResolvedValueOnce({
-      sent: false,
-      reason: 'no_push_token',
-    });
+    mockFindSubscriptionsByTrialDateRange.mockResolvedValue([]);
 
-    const { result } = await executeSteps();
+    const { result, sendEventCalls } = await executeSteps();
 
-    expect(result.warningsSent).toBe(0);
-    expect(mockSendPushNotification).toHaveBeenCalled();
+    expect(result.warningsQueued).toBe(0);
+    expect(result.softLandingQueued).toBe(0);
+    expect(
+      sendEventCalls.filter(
+        (c) =>
+          c.name === 'fan-out-trial-warnings' ||
+          c.name === 'fan-out-soft-landing',
+      ),
+    ).toHaveLength(0);
   });
 
   it('handles zero expired trials gracefully', async () => {
@@ -566,8 +593,8 @@ describe('trialExpiry', () => {
 
     expect(result.expiredCount).toBe(0);
     expect(result.extendedExpiredCount).toBe(0);
-    expect(result.warningsSent).toBe(0);
-    expect(result.softLandingSent).toBe(0);
+    expect(result.warningsQueued).toBe(0);
+    expect(result.softLandingQueued).toBe(0);
   });
 
   it('processes both expired and extended expired in same run', async () => {
@@ -701,20 +728,20 @@ describe('trialExpiry', () => {
         end3.toISOString().slice(0, 10),
       );
 
-      expect(result.warningsSent).toBeGreaterThanOrEqual(1);
+      expect(result.warningsQueued).toBeGreaterThanOrEqual(1);
     });
   });
 
   // -------------------------------------------------------------------------
-  // [BUG-699-FOLLOWUP] Retry dedup via notificationLog
-  // The send-trial-warnings and send-soft-landing-messages steps both loop
-  // over trials and call sendPushNotification per trial. If Inngest retries
-  // the step, it replays every per-trial send. The fix: check
-  // getRecentNotificationCount for trial_expiry within 24h before sending;
-  // if count > 0 the notification was already delivered on a previous attempt.
+  // [TRIAL-FANOUT] Retry-dedup ownership moved. The atomic rate-limit gate
+  // (checkAndLogRateLimitInternal, BUG-117) used to live inline in the cron's
+  // send loop; it now lives in trial-notification-send, the per-trial handler
+  // (covered by trial-notification-send.test.ts). The cron's scan step does
+  // NOT consult the rate-limit gate — it only enumerates trials and fans them
+  // out. This asserts the responsibility has actually moved off the cron.
   // -------------------------------------------------------------------------
-  describe('[BUG-699-FOLLOWUP] retry dedup — skips send when notificationLog already has trial_expiry entry', () => {
-    it('does NOT call sendPushNotification on retry when prior attempt already logged a trial_expiry', async () => {
+  describe('[TRIAL-FANOUT] cron scan does not own the rate-limit gate', () => {
+    it('does NOT call checkAndLogRateLimitInternal or sendPushNotification in the cron scan steps', async () => {
       const trialEndingSoon = {
         id: 'sub-dedup',
         accountId: 'acc-dedup',
@@ -727,16 +754,15 @@ describe('trialExpiry', () => {
         .mockResolvedValueOnce([trialEndingSoon]) // 3-day warning
         .mockResolvedValue([]);
 
-      // [BUG-117] Simulate: the atomic rate-limit check finds a prior log
-      // row in the 24h window (or a concurrent caller won the advisory lock
-      // and inserted first). Either way, our caller is rate-limited.
-      mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(true);
+      const { result, sendEventCalls } = await executeSteps();
 
-      const { result } = await executeSteps();
-
-      // No push sent — dedup guard blocked it.
+      // The cron enumerated + fanned out, but never touched the gate or push.
+      expect(mockCheckAndLogRateLimitInternal).not.toHaveBeenCalled();
       expect(mockSendPushNotification).not.toHaveBeenCalled();
-      expect(result.warningsSent).toBe(0);
+      expect(result.warningsQueued).toBe(1);
+      expect(
+        sendEventCalls.filter((c) => c.name === 'fan-out-trial-warnings'),
+      ).toHaveLength(1);
     });
   });
 });

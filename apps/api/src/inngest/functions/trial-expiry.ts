@@ -32,6 +32,34 @@ const logger = createLogger();
 // the event payload; the caller accumulates and the outer flow dispatches.
 const TRIAL_EXPIRY_FAILURE_EVENT = 'app/billing.trial_expiry_failed' as const;
 
+// [TRIAL-FANOUT] Per-trial notification fan-out. Steps 3 (warnings) and 4
+// (soft-landing) used to scan a date range AND send every push inside ONE
+// step.run, so an Inngest retry re-ran the range queries + re-checked the
+// rate-limit gate for every trial — wasted work scaling with trial count. The
+// cron now scans the range, then dispatches one of these events per trial; the
+// trial-notification-send handler does the actual send inside its own step.run,
+// so a retry replays only the failed per-trial step. The atomic rate-limit gate
+// (checkAndLogRateLimitInternal) is preserved in the handler, so the "one push
+// per 24h" dedup (BUG-117) still holds across replays.
+const TRIAL_NOTIFICATION_SEND_EVENT =
+  'app/billing.trial_notification.send' as const;
+
+export type TrialNotificationStep = 'send-trial-warnings' | 'send-soft-landing';
+
+type TrialNotificationSendEvent = {
+  name: typeof TRIAL_NOTIFICATION_SEND_EVENT;
+  data: {
+    accountId: string;
+    // Dispatch-time snapshot. Payload convention: events always carry a
+    // timestamp (profileId is legitimately absent — this billing-level event
+    // is keyed by accountId). Mirrors topup-expiry-reminder's `timestamp`.
+    timestamp: string;
+    title: string;
+    body: string;
+    step: TrialNotificationStep;
+  };
+};
+
 type TrialExpiryFailureEvent = {
   name: typeof TRIAL_EXPIRY_FAILURE_EVENT;
   data: {
@@ -92,7 +120,7 @@ import { sendPushNotification } from '../../services/notifications';
 import { checkAndLogRateLimitInternal } from '../../services/settings';
 import { findOwnerProfile } from '../../services/profile';
 
-async function sendTrialNotificationToAccountOwner(
+export async function sendTrialNotificationToAccountOwner(
   db: ReturnType<typeof getStepDatabase>,
   accountId: string,
   payload: {
@@ -324,11 +352,14 @@ export const trialExpiry = inngest.createFunction(
     // for a race that cannot occur in production. If this premise ever
     // changes (e.g. trial pause/unpause flows, retroactive status edits),
     // promote to distinct enum values rather than broaden the dedup window.
-    const warningsSent = await step.run('send-trial-warnings', async () => {
+    // [TRIAL-FANOUT] The scan (range queries + payload construction) stays in a
+    // single memoized step.run; the per-trial SEND is fanned out so a retry of
+    // the send does not replay the scan or the other trials' rate-limit gates.
+    const warningEvents = await step.run('send-trial-warnings', async () => {
       const now = new Date(nowIso);
       const db = getStepDatabase();
       const v2 = isIdentityV2EnabledInStep();
-      let sent = 0;
+      const events: TrialNotificationSendEvent[] = [];
 
       for (const daysRemaining of [3, 1, 0]) {
         const warningMessage = getTrialWarningMessage(daysRemaining);
@@ -363,30 +394,36 @@ export const trialExpiry = inngest.createFunction(
             );
 
         for (const trial of trialsToWarn) {
-          const result = await sendTrialNotificationToAccountOwner(
-            db,
-            trial.accountId,
-            {
+          events.push({
+            name: TRIAL_NOTIFICATION_SEND_EVENT,
+            data: {
+              accountId: trial.accountId,
+              timestamp: nowIso,
               title: 'Trial ending soon',
               body: warningMessage,
-              type: 'trial_expiry',
+              step: 'send-trial-warnings',
             },
-          );
-          if (result.sent) sent++;
+          });
         }
       }
 
-      return sent;
+      return events;
     });
 
+    // [TRIAL-FANOUT] One event per trial. Each is independently retryable in
+    // trial-notification-send, which owns the atomic rate-limit gate.
+    if (warningEvents.length > 0) {
+      await step.sendEvent('fan-out-trial-warnings', warningEvents);
+    }
+
     // Step 4: Send soft-landing messages for recently expired trials
-    const softLandingSent = await step.run(
+    const softLandingEvents = await step.run(
       'send-soft-landing-messages',
       async () => {
         const now = new Date(nowIso);
         const db = getStepDatabase();
         const v2 = isIdentityV2EnabledInStep();
-        let sent = 0;
+        const events: TrialNotificationSendEvent[] = [];
 
         for (const daysSinceEnd of [1, 7, 14]) {
           const message = getSoftLandingMessage(daysSinceEnd);
@@ -417,30 +454,35 @@ export const trialExpiry = inngest.createFunction(
               );
 
           for (const trial of expiredTrials) {
-            const result = await sendTrialNotificationToAccountOwner(
-              db,
-              trial.accountId,
-              {
+            events.push({
+              name: TRIAL_NOTIFICATION_SEND_EVENT,
+              data: {
+                accountId: trial.accountId,
+                timestamp: nowIso,
                 title: 'Your trial has ended',
                 body: message,
-                type: 'trial_expiry',
+                step: 'send-soft-landing',
               },
-            );
-            if (result.sent) sent++;
+            });
           }
         }
 
-        return sent;
+        return events;
       },
     );
+
+    // [TRIAL-FANOUT] One event per recently-expired trial.
+    if (softLandingEvents.length > 0) {
+      await step.sendEvent('fan-out-soft-landing', softLandingEvents);
+    }
 
     return {
       status: 'completed',
       date: today,
       expiredCount,
       extendedExpiredCount,
-      warningsSent,
-      softLandingSent,
+      warningsQueued: warningEvents.length,
+      softLandingQueued: softLandingEvents.length,
     };
   },
 );
