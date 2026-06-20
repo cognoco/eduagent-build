@@ -188,35 +188,21 @@ const mockSafeRefundQuota = jest.fn(
 );
 // [BUG-821] Routes now call refundQuotaOrEscalate (the gate that escalates a
 // decrement-without-subscriptionId instead of silently dropping the refund).
-// Mirror the real implementation: when subscriptionId is present, delegate to
-// safeRefundQuota; if that throws, swallow + escalate to Sentry (the real
-// safeRefundQuota catches internally and never propagates), so route frame
-// emission is never interrupted. When subscriptionId is missing but a decrement
-// happened (source set), escalate under the skip tag.
+// Minimal faithful delegate: when subscriptionId is present, delegate to
+// safeRefundQuota; otherwise it's a no-op refund. The gate's internal escalation
+// (the missing-subscription skip tag, and the never-throws contract) is
+// authoritatively covered in services/billing/refund-or-escalate.test.ts — this
+// route-level stub only needs to reproduce the delegate boundary so route
+// assertions observe the safeRefundQuota call when a subscriptionId is present.
 const mockRefundQuotaOrEscalate = jest.fn(
   async (
     db: unknown,
     subscriptionId: string | undefined,
     context?: { source?: string },
-  ) => {
-    if (subscriptionId) {
-      try {
-        return await mockSafeRefundQuota(db, subscriptionId, context);
-      } catch (refundErr) {
-        mockCaptureException(refundErr, {
-          extra: { context: 'metering.refund.failed' },
-        });
-        return { refunded: false };
-      }
-    }
-    if (context?.source !== undefined) {
-      mockCaptureException(
-        new Error('Quota refund skipped: decrement without subscriptionId'),
-        { tags: { surface: 'quota.refund.skipped_no_subscription' } },
-      );
-    }
-    return { refunded: false };
-  },
+  ) =>
+    subscriptionId
+      ? mockSafeRefundQuota(db, subscriptionId, context)
+      : { refunded: false },
 );
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
@@ -2598,12 +2584,15 @@ describe('session routes', () => {
       );
     });
 
-    // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
-    // the fallback frame and done frame must still be emitted so the client
-    // is never left with a truncated stream.
-    it('[M-3] emits fallback and done frames even when safeRefundQuota throws in fallback path', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] In the BUG-941 fallback path the route refunds quota through the
+    // refundQuotaOrEscalate gate, which never throws (it escalates internally —
+    // covered in refund-or-escalate.test.ts). The route therefore always
+    // proceeds to emit the fallback frame and the done frame, so the client is
+    // never left with a truncated stream. Asserting the gate is invoked at this
+    // boundary is the route-level contract; the throw-and-escalate behaviour is
+    // owned by the gate's own unit test.
+    it('[M-3] refunds via refundQuotaOrEscalate and still emits fallback and done frames in fallback path', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
         stream: (async function* () {
@@ -2633,28 +2622,27 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Fallback frame must be written regardless of the refund failure.
+      // The route refunds the decremented quota through the gate at this boundary.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.fallback' }),
+      );
+      // Fallback frame must be written because the gate never throws.
       expect(body).toContain('"type":"fallback"');
       expect(body).toContain('"reason":"malformed_envelope"');
       // Done frame must follow.
       expect(body).toContain('"type":"done"');
-      // The refund error must be escalated to Sentry.
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
-      );
     });
 
-    // [M-3] If safeRefundQuota throws in the onComplete catch path, the SSE
-    // error frame must still be written.
-    it('[M-3] emits error frame even when safeRefundQuota throws in onComplete catch', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] In the onComplete catch path the route refunds via the
+    // refundQuotaOrEscalate gate (which never throws — covered in
+    // refund-or-escalate.test.ts) and then writes the SSE error frame. The
+    // route-level contract is that the gate is invoked at this boundary and the
+    // error frame is still emitted; the onComplete error's own Sentry escalation
+    // is asserted by the BUG-666 test below.
+    it('[M-3] refunds via refundQuotaOrEscalate and still emits error frame in onComplete catch', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       const onCompleteErr = new Error('envelope parse failed');
       (streamMessage as jest.Mock).mockResolvedValueOnce({
@@ -2677,18 +2665,14 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Error frame must be written regardless of the refund failure.
-      expect(body).toContain('"type":"error"');
-      // captureException should be called at least once (for the refund throw).
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
+      // The route refunds the decremented quota through the gate at this boundary.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.onComplete' }),
       );
+      // Error frame must be written because the gate never throws.
+      expect(body).toContain('"type":"error"');
     });
   });
 
