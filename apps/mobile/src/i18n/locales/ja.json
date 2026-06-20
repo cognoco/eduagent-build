@@ -2278,7 +2278,8 @@
       "bookCompleted": "ブックを完了しました",
       "cefrLevelUp": "言語レベルが上がりました",
       "topicsExplored": "{{subject}}で{{count}}個のトピックを探求しました",
-      "topicsExploredFallback": "科目で{{count}}個のトピックを探求しました"
+      "topicsExploredFallback": "科目で{{count}}個のトピックを探求しました",
+      "unknown": "マイルストーンを達成"
     }
   },
   "onboarding": {

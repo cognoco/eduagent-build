@@ -2278,7 +2278,8 @@
       "bookCompleted": "Libro completado",
       "cefrLevelUp": "Nivel de idioma aumentado",
       "topicsExplored": "{{count}} temas explorados en {{subject}}",
-      "topicsExploredFallback": "{{count}} temas explorados en una materia"
+      "topicsExploredFallback": "{{count}} temas explorados en una materia",
+      "unknown": "Hito alcanzado"
     }
   },
   "onboarding": {

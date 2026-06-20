@@ -2411,7 +2411,8 @@
       "bookCompleted": "Ukończono książkę",
       "cefrLevelUp": "Wzrost poziomu językowego",
       "topicsExplored": "Odkryto {{count}} tematów w {{subject}}",
-      "topicsExploredFallback": "Odkryto {{count}} tematów w przedmiocie"
+      "topicsExploredFallback": "Odkryto {{count}} tematów w przedmiocie",
+      "unknown": "Kamień milowy osiągnięty"
     }
   },
   "onboarding": {
