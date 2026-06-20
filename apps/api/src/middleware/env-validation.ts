@@ -111,6 +111,18 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
             },
           );
         }
+        // [Issue-888] Non-fatal advisory warnings (e.g. missing SENTRY_DSN).
+        // These do not block traffic but must be loud so ops can detect
+        // misconfiguration without waiting for an incident.
+        for (const key of bindingResult.warnings) {
+          logger.warn(
+            `[env-validation] production missing optional binding: ${key} — error events may drop silently`,
+            {
+              event: 'env-validation.optional_binding_absent',
+              key,
+            },
+          );
+        }
       }
       // [BUG-486] Hash is updated ONLY after the full validation block
       // succeeds.  A failed validation leaves the hash unset so the next
