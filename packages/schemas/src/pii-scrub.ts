@@ -37,16 +37,16 @@ export const INNGEST_PII_PAYLOAD_KEYS: readonly string[] = [
 
 /**
  * Step-return keys that must never cross the Inngest trust boundary carrying
- * minor-PII. Memoized step returns are persisted in Inngest's third-party
- * state store just like event payloads; the offending steps now return opaque
- * references (profile/session/notice ids) and the consuming steps rehydrate
- * from the database.
+ * minor-PII (or, for `parentEmail`, guardian-PII). Memoized step returns are
+ * persisted in Inngest's third-party state store just like event payloads; the
+ * offending steps now return opaque references (profile/session/notice ids, or
+ * the fresh token alone) and the consuming steps rehydrate from the database.
  *
- * Deliberately NOT listed: `parentEmail`. consent-reminders.ts legitimately
- * memoizes `{ parentEmail, freshToken }` in its day-7/day-14 token-mint steps
- * (the mint is non-idempotent and must survive replay); converting that flow
- * is tracked as its own work item, and a denylist hit there would break
- * reminder emails. Add the key once that flow rehydrates the address.
+ * `parentEmail` [WI-637]: consent-reminders.ts no longer memoizes the address —
+ * its day-7/day-14 token-mint steps return the fresh token only, and the send
+ * steps re-read the email in-step via lookupConsentDetails(). monthly-report
+ * and weekly-progress already keep the email a step-local var (returns carry
+ * only `{ sent, reason }`), so arming this key cannot break a live send.
  */
 export const INNGEST_PII_STEP_KEYS: readonly string[] = [
   'childName',
@@ -54,6 +54,7 @@ export const INNGEST_PII_STEP_KEYS: readonly string[] = [
   'childSummaries',
   'struggleLines',
   'struggleTopics',
+  'parentEmail',
 ];
 
 /** Replacement value written over scrubbed payload fields. */

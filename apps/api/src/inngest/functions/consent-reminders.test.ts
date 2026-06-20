@@ -156,7 +156,7 @@ async function executeHandler(
     requestedAt: '2026-05-01T00:00:00.000Z',
   },
   latestAnyConsentStatusSequence: (string | null)[] = statusSequence,
-): Promise<void> {
+): Promise<{ stepReturns: Record<string, unknown> }> {
   let latestStatusCallIndex = 0;
   mockGetConsentStatus.mockImplementation(async () => {
     const status =
@@ -205,7 +205,18 @@ async function executeHandler(
       : null,
   );
 
-  const { step } = createInngestStepRunner();
+  const runner = createInngestStepRunner();
+  // [WI-637] Capture each step's memoized return value so a test can assert no
+  // PII (parent email) ever rides Inngest's durable step state.
+  const stepReturns: Record<string, unknown> = {};
+  const step = {
+    ...runner.step,
+    async run(name: string, callback: () => unknown) {
+      const result = await runner.step.run(name, callback);
+      stepReturns[name] = result;
+      return result;
+    },
+  };
 
   const handler = (consentReminder as any).fn;
   await handler({
@@ -216,6 +227,8 @@ async function executeHandler(
     },
     step,
   });
+
+  return { stepReturns };
 }
 
 beforeEach(() => {
@@ -342,6 +355,32 @@ describe('consentReminder', () => {
     expect(day14Email?.body).toContain('refreshed-token-xyz');
     // The stale DB token must NOT appear — proves we are not reading the old token.
     expect(day14Email?.body).not.toContain('test-token-abc123');
+  });
+
+  // [WI-637] The day-7/day-14 token-mint steps must memoize ONLY the fresh
+  // token — never the parent's email. Inngest persists a step's return value in
+  // its third-party state store, so an email in the return durably over-retains
+  // guardian PII. The send steps re-read the address in-step instead.
+  it('[WI-637] memoizes only the fresh token (never the parent email) in the day-7/day-14 mint steps', async () => {
+    const { stepReturns } = await executeHandler([
+      'PENDING',
+      'PENDING',
+      'PENDING',
+      'PENDING',
+    ]);
+
+    for (const stepName of ['refresh-day-7-token', 'refresh-day-14-token']) {
+      const ret = stepReturns[stepName];
+      expect(ret).toEqual({ freshToken: 'refreshed-token-xyz' });
+      expect(ret).not.toHaveProperty('parentEmail');
+      expect(JSON.stringify(ret)).not.toContain('parent@example.com');
+    }
+
+    // The address must still reach the parent — proves the email is rehydrated
+    // in the send step, not lost (day-7 + day-14 + day-25 = 3 sends).
+    expect(mockSendEmail).toHaveBeenCalledTimes(3);
+    const day7Email = mockSendEmail.mock.calls[0]?.[0] as { to?: string };
+    expect(day7Email.to).toBe('parent@example.com');
   });
 
   it('stops sending when consent is granted mid-sequence', async () => {
