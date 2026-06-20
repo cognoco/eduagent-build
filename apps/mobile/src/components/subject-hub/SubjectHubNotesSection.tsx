@@ -12,7 +12,7 @@ interface SubjectHubNotesSectionProps {
 
 const NOTE_ORIGINS: NoteOrigin[] = ['self', 'mentor'];
 
-function noteOriginLabel(origin: NoteOrigin): string {
+function noteOriginLabel(origin: NoteOrigin) {
   return origin === 'self'
     ? 'subjectHub.notes.authorSelf'
     : 'subjectHub.notes.authorMentor';

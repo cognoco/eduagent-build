@@ -72,7 +72,8 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
     isFirstEncounter: false,
     inputMode: 'text',
     llmTier: 'standard',
-    conversationLanguage: profile.conversationLanguage,
+    conversationLanguage:
+      profile.conversationLanguage as ExchangeContext['conversationLanguage'],
     pronouns: profile.pronouns,
   };
 }
