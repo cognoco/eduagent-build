@@ -75,7 +75,7 @@ import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
-import { safeRefundQuota } from '../services/billing';
+import { refundQuotaOrEscalate } from '../services/billing';
 import {
   startInterleavedSession,
   NoInterleavedTopicsError,
@@ -588,19 +588,19 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+        // [BUG-821] refundQuotaOrEscalate escalates if a decrement happened but
+        // subscriptionId is missing, instead of silently dropping the refund.
         // [CR-2026-05-19-C6] Thread source/topUpCreditId so top-up refunds
         // credit the original batch instead of inflating monthly quota.
-        if (subscriptionId) {
-          await safeRefundQuota(db, subscriptionId, {
-            route: 'sessions.message',
-            profileId,
-            source: c.get('quotaDecrementSource'),
-            quotaModel: c.get('quotaDecrementQuotaModel'),
-            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-            // [WI-776 / WP-7] Refund via the store the decrement ran under.
-            identityV2: c.get('quotaIdentityV2'),
-          });
-        }
+        await refundQuotaOrEscalate(db, subscriptionId, {
+          route: 'sessions.message',
+          profileId,
+          source: c.get('quotaDecrementSource'),
+          quotaModel: c.get('quotaDecrementQuotaModel'),
+          topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+          // [WI-776 / WP-7] Refund via the store the decrement ran under.
+          identityV2: c.get('quotaIdentityV2'),
+        });
         throw err;
       }
     },
@@ -875,28 +875,21 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               }
             }
 
-            if (subscriptionId) {
-              try {
-                await safeRefundQuota(db, subscriptionId, {
-                  route: 'sessions.stream.llm_error',
-                  profileId,
-                  sessionId,
-                  // [CR-2026-05-19-C6] Refund to the same pool the decrement
-                  // consumed; otherwise top-up consumptions silently inflate
-                  // monthly quota on every LLM failure.
-                  source: c.get('quotaDecrementSource'),
-                  quotaModel: c.get('quotaDecrementQuotaModel'),
-                  topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-                  // [WI-776 / WP-7] Refund via the store the decrement ran under.
-                  identityV2: c.get('quotaIdentityV2'),
-                });
-              } catch (refundErr) {
-                captureException(refundErr, {
-                  profileId,
-                  extra: { sessionId, route: 'sessions.stream.llm_error' },
-                });
-              }
-            }
+            // [BUG-821] refundQuotaOrEscalate never throws and escalates when a
+            // decrement happened but subscriptionId is missing.
+            await refundQuotaOrEscalate(db, subscriptionId, {
+              route: 'sessions.stream.llm_error',
+              profileId,
+              sessionId,
+              // [CR-2026-05-19-C6] Refund to the same pool the decrement
+              // consumed; otherwise top-up consumptions silently inflate
+              // monthly quota on every LLM failure.
+              source: c.get('quotaDecrementSource'),
+              quotaModel: c.get('quotaDecrementQuotaModel'),
+              topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+              // [WI-776 / WP-7] Refund via the store the decrement ran under.
+              identityV2: c.get('quotaIdentityV2'),
+            });
             // Map error to a stable machine-readable code so clients can
             // classify failures without brittle message parsing.
             const errorCode: string = (() => {
@@ -976,39 +969,22 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 reason: fallbackInfo.reason,
                 fallbackText: fallbackInfo.fallbackText,
               });
-              // Refund quota before emitting frames. safeRefundQuota escalates
-              // internally, but if it throws we must still emit the SSE frames
-              // so the client is never left with a truncated stream. [M-3]
-              if (subscriptionId) {
-                try {
-                  await safeRefundQuota(db, subscriptionId, {
-                    route: 'sessions.stream.fallback',
-                    profileId,
-                    sessionId,
-                    // [CR-2026-05-19-C6] See sessions.stream.llm_error.
-                    source: c.get('quotaDecrementSource'),
-                    quotaModel: c.get('quotaDecrementQuotaModel'),
-                    topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-                    // [WI-776 / WP-7] Refund via the store the decrement ran under.
-                    identityV2: c.get('quotaIdentityV2'),
-                  });
-                } catch (refundErr) {
-                  captureException(refundErr, {
-                    profileId,
-                    extra: { sessionId, route: 'sessions.stream.fallback' },
-                  });
-                  logger.error(
-                    '[sessions/stream] safeRefundQuota threw in fallback path',
-                    {
-                      sessionId,
-                      error:
-                        refundErr instanceof Error
-                          ? refundErr.message
-                          : String(refundErr),
-                    },
-                  );
-                }
-              }
+              // Refund quota before emitting frames. refundQuotaOrEscalate
+              // never throws (escalates internally), so the SSE frames below
+              // always run and the client is never left with a truncated
+              // stream. [M-3] [BUG-821] It also escalates when a decrement
+              // happened but subscriptionId is missing.
+              await refundQuotaOrEscalate(db, subscriptionId, {
+                route: 'sessions.stream.fallback',
+                profileId,
+                sessionId,
+                // [CR-2026-05-19-C6] See sessions.stream.llm_error.
+                source: c.get('quotaDecrementSource'),
+                quotaModel: c.get('quotaDecrementQuotaModel'),
+                topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+                // [WI-776 / WP-7] Refund via the store the decrement ran under.
+                identityV2: c.get('quotaIdentityV2'),
+              });
               await sseStream.writeSSE({ data: JSON.stringify(frame) });
               await sseStream.writeSSE({
                 data: JSON.stringify({
@@ -1101,38 +1077,21 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               },
             });
             // Refund quota — user should not be charged for a failed exchange.
-            // Wrap in try/catch: if safeRefundQuota throws, the error frame
-            // must still be written so the client is never left hanging. [M-3]
-            if (subscriptionId) {
-              try {
-                await safeRefundQuota(db, subscriptionId, {
-                  route: 'sessions.stream.onComplete',
-                  profileId,
-                  sessionId,
-                  // [CR-2026-05-19-C6] See sessions.stream.llm_error.
-                  source: c.get('quotaDecrementSource'),
-                  quotaModel: c.get('quotaDecrementQuotaModel'),
-                  topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-                  // [WI-776 / WP-7] Refund via the store the decrement ran under.
-                  identityV2: c.get('quotaIdentityV2'),
-                });
-              } catch (refundErr) {
-                captureException(refundErr, {
-                  profileId,
-                  extra: { sessionId, route: 'sessions.stream.onComplete' },
-                });
-                logger.error(
-                  '[sessions/stream] safeRefundQuota threw in onComplete catch',
-                  {
-                    sessionId,
-                    error:
-                      refundErr instanceof Error
-                        ? refundErr.message
-                        : String(refundErr),
-                  },
-                );
-              }
-            }
+            // refundQuotaOrEscalate never throws (escalates internally), so the
+            // error frame below is always written and the client is never left
+            // hanging. [M-3] [BUG-821] It also escalates when a decrement
+            // happened but subscriptionId is missing.
+            await refundQuotaOrEscalate(db, subscriptionId, {
+              route: 'sessions.stream.onComplete',
+              profileId,
+              sessionId,
+              // [CR-2026-05-19-C6] See sessions.stream.llm_error.
+              source: c.get('quotaDecrementSource'),
+              quotaModel: c.get('quotaDecrementQuotaModel'),
+              topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+              // [WI-776 / WP-7] Refund via the store the decrement ran under.
+              identityV2: c.get('quotaIdentityV2'),
+            });
             await sseStream.writeSSE({
               data: JSON.stringify(
                 streamErrorFrameSchema.parse({
@@ -1255,20 +1214,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
         // Refund quota on LLM failure — user should not be charged for a failed exchange
         // [BUG-661 / A-21] safeRefundQuota escalates if the refund itself fails.
+        // [BUG-821] refundQuotaOrEscalate escalates if a decrement happened but
+        // subscriptionId is missing, instead of silently dropping the refund.
         // [CR-2026-05-19-C6] See sessions.stream.llm_error for pool-routing
         // rationale.
-        if (subscriptionId) {
-          await safeRefundQuota(db, subscriptionId, {
-            route: 'sessions.stream',
-            profileId,
-            sessionId,
-            source: c.get('quotaDecrementSource'),
-            quotaModel: c.get('quotaDecrementQuotaModel'),
-            topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-            // [WI-776 / WP-7] Refund via the store the decrement ran under.
-            identityV2: c.get('quotaIdentityV2'),
-          });
-        }
+        await refundQuotaOrEscalate(db, subscriptionId, {
+          route: 'sessions.stream',
+          profileId,
+          sessionId,
+          source: c.get('quotaDecrementSource'),
+          quotaModel: c.get('quotaDecrementQuotaModel'),
+          topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
+          // [WI-776 / WP-7] Refund via the store the decrement ran under.
+          identityV2: c.get('quotaIdentityV2'),
+        });
         throw err;
       }
     },

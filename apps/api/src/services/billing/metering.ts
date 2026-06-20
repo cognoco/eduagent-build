@@ -1252,3 +1252,90 @@ export async function safeRefundQuota(
     return { refunded: false };
   }
 }
+
+// ---------------------------------------------------------------------------
+// refundQuotaOrEscalate
+// ---------------------------------------------------------------------------
+
+/**
+ * [BUG-821] Gate wrapper around {@link safeRefundQuota} for the LLM
+ * failure-refund path. Every refund call site previously guarded the refund
+ * with a bare `if (subscriptionId)`. That silently dropped the refund whenever
+ * a quota decrement HAD happened (the metering middleware set
+ * `quotaDecrementSource`) but `subscriptionId` was missing — e.g. trial users,
+ * edge-cached responses, or a future free-tier bypass where the middleware
+ * returns without seeding `subscriptionId`. The user was charged a turn and the
+ * refund vanished with no Sentry, no log, no metric — a silent recovery in
+ * billing code, which AGENTS.md "Silent Recovery Without Escalation is Banned"
+ * forbids.
+ *
+ * This helper keeps the happy-path refund behaviour identical (delegates to
+ * `safeRefundQuota`), but when `subscriptionId` is absent AND a decrement
+ * actually occurred, it escalates: structured `logger.error` + a Sentry
+ * `captureException` tagged `quota.refund.skipped_no_subscription` so we can
+ * query how often customers are silently overcharged. When no decrement
+ * happened (no `quotaDecrementSource`), there is nothing to refund and the
+ * helper is a no-op.
+ *
+ * Like `safeRefundQuota`, this never throws — the caller is already in an
+ * error path.
+ */
+export async function refundQuotaOrEscalate(
+  db: Database,
+  subscriptionId: string | undefined,
+  context: {
+    route: string;
+    profileId?: string;
+    sessionId?: string;
+    /**
+     * From the metering middleware's `quotaDecrementSource`. Presence means a
+     * decrement happened, so a missing `subscriptionId` is a billing defect,
+     * not a no-op.
+     */
+    source?: 'monthly' | 'top_up';
+    quotaModel?: QuotaModel;
+    topUpCreditId?: string;
+    identityV2?: boolean;
+  },
+): Promise<{ refunded: boolean }> {
+  if (subscriptionId) {
+    return safeRefundQuota(db, subscriptionId, {
+      route: context.route,
+      profileId: context.profileId,
+      sessionId: context.sessionId,
+      source: context.source,
+      quotaModel: context.quotaModel,
+      topUpCreditId: context.topUpCreditId,
+      identityV2: context.identityV2,
+    });
+  }
+
+  // No subscriptionId. Only a defect if a decrement actually occurred —
+  // `source` is set by the metering middleware alongside the decrement.
+  if (context.source !== undefined) {
+    logger.error(
+      '[metering] Quota refund skipped — decrement happened but no subscriptionId; user may be overcharged',
+      {
+        route: context.route,
+        profileId: context.profileId,
+        sessionId: context.sessionId,
+        source: context.source,
+      },
+    );
+    captureException(
+      new Error('Quota refund skipped: decrement without subscriptionId'),
+      {
+        profileId: context.profileId,
+        tags: { surface: 'quota.refund.skipped_no_subscription' },
+        extra: {
+          context: 'quota.refund.skipped_no_subscription',
+          route: context.route,
+          sessionId: context.sessionId,
+          source: context.source,
+        },
+      },
+    );
+  }
+
+  return { refunded: false };
+}
