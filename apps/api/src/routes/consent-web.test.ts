@@ -300,4 +300,50 @@ describe('[QA-12] POST /consent-page/confirm — deny-confirmation + invalid han
     const html = await res.text();
     expect(html).toContain('Link expired or invalid');
   });
+
+  // [BUG-870] Before the fix the confirm handler classified errors by
+  // string-matching `error.message === 'Invalid consent token'`. Only
+  // ConsentTokenNotFoundError carries that message; the two other known errors
+  // thrown by the real processConsentResponse —
+  //   - ConsentAlreadyProcessedError ('This consent request has already been processed')
+  //   - ConsentTokenExpiredError    ('Consent token has expired')
+  // — did not match, fell through the catch, and re-threw, surfacing a raw 500
+  // to the parent instead of an actionable friendly page. The fix classifies on
+  // the error CLASS. These tests drive the REAL service to throw each class and
+  // assert the friendly page (never a 500).
+
+  it('[BUG-870] renders the "already processed" page (409, not 500) when the token was already responded to', async () => {
+    // A terminal status (CONSENTED) makes the real processConsentResponse throw
+    // ConsentAlreadyProcessedError at the replay-protection check.
+    const db = makeDb({
+      row: makeRow({ status: 'CONSENTED', respondedAt: new Date() }),
+    });
+    const res = await postConfirm(db, {
+      token: 'valid-token',
+      approved: 'true',
+    });
+    expect(res.status).not.toBe(500);
+    expect(res.status).toBe(409);
+    const html = await res.text();
+    expect(html.toLowerCase()).toContain('already');
+    // No status transition is attempted once it is already terminal.
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('[BUG-870] renders the "link expired" page (410, not 500) when the token has expired', async () => {
+    // A non-terminal row with a past expiresAt makes the real
+    // processConsentResponse throw ConsentTokenExpiredError.
+    const db = makeDb({
+      row: makeRow({ expiresAt: new Date(Date.now() - 1000) }),
+    });
+    const res = await postConfirm(db, {
+      token: 'valid-token',
+      approved: 'true',
+    });
+    expect(res.status).not.toBe(500);
+    expect(res.status).toBe(410);
+    const html = await res.text();
+    expect(html.toLowerCase()).toContain('expired');
+    expect(db.update).not.toHaveBeenCalled();
+  });
 });
