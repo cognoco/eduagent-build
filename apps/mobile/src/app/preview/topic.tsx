@@ -67,28 +67,32 @@ export default function PreviewTopicScreen() {
   const onSelect = async (sample: SampleLesson) => {
     if (submitting) return;
     setSubmitting(true);
-    // Re-fetch state in case the effect hadn't settled when the user pressed.
-    const s = current ?? (await getPreviewState());
-    const base: PreviewOnboardingStateV0 = s ?? {
-      intent: 'not_sure',
-      path: 'learner_value_prop',
-      createdAt: new Date().toISOString(),
-    };
-    await setPreviewState({
-      ...base,
-      path: 'learner_value_prop',
-      topicText: sample.topicText,
-    });
-    track('preview_topic_submitted', {
-      intent: base.intent,
-      path: 'learner_value_prop',
-      sampleId: sample.id,
-      topicLength: sample.topicText.length,
-    });
-    router.push({
-      pathname: '/preview/value-prop',
-      params: { variant: 'learner' },
-    });
+    try {
+      // Re-fetch state in case the effect hadn't settled when the user pressed.
+      const s = current ?? (await getPreviewState());
+      const base: PreviewOnboardingStateV0 = s ?? {
+        intent: 'not_sure',
+        path: 'learner_value_prop',
+        createdAt: new Date().toISOString(),
+      };
+      await setPreviewState({
+        ...base,
+        path: 'learner_value_prop',
+        topicText: sample.topicText,
+      });
+      track('preview_topic_submitted', {
+        intent: base.intent,
+        path: 'learner_value_prop',
+        sampleId: sample.id,
+        topicLength: sample.topicText.length,
+      });
+      router.push({
+        pathname: '/preview/value-prop',
+        params: { variant: 'learner' },
+      });
+    } catch {
+      setSubmitting(false);
+    }
   };
 
   const sampleLessons = buildSampleLessons(t);
