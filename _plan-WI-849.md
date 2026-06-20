@@ -67,7 +67,7 @@ longer exists. The counterpart person and their own org are untouched.
      (an in-org person supported-by an out-of-org person); run `executeDeletionV2`; assert success, both
      incident edges gone, and the out-of-org counterpart person SURVIVES. RED without teardown; GREEN with it.
    - NO Gap-1 test (founder ruling — do not paper over the deferred subscription RESTRICT).
-3. `docs/adr/MMT-ADR-0026-whole-org-erasure-tears-down-surviving-edges.md` — NEW ADR, Status=Proposed
+3. `docs/adr/MMT-ADR-0025-whole-org-erasure-tears-down-surviving-edges.md` — NEW ADR, Status=Proposed
    (human-Architecture sign-off pending), dedicated `docs(adr)` change-set semantics (lockstep with canon).
 4. `docs/canon/identity/data-model.md` — §3.2 + §6.1 lockstep edit: add the whole-org-erasure row/note that
    the otherwise-surviving subscription/guardianship/supportership edges are torn down on a whole-org/whole-
@@ -79,7 +79,7 @@ longer exists. The counterpart person and their own org are untouched.
 - [ ] `pnpm exec nx test:integration api` green for the new suite (staging DB).
 - [ ] `pnpm exec nx run api:typecheck` green.
 - [ ] `pnpm exec nx run api:lint` green (no eslint-disable).
-- [ ] `decision-adr-link` ratchet satisfied (canon edit references MMT-ADR-0026; ADR exists).
+- [ ] `decision-adr-link` ratchet satisfied (canon edit references MMT-ADR-0025; ADR exists).
 - [ ] `bash scripts/check-change-class.sh --branch --run` for the docs+api change classes.
 - [ ] Gap 1 deferral documented in PR body + WI-693 linked.
 
