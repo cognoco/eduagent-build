@@ -4102,5 +4102,35 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Uso: {{used}} de {{limit}} preguntas usadas"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Centro de apoyo",
+      "subtitle": "Un panel de control para los estudiantes que apoyas.",
+      "empty": "Añade un estudiante para ver sus necesidades de apoyo aquí.",
+      "openPerson": "Abrir {{name}}",
+      "personHint": "Abre la vista de apoyo de este estudiante.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Señales de apoyo para este estudiante."
+    },
+    "subjects": {
+      "title": "Asignaturas",
+      "subtitle": "Una vista estructural de las asignaturas de cada estudiante.",
+      "empty": "Añade un estudiante para ver sus asignaturas aquí.",
+      "openPerson": "Abrir asignaturas de {{name}}",
+      "personHint": "Abre la vista estructural de la asignatura.",
+      "structuralOnly": "Solo la estructura de asignatura, capítulo y tema.",
+      "bookCount": "{{count}} libro",
+      "bookCount_other": "{{count}} libros",
+      "errorTitle": "No se pudieron cargar las asignaturas",
+      "errorMessage": "Inténtalo de nuevo en un momento."
+    },
+    "journal": {
+      "title": "Diario",
+      "subtitle": "Registros de apoyo que te han enviado, agrupados por estudiante.",
+      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento.",
+      "personPlaceholderTitle": "Los registros compartidos llegan en S5",
+      "personPlaceholderMessage": "Por ahora, este ámbito mantiene ocultas las notas del estudiante, los chats y los elementos privados del diario."
+    }
   }
 }

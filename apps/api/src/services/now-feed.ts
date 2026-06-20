@@ -54,6 +54,7 @@ export const RANKING = {
   CHALLENGE_READY: 3,
   PARKED_ITEM: 4,
   LEDGER_MOMENT: 5,
+  SUPPORT_HUB_POINTER: 0.5,
 } as const;
 
 export const ROUTE_CATALOG = {
@@ -72,6 +73,7 @@ export const ROUTE_CATALOG = {
     chain: ['subject.hub'],
   },
   journal: { params: [], chain: [] },
+  'support.hub': { params: [], chain: [] },
 } as const satisfies Record<
   NowDeepLinkRoute,
   { params: readonly string[]; chain: readonly NowDeepLinkRoute[] }
@@ -128,6 +130,8 @@ function basePriority(kind: NowCardKind): number {
       return RANKING.PARKED_ITEM;
     case 'ledger_moment':
       return RANKING.LEDGER_MOMENT;
+    case 'support_hub_pointer':
+      return RANKING.SUPPORT_HUB_POINTER;
   }
 }
 
@@ -189,6 +193,36 @@ export function rankCandidates(
     });
 }
 
+export function orderSupporterHubCandidates(
+  candidates: NowFeedCandidate[],
+  now: Date = new Date(),
+  visibleBudget = 3,
+): NowFeedCandidate[] {
+  const ranked = rankCandidates(candidates, now);
+  const grouped = new Map<string, NowFeedCandidate[]>();
+  for (const candidate of ranked) {
+    if (!candidate.edgeId) continue;
+    const group = grouped.get(candidate.edgeId) ?? [];
+    group.push(candidate);
+    grouped.set(candidate.edgeId, group);
+  }
+
+  const selected = new Set<string>();
+  const fairTop = [...grouped.values()]
+    .map((group) => group[0])
+    .filter((candidate): candidate is NowFeedCandidate => Boolean(candidate))
+    .sort((a, b) => {
+      const aIndex = ranked.findIndex((item) => item.id === a.id);
+      const bIndex = ranked.findIndex((item) => item.id === b.id);
+      return aIndex - bIndex;
+    })
+    .slice(0, visibleBudget);
+
+  for (const candidate of fairTop) selected.add(candidate.id);
+  const fill = ranked.filter((candidate) => !selected.has(candidate.id));
+  return [...fairTop, ...fill];
+}
+
 function toCard(candidate: NowFeedCandidate): NowCard {
   return {
     kind: candidate.kind,
@@ -239,18 +273,17 @@ export async function buildNowFeed(
   const now = new Date();
   const request = normalizeNowQuery(query);
   const target = await resolveNowTarget(db, profileId, request);
-  const candidates =
+  const candidates = await collectCandidatesForRequest(
+    db,
+    target.personId,
+    request,
+    now,
+    target.edgeId,
+  );
+  const sorted =
     request.scope === 'supporter-hub'
-      ? []
-      : await collectNowCandidates(
-          db,
-          target.personId,
-          request.scope,
-          now,
-          request.scope === 'self' ? 'self' : 'supporter',
-          target.edgeId,
-        );
-  const sorted = rankCandidates(candidates, now);
+      ? candidates
+      : rankCandidates(candidates, now);
   const ledgerIds = sorted
     .slice(0, 3)
     .map((candidate) => candidate.ledgerId)
@@ -276,17 +309,19 @@ export async function buildNowOverflow(
   const now = new Date();
   const request = normalizeNowQuery(query);
   const target = await resolveNowTarget(db, profileId, request);
-  const candidates =
-    request.scope === 'supporter-hub'
-      ? []
-      : await collectNowCandidates(
-          db,
-          target.personId,
-          request.scope,
-          now,
-          request.scope === 'self' ? 'self' : 'supporter',
-          target.edgeId,
-        );
+  const candidates = await collectCandidatesForRequest(
+    db,
+    target.personId,
+    request,
+    now,
+    target.edgeId,
+  );
+  if (request.scope === 'supporter-hub') {
+    return {
+      scope: request.scope,
+      items: candidates.slice(3).map(toOverflowItem),
+    };
+  }
   return buildNowOverflowFromCandidates(candidates, request.scope, now);
 }
 
@@ -327,6 +362,86 @@ async function resolveNowTarget(
   }
 
   return { personId: query.personId, edgeId };
+}
+
+async function collectCandidatesForRequest(
+  db: Database,
+  personId: string,
+  request: NowQuery,
+  now: Date,
+  edgeId?: string,
+): Promise<NowFeedCandidate[]> {
+  if (request.scope === 'supporter-hub') {
+    return collectSupporterHubCandidates(db, personId, now);
+  }
+
+  const candidates = await collectNowCandidates(
+    db,
+    personId,
+    request.scope,
+    now,
+    request.scope === 'self' ? 'self' : 'supporter',
+    edgeId,
+  );
+
+  if (request.scope !== 'self') return candidates;
+
+  const hubCandidates = await collectSupporterHubCandidates(db, personId, now);
+  if (hubCandidates.length === 0) return candidates;
+
+  return [
+    ...candidates,
+    {
+      id: `support-hub-pointer:${personId}`,
+      kind: 'support_hub_pointer',
+      createdAt: now,
+      sortAt: now,
+      templateKey: 'now.support_hub_pointer.default',
+      params: { count: hubCandidates.length },
+      deepLink: resolveDeepLink('support.hub', {}),
+      scope: 'self',
+    },
+  ];
+}
+
+async function collectSupporterHubCandidates(
+  db: Database,
+  supporterPersonId: string,
+  now: Date,
+): Promise<NowFeedCandidate[]> {
+  const edges = await db
+    .select({
+      edgeId: supportership.id,
+      personId: supportership.supporteePersonId,
+    })
+    .from(supportership)
+    .innerJoin(person, eq(person.id, supportership.supporteePersonId))
+    .where(
+      and(
+        eq(supportership.supporterPersonId, supporterPersonId),
+        isNull(supportership.revokedAt),
+        isNull(person.archivedAt),
+      ),
+    )
+    .orderBy(asc(supportership.id))
+    .limit(50);
+
+  if (edges.length === 0) return [];
+
+  const perEdge = await Promise.all(
+    edges.map((edge) =>
+      collectNowCandidates(
+        db,
+        edge.personId,
+        'person',
+        now,
+        'supporter',
+        edge.edgeId,
+      ),
+    ),
+  );
+
+  return orderSupporterHubCandidates(perEdge.flat(), now);
 }
 
 async function collectNowCandidates(

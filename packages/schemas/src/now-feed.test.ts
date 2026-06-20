@@ -56,7 +56,7 @@ describe('now feed schemas', () => {
     ).toThrow();
   });
 
-  it('defines every S0 card kind', () => {
+  it('defines every S0 and S4 card kind', () => {
     expect(nowCardKindSchema.options).toEqual([
       'unfinished_session',
       'retention_due',
@@ -64,6 +64,7 @@ describe('now feed schemas', () => {
       'needs_deepening',
       'challenge_ready',
       'ledger_moment',
+      'support_hub_pointer',
     ]);
   });
 
@@ -88,6 +89,7 @@ describe('now feed schemas', () => {
   it('requires deep-link routes to come from the closed catalog', () => {
     expect(nowDeepLinkSchema.parse(deepLink)).toEqual(deepLink);
     expect(nowDeepLinkRouteSchema.options).toContain('journal');
+    expect(nowDeepLinkRouteSchema.options).toContain('support.hub');
     expect(
       nowDeepLinkSchema.parse({
         route: 'journal',

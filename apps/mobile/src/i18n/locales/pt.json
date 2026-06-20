@@ -4102,5 +4102,35 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Utilização: {{used}} de {{limit}} perguntas utilizadas"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Central de apoio",
+      "subtitle": "Um painel para os alunos que você apoia.",
+      "empty": "Adicione um aluno para ver as necessidades de apoio aqui.",
+      "openPerson": "Abrir {{name}}",
+      "personHint": "Abrir a vista de apoio deste aluno.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Sinais de apoio para este aluno."
+    },
+    "subjects": {
+      "title": "Disciplinas",
+      "subtitle": "Uma vista estrutural das disciplinas de cada aluno.",
+      "empty": "Adicione um aluno para ver as suas disciplinas aqui.",
+      "openPerson": "Abrir disciplinas de {{name}}",
+      "personHint": "Abrir a vista estrutural da disciplina.",
+      "structuralOnly": "Apenas estrutura de disciplina, capítulo e tópico.",
+      "bookCount": "{{count}} livro",
+      "bookCount_other": "{{count}} livros",
+      "errorTitle": "Não foi possível carregar as disciplinas",
+      "errorMessage": "Tente novamente daqui a pouco."
+    },
+    "journal": {
+      "title": "Diário",
+      "subtitle": "Registos de apoio enviados para si, agrupados por aluno.",
+      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento.",
+      "personPlaceholderTitle": "Registos partilhados chegam no S5",
+      "personPlaceholderMessage": "Por enquanto, este âmbito mantém ocultas as notas do aluno, conversas e artefactos privados do diário."
+    }
   }
 }

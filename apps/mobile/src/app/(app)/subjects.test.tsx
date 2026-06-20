@@ -9,6 +9,24 @@ let mockSubjectsIndex: {
   isError: boolean;
   refetch: jest.Mock;
 };
+let mockScopeContext: {
+  activeScope:
+    | { kind: 'me' }
+    | { kind: 'supporter-hub' }
+    | {
+        kind: 'person';
+        personId: string;
+        edgeId: string;
+        displayName: string;
+      };
+  availableScopes: Array<{
+    kind: 'person';
+    personId: string;
+    edgeId: string;
+    displayName: string;
+  }>;
+  setActiveScope: jest.Mock;
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -19,6 +37,42 @@ jest.mock(
   () => ({
     useSubjectsIndex: () => mockSubjectsIndex,
   }),
+);
+
+jest.mock(
+  '../../lib/scope-context' /* gc1-allow: route branch test fixes the active V2 scope without exercising provider persistence */,
+  () => ({
+    useScopeContext: () => mockScopeContext,
+  }),
+);
+
+jest.mock(
+  '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
+  () => {
+    const { Text, View } = require('react-native');
+    return {
+      SupportHubSubjectsTab: ({
+        personScopes,
+      }: {
+        personScopes: Array<{ personId: string; displayName: string }>;
+      }) => (
+        <View testID="support-hub-subjects-tab">
+          {personScopes.map((scope) => (
+            <Text key={scope.personId}>{scope.displayName}</Text>
+          ))}
+        </View>
+      ),
+      PersonScopeStructuralSubjects: ({
+        scope,
+      }: {
+        scope: { displayName: string };
+      }) => (
+        <View testID="person-scope-structural-subjects">
+          <Text>{scope.displayName}</Text>
+        </View>
+      ),
+    };
+  },
 );
 
 const SubjectsScreen = require('./subjects').default;
@@ -43,6 +97,18 @@ describe('SubjectsScreen', () => {
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
+    };
+    mockScopeContext = {
+      activeScope: { kind: 'me' },
+      availableScopes: [
+        {
+          kind: 'person',
+          personId: '550e8400-e29b-41d4-a716-446655440101',
+          edgeId: '550e8400-e29b-41d4-a716-446655440201',
+          displayName: 'Emma',
+        },
+      ],
+      setActiveScope: jest.fn(),
     };
   });
 
@@ -75,5 +141,36 @@ describe('SubjectsScreen', () => {
 
     fireEvent.press(screen.getByTestId('subjects-browse-retry'));
     expect(mockSubjectsIndex.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the Support hub Subjects variant without falling through to Me subjects', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+
+    render(<SubjectsScreen />);
+
+    screen.getByTestId('support-hub-subjects-tab');
+    screen.getByText('Emma');
+    expect(screen.queryByText('Spanish')).toBeNull();
+  });
+
+  it('renders a person-scope structural placeholder without supportee artifacts', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: {
+        kind: 'person',
+        personId: '550e8400-e29b-41d4-a716-446655440101',
+        edgeId: '550e8400-e29b-41d4-a716-446655440201',
+        displayName: 'Emma',
+      },
+    };
+
+    render(<SubjectsScreen />);
+
+    screen.getByTestId('person-scope-structural-subjects');
+    screen.getByText('Emma');
+    expect(screen.queryByText('Notes')).toBeNull();
   });
 });

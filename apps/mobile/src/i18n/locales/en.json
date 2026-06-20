@@ -3857,6 +3857,36 @@
     "supportHub": "Support hub",
     "me": "Me"
   },
+  "supportHub": {
+    "mentor": {
+      "title": "Support hub",
+      "subtitle": "A cockpit for the learners you support.",
+      "empty": "Add a learner to see support needs here.",
+      "openPerson": "Open {{name}}",
+      "personHint": "Open this learner's support view.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Support signals for this learner."
+    },
+    "subjects": {
+      "title": "Subjects",
+      "subtitle": "A structural view of each learner's subjects.",
+      "empty": "Add a learner to see their subjects here.",
+      "openPerson": "Open {{name}}'s subjects",
+      "personHint": "Open the structural subject view.",
+      "structuralOnly": "Subject, chapter and topic structure only.",
+      "bookCount": "{{count}} book",
+      "bookCount_other": "{{count}} books",
+      "errorTitle": "Couldn't load subjects",
+      "errorMessage": "Try again in a moment."
+    },
+    "journal": {
+      "title": "Journal",
+      "subtitle": "Support records sent to you, grouped by learner.",
+      "personHint": "Shared records arrive here after consent is finalized.",
+      "personPlaceholderTitle": "Shared records arrive in S5",
+      "personPlaceholderMessage": "For now, this scope keeps learner notes, chats and private journal artifacts hidden."
+    }
+  },
   "modeSwitcher": {
     "switchError": "Couldn't switch. Tap to try again.",
     "a11yRetry": "Retry mode switch"

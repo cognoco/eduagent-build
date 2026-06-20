@@ -4260,5 +4260,35 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Wykorzystanie: {{used}} z {{limit}} pytań użytych"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Centrum wsparcia",
+      "subtitle": "Panel kontrolny dla uczniów, których wspierasz.",
+      "empty": "Dodaj ucznia, aby zobaczyć tutaj potrzeby wsparcia.",
+      "openPerson": "Otwórz {{name}}",
+      "personHint": "Otwórz widok wsparcia dla tego ucznia.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Sygnały wsparcia dla tego ucznia."
+    },
+    "subjects": {
+      "title": "Przedmioty",
+      "subtitle": "Strukturalny widok przedmiotów każdego ucznia.",
+      "empty": "Dodaj ucznia, aby zobaczyć tutaj jego przedmioty.",
+      "openPerson": "Zobacz przedmioty {{name}}",
+      "personHint": "Otwórz strukturalny widok przedmiotów.",
+      "structuralOnly": "Tylko struktura przedmiotów, rozdziałów i tematów.",
+      "bookCount": "{{count}} książka",
+      "bookCount_other": "{{count}} książek",
+      "errorTitle": "Nie udało się wczytać przedmiotów",
+      "errorMessage": "Spróbuj ponownie za chwilę."
+    },
+    "journal": {
+      "title": "Dziennik",
+      "subtitle": "Zapisy wsparcia wysłane do Ciebie, pogrupowane według uczniów.",
+      "personHint": "Udostępnione zapisy pojawią się tutaj po wyrażeniu zgody.",
+      "personPlaceholderTitle": "Udostępnione zapisy pojawią się w S5",
+      "personPlaceholderMessage": "Na razie ten zakres ukrywa notatki uczniów, czaty i prywatne zapisy w dzienniku."
+    }
   }
 }

@@ -1296,7 +1296,6 @@ describe('refreshProgressSnapshot', () => {
         threshold: 3,
         backfilled: false,
       },
-      visibility: 'self',
     });
   });
 

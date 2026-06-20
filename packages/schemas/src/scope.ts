@@ -109,3 +109,62 @@ export const supporteeStructuralSubjectsResponseSchema = z.strictObject({
 export type SupporteeStructuralSubjectsResponse = z.infer<
   typeof supporteeStructuralSubjectsResponseSchema
 >;
+
+export const supporterColdStartCardSchema = z.discriminatedUnion('state', [
+  z.strictObject({
+    state: z.literal('none'),
+    anchor: z.literal('add-child'),
+  }),
+  z.strictObject({
+    personId: z.string().uuid(),
+    edgeId: z.string().uuid(),
+    displayName: z.string().trim().min(1),
+    state: z.literal('managed'),
+    anchor: z.literal('handoff'),
+  }),
+  z.strictObject({
+    pendingLinkId: z.string().uuid(),
+    displayName: z.string().trim().min(1),
+    state: z.literal('consent-pending'),
+    anchor: z.literal('approve'),
+  }),
+  z.strictObject({
+    personId: z.string().uuid(),
+    edgeId: z.string().uuid(),
+    displayName: z.string().trim().min(1),
+    state: z.literal('granted-idle'),
+    anchor: z.literal('kickstart'),
+    staleIdleStep: z
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+      .optional(),
+  }),
+]);
+export type SupporterColdStartCard = z.infer<
+  typeof supporterColdStartCardSchema
+>;
+
+export const supporterColdStartSchema = z
+  .strictObject({
+    variant: z.enum(['variant-zero', 'per-child']),
+    cards: z.array(supporterColdStartCardSchema),
+    selfLearningDoorway: z.literal(true),
+  })
+  .superRefine((value, ctx) => {
+    const hasAddChild = value.cards.some((card) => card.state === 'none');
+    if (value.variant === 'variant-zero') {
+      if (value.cards.length !== 1 || !hasAddChild) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['cards'],
+          message: 'variant-zero must contain only the add-child card',
+        });
+      }
+    } else if (hasAddChild) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cards'],
+        message: 'per-child cold start must not contain add-child cards',
+      });
+    }
+  });
+export type SupporterColdStart = z.infer<typeof supporterColdStartSchema>;

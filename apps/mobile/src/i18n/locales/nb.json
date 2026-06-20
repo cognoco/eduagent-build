@@ -4102,5 +4102,35 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Bruk: {{used}} av {{limit}} spørsmål brukt"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Støttesenter",
+      "subtitle": "Et kontrollpanel for elevene du støtter.",
+      "empty": "Legg til en elev for å se støttebehov her.",
+      "openPerson": "Åpne {{name}}",
+      "personHint": "Åpne denne elevens støttevisning.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Støttesignaler for denne eleven."
+    },
+    "subjects": {
+      "title": "Fag",
+      "subtitle": "En strukturell oversikt over hver elevs fag.",
+      "empty": "Legg til en elev for å se fagene deres her.",
+      "openPerson": "Åpne {{name}}s fag",
+      "personHint": "Åpne den strukturelle fagoversikten.",
+      "structuralOnly": "Kun struktur for fag, kapittel og emne.",
+      "bookCount": "{{count}} bok",
+      "bookCount_other": "{{count}} bøker",
+      "errorTitle": "Kunne ikke laste inn fag",
+      "errorMessage": "Prøv igjen om et øyeblikk."
+    },
+    "journal": {
+      "title": "Logg",
+      "subtitle": "Støtteoppføringer sendt til deg, gruppert etter elev.",
+      "personHint": "Delte oppføringer kommer hit etter at samtykke er fullført.",
+      "personPlaceholderTitle": "Delte oppføringer kommer i S5",
+      "personPlaceholderMessage": "Foreløpig holder dette omfanget elevnotater, chatter og private loggelementer skjult."
+    }
   }
 }

@@ -4102,5 +4102,35 @@
   },
   "usageMeter": {
     "a11yProgressBar": "Nutzung: {{used}} von {{limit}} Fragen verwendet"
+  },
+  "supportHub": {
+    "mentor": {
+      "title": "Support-Hub",
+      "subtitle": "Ein Cockpit für die Lernenden, die du unterstützt.",
+      "empty": "Füge Lernende hinzu, um hier ihren Bedarf zu sehen.",
+      "openPerson": "{{name}} öffnen",
+      "personHint": "Support-Ansicht dieses Lernenden öffnen.",
+      "personTitle": "{{name}}",
+      "personSubtitle": "Support-Signale für diesen Lernenden."
+    },
+    "subjects": {
+      "title": "Fächer",
+      "subtitle": "Eine strukturelle Ansicht der Fächer jedes Lernenden.",
+      "empty": "Füge einen Lernenden hinzu, um hier seine Fächer zu sehen.",
+      "openPerson": "Fächer von {{name}} öffnen",
+      "personHint": "Die strukturelle Fächeransicht öffnen.",
+      "structuralOnly": "Nur Fächer-, Kapitel- und Themenstruktur.",
+      "bookCount": "{{count}} Buch",
+      "bookCount_other": "{{count}} Bücher",
+      "errorTitle": "Fächer konnten nicht geladen werden",
+      "errorMessage": "Gleich erneut versuchen."
+    },
+    "journal": {
+      "title": "Journal",
+      "subtitle": "An dich gesendete Support-Einträge, nach Lernenden gruppiert.",
+      "personHint": "Geteilte Einträge kommen hier an, nachdem die Zustimmung abgeschlossen ist.",
+      "personPlaceholderTitle": "Geteilte Einträge kommen in S5 an",
+      "personPlaceholderMessage": "Vorerst hält dieser Bereich Notizen, Chats und private Journaleinträge von Lernenden verborgen."
+    }
   }
 }
