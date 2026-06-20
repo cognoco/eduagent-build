@@ -270,7 +270,7 @@ describe('ParentHomeScreen', () => {
     });
   }
 
-  it('renders greeting with profile first name', () => {
+  it('[PARENT-01] renders greeting with profile first name', () => {
     const { result } = mount(
       [PARENT],
       {},
@@ -280,7 +280,7 @@ describe('ParentHomeScreen', () => {
     result.getByText('Hey Alex');
   });
 
-  it('renders one command card per linked child with actions inside it', async () => {
+  it('[PARENT-01][PARENT-02] renders one command card per linked child with actions inside it', async () => {
     const { result } = mount([PARENT, CHILD_A, CHILD_B]);
     await waitForParentTransitionNotice(result);
 
@@ -535,7 +535,7 @@ describe('ParentHomeScreen', () => {
     ).toMatch(/^#[0-9a-f]{8}$/i);
   });
 
-  it('shows the household pulse subtitle when children are active', async () => {
+  it('[PARENT-24] shows the household pulse subtitle when children are active', async () => {
     const { result } = mount([PARENT, CHILD_A, CHILD_B], {
       dashboard: {
         children: [
@@ -553,7 +553,7 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('falls back to the greeting subtitle when there are no children', () => {
+  it('[PARENT-24] falls back to the greeting subtitle when there are no children', () => {
     const { result } = mount([PARENT]);
     const pulse = result.getByTestId('parent-home-pulse').props.children;
     expect(String(pulse)).not.toMatch(/active this week|learners/i);
@@ -618,7 +618,7 @@ describe('ParentHomeScreen', () => {
     ).toBeNull();
   });
 
-  it('replaces the family panel with durable mentor insight + add-learner row for a single child', async () => {
+  it('[PARENT-02] replaces the family panel with durable mentor insight + add-learner row for a single child', async () => {
     const { result } = mount([PARENT, CHILD_A], {
       dashboard: {
         children: [
@@ -684,7 +684,7 @@ describe('ParentHomeScreen', () => {
     expect(result.queryByText('You: Fractions in Math')).toBeNull();
   });
 
-  it('shows one activity-based prompt inside each child card when multiple children are linked', async () => {
+  it('[PARENT-02] shows one activity-based prompt inside each child card when multiple children are linked', async () => {
     const { result } = mount([CHILD_B, CHILD_A], {
       // intentionally reversed profiles to verify sort
       dashboard: {
@@ -756,7 +756,7 @@ describe('ParentHomeScreen', () => {
     expect(result.queryByText('Liam may need attention')).toBeNull();
   });
 
-  it('shows ParentTransitionNotice after at least one child is linked', async () => {
+  it('[PARENT-24] shows ParentTransitionNotice after at least one child is linked', async () => {
     const transitionParent = makeProfile({ id: 'profile-transition' });
     const { result } = mount(
       [transitionParent, { ...CHILD_A, accountId: transitionParent.accountId }],

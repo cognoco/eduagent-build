@@ -270,7 +270,7 @@ describe('curriculum routes', () => {
   // ---- POST /v1/curriculum/clone-from-child --------------------------------
 
   describe('POST /v1/curriculum/clone-from-child', () => {
-    it('clones a child topic into the active adult profile', async () => {
+    it('[PARENT-14] clones a child topic into the active adult profile', async () => {
       mockCloneTopicFromChild.mockResolvedValueOnce({
         topicId: TOPIC_ID,
         subjectId: SUBJECT_ID,
