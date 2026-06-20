@@ -278,6 +278,42 @@ describe('processExchange/streamExchange — image/vision safety tripwire (Issue
     expect(result.model).toBe('deterministic:image_unscreened');
     expect(result.response).toBe(imageUnscreenedResponse());
   });
+
+  it('[BREAK] streamExchange fails safe when OCR throws (image_unscreened, never handed to model)', async () => {
+    // The conversational provider THROWS if called — so if the unscreened
+    // branch in streamExchange is removed, the test fails with the provider
+    // error rather than the canned safe reply.
+    registerProvider(throwingProvider);
+    const failingOcr: OcrProvider = {
+      async extractText(): Promise<OcrResult> {
+        throw new Error('OCR provider unavailable');
+      },
+    };
+    setOcrProvider(failingOcr);
+
+    const result = await streamExchange(
+      baseContext,
+      'can you read this for me?',
+      imageData,
+    );
+
+    // Drain the stream — rawResponsePromise only settles after the source
+    // stream is fully consumed (same contract as the other streamExchange tests).
+    let streamed = '';
+    for await (const chunk of result.stream) streamed += chunk;
+
+    // Fail-safe: OCR error must NOT fall through to the conversational model.
+    expect(result.provider).toBe('safety-tripwire');
+    expect(result.model).toBe('deterministic:image_unscreened');
+    expect(streamed).toBe(imageUnscreenedResponse());
+
+    // The synthetic envelope must NOT carry crisis_redirect (this is a
+    // screening failure, not a crisis intervention — different downstream path).
+    const raw = await result.rawResponsePromise;
+    const parsed = parseExchangeEnvelope(raw);
+    expect(parsed.crisisRedirect).toBe(false);
+    expect(parsed.cleanResponse).toBe(imageUnscreenedResponse());
+  });
 });
 
 // ---------------------------------------------------------------------------
