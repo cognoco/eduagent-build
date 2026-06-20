@@ -1713,6 +1713,126 @@ describe('ChatShell', () => {
         });
       }
     });
+
+    // [F-123] The four voice-state UI elements rendered ABOVE the guarded
+    // chat-input-row (live-listening indicator, processing indicator, STT-error
+    // retry Pressable, VoiceTranscriptPreview) must ALSO be suppressed on a
+    // dormant web instance. They were left rendered by the BUG-886 fix even
+    // though their tap handlers (startListening, onSend) are still bound to the
+    // prior/stale session. Each test forces the render state that would
+    // otherwise show the control, then asserts it is absent when web+unfocused.
+
+    it('[F-123] hides the live-listening indicator when dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        // Force the listening state so the indicator would otherwise render.
+        mockSttState = {
+          ...mockSttState,
+          isListening: true,
+          status: 'listening',
+          transcript: 'partial transcript...',
+        };
+        renderChatShell({ onSend: jest.fn(), verificationType: 'teach_back' });
+
+        expect(
+          screen.queryByTestId('voice-listening-indicator', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('[F-123] hides the processing indicator when dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        // Force the processing state so the indicator would otherwise render.
+        mockSttState = {
+          ...mockSttState,
+          status: 'processing',
+        };
+        renderChatShell({ onSend: jest.fn(), verificationType: 'teach_back' });
+
+        expect(
+          screen.queryByTestId('voice-processing-indicator', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('[F-123] hides the STT-error retry Pressable when dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        // Force an STT error so the retry Pressable would otherwise render.
+        // Its onPress is bound to startListening() on the stale session — the
+        // highest-severity dormant control.
+        mockSttState = {
+          ...mockSttState,
+          status: 'error',
+          error: 'Microphone permission denied',
+        };
+        renderChatShell({ onSend: jest.fn(), verificationType: 'teach_back' });
+
+        expect(
+          screen.queryByTestId('voice-error-indicator', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    it('[F-123] hides the VoiceTranscriptPreview when dormant (web + unfocused)', () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
+
+      try {
+        mockIsFocused = false;
+        // Provide a transcript while not listening so pendingTranscript syncs
+        // and the preview (whose onSend is bound to the stale session) would
+        // otherwise render.
+        mockSttState = {
+          ...mockSttState,
+          isListening: false,
+          transcript: 'Photosynthesis is the process...',
+        };
+        renderChatShell({ onSend: jest.fn(), verificationType: 'teach_back' });
+
+        expect(
+          screen.queryByTestId('voice-send-button', {
+            includeHiddenElements: true,
+          }),
+        ).toBeNull();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
   });
 
   describe('escalation rung strip', () => {
