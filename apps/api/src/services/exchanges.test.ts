@@ -23,7 +23,9 @@ import {
   MAX_INTERVIEW_EXCHANGES,
 } from './exchanges';
 import type { ExchangeContext } from './exchanges';
-import { tripwireResponse } from './safety-tripwire';
+import { tripwireResponse, imageUnscreenedResponse } from './safety-tripwire';
+import { setOcrProvider, resetOcrProvider, type OcrProvider } from './ocr';
+import type { OcrResult } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -132,6 +134,149 @@ describe('processExchange — safety tripwire wiring', () => {
     } finally {
       registerProvider(createMockProvider('gemini'));
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deterministic safety tripwire — IMAGE / VISION input (Issue 894)
+//
+// [BREAK] The text-only tripwire runs on `userMessage` but the attached image
+// reaches the vision model unscreened. A catastrophic image with a benign
+// caption defeats the deterministic floor. These tests prove the OCR-then-
+// tripwire floor: when imageData is present we OCR the image (external Gemini
+// vision boundary, mocked here via setOcrProvider) and re-run the tripwire over
+// the caption + extracted text, short-circuiting the conversational LLM exactly
+// like the text path. The conversational provider THROWS if called, so a
+// regression that skips OCR screening fails with the provider error.
+// ---------------------------------------------------------------------------
+
+describe('processExchange/streamExchange — image/vision safety tripwire (Issue 894)', () => {
+  const throwingProvider: LLMProvider = {
+    id: 'gemini',
+    async chat() {
+      throw new Error(
+        'conversational LLM must not be called when an image trips the safety floor',
+      );
+    },
+    chatStream(): never {
+      throw new Error(
+        'conversational LLM must not be called when an image trips the safety floor',
+      );
+    },
+  };
+
+  /** Fake OCR provider — the external Gemini vision boundary. Returns whatever
+   * extracted text the test pins, never touches the network. */
+  function pinOcrText(text: string): void {
+    const provider: OcrProvider = {
+      async extractText(): Promise<OcrResult> {
+        return { text, confidence: 0.95, regions: [] };
+      },
+    };
+    setOcrProvider(provider);
+  }
+
+  const imageData = {
+    base64: Buffer.from('not-a-real-image').toString('base64'),
+    mimeType: 'image/png' as const,
+  };
+
+  afterEach(() => {
+    resetOcrProvider();
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  it('[BREAK] processExchange short-circuits when OCR of the image yields a catastrophic phrase under a benign caption', async () => {
+    registerProvider(throwingProvider);
+    pinOcrText('how do i kill myself');
+
+    const result = await processExchange(
+      baseContext,
+      'can you read this for me?',
+      imageData,
+    );
+
+    expect(result.provider).toBe('safety-tripwire');
+    expect(result.model).toBe('deterministic:self_harm_method');
+    expect(result.response).toBe(tripwireResponse('self_harm_method'));
+  });
+
+  it('[BREAK] streamExchange short-circuits when OCR of the image yields a catastrophic phrase under a benign caption', async () => {
+    registerProvider(throwingProvider);
+    pinOcrText('how do i kill myself');
+
+    const result = await streamExchange(
+      baseContext,
+      'can you read this for me?',
+      imageData,
+    );
+
+    let streamed = '';
+    for await (const chunk of result.stream) streamed += chunk;
+    expect(result.provider).toBe('safety-tripwire');
+    expect(result.model).toBe('deterministic:self_harm_method');
+    expect(streamed).toBe(tripwireResponse('self_harm_method'));
+
+    const raw = await result.rawResponsePromise;
+    const parsed = parseExchangeEnvelope(raw);
+    expect(parsed.crisisRedirect).toBe(true);
+    expect(parsed.cleanResponse).toBe(tripwireResponse('self_harm_method'));
+  });
+
+  it('does NOT trip on a benign image (OCR yields ordinary homework text → LLM is used)', async () => {
+    let called = false;
+    const countingProvider: LLMProvider = {
+      id: 'gemini',
+      async chat() {
+        called = true;
+        return {
+          content: JSON.stringify({
+            reply: 'Let us solve this quadratic together…',
+            signals: { understanding_check: false },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(countingProvider);
+    pinOcrText('solve x^2 + 5x + 6 = 0');
+
+    const result = await processExchange(
+      baseContext,
+      'help me with this problem',
+      imageData,
+    );
+
+    expect(called).toBe(true);
+    expect(result.provider).not.toBe('safety-tripwire');
+  });
+
+  it('fails safe (short-circuits) when OCR throws so a catastrophic image is never silently handed to the model', async () => {
+    registerProvider(throwingProvider);
+    const failingOcr: OcrProvider = {
+      async extractText(): Promise<OcrResult> {
+        throw new Error('OCR provider unavailable');
+      },
+    };
+    setOcrProvider(failingOcr);
+
+    const result = await processExchange(
+      baseContext,
+      'can you read this for me?',
+      imageData,
+    );
+
+    // Fail-safe: OCR error must NOT fall through to the conversational model
+    // (that would defeat the floor). It returns the deterministic safe reply.
+    expect(result.provider).toBe('safety-tripwire');
+    expect(result.model).toBe('deterministic:image_unscreened');
+    expect(result.response).toBe(imageUnscreenedResponse());
   });
 });
 

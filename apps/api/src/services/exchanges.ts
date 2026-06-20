@@ -36,8 +36,11 @@ import { inngest } from '../inngest/client';
 import {
   detectCatastrophicSafetyTrigger,
   tripwireResponse,
+  imageUnscreenedResponse,
+  IMAGE_UNSCREENED_MODEL,
   type CatastrophicCategory,
 } from './safety-tripwire';
+import { getOcrProvider } from './ocr';
 import {
   GENERAL_KNOWLEDGE_SOURCE_ID,
   GENERAL_KNOWLEDGE_CONFIDENCE_FLOOR,
@@ -1286,6 +1289,94 @@ function buildTripwireEnvelope(category: CatastrophicCategory): string {
 }
 
 /**
+ * [Issue 894] Image/vision safety screening for the deterministic floor.
+ *
+ * The catastrophic tripwire (`detectCatastrophicSafetyTrigger`) is text-only,
+ * so a catastrophic image with a benign caption would reach the vision model
+ * unscreened — defeating the floor's guarantee that the worst inputs never
+ * reach the model even when it is jailbroken. Before attaching the image, we
+ * OCR it via the existing OCR provider and re-run the tripwire over the
+ * caption + extracted text.
+ *
+ * SCOPE: a regex tripwire cannot read pixels. A purely pixel-based catastrophic
+ * image with no extractable text (drawn/photographic) is OUT OF SCOPE here and
+ * needs a vision safety classifier (tracked follow-up). This covers the
+ * embedded/handwritten/printed-text case the OCR provider can extract.
+ *
+ * FAIL-SAFE: if OCR errors we must NOT fall through to the conversational
+ * model (that would silently defeat the floor). We return `image_unscreened`
+ * so the caller refuses the image with a neutral message — matching the
+ * "silent recovery without escalation is banned" rule on safety paths.
+ */
+type ImageScreenResult =
+  | { kind: 'clean' }
+  | { kind: 'tripwire'; category: CatastrophicCategory }
+  | { kind: 'unscreened' };
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const buf = Buffer.from(base64, 'base64');
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+async function screenImageForCatastrophicContent(
+  userMessage: string,
+  imageData: ImageData,
+  context: ExchangeContext,
+): Promise<ImageScreenResult> {
+  let extractedText: string;
+  try {
+    // useRouter:true — the GeminiOcrProvider routes through routeAndCall, so the
+    // API key comes from the registered LLM provider (no env read here). A DI
+    // override set via setOcrProvider (tests) takes precedence.
+    const provider = getOcrProvider(true);
+    const result = await provider.extractText(
+      base64ToArrayBuffer(imageData.base64),
+      imageData.mimeType,
+    );
+    extractedText = result.text;
+  } catch (error) {
+    // Fail safe: never hand an unscreened image to the model. Escalate (not a
+    // bare console.warn) so the gap is observable, then refuse this image.
+    logger.error('safety.image_ocr_screen_failed', {
+      session_id: context.sessionId,
+      profile_id: context.profileId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { kind: 'unscreened' };
+  }
+
+  const combined = `${userMessage}\n${extractedText}`;
+  const hit = detectCatastrophicSafetyTrigger(combined);
+  return hit ? { kind: 'tripwire', category: hit.category } : { kind: 'clean' };
+}
+
+/** Non-streaming ExchangeResult for the image-could-not-be-screened fail-safe. */
+function buildImageUnscreenedResult(context: ExchangeContext): ExchangeResult {
+  const response = imageUnscreenedResponse();
+  return {
+    response,
+    newEscalationRung: context.escalationRung,
+    isUnderstandingCheck: false,
+    expectedResponseMinutes: estimateExpectedResponseMinutes(response, context),
+    needsDeepening: false,
+    partialProgress: false,
+    provider: 'safety-tripwire',
+    model: IMAGE_UNSCREENED_MODEL,
+    latencyMs: 0,
+    readyToFinish: false,
+  };
+}
+
+/** Synthetic envelope for the streaming image-unscreened fail-safe. */
+function buildImageUnscreenedEnvelope(): string {
+  return JSON.stringify({
+    reply: imageUnscreenedResponse(),
+    signals: {},
+    confidence: 'high',
+  });
+}
+
+/**
  * Non-streaming ExchangeResult for a deterministic tripwire hit. The LLM is
  * never called — `provider`/`model` record that the response was produced by
  * the safety floor, not a model.
@@ -1329,6 +1420,30 @@ export async function processExchange(
       flow: `exchange.process.tripwire.${inputTrip.category}`,
     });
     return buildTripwireResult(inputTrip.category, context);
+  }
+
+  // [Issue 894] Vision-input floor. The text tripwire above only sees
+  // userMessage; an attached image reaches the model unscreened. OCR the image
+  // and re-run the tripwire over caption + extracted text BEFORE buildUserContent
+  // attaches it, short-circuiting exactly like the text path on a hit. OCR
+  // failure fails safe (refuse the image) rather than handing it to the model.
+  if (imageData) {
+    const screen = await screenImageForCatastrophicContent(
+      userMessage,
+      imageData,
+      context,
+    );
+    if (screen.kind === 'tripwire') {
+      await emitCrisisRedirectEvent({
+        sessionId: context.sessionId,
+        profileId: context.profileId,
+        flow: `exchange.process.tripwire.image.${screen.category}`,
+      });
+      return buildTripwireResult(screen.category, context);
+    }
+    if (screen.kind === 'unscreened') {
+      return buildImageUnscreenedResult(context);
+    }
   }
 
   const appHelpTurn = isAppHelpQuery(userMessage);
@@ -1459,15 +1574,14 @@ export async function streamExchange(
   // resolve rawResponsePromise to a synthetic crisis envelope so the caller's
   // classifyExchangeOutcome persists the safe reply rather than an orphan
   // fallback. The structured safety event is emitted here, deterministically.
-  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
-  if (inputTrip) {
-    await emitCrisisRedirectEvent({
-      sessionId: context.sessionId,
-      profileId: context.profileId,
-      flow: `exchange.stream.tripwire.${inputTrip.category}`,
-    });
-    const safeReply = tripwireResponse(inputTrip.category);
-    const rawEnvelope = buildTripwireEnvelope(inputTrip.category);
+  // Shared builder for any deterministic short-circuit on the streaming path:
+  // streams the safe reply as one chunk and resolves a synthetic envelope so
+  // classifyExchangeOutcome persists the safe reply (not an orphan fallback).
+  const buildSafeStreamResult = (
+    safeReply: string,
+    rawEnvelope: string,
+    model: string,
+  ): ExchangeStreamResult => {
     async function* singleChunk(): AsyncIterable<string> {
       yield safeReply;
     }
@@ -1476,11 +1590,55 @@ export async function streamExchange(
       rawResponsePromise: Promise.resolve(rawEnvelope),
       newEscalationRung: context.escalationRung,
       provider: 'safety-tripwire',
-      model: `deterministic:${inputTrip.category}`,
+      model,
       sourceEvidence: buildExchangeSourceEvidence(context, userMessage, {
         appHelpTurn: false,
       }),
     };
+  };
+
+  const inputTrip = detectCatastrophicSafetyTrigger(userMessage);
+  if (inputTrip) {
+    await emitCrisisRedirectEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: `exchange.stream.tripwire.${inputTrip.category}`,
+    });
+    return buildSafeStreamResult(
+      tripwireResponse(inputTrip.category),
+      buildTripwireEnvelope(inputTrip.category),
+      `deterministic:${inputTrip.category}`,
+    );
+  }
+
+  // [Issue 894] Vision-input floor (streaming). Mirror processExchange: OCR the
+  // image and re-run the tripwire over caption + extracted text before the
+  // image reaches the model. OCR failure fails safe (refuse the image).
+  if (imageData) {
+    const screen = await screenImageForCatastrophicContent(
+      userMessage,
+      imageData,
+      context,
+    );
+    if (screen.kind === 'tripwire') {
+      await emitCrisisRedirectEvent({
+        sessionId: context.sessionId,
+        profileId: context.profileId,
+        flow: `exchange.stream.tripwire.image.${screen.category}`,
+      });
+      return buildSafeStreamResult(
+        tripwireResponse(screen.category),
+        buildTripwireEnvelope(screen.category),
+        `deterministic:${screen.category}`,
+      );
+    }
+    if (screen.kind === 'unscreened') {
+      return buildSafeStreamResult(
+        imageUnscreenedResponse(),
+        buildImageUnscreenedEnvelope(),
+        IMAGE_UNSCREENED_MODEL,
+      );
+    }
   }
 
   const appHelpTurn = isAppHelpQuery(userMessage);
