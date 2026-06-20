@@ -416,12 +416,14 @@ describe('buildAppHelpPromptBlock — V2 shell', () => {
 
   it('routes notes / sessions / bookmarks / memory into the Journal tab', () => {
     expect(en.journal.sections.notes).toBe('Saved notes');
-    expect(en.journal.notes.sessions).toBe('Recent learning sessions');
-    expect(en.journal.notes.bookmarks).toBe('Saved mentor replies');
     expect(en.journal.sections.memory).toBe('Mentor memory');
     expect(v2).toContain(en.journal.sections.notes);
-    expect(v2).toContain(en.journal.notes.sessions);
-    expect(v2).toContain(en.journal.notes.bookmarks);
+    // Sessions and bookmarks are routed as sub-labels of "Saved notes" in the
+    // V2 prompt, not standalone i18n keys: the journal i18n was restructured in
+    // #1316 (journal.notes.sessions / journal.notes.bookmarks were removed), so
+    // assert the literal destination copy the prompt actually teaches.
+    expect(v2).toContain('Recent learning sessions');
+    expect(v2).toContain('Saved mentor replies');
     expect(v2).toContain(en.journal.sections.memory);
   });
 
