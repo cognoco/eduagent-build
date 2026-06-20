@@ -78,10 +78,14 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
+// Mutable so individual tests can drop subjectId to exercise the missing-param
+// guard. Reset to the default in beforeEach.
+let mockSearchParams: { subjectId?: string } = { subjectId: 'sub-1' };
+
 jest.mock(
   'expo-router', // gc1-allow: native-boundary
   () => ({
-    useLocalSearchParams: () => ({ subjectId: 'sub-1' }),
+    useLocalSearchParams: () => mockSearchParams,
     useRouter: () => ({
       push: mockPush,
       back: mockBack,
@@ -157,6 +161,7 @@ describe('PickBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
+    mockSearchParams = { subjectId: 'sub-1' };
     resetRoutes();
   });
 
@@ -700,6 +705,69 @@ describe('PickBookScreen', () => {
 
       // The stale navigation must NOT fire.
       expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('missing subjectId param guard', () => {
+    it('renders the missing-param guard when subjectId is absent', () => {
+      mockSearchParams = {};
+
+      const { result } = renderPickBook();
+
+      result.getByTestId('pick-book-missing-param');
+      result.getByTestId('pick-book-missing-param-back');
+      // The normal picker shell must NOT mount without a subjectId.
+      expect(result.queryByTestId('pick-book-screen')).toBeNull();
+      expect(result.queryByTestId('pick-book-loading')).toBeNull();
+    });
+
+    it('missing-param back button replaces to the library', () => {
+      mockSearchParams = {};
+
+      const { result } = renderPickBook();
+
+      fireEvent.press(result.getByTestId('pick-book-missing-param-back'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+  });
+
+  describe('[BUG-539] slow-loading hint', () => {
+    // Restore real timers even if an assertion throws mid-test, so fake timers
+    // never leak into a sibling test.
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('reveals the slow-loading hint only after the slow timer elapses', async () => {
+      jest.useFakeTimers();
+
+      // Never-resolving suggestions keep the query in its loading state so the
+      // slow-hint timer (SLOW_LOADING_HINT_MS = 5000ms) can fire deterministically.
+      // The executor intentionally never calls resolve/reject, so the promise
+      // never settles.
+      const pendingForever = new Promise<Response>(() => undefined);
+      mockFetch.setRoute('/book-suggestions', () => pendingForever);
+
+      const { result } = renderPickBook();
+
+      // Loading view is up, slow hint is not yet present.
+      result.getByTestId('pick-book-loading');
+      expect(result.queryByTestId('pick-book-loading-slow')).toBeNull();
+
+      // Just before the threshold: still no hint.
+      await act(async () => {
+        jest.advanceTimersByTime(4_999);
+      });
+      result.rerender(<PickBookScreen />);
+      expect(result.queryByTestId('pick-book-loading-slow')).toBeNull();
+
+      // Crossing the 5s threshold reveals the hint.
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      result.rerender(<PickBookScreen />);
+      result.getByTestId('pick-book-loading-slow');
     });
   });
 });
