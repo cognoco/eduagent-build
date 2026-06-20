@@ -19,7 +19,7 @@ jest.mock(
     return {
       ...actual,
       getActiveAssessmentForTopic: jest.fn(),
-      createAssessment: jest.fn(),
+      createAssessmentIfNoneActive: jest.fn(),
       getAssessment: jest.fn(),
       updateAssessment: jest.fn(),
       evaluateAssessmentAnswer: jest.fn(),
@@ -126,7 +126,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import {
   getActiveAssessmentForTopic,
-  createAssessment,
+  createAssessmentIfNoneActive,
   getAssessment,
   updateAssessment,
   evaluateAssessmentAnswer,
@@ -278,7 +278,9 @@ function makeStubDb(): Partial<Database> {
 const getActiveAssessmentForTopicMock = jest.mocked(
   getActiveAssessmentForTopic,
 );
-const createAssessmentMock = jest.mocked(createAssessment);
+const createAssessmentIfNoneActiveMock = jest.mocked(
+  createAssessmentIfNoneActive,
+);
 const getAssessmentMock = jest.mocked(getAssessment);
 const updateAssessmentMock = jest.mocked(updateAssessment);
 const evaluateAssessmentAnswerMock = jest.mocked(evaluateAssessmentAnswer);
@@ -326,26 +328,19 @@ beforeEach(() => {
 describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
   const path = `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/assessments`;
 
-  it('returns 201 with the active assessment when one already exists', async () => {
-    const existing = makeAssessmentRecord();
-    getActiveAssessmentForTopicMock.mockResolvedValue(existing);
+  it('returns 201 with the assessment the race-safe get-or-create returns', async () => {
+    // Get-or-create is now serialized inside the service
+    // (createAssessmentIfNoneActive); the route only delegates. The
+    // race semantics (exactly one in_progress row under concurrency) are
+    // covered by the integration test + service unit tests.
+    createAssessmentIfNoneActiveMock.mockResolvedValue(makeAssessmentRecord());
 
     const res = await makeApp().request(path, { method: 'POST' });
 
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body).toMatchObject({ assessment: { id: ASSESSMENT_ID } });
-    expect(createAssessmentMock).not.toHaveBeenCalled();
-  });
-
-  it('creates a new assessment when none is active', async () => {
-    getActiveAssessmentForTopicMock.mockResolvedValue(null);
-    createAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-
-    const res = await makeApp().request(path, { method: 'POST' });
-
-    expect(res.status).toBe(201);
-    expect(createAssessmentMock).toHaveBeenCalledWith(
+    expect(createAssessmentIfNoneActiveMock).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID,
       SUBJECT_ID,
@@ -360,7 +355,7 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(createAssessmentMock).not.toHaveBeenCalled();
+    expect(createAssessmentIfNoneActiveMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when profileId is absent (missing profile context)', async () => {

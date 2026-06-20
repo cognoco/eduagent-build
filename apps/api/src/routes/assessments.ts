@@ -19,7 +19,7 @@ import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   evaluateAssessmentAnswer,
   buildAssessmentAppHelpEvaluation,
-  createAssessment,
+  createAssessmentIfNoneActive,
   getAssessment,
   getActiveAssessmentForTopic,
   updateAssessment,
@@ -74,9 +74,17 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
-    const assessment =
-      (await getActiveAssessmentForTopic(db, profileId, subjectId, topicId)) ??
-      (await createAssessment(db, profileId, subjectId, topicId));
+    // Race-safe get-or-create. The read-then-create is serialized inside the
+    // service under db.transaction + SELECT ... FOR UPDATE on the parent topic
+    // row; a bare `getActive ?? create` let two concurrent POSTs both INSERT,
+    // leaving a duplicate orphaned in_progress row that still consumed quota
+    // tracking.
+    const assessment = await createAssessmentIfNoneActive(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+    );
 
     return c.json(
       createAssessmentResponseSchema.parse({

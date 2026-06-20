@@ -124,6 +124,57 @@ describe('Integration: assessment routes', () => {
     expect(assessment?.status).toBe('in_progress');
   });
 
+  it('[BREAK / race] creates exactly one in_progress row under concurrent create POSTs', async () => {
+    // Two near-simultaneous POSTs for the same (profileId, topicId) must not
+    // both pass the "no active assessment" read and both INSERT. The route
+    // serializes the read-then-create under db.transaction + SELECT ... FOR
+    // UPDATE on the parent topic row, so the loser observes the winner's
+    // freshly-inserted in_progress row and returns it instead of inserting a
+    // duplicate. Without the fix this test sees TWO in_progress rows.
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const topicId = curriculum.topicIds[0]!;
+
+    const fire = () =>
+      app.request(
+        `/v1/subjects/${subject.id}/topics/${topicId}/assessments`,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(
+            { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+            profile.id,
+          ),
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+    const [resA, resB] = await Promise.all([fire(), fire()]);
+
+    expect(resA.status).toBe(201);
+    expect(resB.status).toBe(201);
+
+    const bodyA = await resA.json();
+    const bodyB = await resB.json();
+    // Both callers must observe the SAME assessment id — the loser returns the
+    // winner's row rather than a second freshly-created one.
+    expect(bodyA.assessment.id).toBe(bodyB.assessment.id);
+
+    const db = getIntegrationDb();
+    const rows = await db.query.assessments.findMany({
+      where: and(
+        eq(assessments.profileId, profile.id),
+        eq(assessments.topicId, topicId),
+        eq(assessments.status, 'in_progress'),
+      ),
+    });
+    expect(rows).toHaveLength(1);
+  });
+
   it('returns 401 without auth when creating an assessment', async () => {
     const profile = await createOwnerProfile();
     const subject = await seedSubject(profile.id, 'Biology');
