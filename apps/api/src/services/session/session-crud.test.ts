@@ -2,6 +2,7 @@ import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
   closeSession,
+  closeStaleSessions,
   flagContent,
   getSessionCompletionContext,
   matchTopicByIntent,
@@ -1292,5 +1293,201 @@ describe('[WI-650] getSessionCompletionContext — typed NotFoundError for missi
     await expect(
       getSessionCompletionContext(db, 'prof-1', 'sess-missing'),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// closeStaleSessions — per-session error isolation
+//
+// Regression for the cron-batch abort bug: the inner closeSession loop had no
+// try/catch, so a single throwing session (e.g. a transient DB read error)
+// aborted the entire batch — every stale session AFTER the failing one stayed
+// status='active' until the next cron run, blocking the per-profile
+// post-session pipeline (XP, streaks, memory).
+//
+// Red-green evidence:
+//   GREEN (fix applied):  the middle session throws, the OTHER two still close,
+//     and the failure is surfaced on result.failures + escalated to Sentry.
+//   RED   (fix reverted): closeStaleSessions rejects with the middle session's
+//     error; sessions after it are never processed. This test fails because the
+//     awaited call throws instead of returning a batch.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fake Database that drives the REAL closeStaleSessions + REAL closeSession.
+ *
+ * The database is a true external boundary, so a hand-built fake (not a
+ * jest.mock of internal code) is the sanctioned substitute. It implements
+ * exactly the Drizzle surface the real close path touches:
+ *
+ *   closeStaleSessions: db.query.learningSessions.findMany (the batch query)
+ *   closeSession → getSession: db.query.learningSessions.findFirst (scoped repo)
+ *   closeSession: db.query.sessionEvents.findMany (active-time computation)
+ *   closeSession: db.transaction(fn) → tx.update().set().where().returning()
+ *   createPendingSessionSummary → findSessionSummaryRow:
+ *     db.query.sessionSummaries.findFirst (scoped repo)
+ *   createPendingSessionSummary: tx.insert().values().returning()
+ *
+ * `throwForSessionId` makes findFirst throw for ONE session — a genuine DB read
+ * failure inside the real closeSession, the exact transient-error scenario the
+ * cron must isolate. All other sessions complete the real success path.
+ */
+function makeStaleBatchDb(options: {
+  staleRows: Array<{
+    id: string;
+    profileId: string;
+    subjectId: string;
+    sessionType: string;
+  }>;
+  throwForSessionId: string;
+}) {
+  const STALE_DATE = new Date('2026-01-01T00:00:00.000Z');
+
+  function fullSessionRow(stub: {
+    id: string;
+    profileId: string;
+    subjectId: string;
+    sessionType: string;
+  }) {
+    return {
+      id: stub.id,
+      profileId: stub.profileId,
+      subjectId: stub.subjectId,
+      topicId: null,
+      sessionType: stub.sessionType,
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
+      escalationRung: 0,
+      exchangeCount: 5,
+      startedAt: STALE_DATE,
+      lastActivityAt: STALE_DATE,
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      metadata: null,
+    };
+  }
+
+  // The scoped repo passes a composed `where` SQL; we cannot introspect it
+  // cheaply, so we resolve the target session from the most recent findFirst
+  // arg by scanning the staleRows. closeSession only ever findFirst-s the
+  // session it is currently closing, in loop order, so a simple cursor works.
+  let cursor = 0;
+
+  const db = {
+    query: {
+      learningSessions: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(options.staleRows.map((r) => fullSessionRow(r))),
+        findFirst: jest.fn().mockImplementation(async () => {
+          const stub = options.staleRows[cursor];
+          cursor += 1;
+          if (!stub) return undefined;
+          if (stub.id === options.throwForSessionId) {
+            throw new Error(`DB read failed for ${stub.id}`);
+          }
+          return fullSessionRow(stub);
+        }),
+      },
+      sessionEvents: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      sessionSummaries: {
+        // No pre-existing summary → createPendingSessionSummary inserts a new one
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(txBuilder),
+      ),
+  };
+
+  // Chainable tx builder covering update(...).set(...).where(...).returning()
+  // and insert(...).values(...).returning(). Shares db.query so that
+  // createPendingSessionSummary's scoped findSessionSummaryRow(txDb, ...) read
+  // resolves through the same fake surface.
+  const txBuilder = {
+    query: db.query,
+    update: () => txBuilder,
+    set: () => txBuilder,
+    where: () => txBuilder,
+    returning: async () => [{ id: 'closed-row' }],
+    insert: () => txBuilder,
+    values: () => txBuilder,
+  };
+
+  return db as never;
+}
+
+describe('closeStaleSessions — per-session error isolation', () => {
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+
+  beforeEach(() => {
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    captureExceptionSpy.mockRestore();
+  });
+
+  it('closes the other sessions when one throws, and surfaces + escalates the failure', async () => {
+    const staleRows = [
+      {
+        id: 'sess-a',
+        profileId: 'prof-a',
+        subjectId: 'subj-a',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-b',
+        profileId: 'prof-b',
+        subjectId: 'subj-b',
+        sessionType: 'learning',
+      },
+      {
+        id: 'sess-c',
+        profileId: 'prof-c',
+        subjectId: 'subj-c',
+        sessionType: 'learning',
+      },
+    ];
+    const db = makeStaleBatchDb({ staleRows, throwForSessionId: 'sess-b' });
+
+    const result = await closeStaleSessions(
+      db,
+      new Date('2026-06-01T00:00:00.000Z'),
+    );
+
+    // The batch must NOT abort: the two healthy sessions are still closed.
+    const closedIds = result.map((r) => r.sessionId).sort();
+    expect(closedIds).toEqual(['sess-a', 'sess-c']);
+
+    // The failure is surfaced on the returned batch (observable outcome).
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      sessionId: 'sess-b',
+      profileId: 'prof-b',
+    });
+    expect(result.failures[0]!.error).toContain('DB read failed for sess-b');
+
+    // Silent recovery is banned: the failure is escalated to Sentry.
+    expect(captureExceptionSpy).toHaveBeenCalledTimes(1);
+    const [, context] = captureExceptionSpy.mock.calls[0] as [
+      unknown,
+      { extra?: { sessionId?: string } },
+    ];
+    expect(context?.extra?.sessionId).toBe('sess-b');
   });
 });

@@ -1193,28 +1193,43 @@ export async function closeSession(
   };
 }
 
+export interface StaleSessionCloseResult {
+  profileId: string;
+  sessionId: string;
+  topicId: string | null;
+  subjectId: string;
+  sessionType: string;
+  verificationType: string | null;
+  wallClockSeconds: number;
+  summaryStatus:
+    | 'pending'
+    | 'submitted'
+    | 'accepted'
+    | 'skipped'
+    | 'auto_closed';
+  interleavedTopicIds?: string[];
+  escalationRungs?: number[];
+}
+
+export interface StaleSessionCloseFailure {
+  profileId: string;
+  sessionId: string;
+  error: string;
+}
+
+/**
+ * Array of successfully-closed sessions (backward-compatible: callers can read
+ * `.length` / `.map` / `.filter` exactly as before) carrying a non-enumerable
+ * `failures` channel so the cron's per-session error isolation is observable.
+ */
+export type StaleSessionCloseBatch = StaleSessionCloseResult[] & {
+  failures: StaleSessionCloseFailure[];
+};
+
 export async function closeStaleSessions(
   db: Database,
   cutoff: Date,
-): Promise<
-  Array<{
-    profileId: string;
-    sessionId: string;
-    topicId: string | null;
-    subjectId: string;
-    sessionType: string;
-    verificationType: string | null;
-    wallClockSeconds: number;
-    summaryStatus:
-      | 'pending'
-      | 'submitted'
-      | 'accepted'
-      | 'skipped'
-      | 'auto_closed';
-    interleavedTopicIds?: string[];
-    escalationRungs?: number[];
-  }>
-> {
+): Promise<StaleSessionCloseBatch> {
   // Intentional cross-profile batch query: this cron scans all active sessions
   // and closes only those stale beyond the cutoff, so scoped-repo access does
   // not apply here.
@@ -1225,47 +1240,68 @@ export async function closeStaleSessions(
     ),
   });
 
-  const results: Array<{
-    profileId: string;
-    sessionId: string;
-    topicId: string | null;
-    subjectId: string;
-    sessionType: string;
-    verificationType: string | null;
-    wallClockSeconds: number;
-    summaryStatus:
-      | 'pending'
-      | 'submitted'
-      | 'accepted'
-      | 'skipped'
-      | 'auto_closed';
-    interleavedTopicIds?: string[];
-    escalationRungs?: number[];
-  }> = [];
+  const results: StaleSessionCloseResult[] = [];
+  const failures: StaleSessionCloseFailure[] = [];
 
   for (const staleSession of staleSessions) {
-    const result = await closeSession(
-      db,
-      staleSession.profileId,
-      staleSession.id,
-      {
-        reason: 'silence_timeout',
-        summaryStatus: 'auto_closed',
-      },
-    );
+    // [BUG] Per-session error isolation: a single throwing close must not
+    // abort the whole backlog. Without this try/catch, every stale session
+    // AFTER the failing one stays status='active' until the next cron run.
+    // On failure we escalate via Sentry (silent recovery is banned) and
+    // continue, surfacing the failure in the returned batch's `failures`
+    // channel so the cron's outcome is observable.
+    try {
+      const result = await closeSession(
+        db,
+        staleSession.profileId,
+        staleSession.id,
+        {
+          reason: 'silence_timeout',
+          summaryStatus: 'auto_closed',
+        },
+      );
 
-    // BD-05: Skip sessions that were resumed between read and write
-    if (result.message === 'Session already closed or resumed') {
-      continue;
+      // BD-05: Skip sessions that were resumed between read and write
+      if (result.message === 'Session already closed or resumed') {
+        continue;
+      }
+
+      results.push({
+        profileId: staleSession.profileId,
+        ...result,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('closeStaleSessions: failed to close a stale session', {
+        profileId: staleSession.profileId,
+        sessionId: staleSession.id,
+        error: message,
+      });
+      captureException(error, {
+        tags: { area: 'session-stale-cleanup' },
+        extra: {
+          profileId: staleSession.profileId,
+          sessionId: staleSession.id,
+        },
+      });
+      failures.push({
+        profileId: staleSession.profileId,
+        sessionId: staleSession.id,
+        error: message,
+      });
     }
-
-    results.push({
-      profileId: staleSession.profileId,
-      ...result,
-    });
   }
 
-  return results;
+  // Attach `failures` as a non-enumerable property so existing array
+  // consumers (length / map / filter / spread of successes) are unaffected.
+  const batch = results as StaleSessionCloseBatch;
+  Object.defineProperty(batch, 'failures', {
+    value: failures,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+  return batch;
 }
 
 export async function getSessionCompletionContext(
