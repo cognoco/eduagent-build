@@ -1931,7 +1931,7 @@ export async function claimSessionForFilingRetry(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.filingStatus, 'filing_failed'),
-        lt(learningSessions.filingRetryCount, 3),
+        lt(learningSessions.filingRetryCount, FILING_CONFIG.maxRetries),
       ),
     )
     .returning({ id: learningSessions.id });

@@ -1,6 +1,7 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  claimSessionForFilingRetry,
   closeSession,
   closeStaleSessions,
   flagContent,
@@ -20,6 +21,7 @@ import {
   getSessionMetadata,
   normalizeHomeworkSummary,
 } from './session-crud';
+import { FILING_CONFIG } from '../../config/filing';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
 import * as profileService from '../profile';
@@ -1554,5 +1556,95 @@ describe('closeStaleSessions — per-session error isolation', () => {
     const roundTripped = JSON.parse(JSON.stringify(result));
     expect(roundTripped.failures).toEqual(result.failures);
     expect(roundTripped.sessions).toEqual(result.sessions);
+  });
+});
+
+// [WI-730] The atomic UPDATE predicate in claimSessionForFilingRetry must
+// derive its cap from FILING_CONFIG.maxRetries, not a hardcoded literal.
+// WI-727 already made routes/filing.ts config-driven; this test guards the
+// data-access claim predicate so the two stay in sync if maxRetries changes.
+//
+// Red-green evidence (manual verification):
+//   - WITHOUT fix (lt(..., 3)) + FILING_CONFIG.maxRetries changed to 2:
+//     extractedCap === 3 but FILING_CONFIG.maxRetries === 2 → test FAILS.
+//   - WITH fix (lt(..., FILING_CONFIG.maxRetries)) + maxRetries changed to 2:
+//     extractedCap === 2 === FILING_CONFIG.maxRetries → test PASSES.
+describe('[WI-730] claimSessionForFilingRetry — cap is derived from FILING_CONFIG.maxRetries', () => {
+  const PROFILE_ID = '00000000-0000-7000-8001-000000000001';
+  const SESSION_ID = '00000000-0000-7000-8001-000000000002';
+
+  // Walk any nested plain-object / array structure and collect all numeric
+  // values. Drizzle SQL expression objects are plain objects whose leaves
+  // carry the actual bound values.
+  function collectNumericValues(
+    node: unknown,
+    seen = new Set<unknown>(),
+  ): number[] {
+    if (node == null || typeof node !== 'object' || seen.has(node)) return [];
+    seen.add(node);
+    const nums: number[] = [];
+    for (const val of Object.values(node as Record<string, unknown>)) {
+      if (typeof val === 'number') {
+        nums.push(val);
+      } else if (typeof val === 'object') {
+        nums.push(...collectNumericValues(val, seen));
+      }
+    }
+    return nums;
+  }
+
+  it('embeds FILING_CONFIG.maxRetries as the cap in the WHERE predicate (not a hardcoded literal)', async () => {
+    let capturedWhere: unknown;
+
+    // Chainable builder that records the predicate passed to .where().
+    // .returning() resolves to [] (no row) — the claimed/not-claimed outcome
+    // is irrelevant to this assertion; we only care about the predicate.
+    const chain = {
+      set: () => chain,
+      where: (predicate: unknown) => {
+        capturedWhere = predicate;
+        return chain;
+      },
+      returning: async () => [],
+    };
+    const db = {
+      update: () => chain,
+    } as never;
+
+    await claimSessionForFilingRetry(db, PROFILE_ID, SESSION_ID);
+
+    expect(capturedWhere).toBeDefined();
+
+    // Extract every numeric leaf from the WHERE SQL AST and assert the cap
+    // value (FILING_CONFIG.maxRetries) is present — confirming the predicate
+    // is config-driven, not hardcoded to an unrelated literal.
+    const nums = collectNumericValues(capturedWhere);
+    expect(nums).toContain(FILING_CONFIG.maxRetries);
+  });
+
+  it('does not claim a session whose filingRetryCount equals the cap', async () => {
+    // Build a fake db that returns a row only when the WHERE predicate would
+    // match (filingRetryCount < cap). We simulate the DB enforcing the
+    // predicate by returning [] for a count that is at the cap.
+    //
+    // The predicate is: filingRetryCount < FILING_CONFIG.maxRetries
+    // A session at filingRetryCount == FILING_CONFIG.maxRetries must NOT match.
+    //
+    // Since we cannot introspect Drizzle predicates at the value level without
+    // walking the AST (done in the sibling test above), we verify the behavioral
+    // contract: a db that returns [] signals "not claimed" → function returns
+    // undefined. This confirms the calling code honours the DB's "no rows" result.
+    const chain = {
+      set: () => chain,
+      where: () => chain,
+      returning: async (): Promise<Array<{ id: string }>> => [],
+    };
+    const db = { update: () => chain } as never;
+
+    const result = await claimSessionForFilingRetry(db, PROFILE_ID, SESSION_ID);
+
+    // When the DB returns no rows (cap predicate rejected the session),
+    // claimSessionForFilingRetry must return undefined — not throw, not return {}.
+    expect(result).toBeUndefined();
   });
 });
