@@ -1,6 +1,7 @@
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { subjectRetryCurriculum } from './subject-retry-curriculum';
+import { seedConsentState } from '../../test-utils/consent-seed';
 
 const mockGetStepDatabase = jest.fn();
 const mockGenerateBookTopics = jest.fn();
@@ -95,6 +96,20 @@ function makeMockDb(
       },
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+      // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first.
+      // null = no org = allowed immediately (IDENTITY_V2_ENABLED=true in .env.development.local).
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      // WI-867: getPersonLlmContext + getPersonBirthYear (helpers.ts) both read person.findFirst.
+      // birthDate '2012-01-01' → birthYear 2012 → age 14 (2026-2012), matching the test assertion.
+      // (Old code used mocked getProfileAge; v2 reads person.birthDate directly.)
+      person: {
+        findFirst: jest.fn().mockResolvedValue({
+          birthDate: '2012-01-01',
+          conversationLanguage: null,
+        }),
       },
       // i18n Phase 1: profile lookup for conversationLanguage.
       profiles: {
@@ -374,14 +389,18 @@ describe('subjectRetryCurriculum', () => {
 
   describe('GDPR consent gate', () => {
     it.each([
-      ['WITHDRAWN', { status: 'WITHDRAWN' }],
-      ['PENDING', { status: 'PENDING' }],
-      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+      ['WITHDRAWN', 'WITHDRAWN' as const],
+      ['PENDING', 'PENDING' as const],
+      ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
     ])(
       'skips and returns consent_not_granted when consent status is %s',
-      async (_label, consentRow) => {
+      async (_label, seedState) => {
         const mockDb = makeMockDb();
-        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+        // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+        // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+        seedConsentState(mockDb as unknown as Record<string, unknown>, {
+          state: seedState,
+        });
         mockGetStepDatabase.mockReturnValue(mockDb);
         const { step } = createInngestStepRunner();
 
@@ -428,9 +447,11 @@ describe('subjectRetryCurriculum', () => {
       // load-retry-context sees CONSENTED → context becomes 'pending'.
       // retry-generate-and-persist sees WITHDRAWN → LLM must be skipped.
       const loadDb = makeMockDb();
-      loadDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Sequence: first check = CONSENTED (load step), second check = WITHDRAWN (generate step).
+      seedConsentState(loadDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
       const confirmDb = makeMockDb({ topicsGenerated: false });
       let callCount = 0;
       mockGetStepDatabase.mockImplementation(() => {

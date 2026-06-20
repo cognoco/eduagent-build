@@ -34,6 +34,10 @@ const mockDb = {
     familyLinks: { findMany: jest.fn().mockResolvedValue([]) },
     consentStates: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+    // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+    person: { findFirst: jest.fn().mockResolvedValue(null) },
+    // WI-867: getChargePersonIds (v2 child-discovery) reads db.query.guardianship.findMany
+    guardianship: { findMany: jest.fn().mockResolvedValue([]) },
     learningProfiles: {
       findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
     },
@@ -42,14 +46,21 @@ const mockDb = {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     accounts: { findFirst: jest.fn().mockResolvedValue(null) },
+    // WI-867: send-email step reads db.query.login.findFirst for parent email (v2)
+    login: { findFirst: jest.fn().mockResolvedValue(null) },
   },
   insert: jest.fn().mockReturnValue({ values: mockWeeklyReportInsertValues }),
+  // WI-867: v2 timezone query is person→membership→organization (TWO
+  // innerJoins); the base shape declares both so per-test mockReturnValue
+  // overrides type-check.
   select: jest.fn(() => ({
     from: () => ({
       innerJoin: () => ({
-        where: async (): Promise<
-          Array<{ profileId: string; timezone: string }>
-        > => [],
+        innerJoin: () => ({
+          where: async (): Promise<
+            Array<{ profileId: string; timezone: string }>
+          > => [],
+        }),
       }),
     }),
   })),
@@ -164,6 +175,50 @@ jest.mock(
     listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
       mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
   }),
+);
+
+// WI-867 flag-collapse: the cron's parent-discovery + self-report-eligibility
+// reads moved from the flag-gated v1 services to the now-unconditional v2
+// services (weekly-progress-push.ts:289/160/371). Each v2 function below is a
+// db.selectDistinct().from().where() SELECT shape — UNSEEDABLE on the Proxy
+// unit-mock (which only resolves db.query.* findFirst/findMany, not
+// selectDistinct chains). Continuity-mock ONLY these SELECT-shaped functions
+// (pattern-a requireActual override); every db.query.guardianship.* read
+// (getChargePersonIds / isGuardianOf / getGuardianPersonIds) stays REAL and
+// keeps using the already-seeded mockDb.query.guardianship.findMany path.
+const mockGetAllActiveGuardianPersonIds = jest.fn().mockResolvedValue([]);
+jest.mock(
+  '../../services/identity-v2/guardianship' /* gc1-allow: getAllActiveGuardianPersonIds = db.selectDistinct().from(guardianship).where(isNull(revokedAt)) — a db.SELECT shape, unseedable on the Proxy unit-mock. Only this one fn is overridden; getChargePersonIds/isGuardianOf/getGuardianPersonIds stay real (db.query reads, seeded). Real selectDistinct path covered against a live DB by weekly-progress-push.integration.test.ts (seeds real guardianship edges, exercises getAllActiveGuardianPersonIds). */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/guardianship',
+    ) as typeof import('../../services/identity-v2/guardianship');
+    return {
+      ...actual,
+      getAllActiveGuardianPersonIds: (...args: unknown[]) =>
+        mockGetAllActiveGuardianPersonIds(...args),
+    };
+  },
+);
+
+const mockListEligibleSelfReportPersonIdsV2 = jest.fn().mockResolvedValue([]);
+const mockListEligibleSelfReportPersonIdsAtLocalHour9V2 = jest
+  .fn()
+  .mockResolvedValue([]);
+jest.mock(
+  '../../services/identity-v2/solo-progress-reports-v2' /* gc1-allow: listEligibleSelfReportPersonIdsV2 / ...AtLocalHour9V2 each open with db.selectDistinct().from(learningSessions).where(...) (then db.select joins) — db.SELECT shapes, unseedable on the Proxy unit-mock. NO .integration.test.ts twin currently exercises the v2 self-report eligibility SQL against a real DB (coverage gap — follow-up); the closest existing coverage is unit-level (weekly-self-reports.test.ts / solo-progress-reports.test.ts cover the v1 names). */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/solo-progress-reports-v2',
+    ) as typeof import('../../services/identity-v2/solo-progress-reports-v2');
+    return {
+      ...actual,
+      listEligibleSelfReportPersonIdsV2: (...args: unknown[]) =>
+        mockListEligibleSelfReportPersonIdsV2(...args),
+      listEligibleSelfReportPersonIdsAtLocalHour9V2: (...args: unknown[]) =>
+        mockListEligibleSelfReportPersonIdsAtLocalHour9V2(...args),
+    };
+  },
 );
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
@@ -295,13 +350,26 @@ beforeEach(() => {
   mockDb.query.consentStates.findFirst.mockResolvedValue(null);
   mockDb.query.profiles.findFirst.mockReset();
   mockDb.query.profiles.findFirst.mockResolvedValue(null);
+  // WI-867: reset v2 person.findFirst seam (isPersonLive)
+  mockDb.query.person.findFirst.mockReset();
+  mockDb.query.person.findFirst.mockResolvedValue(null);
+  // WI-867: reset v2 guardianship.findMany seam (getChargePersonIds)
+  mockDb.query.guardianship.findMany.mockReset();
+  mockDb.query.guardianship.findMany.mockResolvedValue([]);
+  // WI-867: reset v2 login.findFirst seam (send-email step parent email)
+  mockDb.query.login.findFirst.mockReset();
+  mockDb.query.login.findFirst.mockResolvedValue(null);
   mockDb.query.learningProfiles.findFirst.mockResolvedValue({ struggles: [] });
   mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
   mockDb.query.notificationPreferences.findFirst.mockResolvedValue(null);
   mockDb.query.accounts.findFirst.mockResolvedValue(null);
+  // WI-867: default timezone-query stub matches the v2 person→membership→
+  // organization shape (TWO innerJoins). Per-test overrides supply rows.
   mockDb.select.mockReturnValue({
     from: () => ({
-      innerJoin: () => ({ where: async () => [] }),
+      innerJoin: () => ({
+        innerJoin: () => ({ where: async () => [] }),
+      }),
     }),
   });
   mockDb.insert.mockReturnValue({ values: mockWeeklyReportInsertValues });
@@ -343,6 +411,11 @@ beforeEach(() => {
   mockLogNotification.mockResolvedValue(undefined);
   mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
   mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
+  // WI-867: v2 SELECT-shaped discovery functions default to empty; the 5
+  // flag-collapse tests override per-case to the IDs their fanout asserts.
+  mockGetAllActiveGuardianPersonIds.mockResolvedValue([]);
+  mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([]);
+  mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -416,6 +489,12 @@ describe('[WI-368] weekly progress push GDPR consent helper consolidation', () =
       mockDb.query.familyLinks.findMany.mockResolvedValue([
         { childProfileId: CHILD_ID },
       ]);
+      // WI-867: v2 child-discovery; guardianship.findMany now owns the link list.
+      mockDb.query.guardianship.findMany.mockResolvedValue([
+        { chargePersonId: CHILD_ID },
+      ]);
+      // WI-867: isPersonLive (v2); parent must be live to reach GDPR check.
+      mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
       mockDb.query.consentStates.findFirst.mockResolvedValue({
         status,
         requestedAt: new Date('2026-05-12T00:00:00.000Z'),
@@ -462,6 +541,12 @@ describe('[WI-368] weekly progress push GDPR consent helper consolidation', () =
       mockDb.query.familyLinks.findMany.mockResolvedValue([
         { childProfileId: CHILD_ID },
       ]);
+      // WI-867: v2 child-discovery; guardianship.findMany now owns the link list.
+      mockDb.query.guardianship.findMany.mockResolvedValue([
+        { chargePersonId: CHILD_ID },
+      ]);
+      // WI-867: isPersonLive (v2); parent must be live.
+      mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
       mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
       mockDb.query.profiles.findFirst.mockResolvedValue({
         displayName: 'Alex',
@@ -567,9 +652,12 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
     mockInngestTransport.clear();
     mockDb.query.familyLinks.findMany.mockResolvedValue([]);
     mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+    // WI-867: v2 timezone query is person→membership→organization (TWO innerJoins).
     mockDb.select.mockReturnValue({
       from: () => ({
-        innerJoin: () => ({ where: async () => [] }),
+        innerJoin: () => ({
+          innerJoin: () => ({ where: async () => [] }),
+        }),
       }),
     });
   });
@@ -684,6 +772,9 @@ describe('weekly progress parent eligibility', () => {
   });
 
   it('queues an email-only parent even when push is disabled', async () => {
+    // WI-867: parent discovery now reads getAllActiveGuardianPersonIds (v2
+    // SELECT, mocked) instead of familyLinks.findMany.
+    mockGetAllActiveGuardianPersonIds.mockResolvedValue(['parent-email-only']);
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { parentProfileId: 'parent-email-only' },
     ]);
@@ -695,15 +786,19 @@ describe('weekly progress parent eligibility', () => {
         weeklyProgressEmail: true,
       },
     ]);
+    // WI-867: v2 timezone query is person→membership→organization (TWO
+    // innerJoins), vs the v1 single-innerJoin shape.
     mockDb.select.mockReturnValue({
       from: () => ({
         innerJoin: () => ({
-          where: async () => [
-            {
-              profileId: 'parent-email-only',
-              timezone: timezoneForLocalHour(9),
-            },
-          ],
+          innerJoin: () => ({
+            where: async () => [
+              {
+                profileId: 'parent-email-only',
+                timezone: timezoneForLocalHour(9),
+              },
+            ],
+          }),
         }),
       }),
     });
@@ -733,13 +828,19 @@ describe('weekly progress parent eligibility', () => {
 
   it('[WI-86] does not queue parents missing from the active-profile timezone query', async () => {
     jest.useFakeTimers({ now: new Date('2026-05-11T09:00:00.000Z') });
+    // WI-867: parent discovery now reads getAllActiveGuardianPersonIds (v2
+    // SELECT, mocked); the timezone query below still filters it out → queued 0.
+    mockGetAllActiveGuardianPersonIds.mockResolvedValue(['parent-archived']);
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { parentProfileId: 'parent-archived' },
     ]);
     mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+    // WI-867: v2 timezone query is person→membership→organization (TWO innerJoins).
     mockDb.select.mockReturnValue({
       from: () => ({
-        innerJoin: () => ({ where: async () => [] }),
+        innerJoin: () => ({
+          innerJoin: () => ({ where: async () => [] }),
+        }),
       }),
     });
 
@@ -765,6 +866,11 @@ describe('weekly progress parent eligibility', () => {
   });
 
   it('queues eligible self-report profiles through the proven weekly fan-out', async () => {
+    // WI-867: self-report-at-9am discovery now reads the v2
+    // listEligibleSelfReportPersonIdsAtLocalHour9V2 (SELECT, mocked).
+    mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([
+      PARENT_ID,
+    ]);
     mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
       PARENT_ID,
     ]);
@@ -810,6 +916,11 @@ describe('weekly progress generate practice summary', () => {
     jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { childProfileId: CHILD_ID },
+    ]);
+    // WI-867: v2 liveness + child-discovery seams.
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
     ]);
     mockDb.query.profiles.findFirst.mockResolvedValue({
       displayName: 'Alex',
@@ -880,6 +991,11 @@ describe('weekly progress generate practice summary', () => {
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { childProfileId: CHILD_ID },
     ]);
+    // WI-867: v2 liveness + child-discovery seams.
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
+    ]);
     mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
     mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
       pushEnabled: true,
@@ -927,6 +1043,12 @@ describe('weekly progress generate practice summary', () => {
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { childProfileId: CHILD_ID },
       { childProfileId: CHILD_ID_2 },
+    ]);
+    // WI-867: v2 liveness + child-discovery seams (2 children).
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
+      { chargePersonId: CHILD_ID_2 },
     ]);
     mockDb.query.profiles.findFirst.mockResolvedValue({
       displayName: 'Alex',
@@ -999,7 +1121,8 @@ describe('weekly progress generate practice summary', () => {
   });
 
   it('[WI-86] skips weekly push and email when parent is archived after preparation', async () => {
-    mockDb.query.profiles.findFirst.mockResolvedValue(null);
+    // WI-867: isPersonLive reads person.findFirst (v2); null = archived/missing.
+    mockDb.query.person.findFirst.mockResolvedValue(null);
 
     const result = await executeGenerateSteps(
       { parentId: PARENT_ID },
@@ -1026,7 +1149,9 @@ describe('weekly progress generate practice summary', () => {
   });
 
   it('[WI-86] skips weekly push and email when a child is archived after preparation', async () => {
-    mockDb.query.profiles.findFirst
+    // WI-867: isPersonLive reads person.findFirst (v2). Parent=live, child=archived
+    // for both the push and email steps; two steps × (parent + child) = 4 calls.
+    mockDb.query.person.findFirst
       .mockResolvedValueOnce({ id: PARENT_ID })
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: PARENT_ID })
@@ -1062,15 +1187,22 @@ describe('weekly progress generate practice summary', () => {
       { childProfileId: CHILD_ID },
       { childProfileId: nonRenderedChildId },
     ]);
+    // WI-867: v2 liveness (person.findFirst) — prepare:parent, send-push:parent+child.
+    mockDb.query.person.findFirst
+      .mockResolvedValueOnce({ id: PARENT_ID }) // prepare: parent live
+      .mockResolvedValueOnce({ id: PARENT_ID }) // send-push: parent live
+      .mockResolvedValueOnce({ id: CHILD_ID }); // send-push: child live
+    // WI-867: v2 child-discovery — both children present; only CHILD_ID renders.
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
+      { chargePersonId: nonRenderedChildId },
+    ]);
+    // v1 path (IDENTITY_V2_ENABLED deleted): profiles.findFirst for display names only.
     mockDb.query.profiles.findFirst
-      .mockResolvedValueOnce({ id: PARENT_ID })
-      .mockResolvedValueOnce({ displayName: 'Alex' })
-      .mockResolvedValueOnce({ displayName: 'Noah' })
-      .mockResolvedValueOnce({ id: PARENT_ID })
-      .mockResolvedValueOnce({ id: CHILD_ID })
+      .mockResolvedValueOnce({ displayName: 'Alex' }) // prepare: CHILD_ID name
+      .mockResolvedValueOnce({ displayName: 'Noah' }) // prepare: nonRenderedChild name
       // Push-step rebuild rehydrates the contributing child's name in-step.
-      .mockResolvedValueOnce({ displayName: 'Alex' })
-      .mockResolvedValueOnce(null);
+      .mockResolvedValueOnce({ displayName: 'Alex' }); // send-push rebuild: CHILD_ID name
     mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
       pushEnabled: true,
       weeklyProgressPush: true,
@@ -1122,7 +1254,18 @@ describe('weekly progress generate practice summary', () => {
   it('persists a self report without child links when includeSelfReport is set', async () => {
     jest.useFakeTimers({ now: new Date('2026-05-19T12:00:00.000Z') });
     mockDb.query.familyLinks.findMany.mockResolvedValue([]);
+    // WI-867: v2 self-report reads person.findFirst for BOTH liveness AND the
+    // display name (weekly-progress-push.ts:165, columns:{displayName}); the
+    // old profiles.findFirst seam no longer feeds the self-report name.
+    mockDb.query.person.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      displayName: 'Alex',
+    });
+    // guardianship.findMany already defaults to [] via beforeEach.
     mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    // WI-867: persistWeeklySelfReportForProfile re-checks eligibility via the
+    // v2 listEligibleSelfReportPersonIdsV2 (SELECT, mocked).
+    mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([PARENT_ID]);
     mockListEligibleSelfReportProfileIds.mockResolvedValue([PARENT_ID]);
     mockGetLatestSnapshotOnOrBefore
       .mockResolvedValueOnce({
@@ -1166,14 +1309,19 @@ describe('memoized step-state PII break test [F-085]', () => {
     mockDb.query.familyLinks.findMany.mockResolvedValue([
       { childProfileId: CHILD_ID },
     ]);
-    // Blanket profile row serves every call site (parent lookup, child
-    // lookup, send-step rechecks, in-step rebuilds).
+    // WI-867: v2 liveness + child-discovery seams.
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    mockDb.query.guardianship.findMany.mockResolvedValue([
+      { chargePersonId: CHILD_ID },
+    ]);
+    // v1 path (IDENTITY_V2_ENABLED deleted): profiles.findFirst for child display name.
     mockDb.query.profiles.findFirst.mockResolvedValue({
       id: PARENT_ID,
       accountId: 'account-1',
       displayName: 'Alex',
     });
-    mockDb.query.accounts.findFirst.mockResolvedValue({
+    // WI-867: send-email step reads login.findFirst for parent email (v2).
+    mockDb.query.login.findFirst.mockResolvedValue({
       email: 'parent@example.com',
     });
     mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
@@ -1248,6 +1396,8 @@ describe('memoized step-state PII break test [F-085]', () => {
 // activity under the original week's idempotency key (PR #933 review).
 describe('send-step rehydration is pinned to the prepare-time snapshot', () => {
   it('re-pins a delayed retry to the memoized snapshotDate when a newer snapshot exists', async () => {
+    // WI-867: runResults bypasses prepare; send-push step still calls isPersonLive.
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
     mockDb.query.profiles.findFirst.mockResolvedValue({
       id: PARENT_ID,
       displayName: 'Alex',
@@ -1324,14 +1474,18 @@ describe('[BUG-842] email send and notificationLog write are atomic', () => {
   };
 
   function seedEmailSendDb(): void {
-    // Satisfies parent/child live checks, email address lookup, and child name
-    // lookup in one blanket mock (all profiles.findFirst calls return this row).
+    // WI-867: v2 liveness (person.findFirst); send-email step calls isPersonLive
+    // for parent + child before rebuilding content.
+    mockDb.query.person.findFirst.mockResolvedValue({ id: PARENT_ID });
+    // v1 path (IDENTITY_V2_ENABLED deleted): profiles.findFirst serves child name
+    // lookup in buildChildWeeklyDigestLine.
     mockDb.query.profiles.findFirst.mockResolvedValue({
       id: PARENT_ID,
       accountId: 'account-1',
       displayName: 'Alex',
     });
-    mockDb.query.accounts.findFirst.mockResolvedValue({
+    // WI-867: send-email step reads login.findFirst for parent email (v2).
+    mockDb.query.login.findFirst.mockResolvedValue({
       email: 'parent@example.com',
     });
     // Current + previous snapshot ensures topic delta > 0 so buildChildWeeklyDigestLine

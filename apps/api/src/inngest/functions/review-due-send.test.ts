@@ -81,6 +81,9 @@ jest.mock(
     curricula: {},
     profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
     subjects: { status: 'subjects.status' },
+    // WI-867: isPersonLive (helpers.ts:126) accesses person.id + person.archivedAt
+    // to build WHERE clause. String stubs satisfy eq()/isNull() mocks.
+    person: { id: 'person.id', archivedAt: 'person.archivedAt' },
   }),
 );
 
@@ -107,6 +110,10 @@ describe('reviewDueSend', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
@@ -125,6 +132,7 @@ describe('reviewDueSend', () => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue(
       'You have 2 topics to review.',
     );
@@ -187,7 +195,9 @@ describe('reviewDueSend', () => {
     });
 
     it('[WI-86] skips stale send events for archived profiles', async () => {
-      mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+      // WI-867: source now calls isPersonLive (db.query.person.findFirst); null =
+      // archived/missing → skip. Old profiles.findFirst override no longer reached.
+      mockDb.query.person.findFirst.mockResolvedValueOnce(null);
 
       const { result } = await executeHandler({
         profileId: 'p-archived',
@@ -244,6 +254,10 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
@@ -262,6 +276,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 
@@ -331,6 +346,10 @@ describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB fa
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
@@ -347,6 +366,7 @@ describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB fa
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 

@@ -96,6 +96,10 @@ describe('dailyReminderSend', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -104,6 +108,7 @@ describe('dailyReminderSend', () => {
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
     mockSendPushNotification.mockResolvedValue({
       sent: true,
@@ -206,7 +211,9 @@ describe('dailyReminderSend', () => {
   });
 
   it('[WI-86] skips stale send events for archived profiles', async () => {
-    mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+    // WI-867: source now calls isPersonLive (db.query.person.findFirst); null =
+    // archived/missing → skip. Old profiles.findFirst override no longer reached.
+    mockDb.query.person.findFirst.mockResolvedValueOnce(null);
 
     const { result } = await executeHandler({
       profileId: 'p-archived',
@@ -250,6 +257,10 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -258,6 +269,7 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 
@@ -334,6 +346,10 @@ describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal D
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -342,6 +358,7 @@ describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal D
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 
