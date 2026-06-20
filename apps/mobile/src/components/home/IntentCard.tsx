@@ -9,6 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 
 interface IntentCardProps {
@@ -31,10 +32,12 @@ export function IntentCard({
   icon,
   onPress,
   onDismiss,
-  dismissLabel = 'Dismiss',
+  dismissLabel,
   testID,
 }: IntentCardProps): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
+  const resolvedDismissLabel = dismissLabel ?? t('common.dismiss');
   const isHighlight = variant === 'highlight';
   const isSubtle = variant === 'subtle';
   const isAccent = variant === 'accent';
@@ -64,11 +67,17 @@ export function IntentCard({
     ? {
         onPress,
         accessibilityRole: 'button' as const,
-        accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
-        accessibilityHint: 'Opens this activity',
+        accessibilityLabel:
+          badge != null
+            ? t('home.intentCard.titleWithBadge', { title, count: badge })
+            : title,
+        accessibilityHint: t('home.intentCard.opensActivityHint'),
       }
     : {
-        accessibilityLabel: badge != null ? `${title}, ${badge} items` : title,
+        accessibilityLabel:
+          badge != null
+            ? t('home.intentCard.titleWithBadge', { title, count: badge })
+            : title,
       };
 
   return (
@@ -120,7 +129,7 @@ export function IntentCard({
             onPress={handleDismiss}
             className="min-h-[32px] min-w-[32px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel={dismissLabel}
+            accessibilityLabel={resolvedDismissLabel}
             testID={testID ? `${testID}-dismiss` : undefined}
             hitSlop={8}
           >

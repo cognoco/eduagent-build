@@ -44,7 +44,7 @@ export function UsageMeter({ used, limit, warningLevel }: UsageMeterProps) {
       <View
         accessible
         accessibilityRole="progressbar"
-        accessibilityLabel={`Usage: ${used} of ${limit} questions used`}
+        accessibilityLabel={t('usageMeter.a11yProgressBar', { used, limit })}
         accessibilityValue={{ min: 0, max: limit, now: clampedUsed }}
         className="h-2.5 bg-border rounded-full overflow-hidden"
       >

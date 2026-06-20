@@ -35,8 +35,6 @@ const SCREEN_HEIGHT =
 // helper below caps every Clerk call at 20s, surfaces a clear message, and
 // re-enables the button.
 const RESET_REQUEST_TIMEOUT_MS = 20_000;
-const RESET_TIMEOUT_USER_MESSAGE =
-  "We couldn't reach the reset service in time. Check your connection and try again.";
 
 class ResetRequestTimeoutError extends Error {
   constructor(public readonly operation: string) {
@@ -72,6 +70,7 @@ function withTimeout<T>(
 export default function ForgotPasswordScreen() {
   const { t } = useTranslation();
   const { signIn, setActive, isLoaded } = useSignIn();
+  const timeoutMessage = t('auth.forgotPassword.timeoutMessage');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -127,7 +126,7 @@ export default function ForgotPasswordScreen() {
             timeoutMs: RESET_REQUEST_TIMEOUT_MS,
           },
         });
-        setError(RESET_TIMEOUT_USER_MESSAGE);
+        setError(timeoutMessage);
       } else {
         setError(extractClerkError(err));
       }
@@ -170,14 +169,12 @@ export default function ForgotPasswordScreen() {
             data: { sessionId, error: String(activateErr) },
           });
           setPendingActivationSessionId(sessionId);
-          setError(
-            'Your password was reset but we could not sign you in automatically.',
-          );
+          setError(t('auth.forgotPassword.resetSuccessActivationError'));
           return;
         }
         // Auth layout guard handles navigation once isSignedIn propagates.
       } else {
-        setError('Password reset could not be completed. Please try again.');
+        setError(t('auth.forgotPassword.resetNotCompleted'));
       }
     } catch (err: unknown) {
       if (err instanceof ResetRequestTimeoutError) {
@@ -190,7 +187,7 @@ export default function ForgotPasswordScreen() {
             timeoutMs: RESET_REQUEST_TIMEOUT_MS,
           },
         });
-        setError(RESET_TIMEOUT_USER_MESSAGE);
+        setError(timeoutMessage);
       } else {
         setError(extractClerkError(err));
       }
@@ -217,9 +214,7 @@ export default function ForgotPasswordScreen() {
         level: 'error',
         data: { error: String(err) },
       });
-      setError(
-        'Still unable to sign you in. Use the link below to sign in with your new password.',
-      );
+      setError(t('auth.forgotPassword.retryActivationFailed'));
     } finally {
       setLoading(false);
     }
@@ -250,7 +245,7 @@ export default function ForgotPasswordScreen() {
             timeoutMs: RESET_REQUEST_TIMEOUT_MS,
           },
         });
-        setError(RESET_TIMEOUT_USER_MESSAGE);
+        setError(timeoutMessage);
       } else {
         setError(extractClerkError(err));
       }
@@ -329,7 +324,7 @@ export default function ForgotPasswordScreen() {
             <View className="gap-3">
               <Button
                 variant="primary"
-                label="Try Again"
+                label={t('common.tryAgain')}
                 onPress={() => void onRetryActivation()}
                 loading={loading}
                 testID="reset-retry-activation"
@@ -338,7 +333,7 @@ export default function ForgotPasswordScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Sign in with your new password"
+                  label={t('auth.forgotPassword.signInWithNewPassword')}
                   onPress={() =>
                     router.push({
                       pathname: '/(auth)/sign-in',
@@ -356,7 +351,7 @@ export default function ForgotPasswordScreen() {
                 </Text>
                 <TextInput
                   className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-                  placeholder="Enter 6-digit code"
+                  placeholder={t('auth.forgotPassword.codePlaceholder')}
                   placeholderTextColor={colors.muted}
                   keyboardType="number-pad"
                   value={code}
@@ -375,7 +370,9 @@ export default function ForgotPasswordScreen() {
                   <PasswordInput
                     value={newPassword}
                     onChangeText={setNewPassword}
-                    placeholder="Enter new password"
+                    placeholder={t(
+                      'auth.forgotPassword.newPasswordPlaceholder',
+                    )}
                     editable={!loading}
                     testID="reset-new-password"
                     showRequirements
@@ -387,7 +384,7 @@ export default function ForgotPasswordScreen() {
 
               <Button
                 variant="primary"
-                label="Reset password"
+                label={t('auth.forgotPassword.resetPasswordButton')}
                 onPress={onResetPress}
                 disabled={!canSubmitReset}
                 loading={loading}
@@ -398,7 +395,7 @@ export default function ForgotPasswordScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Resend code"
+                  label={t('auth.forgotPassword.resendCode')}
                   onPress={onResendCode}
                   loading={resending}
                   testID="reset-resend-code"
@@ -409,7 +406,7 @@ export default function ForgotPasswordScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Use a different email"
+                  label={t('auth.forgotPassword.useDifferentEmail')}
                   onPress={onBackFromReset}
                   testID="reset-back-from-code"
                 />
@@ -419,7 +416,7 @@ export default function ForgotPasswordScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Back to sign in"
+                  label={t('auth.forgotPassword.backToSignIn')}
                   onPress={() => router.push('/(auth)/sign-in')}
                   testID="reset-back-to-sign-in"
                 />
@@ -483,7 +480,7 @@ export default function ForgotPasswordScreen() {
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
-            placeholder="you@example.com"
+            placeholder={t('auth.forgotPassword.emailPlaceholder')}
             placeholderTextColor={colors.muted}
             value={emailAddress}
             onChangeText={setEmailAddress}
@@ -495,7 +492,7 @@ export default function ForgotPasswordScreen() {
 
         <Button
           variant="primary"
-          label="Send reset code"
+          label={t('auth.forgotPassword.sendResetCode')}
           onPress={onSendCodePress}
           disabled={!canSubmitEmail}
           loading={loading}
@@ -506,7 +503,7 @@ export default function ForgotPasswordScreen() {
           <Button
             variant="tertiary"
             size="small"
-            label="Back to sign in"
+            label={t('auth.forgotPassword.backToSignIn')}
             onPress={() => goBackOrReplace(router, '/sign-in' as const)}
             testID="back-to-sign-in"
           />

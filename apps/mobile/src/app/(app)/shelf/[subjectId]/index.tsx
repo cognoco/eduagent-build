@@ -284,7 +284,7 @@ export default function ShelfScreen() {
     const errorMessage =
       classified.message !== 'Something unexpected happened. Please try again.'
         ? classified.message
-        : 'Unable to load this shelf. Please try again.';
+        : t('library.shelf.loadErrorFallback');
     const actions = recoveryActions(classified, {
       retry: handleRetry,
       goBack: handleBack,

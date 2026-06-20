@@ -59,17 +59,17 @@ export default function QuizResultsScreen(): React.ReactElement {
   const tierConfig = {
     perfect: {
       icon: 'trophy' as const,
-      title: 'Perfect round!',
+      title: t('quiz.results.tierPerfectTitle'),
       color: colors.reward,
     },
     great: {
       icon: 'star' as const,
-      title: 'Great round!',
+      title: t('quiz.results.tierGreatTitle'),
       color: colors.primary,
     },
     nice: {
       icon: 'thumbs-up' as const,
-      title: 'Nice effort!',
+      title: t('quiz.results.tierNiceTitle'),
       color: colors.textSecondary,
     },
   };
@@ -81,17 +81,17 @@ export default function QuizResultsScreen(): React.ReactElement {
 
   function questionPrompt(questionIndex: number): string {
     const q = stableRound?.questions[questionIndex];
-    if (!q) return 'Question';
+    if (!q) return t('quiz.results.questionFallback');
     switch (q.type) {
       case 'capitals':
-        return `Capital of ${q.country}`;
+        return t('quiz.round.capitalQuestion', { country: q.country });
       case 'vocabulary':
         return q.term;
       case 'guess_who':
         // [F-Q-04] Use the first clue as the prompt — it's the hardest/most
         // vague, making it spoiler-safe. Falls back to 'Guess Who' only if
         // clues are unexpectedly absent.
-        return q.clues[0] ?? 'Guess Who';
+        return q.clues[0] ?? t('quiz.round.guessWhoFallback');
     }
   }
 
@@ -202,11 +202,11 @@ export default function QuizResultsScreen(): React.ReactElement {
                 accessibilityRole="text"
                 accessibilityLabel={`${prompt}. ${
                   qr.answerGiven && qr.answerGiven !== '[skipped]'
-                    ? `You said ${qr.answerGiven}`
+                    ? t('quiz.results.a11yYouSaid', { answer: qr.answerGiven })
                     : qr.answerGiven === '[skipped]'
-                      ? 'You skipped this question'
-                      : "You didn't answer"
-                }. Correct answer ${qr.correctAnswer}.`}
+                      ? t('quiz.results.a11yYouSkipped')
+                      : t('quiz.results.a11yNoAnswer')
+                }. ${t('quiz.results.a11yCorrectAnswer', { answer: qr.correctAnswer })}`}
               >
                 <Text className="text-body-sm text-text-secondary">
                   {prompt}

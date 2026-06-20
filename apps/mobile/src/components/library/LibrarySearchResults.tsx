@@ -150,6 +150,7 @@ function ResultRow({
   subjectName: string;
   onPress: () => void;
 }): React.ReactElement {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const tint = useSubjectTint(subjectId);
 
@@ -158,7 +159,7 @@ function ResultRow({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${subtitle}`}
+      accessibilityLabel={t('library.searchResult.a11y', { title, subtitle })}
       style={({ pressed }) => ({
         alignItems: 'center',
         flexDirection: 'row',

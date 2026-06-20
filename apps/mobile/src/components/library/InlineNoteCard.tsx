@@ -55,9 +55,17 @@ export function InlineNoteCard({
       onLongPress={() => onLongPress?.(noteId)}
       testID={cardTestID}
       accessibilityRole="button"
-      accessibilityLabel={`Note for ${topicTitle}. ${sourceLine}. Tap to ${
-        expanded ? 'collapse' : 'expand'
-      }.`}
+      accessibilityLabel={
+        expanded
+          ? t('library.inlineNote.a11yCollapse', {
+              topic: topicTitle,
+              source: sourceLine,
+            })
+          : t('library.inlineNote.a11yExpand', {
+              topic: topicTitle,
+              source: sourceLine,
+            })
+      }
       style={{
         marginHorizontal: 20,
         marginBottom: 8,
@@ -82,7 +90,9 @@ export function InlineNoteCard({
           <Pressable
             onPress={onSourcePress}
             accessibilityRole="link"
-            accessibilityLabel={`Open source session for ${topicTitle}`}
+            accessibilityLabel={t('library.inlineNote.a11yOpenSource', {
+              topic: topicTitle,
+            })}
             testID={`${cardTestID}-source`}
             style={{ flex: 1, marginEnd: 8 }}
           >
@@ -144,7 +154,9 @@ export function InlineNoteCard({
               onLongPress(noteId);
             }}
             accessibilityRole="button"
-            accessibilityLabel={`Note options for ${topicTitle}`}
+            accessibilityLabel={t('library.inlineNote.a11yNoteOptions', {
+              topic: topicTitle,
+            })}
             testID={`${cardTestID}-menu`}
             hitSlop={8}
             style={{

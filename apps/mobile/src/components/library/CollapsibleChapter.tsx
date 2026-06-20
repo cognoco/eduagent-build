@@ -37,7 +37,11 @@ export function CollapsibleChapter({
         onPress={() => setExpanded((prev) => !prev)}
         className="flex-row items-center justify-between px-4 py-3 bg-surface-elevated rounded-card"
         accessibilityRole="button"
-        accessibilityLabel={`${title}, ${topics.length} of ${totalTopicCount} topics not started`}
+        accessibilityLabel={t('library.collapsibleChapter.a11yHeader', {
+          title,
+          notStarted: topics.length,
+          total: totalTopicCount,
+        })}
         accessibilityState={{ expanded }}
       >
         <View className="flex-row items-center flex-1 me-2">

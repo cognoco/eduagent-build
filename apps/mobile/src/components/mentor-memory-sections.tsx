@@ -19,7 +19,10 @@ export type LearningStyleRow = {
   source: NonNullable<LearningStyle>['source'];
 };
 
-export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
+export function getLearningStyleRows(
+  style: LearningStyle,
+  t: Translate,
+): LearningStyleRow[] {
   if (!style) return [];
 
   const rows: LearningStyleRow[] = [];
@@ -27,7 +30,9 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
   if (style.preferredExplanations?.length) {
     rows.push({
       key: 'preferredExplanations',
-      label: `Prefers ${style.preferredExplanations.join(', ')} explanations`,
+      label: t('guardian.learningStyle.prefersExplanations', {
+        types: style.preferredExplanations.join(', '),
+      }),
       source: style.source,
     });
   }
@@ -37,8 +42,8 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
       key: 'pacePreference',
       label:
         style.pacePreference === 'thorough'
-          ? 'Prefers a step-by-step pace'
-          : 'Prefers a quicker pace',
+          ? t('guardian.learningStyle.prefersStepByStep')
+          : t('guardian.learningStyle.prefersQuickerPace'),
       source: style.source,
     });
   }
@@ -48,8 +53,8 @@ export function getLearningStyleRows(style: LearningStyle): LearningStyleRow[] {
       key: 'responseToChallenge',
       label:
         style.responseToChallenge === 'motivated'
-          ? 'Likes a challenge'
-          : 'Needs extra encouragement when work gets difficult',
+          ? t('guardian.learningStyle.likesChallenge')
+          : t('guardian.learningStyle.needsEncouragement'),
       source: style.source,
     });
   }
@@ -69,10 +74,10 @@ export function getFocusAreaProgress(
   });
   const confidenceLabel =
     entry.confidence === 'high'
-      ? 'Showing up a lot lately'
+      ? t('guardian.focusArea.confidenceHigh')
       : entry.confidence === 'medium'
-        ? 'Repeated pattern'
-        : 'Early signal';
+        ? t('guardian.focusArea.confidenceMedium')
+        : t('guardian.focusArea.confidenceLow');
 
   return {
     progressLabel: `${confidenceLabel} - ${attemptsLabel}`,
@@ -139,14 +144,11 @@ export function CollapsibleMemorySection({
   );
 }
 
-function getSourceBadgeLabel(source?: MemorySource): string | null {
-  if (source === 'learner') return 'You told your mentor';
-  if (source === 'parent') return 'Added by parent';
-  return null;
-}
-
 export function MemorySourceBadge({ source }: { source?: MemorySource }) {
-  const label = getSourceBadgeLabel(source);
+  const { t } = useTranslation();
+  let label: string | null = null;
+  if (source === 'learner') label = t('guardian.sourceBadge.learner');
+  else if (source === 'parent') label = t('guardian.sourceBadge.parent');
   if (!label) return null;
 
   return (
@@ -164,7 +166,7 @@ export function MemoryRow({
   progressValue,
   onRemove,
   children,
-  actionLabel = 'Remove',
+  actionLabel,
 }: {
   label: string;
   detail?: string;
@@ -175,6 +177,8 @@ export function MemoryRow({
   children?: ReactNode;
   actionLabel?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedActionLabel = actionLabel ?? t('guardian.remove');
   const clampedProgress =
     progressValue == null
       ? undefined
@@ -197,10 +201,10 @@ export function MemoryRow({
             onPress={onRemove}
             className="px-3 py-2"
             accessibilityRole="button"
-            accessibilityLabel={`${actionLabel} ${label}`}
+            accessibilityLabel={`${resolvedActionLabel} ${label}`}
           >
             <Text className="text-body-sm font-semibold text-danger">
-              {actionLabel}
+              {resolvedActionLabel}
             </Text>
           </Pressable>
         ) : null}

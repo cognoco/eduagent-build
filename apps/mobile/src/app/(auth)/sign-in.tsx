@@ -14,6 +14,7 @@ import {
 import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Trans, useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import * as Linking from 'expo-linking';
 import * as SecureStore from '../../lib/secure-storage';
 import { useWebBrowserWarmup } from '../../hooks/use-web-browser-warmup';
@@ -180,38 +181,42 @@ function hasSSOProviders(factors: unknown[] | null | undefined): boolean {
   );
 }
 
-function describeVerificationStrategy(strategy: string): string {
+function describeVerificationStrategy(strategy: string, t: TFunction): string {
   switch (strategy) {
     case 'webauthn':
-      return 'a security key or passkey';
+      return t('auth.signIn.strategyWebauthn');
     case 'totp':
-      return 'an authenticator app';
+      return t('auth.signIn.strategyTotp');
     case 'phone_code':
-      return 'a phone verification code';
+      return t('auth.signIn.strategyPhoneCode');
     case 'email_code':
-      return 'an email verification code';
+      return t('auth.signIn.strategyEmailCode');
     default:
       return strategy.replace(/_/g, ' ');
   }
 }
 
-function formatUnsupportedVerificationMessage(strategies: string[]): string {
+function formatUnsupportedVerificationMessage(
+  strategies: string[],
+  t: TFunction,
+): string {
   if (strategies.length === 0) {
-    return 'This account needs an additional verification method that is not available on mobile yet.';
+    return t('auth.signIn.unsupportedMethodGeneric');
   }
 
   const [first] = strategies;
   if (strategies.length === 1 && first) {
-    return `This account requires ${describeVerificationStrategy(
-      first,
-    )} which isn't available on mobile yet.`;
+    return t('auth.signIn.unsupportedMethodSingle', {
+      method: describeVerificationStrategy(first, t),
+    });
   }
 
-  const described = strategies.map(describeVerificationStrategy);
+  const described = strategies.map((s) => describeVerificationStrategy(s, t));
   const last = described.pop();
-  return `This account requires ${described.join(
-    ', ',
-  )} or ${last} which isn't available on mobile yet.`;
+  return t('auth.signIn.unsupportedMethodMultiple', {
+    methods: described.join(', '),
+    last,
+  });
 }
 
 export default function SignInScreen() {
@@ -335,9 +340,7 @@ export default function SignInScreen() {
       clearTransitionState();
       setTransitionStuck(false);
       setIsTransitioning(false);
-      setError(
-        'Sign-in is taking longer than expected. Please try signing in again.',
-      );
+      setError(t('auth.signIn.transitionTimeout'));
     }, remaining + 15_000);
     return () => {
       clearTimeout(phase1);
@@ -411,15 +414,13 @@ export default function SignInScreen() {
     if (peekSessionRevokedNotice()) {
       clearVerificationFlow();
       setForcedSignOutReason('revoked');
-      setError(
-        'Your session was signed out from another device. Sign in again to continue.',
-      );
+      setError(t('auth.signIn.sessionRevoked'));
       return;
     }
     if (peekSessionExpiredNotice()) {
       clearVerificationFlow();
       setForcedSignOutReason('expired');
-      setError('Your session expired. Sign in again to continue learning.');
+      setError(t('auth.signIn.sessionExpired'));
     }
   }, [clearVerificationFlow]);
 
@@ -557,9 +558,7 @@ export default function SignInScreen() {
       clearVerificationFlow();
 
       if (attempt.status === 'needs_new_password') {
-        setError(
-          'Your password needs to be updated before you can sign in. Use Forgot password? to reset it.',
-        );
+        setError(t('auth.signIn.needsNewPassword'));
         return;
       }
 
@@ -575,20 +574,22 @@ export default function SignInScreen() {
         const ssoAvailable = hasSSOProviders(attempt.supportedFirstFactors);
         setUnsupportedVerificationStrategies(unsupportedStrategies);
         setUnsupportedHasSSOProviders(ssoAvailable);
-        setError(formatUnsupportedVerificationMessage(unsupportedStrategies));
+        setError(
+          formatUnsupportedVerificationMessage(unsupportedStrategies, t),
+        );
         return;
       }
 
-      setError('Sign-in could not be completed. Please try again.');
+      setError(t('auth.signIn.signInNotCompleted'));
     },
-    [clearVerificationFlow, getVerificationStep, startVerificationFlow],
+    [clearVerificationFlow, getVerificationStep, startVerificationFlow, t],
   );
 
   const onContactSupport = useCallback(async () => {
     const describedMethods =
       unsupportedVerificationStrategies.length > 0
         ? unsupportedVerificationStrategies
-            .map(describeVerificationStrategy)
+            .map((s) => describeVerificationStrategy(s, t))
             .join(', ')
         : 'an unsupported verification method';
 
@@ -602,10 +603,12 @@ export default function SignInScreen() {
       );
     } catch {
       setError(
-        `We couldn't open your email app. Please contact support@mentomate.app and mention ${describedMethods}.`,
+        t('auth.signIn.contactSupportEmailError', {
+          methods: describedMethods,
+        }),
       );
     }
-  }, [unsupportedVerificationStrategies]);
+  }, [unsupportedVerificationStrategies, t]);
 
   const activateSession = useCallback(
     async (
@@ -614,11 +617,11 @@ export default function SignInScreen() {
     ): Promise<boolean> => {
       if (!isMountedRef.current) return false;
       if (!sessionId) {
-        setError('No session was created. Please try again.');
+        setError(t('auth.signIn.noSessionCreated'));
         return false;
       }
       if (!setActive) {
-        setError('Authentication not loaded. Please try again.');
+        setError(t('auth.signIn.authNotLoaded'));
         return false;
       }
 
@@ -636,7 +639,7 @@ export default function SignInScreen() {
           console.warn('[AUTH-DEBUG] activateSession → setActive THREW', e);
         setPendingSessionActivationId(sessionId);
         setActivationFailureContext(context);
-        setError('Could not activate your session. Please try again.');
+        setError(t('auth.signIn.activationFailed'));
         return false;
       }
 
@@ -751,14 +754,14 @@ export default function SignInScreen() {
                 )}`,
             );
           setError(
-            `Sign-up via ${
-              strategy === 'oauth_google' ? 'Google' : 'SSO'
-            } needs additional information. Please sign up with email instead.`,
+            t('auth.signIn.ssoSignUpIncomplete', {
+              provider: strategy === 'oauth_google' ? 'Google' : 'SSO',
+            }),
           );
           return;
         }
 
-        setError('Sign-in could not be completed. Please try again.');
+        setError(t('auth.signIn.signInNotCompleted'));
       } catch (err: unknown) {
         if (__DEV__) console.warn('[AUTH-DEBUG] SSO flow threw:', err);
         setError(extractClerkError(err));
@@ -783,7 +786,7 @@ export default function SignInScreen() {
       return;
     }
     if (!isLoaded || !setActive) {
-      setError('Authentication not ready. Please reload and try again.');
+      setError(t('auth.signIn.authNotReady'));
       return;
     }
 
@@ -1022,10 +1025,10 @@ export default function SignInScreen() {
         >
           <ErrorFallback
             variant="centered"
-            title="Still signing you in"
-            message="This is taking longer than expected. Try again."
+            title={t('auth.signIn.stuckTitle')}
+            message={t('auth.signIn.stuckMessage')}
             primaryAction={{
-              label: 'Try again',
+              label: t('common.tryAgainAction'),
               testID: 'sign-in-stuck-retry',
               onPress: () => {
                 // [#509] Sign out Clerk's in-memory session before resetting
@@ -1050,7 +1053,7 @@ export default function SignInScreen() {
               },
             }}
             secondaryAction={{
-              label: 'Sign up',
+              label: t('auth.signIn.signUpLabel'),
               testID: 'sign-in-stuck-signup',
               onPress: () => {
                 void clerkSignOut()
@@ -1074,7 +1077,10 @@ export default function SignInScreen() {
         className="flex-1 bg-background items-center justify-center"
         testID="sign-in-transitioning"
       >
-        <ActivityIndicator size="large" accessibilityLabel="Signing you in" />
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('auth.signIn.signingYouIn')}
+        />
         <Text className="text-body text-text-secondary mt-4">
           {t('auth.signIn.signingYouIn')}
         </Text>
@@ -1153,8 +1159,8 @@ export default function SignInScreen() {
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
               placeholder={
                 pendingVerification.strategy === 'backup_code'
-                  ? 'Enter backup code'
-                  : 'Enter 6-digit code'
+                  ? t('auth.signIn.enterBackupCodePlaceholder')
+                  : t('auth.signIn.enterSixDigitCodePlaceholder')
               }
               placeholderTextColor={colors.muted}
               keyboardType={
@@ -1173,7 +1179,7 @@ export default function SignInScreen() {
 
           <Button
             variant="primary"
-            label="Verify"
+            label={t('auth.signIn.verifyButton')}
             onPress={onVerifyPress}
             disabled={!canSubmitCode}
             loading={loading}
@@ -1186,7 +1192,7 @@ export default function SignInScreen() {
               <Button
                 variant="secondary"
                 size="small"
-                label="Try Again"
+                label={t('common.tryAgain')}
                 onPress={() => void retrySessionActivation()}
                 disabled={loading}
                 testID="sign-in-retry-activation"
@@ -1200,7 +1206,7 @@ export default function SignInScreen() {
                 <Button
                   variant="tertiary"
                   size="small"
-                  label="Resend code"
+                  label={t('auth.signIn.resendCode')}
                   onPress={onResendCode}
                   loading={resending}
                   testID="sign-in-resend-code"
@@ -1212,7 +1218,7 @@ export default function SignInScreen() {
             <Button
               variant="tertiary"
               size="small"
-              label="Back to sign in"
+              label={t('auth.signIn.backToSignIn')}
               onPress={onBackFromVerification}
               testID="sign-in-back-from-verify"
             />
@@ -1313,7 +1319,7 @@ export default function SignInScreen() {
                     ? t('auth.signIn.unsupportedSsoHint')
                     : t('auth.signIn.unsupportedContactHint', {
                         methods: unsupportedVerificationStrategies
-                          .map(describeVerificationStrategy)
+                          .map((s) => describeVerificationStrategy(s, t))
                           .join(', '),
                       })}
                 </Text>
@@ -1321,7 +1327,7 @@ export default function SignInScreen() {
                   <Button
                     variant="secondary"
                     size="small"
-                    label="Contact support"
+                    label={t('auth.signIn.contactSupport')}
                     onPress={() => void onContactSupport()}
                     testID="sign-in-contact-support"
                   />
@@ -1334,7 +1340,7 @@ export default function SignInScreen() {
               <View className="mb-6">
                 <Button
                   variant="secondary"
-                  label="Try Again"
+                  label={t('common.tryAgain')}
                   onPress={() => void retrySessionActivation()}
                   disabled={loading || oauthLoading !== null}
                   testID="sign-in-oauth-retry"
@@ -1349,7 +1355,7 @@ export default function SignInScreen() {
                   <Button
                     variant="tertiary"
                     size="small"
-                    label="Cancel sign-in"
+                    label={t('auth.signIn.cancelSignIn')}
                     onPress={cancelPendingSSOActivation}
                     disabled={loading}
                     testID="sign-in-oauth-cancel"
@@ -1362,7 +1368,7 @@ export default function SignInScreen() {
               <View className="mb-2">
                 <Button
                   variant="secondary"
-                  label="Continue with Google"
+                  label={t('auth.signIn.continueWithGoogle')}
                   onPress={() => onSSOPress('oauth_google')}
                   disabled={oauthLoading !== null}
                   loading={oauthLoading === 'oauth_google'}
@@ -1375,7 +1381,7 @@ export default function SignInScreen() {
               <View className="mb-2">
                 <Button
                   variant="secondary"
-                  label="Continue with Apple"
+                  label={t('auth.signIn.continueWithApple')}
                   onPress={() => onSSOPress('oauth_apple')}
                   disabled={oauthLoading !== null}
                   loading={oauthLoading === 'oauth_apple'}
@@ -1388,7 +1394,7 @@ export default function SignInScreen() {
               <View className="mb-2">
                 <Button
                   variant="secondary"
-                  label="Continue with OpenAI"
+                  label={t('auth.signIn.continueWithOpenAI')}
                   onPress={() => onSSOPress(openAIStrategy)}
                   disabled={oauthLoading !== null}
                   loading={oauthLoading === openAIStrategy}
@@ -1414,7 +1420,7 @@ export default function SignInScreen() {
                 autoCapitalize="none"
                 autoComplete="email"
                 keyboardType="email-address"
-                placeholder="you@example.com"
+                placeholder={t('auth.signIn.emailPlaceholder')}
                 placeholderTextColor={colors.muted}
                 value={emailAddress}
                 onChangeText={(value) => {
@@ -1438,7 +1444,7 @@ export default function SignInScreen() {
                     clearVerificationFlow(true);
                     setPassword(value);
                   }}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.signIn.passwordPlaceholder')}
                   editable={!loading}
                   testID="sign-in-password"
                   onSubmitEditing={onSignInPress}
@@ -1451,7 +1457,7 @@ export default function SignInScreen() {
               <Button
                 variant="tertiary"
                 size="small"
-                label="Forgot password?"
+                label={t('auth.signIn.forgotPassword')}
                 onPress={() => router.push('/(auth)/forgot-password')}
                 testID="forgot-password-link"
               />
@@ -1459,7 +1465,7 @@ export default function SignInScreen() {
 
             <Button
               variant="primary"
-              label="Sign in"
+              label={t('auth.signIn.signInButton')}
               onPress={onSignInPress}
               disabled={!canSubmit}
               loading={loading}
@@ -1504,7 +1510,7 @@ export default function SignInScreen() {
                 <View className="mt-4">
                   <Button
                     variant="secondary"
-                    label="Send verification code"
+                    label={t('auth.signIn.sendVerificationCode')}
                     onPress={onStartVerificationPress}
                     disabled={loading}
                     loading={loading}
@@ -1521,7 +1527,7 @@ export default function SignInScreen() {
               <Button
                 variant="tertiary"
                 size="small"
-                label="Sign up"
+                label={t('auth.signIn.signUpLabel')}
                 onPress={() =>
                   router.push({
                     pathname: '/(auth)/sign-up',
