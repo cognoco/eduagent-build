@@ -93,6 +93,37 @@ describe('MentorScreen', () => {
     screen.getByTestId('mentor-bar-mic');
   });
 
+  it('surfaces the school-day-evening homework highlight above the feed, tappable to camera [T11]', () => {
+    jest.useFakeTimers();
+    // 2026-06-15 is a Monday; 18:00 local = weekday evening.
+    jest.setSystemTime(new Date(2026, 5, 15, 18, 0, 0));
+    try {
+      render(<MentorScreen />);
+
+      const prompt = screen.getByTestId('mentor-homework-prompt');
+      fireEvent.press(prompt);
+
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/homework/camera',
+        params: { entrySource: 'mentor', returnTo: 'mentor' },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('hides the homework highlight on a weekend [T11]', () => {
+    jest.useFakeTimers();
+    // 2026-06-13 is a Saturday afternoon.
+    jest.setSystemTime(new Date(2026, 5, 13, 15, 0, 0));
+    try {
+      render(<MentorScreen />);
+      expect(screen.queryByTestId('mentor-homework-prompt')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('renders ColdStartCard in the anchor slot for a profile with no first real state', () => {
     mockSubjectsCount = 0;
     mockNowFeed = {
@@ -151,6 +182,46 @@ describe('MentorScreen', () => {
 
     screen.getByTestId('mentor-feed-fallback');
     screen.getByTestId('now-card-stack');
+  });
+
+  it('renders a continue-where-you-left-off fallback card on error with populated cache (never a dead-end) [T11]', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: undefined,
+      fallbackFeed: feed([card({ kind: 'unfinished_session' })]),
+      isError: true,
+      isSlowFallback: true,
+    };
+
+    render(<MentorScreen />);
+
+    // Cached cards still render...
+    screen.getByTestId('now-card-stack');
+    // ...PLUS a continue-where-you-left-off fallback that is actionable.
+    const fallback = screen.getByTestId('continue-fallback-card');
+    fireEvent.press(fallback);
+
+    // The cached unfinished_session deep-links straight back into that session.
+    expect(mockPush).toHaveBeenCalledWith('/(app)/session?sessionId=session-1');
+  });
+
+  it('falls back to the session spine when the cache has no resumable session [T11]', () => {
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: undefined,
+      fallbackFeed: feed([card({ kind: 'retention_due' })]),
+      isError: true,
+      isSlowFallback: true,
+    };
+
+    render(<MentorScreen />);
+
+    fireEvent.press(screen.getByTestId('continue-fallback-card'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: { entrySource: 'mentor', returnTo: 'mentor' },
+    });
   });
 
   it('renders retryable error state when there is no feed or cache', () => {

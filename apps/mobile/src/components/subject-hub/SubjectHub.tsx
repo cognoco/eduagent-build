@@ -56,7 +56,11 @@ export function SubjectHub({
   const selectedTopicNotes = selectedTopic
     ? data.notes.filter((note) => note.topicId === selectedTopic.topic.id)
     : [];
-  const showNotes = data.canStudy && data.notes.length > 0;
+  // Render the notes section whenever the learner can study (so the empty-state
+  // add-note affordance is reachable, not a dead end — spec §5.4 / S2 T7) OR when
+  // there are notes to show (a masked supporter with canStudy=false still sees
+  // existing notes read-only). canStudy=false + no notes → nothing to render.
+  const showNotes = data.canStudy || data.notes.length > 0;
 
   return (
     <>
@@ -107,7 +111,9 @@ export function SubjectHub({
           </Text>
         )}
 
-        {showNotes ? <SubjectHubNotesSection notes={data.notes} /> : null}
+        {showNotes ? (
+          <SubjectHubNotesSection notes={data.notes} canStudy={data.canStudy} />
+        ) : null}
       </ScrollView>
 
       <TopicDetailSheet
