@@ -23,6 +23,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
@@ -44,6 +45,12 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
       return {
         findFirst: (...args: unknown[]) => mockFindConsentState(...args),
       };
+    }
+    // [WI-867] v2: assertParentAccess now delegates to validateGuardianChargeRelationshipV2
+    // → isGuardianOf → db.query.guardianship.findFirst. Share the same mock so
+    // existing IDOR tests that set mockFindFamilyLink to null still block access.
+    if (prop === 'guardianship') {
+      return { findFirst: (...args: unknown[]) => mockFindFamilyLink(...args) };
     }
     return Reflect.get(target, prop, receiver);
   },
@@ -91,6 +98,22 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
     }),
   };
 });
+
+// [WI-867] v2 profile-scope seam continuity mock.
+// birthYear: 2008 mirrors the legacy getProfile mock's value (age 18 in 2026),
+// required for assertPronounsSelfEditAllowed (min age 13).
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 2008 }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Onboarding service mock
@@ -184,6 +207,9 @@ describe('onboarding routes', () => {
       childProfileId: CHILD_PROFILE_ID,
     });
     mockFindConsentState.mockResolvedValue(undefined);
+    // [WI-867] Restore v2 seam defaults after clearAllMocks.
+    mockFindOwnerPersonScope.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue(personScope({ birthYear: 2008 }));
   });
 
   // ---- PATCH /v1/onboarding/language (self) --------------------------------
@@ -294,16 +320,8 @@ describe('onboarding routes', () => {
     // able to PATCH conversationLanguage on its own profile. The tutor language
     // is an account-level setting owned by the parent.
     it('[CR-2026-05-21-011] returns 403 when non-owner profile tries to PATCH conversationLanguage', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
       // Caller is a child profile (isOwner: false)
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2010,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/onboarding/language',
@@ -405,16 +423,10 @@ describe('onboarding routes', () => {
     // assertParentAccess only checked the link — not whether the caller is the
     // account owner. assertOwnerAndParentAccess adds that gate.
     it('[BUG-406] returns 403 when non-owner profile tries to update child language', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
       // Caller profile is a child account (isOwner: false)
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       // Family link exists — the bug was that this was sufficient to grant access
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
@@ -640,15 +652,9 @@ describe('onboarding routes', () => {
 
     // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
     it('[BUG-406] returns 403 when non-owner profile tries to update child pronouns', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
         childProfileId: CHILD_PROFILE_ID,
@@ -882,15 +888,9 @@ describe('onboarding routes', () => {
 
     // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
     it('[BUG-406] returns 403 when non-owner profile tries to update child interests', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
         childProfileId: CHILD_PROFILE_ID,
