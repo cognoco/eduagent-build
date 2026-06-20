@@ -90,6 +90,7 @@ import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeT
 import {
   SessionToolAccessory,
   SessionAccessory,
+  MentorHomeworkFirstResponse,
 } from '../../../components/session/SessionAccessories';
 import {
   ParkingLotModal,
@@ -305,6 +306,7 @@ function SessionScreenInner() {
     initialProblemText,
     homeBackHref,
     chatBackFallback,
+    mentorHomeworkWrapUpFrame,
   } = useMemo(
     () =>
       getSessionRouteParams({
@@ -472,6 +474,14 @@ function SessionScreenInner() {
   const [homeworkMode, setHomeworkMode] = useState<
     'help_me' | 'check_answer' | undefined
   >(undefined);
+  // T23: V2 mentor-homework round-trip. The captured photo lands back in the
+  // session thread as the learner's image bubble with two deterministic
+  // first-response actions (help me solve / check my answer). Once the learner
+  // picks one, the deterministic block is consumed and the tutoring turn begins.
+  const isMentorHomeworkFrame = mentorHomeworkWrapUpFrame === 'mentor-homework';
+  const [mentorHomeworkChoice, setMentorHomeworkChoice] = useState<
+    'help_me' | 'check_answer' | null
+  >(null);
   const [draftText, setDraftText] = useState('');
   const [resumedBanner, setResumedBanner] = useState(false);
   const [responseHistory, setResponseHistory] = useState<
@@ -675,6 +685,7 @@ function SessionScreenInner() {
       setHomeworkProblemsState(initialHomeworkProblems);
       setCurrentProblemIndex(0);
       setHomeworkMode(undefined);
+      setMentorHomeworkChoice(null);
       hasAutoSentRef.current = false;
     }, [
       hasHydratedRecoveryRef,
@@ -974,6 +985,14 @@ function SessionScreenInner() {
   }, [currentProblemIndex, handleSend]);
 
   useEffect(() => {
+    // T23: For the V2 mentor-homework frame the deterministic help/check
+    // buttons are the first actionable response — defer the OCR auto-send
+    // until the learner picks one (mentorHomeworkChoice set). This keeps the
+    // image bubble + buttons as the genuine first turn with no LLM/subject
+    // preamble. For every other entry the auto-send fires as before.
+    if (isMentorHomeworkFrame && !mentorHomeworkChoice) {
+      return undefined;
+    }
     if (initialProblemText && !routeSessionId && !hasAutoSentRef.current) {
       if (imageUri && imageAttachmentStatus === 'loading') {
         return undefined;
@@ -1044,6 +1063,8 @@ function SessionScreenInner() {
     createLocalMessageId,
     homeworkCaptureSource,
     normalizedOcrText,
+    isMentorHomeworkFrame,
+    mentorHomeworkChoice,
   ]);
 
   const shouldUseFirstSessionWrapUp = isV2MentorEntry && isFirstSession;
@@ -1306,6 +1327,20 @@ function SessionScreenInner() {
     }
   }, [clearContinuationDepth, t]);
 
+  // T23: Deterministic V2 mentor-homework first-response handlers. Picking a
+  // mode records the learner's intent and re-enables the (previously deferred)
+  // OCR auto-send with the chosen homeworkMode — no subject-picker preamble.
+  const handleMentorHomeworkHelpMeSolve = useCallback(() => {
+    if (mentorHomeworkChoice) return;
+    setHomeworkMode('help_me');
+    setMentorHomeworkChoice('help_me');
+  }, [mentorHomeworkChoice]);
+  const handleMentorHomeworkCheckMyAnswer = useCallback(() => {
+    if (mentorHomeworkChoice) return;
+    setHomeworkMode('check_answer');
+    setMentorHomeworkChoice('check_answer');
+  }, [mentorHomeworkChoice]);
+
   const { headerRight, headerBelow, subtitle } = SessionScreenChrome({
     activeSessionId,
     isClosing,
@@ -1407,6 +1442,20 @@ function SessionScreenInner() {
     />
   ) : null;
 
+  // T23: Render the deterministic homework first-response only for the V2
+  // mentor-homework frame and only until the learner picks help/check. It is
+  // the FIRST actionable response in-thread — image bubble + two buttons, with
+  // no subject-picking preamble.
+  const mentorHomeworkFirstResponse =
+    isMentorHomeworkFrame && !mentorHomeworkChoice ? (
+      <MentorHomeworkFirstResponse
+        imageUri={imageUri}
+        disabled={isStreaming || isClosing || !!quotaError}
+        onHelpMeSolve={handleMentorHomeworkHelpMeSolve}
+        onCheckMyAnswer={handleMentorHomeworkCheckMyAnswer}
+      />
+    ) : null;
+
   const sessionAccessory = (
     <SessionAccessory
       pendingSubjectResolution={pendingSubjectResolution}
@@ -1427,6 +1476,7 @@ function SessionScreenInner() {
       setHomeworkMode={setHomeworkMode}
       handleNextProblem={handleNextProblem}
       handleEndSession={handleEndSession}
+      suppress={isMentorHomeworkFrame && !mentorHomeworkChoice}
     />
   );
 
@@ -1509,6 +1559,7 @@ function SessionScreenInner() {
           <>
             {challengeBanner}
             {drillStrip}
+            {mentorHomeworkFirstResponse}
             {sessionAccessory}
           </>
         }

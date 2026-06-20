@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-8181-a54f-da597f8c1039",
+  "id": "WI-875",
+  "name": "[ACCOUNT-08/CC-07] Complete accommodation picker and badge branch coverage",
+  "description": "Track remaining accommodation-related branch coverage for picker restore edges and badge surfaces across mentor-memory/settings roles.",
+  "acceptanceCriteria": "ACCOUNT-08 restore edge case has deterministic evidence or a documented blocker; CC-07 badge surfaces are covered across mentor-memory, child settings, self settings, and role-gated capture paths; master flow plan rows reference this item.",
+  "riskImpact": "Accommodation controls affect learner support and account safety; source-only branch coverage makes regressions easy to miss.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

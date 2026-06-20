@@ -3922,6 +3922,11 @@
       "message": "再試行するか、教科を直接閲覧できます。",
       "subjects": "教科を閲覧"
     },
+    "homework": {
+      "imageAlt": "撮影された宿題の写真",
+      "helpMeSolve": "解き方を教えて",
+      "checkMyAnswer": "答え合わせをする"
+    },
     "homeworkPrompt": "今夜、宿題はありますか？写真を撮れば、一緒に取り組みます。"
   },
   "subjectsBrowse": {
