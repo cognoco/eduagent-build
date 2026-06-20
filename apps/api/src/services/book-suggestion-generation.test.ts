@@ -832,7 +832,7 @@ describe('generateCategorizedBookSuggestions', () => {
         expect(dbUpdateMock).toHaveBeenCalledTimes(1);
       });
 
-      it('resets cooldown on quota error', async () => {
+      it('does NOT reset cooldown on quota error (retrying hammers an out-of-quota provider)', async () => {
         const subject = makeSubject();
         routeAndCallMock.mockRejectedValue(new Error('quota exceeded'));
 
@@ -846,10 +846,13 @@ describe('generateCategorizedBookSuggestions', () => {
         );
 
         expect(outcome).toBe('quota');
-        expect(dbUpdateMock).toHaveBeenCalledTimes(1);
+        // Stamp must REMAIN — quota exhaustion is not a retry-now blip;
+        // the cooldown gate must still block the next call (integration test
+        // encodes this invariant).
+        expect(dbUpdateMock).not.toHaveBeenCalled();
       });
 
-      it('resets cooldown on unknown error', async () => {
+      it('does NOT reset cooldown on unknown error (conservative catch-all keeps the stamp)', async () => {
         const subject = makeSubject();
         routeAndCallMock.mockRejectedValue(new Error('something unexpected'));
 
@@ -863,7 +866,9 @@ describe('generateCategorizedBookSuggestions', () => {
         );
 
         expect(outcome).toBe('unknown');
-        expect(dbUpdateMock).toHaveBeenCalledTimes(1);
+        // Stamp must REMAIN — 'unknown' is a catch-all; resetting would open
+        // the door to unbounded retries on unclassified errors.
+        expect(dbUpdateMock).not.toHaveBeenCalled();
       });
 
       it('does NOT reset cooldown on parse error (deterministic — retry won\'t help)', async () => {

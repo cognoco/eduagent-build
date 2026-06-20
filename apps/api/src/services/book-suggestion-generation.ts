@@ -338,13 +338,12 @@ export async function generateCategorizedBookSuggestions(
   } catch (error) {
     const reason = classifyError(error);
     emitFailureMetric(profileId, subjectId, reason);
-    // [BUG-861] Transient failures (network/timeout/quota/unknown) must not
-    // leave the cooldown stamp committed — the learner should be able to retry
-    // immediately after a transient infra blip. Deterministic failures
-    // (parse, all_filtered) keep the stamp so we don't hot-loop on something
-    // that will fail the same way. Reset errors are swallowed: the primary
-    // failure reason is still returned, and the stamp falling through on a
-    // reset failure is acceptable (cooldown expires naturally).
+    // [BUG-861] Only genuine transient infra blips (network/timeout) reset the
+    // cooldown stamp so the learner can retry immediately. quota and unknown
+    // keep the stamp — see isTransientFailure() for the full rationale. Reset
+    // errors are swallowed: the primary failure reason is still returned, and
+    // the stamp falling through on a reset failure is acceptable (cooldown
+    // expires naturally).
     if (isTransientFailure(reason)) {
       try {
         await db
@@ -567,20 +566,16 @@ function classifyError(error: unknown): FailureReason {
 }
 
 /**
- * [BUG-861] Transient failures (network, timeout, quota, unknown) should not
- * leave the cooldown stamp committed, or the learner is locked out for
- * COOLDOWN_MS even though the LLM was never reached / never produced a usable
- * result due to an infrastructure blip. Deterministic failures (parse,
- * all_filtered) leave the stamp so we don't immediately retry something that
- * will fail the same way.
+ * [BUG-861] Only genuine transient infra blips (network/timeout) reset the
+ * cooldown stamp. 'quota' is excluded: retrying immediately hammers an
+ * already-exhausted provider and the integration test encodes this invariant
+ * (cooldown must still block the second call after a quota failure). 'unknown'
+ * is a catch-all that must conservatively KEEP the cooldown rather than open
+ * the door to unbounded retries on unclassified errors. Deterministic failures
+ * (parse, all_filtered) also keep the stamp.
  */
 function isTransientFailure(reason: FailureReason): boolean {
-  return (
-    reason === 'network' ||
-    reason === 'timeout' ||
-    reason === 'quota' ||
-    reason === 'unknown'
-  );
+  return reason === 'network' || reason === 'timeout';
 }
 
 function getLanguageDisplayName(languageCode: string): string | null {
