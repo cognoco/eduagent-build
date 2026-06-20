@@ -16,8 +16,10 @@ import { createLogger } from '../services/logger';
 import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
 import { resendSignatureFailureEscalator } from '../services/webhooks/signature-failure-escalator';
+import { suppressEmail } from '../services/email-suppression';
 import {
   resendWebhookPayloadSchema,
+  isHardBounce,
   type ResendEmailEventData,
 } from '../services/notifications/resend-types';
 
@@ -214,10 +216,11 @@ function maskEmail(email: string | undefined): string {
 // Event handlers
 // ---------------------------------------------------------------------------
 
-/** email.bounced or email.complained — emit Inngest event for observability */
+/** email.bounced or email.complained — persist suppression + emit Inngest event */
 async function handleEmailBounced(
   eventType: 'email.bounced' | 'email.complained',
   data: ResendEmailEventData,
+  db: Database | undefined,
 ): Promise<void> {
   logger.warn('[resend] Email delivery failure', {
     event: eventType,
@@ -225,6 +228,28 @@ async function handleEmailBounced(
     to: maskEmail(data.to),
     emailId: data.email_id,
   });
+
+  // Persist a suppression record for PERMANENTLY-dead addresses so the send
+  // path stops re-mailing them (burning quota + sender reputation). A HARD
+  // bounce (`bounce.type === 'Permanent'`) or a spam complaint is permanent; a
+  // SOFT/transient bounce (`Transient` / `Undetermined`) is NOT — the mailbox
+  // may accept mail again later, so we deliberately do not suppress it.
+  //
+  // The RAW recipient address is used here (before the Inngest masking below):
+  // suppression is matched against the real send-to address. db may be absent
+  // in dev (no DB middleware); a missing binding in a deployed env is already
+  // surfaced upstream via the dedup_db_missing observability signal.
+  const shouldSuppress = eventType === 'email.complained' || isHardBounce(data);
+  if (shouldSuppress && data.to && db) {
+    const reason =
+      eventType === 'email.complained' ? 'complaint' : 'hard_bounce';
+    // suppressEmail escalates its own DB failures to Sentry + structured log
+    // (silent recovery is banned). It never throws, so a persistence failure
+    // does not turn a verified webhook into a 500 / Svix retry storm.
+    // Return value intentionally ignored — webhook is always acked; suppressEmail
+    // escalates its own failures internally.
+    await suppressEmail(db, data.to, reason, data.email_id ?? null);
+  }
 
   // Observability event — consumed by email-bounced-observe.ts (structured-log terminus).
   // [SEC-6 / BUG-722] Inngest event payloads are persisted in the Inngest
@@ -570,7 +595,7 @@ export const resendWebhookRoute = new Hono<{
   switch (type) {
     case 'email.bounced':
     case 'email.complained':
-      await handleEmailBounced(type, data);
+      await handleEmailBounced(type, data, db);
       break;
     case 'email.delivered':
       handleEmailDelivered(data);

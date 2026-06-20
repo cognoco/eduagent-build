@@ -567,7 +567,9 @@ export async function requestConsent(
       input.consentType,
       tokenUrl,
     ),
-    emailOptions,
+    // Pass db so sendEmail skips permanently-dead (suppressed) parent addresses
+    // instead of re-burning quota on every consent attempt.
+    { ...emailOptions, db },
   );
 
   if (!emailResult.sent) {
@@ -757,7 +759,9 @@ export async function resendConsent(
       row.consentType,
       tokenUrl,
     ),
-    emailOptions,
+    // Pass db so sendEmail skips permanently-dead (suppressed) parent addresses
+    // instead of re-burning quota on every consent re-send.
+    { ...emailOptions, db },
   );
 
   if (!emailResult.sent) {
