@@ -1218,7 +1218,8 @@
       "repeatLastPhrase": "Letzten Satz wiederholen",
       "repeat": "Wiederholen",
       "exitDictation": "Diktat beenden",
-      "exit": "Beenden"
+      "exit": "Beenden",
+      "skipToPrevious": "Gehe zum vorherigen Satz"
     },
     "review": {
       "couldNotSaveTitle": "Ergebnis konnte nicht gespeichert werden",

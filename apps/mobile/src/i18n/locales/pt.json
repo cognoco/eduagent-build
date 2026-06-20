@@ -1245,7 +1245,8 @@
       "repeatLastPhrase": "Repetir última frase",
       "repeat": "Repetir",
       "exitDictation": "Sair do ditado",
-      "exit": "Sair"
+      "exit": "Sair",
+      "skipToPrevious": "Ir para a frase anterior"
     },
     "review": {
       "couldNotSaveTitle": "Não foi possível salvar o resultado",

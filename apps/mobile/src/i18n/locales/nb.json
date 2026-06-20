@@ -1218,7 +1218,8 @@
       "repeatLastPhrase": "Gjenta siste frase",
       "repeat": "Gjenta",
       "exitDictation": "Avslutt diktat",
-      "exit": "Avslutt"
+      "exit": "Avslutt",
+      "skipToPrevious": "Gå til forrige setning"
     },
     "review": {
       "couldNotSaveTitle": "Kunne ikke lagre resultat",

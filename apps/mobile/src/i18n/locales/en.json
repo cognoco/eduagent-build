@@ -1301,6 +1301,7 @@
       },
       "punctuationOn": "Punctuation read aloud. Tap to turn off.",
       "punctuationOff": "Punctuation silent. Tap to turn on.",
+      "skipToPrevious": "Go to previous sentence",
       "skipToNext": "Skip to next sentence",
       "resumeDictation": "Resume dictation",
       "pauseDictation": "Pause dictation",

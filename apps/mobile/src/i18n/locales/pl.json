@@ -1259,7 +1259,8 @@
       "repeatLastPhrase": "Powtórz ostatnią frazę",
       "repeat": "Powtórz",
       "exitDictation": "Wyjdź z dyktanda",
-      "exit": "Wyjdź"
+      "exit": "Wyjdź",
+      "skipToPrevious": "Przejdź do poprzedniego zdania"
     },
     "review": {
       "couldNotSaveTitle": "Nie można zapisać wyniku",

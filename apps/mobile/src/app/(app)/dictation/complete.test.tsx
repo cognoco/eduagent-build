@@ -522,7 +522,7 @@ describe('DictationCompleteScreen', () => {
     rerender(<DictationCompleteScreen />);
 
     act(() => {
-      jest.advanceTimersByTime(20_000);
+      jest.advanceTimersByTime(39_000);
     });
 
     await act(async () => {
@@ -595,9 +595,9 @@ describe('DictationCompleteScreen', () => {
       rerender(<DictationCompleteScreen />);
     });
 
-    // The timeout useEffect ran; advance past 20s so it fires.
+    // The timeout useEffect ran; advance past the review UI timeout so it fires.
     act(() => {
-      jest.advanceTimersByTime(21_000);
+      jest.advanceTimersByTime(39_000);
     });
 
     // Flush the state update from setReviewTimedOut(true).
@@ -625,7 +625,7 @@ describe('DictationCompleteScreen', () => {
     expect(mockPush).not.toHaveBeenCalledWith('/(app)/dictation/review');
   });
 
-  it('[BUG-612] review-timeout-error UI appears after 20s', async () => {
+  it('[BUG-612] review-timeout-error UI appears after the review UI timeout', async () => {
     // Render in reviewing state so the timeout useEffect arms immediately.
     mockReviewIsPending = true;
     const { queryByTestId } = render(<DictationCompleteScreen />);
@@ -633,9 +633,9 @@ describe('DictationCompleteScreen', () => {
     // Before timeout the error banner must not be visible.
     expect(queryByTestId('review-timeout-error')).toBeNull();
 
-    // Fire the 20-second timeout.
+    // Fire the review UI backstop timeout (review request budget + margin).
     act(() => {
-      jest.advanceTimersByTime(21_000);
+      jest.advanceTimersByTime(39_000);
     });
     await act(async () => {
       await Promise.resolve();

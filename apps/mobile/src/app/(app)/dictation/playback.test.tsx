@@ -47,6 +47,7 @@ const mockStart = jest.fn();
 const mockPause = jest.fn();
 const mockResume = jest.fn();
 const mockRepeat = jest.fn();
+const mockPrevious = jest.fn();
 const mockSkip = jest.fn();
 
 jest.mock(
@@ -60,6 +61,7 @@ jest.mock(
       pause: mockPause,
       resume: mockResume,
       repeat: mockRepeat,
+      previous: mockPrevious,
       skip: mockSkip,
     }),
   }),
@@ -167,6 +169,7 @@ describe('PlaybackScreen', () => {
     getByTestId('dictation-playback-screen');
     getByTestId('playback-pace');
     getByTestId('playback-punctuation');
+    getByTestId('playback-previous');
     getByTestId('playback-skip');
     getByTestId('playback-repeat');
     getByTestId('playback-exit');
@@ -273,6 +276,12 @@ describe('PlaybackScreen', () => {
     const { getByTestId } = render(<PlaybackScreen />);
     fireEvent.press(getByTestId('playback-skip'));
     expect(mockSkip).toHaveBeenCalledTimes(1);
+  });
+
+  it('[WI-903] calls previous when previous button pressed', () => {
+    const { getByTestId } = render(<PlaybackScreen />);
+    fireEvent.press(getByTestId('playback-previous'));
+    expect(mockPrevious).toHaveBeenCalledTimes(1);
   });
 
   it('auto-starts playback on mount when data is present', () => {
