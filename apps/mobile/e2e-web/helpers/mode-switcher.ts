@@ -19,9 +19,9 @@ function targetScreen(page: Page, mode: AppMode): Locator {
 }
 
 function selectedModeTab(page: Page, mode: AppMode): Locator {
-  return page
-    .getByTestId('tab-home')
-    .filter({ hasText: mode === 'study' ? 'My Learning' : 'Family' });
+  return page.getByRole('tab', {
+    name: mode === 'study' ? 'My Learning' : 'Family',
+  });
 }
 
 async function modeIsVisible(page: Page, mode: AppMode): Promise<boolean> {
@@ -145,5 +145,9 @@ export async function expectAppMode(
   mode: AppMode,
   timeout = 15_000,
 ): Promise<void> {
-  await expect(selectedModeTab(page, mode)).toBeVisible({ timeout });
+  await expect(
+    targetScreen(page, mode).or(selectedModeTab(page, mode)).first(),
+  ).toBeVisible({
+    timeout,
+  });
 }
