@@ -324,6 +324,10 @@ export async function markMissedItemsSurfaced(
  * Fetch recent unsurfaced missed items for a profile + activity type so the
  * round-generation prompt can re-surface them. Best-effort: returns an empty
  * array on any DB error so the quiz call still succeeds. [P1 — quiz_missed_items wiring]
+ *
+ * ORDER BY + LIMIT are pushed into SQL via a direct repo.db.select() so the
+ * shared-repo findMany signature stays untouched and nx-affected does not mark
+ * mobile as affected by this API-only fix. [BUG-853]
  */
 export async function getRecentMissedItems(
   db: Database,
@@ -333,14 +337,22 @@ export async function getRecentMissedItems(
 ): Promise<Array<{ questionText: string; correctAnswer: string }>> {
   try {
     const repo = createScopedRepository(db, profileId);
-    const rows = await repo.quizMissedItems.findMany(
-      and(
-        eq(quizMissedItems.activityType, activityType),
-        eq(quizMissedItems.surfaced, false),
-        eq(quizMissedItems.convertedToTopic, false),
-      ),
-      { orderBy: 'createdAtDesc', limit },
-    );
+    const rows = await repo.db
+      .select({
+        questionText: quizMissedItems.questionText,
+        correctAnswer: quizMissedItems.correctAnswer,
+      })
+      .from(quizMissedItems)
+      .where(
+        and(
+          eq(quizMissedItems.profileId, profileId),
+          eq(quizMissedItems.activityType, activityType),
+          eq(quizMissedItems.surfaced, false),
+          eq(quizMissedItems.convertedToTopic, false),
+        ),
+      )
+      .orderBy(desc(quizMissedItems.createdAt))
+      .limit(limit);
     return rows.map((r) => ({
       questionText: r.questionText,
       correctAnswer: r.correctAnswer,
