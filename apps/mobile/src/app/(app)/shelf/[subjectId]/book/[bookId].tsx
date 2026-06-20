@@ -1334,8 +1334,7 @@ export default function BookScreen() {
   if (bookQuery.isLoading && !hasBookData) {
     // Extract title/emoji from the books list query if available (already cached)
     const cachedBook = allBooksQuery.data?.find?.((b) => b.id === bookId);
-    const heroTitle =
-      cachedBook?.title ?? params.bookId ?? t('library.book.genericTitle');
+    const heroTitle = cachedBook?.title ?? t('library.book.genericTitle');
     const heroEmoji = cachedBook?.emoji ?? null;
 
     return (

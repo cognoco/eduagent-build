@@ -182,7 +182,7 @@ export function SubjectResolutionAccessory({
                   pendingClassification ||
                   createSubject.isPending,
               }}
-              testID="subject-resolution-create-new"
+              testID="subject-resolution-create-suggested"
             >
               <Text className="text-body-sm font-semibold text-primary">
                 {createSubject.isPending
@@ -394,7 +394,7 @@ export function HomeworkModeChips({
                 className="text-caption text-text-secondary mt-0.5"
                 testID="homework-problem-text"
               >
-                {activeHomeworkProblem?.text.slice(0, 70) ?? ''}
+                {activeHomeworkProblem?.text ?? ''}
               </Text>
             )}
           </Pressable>

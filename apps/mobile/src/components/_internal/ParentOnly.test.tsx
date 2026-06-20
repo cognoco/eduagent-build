@@ -35,34 +35,37 @@ describe('ParentOnly', () => {
 
   it('redirects child role to home', () => {
     mockUseRole.mockReturnValue('child');
-    render(
+    const { getByTestId } = render(
       <ParentOnly>
         <Text>Inner</Text>
       </ParentOnly>,
     );
 
-    expect(mockReplace).toHaveBeenCalledWith('/');
+    getByTestId('parent-only-redirect');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
   it('redirects impersonated-child role to home', () => {
     mockUseRole.mockReturnValue('impersonated-child');
-    render(
+    const { getByTestId } = render(
       <ParentOnly>
         <Text>Inner</Text>
       </ParentOnly>,
     );
 
-    expect(mockReplace).toHaveBeenCalledWith('/');
+    getByTestId('parent-only-redirect');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
   });
 
-  it('renders nothing while role is loading', () => {
+  it('renders a visible fallback while role is loading', () => {
     mockUseRole.mockReturnValue(null);
-    const { queryByText } = render(
+    const { getByTestId, queryByText } = render(
       <ParentOnly>
         <Text>Inner</Text>
       </ParentOnly>,
     );
 
+    getByTestId('parent-only-loading');
     expect(queryByText('Inner')).toBeNull();
     expect(mockReplace).not.toHaveBeenCalled();
   });

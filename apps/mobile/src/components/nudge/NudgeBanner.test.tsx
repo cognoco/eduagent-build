@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { NudgeBanner } from './NudgeBanner';
 
@@ -68,6 +69,19 @@ const NUDGE_B = {
   template: 'proud_of_you',
 };
 
+function renderNudgeBanner() {
+  return render(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { x: 0, y: 0, width: 390, height: 844 },
+        insets: { top: 0, right: 0, bottom: 24, left: 0 },
+      }}
+    >
+      <NudgeBanner />
+    </SafeAreaProvider>,
+  );
+}
+
 describe('NudgeBanner', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -78,7 +92,7 @@ describe('NudgeBanner', () => {
 
   it('returns null when no unread nudges', () => {
     mockUnreadNudgesData = [];
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     expect(screen.queryByTestId('nudge-banner')).toBeNull();
   });
@@ -88,7 +102,7 @@ describe('NudgeBanner', () => {
     mockActiveProfileConsentStatus = 'PENDING';
     mockConsentStatusData = undefined;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     expect(screen.queryByTestId('nudge-banner')).toBeNull();
   });
@@ -97,7 +111,7 @@ describe('NudgeBanner', () => {
     mockUnreadNudgesData = [NUDGE_A];
     mockActiveProfileConsentStatus = null;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     screen.getByTestId('nudge-banner');
     screen.getByText('Dad sent you a nudge');
@@ -107,7 +121,7 @@ describe('NudgeBanner', () => {
     mockUnreadNudgesData = [NUDGE_A, NUDGE_B];
     mockActiveProfileConsentStatus = null;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     // Badge text is visually rendered but hidden from accessibility tree (F-058:
     // count is surfaced via the parent Pressable's accessibilityLabel instead).
@@ -124,7 +138,7 @@ describe('NudgeBanner', () => {
     mockUnreadNudgesData = [NUDGE_A];
     mockActiveProfileConsentStatus = null;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     const label = screen.getByTestId('nudge-banner').props.accessibilityLabel;
     expect(label).toContain('Dad');
@@ -135,7 +149,7 @@ describe('NudgeBanner', () => {
     mockUnreadNudgesData = [NUDGE_A];
     mockActiveProfileConsentStatus = null;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     expect(screen.queryByText(/new/)).toBeNull();
   });
@@ -144,7 +158,7 @@ describe('NudgeBanner', () => {
     mockUnreadNudgesData = [NUDGE_A];
     mockActiveProfileConsentStatus = null;
 
-    render(<NudgeBanner />);
+    renderNudgeBanner();
 
     fireEvent.press(screen.getByTestId('nudge-banner'));
 

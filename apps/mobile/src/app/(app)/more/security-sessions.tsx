@@ -22,7 +22,9 @@ export default function SecuritySessionsScreen(): React.JSX.Element | null {
     <View className="flex-1 bg-background">
       {/* Credential controls are account-level for the shared Clerk identity,
           so deep links re-check the same owner-and-non-proxy gate as account.tsx. */}
-      <SecuritySessions />
+      <SecuritySessions
+        onBackToAccount={() => router.replace('/(app)/more/account')}
+      />
     </View>
   );
 }

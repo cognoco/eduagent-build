@@ -31,6 +31,21 @@ describe('SettingsRow', () => {
     screen.getByText('Norwegian');
   });
 
+  it('keeps value text shrink-safe for narrow screens', () => {
+    render(
+      <SettingsRow
+        label="Language"
+        value="A very long language value that should not push the chevron away"
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        'A very long language value that should not push the chevron away',
+      ).props.numberOfLines,
+    ).toBe(1);
+  });
+
   it('shows description when provided', () => {
     render(<SettingsRow label="Language" description="Select your language" />);
     screen.getByText('Select your language');

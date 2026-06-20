@@ -428,6 +428,10 @@ describe('ShelfScreen', () => {
     await waitFor(() => {
       getByTestId('shelf-screen');
     });
+    expect(getByTestId('shelf-back').props.accessibilityRole).toBe('button');
+    expect(getByTestId('shelf-settings').props.accessibilityRole).toBe(
+      'button',
+    );
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
@@ -749,7 +753,9 @@ describe('ShelfScreen', () => {
     await act(async () => {
       jest.advanceTimersByTime(15_500);
     });
-    getByTestId('shelf-filing-skip');
+    expect(getByTestId('shelf-filing-skip').props.accessibilityRole).toBe(
+      'button',
+    );
 
     // User taps Skip — must replace route AND mark filing as skipped.
     fireEvent.press(getByTestId('shelf-filing-skip'));

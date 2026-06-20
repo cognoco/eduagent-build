@@ -51,7 +51,13 @@ function formatLastActive(
   return date.toLocaleString();
 }
 
-export function SecuritySessions(): React.JSX.Element {
+interface SecuritySessionsProps {
+  onBackToAccount?: () => void;
+}
+
+export function SecuritySessions({
+  onBackToAccount,
+}: SecuritySessionsProps = {}): React.JSX.Element {
   const { sessionId } = useAuth();
   const { user } = useUser();
   const { t } = useTranslation();
@@ -238,6 +244,19 @@ export function SecuritySessions(): React.JSX.Element {
         <Text className="text-body-sm text-text-secondary text-center mt-2">
           {t('securitySessions.emptyDescription')}
         </Text>
+        {onBackToAccount ? (
+          <Pressable
+            onPress={onBackToAccount}
+            className="bg-primary rounded-card px-4 py-3 mt-4 items-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('securitySessions.emptyBackLabel')}
+            testID="security-sessions-empty-back"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              {t('securitySessions.emptyBackButton')}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }

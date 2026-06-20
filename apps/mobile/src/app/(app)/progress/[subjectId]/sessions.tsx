@@ -138,7 +138,18 @@ export default function SubjectSessionsScreen(): React.ReactElement {
               {t('progress.subjectSessions.empty')}
             </Text>
             <Pressable
-              onPress={() => router.replace('/(app)/home' as Href)}
+              onPress={() =>
+                router.replace({
+                  pathname: '/(app)/session',
+                  params: {
+                    mode: 'learning',
+                    subjectId,
+                    ...(subject?.subjectName
+                      ? { subjectName: subject.subjectName }
+                      : {}),
+                  },
+                } as Href)
+              }
               className="bg-primary rounded-button px-6 py-3 items-center min-h-[44px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('recaps.emptyCtaStartSession')}

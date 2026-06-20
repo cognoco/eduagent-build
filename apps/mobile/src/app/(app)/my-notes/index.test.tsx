@@ -73,6 +73,10 @@ const MyNotesHubScreen = require('./index').default;
 describe('MyNotesHubScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [],
+      nextCursor: null,
+    });
     mockReturnTo = undefined;
   });
 
@@ -138,6 +142,34 @@ describe('MyNotesHubScreen', () => {
     render(<MyNotesHubScreen />, { wrapper: createWrapper() });
 
     await waitFor(() => screen.getByText('1'));
+  });
+
+  it('shows that the sessions count is loading instead of hiding it', () => {
+    mockFetch.setRoute(
+      '/progress/sessions',
+      () => new Promise(() => undefined),
+    );
+
+    render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+    screen.getByTestId('my-notes-sessions-count');
+    screen.getByText('Loading');
+  });
+
+  it('shows when the sessions count is unavailable', async () => {
+    mockFetch.setRoute(
+      '/progress/sessions',
+      new Response(JSON.stringify({ message: 'Unavailable' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      screen.getByText('Unavailable');
+    });
   });
 
   it('navigates to sessions, notes, and bookmarks list from hub', () => {

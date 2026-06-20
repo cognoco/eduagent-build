@@ -413,14 +413,6 @@
     "intentCard": {
       "titleWithBadge": "{{title}}, {{count}} Elemente",
       "opensActivityHint": "Öffnet diese Aktivität"
-    },
-    "engagementChip": {
-      "curious": "Neugierig",
-      "stuck": "Hänge fest",
-      "breezing": "Kinderleicht",
-      "focused": "Konzentriert",
-      "scattered": "Unkonzentriert",
-      "a11yLabel": "Engagement: {{label}}"
     }
   },
   "family": {
@@ -1582,7 +1574,9 @@
     },
     "searchResult": {
       "a11y": "{{title}}, {{subtitle}}"
-    }
+    },
+    "topicPickerEmptyTitle": "Noch keine Themen",
+    "topicPickerEmptyDescription": "Dieses Buch hat noch keine Themen zur Auswahl."
   },
   "topic": {
     "relevance": {
@@ -2548,7 +2542,17 @@
       "sessionSummary": "Sitzungszusammenfassung",
       "noSummaryBody": "Für diese Sitzung wurde keine Zusammenfassung generiert",
       "openTopicWithTitle": "{{title}} öffnen",
-      "backToChildProfile": "Zurück zum Kinderprofil"
+      "backToChildProfile": "Zurück zum Kinderprofil",
+      "engagementChip": {
+        "accessibilityLabel": "Engagement: {{label}}",
+        "labels": {
+          "curious": "Neugierig",
+          "stuck": "Arbeite mich durch",
+          "breezing": "Ganz einfach",
+          "focused": "Fokussiert",
+          "scattered": "Suche Fokus"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "Fach nicht gefunden",
@@ -3359,7 +3363,9 @@
     "signingOutAll": "Andere Geräte werden abgemeldet...",
     "signOutAllTitle": "Alle anderen Geräte abmelden?",
     "signOutAllConfirm": "Hiermit werden {{count}} andere Sitzungen beendet. Dieses Gerät bleibt angemeldet.",
-    "signOutAllConfirmButton": "Alle abmelden"
+    "signOutAllConfirmButton": "Alle abmelden",
+    "emptyBackLabel": "Zurück zu den Kontoeinstellungen",
+    "emptyBackButton": "Zurück zum Konto"
   },
   "changePassword": {
     "errorCurrentRequired": "Aktuelles Passwort eingeben",
@@ -3586,7 +3592,9 @@
     "hub": {
       "sessionsSubtitle": "Unterhaltungen, die du hattest",
       "notesSubtitle": "Dinge, die du aufgeschrieben hast",
-      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor"
+      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor",
+      "countLoading": "Lade...",
+      "countUnavailable": "Nicht verfügbar"
     },
     "unknownSubject": "Unbekanntes Fach",
     "searchSessions": "Sitzungen suchen",
@@ -3663,7 +3671,8 @@
     "childNamePlaceholder": "Name oder Spitzname",
     "childBirthYearPlaceholder": "Geburtsjahr",
     "a11yBack": "Zurück zum vorigen Schritt",
-    "a11yCancel": "Abbrechen und beenden"
+    "a11yCancel": "Abbrechen und beenden",
+    "loading": "Gespeicherte Vorschau wird geladen ..."
   },
   "pickBook": {
     "subjectFallback": "Thema",

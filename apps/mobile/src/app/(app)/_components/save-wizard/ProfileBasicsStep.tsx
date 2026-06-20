@@ -26,6 +26,7 @@ import {
   type SaveTarget,
 } from '../../../../lib/preview-onboarding-state';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
+import { useThemeColors } from '../../../../lib/theme';
 
 export function ProfileBasicsStep({
   target,
@@ -45,6 +46,7 @@ export function ProfileBasicsStep({
   const queryClient = useQueryClient();
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const colors = useThemeColors();
   // i18n Phase 1 — Signup-time fix. The owner POST is a self-create, so
   // forward the device UI language for the first LLM call. The child POST
   // OMITS the field (MED-2): the parent's UI locale does not reliably
@@ -371,7 +373,7 @@ export function ProfileBasicsStep({
       >
         {loading ? (
           <ActivityIndicator
-            color="white"
+            color={colors.textInverse}
             accessibilityLabel={t('common.loading')}
           />
         ) : (

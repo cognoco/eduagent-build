@@ -200,7 +200,7 @@ export default function SessionDetailScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
         >
-          <Ionicons name="arrow-back" size={24} />
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </Pressable>
 
         <Text className="text-text-primary text-xl font-bold">

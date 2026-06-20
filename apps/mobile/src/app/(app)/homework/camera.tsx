@@ -1556,7 +1556,7 @@ export default function CameraScreen(): React.ReactNode {
           accessibilityLabel={t('common.close')}
           accessibilityRole="button"
         >
-          <Text className="text-h3 font-bold text-text-primary">X</Text>
+          <Ionicons name="close" size={28} color={colors.textPrimary} />
         </Pressable>
 
         <View className="flex-1 justify-center">

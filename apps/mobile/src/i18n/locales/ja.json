@@ -413,14 +413,6 @@
     "intentCard": {
       "titleWithBadge": "{{title}}、{{count}}項目",
       "opensActivityHint": "このアクティビティを開きます"
-    },
-    "engagementChip": {
-      "curious": "好奇心",
-      "stuck": "行き詰まり",
-      "breezing": "順調",
-      "focused": "集中",
-      "scattered": "散漫",
-      "a11yLabel": "エンゲージメント: {{label}}"
     }
   },
   "family": {
@@ -1582,7 +1574,9 @@
     },
     "searchResult": {
       "a11y": "{{title}}、{{subtitle}}"
-    }
+    },
+    "topicPickerEmptyTitle": "まだトピックがありません",
+    "topicPickerEmptyDescription": "この本には、まだ選択できるトピックがありません。"
   },
   "topic": {
     "relevance": {
@@ -2548,7 +2542,17 @@
       "sessionSummary": "セッションの概要",
       "noSummaryBody": "このセッションの概要は生成されませんでした",
       "openTopicWithTitle": "{{title}}を開く",
-      "backToChildProfile": "お子様のプロフィールに戻る"
+      "backToChildProfile": "お子様のプロフィールに戻る",
+      "engagementChip": {
+        "accessibilityLabel": "エンゲージメント: {{label}}",
+        "labels": {
+          "curious": "興味津々",
+          "stuck": "奮闘中",
+          "breezing": "スラスラ",
+          "focused": "集中",
+          "scattered": "集中しようとしています"
+        }
+      }
     },
     "subjects": {
       "subjectNotFound": "科目が見つかりません",
@@ -3359,7 +3363,9 @@
     "signingOutAll": "他のデバイスからサインアウトしています...",
     "signOutAllTitle": "他のすべてのデバイスからサインアウトしますか？",
     "signOutAllConfirm": "これにより、他の{{count}}個のセッションが終了します。このデバイスはサインインしたままになります。",
-    "signOutAllConfirmButton": "すべてサインアウト"
+    "signOutAllConfirmButton": "すべてサインアウト",
+    "emptyBackLabel": "アカウント設定に戻る",
+    "emptyBackButton": "アカウントに戻る"
   },
   "changePassword": {
     "errorCurrentRequired": "現在のパスワードを入力してください",
@@ -3586,7 +3592,9 @@
     "hub": {
       "sessionsSubtitle": "あなたの会話履歴",
       "notesSubtitle": "あなたが書き留めたこと",
-      "bookmarksSubtitle": "あなたが保存したメンターの返信"
+      "bookmarksSubtitle": "あなたが保存したメンターの返信",
+      "countLoading": "読み込み中",
+      "countUnavailable": "利用不可"
     },
     "unknownSubject": "不明な科目",
     "searchSessions": "セッションを検索",
@@ -3663,7 +3671,8 @@
     "childNamePlaceholder": "お子様の名前またはニックネーム",
     "childBirthYearPlaceholder": "誕生年",
     "a11yBack": "前のステップに戻る",
-    "a11yCancel": "キャンセルして終了"
+    "a11yCancel": "キャンセルして終了",
+    "loading": "保存したプレビューを読み込み中..."
   },
   "pickBook": {
     "subjectFallback": "科目",

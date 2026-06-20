@@ -50,6 +50,25 @@ describe('SuggestionCard', () => {
     screen.getByTestId('suggestion-forests');
   });
 
+  it('groups composed content as one accessible button', () => {
+    render(
+      <SuggestionCard
+        title="Forests"
+        description="Learn about trees"
+        addLabel="Add to shelf"
+        onPress={jest.fn()}
+        testID="suggestion-forests"
+      />,
+    );
+
+    const card = screen.getByTestId('suggestion-forests');
+    expect(card.props.accessible).toBe(true);
+    expect(card.props.accessibilityRole).toBe('button');
+    expect(card.props.accessibilityLabel).toBe(
+      'Add to shelf: Forests. Learn about trees',
+    );
+  });
+
   it('uses subject tint for suggested books when provided', () => {
     render(
       <SuggestionCard

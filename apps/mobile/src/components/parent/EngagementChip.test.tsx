@@ -8,6 +8,23 @@ describe('EngagementChip', () => {
     screen.getByText('Focused');
   });
 
+  it('uses positive localized labels for support states', () => {
+    const { rerender } = render(<EngagementChip signal="stuck" />);
+
+    screen.getByText('Working through it');
+    expect(screen.queryByText('Stuck')).toBeNull();
+    expect(
+      screen.getByTestId('engagement-chip-stuck').props.accessibilityLabel,
+    ).toBe('Engagement: Working through it');
+
+    rerender(<EngagementChip signal="scattered" />);
+    screen.getByText('Finding focus');
+    expect(screen.queryByText('Scattered')).toBeNull();
+    expect(
+      screen.getByTestId('engagement-chip-scattered').props.accessibilityLabel,
+    ).toBe('Engagement: Finding focus');
+  });
+
   it('renders each supported engagement state with a stable test id', () => {
     const { rerender } = render(<EngagementChip signal="curious" />);
 

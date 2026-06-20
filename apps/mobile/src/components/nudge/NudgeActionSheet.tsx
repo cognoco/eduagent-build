@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { NudgeTemplate } from '@eduagent/schemas';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSendNudge } from '../../hooks/use-nudges';
 import {
@@ -37,6 +38,7 @@ export function NudgeActionSheet({
 }: NudgeActionSheetProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const sendNudge = useSendNudge();
   const [pendingTemplate, setPendingTemplate] = useState<NudgeTemplate | null>(
     null,
@@ -95,7 +97,11 @@ export function NudgeActionSheet({
       accessibilityViewIsModal
     >
       <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-surface rounded-t-3xl px-5 pt-5 pb-8">
+        <View
+          className="bg-surface rounded-t-3xl px-5 pt-5"
+          style={{ paddingBottom: insets.bottom + 8 }}
+          testID="nudge-action-sheet"
+        >
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-1 pr-3">
               <Text className="text-h3 font-bold text-text-primary">

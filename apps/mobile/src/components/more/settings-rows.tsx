@@ -42,9 +42,14 @@ export function SettingsRow({
           </Text>
         ) : null}
       </View>
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row items-center gap-2 min-w-0 max-w-[48%]">
         {value ? (
-          <Text className="text-body-sm text-text-secondary">{value}</Text>
+          <Text
+            className="text-body-sm text-text-secondary min-w-0 flex-shrink"
+            numberOfLines={1}
+          >
+            {value}
+          </Text>
         ) : null}
         {onPress ? (
           <Ionicons

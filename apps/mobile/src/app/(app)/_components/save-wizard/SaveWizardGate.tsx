@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,7 +109,22 @@ export function SaveWizardGate({
   }, [probeDone, previewState, router, onComplete]);
 
   if (!previewState) {
-    return <View testID="save-wizard-gate" className="flex-1 bg-background" />;
+    return (
+      <View
+        testID="save-wizard-gate"
+        className="flex-1 bg-background items-center justify-center px-6"
+      >
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          accessibilityLabel={t('common.loading')}
+          testID="save-wizard-loading"
+        />
+        <Text className="mt-3 text-body-sm text-text-secondary text-center">
+          {t('saveWizard.loading')}
+        </Text>
+      </View>
+    );
   }
 
   return (

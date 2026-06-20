@@ -728,7 +728,7 @@ function LibraryScreenContent({
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => router.replace('/(app)')}
+            onPress={() => router.replace('/(app)/home' as Href)}
             className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
             testID="library-home-button"
           >

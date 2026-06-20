@@ -656,7 +656,7 @@ export default function TopicDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.replace('/(app)')}
+          onPress={() => router.replace('/(app)/home' as Href)}
           className="py-2 items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goHome')}
