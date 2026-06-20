@@ -21,32 +21,34 @@
  * Payload keys that must never cross the Inngest trust boundary carrying
  * raw learner content.
  *
- * Deliberately NOT listed (yet): `learnerMessage` / `topicTitle`. The
- * `app/review.calibration.requested` event still legitimately carries them
- * to its consumer (`review-calibration-grade`) — that site is the same
- * leak class but sits outside the event-payload unit's audited finding set
- * and is tracked as its own work item. Add both keys here when that
- * dispatch is converted to the reference-and-rehydrate pattern.
+ * `learnerMessage` / `topicTitle` (WI-620): the `app/review.calibration.requested`
+ * dispatch was converted to the reference-and-rehydrate pattern (it now carries
+ * an opaque `learnerMessageEventId` and the consumer rehydrates from the DB
+ * scoped by profileId), so these keys no longer have a legitimate carrier.
+ * Listing them makes the middleware a runtime ratchet against any future
+ * regression that re-introduces the raw fields.
  */
 export const INNGEST_PII_PAYLOAD_KEYS: readonly string[] = [
   'sessionTranscript',
   'classifyInput',
   'transcript',
   'exchangeHistory',
+  'learnerMessage',
+  'topicTitle',
 ];
 
 /**
  * Step-return keys that must never cross the Inngest trust boundary carrying
- * minor-PII. Memoized step returns are persisted in Inngest's third-party
- * state store just like event payloads; the offending steps now return opaque
- * references (profile/session/notice ids) and the consuming steps rehydrate
- * from the database.
+ * minor-PII (or, for `parentEmail`, guardian-PII). Memoized step returns are
+ * persisted in Inngest's third-party state store just like event payloads; the
+ * offending steps now return opaque references (profile/session/notice ids, or
+ * the fresh token alone) and the consuming steps rehydrate from the database.
  *
- * Deliberately NOT listed: `parentEmail`. consent-reminders.ts legitimately
- * memoizes `{ parentEmail, freshToken }` in its day-7/day-14 token-mint steps
- * (the mint is non-idempotent and must survive replay); converting that flow
- * is tracked as its own work item, and a denylist hit there would break
- * reminder emails. Add the key once that flow rehydrates the address.
+ * `parentEmail` [WI-637]: consent-reminders.ts no longer memoizes the address —
+ * its day-7/day-14 token-mint steps return the fresh token only, and the send
+ * steps re-read the email in-step via lookupConsentDetails(). monthly-report
+ * and weekly-progress already keep the email a step-local var (returns carry
+ * only `{ sent, reason }`), so arming this key cannot break a live send.
  */
 export const INNGEST_PII_STEP_KEYS: readonly string[] = [
   'childName',
@@ -54,6 +56,7 @@ export const INNGEST_PII_STEP_KEYS: readonly string[] = [
   'childSummaries',
   'struggleLines',
   'struggleTopics',
+  'parentEmail',
 ];
 
 /** Replacement value written over scrubbed payload fields. */

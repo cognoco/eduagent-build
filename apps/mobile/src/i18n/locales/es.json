@@ -3900,7 +3900,9 @@
       "caption": "¿En qué quieres trabajar?",
       "equalWeight": "Ejemplo de pregunta",
       "placeholderRotation": {
-        "one": "Escribe una pregunta o pega una tarea..."
+        "one": "Escribe una pregunta o pega una tarea...",
+        "two": "Pídeme que te explique algo...",
+        "three": "Prueba: mostrar mi progreso"
       },
       "orJustType": "O empieza con una de estas.",
       "chipHomework": "Ayúdame con la tarea",
@@ -3912,7 +3914,8 @@
     "title": "Tutor",
     "subtitle": "Algunos próximos pasos útiles, además de un lugar para preguntar o apuntar cualquier cosa.",
     "fallback": {
-      "cached": "Mostrando la última información guardada mientras nos reconectamos."
+      "cached": "Mostrando la última información guardada mientras nos reconectamos.",
+      "continue": "Continúa donde lo dejaste"
     },
     "error": {
       "title": "No pudimos cargar tus próximos pasos",
@@ -3923,7 +3926,8 @@
       "imageAlt": "Foto de la tarea",
       "helpMeSolve": "Ayúdame a resolver esto",
       "checkMyAnswer": "Revisa mi respuesta"
-    }
+    },
+    "homeworkPrompt": "¿Tienes deberes esta noche? Haz una foto y los resolveremos juntos."
   },
   "subjectsBrowse": {
     "title": "Temas",
@@ -3974,7 +3978,10 @@
     "notes": {
       "heading": "Notas",
       "authorSelf": "Mis notas",
-      "authorMentor": "Guardado del tutor"
+      "authorMentor": "Guardado del tutor",
+      "addNote": "Añadir una nota",
+      "micLabel": "Añadir una nota por voz",
+      "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura."
     },
     "sheet": {
       "close": "Cerrar",
@@ -3991,7 +3998,8 @@
       "later": "Más tarde",
       "done": "Hecho",
       "mastered": "Dominado"
-    }
+    },
+    "linkLabel": "Abrir centro de asignaturas"
   },
   "journal": {
     "title": "Diario",
@@ -4028,15 +4036,18 @@
     "reports": {
       "error": "No se pudieron cargar tus informes."
     },
-    "notes": {
-      "sessions": "Sesiones de aprendizaje recientes",
-      "notes": "Notas de estudio que guardaste",
-      "bookmarks": "Respuestas guardadas del tutor"
-    },
     "memory": {
       "title": "Controles de memoria del tutor",
       "body": "Revisa, edita, oculta, exporta o borra lo que tu tutor recuerda desde la pantalla de memoria completa.",
       "open": "Abrir controles de memoria"
+    },
+    "notes": {
+      "error": "No se han podido cargar tus notas.",
+      "searchPlaceholder": "Buscar notas",
+      "searchEmpty": "Ninguna nota coincide con la búsqueda.",
+      "empty": "Aquí aparecerán las notas que guardes y las respuestas del tutor que marques.",
+      "authorshipMentor": "Del tutor",
+      "authorshipMine": "Mi nota"
     }
   },
   "accountAdmin": {

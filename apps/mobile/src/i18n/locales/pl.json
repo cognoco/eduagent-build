@@ -4058,7 +4058,9 @@
       "caption": "Nad czym chcesz popracować?",
       "equalWeight": "Przykładowe polecenie",
       "placeholderRotation": {
-        "one": "Wpisz pytanie lub wklej pracę domową..."
+        "one": "Wpisz pytanie lub wklej pracę domową...",
+        "two": "Poproś mnie o wyjaśnienie czegoś...",
+        "three": "Spróbuj: pokaż moje postępy"
       },
       "orJustType": "Lub zacznij od jednego z tych.",
       "chipHomework": "Pomóż mi z pracą domową",
@@ -4070,7 +4072,8 @@
     "title": "Mentor",
     "subtitle": "Kilka przydatnych kroków i jedno miejsce na pytania i notatki.",
     "fallback": {
-      "cached": "Wyświetlanie ostatniego zapisanego kanału podczas ponownego łączenia."
+      "cached": "Wyświetlanie ostatniego zapisanego kanału podczas ponownego łączenia.",
+      "continue": "Kontynuuj od ostatniego miejsca"
     },
     "error": {
       "title": "Nie udało się wczytać kolejnych kroków",
@@ -4081,7 +4084,8 @@
       "imageAlt": "Zdjęcie pracy domowej",
       "helpMeSolve": "Pomóż mi to rozwiązać",
       "checkMyAnswer": "Sprawdź moją odpowiedź"
-    }
+    },
+    "homeworkPrompt": "Masz dziś zadanie domowe? Zrób zdjęcie, a rozwiążemy je razem."
   },
   "subjectsBrowse": {
     "title": "Przedmioty",
@@ -4132,7 +4136,10 @@
     "notes": {
       "heading": "Notatki",
       "authorSelf": "Moje notatki",
-      "authorMentor": "Zapisane od tutora"
+      "authorMentor": "Zapisane od tutora",
+      "addNote": "Dodaj notatkę",
+      "micLabel": "Dodaj notatkę głosowo",
+      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu."
     },
     "sheet": {
       "close": "Zamknij",
@@ -4149,7 +4156,8 @@
       "later": "Później",
       "done": "Gotowe",
       "mastered": "Opanowane"
-    }
+    },
+    "linkLabel": "Otwórz centrum tematyczne"
   },
   "journal": {
     "title": "Dziennik",
@@ -4186,15 +4194,18 @@
     "reports": {
       "error": "Nie udało się wczytać raportów."
     },
-    "notes": {
-      "sessions": "Ostatnie sesje nauki",
-      "notes": "Zapisane notatki",
-      "bookmarks": "Zapisane odpowiedzi tutora"
-    },
     "memory": {
       "title": "Zarządzanie pamięcią tutora",
       "body": "Przeglądaj, edytuj, ukrywaj, eksportuj lub usuwaj to, co pamięta Twój tutor, na pełnym ekranie pamięci.",
       "open": "Otwórz zarządzanie pamięcią"
+    },
+    "notes": {
+      "error": "Nie udało się wczytać Twoich notatek.",
+      "searchPlaceholder": "Szukaj w notatkach",
+      "searchEmpty": "Brak notatek pasujących do wyszukiwania.",
+      "empty": "Zapisane notatki i odpowiedzi tutora dodane do zakładek pojawią się tutaj.",
+      "authorshipMentor": "Od tutora",
+      "authorshipMine": "Moja notatka"
     }
   },
   "accountAdmin": {

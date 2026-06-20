@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
-import { Share } from 'react-native';
+import { Platform, Share } from 'react-native';
 import {
   renderScreen,
   cleanupScreen,
@@ -308,6 +308,102 @@ describe('PrivacyScreen', () => {
         expect.any(String),
         expect.stringContaining('Export failed'),
       );
+    });
+  });
+
+  // [WI-874 / ACCOUNT-10] Web export branch. The native Share path is covered
+  // above ("hits the export endpoint"); on web the screen instead builds a
+  // Blob and triggers an anchor download. Platform.OS and the browser
+  // primitives (document, URL) are true external boundaries we control here.
+  describe('web export download branch (Platform.OS === "web")', () => {
+    let originalOS: typeof Platform.OS;
+    let clickSpy: jest.Mock;
+    let createElementSpy: jest.Mock;
+    let createObjectURLSpy: jest.Mock;
+    let revokeObjectURLSpy: jest.Mock;
+    let fakeAnchor: { href: string; download: string; click: jest.Mock };
+    let originalURL: typeof globalThis.URL;
+
+    beforeEach(() => {
+      originalOS = Platform.OS;
+      Object.defineProperty(Platform, 'OS', {
+        value: 'web',
+        configurable: true,
+      });
+
+      clickSpy = jest.fn();
+      fakeAnchor = { href: '', download: '', click: clickSpy };
+      createElementSpy = jest.fn(() => fakeAnchor);
+      (globalThis as { document?: unknown }).document = {
+        createElement: createElementSpy,
+      };
+
+      createObjectURLSpy = jest.fn(() => 'blob:mock-url');
+      revokeObjectURLSpy = jest.fn();
+      originalURL = globalThis.URL;
+      (globalThis as { URL: unknown }).URL = {
+        createObjectURL: createObjectURLSpy,
+        revokeObjectURL: revokeObjectURLSpy,
+      };
+    });
+
+    afterEach(() => {
+      Object.defineProperty(Platform, 'OS', {
+        value: originalOS,
+        configurable: true,
+      });
+      delete (globalThis as { document?: unknown }).document;
+      // Restore the original URL global so cleanup is symmetric with the
+      // beforeEach override and no later test inherits the stub.
+      (globalThis as { URL: typeof globalThis.URL }).URL = originalURL;
+    });
+
+    it('triggers a JSON anchor download instead of the native share sheet', async () => {
+      const shareSpy = jest.spyOn(Share, 'share');
+      active = renderScreen(<PrivacyScreen />, {
+        profile: ownerProfile,
+        routes: { '/account/export': { data: 'test' } },
+      });
+      await act(async () => {
+        fireEvent.press(active!.result.getByTestId('more-row-export'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(createElementSpy).toHaveBeenCalledWith('a');
+      });
+      expect(fakeAnchor.download).toBe('mentomate-data-export.json');
+      expect(fakeAnchor.href).toBe('blob:mock-url');
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url');
+      // Web path must NOT fall through to the native share sheet.
+      expect(shareSpy).not.toHaveBeenCalled();
+      shareSpy.mockRestore();
+    });
+
+    it('returns without throwing when no document is available on web', async () => {
+      delete (globalThis as { document?: unknown }).document;
+      active = renderScreen(<PrivacyScreen />, {
+        profile: ownerProfile,
+        routes: { '/account/export': { data: 'test' } },
+      });
+      await act(async () => {
+        fireEvent.press(active!.result.getByTestId('more-row-export'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(active!.routedFetch, '/account/export').length,
+        ).toBeGreaterThanOrEqual(1);
+      });
+      // The early `if (!doc) return` guard means no anchor was created and no
+      // error alert surfaced.
+      expect(createElementSpy).not.toHaveBeenCalled();
+      expect(mockPlatformAlert).not.toHaveBeenCalled();
     });
   });
 });

@@ -287,7 +287,8 @@ export const sessionSummaryRegenerate = inngest.createFunction(
           .from(profiles)
           .where(eq(profiles.id, payload.profileId))
           .limit(1);
-        regenerateConversationLanguage = regenerateProfile?.conversationLanguage;
+        regenerateConversationLanguage =
+          regenerateProfile?.conversationLanguage;
       }
       const summary = await generateAndStoreLlmSummary(db, {
         sessionId: payload.sessionId,

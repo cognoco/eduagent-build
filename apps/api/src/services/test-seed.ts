@@ -5901,25 +5901,30 @@ export async function seedScenario(
 // ---------------------------------------------------------------------------
 // Internal helper: delete an organization and all RESTRICT-gated dependents.
 //
-// ON DELETE RESTRICT tables that block a bare DELETE FROM organization:
-//   - subscription   (organizationId RESTRICT)
-//   - consent_grant  (organizationId RESTRICT)
-//   - guardianship   (guardianPersonId RESTRICT, chargePersonId RESTRICT)
-//   - subscription   (payerPersonId RESTRICT)
+// FK edges that block a bare DELETE FROM organization / consent_grant:
+//   - subscription    (organizationId RESTRICT)
+//   - consent_grant   (organizationId RESTRICT)
+//   - guardianship    (guardianPersonId RESTRICT, chargePersonId RESTRICT)
+//   - subscription    (payerPersonId RESTRICT)
+//   - consent_request (consent_grant_id → consent_grant.id, NO ACTION — an
+//     approved/withdrawn request back-linking a grant blocks that grant's
+//     delete; its own organization_id/charge_person_id CASCADEs only fire on
+//     person/org delete, which is AFTER the consent_grant delete — too late).
 //
 // Safe cascade tables (no action needed before org delete):
 //   - membership     (CASCADE from both personId and organizationId)
-//   - consent_request (CASCADE from organizationId and chargePersonId)
 //   - login          (CASCADE from personId)
 //   - subjects + all learning data (CASCADE from profileId → person.id post-M-REPOINT)
 //
 // Deletion order:
 //   1. Collect all personIds in the orgs (via membership — includes managed children)
-//   2. Delete consent_grant rows (clears both chargePersonId and organizationId RESTRICT)
-//   3. Delete subscription rows (clears organizationId and payerPersonId RESTRICT)
-//   4. Delete guardianship rows for those persons (clears RESTRICT on person)
-//   5. Delete person rows (cascades login, membership, consent_request, subjects, sessions…)
-//   6. Delete organization rows (membership already gone; safe)
+//   2. Delete consent_request rows (clears the consent_grant_id back-link FK before
+//      the consent_grant delete below — see WI-880)
+//   3. Delete consent_grant rows (clears both chargePersonId and organizationId RESTRICT)
+//   4. Delete subscription rows (clears organizationId and payerPersonId RESTRICT)
+//   5. Delete guardianship rows for those persons (clears RESTRICT on person)
+//   6. Delete person rows (cascades login, membership, any remaining consent_request, subjects, sessions…)
+//   7. Delete organization rows (membership already gone; safe)
 // ---------------------------------------------------------------------------
 async function deleteOrganizationGraph(
   db: Database,
@@ -5969,17 +5974,28 @@ async function deleteOrganizationGraph(
     deletablePersonIds = personIds.filter((id) => !sharedPersonIds.has(id));
   }
 
-  // 2. Delete consent_grant rows (RESTRICT on organizationId).
+  // 2. Delete consent_request rows FIRST (WI-880). consent_request.consent_grant_id
+  // → consent_grant.id is a NO ACTION (RESTRICT) FK with no ON DELETE, so an
+  // approved/withdrawn request back-linking a grant blocks the consent_grant
+  // delete below. The request's own organization_id/charge_person_id CASCADEs
+  // only fire on person/org delete (steps 6-7), too late. Clearing requests here
+  // (org-scoped, mirroring the consent_grant delete) breaks the FK dependency
+  // for approved, withdrawn, and failed/partial J-13/J-21 teardown variants.
+  await db
+    .delete(consentRequest)
+    .where(inArray(consentRequest.organizationId, orgIds));
+
+  // 3. Delete consent_grant rows (RESTRICT on organizationId).
   await db
     .delete(consentGrant)
     .where(inArray(consentGrant.organizationId, orgIds));
 
-  // 3. Delete subscription rows (RESTRICT on organizationId and payerPersonId).
+  // 4. Delete subscription rows (RESTRICT on organizationId and payerPersonId).
   await db
     .delete(subscription)
     .where(inArray(subscription.organizationId, orgIds));
 
-  // 4. Delete guardianship rows (RESTRICT on both person FK columns). Scoped to
+  // 5. Delete guardianship rows (RESTRICT on both person FK columns). Scoped to
   // deletable persons so a shared person's guardianship edges are left intact.
   if (deletablePersonIds.length > 0) {
     await db
@@ -5992,12 +6008,12 @@ async function deleteOrganizationGraph(
       );
   }
 
-  // 5. Delete person rows (cascades login, membership, consent_request, subjects, sessions…).
+  // 6. Delete person rows (cascades login, membership, any remaining consent_request, subjects, sessions…).
   if (deletablePersonIds.length > 0) {
     await db.delete(person).where(inArray(person.id, deletablePersonIds));
   }
 
-  // 6. Delete organization rows (cascades any remaining membership — including a
+  // 7. Delete organization rows (cascades any remaining membership — including a
   // shared person's membership in this org — via membership.organizationId).
   const deleted = await db
     .delete(organization)

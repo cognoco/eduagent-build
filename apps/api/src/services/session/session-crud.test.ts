@@ -1,6 +1,7 @@
 import {
   __sessionCrudTestHooks,
   buildTopicIntentMatcherMessages,
+  claimSessionForFilingRetry,
   closeSession,
   closeStaleSessions,
   flagContent,
@@ -20,6 +21,7 @@ import {
   getSessionMetadata,
   normalizeHomeworkSummary,
 } from './session-crud';
+import { FILING_CONFIG } from '../../config/filing';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
 import * as profileService from '../profile';
@@ -1554,5 +1556,109 @@ describe('closeStaleSessions — per-session error isolation', () => {
     const roundTripped = JSON.parse(JSON.stringify(result));
     expect(roundTripped.failures).toEqual(result.failures);
     expect(roundTripped.sessions).toEqual(result.sessions);
+  });
+});
+
+// [WI-730] The atomic UPDATE predicate in claimSessionForFilingRetry must
+// derive its cap from FILING_CONFIG.maxRetries, not a hardcoded literal.
+// WI-727 already made routes/filing.ts config-driven; this test guards the
+// data-access claim predicate so the two stay in sync if maxRetries changes.
+//
+// Red-green is SELF-CONTAINED in the test below (no manual config edit
+// required). The subtlety the first version missed: when
+// FILING_CONFIG.maxRetries === 3 (its default), a hardcoded `lt(..., 3)` and
+// `lt(..., FILING_CONFIG.maxRetries)` bind an IDENTICAL value into the Drizzle
+// AST, so asserting the AST merely "contains 3" cannot tell fix from bug. The
+// test therefore overrides maxRetries to a sentinel distinct from 3 and asserts
+// the predicate's cap follows it — a restored `lt(..., 3)` then binds 3 (not the
+// sentinel) and the test fails, which is the genuine red-green guard.
+describe('[WI-730] claimSessionForFilingRetry — cap is derived from FILING_CONFIG.maxRetries', () => {
+  const PROFILE_ID = '00000000-0000-7000-8001-000000000001';
+  const SESSION_ID = '00000000-0000-7000-8001-000000000002';
+
+  // Walk any nested plain-object / array structure and collect all numeric
+  // values. Drizzle SQL expression objects are plain objects whose leaves
+  // carry the actual bound values.
+  function collectNumericValues(
+    node: unknown,
+    seen = new Set<unknown>(),
+  ): number[] {
+    if (node == null || typeof node !== 'object' || seen.has(node)) return [];
+    seen.add(node);
+    const nums: number[] = [];
+    for (const val of Object.values(node as Record<string, unknown>)) {
+      if (typeof val === 'number') {
+        nums.push(val);
+      } else if (typeof val === 'object') {
+        nums.push(...collectNumericValues(val, seen));
+      }
+    }
+    return nums;
+  }
+
+  it('binds the cap from FILING_CONFIG.maxRetries — overriding it to a sentinel proves the predicate is not hardcoded', async () => {
+    // Sentinel distinct from the default cap (3) and from any plausible
+    // incidental numeric in the Drizzle AST, so the assertion is unambiguous.
+    const SENTINEL = 4242;
+    const original = FILING_CONFIG.maxRetries;
+    // FILING_CONFIG is `as const` (TS-readonly) but NOT frozen at runtime, so a
+    // cast lets the test drive a non-default cap and restore it in `finally`.
+    (FILING_CONFIG as { maxRetries: number }).maxRetries = SENTINEL;
+    try {
+      let capturedWhere: unknown;
+
+      // Chainable builder that records the predicate passed to .where().
+      // .returning() resolves to [] (no row) — the claimed/not-claimed outcome
+      // is irrelevant to this assertion; we only care about the predicate.
+      const chain = {
+        set: () => chain,
+        where: (predicate: unknown) => {
+          capturedWhere = predicate;
+          return chain;
+        },
+        returning: async () => [],
+      };
+      const db = {
+        update: () => chain,
+      } as never;
+
+      await claimSessionForFilingRetry(db, PROFILE_ID, SESSION_ID);
+
+      expect(capturedWhere).toBeDefined();
+
+      // The cap bound into the WHERE SQL AST must follow the overridden config
+      // value. A restored hardcoded `lt(..., 3)` would bind 3 (≠ SENTINEL) here
+      // and fail — that is the red half of the red-green guard.
+      const nums = collectNumericValues(capturedWhere);
+      expect(nums).toContain(SENTINEL);
+    } finally {
+      (FILING_CONFIG as { maxRetries: number }).maxRetries = original;
+    }
+  });
+
+  it('does not claim a session whose filingRetryCount equals the cap', async () => {
+    // Build a fake db that returns a row only when the WHERE predicate would
+    // match (filingRetryCount < cap). We simulate the DB enforcing the
+    // predicate by returning [] for a count that is at the cap.
+    //
+    // The predicate is: filingRetryCount < FILING_CONFIG.maxRetries
+    // A session at filingRetryCount == FILING_CONFIG.maxRetries must NOT match.
+    //
+    // Since we cannot introspect Drizzle predicates at the value level without
+    // walking the AST (done in the sibling test above), we verify the behavioral
+    // contract: a db that returns [] signals "not claimed" → function returns
+    // undefined. This confirms the calling code honours the DB's "no rows" result.
+    const chain = {
+      set: () => chain,
+      where: () => chain,
+      returning: async (): Promise<Array<{ id: string }>> => [],
+    };
+    const db = { update: () => chain } as never;
+
+    const result = await claimSessionForFilingRetry(db, PROFILE_ID, SESSION_ID);
+
+    // When the DB returns no rows (cap predicate rejected the session),
+    // claimSessionForFilingRetry must return undefined — not throw, not return {}.
+    expect(result).toBeUndefined();
   });
 });

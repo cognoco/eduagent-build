@@ -35,6 +35,7 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
 const CARD_ID = '00000000-0000-4000-8000-000000000004';
+const LEARNER_MESSAGE_EVENT_ID = '00000000-0000-4000-8000-000000000005';
 const EVENT_TS = '2026-01-15T12:00:00.000Z';
 
 function makeValidPayload(overrides: Record<string, unknown> = {}) {
@@ -42,8 +43,8 @@ function makeValidPayload(overrides: Record<string, unknown> = {}) {
     profileId: PROFILE_ID,
     sessionId: SESSION_ID,
     topicId: TOPIC_ID,
-    learnerMessage: 'Plants turn sunlight into food.',
-    topicTitle: 'Photosynthesis',
+    // [WI-620] Opaque reference — no raw learnerMessage / topicTitle in payload.
+    learnerMessageEventId: LEARNER_MESSAGE_EVENT_ID,
     timestamp: EVENT_TS,
     ...overrides,
   };
@@ -89,8 +90,7 @@ describe('reviewCalibrationGrade', () => {
       profileId: PROFILE_ID,
       sessionId: SESSION_ID,
       topicId: TOPIC_ID,
-      learnerMessage: 'Plants turn sunlight into food.',
-      topicTitle: 'Photosynthesis',
+      learnerMessageEventId: LEARNER_MESSAGE_EVENT_ID,
       // Missing timestamp: every durable app event payload must carry one.
     });
 
@@ -136,7 +136,10 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [{ id: CARD_ID }],
-        'grade-recall-quality': 4,
+        // [WI-620] Rehydration + grading share ONE step closure so the raw
+        // learner text / topic title stay local and only the non-PII quality
+        // number crosses the step boundary (Inngest memoizes step returns).
+        'rehydrate-and-grade-recall-quality': 4,
         'finalize-retention-update': undefined,
         'stamp-mastery-on-verify': undefined,
       },
@@ -149,14 +152,41 @@ describe('reviewCalibrationGrade', () => {
       passed: true,
     });
     expect(runCalls).toHaveLength(5);
-    // F-174: the cooldown claim MUST precede the paid LLM grade step.
+    // F-174: the cooldown claim MUST precede the paid LLM grade.
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
       'claim-cooldown-slot',
-      'grade-recall-quality',
+      'rehydrate-and-grade-recall-quality',
       'finalize-retention-update',
       'stamp-mastery-on-verify',
     ]);
+  });
+
+  // [WI-620] Rehydration fails (transcript purged / topic changed since
+  // dispatch) → the merged step returns null and grading is skipped rather
+  // than guessing; finalize/stamp never run.
+  it('[WI-620] returns rehydration_failed and skips grading when the DB lookup yields null', async () => {
+    const { result, runCalls } = await executeHandlerWithResults(
+      makeValidPayload(),
+      {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'rehydrate-and-grade-recall-quality': null,
+      },
+    );
+
+    expect(result).toEqual({
+      skipped: 'rehydration_failed',
+      sessionId: SESSION_ID,
+    });
+    expect(runCalls.map((c) => c.name)).toEqual([
+      'load-retention-card',
+      'claim-cooldown-slot',
+      'rehydrate-and-grade-recall-quality',
+    ]);
+    expect(runCalls.map((c) => c.name)).not.toContain(
+      'finalize-retention-update',
+    );
   });
 
   it('returns cooldown_claim_lost when CAS update matches 0 rows', async () => {
@@ -165,10 +195,9 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [],
-        // Pre-fix step names kept as safety nets so a regression to the old
-        // ordering cannot leak a real LLM call out of this unit test.
-        'grade-recall-quality': 4,
-        'persist-retention-update': [],
+        // Safety net so a regression that runs grading before the claim cannot
+        // leak a real LLM call out of this unit test.
+        'rehydrate-and-grade-recall-quality': 4,
       },
     );
 
@@ -191,9 +220,8 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [], // 0 rows → claim lost
-        // Safety net against the pre-fix ordering — must NOT be reached.
-        'grade-recall-quality': 4,
-        'persist-retention-update': [],
+        // Safety net — the merged rehydrate+grade step must NOT be reached.
+        'rehydrate-and-grade-recall-quality': 4,
       },
     );
 
@@ -201,7 +229,9 @@ describe('reviewCalibrationGrade', () => {
       skipped: 'cooldown_claim_lost',
       sessionId: SESSION_ID,
     });
-    expect(runCalls.map((c) => c.name)).not.toContain('grade-recall-quality');
+    expect(runCalls.map((c) => c.name)).not.toContain(
+      'rehydrate-and-grade-recall-quality',
+    );
   });
 
   // [WI-848] finalize-retention-update callback runs inline (not stubbed) so
@@ -213,7 +243,7 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
-      'grade-recall-quality': 0, // quality 0 → processRecallResult yields xpChange:'decayed'
+      'rehydrate-and-grade-recall-quality': 0, // quality 0 → processRecallResult yields xpChange:'decayed'
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
     });
@@ -240,7 +270,7 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
-      'grade-recall-quality': 5, // quality 5 → processRecallResult yields xpChange:'verified'
+      'rehydrate-and-grade-recall-quality': 5, // quality 5 → processRecallResult yields xpChange:'verified'
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
     });

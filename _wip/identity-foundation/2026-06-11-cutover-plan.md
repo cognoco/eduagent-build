@@ -1,8 +1,24 @@
 # IF Application Cutover Plan — WP-CUT-A → WP-CUT-B → WI-586 convergence
 
-**Date:** 2026-06-11 · **Status:** DRAFT v1.7 — awaiting ratification (program session + operator)
+**Date:** 2026-06-11 (Option A + abbreviated gates ratified 2026-06-17) · **Status:** RATIFIED — Option A (empty-prod) in effect; prod path = snapshot→repoint→flip→drop, pre-launch; full rehearsal on staging (see ⭐ banner below)
 **Author:** dedicated architecture/planning session (per `cutover-planning-brief.md`)
 **Profile:** design (plan only; no code, no migrations, no Cosmo writes)
+
+> **⭐ RATIFIED 2026-06-17 — OPTION A (empty-prod) + ABBREVIATED GATES. READ FIRST; this supersedes the prod-execution ceremony described in §4 below.**
+>
+> **Finding (verified 3 ways):** production is **EMPTY** — 0 rows across all 85 tables, migration level 116, the only MentoMate Neon prod branch. Runtime DB now locked: GitHub `DATABASE_URL_PRODUCTION`(+`_HOST`) set to the verified prod connection; the next prod deploy's built-in host-assertion is the byte-confirm. Operator confirms **no launch within the working window**.
+>
+> **Implication (Option A, ratified):** on **prod** the data spine — freeze → disposal → reseed → parity (C2–C5) — is a **no-op** (0 rows); #11 drops 0 rows; #8 flips for 0 users. The irreversible-prod-data-loss catastrophe that gated #8/#11 **does not apply while prod is empty.** The prod cutover collapses to **snapshot → repoint → flip → drop**, and **must land before launch** (the instant prod gets a row, the full §4 runbook re-applies). The **full data rehearsal stays on STAGING** (it has data: 524 acc / 509 prof) — that is where all the rigor lives now.
+>
+> **Abbreviated gate model (ratified 2026-06-17):**
+> - **THE proof gate = staging rehearsal GREEN** — full sequence on staging incl. the post-drop route-smoke. If staging passes end-to-end on real-shaped data, the prod steps are mechanical.
+> - **Prod flip (#8) — OPERATOR-only.** Precondition: staging rehearsal green + WI-811/reader-sweeps merged + prod-deploy host-assertion confirmed. **Reversible** (flag→false + redeploy) until the drop. **No prod freeze** (no users), **no prod parity** (trivially 0=0).
+> - **Prod drop (#11) — OPERATOR-only.** Precondition: a **pre-drop prod snapshot** (cheap insurance) + post-flip soak (compressible — no prod traffic). Irreversible-schema but **0 rows lost**.
+> - **DROPPED as prod-specific (now moot, were data-loss controls):** parity-exact, abort-on-deviation, notify-before-each-gate. **KEPT:** the pre-drop snapshot. #8/#11 stay operator-only by policy — but become quick rulings, not ceremony.
+>
+> **Repoint is per-environment.** Live FK catalog (2026-06-17): **staging 64 FKs / prod 65 FKs** reference the legacy tables (~58–59 off `profiles`; +2 off `accounts`; +4 off `subscriptions` = WI-805 billing scope). Staging and prod **differ by one FK** (`memberships`→profiles on prod only) — handled automatically: `0117_m_repoint.sql` is a **dynamic catalog-driven loop** (queries `pg_constraint` at run time + `EXECUTE format`; hard-coding the list is banned) that **self-adapts to each target's live catalog**, with a completeness `RAISE EXCEPTION` that aborts on any unexpected FK. **No manual per-env re-authoring** — apply the same file to each env. (Verified 2026-06-17; the header's "regenerate" prose is stale from the static-0112 era.)
+>
+> **Still required (empty-prod is NOT a code pass):** WI-811 (v2 child-create), the staging rehearsal, reader-sweep correctness — they make the first real post-launch signup work; their value shifts from data-safety to post-launch code-correctness. Snapshot + repoint are still required at 0 rows (FK *constraints* exist regardless of row count; the DROP fails loud without the repoint).
 
 > **Revision v1.1 (2026-06-11).** Four adversarial-review findings folded: (1) FK
 > re-pointing moved inside the freeze window before the flip (runbook §4 step 6; the
@@ -1226,6 +1242,43 @@ legacy side is untouched (pure addition + seam indirection).
 
 ## 4. Convergence runbook — the shrunk WI-586
 
+> ### ⚠️ STALENESS RECONCILIATION (2026-06-17) — read before executing any step
+> This runbook predates the executed code phase (WI-586/809/810 merged 2026-06-17). The
+> **authoritative artifacts are now the merged migrations themselves** —
+> `apps/api/drizzle/_freeze-only/0117_m_repoint.sql` + `0118_m_drop.sql` on `main`. Where this
+> prose conflicts with those files, **the files win.** Do NOT copy the step-8 SQL below verbatim
+> (it is corrected inline). Current recommendation / corrections:
+>
+> 1. **M-DROP is drop-4, not drop-5.** It drops **4** identity tables — `consent_states`,
+>    `family_links`, `profiles`, `accounts` — + **3** enums (`consent_status`, `consent_type`,
+>    `location_type`). **`subscriptions` is RETAINED through the flip** (its `subscription_status` /
+>    `subscription_tier` enums stay with it). The subscriptions drop + the 4 quota-table FK repoints
+>    (`quota_pools` / `profile_quota_usage` / `top_up_credits` / `usage_events`) are a **coupled
+>    billing cutover owned by WI-805**, run **post-flip** — a second, later drop. This runbook
+>    covers only the identity drop-4.
+> 2. **M-REPOINT / M-DROP are de-journaled freeze-only scripts**, NOT chain migrations. They live in
+>    `apps/api/drizzle/_freeze-only/` with a `-- @freeze-only` marker on line 1; a **fail-closed
+>    deploy guard** (`packages/database/scripts/check-reference-only-migrations.mjs`) blocks them from
+>    auto-applying. Steps 6 + 8 = **apply the freeze-only script by hand inside the freeze**, never
+>    "deploy migration N." The journal tip on `main` is **0116**.
+> 3. **FK re-point is catalog-driven** (computed from the live catalog at run time; hard-coded list
+>    banned). ~**58–59** FKs at current schema, not "≈56."
+> 4. **Reseed (step 4)** = re-run **0109 + 0114 + 0115** (the §1.5 extension landed as those numbered
+>    migrations), not an unnumbered "M-RESEED2" block.
+> 5. **Step-9 grep-clean is carved out:** flag-on integration + non-flip readers → **WI-808**;
+>    subscriptions/billing teardown + full `IDENTITY_V2_ENABLED` retirement → **WI-805** (the flag
+>    still gates billing v2). The "shrunk WI-586" no longer owns the full flag retirement.
+> 6. **Preconditions (real gate today):** WI-586 + WI-809 + WI-810 merged + Gate-2 closed, plus the
+>    staging step-8.5 rehearsal on a **0118-exact (drop-4, subscriptions-present)** DB — superseding
+>    the 2026-06-11 CUT-A/B precondition list below.
+>
+> **Unchanged / still accurate:** the C0→C9 sequence and order (freeze → snapshot → disposal →
+> reseed → parity → repoint → **flip → DROP → post-drop smoke**), the gate ownership (#4 + #6
+> delegated-conditioned; **#8 flip + #11 drop operator-only**), and the supporting machinery
+> (`MAINTENANCE_READONLY`/`MAINTENANCE_BLOCK_INNGEST`, `verify-identity-reseed.mjs`,
+> `flag-on-route-smoke.mjs`) — all verified present on `main`. The step-5 `subs_ok` parity check
+> remains valid (the v2 `subscription` table is reseeded + read post-flip).
+
 **Roles.** *Flip owner:* **Jorn (operator/shepherd)** — personally executes step 2,
 the step-7 flip (Doppler), and the go decisions at the step-6 (M-REPOINT) + step-8 (M-DROP) STOPs, per env. *Orchestrator delegation (operator-ratified 2026-06-15, re-affirmed 2026-06-16; durable record: `.claude/memory/project_586_gate_delegation.md` + WI-586 Cosmo comments):* gate **#4** (cutover-window entry) + gate **#6** (STOP-1 ≈ the step-3 ownerless-disposal STOP, incl. the step-2 Neon branch snapshot) are delegated to the **orchestrator** under conditions — staging rehearsal green + parity exact; abort-to-operator on any deviation; notify operator at each; Neon branch snapshot before disposal. Gates **#8** (step-7 flip) + **#11** (step-8 M-DROP) remain operator-only; any STOP not explicitly delegated defaults to operator. *Executor:* the WI-586
 executor performs the mechanical steps under the executor-protocol hard rule — at the
@@ -1366,13 +1419,15 @@ Per environment — **dev first (full rehearsal), then staging**; production §4
 8. **Drop migration** (`M-DROP` — `*_drop_legacy_identity.sql`) *(STOP → shepherd go)*. One
    transaction (FKs already re-pointed in step 6):
    ```sql
-   DROP TABLE consent_states, family_links, profiles, subscriptions, accounts;
-   DROP TYPE consent_status, consent_type, location_type,
-             subscription_status, subscription_tier;
+   -- [CORRECTED 2026-06-17 — drop-4; authoritative copy: _freeze-only/0118_m_drop.sql]
+   DROP TABLE consent_states, family_links, profiles, accounts;   -- subscriptions RETAINED (→ WI-805)
+   DROP TYPE consent_status, consent_type, location_type;          -- subscription_status/_tier KEPT (table lives)
    ```
-   (children before parents; kept satellites already re-pointed; `webhook_idempotency`,
-   `withdrawal_archive_preference` + `pending_notice_type` enums stay — their tables
-   live on). The migration file carries the §4.2 `## Rollback` section verbatim.
+   (children before parents; kept satellites already re-pointed; `subscriptions` +
+   `subscription_status` / `subscription_tier` stay — their drop is the WI-805 billing
+   cutover, post-flip; `webhook_idempotency`, `withdrawal_archive_preference` +
+   `pending_notice_type` enums stay — their tables live on). The migration file carries
+   the §4.2 `## Rollback` section verbatim.
 8.5. **Post-drop flag-on ROUTE smoke — the real drop-safety net (WI-803, AC#3)**
    *(immediately after step 8, inside the soak; non-STOP)*. M-DROP has just made
    `family_links` (and the other legacy tables) genuinely absent — the **only**

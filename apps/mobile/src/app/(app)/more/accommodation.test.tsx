@@ -148,6 +148,36 @@ describe('AccommodationScreen', () => {
     });
   });
 
+  // [WI-875] Picker restore/no-op edge: handleSelectAccommodation early-returns
+  // when the pressed mode equals the current mode (`if (mode === currentMode)
+  // return;`), so re-selecting the already-active card must NOT fire a PATCH.
+  it('does not PATCH when the already-active mode is re-selected', async () => {
+    active = renderScreen(<AccommodationScreen />, {
+      profile: owner,
+      routes: modeRoute('short-burst'),
+    });
+
+    await waitFor(() => {
+      active!.result.getByTestId('accommodation-mode-short-burst');
+    });
+    await act(async () => {
+      fireEvent.press(
+        active!.result.getByTestId('accommodation-mode-short-burst'),
+      );
+      await Promise.resolve();
+    });
+
+    // Allow any erroneous mutation a tick to flush, then assert none happened.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const patches = fetchCallsMatching(
+      active.routedFetch,
+      '/learner-profile',
+    ).filter((c) => c.init?.method === 'PATCH');
+    expect(patches).toHaveLength(0);
+  });
+
   it('shows the celebration settings link only for short-burst and predictable', async () => {
     active = renderScreen(<AccommodationScreen />, {
       profile: owner,

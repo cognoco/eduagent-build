@@ -87,6 +87,9 @@ function createMockDb({
   findFirstResult = undefined as ReturnType<typeof mockConsentRow> | undefined,
   insertReturning = [] as ReturnType<typeof mockConsentRow>[],
   transactionError = undefined as Error | undefined,
+  // Rows returned by the suppression lookup that sendEmail runs when `db` is
+  // passed through. Empty (default) → address not suppressed → send proceeds.
+  suppressionRows = [] as { email: string }[],
 } = {}): Database {
   // Atomic update chain: update().set().where().returning()
   // returning() resolves with the row (simulates 1 matched row)
@@ -137,6 +140,15 @@ function createMockDb({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockReturnValue({
           returning: jest.fn().mockResolvedValue(insertReturning),
+        }),
+      }),
+    }),
+    // Used only by isEmailSuppressed (via sendEmail) when db is threaded
+    // through. The caller looks up exactly one address per send.
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue(suppressionRows),
         }),
       }),
     }),
@@ -417,6 +429,35 @@ describe('requestConsent', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
+  it('throws EmailDeliveryError without hitting the network when the parent address is suppressed', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({
+      insertReturning: [row],
+      suppressionRows: [{ email: 'parent@example.com' }],
+    });
+
+    await expect(
+      requestConsent(
+        db,
+        {
+          childProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          parentEmail: 'parent@example.com',
+          consentType: 'GDPR',
+        },
+        'https://test.example.com',
+        EMAIL_OPTIONS,
+      ),
+    ).rejects.toThrow(EmailDeliveryError);
+
+    // Suppressed → sendEmail returns { sent: false, reason: 'suppressed' }
+    // BEFORE any network call. This is the behavioural distinction from a 503:
+    // we must never re-burn send quota on a permanently-dead address.
+    expect(fetchMock).not.toHaveBeenCalled();
+    // The reason is NOT 'no_api_key', so the counter is rolled back (unlike the
+    // missing-config branch, which returns gracefully without rollback).
+    expect(db.update).toHaveBeenCalled();
+  });
+
   // BUG-240: Consent email link must use the API origin, never APP_URL
   it('uses the provided API origin in the sent consent email body [BUG-240]', async () => {
     const row = mockConsentRow();
@@ -692,6 +733,30 @@ describe('resendConsent [WI-374]', () => {
     ).rejects.toThrow(EmailDeliveryError);
 
     // Two updates: the atomic increment, then the rollback decrement.
+    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(
+      2,
+    );
+  });
+
+  it('throws EmailDeliveryError and rolls back the resend counter when the parent address is suppressed', async () => {
+    const row = mockConsentRow();
+    const db = createMockDb({
+      findFirstResult: row,
+      suppressionRows: [{ email: row.parentEmail }],
+    });
+
+    await expect(
+      resendConsent(
+        db,
+        { childProfileId: CHILD_ID, consentType: 'GDPR' },
+        'https://api.mentomate.com',
+        EMAIL_OPTIONS,
+      ),
+    ).rejects.toThrow(EmailDeliveryError);
+
+    // Suppressed → no network send, but the counter IS rolled back (reason is
+    // 'suppressed', not 'no_api_key'): atomic increment + rollback decrement.
+    expect(fetchMock).not.toHaveBeenCalled();
     expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(
       2,
     );

@@ -2234,7 +2234,12 @@ describe('SessionScreen homework flow', () => {
         });
       });
 
-      testScreen.getByTestId('mentor-reward-receipt');
+      // The reward receipt renders on a state update that settles a tick after
+      // mockSubmitSummary resolves, so await its appearance rather than reading
+      // synchronously (a bare get here flakes under parallel-suite timing).
+      await waitFor(() => {
+        testScreen.getByTestId('mentor-reward-receipt');
+      });
       expect(testScreen.getByTestId('mentor-reward-value').props.children).toBe(
         '1.5x / 18',
       );

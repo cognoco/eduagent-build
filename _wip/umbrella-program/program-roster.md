@@ -219,7 +219,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   itself dogfood for PRG-04 — §2.1 has no design-activation altitude.)*
 - **Activate-when:** — (design-active 2026-06-13; execution activation = post-grill slice).
 
-### PRG-06 · Identity Cutover — `active` — EXECUTING (gate cleared 2026-06-15)
+### PRG-06 · Identity Cutover — `active` — CUTOVER LANDED 2026-06-18 (terminal cleanup in flight)
 - **Outcome:** app reads/writes the new identity model end-to-end **per canon** (S0–S6
   reconciled, not inherited); `IDENTITY_V2_ENABLED` removed; full unit + 51 integration
   suites green; corrected staging→prod cutover re-run; **WI-586 closed**.
@@ -237,7 +237,22 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   substantially correct (semantic-only remaining) → ADR-0020/0021/0022 trusted canon. Shepherd
   released via inbox `directive` (refining WP-1 = WI-765 + dispatching the enumeration); reviewer =
   existing watcher session extended to cover WS-18 (running; out-of-band of the orchestrator channel).
-- **Activate-when:** — (active; execution gated on the launch gate above)
+- **CUTOVER LANDED 2026-06-18:** #8 flag flip + §3 repoint + #11 legacy-table drop executed on prod
+  (v2-only, verified; pre-launch/empty → 0-row blast radius). **WI-765 (enumeration) / WI-586
+  (convergence runbook) / WI-828 (P5 — #11 drop) Closed**; soak-fix batch WI-821/824/826 Closed. **G5
+  fired.** Post-drop cleanup in flight: **WI-805** (drop legacy `subscriptions` + ~18-site billing
+  sweep) + **WI-814** (staging reseed) Executing; **WI-779** (remove `IDENTITY_V2_ENABLED` + legacy
+  twins) + **WI-817** (flag-on lane green + make-required) Blocked-by WI-805 (wired 06-18); **WI-827**
+  folded as Duplicate → WI-779. **Not yet graduated** — terminal cleanup pending.
+- **Activate-when:** — (active; cutover landed, terminal cleanup pending)
+
+### PRG-18 · Flow Remediation — `active` (2026-06-18)
+- **Outcome:** all **post-identity-cutover mop-up NOT directly tied to the identity-foundation changes** resolved — the 2026-06-17 flow-revision sweep's pre-existing/non-identity defects + non-identity cleanup parked elsewhere. (The "ours" v2-read-path bugs stay in PRG-06/WS-18.)
+- **Owner:** **Zuzka** — executes via her **own ZDX + agents** (full capture/refine/execute, **NOT** the Quartet). Orchestrator owns workstream-level ordering/dependencies + tracking; **done-signal** = PR merged refs `WI-NNN`; **close** = our autonomous Gate-2 reviewer (TBD whether ours covers this lane or Zuzka's own).
+- **Depends-on:** — drop-orthogonal; **none gate P5**; parallel-safe with the live cutover.
+- **Decomposition:** `_wip/flow-remediation/execution-tracker.md`. Cosmo **Workstream "Flow Remediation"** (**WS-20**, `3838bce9-1f7c-812d-aa36-caea0b669e76`) with WI-819/818/822/820/825 (sweep) + WI-782 (V2-shell S4/S5 rework — re-home candidate if a V2-shell initiative activates), `Workstream Order` 100–600.
+- **Activate-when:** — (active; ongoing intake home for future non-identity post-cutover sweep findings).
+- **2026-06-19 HYBRID (operator):** current 6 items moved to a dedicated **our-Quartet shepherd** — WI-820/825 execute-to-close (review-bounce fixes, `main`-based; new-llm FROZEN), WI-818/819/822/782 refine-to-Ready only; post-Ready execution + steady-state Zuzka-vs-Quartet model deferred. Full 8-step ceremony provisioned (channel/kickoff/watcher). Operator actions: confirm reviewer pulls WS-20; heads-up to Zuzka. Detail: `_wip/flow-remediation/execution-tracker.md` change-log.
 
 ### PRG-10 · API Security & PII — `active` (2026-06-13)
 - **Outcome:** all 27 `security-pii-api` clear-out findings (2026-05-29 full audit)
@@ -267,7 +282,7 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   verdicts, does not own the watcher.
 - **Activate-when:** — (active)
 
-### PRG-11 · Architecture Clean-Out — `active` (2026-06-13)
+### PRG-11 · Architecture Clean-Out — `✓ graduated` (2026-06-20)
 - **Outcome:** all ~24 LIVE code-structural + correctness findings (2026-05-29 full
   audit, `Defer-to-workstream=architecture`) remediated — circular deps, god-modules,
   domain-org, architecture-class test-coverage gaps, mobile-nav copy-paste, data-access
@@ -292,7 +307,14 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   decomposition decision or a cutover collision. Shepherd = separate session (running);
   Sonnet executors (Opus plan-phase on WI-717 concurrency); separate Codex reviewer owns
   the loop.
-- **Activate-when:** — (active)
+- **Execution state:** **GRADUATED 2026-06-20 (operator ruling)** — Cosmo Workstream
+  "Architecture Clean-Out" (`37e8bce9-1f7c-81fe-be97-e063ce8f17e8`) has **10/10 WIs Closed**:
+  Tier-1 `WI-717…720` (races · tests · GC1 guard · GC6 sweep) + the `WI-724…729` cycle/seam/nav
+  batch (curriculum⇄language import cycle, exchanges⇄prompts type cycle,
+  `dispatchSessionCompletedEvent` service move, retry-filing cap drift, nav entry-gate dedup, dead
+  `showParentHome` removal). No open WIs remain. (Any Tier-2/3 audit findings never sliced into
+  Cosmo fold into a future architecture rescan — not blocking graduation.)
+- **Activate-when:** — (graduated)
 
 ### PRG-12 · L10n & A11y Mobile — `✓ graduated` (2026-06-12)
 - **Outcome:** all 34 `l10n-a11y-mobile` audit findings resolved — 358+ hardcoded
@@ -548,12 +570,13 @@ behind entries 1/2/5–8: `activation-planning.md` §4.
 | 5 | **PRG-15** errors-api | ✓ **GRADUATED 06-11** — activation → graduation within a day (all 3 units closed via the autonomous loop) |
 | 6 | **PRG-13** security-pii-inngest | ✓ **GRADUATED 06-12** — both WPs closed in under a day; all 6 findings remediated |
 | 7 | **PRG-10** security-pii-api | ✓ **ACTIVATED 06-13** — 27 findings sliced into WI-698…704 (5 WP + 2 Item); slice scan 27/27 LIVE + 27/27 CLEAN (parallel-safe with the IF cutover); shepherd **SPAWNED 06-13** (Opus/medium + Sonnet executors) |
-| 8 | **PRG-11** architecture | ✓ **ACTIVATED 06-13** — Tier-1 autonomous slice WI-717…720 (races/tests/GC1-guard/GC6-sweep); cutover scan 16 parallel-safe / 9 serialize / 0 moot-risk; Tiers 2/3 operator-gated |
+| 8 | **PRG-11** architecture | ✓ **GRADUATED 06-20** — workstream 10/10 WIs Closed (Tier-1 WI-717…720 + WI-724…729 cycle/seam/nav batch); no open WIs. Operator ruling |
 | 9 | **PRG-04** top-down delivery layer + **PRG-05** execution-mechanism productionization | **PRG-05 design-ACTIVATED 06-13** (agnosticity spike = first work); PRG-04 design opens at the joint grill. Sequence spike → grill → slice; no Cosmo until post-grill |
 | 10 | **PRG-20** Stream 2 — estate-canon drain | IF "clean-cut tail done", OR first pull-forward cluster named earlier |
 | 11 | **PRG-21** learning-canon design | product trigger (hardened-B): learning-domain feature work begins OR glossary scheduled for deletion |
 | 12 | **PRG-17** new-llm integration (LLM) | ✓ **GRADUATED 06-13** — fifth graduation (first integration lane); merged `105b39ac0`, deploy green, cutover unlocked |
-| 13 | **PRG-06** Identity Cutover | ✓ **STOOD UP 06-15** — workstream + WP-1 + WI-586 moved in; shepherd launch **gated on ADR-0020/0021/0022 cleanup** (operator-confirmed) → then WP-1 enumeration → code-half WPs → terminal staging/prod cutover → close WI-586 |
+| 13 | **PRG-06** Identity Cutover | ✓ **CUTOVER LANDED 06-18** — #8 flip + §3 repoint + #11 drop on prod (v2-only); WI-765/586/828 (incl. P5) Closed; soak batch WI-821/824/826 Closed. Terminal cleanup: WI-805 (drop legacy subscriptions) + WI-814 (staging reseed) Executing; WI-779/817 gated behind 805; WI-827 folded (dup). **Not yet graduated** |
+| 14 | **PRG-18** Flow Remediation | ✓ **STOOD UP 06-18** — WS-20 created; non-identity post-cutover mop-up (flow-revision sweep WI-818/819/820/822/825 + WI-782 moved from WS-18). **Zuzka-executed** (her own ZDX+agents); orchestrator owns ordering/deps; close via autonomous reviewer (TBD). Drop-orthogonal |
 
 Attention budget is evaluated per activation window when a gate clears — it is
 never an edge (planning-reference §5.3/§6.3).
@@ -639,6 +662,17 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
 ---
 
 ## Change log
+- **2026-06-18 — PRG-06 (Identity Cutover) CUTOVER LANDED.** #8 flag flip + §3 repoint + #11
+  legacy-table drop executed on prod (v2-only, verified; prod pre-launch/empty → 0-row blast radius).
+  **WI-765 (breaking-set enumeration), WI-586 (convergence runbook), WI-828 (P5 — #11 drop) all
+  Closed**; soak-fix batch WI-821/824/826 Closed. **G5 ("IF tail done") FIRED** → PRG-20 ungated;
+  **PRG-11 Tier 3 newly eligible** (its gate "WI-586 closed + post-flip rescan" — WI-586 now Closed).
+  **Post-drop cleanup in flight:** WI-805 (drop legacy `subscriptions` + ~18-site billing sweep) +
+  WI-814 (staging reseed) Executing; WI-779 (remove `IDENTITY_V2_ENABLED` + legacy schema/twins) +
+  WI-817 (flag-on lane green + make-required) **Blocked-by WI-805** (dependency wired 06-18); WI-827
+  (stale flag comment) folded as **Duplicate → WI-779**. PRG-06 **not yet graduated** (terminal
+  cleanup pending). Dashboard regenerated.
+- **2026-06-18 — PRG-18 (Flow Remediation) STOOD UP — new Initiative for non-identity post-cutover mop-up.** Cosmo **Workstream "Flow Remediation"** (WS-20, `3838bce9-1f7c-812d-aa36-caea0b669e76`) created; seeded with the 2026-06-17 flow-revision sweep's non-identity defects (WI-818/819/820/822/825, moved in from unparented-Captured) + **WI-782** (V2-shell S4/S5 visibility-contract rework, moved out of WS-18 — its one non-identity holding; re-home if a V2-shell initiative activates), `Workstream Order` 100–600. **Execution model = NON-Quartet:** Zuzka runs her own ZDX+agents (capture/refine/execute); orchestrator owns workstream-level ordering/dependencies; done-signal = PR-merge-refs-WI; close = autonomous Gate-2 reviewer (operator TBD: ours vs Zuzka's). Tracker `_wip/flow-remediation/execution-tracker.md`. The "ours" v2-read-path bugs (WI-821/823/824/826) stay in PRG-06/WS-18. Dashboard regen pending.
 - **2026-06-15 — PRG-06 (Identity Cutover) STOOD UP — new Initiative ∥ PRG-01 (organization
   ruling B).** The WI-586 "code half" — never PRG-01 scope; assumed delivered by the parallel
   S0–S6 *mentor-is-the-app* track, which the staging cutover proved misaligned to canon

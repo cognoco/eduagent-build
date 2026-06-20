@@ -1434,3 +1434,275 @@ describe('[BUG-319] atomic DB-based webhook idempotency', () => {
     expect(inngest.send).toHaveBeenCalledTimes(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Hard-bounce suppression persistence
+//
+// The bug: the webhook handler emitted an observability-only Inngest event for
+// `email.bounced` but never PERSISTED the dead address, so the send path kept
+// re-sending to it — burning quota and hurting sender reputation.
+//
+// These tests exercise the REAL route with the REAL suppressEmail / claimWebhookId
+// services against a hand-built fake `Database` at the true DB boundary (no
+// internal jest.mock). They assert:
+//   - a HARD bounce (`bounce.type: "Permanent"`) writes an email_suppressions row
+//   - a SOFT/transient bounce (`Transient` / no bounce object) does NOT
+//   - a complaint also suppresses (recipient marked us as spam)
+//   - the persisted address is the raw lower-cased recipient (NOT the masked
+//     form sent to Inngest), so the send path can match it
+//   - a subsequent send-path lookup (isEmailSuppressed) finds the address
+// ---------------------------------------------------------------------------
+
+import { emailSuppressions, webhookIdempotencyKeys } from '@eduagent/database';
+// suppressEmail's direct unit contract lives in the co-located
+// services/email-suppression.test.ts; here we only need the send-path lookup.
+import { isEmailSuppressed } from '../services/email-suppression';
+
+type SuppressionRow = {
+  email: string;
+  reason: string;
+  emailId: string | null;
+};
+
+/**
+ * Fake Database supporting BOTH services the route touches:
+ *   - claimWebhookId: insert(webhookIdempotencyKeys)....returning()
+ *   - suppressEmail:  insert(emailSuppressions)....onConflictDoNothing() [awaited]
+ *   - isEmailSuppressed: select(...).from(emailSuppressions).where(...).limit(1)
+ *
+ * Tables are distinguished by object identity against the real Drizzle table
+ * objects, so the fake mirrors the real call site exactly.
+ */
+function makeSuppressionDb() {
+  const suppressions = new Map<string, SuppressionRow>();
+  const claimed = new Set<string>();
+
+  const db = {
+    insert(table: unknown) {
+      if (table === emailSuppressions) {
+        let pending: SuppressionRow | null = null;
+        // The builder is awaited directly (no .returning()); make it thenable
+        // after .onConflictDoNothing() resolves the write.
+        const builder = {
+          values(vals: SuppressionRow) {
+            pending = {
+              email: vals.email,
+              reason: vals.reason,
+              emailId: vals.emailId ?? null,
+            };
+            return builder;
+          },
+          onConflictDoNothing(_o: unknown) {
+            // Returns a thenable so `await db.insert(...).values(...).onConflictDoNothing(...)`
+            // resolves. ON CONFLICT DO NOTHING → first write wins, repeat is no-op.
+            return {
+              then(resolve: (v: undefined) => void) {
+                if (pending && !suppressions.has(pending.email)) {
+                  suppressions.set(pending.email, pending);
+                }
+                resolve(undefined);
+              },
+            };
+          },
+        };
+        return builder;
+      }
+      if (table === webhookIdempotencyKeys) {
+        let key: string | null = null;
+        const chain = {
+          values(vals: { source: string; webhookId: string }) {
+            key = `${vals.source}:${vals.webhookId}`;
+            return chain;
+          },
+          onConflictDoNothing(_o: unknown) {
+            return chain;
+          },
+          async returning(_cols: unknown) {
+            if (key === null) return [];
+            if (claimed.has(key)) return [];
+            claimed.add(key);
+            return [{ webhookId: key.split(':')[1] }];
+          },
+        };
+        return chain;
+      }
+      throw new Error('unexpected insert target in fake DB');
+    },
+    select(_cols: unknown) {
+      return {
+        from(table: unknown) {
+          if (table !== emailSuppressions) {
+            throw new Error('unexpected select target in fake DB');
+          }
+          const q = {
+            where(_predicate: unknown) {
+              // We can't introspect the drizzle eq() expression here, so the
+              // fake matches on the single suppressions map. The caller only
+              // ever looks one address up at a time.
+              return q;
+            },
+            async limit(_n: number) {
+              // Return all rows; isEmailSuppressed only checks length > 0 and
+              // the test seeds exactly the address under test.
+              return [...suppressions.values()].map((r) => ({
+                email: r.email,
+              }));
+            },
+          };
+          return q;
+        },
+      };
+    },
+    __suppressions: suppressions,
+  };
+
+  return db;
+}
+
+function buildAppWithSuppressionDb(db: ReturnType<typeof makeSuppressionDb>) {
+  const a = new Hono();
+  a.use('*', async (c, next) => {
+    c.set('db' as never, db as unknown as Database);
+    await next();
+  });
+  a.route('/', resendWebhookRoute);
+  return a;
+}
+
+async function postSigned(app: Hono, body: unknown): Promise<Response> {
+  const rawBody = JSON.stringify(body);
+  const id = 'msg_supp_' + Math.random().toString(36).slice(2);
+  const ts = nowTimestamp();
+  const sig = await signPayload(rawBody, id, ts);
+  return app.request(
+    '/webhooks/resend',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'svix-id': id,
+        'svix-timestamp': ts,
+        'svix-signature': sig,
+      },
+      body: rawBody,
+    },
+    TEST_ENV,
+  );
+}
+
+describe('hard-bounce suppression persistence', () => {
+  beforeEach(() => {
+    (inngest.send as jest.Mock).mockClear();
+  });
+
+  it('persists a suppression row for a HARD (Permanent) bounce', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const res = await postSigned(app, {
+      type: 'email.bounced',
+      data: {
+        email_id: 'email_hard_001',
+        to: 'Dead.Address@Example.com',
+        bounce: { type: 'Permanent', subType: 'General' },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    // RAW, lower-cased recipient must be persisted — NOT the masked form that
+    // goes to Inngest. The send path matches on the real address.
+    const row = db.__suppressions.get('dead.address@example.com');
+    expect(row).toBeDefined();
+    expect(row?.reason).toBe('hard_bounce');
+    expect(row?.emailId).toBe('email_hard_001');
+  });
+
+  it('does NOT persist a suppression row for a SOFT (Transient) bounce', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const res = await postSigned(app, {
+      type: 'email.bounced',
+      data: {
+        email_id: 'email_soft_001',
+        to: 'temporary@example.com',
+        bounce: { type: 'Transient', subType: 'MailboxFull' },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(db.__suppressions.size).toBe(0);
+  });
+
+  it('does NOT persist when the bounce object is absent (defensive)', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const res = await postSigned(app, {
+      type: 'email.bounced',
+      data: { email_id: 'email_nobounce', to: 'unknown@example.com' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(db.__suppressions.size).toBe(0);
+  });
+
+  it('persists a suppression row for a complaint (spam report)', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const res = await postSigned(app, {
+      type: 'email.complained',
+      data: { email_id: 'email_complaint_001', to: 'angry@example.com' },
+    });
+
+    expect(res.status).toBe(200);
+    const row = db.__suppressions.get('angry@example.com');
+    expect(row).toBeDefined();
+    expect(row?.reason).toBe('complaint');
+  });
+
+  it('the suppressed address is then visible to the send-path lookup', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    await postSigned(app, {
+      type: 'email.bounced',
+      data: {
+        email_id: 'email_hard_002',
+        to: 'gone@example.com',
+        bounce: { type: 'Permanent' },
+      },
+    });
+
+    // The real send-path guard must now report this address as suppressed.
+    const suppressed = await isEmailSuppressed(
+      db as unknown as Database,
+      'gone@example.com',
+    );
+    expect(suppressed).toBe(true);
+    // The un-suppressed (false) case is covered at the service level in
+    // services/email-suppression.test.ts, where the fake store can isolate a
+    // single address; this fake returns all rows, so a fresh-address assertion
+    // here would be vacuous.
+  });
+
+  it('repeated hard bounce for the same address is idempotent (no duplicate)', async () => {
+    const db = makeSuppressionDb();
+    const app = buildAppWithSuppressionDb(db);
+
+    const payload = {
+      type: 'email.bounced',
+      data: {
+        email_id: 'email_hard_003',
+        to: 'repeat@example.com',
+        bounce: { type: 'Permanent' },
+      },
+    };
+    await postSigned(app, payload);
+    await postSigned(app, payload);
+
+    expect(db.__suppressions.size).toBe(1);
+    expect(db.__suppressions.has('repeat@example.com')).toBe(true);
+  });
+});

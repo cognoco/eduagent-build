@@ -8,12 +8,12 @@ let mockNowFeed: {
   data: NowResponse | undefined;
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   refetch: jest.Mock;
 };
 let mockRecaps: ReturnType<typeof query>;
 let mockMonthlyReports: ReturnType<typeof query>;
 let mockWeeklyReports: ReturnType<typeof query>;
-let mockSessionsArchive: ReturnType<typeof infiniteQuery>;
 let mockNotes: ReturnType<typeof infiniteQuery>;
 let mockBookmarks: ReturnType<typeof infiniteQuery>;
 
@@ -40,7 +40,6 @@ jest.mock(
   () => ({
     useProfileReports: () => mockMonthlyReports,
     useProfileWeeklyReports: () => mockWeeklyReports,
-    useProfileSessionsArchive: () => mockSessionsArchive,
   }),
 );
 
@@ -195,12 +194,33 @@ describe('JournalTabView', () => {
     mockRecaps = query([recap]);
     mockMonthlyReports = query([monthlyReport]);
     mockWeeklyReports = query([weeklyReport]);
-    mockSessionsArchive = infiniteQuery({ sessions: [recap] });
     mockNotes = infiniteQuery({
-      notes: [{ id: 'note-1', content: 'Remember phase changes.' }],
+      notes: [
+        {
+          id: 'note-1',
+          content: 'Remember phase changes.',
+          origin: 'self',
+          subjectName: 'Science',
+          topicTitle: 'States of matter',
+        },
+        {
+          id: 'note-2',
+          content: 'Mentor said evaporation is surface-only.',
+          origin: 'mentor',
+          subjectName: 'Science',
+          topicTitle: 'States of matter',
+        },
+      ],
     });
     mockBookmarks = infiniteQuery({
-      bookmarks: [{ id: 'bookmark-1', content: 'Saved mentor explanation.' }],
+      bookmarks: [
+        {
+          id: 'bookmark-1',
+          content: 'Saved mentor explanation about fractions.',
+          subjectName: 'Math',
+          topicTitle: 'Fractions',
+        },
+      ],
     });
   });
 
@@ -245,15 +265,81 @@ describe('JournalTabView', () => {
     });
   });
 
-  it('switches to notes and routes archive rows to the existing notes surface', () => {
+  it('shows the full cross-subject saved list browse-first before any search', () => {
     render(<JournalTabView />);
 
     fireEvent.press(screen.getByTestId('journal-tab-notes'));
     screen.getByTestId('journal-notes-section');
-    screen.getByText('Fractions session');
+
+    // Browse-first: every saved item (2 notes + 1 bookmark) is visible without
+    // typing anything into the search line.
+    expect(screen.getByTestId('journal-note-note:note-1')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-note:note-2')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-bookmark:bookmark-1')).toBeTruthy();
     screen.getByText('Remember phase changes.');
-    screen.getByText('Saved mentor explanation.');
-    fireEvent.press(screen.getByTestId('journal-notes-notes'));
+    screen.getByText('Saved mentor explanation about fractions.');
+  });
+
+  it('marks per-item authorship (my note vs saved from mentor)', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+
+    // note-1 is the learner's own (origin: 'self'); note-2 + the bookmark are
+    // saved from the mentor.
+    expect(screen.getAllByTestId('journal-note-authorship-mine').length).toBe(
+      1,
+    );
+    expect(screen.getAllByTestId('journal-note-authorship-mentor').length).toBe(
+      2,
+    );
+  });
+
+  it('narrows the list while searching and restores it when cleared', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    const input = screen.getByTestId('journal-notes-search-input');
+
+    // Filter to the bookmark only (matches subject "Math" / content "fractions").
+    fireEvent.changeText(input, 'fractions');
+    expect(screen.queryByTestId('journal-note-note:note-1')).toBeNull();
+    expect(screen.getByTestId('journal-note-bookmark:bookmark-1')).toBeTruthy();
+
+    // Clearing the filter restores the full browse list.
+    fireEvent.changeText(input, '');
+    expect(screen.getByTestId('journal-note-note:note-1')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-note:note-2')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-bookmark:bookmark-1')).toBeTruthy();
+  });
+
+  it('renders an empty state when no saved items match', () => {
+    mockNotes = infiniteQuery({ notes: [] });
+    mockBookmarks = infiniteQuery({ bookmarks: [] });
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+
+    screen.getByTestId('journal-notes-empty');
+  });
+
+  it('exposes a transcription-only mic on the archive search line', () => {
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+
+    // The mic is the shared voice primitive — transcription only, no
+    // tone/emotion analysis (§16). Tapping it does not navigate.
+    const mic = screen.getByTestId('journal-notes-mic');
+    expect(mic).toBeTruthy();
+    fireEvent.press(screen.getByTestId('voice-record-button'));
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('routes a saved row to the existing notes surface', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    fireEvent.press(screen.getByTestId('journal-note-note:note-1'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/my-notes/[kind]',
@@ -278,13 +364,41 @@ describe('JournalTabView', () => {
       data: undefined,
       isLoading: false,
       isError: true,
+      error: new Error('boom'),
       refetch: jest.fn(),
-    };
+    } as typeof mockNowFeed;
 
     render(<JournalTabView />);
 
+    // Feed error renders the shared ErrorFallback (not bespoke inline UI).
+    screen.getByTestId('journal-moments-error');
     fireEvent.press(screen.getByTestId('journal-moments-retry'));
     expect(mockNowFeed.refetch).toHaveBeenCalledTimes(1);
     screen.getByTestId('journal-recaps-section');
+  });
+
+  it('renders the shared ErrorFallback when the notes archive fails to load', () => {
+    mockNotes = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('notes-load-failed'),
+      refetch: jest.fn(),
+    } as unknown as ReturnType<typeof infiniteQuery>;
+    mockBookmarks = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('bookmarks-load-failed'),
+      refetch: jest.fn(),
+    } as unknown as ReturnType<typeof infiniteQuery>;
+
+    render(<JournalTabView />);
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+
+    // Shared ErrorFallback with a retry primary (testID stable across recovery).
+    screen.getByTestId('journal-notes-error');
+    fireEvent.press(screen.getByTestId('journal-notes-error-retry'));
+    expect(mockNotes.refetch).toHaveBeenCalledTimes(1);
   });
 });

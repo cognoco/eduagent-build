@@ -64,6 +64,43 @@ describe('scrubOutgoingEventPayloads [WI-577]', () => {
     expect(JSON.stringify(payloads)).not.toContain('Milo Janssen');
   });
 
+  it('[WI-620] scrubs a regressed learnerMessage / topicTitle on app/review.calibration.requested', () => {
+    const { payloads } = scrubOutgoingEventPayloads([
+      {
+        name: 'app/review.calibration.requested',
+        data: {
+          profileId: 'p-1',
+          sessionId: 's-1',
+          topicId: 't-1',
+          learnerMessage: KNOWN_MINOR_TEXT,
+          topicTitle: 'Fractions for Milo Janssen',
+        },
+      },
+    ]);
+
+    expect(payloads[0]?.data).toEqual({
+      profileId: 'p-1',
+      sessionId: 's-1',
+      topicId: 't-1',
+      learnerMessage: PII_SCRUBBED_PLACEHOLDER,
+      topicTitle: PII_SCRUBBED_PLACEHOLDER,
+    });
+    expect(JSON.stringify(payloads)).not.toContain('Milo Janssen');
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          site: 'inngest.piiScrubMiddleware',
+          event: 'app/review.calibration.requested',
+          scrubbedPaths: expect.arrayContaining([
+            'learnerMessage',
+            'topicTitle',
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('escalates every scrub to Sentry — a scrub firing means a regression', () => {
     scrubOutgoingEventPayloads([
       {

@@ -242,12 +242,15 @@ async function loadRetentionCard(profileId: string, topicId: string) {
   });
 }
 
+// [WI-620] The payload now carries an opaque `learnerMessageEventId` only — no
+// raw learnerMessage / topicTitle (Inngest persists payloads in its
+// third-party store; the consumer rehydrates both from the DB scoped by
+// profileId).
 function findCalibrationEvent(): {
   profileId: string;
   sessionId: string;
   topicId: string;
-  learnerMessage: string;
-  topicTitle: string;
+  learnerMessageEventId: string;
   timestamp: string;
 } | null {
   for (const event of getCapturedInngestEvents()) {
@@ -256,8 +259,7 @@ function findCalibrationEvent(): {
         profileId: string;
         sessionId: string;
         topicId: string;
-        learnerMessage: string;
-        topicTitle: string;
+        learnerMessageEventId: string;
         timestamp: string;
       };
     }
@@ -323,7 +325,12 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     expect(eventData).not.toBeNull();
     expect(eventData!.profileId).toBe(profileId);
     expect(eventData!.topicId).toBe(topicId);
-    expect(eventData!.learnerMessage).toBe(SUBSTANTIVE_ANSWER);
+    // [WI-620] Opaque reference only — the raw answer must never ride the
+    // event payload (third-party event store).
+    expect(eventData!.learnerMessageEventId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(eventData).not.toHaveProperty('learnerMessage');
+    expect(eventData).not.toHaveProperty('topicTitle');
+    expect(JSON.stringify(eventData)).not.toContain(SUBSTANTIVE_ANSWER);
 
     // Session metadata should record the calibration
     const session = await loadSession(sessionId);
@@ -390,7 +397,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
 
     const eventData = findCalibrationEvent();
     expect(eventData).not.toBeNull();
-    expect(eventData!.learnerMessage).toBe(SUBSTANTIVE_ANSWER);
+    // [WI-620] Opaque reference only — no raw answer in the payload.
+    expect(eventData!.learnerMessageEventId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(JSON.stringify(eventData)).not.toContain(SUBSTANTIVE_ANSWER);
 
     // Metadata reflects both attempts
     const session = await loadSession(sessionId);

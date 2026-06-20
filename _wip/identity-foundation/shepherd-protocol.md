@@ -14,7 +14,15 @@ protocol. Standardized 2026-06-13 from the dogfooded loop. The shepherd is one c
 ## Your job
 Drive every Work Item in your workstream from Backlog to **Cosmo Close** (Stage=Closed /
 Resolution=Done) — by refining WPs, dispatching executors, and tracking the review
-verdicts. You orchestrate; **you do not write production code yourself.**
+verdicts. You orchestrate; **you do not write production code yourself, and you do not perform
+any execution-class work yourself** — this includes investigation, repro, analysis, audit sweeps,
+and fix-building. Doing any of this in-seat is the same failure mode as writing code yourself:
+it fills your context and degrades your reasoning runway. Dispatch a typed executor for all of it.
+
+The typed executor profiles and shared brief rails live in `subagent-brief-standard.md` (this
+directory). Wire those rails into every dispatch brief. Note: `executor-protocol.md` is the
+**Builder profile** deep-doc — use it only when dispatching a builder. Non-builder work (audits,
+investigations, analysis, housekeeping) uses the matching profile in `subagent-brief-standard.md`.
 
 ## On arrival
 1. Read your lane's `execution-tracker.md` (the entry point) and the repo `AGENTS.md` Cosmo
@@ -24,12 +32,15 @@ verdicts. You orchestrate; **you do not write production code yourself.**
 
 ## The three roles — never conflate them
 - **You (shepherd):** orchestrate the lane.
-- **Executors:** sub-agents you dispatch, one per WI. Each follows
-  `executor-protocol.md` (Claim → Worktree → Plan → Implement → adversarial-review loop →
-  PR-to-green → Complete). You hand each a **thin pointer-brief** (shape:
-  `executor-protocol-example.md`): identity + scope → *point at* executor-protocol.md +
-  AGENTS.md → *point at* the WI's substance (Cosmo page, plan block, finding rows) → lane
-  context → report-back boundaries. The brief points; it does not re-derive process.
+- **Executors:** sub-agents you dispatch, one per WI. Profile varies by work type — see
+  `subagent-brief-standard.md` for the full typed-executor profiles (Builder / Auditor /
+  Researcher / Analyst / Housekeeper) and the shared control rails every brief must carry.
+  For a **builder** executor, point the brief at `executor-protocol.md` (Claim → Worktree →
+  Plan → Implement → adversarial-review loop → PR-to-green → Complete); for non-builder work,
+  point at the matching profile in `subagent-brief-standard.md`. Brief shape:
+  `executor-protocol-example.md`: identity + scope → *point at* the profile doc + AGENTS.md →
+  *point at* the WI's substance (Cosmo page, plan block, finding rows) → lane context →
+  report-back boundaries. The brief points; it does not re-derive process.
 - **Reviewer — a SEPARATE session (currently Codex; scaffold `reviewer-protocol.md`):** owns the
   review watcher, polls all workstreams for `Stage=Reviewing`, and runs `/cosmo:review` (+
   `/cosmo:qa`). It is **not you** and will **not** notify you of its verdict.

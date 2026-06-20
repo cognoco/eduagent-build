@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
 import {
   processConsentResponse,
@@ -153,6 +154,59 @@ function pageLayout(title: string, body: string): string {
 </html>`;
 }
 
+/**
+ * Shared IP-based rate-limit gate for the unauthenticated consent-page
+ * endpoints. Returns a 429 HTML "Too many requests" Response (with Retry-After)
+ * when the caller's IP is over budget, or `null` to proceed.
+ *
+ * The unauthenticated GET /consent-page and GET /consent-page/deny-confirm
+ * token lookups (and the POST /consent-page/confirm mutation) all bucket
+ * against the SAME shared sliding-window limiter that owns /consent/respond
+ * (consent.ts) — same 30/hr per-IP cap, same Retry-After. Opening the consent
+ * decision page, viewing the deny confirmation, and submitting each consume a
+ * handful of the per-hour budget, so a legitimate single-open flow is never
+ * throttled. Without this gate the unauthenticated GET lookups can be hammered
+ * for token enumeration / DoS of the consent DB lookups.
+ *
+ * [BUG-99 — ACCEPTED LIMITATION] The shared limiter is the per-isolate
+ * in-memory Map (services/rate-limit.ts); on Cloudflare Workers each isolate
+ * keeps its own state, so the effective ceiling is max × N isolates per
+ * window. This is defense-in-depth, not a load-bearing global control, and
+ * matches the documented posture of the sibling /consent/respond endpoint.
+ * Moving to a Workers-durable backing store is tracked separately and is out
+ * of scope here.
+ */
+function consentPageRateLimit(
+  c: Context,
+  // 'submit' (the POST mutation) tells the parent they sent too many
+  // responses; 'view' (the GET page loads) must NOT imply a submission —
+  // a parent merely reloading the page has submitted nothing.
+  reason: 'view' | 'submit' = 'submit',
+): Response | null {
+  const ipKey = resolveRateLimitIp(
+    c.req.header('cf-connecting-ip'),
+    c.req.header('x-forwarded-for'),
+  );
+  if (!isConsentRespondRateLimited(ipKey)) {
+    return null;
+  }
+  const retryAfterSecs = Math.ceil(CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000);
+  c.header('Retry-After', String(retryAfterSecs));
+  const bodyMessage =
+    reason === 'view'
+      ? 'Too many requests to this page. Please try again in a little while.'
+      : 'You have submitted too many consent responses. Please try again later.';
+  return c.html(
+    pageLayout(
+      'Too Many Requests',
+      `<h1 class="error">Too many requests</h1>
+       <p>${bodyMessage}</p>
+       ${errorActionHtml()}`,
+    ),
+    429,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Routes — public, no auth required
 // ---------------------------------------------------------------------------
@@ -178,6 +232,11 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
    * which links to the confirm endpoint.
    */
   .get('/consent-page', async (c) => {
+    // Unauthenticated token lookup — rate-limit before the DB read so the
+    // endpoint can't be hammered for token enumeration / DoS.
+    const limited = consentPageRateLimit(c, 'view');
+    if (limited) return limited;
+
     const token = c.req.query('token');
     if (!token) {
       return c.html(
@@ -242,6 +301,11 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
    * Renders an "Are you sure?" page with confirm / go back buttons.
    */
   .get('/consent-page/deny-confirm', async (c) => {
+    // Unauthenticated token lookup — same per-IP rate limit as the decision
+    // page; gate before the DB read.
+    const limited = consentPageRateLimit(c, 'view');
+    if (limited) return limited;
+
     const token = c.req.query('token');
     if (!token) {
       return c.html(
@@ -343,28 +407,10 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     const db = c.get('db');
 
     // [BUG-491] Apply the same IP-based sliding-window rate limit as
-    // /consent/respond (consent.ts). Both endpoints perform expensive DB
-    // lookups and destructive mutations (profile delete on denial). Shared
-    // limiter state lives in consent.ts; same 30/hr cap, same Retry-After.
-    const ipKey = resolveRateLimitIp(
-      c.req.header('cf-connecting-ip'),
-      c.req.header('x-forwarded-for'),
-    );
-    if (isConsentRespondRateLimited(ipKey)) {
-      const retryAfterSecs = Math.ceil(
-        CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS / 1000,
-      );
-      c.header('Retry-After', String(retryAfterSecs));
-      return c.html(
-        pageLayout(
-          'Too Many Requests',
-          `<h1 class="error">Too many requests</h1>
-           <p>You have submitted too many consent responses. Please try again later.</p>
-           ${errorActionHtml()}`,
-        ),
-        429,
-      );
-    }
+    // /consent/respond (consent.ts) — destructive mutation (profile delete on
+    // denial). Same shared limiter as the GET lookups above.
+    const limited = consentPageRateLimit(c);
+    if (limited) return limited;
 
     try {
       // Fetch child name BEFORE processing — denial deletes the profile

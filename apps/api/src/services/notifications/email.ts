@@ -12,8 +12,10 @@
 // ---------------------------------------------------------------------------
 
 import type { ConsentType, SecurityNotificationType } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { isEmailSuppressed } from '../email-suppression';
 
 const logger = createLogger();
 
@@ -48,6 +50,15 @@ export interface EmailOptions {
    * delivered to the user multiple times. Resend dedupes within a 24h window.
    */
   idempotencyKey?: string;
+  /**
+   * Optional DB handle. When provided, `sendEmail` first checks the
+   * `email_suppressions` table and SKIPS the send if the recipient is a
+   * permanently-dead address (prior hard bounce / spam complaint) — so we stop
+   * re-sending to dead addresses, burning quota and sender reputation. When
+   * absent (no DB in scope), the check is skipped and the send proceeds as
+   * before (backward-compatible).
+   */
+  db?: Database;
 }
 
 export interface EmailResult {
@@ -76,6 +87,19 @@ export async function sendEmail(
   if (!apiKey) {
     logger.warn('[email] RESEND_API_KEY not configured — skipping email send');
     return { sent: false, reason: 'no_api_key' };
+  }
+
+  // Skip permanently-dead addresses (prior hard bounce / spam complaint). This
+  // is the send-path half of the bounce-suppression fix: the Resend webhook
+  // persists the address, and this guard stops the re-send. isEmailSuppressed
+  // fails OPEN (returns false) on a DB error and escalates internally, so a
+  // transient DB outage never silently drops a legitimate email.
+  if (options?.db && (await isEmailSuppressed(options.db, payload.to))) {
+    logger.warn('[email] recipient suppressed — skipping send', {
+      event: 'notification.email.suppressed',
+      type: payload.type,
+    });
+    return { sent: false, reason: 'suppressed' };
   }
 
   const from = options?.emailFrom ?? 'noreply@mentomate.com';

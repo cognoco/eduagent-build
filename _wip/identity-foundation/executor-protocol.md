@@ -1,4 +1,10 @@
-# Identity Foundation — Executor Protocol
+# Identity Foundation — Executor Protocol (Builder Profile)
+
+> **This is the Builder profile deep-doc** — one of the typed executor profiles defined in
+> `subagent-brief-standard.md`. It covers the full Phase-0–7 ceremony for executors that
+> **mutate production code**. For non-builder profiles (Auditor, Researcher, Analyst,
+> Housekeeper) and the shared control rails every brief must carry, see
+> `subagent-brief-standard.md`.
 
 **What this is.** The standard process scaffold for any agent executing an
 Identity-Foundation Work Item (WI-569…586). The shepherd's brief points here;

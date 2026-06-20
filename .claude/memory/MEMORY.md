@@ -7,14 +7,15 @@
 
 ## Shepherding & Cosmo Workflow
 
-- [project_cosmo_shepherd_finalization.md](project_cosmo_shepherd_finalization.md) — Finalizing Cosmo WIs for the autonomous /cosmo:review loop: replace_content + property PATCH (NOT execute complete, which appends + writes literal text the reviewer rejects); set Fixed In manually; single-line `Caveats / Follow-ups:`; refine can't promote childless WPs.
-- [project_prg11_arch_cleanout_lane.md](project_prg11_arch_cleanout_lane.md) — PRG-11 Architecture Clean-Out shepherd lane (Tier 1: WI-717/718/719/720). Gate-deletion=go; WP→Item demotion rationale; Assisted DoR; 4 background executors dispatched; reviewer is separate Codex; DoD=Cosmo Close.
-- [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — PRG-14 Agent-Instructions lane (WS-17) GRADUATED 6/6. Reusable lessons: Type=Bug DoD needs red-green-revert guard upfront; docs-PR ci.yml paths-ignore blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; reviewer honors operator approve-as-is deferrals.
+- **Quartet mechanics extracted (2026-06-20)** → `_wip/umbrella-program/quartet-learning-tracker.md` (PRG-05 productization input; 5 drained memories deleted, residual-bearing ones retained below).
+
+- **Cosmo WI finalization drained (2026-06-20)** → `_wip/umbrella-program/cosmo-finalization-guide.md` (3 memories merged: shepherd-finalization + execute-complete-finalize + reviewer-reads-objective). Covers: `complete` vs `replace_content`, parser-clean completion-summary, `Fixed In`, re-finalize after a bounce, closure-verification reads OBJECTIVE/NAME, append-parse deadlock → operator force-close.
+- [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
+- [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons moved to quartet-learning-tracker §E9): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
 
 ## Identity Foundation (re-platform)
 
 - [project_identity_foundation_decisions.md](project_identity_foundation_decisions.md) — Pointer to the ratified identity/policy-engine/router/safety ADRs + the `docs/registers/llm-models/` register. Current runway state lives in `_wip/identity-foundation/ROADMAP.md`; canon membership lives in `_wip/identity-foundation/CANONICAL-SET.md`.
-- [project_586_gate_delegation.md](project_586_gate_delegation.md) — WI-586 cutover gate delegation: #4 (entry) + #6 (STOP-1) → orchestrator under conditions; #8 (flip) + #11 (drop) operator-only; Neon branch snapshot required. Re-affirmed 2026-06-16.
 
 ## V2 Shell Redesign (mentor-is-the-app)
 
@@ -27,6 +28,7 @@
 - [project_schema_drift_pattern.md](project_schema_drift_pattern.md) — push→migrate transition silently skips columns; `mentomate-api-dev` "column does not exist" → `db:push:dev` + `db:generate:dev`. Neon "staging" ≠ dev Worker's DB.
 - [project_expo_router_pollution.md](_archive/project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
 - [project_claude_review_self_referential_401.md](project_claude_review_self_referential_401.md) — A PR editing `.github/workflows/claude*.yml` shows a benign RED claude-review (self-referential 401, not token exhaustion). Confirm via rerun-after-merge or a non-workflow follow-up PR.
+- [feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md](feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md) — Collapsing a feature flag to one arm mass-breaks legacy-pinned mock-DB unit tests (v2 seams run unconditionally); diagnose by crash-site histogram (seams≠bespoke), verify counts vs base, delete-vs-migrate by phase-B-survival/integration-twin. Recurs for WI-868/869.
 
 ## Auth
 
@@ -58,7 +60,6 @@
 - [feedback_code_review_should_fix.md](feedback_code_review_should_fix.md) — Valid code-review should-fixes get fixed now; never ask whether to fix, only rule on validity. "Ping on findings" = surface, not ask-permission.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
-- [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
 - [feedback_flow_testing_from_main.md](feedback_flow_testing_from_main.md) — Flow testing/status evidence must run from `main` unless the user explicitly names another branch; use a clean `origin/main` worktree if needed.
 
@@ -109,14 +110,20 @@
 ## Development Process & Feedback
 
 - [feedback_monitor_silence_not_health.md](feedback_monitor_silence_not_health.md) — Session/host-scoped monitors die on reboot/session-end; silence ≠ healthy. Spot-check Cosmo; re-arm after restart.
-- [feedback_shepherd_kickoff_role_split.md](feedback_shepherd_kickoff_role_split.md) — Use the standard layered machinery (executor-protocol.md + shepherd-protocol.md + thin pointer-briefs + lane tracker + thin kickoff); don't author bespoke shepherd kickoffs. Lineage: wi-execute.md (raw example) → executor-protocol.md (standardized, NOT embryo). Reviewer is a SEPARATE session; shepherd self-monitors Cosmo for verdicts (DoD=Close).
+- [feedback_subagent_stale_local_repro.md](feedback_subagent_stale_local_repro.md) — Sub-agents reproduce CI failures vs the session's LOCAL checkout (may be behind origin/main) → false causation; dispatch CI-failure repro against a fresh worktree FROM origin/main + verify HEAD==failing-commit. (WI-808 2026-06-18.)
+- [feedback_adversarial_fork_isolation.md](feedback_adversarial_fork_isolation.md) — Read-only review forks share the worktree + can edit; enforce with isolation:worktree or Explore (no-edit) type.
+- [feedback_orphan_writer_fleet_survives_parent_kill.md](feedback_orphan_writer_fleet_survives_parent_kill.md) — A sub-agent's parallel writer-fleet ORPHANS (survives parent kill) + keeps racing the tree; never >1 writer/worktree (Explore-map→single-applier); TaskStop works on local_agent not in_process_teammate; direct-scan for live children after any kill.
 - [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
 - [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
+- [feedback_verify_directive_premise_before_build.md](feedback_verify_directive_premise_before_build.md) — A directed "fix this live prod error" can rest on a grep of the legacy helper that missed the CALLER-level flag branch; verify caller reachability by primary source before building, and don't fabricate a no-op if the fix already exists. (WI-779 ic-180/181 2026-06-18.)
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_e2e_cascade_root_cause.md](feedback_e2e_cascade_root_cause.md) — 20+ same-day Notion bugs with "Cascading X" in Found In = ONE infra bug. Fix upstream, don't close N individually.
 - [feedback_nx_reset_before_commit.md](feedback_nx_reset_before_commit.md) — NX cache causes phantom `@nx/enforce-module-boundaries` errors. Run `pnpm exec nx reset` to clear.
+- [feedback_prepush_bail_masks_failures.md](feedback_prepush_bail_masks_failures.md) — Pre-push `--bail` + a leading flake masks real fails; verify affected set WITHOUT --bail before any SKIP_PRE_PUSH. tsc/integration miss stale mock `toHaveBeenCalledWith` arg-count.
+- [feedback_forward_ratchets_not_in_prepush.md](feedback_forward_ratchets_not_in_prepush.md) — Forward-only git-diff ratchets (GC1 jest.mock, i18n-jsx, no-clinical-copy, decision-adr) aren't run by local pre-push/jest; run `check-change-class.sh --run` (or the ratchet) before claiming CI-clean. 3rd occurrence (809/586/811).
+- [feedback_commit_skill_bare_push_worktree.md](feedback_commit_skill_bare_push_worktree.md) — Forked /commit bare `git push` in a worktree tracking origin/new-llm FF'd the shared branch directly, bypassing the PR/review gate. Rule: explicit refspec `HEAD:<wi-branch>`, never bare, in worktrees tracking a shared integration branch. ACTION: harden commit/worktree-setup skills.
 
 ## User Profile
 

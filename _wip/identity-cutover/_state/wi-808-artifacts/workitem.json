@@ -1,0 +1,17 @@
+{
+  "pageId": "3818bce9-1f7c-81d2-8229-ce94dd5d3a78",
+  "id": "WI-808",
+  "name": "CUT-B: v2 test-fixture migration (~60 files) + broader non-flip-critical reader cutover — drive flag-on integration suite green (split from WI-586)",
+  "description": "Split from WI-586 per the SPLIT ruling (prg06ic-077 / ic-orch-057, operator-approved 2026-06-16). WI-586's original 'drive flag-on integration green' close-gate rested on a misread: the flag-on integration suite was ALREADY ~mostly red BEFORE drop-4 (192 pass / 488 fail) because ~60 test files seed the now-dropped legacy tables (accounts/profiles) while the flag-on service reads empty v2 -> silent red. That is pre-existing v2-migration debt in the test fixtures, NOT caused by drop-4. This item owns migrating that fixture layer + the broader non-flip-critical readers to v2 and driving the flag-on integration suite green. Parallelizable by domain (schema is committed, so it can run from now, bandwidth permitting). NOT flip-gating.",
+  "acceptanceCriteria": "1. Migrate shared integration fixtures (cleanupAccounts, createProfileViaRoute, setSubscriptionTierForProfile, etc.) to v2-native seed/teardown (login clerkUserId+email -> person -> FK-cascade), replacing the dual-write person.id==profiles.id pattern. 2. Convert the ~60 non-billing test files that seed the dropped tables. 3. Migrate the broader NON-flip-critical readers of the 4 dropped tables to v2 (the flip-critical ~7 are WI-586's). 4. Drive flag-on api:test:integration to GREEN (minus billing/quota -> WI-805). 5. flag-off unchanged. 6. When actively picked up: PROMOTE to WP + decompose by domain for parallel execution (apply the sub-item test). Distinct from WI-586 (flip-critical prod-readers) and WI-779 (post-cutover legacy-symbol removal).",
+  "riskImpact": "NOT flip-gating: flip-safety rests on the flip-critical prod-readers + staging rehearsal (tracked in WI-586 + WI-805), not on this suite. But until done, AUTOMATED regression confidence on the flag-on path is reduced during soak — covered in the interim by the static prod-reader inventory + staging rehearsal + manual soak testing. Restoring this suite to green restores automated confidence before the irreversible drop (#11).",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

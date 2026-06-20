@@ -1,5 +1,6 @@
 import {
   INNGEST_PII_PAYLOAD_KEYS,
+  INNGEST_PII_STEP_KEYS,
   PII_SCRUBBED_PLACEHOLDER,
   scrubPiiPayload,
   summarizeRawPayload,
@@ -23,6 +24,23 @@ describe('scrubPiiPayload', () => {
       expect(scrubbedPaths).toEqual([key]);
       expect(JSON.stringify(value)).not.toContain('Milo Janssen');
     }
+  });
+
+  // [WI-637] parentEmail is now an armed step-return denylist key: the
+  // consent-reminders token-mint steps no longer memoize the guardian email,
+  // so the runtime ratchet must scrub it if it ever reappears in step state.
+  it('[WI-637] scrubs parentEmail under the step-return denylist', () => {
+    expect(INNGEST_PII_STEP_KEYS).toContain('parentEmail');
+    const { value, scrubbedPaths } = scrubPiiPayload(
+      { freshToken: 'tok-123', parentEmail: 'parent@example.com' },
+      INNGEST_PII_STEP_KEYS,
+    );
+    expect((value as Record<string, unknown>).parentEmail).toBe(
+      PII_SCRUBBED_PLACEHOLDER,
+    );
+    expect((value as Record<string, unknown>).freshToken).toBe('tok-123');
+    expect(scrubbedPaths).toEqual(['parentEmail']);
+    expect(JSON.stringify(value)).not.toContain('parent@example.com');
   });
 
   it('scrubs nested keys and reports dot paths', () => {
@@ -78,6 +96,23 @@ describe('scrubPiiPayload', () => {
     expect(value.learnerMessage).toBe(PII_SCRUBBED_PLACEHOLDER);
     expect(value.keep).toBe('x');
     expect(scrubbedPaths).toEqual(['learnerMessage']);
+  });
+
+  it('[WI-620] includes learnerMessage / topicTitle in the default denylist and scrubs them', () => {
+    expect(INNGEST_PII_PAYLOAD_KEYS).toEqual(
+      expect.arrayContaining(['learnerMessage', 'topicTitle']),
+    );
+    // Default denylist (no custom keys arg) must scrub both — the
+    // app/review.calibration.requested raw-text shape is now a regression.
+    const { value, scrubbedPaths } = scrubPiiPayload({
+      profileId: 'p-1',
+      learnerMessage: KNOWN_MINOR_TEXT,
+      topicTitle: 'Fractions for Milo Janssen',
+    });
+    expect(value.learnerMessage).toBe(PII_SCRUBBED_PLACEHOLDER);
+    expect(value.topicTitle).toBe(PII_SCRUBBED_PLACEHOLDER);
+    expect(scrubbedPaths.sort()).toEqual(['learnerMessage', 'topicTitle']);
+    expect(JSON.stringify(value)).not.toContain('Milo Janssen');
   });
 
   it('is cycle-safe', () => {

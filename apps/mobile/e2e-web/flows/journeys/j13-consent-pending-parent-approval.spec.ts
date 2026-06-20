@@ -46,9 +46,19 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
     await pressableClick(page.getByTestId('consent-check-again'));
 
     const postApproval = page.getByTestId('post-approval-continue');
-    const postApprovalDestination = page
-      .getByTestId('create-subject-name')
-      .or(page.getByTestId('learner-screen'));
+    // [WI-879] A freshly-approved learner lands on the Mentor home feed
+    // (`mentor-screen` — app/(app)/mentor.tsx:233, rendering the `mentorHome.title`
+    // "Mentor" header + "What do you want to work on?" composer). Verified
+    // empirically against staging Chrome under the e2e-web nav posture
+    // (EXPO_PUBLIC_ENABLE_MODE_NAV + _V1 = true, V2 off — sourced from Doppler
+    // stg, which both the local `doppler run -c stg` flow and the CI e2e-web
+    // job inject into the `expo export`): the post-approval page
+    // snapshot renders the Mentor feed (title "Mentor", "useful next steps",
+    // homework/teach/question prompts), NOT the LearnerScreen (which would show
+    // `home-action-homework`/`home-action-study-new`) and NOT the legacy
+    // `create-subject-name` onboarding funnel. The previous
+    // `create-subject-name | learner-screen` destination is the stale V0 contract.
+    const postApprovalDestination = page.getByTestId('mentor-screen');
     await expect(postApproval.or(postApprovalDestination)).toBeVisible({
       timeout: 30_000,
     });

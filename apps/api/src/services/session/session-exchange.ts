@@ -31,6 +31,7 @@ import type {
   VerificationType,
   ChallengeRoundSessionState,
   TopicProbeRequestedEvent,
+  ReviewCalibrationRequestedEvent,
 } from '@eduagent/schemas';
 import {
   ConflictError,
@@ -687,7 +688,111 @@ async function persistChallengeRoundReviewTargets(
   }
 }
 
-async function finalizeChallengeRoundIfReady(
+/**
+ * Atomically claim Challenge Round finalization for a session.
+ *
+ * `finalizeChallengeRoundIfReady` writes terminal mastery state
+ * (`assessments.mastery_challenge_verified_at`) and `needs_deepening_topics`
+ * rows. It can be entered concurrently (two in-flight exchanges, or a request +
+ * a retry) carrying the SAME pre-finalize `drafting` `ExchangeContext`. Gating
+ * only on that in-memory state lets both invocations pass and double-write.
+ *
+ * This claim is the single-flight gate. It re-reads the PERSISTED session
+ * metadata under a `FOR UPDATE` row lock (the same lock primitive
+ * `persistSessionMetadata` uses) and atomically transitions the persisted
+ * challengeRound `drafting → complete`. Concurrent callers serialize on the
+ * row lock: exactly one observes `drafting` and wins; any other observes the
+ * already-`complete` state and loses. Only the winner proceeds to the terminal
+ * writes, so mastery is written once and deepening rows are inserted once.
+ *
+ * Returns the persisted (authoritative) challengeRound state for the winner, or
+ * `null` for a loser / non-drafting / missing session.
+ */
+async function claimChallengeRoundFinalization(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+): Promise<ChallengeRoundSessionState | null> {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ metadata: learningSessions.metadata })
+      .from(learningSessions)
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .for('update')
+      .limit(1);
+
+    if (!current) return null;
+
+    const metadata = {
+      ...((current.metadata as Record<string, unknown> | null) ?? {}),
+    };
+    const parsed = challengeRoundSessionStateSchema.safeParse(
+      metadata['challengeRound'],
+    );
+    // Only the invocation that observes a persisted `drafting` state under the
+    // lock may finalize. A `complete`/other state means another invocation
+    // already claimed (or the round was never drafting) — bail as a no-op.
+    if (!parsed.success || parsed.data.state !== 'drafting') {
+      return null;
+    }
+
+    const persisted = parsed.data;
+    const complete = transitionChallengeState(
+      transitionChallengeState(persisted, { type: 'draft_ready' }),
+      { type: 'complete' },
+    );
+    metadata['challengeRound'] = complete;
+
+    const [row] = await tx
+      .update(learningSessions)
+      .set({ metadata, updatedAt: new Date() })
+      .where(
+        and(
+          eq(learningSessions.id, sessionId),
+          eq(learningSessions.profileId, profileId),
+        ),
+      )
+      .returning({ id: learningSessions.id });
+
+    // Lost a race that deleted the session between SELECT and UPDATE.
+    if (!row) return null;
+
+    return persisted;
+  });
+}
+
+/**
+ * Release a Challenge Round finalization claim by restoring the persisted
+ * session state to `drafting`.
+ *
+ * `claimChallengeRoundFinalization` commits `drafting → complete` inside its
+ * transaction, but the terminal mastery / deepening writes run AFTER it, in a
+ * separate transaction. If those writes throw (transient DB error, constraint
+ * violation), the session would be stuck `complete` with NO mastery row and NO
+ * deepening rows, and no retry path — the learner silently loses mastery
+ * credit. This is the release leg (mirroring `releaseBookGenerationClaimIfEmpty`
+ * for the book-generation claim): it writes the original pre-claim `drafting`
+ * state back through the same `FOR UPDATE` metadata mechanism the claim used, so
+ * the round is re-finalizeable on the next exchange / retry.
+ *
+ * `claimed` is the authoritative pre-transition `drafting` state returned by the
+ * winning claim, so restoring it reinstates the exact state the claim consumed.
+ */
+async function releaseChallengeRoundClaim(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  claimed: ChallengeRoundSessionState,
+): Promise<void> {
+  await persistChallengeRoundState(db, profileId, sessionId, claimed);
+}
+
+export async function finalizeChallengeRoundIfReady(
   db: Database,
   profileId: string,
   session: LearningSession,
@@ -698,27 +803,91 @@ async function finalizeChallengeRoundIfReady(
   const topicId = challengeRound.topicId ?? session.topicId;
   if (!topicId) return null;
 
-  const evaluations = challengeRound.evaluations;
+  // Single-flight claim against the PERSISTED session state. Only the winning
+  // invocation proceeds to the terminal mastery / deepening writes; concurrent
+  // calls / retries observe the already-`complete` state and no-op here.
+  const claimed = await claimChallengeRoundFinalization(
+    db,
+    profileId,
+    session.id,
+  );
+  if (!claimed) return null;
+
+  // Use the persisted evaluations as the authoritative copy (they match the
+  // state we just transitioned to `complete`).
+  const evaluations = claimed.evaluations;
   const decision = decideMasteryAndReview(evaluations);
   const now = new Date();
 
-  if (decision.markMasteryVerified) {
-    await persistChallengeRoundMasteryEvidence(
-      db,
+  // The terminal mastery / deepening writes run OUTSIDE the claim transaction.
+  // If either throws, the persisted state is already `complete` — without a
+  // compensating release the round can never re-finalize and the learner
+  // silently loses mastery credit. Release the claim back to `drafting` so the
+  // next exchange / retry re-runs, and escalate (silent recovery is banned in
+  // state-machine flows) before re-throwing so the caller's exchange does not
+  // falsely report mastery success.
+  try {
+    if (decision.markMasteryVerified) {
+      await persistChallengeRoundMasteryEvidence(
+        db,
+        profileId,
+        session,
+        topicId,
+        now,
+      );
+    } else {
+      await persistChallengeRoundReviewTargets(
+        db,
+        profileId,
+        session,
+        topicId,
+        decision,
+        now,
+      );
+    }
+  } catch (err) {
+    // Release leg: restore the pre-claim `drafting` state so the round is
+    // re-finalizeable. A release failure must not mask the original error —
+    // capture it separately but still propagate the primary failure.
+    try {
+      await releaseChallengeRoundClaim(db, profileId, session.id, claimed);
+    } catch (releaseErr) {
+      captureException(releaseErr, {
+        profileId,
+        extra: {
+          surface: 'challenge-round.finalize.release-failed',
+          sessionId: session.id,
+          topicId,
+        },
+      });
+    }
+
+    captureException(err, {
       profileId,
-      session,
-      topicId,
-      now,
+      extra: {
+        surface: 'challenge-round.finalize.terminal-write-failed',
+        sessionId: session.id,
+        topicId,
+        markMasteryVerified: decision.markMasteryVerified,
+      },
+    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/challenge-round.finalize.failed',
+          data: {
+            profileId,
+            sessionId: session.id,
+            topicId,
+            markMasteryVerified: decision.markMasteryVerified,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        }),
+      'challenge-round.finalize.failed',
+      { profileId, sessionId: session.id, topicId },
     );
-  } else {
-    await persistChallengeRoundReviewTargets(
-      db,
-      profileId,
-      session,
-      topicId,
-      decision,
-      now,
-    );
+    // Re-throw: the exchange must not report mastery success on a partial write.
+    throw err;
   }
 
   // Concept-capture is parked until the baseline reset applies the
@@ -742,11 +911,12 @@ async function finalizeChallengeRoundIfReady(
   }
 
   const draftedNote = buildValidatedDraft(noteDraft, decision, evaluations);
-  const draftReady = transitionChallengeState(challengeRound, {
-    type: 'draft_ready',
-  });
-  const complete = transitionChallengeState(draftReady, { type: 'complete' });
-  await persistChallengeRoundState(db, profileId, session.id, complete);
+  // The terminal `complete` state was already persisted by the claim above
+  // (single source of truth). Recompute the same value for the return payload.
+  const complete = transitionChallengeState(
+    transitionChallengeState(claimed, { type: 'draft_ready' }),
+    { type: 'complete' },
+  );
 
   return {
     challengeRound: complete,
@@ -917,14 +1087,14 @@ async function applyChallengeRoundRuntimeSignals(
 
 const MAX_REVIEW_CALIBRATION_ATTEMPTS = 2;
 
-interface ReviewCalibrationDispatchPayload {
-  profileId: string;
-  sessionId: string;
-  topicId: string;
-  learnerMessage: string;
-  topicTitle: string;
-  timestamp: string;
-}
+// PII egress: Carries an opaque reference (`learnerMessageEventId`, the
+// session_events row id of the learner's calibration answer) instead of the
+// raw answer / topic title — Inngest persists event payloads in its
+// third-party event store. The consumer (review-calibration-grade) rehydrates
+// both the message content and the topic title from the DB, scoped by
+// profileId. Aliased to the schema-inferred type so the payload cannot drift
+// from `reviewCalibrationRequestedEventSchema` (@eduagent/schemas). [WI-620]
+type ReviewCalibrationDispatchPayload = ReviewCalibrationRequestedEvent;
 
 // PII egress: Carries an opaque reference (`learnerMessageEventId`)
 // instead of the learner's raw probe answer / topic title — Inngest persists
@@ -934,7 +1104,10 @@ interface ReviewCalibrationDispatchPayload {
 // `topicProbeRequestedEventSchema` (@eduagent/schemas).
 type TopicProbeDispatchPayload = TopicProbeRequestedEvent;
 
-async function maybeDispatchReviewCalibration(
+// Exported for the WI-620 PII-egress break test, which asserts the dispatched
+// `app/review.calibration.requested` payload carries no raw learner text /
+// topic title — only the opaque `learnerMessageEventId`.
+export async function maybeDispatchReviewCalibration(
   db: Database,
   profileId: string,
   session: {
@@ -943,12 +1116,19 @@ async function maybeDispatchReviewCalibration(
   },
   effectiveMode: string | undefined,
   conversationLanguage: ConversationLanguage | undefined,
+  // learnerMessageText / topicTitle gate the dispatch locally and are NOT
+  // placed in the event payload (third-party event store) — the payload
+  // carries the opaque `learnerMessageEventId` instead. [WI-620]
   learnerMessageText: string,
   topicTitle: string | undefined,
+  learnerMessageEventId: string | undefined,
 ): Promise<void> {
   if (effectiveMode !== 'review' && effectiveMode !== 'practice') return;
   const topicId = session.topicId;
   if (!topicId || !topicTitle) return;
+  // PII egress: Without a persisted user_message row id there is no PII-safe
+  // way to reference the learner's answer — skip the dispatch. [WI-620]
+  if (!learnerMessageEventId) return;
 
   const isSubstantive = isSubstantiveCalibrationAnswer(
     learnerMessageText,
@@ -1017,8 +1197,7 @@ async function maybeDispatchReviewCalibration(
         profileId,
         sessionId: session.id,
         topicId,
-        learnerMessage: learnerMessageText,
-        topicTitle,
+        learnerMessageEventId,
         timestamp,
       };
     },
@@ -2791,16 +2970,6 @@ export async function processMessage(
       currentUserMessageEventId,
     });
 
-  await maybeDispatchReviewCalibration(
-    db,
-    profileId,
-    { id: session.id, topicId: session.topicId },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-  );
-
   const imageData: ImageData | undefined =
     input.imageBase64 && input.imageMimeType
       ? { base64: input.imageBase64, mimeType: input.imageMimeType }
@@ -2931,6 +3100,19 @@ export async function processMessage(
       context.isFirstEncounter === true,
       persisted.userMessageEventId,
     );
+    // [WI-620] Calibration dispatch fires AFTER the user message is persisted so
+    // it can reference the session_events row id (opaque) instead of carrying
+    // the learner's raw answer / topic title across the Inngest trust boundary.
+    await maybeDispatchReviewCalibration(
+      db,
+      profileId,
+      { id: session.id, topicId: session.topicId },
+      context.effectiveMode,
+      context.conversationLanguage,
+      input.message,
+      context.topicTitle,
+      persisted.userMessageEventId,
+    );
   }
 
   // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
@@ -3036,16 +3218,6 @@ export async function streamMessage(
       homeworkMode: input.homeworkMode,
       currentUserMessageEventId,
     });
-
-  await maybeDispatchReviewCalibration(
-    db,
-    profileId,
-    { id: session.id, topicId: session.topicId },
-    context.effectiveMode,
-    context.conversationLanguage,
-    input.message,
-    context.topicTitle,
-  );
 
   // Compute time-to-answer before streaming begins.
   // [BUG-391] Same defensive cast as the non-streaming path above — ensure a
@@ -3269,6 +3441,20 @@ export async function streamMessage(
           input.message,
           context.topicTitle,
           context.isFirstEncounter === true,
+          persisted.userMessageEventId,
+        );
+        // [WI-620] Calibration dispatch fires AFTER the user message is
+        // persisted so it references the session_events row id (opaque) rather
+        // than carrying raw learner text / topic title across the Inngest
+        // trust boundary.
+        await maybeDispatchReviewCalibration(
+          db,
+          profileId,
+          { id: session.id, topicId: session.topicId },
+          context.effectiveMode,
+          context.conversationLanguage,
+          input.message,
+          context.topicTitle,
           persisted.userMessageEventId,
         );
       }

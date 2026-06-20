@@ -293,7 +293,9 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
           childProfileId,
           account.id,
           interests,
-          { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
+          {
+            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+          },
         );
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {

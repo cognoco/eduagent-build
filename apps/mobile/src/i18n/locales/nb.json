@@ -3900,7 +3900,9 @@
       "caption": "Hva vil du jobbe med?",
       "equalWeight": "Eksempelspørsmål",
       "placeholderRotation": {
-        "one": "Skriv et spørsmål eller lim inn lekser ..."
+        "one": "Skriv et spørsmål eller lim inn lekser ...",
+        "two": "Be meg forklare noe ...",
+        "three": "Prøv: vis fremgangen min"
       },
       "orJustType": "Eller start med en av disse.",
       "chipHomework": "Hjelp meg med lekser",
@@ -3912,7 +3914,8 @@
     "title": "Mentor",
     "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",
     "fallback": {
-      "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt."
+      "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt.",
+      "continue": "Fortsett der du slapp"
     },
     "error": {
       "title": "Vi kunne ikke laste inn dine neste steg",
@@ -3923,7 +3926,8 @@
       "imageAlt": "Bilde av fotograferte lekser",
       "helpMeSolve": "Hjelp meg å løse denne",
       "checkMyAnswer": "Sjekk svaret mitt"
-    }
+    },
+    "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen."
   },
   "subjectsBrowse": {
     "title": "Emner",
@@ -3974,7 +3978,10 @@
     "notes": {
       "heading": "Notater",
       "authorSelf": "Mine notater",
-      "authorMentor": "Lagret fra veileder"
+      "authorMentor": "Lagret fra veileder",
+      "addNote": "Legg til et notat",
+      "micLabel": "Legg til et notat med stemmen",
+      "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget."
     },
     "sheet": {
       "close": "Lukk",
@@ -3991,7 +3998,8 @@
       "later": "Senere",
       "done": "Ferdig",
       "mastered": "Mestret"
-    }
+    },
+    "linkLabel": "Åpne fag-hub"
   },
   "journal": {
     "title": "Journal",
@@ -4028,15 +4036,18 @@
     "reports": {
       "error": "Kunne ikke laste inn rapportene dine."
     },
-    "notes": {
-      "sessions": "Nylige læringsøkter",
-      "notes": "Studienotatene du lagret",
-      "bookmarks": "Lagrede veiledersvar"
-    },
     "memory": {
       "title": "Kontroller for veilederens minne",
       "body": "Se gjennom, rediger, skjul, eksporter eller slett det veilederen din husker fra hele minneskjermen.",
       "open": "Åpne minnekontroller"
+    },
+    "notes": {
+      "error": "Kunne ikke laste inn notatene dine.",
+      "searchPlaceholder": "Søk i notater",
+      "searchEmpty": "Ingen notater samsvarer med søket.",
+      "empty": "Notater du lagrer og svar fra veileder som du bokmerker, vil vises her.",
+      "authorshipMentor": "Fra veileder",
+      "authorshipMine": "Mitt notat"
     }
   },
   "accountAdmin": {

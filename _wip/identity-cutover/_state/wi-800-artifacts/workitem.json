@@ -1,0 +1,17 @@
+{
+  "pageId": "3808bce9-1f7c-81bf-b051-ef59974ac35e",
+  "id": "WI-800",
+  "name": "Test-infra: assess seedTrialExpiredChild + seedConsentPending sub-13 birthYear (else /v1/profiles 500 if signed in as parent)",
+  "description": "af79 (WI-799) adversarial-review residual finding. The 3 LEAVE seed sites in apps/api/src/services/test-seed.ts keep birthYear:2014 (sub-13). 2 of them — seedTrialExpiredChild (paywall/state-machine driven) and seedConsentPending (consentRequest-row driven) — may NOT actually need sub-13 for what they test. If a suite (e.g. mentor-audit-registry-smoke) signs those scenarios in AS PARENT and loads GET /v1/profiles, the v1 birthYearSchema >=13 read-floor 500s the whole family list (same mechanism as WI-799). OFF-LANE: does NOT gate 586/the flip (the affected suite is separate from the auth.setup gating smoke). Source: af79 PR #1205 comment; ic-orch-038 ruling 1.",
+  "acceptanceCriteria": "1. For seedTrialExpiredChild and seedConsentPending: determine whether the child sub-13 birthYear is actually required by what the seed exercises. 2. If age is IRRELEVANT (trial/paywall state-driven; consent-pending consentRequest-row driven) -> bump to >=13 via CHILD_BIRTH_YEAR (test-data fix, mirrors WI-799). 3. If genuinely NEEDS sub-13 (to exercise an under-threshold consent gate) -> concrete instance of the C2/AC#6 v1.1 read-floor landmine -> do NOT bump; fold/link into the compliance-owned v1.1 item. 4. Verify the 3rd LEAVE site (seedMentorAuditPostApprovalRedirect, line 4594) under the same lens. 5. After any bumps: confirm GET /v1/profiles no longer 500s when signed in as parent for the affected scenarios.",
+  "riskImpact": "E2E suites signing in as parent and calling GET /v1/profiles 500 due to v1 birthYearSchema >=13 read-floor rejecting sub-13 child profiles seeded by these 3 LEAVE sites. OFF-LANE: does not gate WI-586 flip.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

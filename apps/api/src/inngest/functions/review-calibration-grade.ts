@@ -1,5 +1,10 @@
-import { eq } from 'drizzle-orm';
-import { createScopedRepository, retentionCards } from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import {
+  createScopedRepository,
+  retentionCards,
+  sessionEvents,
+} from '@eduagent/database';
+import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-ownership';
 import { reviewCalibrationRequestedEventSchema } from '@eduagent/schemas';
 import type { ReviewCalibrationRequestedEvent } from '@eduagent/schemas';
 import { inngest } from '../client';
@@ -34,7 +39,7 @@ export async function handleReviewCalibrationGrade({
     return { skipped: 'invalid_payload' };
   }
 
-  const { profileId, sessionId, topicId, learnerMessage, topicTitle } = payload;
+  const { profileId, sessionId, topicId, learnerMessageEventId } = payload;
   const eventAt = new Date(payload.timestamp);
 
   const card = await step.run('load-retention-card', async () => {
@@ -96,9 +101,46 @@ export async function handleReviewCalibrationGrade({
     return { skipped: 'cooldown_claim_lost', sessionId };
   }
 
-  const quality = await step.run('grade-recall-quality', () =>
-    evaluateRecallQuality(learnerMessage, topicTitle),
+  // PII egress: rehydrate the learner's calibration answer + topic title from
+  // the DB and grade in ONE step closure so the raw text stays a local
+  // variable and only the non-PII recall-quality number crosses the step
+  // boundary (Inngest memoizes step returns into its third-party state store,
+  // so the raw text must never be returned). Both reads are scoped by
+  // profileId — the message via its session_events row id (the opaque event
+  // reference), the title via the curriculum_topics → curriculum_books →
+  // subjects parent chain. A missing row (transcript purged / topic changed
+  // since dispatch) yields a null quality, skipping grading rather than
+  // guessing. [WI-620, mirrors topic-probe-extract's single-closure pattern]
+  const quality = await step.run(
+    'rehydrate-and-grade-recall-quality',
+    async (): Promise<number | null> => {
+      const db = getStepDatabase();
+      // Canonical single-topic ownership join (scoped by profileId) — avoids
+      // re-implementing the join inline (SWEEP-topic-ownership-join ratchet).
+      const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
+      if (!topic?.topicTitle) return null;
+
+      // sessionEvents is a single scoped table — read it through the scoped
+      // repository (profileId enforced by scopedWhere).
+      const repo = createScopedRepository(db, profileId);
+      const learnerMessageRow = await repo.sessionEvents.findFirst(
+        and(
+          eq(sessionEvents.id, learnerMessageEventId),
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.eventType, 'user_message'),
+        ),
+      );
+      if (!learnerMessageRow?.content) return null;
+
+      // Both raw values are local-only and never returned from the step.
+      return evaluateRecallQuality(learnerMessageRow.content, topic.topicTitle);
+    },
   );
+
+  if (quality === null) {
+    return { skipped: 'rehydration_failed', sessionId };
+  }
+
   const result = processRecallResult(state, quality, eventAt.toISOString());
 
   await step.run('finalize-retention-update', async () => {

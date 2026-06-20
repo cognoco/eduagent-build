@@ -1,9 +1,15 @@
-import { eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import { SubjectNotFoundError, type DictationMode } from '@eduagent/schemas';
-import { createScopedRepository, subjects } from '@eduagent/database';
+import {
+  createScopedRepository,
+  curricula,
+  curriculumTopics,
+  subjects,
+} from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
+import { getLearningProfile } from '../learner-profile';
 import { safeWrite } from '../safe-non-core';
 import type { GenerateContext } from './generate';
 
@@ -167,7 +173,15 @@ export async function getDictationStreak(
 
 /**
  * Fetches the context needed by generateDictation from the learner's profile:
- * native language from teaching preferences and age from birth year.
+ * native language from teaching preferences, age from birth year, plus the
+ * personalization signals the generate prompt themes around — the learner's
+ * `interests` and currently-studied `libraryTopics`.
+ *
+ * Interests come from the learning profile (canonical source, same as the quiz
+ * feature). Library topics come from the learner's non-skipped curriculum topic
+ * titles, scoped to the profile via the subjects parent chain. Both are
+ * best-effort: a fetch failure degrades to an un-personalized prompt rather than
+ * failing the whole dictation-generation request.
  */
 export async function fetchGenerateContext(
   db: Database,
@@ -181,7 +195,53 @@ export async function fetchGenerateContext(
   const prefs = await repo.teachingPreferences.findFirst();
   const nativeLanguage = prefs?.nativeLanguage ?? 'en';
 
-  return { nativeLanguage, ageYears };
+  // Interests: source from the learning profile (string[]) and map to the
+  // {label, context} shape the prompt expects. DB interests carry no context
+  // annotation, so treat them as 'free_time' — matching the quiz feature's
+  // resolution (services/quiz/generate-round.ts). Best-effort: any failure
+  // yields an un-personalized prompt.
+  let interests: GenerateContext['interests'];
+  try {
+    const profile = await getLearningProfile(db, profileId);
+    const rawInterests = Array.isArray(profile?.interests)
+      ? (profile.interests as unknown[]).filter(
+          (i): i is string => typeof i === 'string',
+        )
+      : [];
+    interests = rawInterests.map((label) => ({
+      label,
+      context: 'free_time' as const,
+    }));
+  } catch {
+    interests = undefined;
+  }
+
+  // Library topics: the learner's recent non-skipped curriculum topic titles.
+  // Multi-table join (curriculum_topics -> curricula -> subjects), so the
+  // parent-chain pattern enforces isolation via subjects.profileId rather than
+  // the scoped repo (which cannot express joins). Mirrors getGuessWhoRoundContext
+  // in services/quiz/queries.ts. Best-effort.
+  let libraryTopics: string[] | undefined;
+  try {
+    const topics = await db
+      .select({ title: curriculumTopics.title })
+      .from(curriculumTopics)
+      .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
+      .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
+      .where(
+        and(
+          eq(subjects.profileId, profileId),
+          eq(curriculumTopics.skipped, false),
+        ),
+      )
+      .orderBy(desc(curriculumTopics.createdAt))
+      .limit(30);
+    libraryTopics = topics.map((t) => t.title);
+  } catch {
+    libraryTopics = undefined;
+  }
+
+  return { nativeLanguage, ageYears, interests, libraryTopics };
 }
 
 // [BUG-850] The DB driver may hand back a DATE column as either an ISO string
