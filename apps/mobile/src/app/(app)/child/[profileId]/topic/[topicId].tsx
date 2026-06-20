@@ -280,7 +280,7 @@ export default function TopicDetailScreen() {
         {profileId && topicId ? (
           <AddToMyLearningButton
             childProfileId={profileId}
-            childDisplayName={childName ?? 'your child'}
+            childDisplayName={childName ?? t('parentView.index.yourChild')}
             subjectName={subjectName}
             topicId={topicId}
             topicTitle={title}

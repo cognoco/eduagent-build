@@ -297,7 +297,7 @@ describeIfDb('nudge service (integration)', () => {
 
   // ── 3. Per-recipient dimension (I1 spec: max 4/day per child, any sender) ─
 
-  it('[BREAK] parent B cannot send when child has received 4 nudges from any parent', async () => {
+  it('[PARENT-16][BREAK] parent B cannot send when child has received 4 nudges from any parent', async () => {
     const now = new Date();
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
@@ -336,7 +336,7 @@ describeIfDb('nudge service (integration)', () => {
   //          succeeds; rows stays <= 4.
   //          Verified GREEN: all 6 integration tests pass (2026-05-11).
 
-  it('[BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
+  it('[PARENT-16][BREAK] concurrency: at most 1 of 5 concurrent calls succeeds when count is 3', async () => {
     const now = new Date();
     await seedNudgeRow(parentAProfileId, childXProfileId, now);
     await seedNudgeRow(parentAProfileId, childXProfileId, now);

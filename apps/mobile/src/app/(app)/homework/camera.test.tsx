@@ -1,6 +1,12 @@
 import React from 'react';
 import { Alert, AppState, type AppStateStatus } from 'react-native';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import {
+  render,
+  fireEvent,
+  waitFor,
+  act,
+  within,
+} from '@testing-library/react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -680,6 +686,26 @@ describe('CameraScreen', () => {
     fireEvent.press(getByTestId('close-button'));
     expect(mockRouter.replace).toHaveBeenCalledWith('/(app)/home');
     expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('renders the error-phase close affordance as an icon button', () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: null,
+      status: 'error',
+      error: "We couldn't read that.",
+      errorCode: undefined,
+      failCount: 0,
+      source: null,
+      process: mockProcess,
+      retry: mockRetry,
+    });
+
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    expect(getByTestId('close-button').props.accessibilityLabel).toBe('Close');
+    getByText('close');
   });
 
   it('close button replaces to returnTo target when set', () => {
@@ -1504,6 +1530,194 @@ describe('CameraScreen', () => {
     expect(
       fetchCallsMatching(mockFetch, 'subjects/classify').length,
     ).toBeGreaterThan(0);
+  });
+
+  // [HOMEWORK-09] Result-phase subject-resolution branch coverage. These pin
+  // the camera result UI for each classifier outcome so the resolution surface
+  // can't silently regress. All drive the OCR hook to `done` and vary
+  // mockClassifyResult / the enrolled-subjects route.
+  describe('[HOMEWORK-09] result-phase subject resolution', () => {
+    function withOcrDone(text: string): void {
+      (useHomeworkOcr as jest.Mock).mockReturnValue({
+        text,
+        status: 'done',
+        error: null,
+        errorCode: undefined,
+        source: null,
+        failCount: 0,
+        process: mockProcess,
+        retry: mockRetry,
+        cancel: mockCancel,
+      });
+    }
+
+    it('confident single candidate shows "Looks like {subject}" with a Change link, and Change opens the picker', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      mockClassifyResult = {
+        needsConfirmation: false,
+        candidates: [
+          {
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            confidence: 0.95,
+          },
+        ],
+      };
+      withOcrDone('Solve 2x + 5 = 17');
+
+      const { getByTestId, queryByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // Confident → auto-detected subject confirmation, NOT the picker.
+      // The classifier subject name renders inside the confirmation row,
+      // nested in the "Looks like {name}" composed Text (RN splits it into a
+      // virtual text node), so match the name as a substring of that row.
+      await waitFor(() => {
+        const row = getByTestId('auto-detected-subject');
+        expect(within(row).getByText(/Mathematics/)).toBeTruthy();
+      });
+      expect(queryByTestId('subject-picker')).toBeNull();
+
+      // Tapping Change opens the picker.
+      fireEvent.press(getByTestId('change-subject-link'));
+      await waitFor(() => {
+        getByTestId('subject-picker');
+      });
+    });
+
+    it('suggested name with zero enrolled subjects auto-creates the subject and routes to the session on confirm', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      // No enrolled subjects yet.
+      mockFetch.setRoute('subjects', (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') return mockCreateSubjectResult;
+        return { subjects: [] };
+      });
+      // Classifier suggests a name but the learner has none enrolled.
+      mockClassifyResult = {
+        needsConfirmation: false,
+        candidates: [],
+        suggestedSubjectName: 'Biology',
+      };
+      mockCreateSubjectResult = {
+        subject: { id: 'sub-created', name: 'Biology' },
+      };
+      withOcrDone('Label the parts of a plant cell');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      // The suggested subject is auto-created and surfaced as auto-detected.
+      // The name is nested inside the "Looks like {name}" composed Text, so
+      // match it as a substring of the row.
+      await waitFor(() => {
+        const row = getByTestId('auto-detected-subject');
+        expect(within(row).getByText(/Biology/)).toBeTruthy();
+      });
+
+      // A POST /subjects (create) fired for the suggested name.
+      await waitFor(() => {
+        const createCall = fetchCallsMatching(mockFetch, 'subjects').find(
+          (c: { url: string; init?: { method?: string } }) =>
+            c.init?.method === 'POST' && !c.url.includes('classify'),
+        );
+        expect(extractJsonBody<{ name: string }>(createCall?.init)?.name).toBe(
+          'Biology',
+        );
+      });
+
+      // Confirm routes to the session with the created subject.
+      fireEvent.press(getByTestId('confirm-button'));
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            subjectId: 'sub-created',
+            subjectName: 'Biology',
+          }),
+        }),
+      );
+    });
+
+    it('ambiguous candidates open the picker with classifier candidates, enrolled subjects, create, and a manual-entry input', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      mockClassifyResult = {
+        needsConfirmation: true,
+        candidates: [
+          {
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            confidence: 0.55,
+          },
+          { subjectId: 'sub-789', subjectName: 'Physics', confidence: 0.5 },
+        ],
+      };
+      withOcrDone('A ball rolls down a frictionless ramp');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('subject-picker');
+      });
+      // Classifier candidates render as pick rows.
+      getByTestId('subject-pick-sub-123');
+      getByTestId('subject-pick-sub-789');
+      // Enrolled non-candidate subject (Science) is offered too.
+      getByTestId('subject-pick-sub-456');
+      // Create + manual-entry escape hatches present.
+      getByTestId('camera-create-subject');
+      getByTestId('camera-subject-input');
+    });
+
+    it('keeps Retake reachable while subject classification is still pending', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      // Classify never resolves → classifyMutation.isPending stays true.
+      mockFetch.setRoute(
+        'subjects/classify',
+        () =>
+          new Promise<Response>(() => {
+            /* never resolves */
+          }),
+      );
+      withOcrDone('Some homework problem');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('classify-loading');
+        getByTestId('classify-pending-retake');
+      });
+      // Retake is actually pressable during the pending state.
+      fireEvent.press(getByTestId('classify-pending-retake'));
+      await waitFor(() => {
+        getByTestId('camera-view');
+      });
+    });
+
+    it('opens the subject picker when classification succeeds with zero candidates and no suggestion', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      // Success, no confirmation, no candidates, no suggestion → the classify
+      // effect's final branch routes the learner to the picker so they always
+      // have an actionable next step (create / type / pick enrolled).
+      mockClassifyResult = { needsConfirmation: false, candidates: [] };
+      withOcrDone('Ambiguous worksheet text');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('subject-picker');
+      });
+      // Picker stays actionable: create + manual entry are always present.
+      getByTestId('camera-create-subject');
+      getByTestId('camera-subject-input');
+    });
   });
 
   // [BUG-689 / M-9] BREAK TESTS — UI-level safety timeout for OCR processing.

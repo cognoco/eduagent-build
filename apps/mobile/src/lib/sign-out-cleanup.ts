@@ -74,6 +74,8 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
   // ParentTransitionNotice.tsx — show the parent-home orientation cue once per profile.
   (id) => sanitizeSecureStoreKey(`mentomate_parent_home_seen_${id}`),
+  // scope-context.tsx — last active relationship-lens scope per profile.
+  (id) => sanitizeSecureStoreKey(`scope.last-active-${id}`),
 ];
 
 // AsyncStorage keys cleared at sign-out (account-scoped, not device-scoped).

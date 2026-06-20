@@ -186,6 +186,23 @@ const mockSafeRefundQuota = jest.fn(
     return { refunded: true };
   },
 );
+// [BUG-821] Routes now call refundQuotaOrEscalate (the gate that escalates a
+// decrement-without-subscriptionId instead of silently dropping the refund).
+// Minimal faithful delegate: when subscriptionId is present, delegate to
+// safeRefundQuota; otherwise no-op refund. The real refundQuotaOrEscalate has
+// no try/catch around its delegate — safeRefundQuota catches internally and
+// never propagates — so re-implementing a throw-swallow branch here would model
+// an impossible path.
+const mockRefundQuotaOrEscalate = jest.fn(
+  async (
+    db: unknown,
+    subscriptionId: string | undefined,
+    ctx?: { source?: string },
+  ) =>
+    subscriptionId
+      ? mockSafeRefundQuota(db, subscriptionId, ctx)
+      : { refunded: false },
+);
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -234,6 +251,12 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
     incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
     safeRefundQuota: (...args: unknown[]) =>
       mockSafeRefundQuota(args[0], args[1] as string, args[2]),
+    refundQuotaOrEscalate: (...args: unknown[]) =>
+      mockRefundQuotaOrEscalate(
+        args[0],
+        args[1] as string | undefined,
+        args[2] as { source?: string } | undefined,
+      ),
     createSubscription: jest.fn(),
   };
 });
@@ -2560,12 +2583,15 @@ describe('session routes', () => {
       );
     });
 
-    // [M-3] If safeRefundQuota itself throws in the BUG-941 fallback path,
-    // the fallback frame and done frame must still be emitted so the client
-    // is never left with a truncated stream.
-    it('[M-3] emits fallback and done frames even when safeRefundQuota throws in fallback path', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] In the BUG-941 fallback path the route routes the refund through the
+    // refundQuotaOrEscalate gate (which never throws — it escalates internally),
+    // then emits the fallback + done frames. Assert that boundary contract: the
+    // gate is invoked with the fallback route tag and the frames still emit. (The
+    // previous version configured safeRefundQuota to throw to "prove" frame
+    // emission survives a refund throw, but the real gate never propagates a
+    // throw to the route, so that was an impossible path.)
+    it('[M-3] routes the fallback-path refund through refundQuotaOrEscalate and still emits fallback + done frames', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       (streamMessage as jest.Mock).mockResolvedValueOnce({
         stream: (async function* () {
@@ -2595,28 +2621,26 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Fallback frame must be written regardless of the refund failure.
+      // Refund is routed through the gate with the fallback route tag.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.fallback' }),
+      );
+      // Fallback frame is written, then the done frame.
       expect(body).toContain('"type":"fallback"');
       expect(body).toContain('"reason":"malformed_envelope"');
-      // Done frame must follow.
       expect(body).toContain('"type":"done"');
-      // The refund error must be escalated to Sentry.
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
-      );
     });
 
-    // [M-3] If safeRefundQuota throws in the onComplete catch path, the SSE
-    // error frame must still be written.
-    it('[M-3] emits error frame even when safeRefundQuota throws in onComplete catch', async () => {
-      mockSafeRefundQuota.mockRejectedValueOnce(new Error('quota DB timeout'));
-      mockCaptureException.mockClear();
+    // [M-3] When onComplete itself throws, the route routes the refund through
+    // the refundQuotaOrEscalate gate (never throws — escalates internally) and
+    // then writes the SSE error frame. Assert that boundary contract: the gate is
+    // invoked with the onComplete route tag and the error frame still emits. (The
+    // previous version configured safeRefundQuota to throw — an impossible path,
+    // since the real gate never propagates a throw to the route.)
+    it('[M-3] routes the onComplete-catch refund through refundQuotaOrEscalate and still emits the error frame', async () => {
+      mockRefundQuotaOrEscalate.mockClear();
 
       const onCompleteErr = new Error('envelope parse failed');
       (streamMessage as jest.Mock).mockResolvedValueOnce({
@@ -2639,18 +2663,14 @@ describe('session routes', () => {
       expect(res.status).toBe(200);
       const body = await res.text();
 
-      // Error frame must be written regardless of the refund failure.
-      expect(body).toContain('"type":"error"');
-      // captureException should be called at least once (for the refund throw).
-      expect(mockCaptureException).toHaveBeenCalled();
-
-      // Restore default mock so later tests are not affected.
-      mockSafeRefundQuota.mockImplementation(
-        async (db: unknown, subscriptionId: string) => {
-          await mockIncrementQuota(db, subscriptionId);
-          return { refunded: true };
-        },
+      // Refund is routed through the gate with the onComplete route tag.
+      expect(mockRefundQuotaOrEscalate).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ route: 'sessions.stream.onComplete' }),
       );
+      // Error frame is written.
+      expect(body).toContain('"type":"error"');
     });
   });
 

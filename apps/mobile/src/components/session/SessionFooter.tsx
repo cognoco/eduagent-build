@@ -77,6 +77,7 @@ export function SessionFooter({
           setShowFilingPrompt={setShowFilingPrompt}
           setFilingDismissed={setFilingDismissed}
           navigateToSessionSummary={navigateToSessionSummary}
+          colors={colors}
         />
       ) : null}
       {sessionExpired ? (
@@ -167,6 +168,7 @@ function StandardFilingPrompt({
   setShowFilingPrompt,
   setFilingDismissed,
   navigateToSessionSummary,
+  colors,
 }: {
   filing: ReturnType<typeof useFiling>;
   activeSessionId: string | null;
@@ -178,6 +180,7 @@ function StandardFilingPrompt({
     filedSubjectId?: string,
     filedBookId?: string,
   ) => void;
+  colors: ReturnType<typeof useThemeColors>;
 }) {
   const { t } = useTranslation();
   return (
@@ -249,7 +252,7 @@ function StandardFilingPrompt({
         >
           {filing.isPending ? (
             <ActivityIndicator
-              color="white"
+              color={colors.textInverse}
               accessibilityLabel={t('common.loading')}
             />
           ) : (

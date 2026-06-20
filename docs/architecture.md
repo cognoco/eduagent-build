@@ -1311,6 +1311,19 @@ The learner-home `/now` feed shows recent notable moments (e.g. "you filed a ses
 
 Decision rationale: `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`.
 
+**Scope Chip Relationship Lens (proposed, `MMT-ADR-0024`):**
+
+The V2 mobile shell treats active audience context as a relationship scope: implicit `me` for learners, and an explicit chip for supporters containing Support hub, one person-scope per active supportership edge, and `me` once the supporter has durable self-learning state.
+
+Key proposed rules:
+
+- **Supportership-derived visibility.** A person-scope chip is derived from an active `supportership` edge only; guardianship, membership, and payer state do not grant this everyday visibility.
+- **Scope-preserving tabs.** Bottom-tab navigation changes the tab inside the active scope; it does not silently switch scope.
+- **V0/V1 flag isolation.** `ModeSwitcher`, proxy-mode plumbing, and legacy tab-shape helpers stay alive for V0/V1 until a later retirement step. V2 supersedes them but does not delete them in the same change.
+- **User-owned default.** The server may return a `defaultScopeIndex`, but a persisted last-active scope for the active profile wins when still valid.
+
+Decision rationale: `docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md`.
+
 **Freeform Ask Anything — narrower persistence path (`MMT-ADR-0021`):**
 
 Ask Anything (freeform) sessions — a `learning` session with `effectiveMode = 'freeform'` and no `topicId` — are a deliberately narrower persistence path than guided learning:

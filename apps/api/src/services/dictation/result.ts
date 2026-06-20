@@ -129,7 +129,13 @@ export async function getDictationStreak(
     return { streak: 0, lastDate: null };
   }
 
-  const uniqueDates = recentDateRows.map((row) => row.date);
+  // [BUG-850] Normalize each row.date to an ISO `YYYY-MM-DD` string at the
+  // boundary. The neon-serverless (production WebSocket) driver returns DATE
+  // columns as raw JS `Date` objects, not strings; the streak walk below
+  // compares against string `expected` values (`getPreviousDate` returns a
+  // sliced ISO string), so an un-normalized `Date` makes `date === expected`
+  // always false and collapses the streak to 1.
+  const uniqueDates = recentDateRows.map((row) => toIsoDate(row.date));
 
   const today = getServerDate();
   const mostRecentDate = uniqueDates[0];
@@ -176,6 +182,15 @@ export async function fetchGenerateContext(
   const nativeLanguage = prefs?.nativeLanguage ?? 'en';
 
   return { nativeLanguage, ageYears };
+}
+
+// [BUG-850] The DB driver may hand back a DATE column as either an ISO string
+// (HTTP driver) or a raw JS `Date` (neon-serverless WebSocket driver). Normalize
+// both to a `YYYY-MM-DD` string so the streak comparison is shape-stable.
+function toIsoDate(value: string | Date): string {
+  return value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : value.slice(0, 10);
 }
 
 function getServerDate(): string {

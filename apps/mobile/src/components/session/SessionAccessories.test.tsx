@@ -244,7 +244,7 @@ describe('SubjectResolutionAccessory typed subject override', () => {
     const scrollIndex = testIds.indexOf('session-subject-resolution');
     expect(scrollIndex).toBeGreaterThanOrEqual(0);
     expect(testIds.slice(scrollIndex + 1, scrollIndex + 4)).toEqual([
-      'subject-resolution-create-new',
+      'subject-resolution-create-suggested',
       'subject-resolution-s1',
       'subject-resolution-s2',
     ]);
@@ -265,9 +265,27 @@ describe('SubjectResolutionAccessory typed subject override', () => {
     );
 
     getByText('+ Philosophy');
-    fireEvent.press(getByTestId('subject-resolution-create-new'));
+    fireEvent.press(getByTestId('subject-resolution-create-suggested'));
 
     expect(handleCreateSuggestedSubject).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the zero-candidate create-new selector unique from suggested creates', () => {
+    const { queryAllByTestId } = render(
+      <SubjectResolutionAccessory
+        {...(baseProps as any)}
+        pendingSubjectResolution={{
+          ...baseProps.pendingSubjectResolution,
+          suggestedSubjectName: 'Philosophy',
+          candidates: [],
+        }}
+      />,
+    );
+
+    expect(queryAllByTestId('subject-resolution-create-new')).toHaveLength(0);
+    expect(
+      queryAllByTestId('subject-resolution-create-suggested'),
+    ).toHaveLength(1);
   });
 });
 
@@ -297,5 +315,29 @@ describe('HomeworkModeChips M6: zero-problems fallback action', () => {
     );
     fireEvent.press(getByTestId('homework-no-problems-end-btn'));
     expect(handleEndSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('HomeworkModeChips problem text', () => {
+  it('shows the complete expanded homework problem instead of a hard slice', () => {
+    const longProblem =
+      'A very long homework prompt that asks the learner to compare two equations, explain each step, and then decide which expression is equivalent.';
+
+    const { getByTestId } = render(
+      <HomeworkModeChips
+        effectiveMode="homework"
+        homeworkProblemsState={[{ text: longProblem } as any]}
+        currentProblemIndex={0}
+        activeHomeworkProblem={{ text: longProblem } as any}
+        homeworkMode={undefined}
+        setHomeworkMode={jest.fn()}
+        handleNextProblem={jest.fn()}
+        handleEndSession={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('homework-problem-text').props.children).toBe(
+      longProblem,
+    );
   });
 });

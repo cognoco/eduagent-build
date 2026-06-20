@@ -184,7 +184,7 @@ export default function RelearnScreen() {
     directEntry && routeTopicId && routeSubjectId
       ? {
           topicId: routeTopicId,
-          topicTitle: routeTopicName ?? 'this topic',
+          topicTitle: routeTopicName ?? t('library.relearn.thisTopicFallback'),
           subjectId: routeSubjectId,
           subjectName: routeSubjectName,
         }
@@ -216,8 +216,10 @@ export default function RelearnScreen() {
     [linkedChildren, sourceChildProfileId],
   );
   const parentBridgeHeaderText = sourceChild?.displayName
-    ? `Added from ${sourceChild.displayName}'s learning.`
-    : "Added from a child's learning.";
+    ? t('library.relearn.addedFromChildNamed', {
+        name: sourceChild.displayName,
+      })
+    : t('library.relearn.addedFromChild');
 
   useEffect(() => {
     if (
@@ -298,7 +300,8 @@ export default function RelearnScreen() {
         (routeTopicId && routeSubjectId
           ? {
               topicId: routeTopicId,
-              topicTitle: routeTopicName ?? 'this topic',
+              topicTitle:
+                routeTopicName ?? t('library.relearn.thisTopicFallback'),
               subjectId: routeSubjectId,
               subjectName: routeSubjectName,
             }
@@ -653,6 +656,7 @@ export default function RelearnScreen() {
               <Pressable
                 key={method.id}
                 onPress={() => handleStartMethod(method.id)}
+                disabled={isSubmitting}
                 className={`mb-3 rounded-card p-4 ${
                   isPreferred
                     ? 'bg-primary/10 border border-primary'

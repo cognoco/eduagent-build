@@ -1005,8 +1005,8 @@ function SessionScreenInner() {
               role: 'assistant',
               content:
                 imageAttachmentStatus === 'timeout'
-                  ? "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry."
-                  : "I couldn't open your photo, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
+                  ? t('session.imageAttach.timeout')
+                  : t('session.imageAttach.failed'),
               isSystemPrompt: true,
             },
           ]);
@@ -1489,13 +1489,13 @@ function SessionScreenInner() {
         }
         disabledReason={
           isOffline
-            ? "You're offline — input will return when you reconnect"
+            ? t('session.disabledReason.offline')
             : sessionExpired
-              ? 'This session has ended'
+              ? t('session.disabledReason.expired')
               : quotaError
-                ? 'Your session limit has been reached'
+                ? t('session.disabledReason.quotaReached')
                 : showFilingPrompt && !filingDismissed
-                  ? 'Choose where to save this session'
+                  ? t('session.disabledReason.chooseSave')
                   : pendingClassification
                     ? t('session.chatShell.classifyingSubject')
                     : undefined

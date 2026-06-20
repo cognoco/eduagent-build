@@ -7,6 +7,10 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }),
+}));
+
 // NudgeUnreadModal is purely presentational: it receives nudges and onDismiss
 // as props. The caller (NudgeBanner) is responsible for calling
 // markAllRead.mutate() inside its onDismiss handler. The test below therefore
@@ -109,6 +113,14 @@ describe('NudgeUnreadModal', () => {
     // Title and button still render
     screen.getByText('New nudges');
     screen.getByTestId('nudge-unread-dismiss');
+  });
+
+  it('pads the sheet above the bottom safe area', () => {
+    render(<NudgeUnreadModal nudges={[NUDGE_A]} onDismiss={jest.fn()} />);
+
+    expect(screen.getByTestId('nudge-unread-sheet').props.style).toMatchObject({
+      paddingBottom: 42,
+    });
   });
 
   it('does not call onDismiss until the button is pressed', () => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -125,7 +126,7 @@ function SampleMarker() {
 
 function LearnerVariant({ topic }: { topic: string }) {
   const { t } = useTranslation();
-  const sample = getLearnerSample(topic);
+  const sample = getLearnerSample(topic, t);
 
   return (
     <View>
@@ -151,7 +152,10 @@ function LearnerVariant({ topic }: { topic: string }) {
   );
 }
 
-function getLearnerSample(topic: string): {
+function getLearnerSample(
+  topic: string,
+  t: TFunction,
+): {
   mentor: string;
   learner: string;
   followUp: string;
@@ -160,42 +164,35 @@ function getLearnerSample(topic: string): {
 
   if (normalized.includes('geography')) {
     return {
-      mentor:
-        'Let us try geography. A desert is defined by low rainfall, not heat. Why might land behind mountains stay dry?',
-      learner: 'Because the rain falls before the air gets there?',
-      followUp:
-        'Exactly. Mountains can squeeze moisture out on one side, leaving drier air on the other. That is called a rain shadow.',
+      mentor: t('preview.sampleGeographyMentor'),
+      learner: t('preview.sampleGeographyLearner'),
+      followUp: t('preview.sampleGeographyFollowUp'),
     };
   }
 
   if (normalized.includes('fraction')) {
     return {
-      mentor:
-        'Let us compare fractions. If two pieces come from the same whole, the larger piece has the smaller bottom number.',
-      learner: 'So 1/2 is bigger than 1/3?',
-      followUp:
-        'Yes. Splitting something into two parts makes each part bigger than splitting it into three parts.',
+      mentor: t('preview.sampleFractionsMentor'),
+      learner: t('preview.sampleFractionsLearner'),
+      followUp: t('preview.sampleFractionsFollowUp'),
     };
   }
 
   if (normalized.includes('writing')) {
     return {
-      mentor:
-        'Let us plan a paragraph. Start with the one thing you want the reader to believe.',
-      learner: 'So I should choose the main point before examples?',
-      followUp:
-        'Right. Once the main point is clear, the examples have a job instead of feeling random.',
+      mentor: t('preview.sampleWritingMentor'),
+      learner: t('preview.sampleWritingLearner'),
+      followUp: t('preview.sampleWritingFollowUp'),
     };
   }
 
   return {
     mentor:
       topic.length > 0
-        ? `Let us work on ${topic}. I will show one idea, then ask a quick check.`
-        : 'Let us try a quick sample. I will show one idea, then ask a quick check.',
-    learner: 'I am not sure how to start.',
-    followUp:
-      'That is a good starting point. We will make the first step concrete, then build from there.',
+        ? t('preview.sampleGenericMentorWithTopic', { topic })
+        : t('preview.sampleGenericMentor'),
+    learner: t('preview.sampleGenericLearner'),
+    followUp: t('preview.sampleGenericFollowUp'),
   };
 }
 

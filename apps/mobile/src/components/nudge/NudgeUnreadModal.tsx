@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { Nudge } from '@eduagent/schemas';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface NudgeUnreadModalProps {
   nudges: ReadonlyArray<Nudge>;
@@ -12,6 +13,7 @@ export function NudgeUnreadModal({
   onDismiss,
 }: NudgeUnreadModalProps): React.ReactElement {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -22,7 +24,11 @@ export function NudgeUnreadModal({
       accessibilityViewIsModal
     >
       <View className="flex-1 justify-end bg-black/40">
-        <View className="bg-surface rounded-t-3xl px-5 pt-5 pb-8">
+        <View
+          className="bg-surface rounded-t-3xl px-5 pt-5"
+          style={{ paddingBottom: insets.bottom + 8 }}
+          testID="nudge-unread-sheet"
+        >
           <Text className="text-h3 font-bold text-text-primary mb-3">
             {t('nudge.banner.modalTitle')}
           </Text>

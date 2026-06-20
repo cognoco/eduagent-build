@@ -98,4 +98,29 @@ describe('Preview TopicScreen', () => {
         .accessibilityState,
     ).toMatchObject({ disabled: false });
   });
+
+  it('[WI-514] re-enables topic cards when setPreviewState rejects (storage failure)', async () => {
+    // Arrange: setPreviewState rejects to simulate a locked/unavailable Keychain write.
+    // getPreviewState resolves normally (from beforeEach) so the component loads current
+    // state. The rejection happens inside onSelect, proving any storage failure is caught.
+    jest
+      .spyOn(state, 'setPreviewState')
+      .mockRejectedValue(new Error('storage unavailable'));
+
+    render(<TopicScreen />);
+
+    // Act: press a topic card
+    fireEvent.press(screen.getByTestId('preview-topic-sample-geography'));
+
+    // Assert: cards re-enable after the error (setSubmitting(false) in catch)
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('preview-topic-sample-geography').props
+          .accessibilityState,
+      ).toMatchObject({ disabled: false });
+    });
+
+    // Assert: navigation did NOT occur
+    expect(push).not.toHaveBeenCalled();
+  });
 });

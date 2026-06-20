@@ -39,6 +39,12 @@ export const QUIZ_CONFIG = {
     perfect: 1,
     great: 0.8,
   },
+  // [BUG-852] Hard cap on the number of non-final ("probe") /check submissions
+  // accepted per questionIndex within a single active round. Generous relative
+  // to legitimate play (guess_who has at most 5 clues; capitals/vocab are always
+  // final on the first submission), but bounds the jsonb `results` row so a
+  // client cannot grow it without limit by replaying /check.
+  maxProbeAttemptsPerQuestion: 10,
 } as const;
 
 export type QuizActivityConfig = typeof QUIZ_CONFIG;

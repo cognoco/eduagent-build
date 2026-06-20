@@ -13,6 +13,7 @@ import {
   SettingsRow,
   ToggleRow,
 } from '../../../components/more/settings-rows';
+import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 
 type NotificationPermissionState = Awaited<
   ReturnType<typeof Notifications.getPermissionsAsync>
@@ -249,55 +250,77 @@ export default function NotificationsScreen(): React.ReactElement {
         <SectionHeader testID="notifications-section-header">
           {t('more.notifications.sectionHeader')}
         </SectionHeader>
-        <ToggleRow
-          label={t('more.notifications.pushTitle')}
-          description={pushDescription}
-          value={serverPushEnabled}
-          onToggle={handleTogglePush}
-          disabled={
-            notifLoading || settingsUnavailable || updateNotifications.isPending
-          }
-          testID="push-notifications-toggle"
-        />
-        {openSettingsVisible ? (
-          <SettingsRow
-            label={t('more.notifications.openSettingsTitle')}
-            description={t('more.notifications.openSettingsDescription')}
-            onPress={() => {
-              void Linking.openSettings();
-            }}
-            testID="push-notifications-open-settings"
-          />
-        ) : null}
-        <ToggleRow
-          label={t('more.notifications.weeklyDigestTitle')}
-          value={notifPrefs?.weeklyProgressPush ?? false}
-          onToggle={handleToggleDigest}
-          disabled={
-            notifLoading || settingsUnavailable || updateNotifications.isPending
-          }
-          testID="weekly-digest-toggle"
-        />
-        <ToggleRow
-          label={t('more.notifications.weeklyEmailDigestTitle')}
-          description={t('more.notifications.emailDigestDescription')}
-          value={notifPrefs?.weeklyProgressEmail ?? true}
-          onToggle={handleToggleWeeklyEmailDigest}
-          disabled={
-            notifLoading || settingsUnavailable || updateNotifications.isPending
-          }
-          testID="weekly-email-digest-toggle"
-        />
-        <ToggleRow
-          label={t('more.notifications.monthlyEmailDigestTitle')}
-          description={t('more.notifications.emailDigestDescription')}
-          value={notifPrefs?.monthlyProgressEmail ?? true}
-          onToggle={handleToggleMonthlyEmailDigest}
-          disabled={
-            notifLoading || settingsUnavailable || updateNotifications.isPending
-          }
-          testID="monthly-email-digest-toggle"
-        />
+        {notifLoading ? (
+          <View className="py-16" testID="more-notifications-loading">
+            <TimeoutLoader
+              isLoading={notifLoading}
+              timeoutMs={15_000}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void refetchNotificationSettings(),
+                testID: 'more-notifications-loading-retry',
+              }}
+              testID="more-notifications-loading-spinner"
+            />
+          </View>
+        ) : settingsUnavailable ? (
+          <View className="mt-4" testID="more-notifications-error-wrapper">
+            <ErrorFallback
+              title={t('more.notifications.loadErrorTitle')}
+              message={t('more.notifications.loadErrorMessage')}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void refetchNotificationSettings(),
+                testID: 'more-notifications-error-retry',
+              }}
+              testID="more-notifications-error"
+            />
+          </View>
+        ) : (
+          <>
+            <ToggleRow
+              label={t('more.notifications.pushTitle')}
+              description={pushDescription}
+              value={serverPushEnabled}
+              onToggle={handleTogglePush}
+              disabled={updateNotifications.isPending}
+              testID="push-notifications-toggle"
+            />
+            {openSettingsVisible ? (
+              <SettingsRow
+                label={t('more.notifications.openSettingsTitle')}
+                description={t('more.notifications.openSettingsDescription')}
+                onPress={() => {
+                  void Linking.openSettings();
+                }}
+                testID="push-notifications-open-settings"
+              />
+            ) : null}
+            <ToggleRow
+              label={t('more.notifications.weeklyDigestTitle')}
+              value={notifPrefs?.weeklyProgressPush ?? false}
+              onToggle={handleToggleDigest}
+              disabled={updateNotifications.isPending}
+              testID="weekly-digest-toggle"
+            />
+            <ToggleRow
+              label={t('more.notifications.weeklyEmailDigestTitle')}
+              description={t('more.notifications.emailDigestDescription')}
+              value={notifPrefs?.weeklyProgressEmail ?? true}
+              onToggle={handleToggleWeeklyEmailDigest}
+              disabled={updateNotifications.isPending}
+              testID="weekly-email-digest-toggle"
+            />
+            <ToggleRow
+              label={t('more.notifications.monthlyEmailDigestTitle')}
+              description={t('more.notifications.emailDigestDescription')}
+              value={notifPrefs?.monthlyProgressEmail ?? true}
+              onToggle={handleToggleMonthlyEmailDigest}
+              disabled={updateNotifications.isPending}
+              testID="monthly-email-digest-toggle"
+            />
+          </>
+        )}
       </ScrollView>
     </View>
   );

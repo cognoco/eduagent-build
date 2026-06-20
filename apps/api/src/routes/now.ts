@@ -16,13 +16,13 @@ import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
 export const nowRoutes = new Hono<RouteEnv>()
   .get('/now', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
-    const { scope } = c.req.valid('query');
-    const feed = await buildNowFeed(db, profileId, scope);
+    const query = c.req.valid('query');
+    const feed = await buildNowFeed(db, profileId, query);
     return c.json(nowResponseSchema.parse(feed));
   })
   .get('/now/overflow', zValidator('query', nowQuerySchema), async (c) => {
     const { db, profileId } = withProfile(c);
-    const { scope } = c.req.valid('query');
-    const overflow = await buildNowOverflow(db, profileId, scope);
+    const query = c.req.valid('query');
+    const overflow = await buildNowOverflow(db, profileId, query);
     return c.json(nowOverflowResponseSchema.parse(overflow));
   });

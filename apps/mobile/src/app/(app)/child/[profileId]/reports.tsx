@@ -46,9 +46,9 @@ export function getNextReportInfo(now = new Date()): {
   return { date: formattedDate, timeContext };
 }
 
-function formatReportWeek(reportWeek: string): string {
+function formatReportWeek(reportWeek: string, fallback: string): string {
   const start = new Date(`${reportWeek}T00:00:00Z`);
-  if (Number.isNaN(start.getTime())) return 'Latest week';
+  if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
   const startLabel = start.toLocaleDateString(undefined, {
@@ -82,7 +82,10 @@ function ReportsHeaderSummary({
     >
       <View className="flex-row items-start justify-between">
         <Text className="text-caption text-text-secondary flex-1 me-3">
-          {formatReportWeek(latestReport.reportWeek)}
+          {formatReportWeek(
+            latestReport.reportWeek,
+            t('guardian.latestWeekFallback'),
+          )}
         </Text>
         {showNewBadge ? (
           <View

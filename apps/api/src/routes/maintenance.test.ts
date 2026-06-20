@@ -26,6 +26,7 @@ type TestEnv = {
   Bindings: {
     ENVIRONMENT?: string;
     MAINTENANCE_SECRET?: string;
+    MAINTENANCE_PRODUCTION_ENABLED?: string;
     SENTRY_DSN?: string;
   };
 };
@@ -271,5 +272,104 @@ describe('maintenanceRoutes', () => {
         environment: 'staging',
       },
     });
+  });
+
+  // ----- [BUG-875] Environment gate on backfill routes -------------------
+  // Backfill routes (memory-facts / progress-self-reports) were gated ONLY by
+  // MAINTENANCE_SECRET, with no ENVIRONMENT check. Because Doppler pushes
+  // secrets everywhere by default, MAINTENANCE_SECRET is configured in
+  // production — so anyone with the secret could fire a full-table-scan +
+  // Inngest re-emission backfill in prod (LLM token burn, queue flood,
+  // possible data corruption). The fix mirrors the test-seed.ts fail-closed
+  // pattern: fail-closed on production by default, with an explicit
+  // MAINTENANCE_PRODUCTION_ENABLED='true' opt-in for the rare intentional
+  // prod backfill. development/staging remain unaffected.
+  describe('[BUG-875] backfill environment gate', () => {
+    const BACKFILL_ROUTES = [
+      '/maintenance/memory-facts-backfill',
+      '/maintenance/progress-self-reports-backfill',
+    ] as const;
+
+    for (const route of BACKFILL_ROUTES) {
+      it(`[break-test] refuses ${route} in production even WITH a valid secret (no opt-in)`, async () => {
+        const app = createTestApp({
+          ENVIRONMENT: 'production',
+          MAINTENANCE_SECRET: 'secret',
+        });
+
+        const res = await app.request(route, {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'secret' },
+        });
+
+        expect(res.status).toBe(403);
+        // The unauthorized backfill must never reach the Inngest transport.
+        expect(mockInngestTransport.sentEvents).toHaveLength(0);
+      });
+
+      it(`[break-test] refuses ${route} for unrecognised/undefined ENVIRONMENT (fail-closed)`, async () => {
+        const app = createTestApp({
+          // ENVIRONMENT unset — e.g. a partial Doppler sync. Must be treated
+          // as production (deny), not silently allowed.
+          MAINTENANCE_SECRET: 'secret',
+        });
+
+        const res = await app.request(route, {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'secret' },
+        });
+
+        expect(res.status).toBe(403);
+        expect(mockInngestTransport.sentEvents).toHaveLength(0);
+      });
+
+      it(`allows ${route} in production with MAINTENANCE_PRODUCTION_ENABLED='true' opt-in`, async () => {
+        const app = createTestApp({
+          ENVIRONMENT: 'production',
+          MAINTENANCE_SECRET: 'secret',
+          MAINTENANCE_PRODUCTION_ENABLED: 'true',
+        });
+
+        const res = await app.request(route, {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'secret' },
+        });
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ queued: true });
+        expect(mockInngestTransport.sentEvents).toHaveLength(1);
+      });
+
+      it(`refuses ${route} in production when MAINTENANCE_PRODUCTION_ENABLED is a non-"true" value`, async () => {
+        const app = createTestApp({
+          ENVIRONMENT: 'production',
+          MAINTENANCE_SECRET: 'secret',
+          MAINTENANCE_PRODUCTION_ENABLED: 'yes',
+        });
+
+        const res = await app.request(route, {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'secret' },
+        });
+
+        expect(res.status).toBe(403);
+        expect(mockInngestTransport.sentEvents).toHaveLength(0);
+      });
+
+      it(`still dispatches ${route} in development without any opt-in`, async () => {
+        const app = createTestApp({
+          ENVIRONMENT: 'development',
+          MAINTENANCE_SECRET: 'secret',
+        });
+
+        const res = await app.request(route, {
+          method: 'POST',
+          headers: { 'X-Maintenance-Secret': 'secret' },
+        });
+
+        expect(res.status).toBe(200);
+        expect(mockInngestTransport.sentEvents).toHaveLength(1);
+      });
+    }
   });
 });

@@ -6,6 +6,10 @@ import { createReadStream, mkdirSync } from 'node:fs';
 import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
+import {
+  resolveExportTimeoutMs,
+  waitForProcessExit,
+} from './serve-exported-web-control.mjs';
 
 const projectRoot = process.cwd();
 const distDir = path.join(projectRoot, 'dist');
@@ -176,12 +180,15 @@ const exportProcess = spawnPnpm([
   'exec', 'expo', 'export', '--platform', 'web', '--clear',
 ]);
 
-exportProcess.on('exit', async (code) => {
+try {
+  await waitForProcessExit(exportProcess, {
+    label: 'Expo web export',
+    timeoutMs: resolveExportTimeoutMs(),
+  });
   await restoreEnvFiles();
-
-  if (code !== 0) {
-    process.exit(code ?? 1);
-  }
-
   void startServer();
-});
+} catch (error) {
+  await restoreEnvFiles();
+  console.error(`[serve] ${error.message}`);
+  process.exit(1);
+}

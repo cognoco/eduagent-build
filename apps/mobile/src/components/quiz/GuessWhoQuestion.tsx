@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import type { ClientQuizQuestion, QuestionCheckInput } from '@eduagent/schemas';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useThemeColors } from '../../lib/theme';
 
 type ClientGuessWhoQuestion = Extract<
@@ -44,16 +45,17 @@ function shuffle<T>(items: T[]): T[] {
 function getHintMessage(
   nextClueCount: number,
   usedWrongGuess: boolean,
+  t: TFunction,
 ): string {
   if (nextClueCount >= 3) {
     return usedWrongGuess
-      ? "Not quite. Here's another clue, and multiple choice is now available."
-      : "Here's another clue. Multiple choice is now available too.";
+      ? t('quiz.guessWhoQuestion.hintWithMCAvailableWrong')
+      : t('quiz.guessWhoQuestion.hintWithMCAvailable');
   }
 
   return usedWrongGuess
-    ? "Not quite. Here's another clue."
-    : "Here's another clue.";
+    ? t('quiz.guessWhoQuestion.hintWrong')
+    : t('quiz.guessWhoQuestion.hint');
 }
 
 interface GuessWhoQuestionProps {
@@ -131,7 +133,7 @@ export function GuessWhoQuestion({
       );
       setVisibleClueCount(nextClueCount);
       setGuess('');
-      setHelperText(getHintMessage(nextClueCount, true));
+      setHelperText(getHintMessage(nextClueCount, true, t));
     } catch {
       if (isFinalClue) {
         resolveFreeText(false, normalizedGuess);
@@ -142,7 +144,7 @@ export function GuessWhoQuestion({
         );
         setVisibleClueCount(nextClueCount);
         setGuess('');
-        setHelperText(getHintMessage(nextClueCount, true));
+        setHelperText(getHintMessage(nextClueCount, true, t));
       }
     } finally {
       setIsChecking(false);
@@ -172,7 +174,7 @@ export function GuessWhoQuestion({
 
     const nextClueCount = Math.min(question.clues.length, visibleClueCount + 1);
     setVisibleClueCount(nextClueCount);
-    setHelperText(getHintMessage(nextClueCount, false));
+    setHelperText(getHintMessage(nextClueCount, false, t));
   }
 
   async function handleFallbackChoice(option: string) {

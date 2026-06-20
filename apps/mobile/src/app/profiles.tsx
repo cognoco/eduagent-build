@@ -282,8 +282,8 @@ export default function ProfilesScreen() {
             const isActive = profile.id === activeProfile?.id;
             const initial = profile.displayName.charAt(0).toUpperCase();
             const roleLabel = isGuardianProfile(profile, profiles)
-              ? 'Parent'
-              : 'Learner';
+              ? t('onboarding.profiles.roleParent')
+              : t('onboarding.profiles.roleLearner');
 
             return (
               <Pressable

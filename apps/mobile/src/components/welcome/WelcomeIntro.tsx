@@ -3,6 +3,7 @@ import {
   BackHandler,
   FlatList,
   Pressable,
+  ScrollView,
   Text,
   View,
   useWindowDimensions,
@@ -655,9 +656,16 @@ export function WelcomeIntro({
         renderItem={({ item }) => {
           const { headline, supporting } = item;
           return (
-            <View
+            <ScrollView
               style={{ width: screenWidth }}
-              className="items-center justify-center px-8"
+              contentContainerStyle={{
+                minHeight: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 32,
+                paddingVertical: 24,
+              }}
+              showsVerticalScrollIndicator={false}
               testID={`welcome-card-${item.index + 1}`}
               accessibilityLabel={`${headline}. ${supporting}`}
             >
@@ -676,7 +684,7 @@ export function WelcomeIntro({
               >
                 {supporting}
               </Text>
-            </View>
+            </ScrollView>
           );
         }}
       />

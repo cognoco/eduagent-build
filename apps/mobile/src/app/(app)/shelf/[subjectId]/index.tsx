@@ -177,6 +177,8 @@ export default function ShelfScreen() {
           onPress={handleBack}
           className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           testID="shelf-missing-param-back"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
         >
           <Text className="text-text-primary text-body font-semibold">
             {t('common.back')}
@@ -268,6 +270,7 @@ export default function ShelfScreen() {
         <Pressable
           onPress={handleBack}
           className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
           accessibilityLabel={t('common.back')}
           testID="shelf-loading-back"
         >
@@ -284,7 +287,7 @@ export default function ShelfScreen() {
     const errorMessage =
       classified.message !== 'Something unexpected happened. Please try again.'
         ? classified.message
-        : 'Unable to load this shelf. Please try again.';
+        : t('library.shelf.loadErrorFallback');
     const actions = recoveryActions(classified, {
       retry: handleRetry,
       goBack: handleBack,
@@ -319,6 +322,7 @@ export default function ShelfScreen() {
         <Pressable
           onPress={handleBack}
           className="p-2 -ms-2 me-2"
+          accessibilityRole="button"
           accessibilityLabel={t('common.back')}
           testID="shelf-back"
         >
@@ -389,6 +393,7 @@ export default function ShelfScreen() {
             } as Href)
           }
           className="p-2 -me-2"
+          accessibilityRole="button"
           accessibilityLabel={t('library.shelf.settingsAccessibilityLabel')}
           testID="shelf-settings"
         >
@@ -544,6 +549,7 @@ export default function ShelfScreen() {
               }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="shelf-filing-skip"
+              accessibilityRole="button"
               accessibilityLabel={t('library.shelf.skipAccessibilityLabel')}
             >
               <Text className="text-body font-semibold text-text-primary">

@@ -2,12 +2,13 @@ import { Pressable, View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { getTimeOfDay } from '../../lib/greeting';
 import { useThemeColors } from '../../lib/theme';
+import type { Translate } from '../../i18n';
 
-function getTimeAwareEyebrow(now: Date = new Date()): string {
+function getTimeAwareEyebrow(t: Translate, now: Date = new Date()): string {
   const period = getTimeOfDay(now);
-  if (period === 'morning') return 'THIS MORNING';
-  if (period === 'afternoon') return 'THIS AFTERNOON';
-  return 'TONIGHT';
+  if (period === 'morning') return t('home.coachBand.thisMorning');
+  if (period === 'afternoon') return t('home.coachBand.thisAfternoon');
+  return t('home.coachBand.tonight');
 }
 
 export interface CoachBandProps {
@@ -27,9 +28,9 @@ export function CoachBand({
   onDismiss,
   now,
 }: CoachBandProps) {
-  const resolvedEyebrow = eyebrow ?? getTimeAwareEyebrow(now);
-  const colors = useThemeColors();
   const { t } = useTranslation();
+  const resolvedEyebrow = eyebrow ?? getTimeAwareEyebrow(t, now);
+  const colors = useThemeColors();
   if (!headline) return null;
 
   return (
@@ -73,7 +74,7 @@ export function CoachBand({
         testID="home-coach-band-dismiss"
         onPress={onDismiss}
         className="absolute top-2 right-2.5 p-1"
-        hitSlop={8}
+        hitSlop={{ top: 12, bottom: 12, left: 18, right: 18 }}
         accessibilityLabel={t('home.coachBand.a11yDismiss')}
         accessibilityRole="button"
       >

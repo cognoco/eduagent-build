@@ -600,6 +600,53 @@ async function topicBelongsToProfile(
   return findOwnedCurriculumTopic(db, { profileId, topicId });
 }
 
+// [BUG-863] Delete the book + subject that THIS clone created, but only when
+// each is now empty. Ownership is enforced on every delete: the book delete is
+// scoped to the adult's subject chain (book → subject.profileId = adult) and the
+// subject delete is scoped directly to subjects.profileId = adult. The emptiness
+// guards (NOT EXISTS remaining topic / book) ensure a pre-existing or
+// still-populated ancestor is never removed. Deleting the subject cascades its
+// curricula + books + topics, so the book delete is ordered first and is a no-op
+// when the subject delete already swept it.
+async function cascadeUndoCreatedAncestors(
+  db: Database,
+  adultProfileId: string,
+  createdIds: CloneCreatedIds,
+): Promise<void> {
+  if (createdIds.bookId) {
+    await db.delete(curriculumBooks).where(
+      and(
+        eq(curriculumBooks.id, createdIds.bookId),
+        sql`EXISTS (
+          SELECT 1
+          FROM ${subjects}
+          WHERE ${subjects.id} = ${curriculumBooks.subjectId}
+            AND ${subjects.profileId} = ${adultProfileId}
+        )`,
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${curriculumTopics}
+          WHERE ${curriculumTopics.bookId} = ${curriculumBooks.id}
+        )`,
+      ),
+    );
+  }
+
+  if (createdIds.subjectId) {
+    await db.delete(subjects).where(
+      and(
+        eq(subjects.id, createdIds.subjectId),
+        eq(subjects.profileId, adultProfileId),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${curriculumBooks}
+          WHERE ${curriculumBooks.subjectId} = ${subjects.id}
+        )`,
+      ),
+    );
+  }
+}
+
 export async function undoCloneFromChild(
   db: Database,
   adultProfileId: string,
@@ -634,6 +681,15 @@ export async function undoCloneFromChild(
     .returning({ id: curriculumTopics.id });
 
   if (deletedTopic) {
+    // [BUG-863] Cascade the undo to ancestors THIS clone created. createdIds
+    // carries bookId/subjectId only when cloneTopicFromChild had to create them
+    // (first clone into a brand-new book/subject). Without this cascade an
+    // immediate undo leaves an orphan book + subject on the parent's account
+    // with no UI affordance to clean up. Delete an ancestor only when it is
+    // (a) present in createdIds (this clone made it), (b) now empty, and
+    // (c) owned by the adult via the parent chain — guarding against deleting
+    // a pre-existing or still-populated ancestor.
+    await cascadeUndoCreatedAncestors(db, adultProfileId, createdIds);
     return { deleted: { topic: true } };
   }
 

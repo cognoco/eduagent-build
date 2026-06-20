@@ -33,6 +33,7 @@ import {
   UpstreamError,
 } from './api-errors';
 import type { QuotaExceededDetails } from './api-errors';
+import { i18next } from '../i18n';
 
 export {
   BadRequestError,
@@ -246,7 +247,7 @@ export function useApiClient(): ApiClient {
         if (res.status === 401) {
           if (code === 'EMAIL_NOT_AVAILABLE' || code === 'EMAIL_NOT_VERIFIED') {
             throw new ForbiddenError(
-              apiMessage ?? 'Please verify your email address, then try again.',
+              apiMessage ?? i18next.t('errors.emailNotVerified'),
               code,
             );
           }
@@ -291,13 +292,15 @@ export function useApiClient(): ApiClient {
         }
 
         if (res.status === 400) {
-          throw new BadRequestError(apiMessage ?? (errBody || 'Bad request'));
+          throw new BadRequestError(
+            apiMessage ?? (errBody || i18next.t('errors.badRequest')),
+          );
         }
 
         if (res.status === 402) {
           if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
             throw new QuotaExceededError(
-              apiMessage ?? 'Quota exceeded',
+              apiMessage ?? i18next.t('errors.quotaExceeded'),
               parsed.details as QuotaExceededDetails,
             );
           }
@@ -323,13 +326,13 @@ export function useApiClient(): ApiClient {
 
         if (res.status === 404) {
           throw new NotFoundError(
-            apiMessage ?? (errBody || 'Resource not found'),
+            apiMessage ?? (errBody || i18next.t('errors.resourceNotFound')),
           );
         }
 
         if (res.status === 409) {
           const conflict = new ConflictError(
-            apiMessage ?? 'Request conflicts with current state',
+            apiMessage ?? i18next.t('errors.conflictState'),
           ) as ConflictError & {
             status?: number;
             code?: string;

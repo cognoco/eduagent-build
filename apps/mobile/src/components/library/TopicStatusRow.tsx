@@ -27,13 +27,13 @@ const STATE_GLYPH: Record<TopicStatusRowProps['state'], string> = {
   later: '○',
 };
 
-const STATE_LABEL: Record<TopicStatusRowProps['state'], string> = {
-  'continue-now': 'Continue now',
-  started: 'Started',
-  'up-next': 'Up next',
-  done: 'Done',
-  later: 'Later',
-};
+const STATE_I18N_KEY = {
+  'continue-now': 'library.topicStatusRow.stateContinueNow',
+  started: 'library.topicStatusRow.stateStarted',
+  'up-next': 'library.topicStatusRow.stateUpNext',
+  done: 'library.topicStatusRow.stateDone',
+  later: 'library.topicStatusRow.stateLater',
+} as const;
 
 export function TopicStatusRow({
   state,
@@ -154,9 +154,18 @@ export function TopicStatusRow({
         },
       ]}
       accessibilityRole="button"
-      accessibilityLabel={`${STATE_LABEL[state]}: ${title}${
-        subtitleParts.length > 0 ? `, ${subtitleParts.join(', ')}` : ''
-      }`}
+      accessibilityLabel={
+        subtitleParts.length > 0
+          ? t('library.topicStatusRow.a11yWithSubtitle', {
+              state: t(STATE_I18N_KEY[state]),
+              title,
+              subtitle: subtitleParts.join(', '),
+            })
+          : t('library.topicStatusRow.a11y', {
+              state: t(STATE_I18N_KEY[state]),
+              title,
+            })
+      }
     >
       <View className="flex-row items-start">
         <Text

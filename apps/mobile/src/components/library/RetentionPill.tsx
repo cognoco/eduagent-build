@@ -65,9 +65,14 @@ export function RetentionPill({
   return (
     <View
       testID={testID}
-      accessibilityLabel={`Memory check: ${
-        elapsedLabel ? `${label}, ${elapsedLabel}` : label
-      }`}
+      accessibilityLabel={
+        elapsedLabel
+          ? t('library.retentionPill.a11yWithElapsed', {
+              label,
+              elapsed: elapsedLabel,
+            })
+          : t('library.retentionPill.a11y', { label })
+      }
       style={{ gap: showElapsed ? 2 : 0 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

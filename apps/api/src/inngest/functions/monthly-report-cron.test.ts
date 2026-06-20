@@ -2076,7 +2076,10 @@ describe('monthlyReportGenerate', () => {
 
       const handler = (monthlyReportGenerate as any).fn;
       await handler({
-        event: { data: makeGenerateEvent(), name: 'app/monthly-report.generate' },
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
         step: recordingStep,
       });
 
@@ -2106,7 +2109,10 @@ describe('monthlyReportGenerate', () => {
 
       const handler = (monthlyReportGenerate as any).fn;
       await handler({
-        event: { data: makeGenerateEvent(), name: 'app/monthly-report.generate' },
+        event: {
+          data: makeGenerateEvent(),
+          name: 'app/monthly-report.generate',
+        },
         step: recordingStep,
       });
 

@@ -111,6 +111,10 @@ jest.mock(
     return {
       ...actual,
       safeRefundQuota: jest.fn().mockResolvedValue({ refunded: true }),
+      // [BUG-821] The route now calls refundQuotaOrEscalate (the gate that
+      // escalates a decrement-without-subscriptionId instead of silently
+      // dropping the refund). Mock it as the boundary the route actually calls.
+      refundQuotaOrEscalate: jest.fn().mockResolvedValue({ refunded: true }),
     };
   },
 );
@@ -135,7 +139,7 @@ import {
 import { getSession } from '../services/session';
 import { updateRetentionFromSession } from '../services/retention-data';
 import { insertSessionXpEntry } from '../services/xp';
-import { safeRefundQuota } from '../services/billing';
+import { refundQuotaOrEscalate } from '../services/billing';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
 
@@ -290,7 +294,7 @@ const lockAssessmentForAnswerSubmissionMock = jest.mocked(
 );
 const updateRetentionFromSessionMock = jest.mocked(updateRetentionFromSession);
 const insertSessionXpEntryMock = jest.mocked(insertSessionXpEntry);
-const safeRefundQuotaMock = jest.mocked(safeRefundQuota);
+const refundQuotaOrEscalateMock = jest.mocked(refundQuotaOrEscalate);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -718,8 +722,8 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
       // Quota refund WAS called — the learner must not be charged for a
       // no-LLM response.
-      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
-      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
         expect.anything(),
         SUBSCRIPTION_ID,
         expect.objectContaining({ route: 'assessments.answer.app_help' }),
@@ -736,7 +740,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     // app-help turn.
     it('[WI-776] threads identityV2=true into the refund under flag-on', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: true });
+      refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: true });
 
       const res = await makeMeteredApp({ identityV2: true }).request(
         path,
@@ -745,7 +749,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
 
       expect(res.status).toBe(200);
       expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
-      expect(safeRefundQuotaMock).toHaveBeenCalledWith(
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
         expect.anything(),
         SUBSCRIPTION_ID,
         expect.objectContaining({
@@ -762,7 +766,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
     // no-LLM turn. Revert (set quotaRefunded unconditionally) → this goes red.
     it('[WI-776] does NOT mark quotaRefunded when the refund did not complete', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      safeRefundQuotaMock.mockResolvedValueOnce({ refunded: false });
+      refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: false });
 
       let capturedQuotaRefunded: boolean | undefined = 'sentinel' as never;
       const app = new Hono<
@@ -806,7 +810,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
 
       expect(res.status).toBe(200);
-      expect(safeRefundQuotaMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
       // The refund failed → quotaRefunded must remain unset so the failure is
       // visible (and the user is not falsely treated as refunded).
       expect(capturedQuotaRefunded).toBeUndefined();
@@ -829,19 +833,33 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       expect(res.status).toBe(200);
       expect(evaluateAssessmentAnswerMock).toHaveBeenCalled();
       // No refund — the LLM ran, the quota decrement was legitimate.
-      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
+      expect(refundQuotaOrEscalateMock).not.toHaveBeenCalled();
     });
 
-    it('[BREAK] skips the refund when subscriptionId is absent (unmetered call)', async () => {
+    it('[BUG-821] routes the refund through refundQuotaOrEscalate when subscriptionId is absent but a decrement happened', async () => {
       getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
 
-      // Make an app that does NOT inject subscriptionId (simulates unmetered).
+      // App that injects quotaDecrementSource (a decrement HAPPENED) but NOT a
+      // subscriptionId — the exact BUG-821 condition. Previously the route's
+      // bare `if (subscriptionId)` gate silently dropped the refund with no
+      // Sentry/log/metric, charging the user for a no-LLM turn. The route now
+      // delegates to refundQuotaOrEscalate so the gate can escalate the skip.
       const app = makeMeteredApp({ omitSubscriptionId: true });
       const res = await app.request(path, validAnswerBody(APP_HELP_ANSWER));
 
       expect(res.status).toBe(200);
-      // No subscription context — refund is a no-op; function must not throw.
-      expect(safeRefundQuotaMock).not.toHaveBeenCalled();
+      // The gate MUST be invoked (not silently bypassed), and it must receive
+      // the missing subscriptionId alongside the decrement source so its
+      // internal escalation (quota.refund.skipped_no_subscription) can fire.
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledTimes(1);
+      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
+        expect.anything(),
+        undefined,
+        expect.objectContaining({
+          route: 'assessments.answer.app_help',
+          source: 'monthly',
+        }),
+      );
     });
 
     it('[F-146 / WI-701] sets quotaRefunded=true on the 200 early-return so the metering middleware can invalidate KV', async () => {
@@ -914,6 +932,18 @@ describe('PATCH /v1/assessments/:assessmentId/decline-refresh', () => {
   it('returns 200 when the assessment is in a terminal state', async () => {
     getAssessmentMock.mockResolvedValue(
       makeAssessmentRecord({ status: 'passed' }),
+    );
+
+    const res = await makeApp().request(path, { method: 'PATCH' });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ ok: true });
+  });
+
+  it('[BUG-848] returns 200 when the assessment status is "failed" (terminal but was missing from allowlist)', async () => {
+    getAssessmentMock.mockResolvedValue(
+      makeAssessmentRecord({ status: 'failed' }),
     );
 
     const res = await makeApp().request(path, { method: 'PATCH' });
@@ -1048,6 +1078,7 @@ function makeAssessmentRecord(
     status: (overrides.status ?? 'in_progress') as
       | 'in_progress'
       | 'passed'
+      | 'failed'
       | 'failed_exhausted'
       | 'borderline',
     masteryScore: 0,

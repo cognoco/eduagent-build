@@ -103,7 +103,7 @@ export function RequireFamilyContext({
           className="mt-2 bg-primary rounded-xl px-6 py-3"
           onPress={handleSwitchToFamily}
         >
-          <Text className="text-body font-semibold text-white">
+          <Text className="text-body font-semibold text-text-inverse">
             {t('guards.requireFamilyContext.switchCta')}
           </Text>
         </Pressable>

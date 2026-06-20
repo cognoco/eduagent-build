@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '../../lib/theme';
 import { useDurationLabel } from '../../hooks/use-time-format';
@@ -19,6 +20,7 @@ export function TopicSessionRow({
   sessionType,
   onPress,
 }: TopicSessionRowProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const durationLabel = useDurationLabel();
   const formattedDuration = durationLabel(durationSeconds);
@@ -28,7 +30,11 @@ export function TopicSessionRow({
       testID={`session-row-${sessionId}`}
       onPress={() => onPress(sessionId)}
       accessibilityRole="button"
-      accessibilityLabel={`${sessionType}, ${date}, ${formattedDuration}`}
+      accessibilityLabel={t('library.topicSessionRow.a11y', {
+        type: sessionType,
+        date,
+        duration: formattedDuration,
+      })}
       style={{
         flexDirection: 'row',
         alignItems: 'center',

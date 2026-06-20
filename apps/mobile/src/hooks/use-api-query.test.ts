@@ -54,6 +54,29 @@ describe('useApiQuery', () => {
     expect(fetchFn.mock.calls[0]?.[0]).toBeInstanceOf(AbortSignal);
   });
 
+  it('returns a configured fallback for a 404 without parsing the body', async () => {
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValue(new Response('not found', { status: 404 }));
+    const select = jest.fn();
+
+    const { result } = renderHook(
+      () =>
+        useApiQuery<unknown, { shape: 'learner' }>({
+          queryKey: ['probe', 'not-found-fallback'],
+          fetch: (signal) => fetchFn(signal),
+          select,
+          notFoundFallback: { shape: 'learner' },
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual({ shape: 'learner' });
+    expect(select).not.toHaveBeenCalled();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
   it('propagates an assertOk rejection into the error state', async () => {
     const fetchFn = jest
       .fn()

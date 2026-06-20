@@ -26,8 +26,10 @@ import {
 import { FeedbackProvider } from '../../components/feedback/FeedbackProvider';
 import { ErrorFallback } from '../../components/common';
 import { ModeSwitcher } from '../../components/chrome/ModeSwitcher';
+import { ScopeChip } from '../../components/chrome/ScopeChip';
 import { AccountAvatar } from '../../components/account/AccountAvatar';
 import { goBackOrReplace } from '../../lib/navigation';
+import { ScopeContextProvider } from '../../lib/scope-context';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
 import { useNavigationShellContract } from '../../hooks/use-navigation-contract';
@@ -480,7 +482,7 @@ export default function AppLayout() {
       <View className="flex-1 bg-background">
         <ErrorFallback
           variant="centered"
-          title="We could not load your profile"
+          title={t('appShell.profileLoadErrorTitle')}
           message={formatApiError(profileLoadError)}
           primaryAction={{
             label: t('common.retry'),
@@ -624,6 +626,7 @@ export default function AppLayout() {
     !ACCOUNT_AVATAR_HIDDEN_PATHS.some((hiddenPath) =>
       pathname.startsWith(hiddenPath),
     );
+  const showScopeChip = showAccountAvatar;
   const chromeTopInset = FEATURE_FLAGS.MODE_NAV_V2_ENABLED
     ? Math.max(insets.top, V2_CHROME_MIN_TOP_INSET)
     : insets.top;
@@ -633,24 +636,36 @@ export default function AppLayout() {
 
   return (
     <FeedbackProvider>
-      <View style={[{ flex: 1 }, tokenVars]}>
-        {proxyBanner && (
-          <ProxyBanner
-            childName={proxyBanner.childName}
-            onSwitchBack={() => void switchProfile(proxyBanner.parentProfileId)}
-          />
-        )}
-        {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
-        {showAccountAvatar ? (
-          <View
-            className="absolute right-4 z-40"
-            style={{ top: chromeTopInset + 8 }}
-            testID="account-avatar-shell"
-          >
-            <AccountAvatar />
-          </View>
-        ) : null}
-        {/* ─── Whitelist tab pattern ────────────────────────────────────
+      <ScopeContextProvider>
+        <View style={[{ flex: 1 }, tokenVars]}>
+          {proxyBanner && (
+            <ProxyBanner
+              childName={proxyBanner.childName}
+              onSwitchBack={() =>
+                void switchProfile(proxyBanner.parentProfileId)
+              }
+            />
+          )}
+          {!FEATURE_FLAGS.MODE_NAV_V2_ENABLED && <ModeSwitcher />}
+          {showScopeChip ? (
+            <View
+              className="absolute left-4 z-40"
+              style={{ top: chromeTopInset + 8 }}
+              testID="scope-chip-shell"
+            >
+              <ScopeChip />
+            </View>
+          ) : null}
+          {showAccountAvatar ? (
+            <View
+              className="absolute right-4 z-40"
+              style={{ top: chromeTopInset + 8 }}
+              testID="account-avatar-shell"
+            >
+              <AccountAvatar />
+            </View>
+          ) : null}
+          {/* ─── Whitelist tab pattern ────────────────────────────────────
            Only routes listed in visibleTabs render a tab button.
            Everything else is auto-hidden via screenOptions defaults.
            Adding a new route file to (app)/ will NEVER create a
@@ -659,196 +674,197 @@ export default function AppLayout() {
            Routes in FULL_SCREEN_ROUTES also hide the entire tab bar
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
-        <Tabs
-          screenOptions={({ route }) => {
-            const isVisible = visibleTabs.has(route.name);
-            const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
-            return {
-              headerShown: false,
-              // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
-              // An opaque sceneStyle prevents the previous tab from bleeding
-              // through when switching to a full-screen route (session, quiz, etc.).
-              sceneStyle: {
-                backgroundColor: isProxyChromeActive
-                  ? proxyColors.sceneBackground
-                  : colors.background,
-              },
-              tabBarStyle: isFullScreen
-                ? {
-                    display: 'none',
-                    // On some Android devices and Expo web, display:'none'
-                    // alone doesn't remove the tab bar from the touch
-                    // responder chain. Fully collapse it so it can't
-                    // intercept touches or occupy layout space.
-                    height: 0,
-                    overflow: 'hidden' as const,
-                  }
-                : {
-                    backgroundColor: isProxyChromeActive
-                      ? proxyColors.tabBackground
-                      : colors.surface,
-                    borderTopColor: isProxyChromeActive
-                      ? proxyColors.border
-                      : colors.border,
-                    borderTopWidth: isProxyChromeActive ? 2 : 1,
-                    height: 56 + tabBarBottomInset,
-                    paddingBottom: tabBarBottomInset,
-                  },
-              tabBarActiveTintColor: colors.accent,
-              tabBarInactiveTintColor: colors.textSecondary,
-              tabBarLabelStyle: { fontSize: 12 },
-              // Auto-hide any route not in the whitelist.
-              // href:null removes the link; tabBarItemStyle removes the
-              // flexbox space (Expo Router v6 + React Nav v7 regression).
-              ...(isVisible
-                ? {}
-                : { href: null, tabBarItemStyle: { display: 'none' } }),
-            };
-          }}
-        >
-          <Tabs.Screen
-            name="mentor"
-            options={{
-              title: t('tabs.mentor'),
-              tabBarButtonTestID: 'tab-mentor',
-              tabBarAccessibilityLabel: t('tabs.mentorLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Home" focused={focused} />
-              ),
+          <Tabs
+            screenOptions={({ route }) => {
+              const isVisible = visibleTabs.has(route.name);
+              const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
+              return {
+                headerShown: false,
+                // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
+                // An opaque sceneStyle prevents the previous tab from bleeding
+                // through when switching to a full-screen route (session, quiz, etc.).
+                sceneStyle: {
+                  backgroundColor: isProxyChromeActive
+                    ? proxyColors.sceneBackground
+                    : colors.background,
+                },
+                tabBarStyle: isFullScreen
+                  ? {
+                      display: 'none',
+                      // On some Android devices and Expo web, display:'none'
+                      // alone doesn't remove the tab bar from the touch
+                      // responder chain. Fully collapse it so it can't
+                      // intercept touches or occupy layout space.
+                      height: 0,
+                      overflow: 'hidden' as const,
+                    }
+                  : {
+                      backgroundColor: isProxyChromeActive
+                        ? proxyColors.tabBackground
+                        : colors.surface,
+                      borderTopColor: isProxyChromeActive
+                        ? proxyColors.border
+                        : colors.border,
+                      borderTopWidth: isProxyChromeActive ? 2 : 1,
+                      height: 56 + tabBarBottomInset,
+                      paddingBottom: tabBarBottomInset,
+                    },
+                tabBarActiveTintColor: colors.accent,
+                tabBarInactiveTintColor: colors.textSecondary,
+                tabBarLabelStyle: { fontSize: 12 },
+                // Auto-hide any route not in the whitelist.
+                // href:null removes the link; tabBarItemStyle removes the
+                // flexbox space (Expo Router v6 + React Nav v7 regression).
+                ...(isVisible
+                  ? {}
+                  : { href: null, tabBarItemStyle: { display: 'none' } }),
+              };
             }}
-          />
-          <Tabs.Screen
-            name="subjects"
-            options={{
-              title: t('tabs.subjects'),
-              tabBarButtonTestID: 'tab-subjects',
-              tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Book" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="journal"
-            options={{
-              title: t('tabs.journal'),
-              tabBarButtonTestID: 'tab-journal',
-              tabBarAccessibilityLabel: t('tabs.journalLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Recaps" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="home"
-            options={{
-              title: t(homeTabPresentation.titleKey),
-              tabBarButtonTestID: 'tab-home',
-              tabBarAccessibilityLabel: t(
-                homeTabPresentation.accessibilityLabelKey,
-              ),
-              // Lazy-load the Home tab so the initial mount only renders the
-              // visible gate screens (consent, profile creation). The trade-off
-              // is a brief spinner on the first Home tap, but it cuts ~200ms
-              // off the critical auth→gate path on low-end devices.
-              lazy: true,
-              tabBarIcon: ({ focused }) => (
-                <TabIcon
-                  name={homeTabPresentation.iconName}
-                  focused={focused}
-                />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="own-learning"
-            options={{
-              title: t('tabs.myLearning'),
-              tabBarButtonTestID: 'tab-my-learning',
-              tabBarAccessibilityLabel: t('tabs.myLearningLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="School" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="library"
-            options={{
-              title: t('tabs.library'),
-              tabBarButtonTestID: 'tab-library',
-              tabBarAccessibilityLabel: t('tabs.libraryLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Book" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="recaps"
-            options={{
-              title: t('tabs.recaps'),
-              tabBarButtonTestID: 'tab-recaps',
-              tabBarAccessibilityLabel: t('tabs.recapsLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Recaps" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="progress"
-            options={{
-              title: t('tabs.progress'),
-              tabBarButtonTestID: 'tab-progress',
-              tabBarAccessibilityLabel: t('tabs.progressLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="Progress" focused={focused} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="more"
-            options={{
-              title: t('tabs.more'),
-              tabBarButtonTestID: 'tab-more',
-              tabBarAccessibilityLabel: t('tabs.moreLabel'),
-              tabBarIcon: ({ focused }) => (
-                <TabIcon name="More" focused={focused} />
-              ),
-            }}
-          />
-          {/* Bug 763: Explicit href:null entries for non-tab routes so Expo
+          >
+            <Tabs.Screen
+              name="mentor"
+              options={{
+                title: t('tabs.mentor'),
+                tabBarButtonTestID: 'tab-mentor',
+                tabBarAccessibilityLabel: t('tabs.mentorLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Home" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="subjects"
+              options={{
+                title: t('tabs.subjects'),
+                tabBarButtonTestID: 'tab-subjects',
+                tabBarAccessibilityLabel: t('tabs.subjectsLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Book" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="journal"
+              options={{
+                title: t('tabs.journal'),
+                tabBarButtonTestID: 'tab-journal',
+                tabBarAccessibilityLabel: t('tabs.journalLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Recaps" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="home"
+              options={{
+                title: t(homeTabPresentation.titleKey),
+                tabBarButtonTestID: 'tab-home',
+                tabBarAccessibilityLabel: t(
+                  homeTabPresentation.accessibilityLabelKey,
+                ),
+                // Lazy-load the Home tab so the initial mount only renders the
+                // visible gate screens (consent, profile creation). The trade-off
+                // is a brief spinner on the first Home tap, but it cuts ~200ms
+                // off the critical auth→gate path on low-end devices.
+                lazy: true,
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon
+                    name={homeTabPresentation.iconName}
+                    focused={focused}
+                  />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="own-learning"
+              options={{
+                title: t('tabs.myLearning'),
+                tabBarButtonTestID: 'tab-my-learning',
+                tabBarAccessibilityLabel: t('tabs.myLearningLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="School" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="library"
+              options={{
+                title: t('tabs.library'),
+                tabBarButtonTestID: 'tab-library',
+                tabBarAccessibilityLabel: t('tabs.libraryLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Book" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="recaps"
+              options={{
+                title: t('tabs.recaps'),
+                tabBarButtonTestID: 'tab-recaps',
+                tabBarAccessibilityLabel: t('tabs.recapsLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Recaps" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="progress"
+              options={{
+                title: t('tabs.progress'),
+                tabBarButtonTestID: 'tab-progress',
+                tabBarAccessibilityLabel: t('tabs.progressLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="Progress" focused={focused} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="more"
+              options={{
+                title: t('tabs.more'),
+                tabBarButtonTestID: 'tab-more',
+                tabBarAccessibilityLabel: t('tabs.moreLabel'),
+                tabBarIcon: ({ focused }) => (
+                  <TabIcon name="More" focused={focused} />
+                ),
+              }}
+            />
+            {/* Bug 763: Explicit href:null entries for non-tab routes so Expo
               Router does not auto-surface them as /quiz, /shelf/undefined,
               /subject/undefined, /pick-book/undefined, /child/undefined,
               etc. in the tab bar / web link list. The dynamic screenOptions
               callback above is the primary defense; these declarations are
               the belt-and-braces backup for routes that the callback misses
               on web auto-discovery. */}
-          {HIDDEN_TAB_ROUTES.map((routeName) => (
-            <Tabs.Screen
-              key={routeName}
-              name={routeName}
-              options={{ href: null }}
-            />
-          ))}
-        </Tabs>
-        {profileWasRemoved && (
-          <Pressable
-            onPress={acknowledgeProfileRemoval}
-            className="absolute left-4 right-4 z-50"
-            style={{ top: chromeTopInset + 8 }}
-            testID="profile-switched-toast"
-            accessibilityRole="alert"
-          >
-            <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
-              <Text className="text-body font-semibold text-text-primary mb-1">
-                {t('tabs.profileSwitchedToast.title')}
-              </Text>
-              <Text className="text-body-sm text-text-secondary">
-                {t('tabs.profileSwitchedToast.message')}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      </View>
+            {HIDDEN_TAB_ROUTES.map((routeName) => (
+              <Tabs.Screen
+                key={routeName}
+                name={routeName}
+                options={{ href: null }}
+              />
+            ))}
+          </Tabs>
+          {profileWasRemoved && (
+            <Pressable
+              onPress={acknowledgeProfileRemoval}
+              className="absolute left-4 right-4 z-50"
+              style={{ top: chromeTopInset + 8 }}
+              testID="profile-switched-toast"
+              accessibilityRole="alert"
+            >
+              <View className="rounded-2xl bg-surface-elevated px-5 py-4 w-full shadow-lg">
+                <Text className="text-body font-semibold text-text-primary mb-1">
+                  {t('tabs.profileSwitchedToast.title')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary">
+                  {t('tabs.profileSwitchedToast.message')}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+        </View>
+      </ScopeContextProvider>
     </FeedbackProvider>
   );
 }
