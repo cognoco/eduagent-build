@@ -240,7 +240,34 @@ beforeEach(() => {
         updatedAt: new Date(),
       }),
     },
+    // [WI-618] handleSubscription{Event,Deleted} now re-attribute F-124 top-up
+    // credits on a quota-model change. reattributeTopUpCreditsOnModelChange
+    // looks up the owner profile and updates topUpCredits inside the tx; in
+    // these routing-focused tests there are no credits, so it no-ops.
+    profiles: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'profile-owner-1' }),
+    },
   };
+  // [WI-618] lockSubscriptionById__unscoped (real @eduagent/database helper)
+  // reads the prior tier via select(...).for('update'); return the same row the
+  // findFirst above yields so previousTier is coherent.
+  mockDb.select = jest.fn().mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        for: jest
+          .fn()
+          .mockResolvedValue([{ id: 'sub-internal-1', tier: 'plus' }]),
+      }),
+    }),
+  });
+  // [WI-618] topUpCredits re-attribution update — no credits seeded → returns [].
+  mockDb.update = jest.fn().mockReturnValue({
+    set: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([]),
+      }),
+    }),
+  });
 
   (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
     mockUpdatedSubscription(),

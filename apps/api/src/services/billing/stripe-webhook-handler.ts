@@ -10,7 +10,12 @@
 // callers (e.g. an Inngest replay tool) without going through the route.
 // ---------------------------------------------------------------------------
 
-import type { Database } from '@eduagent/database';
+import {
+  type Database,
+  findSubscriptionByStripeId__unscoped,
+  lockSubscriptionById__unscoped,
+} from '@eduagent/database';
+import type { SubscriptionTier } from '@eduagent/schemas';
 import type Stripe from 'stripe';
 // NOTE: Import via the barrel (`../billing`) — NOT via the relative `./index`
 // — so existing webhook tests that mock `../services/billing` continue to
@@ -26,6 +31,10 @@ import type {
   AppliedSubscriptionRow,
   WebhookSubscriptionUpdate,
 } from '../billing';
+import {
+  reattributeTopUpCreditsOnModelChange,
+  emitTopUpCreditsReattributedMetric,
+} from './tier';
 import { getTierConfig } from '../subscription';
 import {
   verifySubscriptionTier,
@@ -160,6 +169,72 @@ function escalateSubscriptionNotFound(
         ...extra,
       },
     },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// [WI-618 / F-124] Top-up credit re-attribution on Stripe tier changes
+// ---------------------------------------------------------------------------
+// The Stripe subscription handlers cross the quota-model boundary (per-profile
+// <-> shared-pool) on three sites: customer.subscription.deleted and the
+// expiry branch (both → free / per-profile), and the active-tier branch of
+// customer.subscription.updated (e.g. plus → family). When the model changes,
+// active top-up credits must be re-attributed (profileId owner <-> null) inside
+// the SAME transaction that writes the new tier, or they are stranded on the
+// wrong attribution and become unspendable — the original F-124 value-loss
+// class, identical to the RevenueCat path fixed under WI-583 (PR #876/#897).
+//
+// These were left untouched in the WI-583 sweep because the Stripe webhook path
+// is dormant (store billing not live). WI-618 closes the sibling gap so the
+// risk does not go live when Stripe billing activates.
+
+/**
+ * Lock-and-read the previous tier of a subscription keyed by Stripe ID, INSIDE
+ * an open transaction. The row lock (SELECT … FOR UPDATE) is held until the
+ * transaction commits, serializing the tier-change detection + credit
+ * re-attribution against concurrent webhooks for the same subscription — the
+ * same F-124 serialization contract as the RevenueCat path
+ * (updateSubscriptionAndQuotaFromRevenuecatWebhook, revenuecat.ts).
+ *
+ * Returns the locked subscription's prior tier, or undefined when no local row
+ * matches the Stripe ID (out-of-order delivery — handled by the caller's
+ * existing escalateSubscriptionNotFound path).
+ */
+async function lockPreviousTierByStripeId(
+  txDb: Database,
+  stripeSubscriptionId: string,
+): Promise<SubscriptionTier | undefined> {
+  // safe-caller: Stripe webhook — keyed by external Stripe ID, authenticated by event signature
+  const existing = await findSubscriptionByStripeId__unscoped(
+    txDb,
+    stripeSubscriptionId,
+  );
+  if (!existing) return undefined;
+  // safe-caller: Stripe webhook — internal id resolved from the verified Stripe ID above
+  const locked = await lockSubscriptionById__unscoped(txDb, existing.id);
+  return locked?.tier ?? existing.tier;
+}
+
+/**
+ * Re-attributes top-up credits when a Stripe tier change crosses the quota
+ * model, inside the open transaction `txDb`, and returns the re-attributed
+ * count (0 when the model did not change or no credits qualified). The queryable
+ * metric is emitted by the caller OUTSIDE the transaction (silent-recovery-banned
+ * rule) — see emitTopUpCreditsReattributedMetric.
+ */
+async function reattributeStripeTierChange(
+  txDb: Database,
+  result: AppliedSubscriptionRow,
+  previousTier: SubscriptionTier | undefined,
+  newTier: SubscriptionTier,
+): Promise<number> {
+  if (!previousTier || previousTier === newTier) return 0;
+  return reattributeTopUpCreditsOnModelChange(
+    txDb,
+    result.id,
+    result.accountId,
+    previousTier,
+    newTier,
   );
 }
 
@@ -309,8 +384,27 @@ export async function handleSubscriptionEvent(
   // (tier/quota divergence). M11's inner transaction inside updateSubscriptionFromWebhook
   // becomes a savepoint inside this outer transaction — Postgres handles nested
   // transactions as savepoints correctly.
+  // [WI-618 / F-124] Capture re-attribution count to emit the queryable metric
+  // outside the transaction (silent-recovery-banned rule). previousTier is read
+  // under a row lock inside the tx so the model-change detection serializes
+  // against concurrent webhooks for this subscription.
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  // The new tier actually written when the quota pool was synced — captured so
+  // the metric emit outside the tx reflects the same value the re-attribution
+  // used (avoids a non-null assertion on effectiveTier).
+  let appliedNewTier: SubscriptionTier | undefined;
+  const reattributionNow = new Date();
+
   const updated = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    // [WI-618 / F-124] Lock-and-read the prior tier BEFORE the update so the
+    // tier change is detected coherently and serialized (FOR UPDATE).
+    previousTier = await lockPreviousTierByStripeId(
+      txDb,
+      stripeSubscription.id,
+    );
 
     const result = await updateSubscriptionFromWebhook(
       txDb,
@@ -327,6 +421,15 @@ export async function handleSubscriptionEvent(
           freeTier.monthlyQuota,
           freeTier.dailyLimit,
         );
+        // [WI-618 / F-124] expiry → free (per-profile): re-attribute credits
+        // if the prior tier was shared-pool (family/pro).
+        appliedNewTier = 'free';
+        reattributedCount = await reattributeStripeTierChange(
+          txDb,
+          result,
+          previousTier,
+          'free',
+        );
       } else if (effectiveTier) {
         // Sync quota pool limit to the price-authoritative tier.
         const tierConfig = getTierConfig(effectiveTier);
@@ -336,11 +439,32 @@ export async function handleSubscriptionEvent(
           tierConfig.monthlyQuota,
           tierConfig.dailyLimit,
         );
+        // [WI-618 / F-124] active-tier change (customer.subscription.updated):
+        // re-attribute credits if the model crossed (e.g. plus <-> family).
+        appliedNewTier = effectiveTier;
+        reattributedCount = await reattributeStripeTierChange(
+          txDb,
+          result,
+          previousTier,
+          effectiveTier,
+        );
       }
     }
 
     return result;
   });
+
+  // [WI-618 / F-124] Emit the queryable re-attribution metric outside the tx.
+  if (reattributedCount > 0 && updated && previousTier && appliedNewTier) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: updated.id,
+      accountId: updated.accountId,
+      previousTier,
+      newTier: appliedNewTier,
+      reattributedCount,
+      occurredAt: reattributionNow,
+    });
+  }
 
   if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(
@@ -387,8 +511,20 @@ export async function handleSubscriptionDeleted(
   // atomically. M11's inner dedup transaction in updateSubscriptionFromWebhook
   // nests as a savepoint. KV cache refresh is intentionally outside the tx
   // (KV is not part of the Postgres commit).
+  // [WI-618 / F-124] See handleSubscriptionEvent — capture count + previousTier
+  // to emit the queryable metric outside the transaction.
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  const reattributionNow = new Date();
+
   const updated = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    // [WI-618 / F-124] Lock-and-read the prior tier BEFORE the update.
+    previousTier = await lockPreviousTierByStripeId(
+      txDb,
+      stripeSubscription.id,
+    );
 
     const result = await updateSubscriptionFromWebhook(
       txDb,
@@ -404,10 +540,30 @@ export async function handleSubscriptionDeleted(
         freeTier.monthlyQuota,
         freeTier.dailyLimit,
       );
+      // [WI-618 / F-124] subscription.deleted → free (per-profile): re-attribute
+      // credits if the prior tier was shared-pool (family/pro).
+      reattributedCount = await reattributeStripeTierChange(
+        txDb,
+        result,
+        previousTier,
+        'free',
+      );
     }
 
     return result;
   });
+
+  // [WI-618 / F-124] Emit the queryable re-attribution metric outside the tx.
+  if (reattributedCount > 0 && updated && previousTier) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: updated.id,
+      accountId: updated.accountId,
+      previousTier,
+      newTier: 'free',
+      reattributedCount,
+      occurredAt: reattributionNow,
+    });
+  }
 
   if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCache(

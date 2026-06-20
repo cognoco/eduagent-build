@@ -26,6 +26,23 @@ export type { SubscriptionRow };
 // ---------------------------------------------------------------------------
 // Trial expiry helpers (used by Inngest trial-expiry function)
 // ---------------------------------------------------------------------------
+//
+// [WI-618 / F-124 N/A] Top-up credit re-attribution is intentionally NOT called
+// from any helper in this file. reattributeTopUpCreditsOnModelChange (tier.ts)
+// only does work when the quota MODEL changes (per-profile <-> shared-pool).
+// Every downgrade-to-free path here transitions a `status='trial'` subscription
+// to `tier='free'`, and trials are created exclusively at `tier='plus'`
+// (account.ts:179 trial-repair, account.ts:311 signup — both pass `'plus'`).
+// Both `plus` and `free` are per-profile (subscription.ts quotaModel), so the
+// model never crosses and re-attribution would be a guaranteed no-op (returns
+// 0). The general helpers (expireTrialSubscription, downgradeQuotaPool,
+// expireTrialAndDowngradeQuota) have no production callers that feed a
+// shared-pool source tier — they are reached only via the trial-expiry Inngest
+// function and the RevenueCat trial-extend path, both guarded on
+// `status='trial'`. Stripe/RevenueCat tier changes that DO cross the model are
+// re-attributed at their own sites (stripe-webhook-handler.ts, revenuecat.ts).
+// If trials ever start on family/pro (shared-pool), this assumption breaks and
+// these helpers must add the same re-attribution the Stripe path now carries.
 
 /**
  * Expires a trial subscription by setting status to expired and tier to free.
