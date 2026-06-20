@@ -69,12 +69,6 @@ const raw: readonly KeepPattern[] = [
   },
   // i18n sweep WI-492..502 — keys reached via runtime-dynamic t(variable) dispatch.
   {
-    pattern: 'home.engagementChip.*',
-    reason:
-      'engagement-state labels selected via CONFIG[state].labelKey at ' +
-      'apps/mobile/src/components/parent/EngagementChip.tsx:54',
-  },
-  {
     pattern: 'library.pickBook.loading*',
     reason:
       'rotating loading copy selected via LOADING_MESSAGE_KEYS[loadingMessageIndex] at ' +
