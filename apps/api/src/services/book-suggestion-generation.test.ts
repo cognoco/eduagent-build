@@ -871,7 +871,7 @@ describe('generateCategorizedBookSuggestions', () => {
         expect(dbUpdateMock).not.toHaveBeenCalled();
       });
 
-      it('does NOT reset cooldown on parse error (deterministic — retry won\'t help)', async () => {
+      it("does NOT reset cooldown on parse error (deterministic — retry won't help)", async () => {
         const subject = makeSubject();
         // Valid JSON but wrong shape — missing `suggestions` key; triggers 'parse' outcome
         routeAndCallMock.mockResolvedValue({

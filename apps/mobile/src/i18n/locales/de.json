@@ -3626,6 +3626,10 @@
     "continueOffline": "Ohne Konto fortfahren",
     "connecting": "Sichere Verbindung wird hergestellt..."
   },
+  "scopeChip": {
+    "supportHub": "Supportbereich",
+    "me": "Ich"
+  },
   "modeSwitcher": {
     "switchError": "Wechseln fehlgeschlagen. Zum Wiederholen tippen.",
     "a11yRetry": "Moduswechsel wiederholen"

@@ -3626,6 +3626,10 @@
     "continueOffline": "アカウントなしで続ける",
     "connecting": "安全に接続中..."
   },
+  "scopeChip": {
+    "supportHub": "サポートハブ",
+    "me": "自分"
+  },
   "modeSwitcher": {
     "switchError": "切り替えられませんでした。タップして再試行してください。",
     "a11yRetry": "モード切り替えを再試行"

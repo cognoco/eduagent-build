@@ -7,6 +7,18 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
+type RetryOption =
+  | boolean
+  | number
+  | ((failureCount: number, error: Error) => boolean);
+
+function resolveFallback<TData>(fallback: TData | (() => TData)): TData {
+  if (typeof fallback === 'function') {
+    return (fallback as () => TData)();
+  }
+  return fallback;
+}
+
 /**
  * Wrapper that absorbs the read-query boilerplate every scoped GET hook
  * repeats: `combinedSignal` timeout wiring, `assertOk`, JSON parse, and the
@@ -16,9 +28,11 @@ import { assertOk } from '../lib/assert-ok';
 export function useApiQuery<TResponse, TData = TResponse>(opts: {
   queryKey: QueryKey;
   enabled?: boolean;
+  retry?: RetryOption;
   timeoutMs?: number;
   fetch: (signal: AbortSignal) => Promise<Response>;
   select: (json: TResponse) => TData;
+  notFoundFallback?: TData | (() => TData);
 }): UseQueryResult<TData> {
   const { activeProfile } = useProfile();
 
@@ -28,6 +42,9 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
       const { signal, cleanup } = combinedSignal(querySignal, opts.timeoutMs);
       try {
         const res = await opts.fetch(signal);
+        if (res.status === 404 && opts.notFoundFallback !== undefined) {
+          return resolveFallback(opts.notFoundFallback);
+        }
         await assertOk(res);
         return opts.select((await res.json()) as TResponse);
       } finally {
@@ -35,5 +52,6 @@ export function useApiQuery<TResponse, TData = TResponse>(opts: {
       }
     },
     enabled: (opts.enabled ?? true) && !!activeProfile,
+    ...(opts.retry !== undefined ? { retry: opts.retry } : {}),
   });
 }

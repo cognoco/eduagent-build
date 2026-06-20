@@ -3772,6 +3772,10 @@
     "continueOffline": "Kontynuuj bez konta",
     "connecting": "Bezpieczne łączenie..."
   },
+  "scopeChip": {
+    "supportHub": "Centrum wsparcia",
+    "me": "Ja"
+  },
   "modeSwitcher": {
     "switchError": "Nie udało się przełączyć. Dotknij, aby spróbować ponownie.",
     "a11yRetry": "Spróbuj ponownie przełączyć tryb"

@@ -3626,6 +3626,10 @@
     "continueOffline": "Continuar sin cuenta",
     "connecting": "Conectando de forma segura..."
   },
+  "scopeChip": {
+    "supportHub": "Centro de apoyo",
+    "me": "Yo"
+  },
   "modeSwitcher": {
     "switchError": "No se pudo cambiar. Toca para reintentar.",
     "a11yRetry": "Reintentar cambio de modo"
