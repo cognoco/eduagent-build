@@ -48,6 +48,9 @@ jest.mock(
 );
 
 jest.mock('react-i18next', () => ({
+  // Screen now transitively imports the auto-initializing @/i18n barrel, which
+  // calls i18next.use(initReactI18next); the boundary must export it.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {

@@ -1561,8 +1561,8 @@
       "stateUpNext": "次へ",
       "stateDone": "完了",
       "stateLater": "後で",
-      "a11y": "{{state}}: {{title}}",
-      "a11yWithSubtitle": "{{state}}: {{title}}、{{subtitle}}"
+      "a11y": "{{state}}：{{title}}",
+      "a11yWithSubtitle": "{{state}}：{{title}}、{{subtitle}}"
     },
     "topicPicker": {
       "a11yTopicWithChapter": "{{name}}、{{chapter}}"

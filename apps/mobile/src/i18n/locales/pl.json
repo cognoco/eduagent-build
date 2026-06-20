@@ -1580,10 +1580,16 @@
     "a11yCloseTopicPicker": "Zamknij wybór tematu",
     "myNotes": {
       "subtitleBookmarks_one": "1 zapisana odpowiedź",
+      "subtitleBookmarks_few": "{{count}} zapisane odpowiedzi",
+      "subtitleBookmarks_many": "{{count}} zapisanych odpowiedzi",
       "subtitleBookmarks_other": "{{count}} zapisanych odpowiedzi",
       "subtitleNotes_one": "1 notatka",
+      "subtitleNotes_few": "{{count}} notatki",
+      "subtitleNotes_many": "{{count}} notatek",
       "subtitleNotes_other": "{{count}} notatek",
       "subtitleSessions_one": "1 sesja",
+      "subtitleSessions_few": "{{count}} sesje",
+      "subtitleSessions_many": "{{count}} sesji",
       "subtitleSessions_other": "{{count}} sesji",
       "searchA11y": "Szukaj {{kind}}"
     },
