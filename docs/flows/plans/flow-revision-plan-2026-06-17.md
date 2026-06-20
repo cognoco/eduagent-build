@@ -1,4 +1,4 @@
-> **STATUS: P0 RERUN UPDATED 2026-06-19** — all 280 flow-plan rows marked from the Chrome/Chromium browser sweep, seeded scenarios, and source-backed checks for dormant/native-only paths. Targeted reruns have cleared the rows tied to WI-818, WI-819, WI-820, WI-822, WI-824, WI-825, WI-826, WI-853, WI-854, WI-855, WI-856, WI-858, WI-861, WI-863, WI-864, and WI-865; WI-859 replaced the QA-03/QA-04 closure proof with deterministic jest coverage. WI-821 still fails on recap detail. Remaining failure issues: WI-821, WI-823. Remaining P0 pass-with-issues rows are now WI-857/QA-02 and WI-862/QUIZ-16; WI-873 tracks the registry-smoke infrastructure timeout seen during this rerun.
+> **STATUS: NOT-PASSING FLOW RERUN UPDATED 2026-06-20** — all 280 flow-plan rows remain marked. The actionable non-passing set was rerun with Chrome/Chromium browser tooling, seeded scenarios, and deterministic/API packs only (no emulator). Statuses are unchanged: 10 pass-with-issues rows, 6 failed rows, 19 blocked rows, 4 removed rows, and 241 pass rows. No new Cosmo issue was needed; current failures still map to WI-862, WI-878, and WI-879, while pass-with-issues rows remain mapped to their existing trackers.
 
 # Mobile App Flow Revision Plan
 
@@ -29,6 +29,10 @@ Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.
 **P1 issue-map update 2026-06-19:** Remaining V2-primary P1 pass-with-issues rows are grouped into three Cosmo issue clusters under Flow Remediation: `WI-870` AUTH-03/05/06/08/09 auth-provider handoffs, `WI-871` ACCOUNT-17/19/20/21/22/24/25/26/27 + QA-09/12 consent handoffs, and `WI-872` PARENT-01/02/03/14/16/17/22/24/25 + QA-08 parent/family branch coverage.
 
 **Remaining issue-map update 2026-06-20:** the 12 pass-with-issues rows that had no tracker are now mapped. New Cosmo items: `WI-874` ACCOUNT-06/09/10/11 account-settings provider/native branches, `WI-875` ACCOUNT-08/CC-07 accommodation picker/badge branches, and `WI-876` SUBJECT-21 curriculum retry evidence. Existing clusters absorbed related rows: `WI-870` QA-13, `WI-871` ACCOUNT-07/23/50, and `WI-872` CC-17.
+
+**Remaining-flow rerun update 2026-06-20:** current detailed table had 14 pass-with-issues rows, not the stale 40-row bottom rollup. Reruns completed with Chrome/Chromium browser tooling and deterministic packs only (no emulator). Deterministic evidence passed for account/settings (13 suites / 144 tests), consent/auth/profile-lens (22 suites / 300 tests), and curriculum/parent route coverage (12 suites / 292 tests). Browser reruns passed auth navigation, auth deep-link redirect, J-07 parent dashboard drilldown, J-16 parent back-chain, and J-17 parent recap copy. Browser reruns still fail QUIZ-16 (quiz-discovery cards route to session, not quiz), QA-02 mentor-audit smoke (13 passed / 8 failed), and BRIDGE-04 parent bridge entry surfaces. Consent J-13/J-21 failures reproduce as automation/readiness drift against the current Mentor/Family shells, plus a seed cleanup FK teardown failure. New Cosmo issues: `WI-878` BRIDGE-04 Chrome entry surfaces, `WI-879` consent browser journey readiness drift, and `WI-880` consent test-seed reset FK ordering.
+
+**Not-passing rerun update 2026-06-20:** reran the current actionable non-passing set. Deterministic evidence passed for account/settings/accommodation (16 suites / 190 tests), consent/auth/profile-lens subset (9 suites / 104 tests), parent/bridge route support (4 suites / 41 tests), and API consent/test-seed/consent-web (3 suites / 245 tests). Chrome reruns reproduced the same open failures: QUIZ-16 has 2/2 discovery-card cases failing because both route to `/session?...returnTo=learner-home`; QA-02's mentor-audit smoke remains 13 passed / 8 failed; BRIDGE-04 still cannot render topic/session/recap entry surfaces; consent J-13/J-21 still fail against current Mentor/Family readiness expectations while J-23 gate/preview checks pass 6/6. No row status changed and no new Cosmo issue was created.
 
 ## Purpose
 
@@ -256,8 +260,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-21 | Parent email entry / resend / change email | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentPendingGate.test.tsx` (resend POSTs `/consent/resend` with NO email; change-email POSTs `/consent/request` with new recipient; same-as-child guard). Live delivery is external. |
 | ACCOUNT-22 | Consent pending gate: PENDING "send to parent" vs REQUESTED waiting UI | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentPendingGate.test.tsx` (PENDING send-to-parent CTA vs REQUESTED masked-email waiting UI + Check-again). Reminder-email automation stays in ACCOUNT-40 (Blocked). |
 | ACCOUNT-23 | Consent withdrawn gate | ⚠️ | Pass w/ issues | WI-871 | ✅ 2026-06-20 | Issue mapped with consent lifecycle cluster: consent expired/cleanup state source-checked; timer-driven expiry not accelerated in browser. |
-| ACCOUNT-24 | Post-approval landing | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_hooks/use-post-approval-landing.test.ts` covers the audience discriminators (child + teen-owner w/ parental flow show; adult-owner + impersonating-parent suppressed; per-profile SecureStore once-only; existing-subjects veto; dismiss persists). |
-| ACCOUNT-25 | Parent consent management: withdraw | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/_components/ConsentWithdrawnGate.test.tsx` (child-side withdrawn gate: deletion-pending messaging, refresh re-check, sign-out reachable). Real email return path is external. |
+| ACCOUNT-24 | Post-approval landing | ⚠️ | Pass w/ issues | WI-871 / WI-879 / WI-880 | ✅ 2026-06-20 | Deterministic post-approval landing evidence still passes, but fresh Chrome J-13 lands on the current Mentor home while the spec waits for old `learner-screen`/subject selectors; WI-879 tracks the browser readiness drift and WI-880 tracks the teardown FK failure. |
+| ACCOUNT-25 | Parent consent management: withdraw | ⚠️ | Pass w/ issues | WI-871 / WI-879 | ✅ 2026-06-20 | Deterministic withdrawn-gate evidence still passes, but fresh Chrome J-21 lands in Family mode while the helper expects learner readiness; WI-879 tracks the browser spec/readiness update. |
 | ACCOUNT-26 | Regional consent variants | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/consent.test.tsx` asserts the single GDPR-everywhere path — every consent request carries `consentType: 'GDPR'` (mobile hardcode); profile-not-found + signed-out deep-link guards covered. COPPA enum stays dormant (no live writer). |
 | ACCOUNT-27 | Parent consent deny confirmation | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/api/src/routes/consent-web.test.ts` (real route + stubbed-DB boundary): two-step deny-confirm page, missing-token 400, unknown/expired/used-token 404, #868 strict-enum 400 data-loss guard, XSS-escaped child name. DB-backed e2e stays in `consent-web.integration.test.ts`. |
 | ACCOUNT-28 | App language bottom sheet | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -324,7 +328,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | SUBJECT-18 | First-subject "Ready" recap interstitial | ✅ | Pass | WI-825 | ✅ 2026-06-18 | WI-825 resolved: J-09 now asserts first focused subject lands on `/ready` before session. |
 | SUBJECT-19 | Existing-subject "Continue" rows inside create-subject | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | SUBJECT-20 | Subject-limit dead-end recovery: regex-on-message classification | ✅ | Pass | WI-855 | ✅ 2026-06-19 | Rerun evidence: route/service/mobile tests cover typed `SUBJECT_LIMIT_EXCEEDED` recovery and reject message-regex spoofing. |
-| SUBJECT-21 | Curriculum retry endpoint | ⚠️ | Pass w/ issues | WI-876 | ✅ 2026-06-20 | Issue mapped: covered by source/route review and adjacent seeded flows; not a distinct visible Chrome path. |
+| SUBJECT-21 | Curriculum retry endpoint | ✅ | Pass | WI-876 | ✅ 2026-06-20 | Fresh deterministic rerun passed mobile curriculum coverage plus API route/service/inngest retry and curriculum integration tests; endpoint has no distinct visible Chrome path. |
 | SUBJECT-22 | Pick-book degraded/recovery states: missing-param guard; cycling loading + slow hint | ✅ | Pass | WI-858 | ✅ 2026-06-19 | WI-858 resolved: degraded-state proof added/refreshed in `(app)/pick-book/[subjectId].test.tsx` — new narrow tests for the missing-param guard (renders + back→library) and the BUG-539 slow-loading hint (`pick-book-loading-slow` at `SLOW_LOADING_HINT_MS`=5000ms, red-green proven); existing tests cover classified hard-error fallback (500/404 → inline error + manual entry), BUG-318 auto-open custom input on empty, and the 8s filing-skip overlay. PARKED pick-book Maestro flows noted in the inventory. |
 
 ---
@@ -421,7 +425,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QUIZ-13 | Answer-check failure: assumes wrong + inline banner + platformAlert + Sentry; flag cleared per question | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-14 | Difficulty-bump challenge banner: `round.difficultyBump` → full-screen banner requiring explicit Start | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-15 | Final-question auto-save: immediate round submit; "saving" panel → See Results / One More; navigation queued if save in flight;… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ⚠️ | Pass w/ issues | WI-862 | ✅ 2026-06-19 | Rerun still issue-bearing: Chrome/Playwright clicked a higher-priority resume card instead of the forced quiz-discovery card; WI-862 has the failure note and artifacts. |
+| QUIZ-16 | Home quiz-discovery card entry: Continue → mark-surfaced POST, then capitals/guess_who push `/(app)/quiz/launch` w/ `activityType` | ❌ | Fail | WI-862 | ✅ 2026-06-20 | Fresh Chrome rerun reached the forced quiz-discovery spec: both capitals and vocabulary cards routed to `/session?...returnTo=learner-home` instead of `/quiz/launch` or `/quiz`; WI-862 remains open. |
 | QUIZ-17 | Quiz index load-error retry | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QUIZ-18 | Play no-round guard | ✅ | Pass | WI-820 | ✅ 06-19 | Rerun 2026-06-19 on staging Chrome/Playwright passed: cold `/quiz/play` with no round renders `quiz-play-no-round`, Retry, and Go Home recovery controls; focused unit regression passed. |
 | DICT-01 | Choice screen | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
@@ -462,13 +466,13 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | PARENT-01 | Parent home mentoring hub | ✅ | Pass | WI-872 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` `[PARENT-01]` — greeting + account avatar + per-child command cards + Children header against routed mock fetch (real dashboard/subscription/notification hooks). |
 | PARENT-02 | Multi-child dashboard: ≥2 children → family-summary panel | ✅ | Pass | WI-872 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` `[PARENT-02]` — ≥2 children render the `parent-home-family-summary` panel + per-child starters + "Who needs you" attention row; single-child case swaps the panel for the mentor-insight + add-learner row. |
 | PARENT-03 | Child detail drill-down: subject mentor-note cards + RecentSessionsList; URL modes default / `?mode=progress` | ✅ | Pass | WI-872 | ✅ 06-20 | Deterministic jest: `apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx` `[PARENT-03]` — lean overview (subjects + raw-input mentor note + recent session cards) for the default mode, and `?mode=progress` renders the child-progress view only. Family-gate entry to the route additionally covered by `RequireFamilyContext.test.tsx [PARENT-03]`. |
-| PARENT-04 | Child subject → topic drill-down: skeletons, error+retry, `topics-load-unknown` branch, new-learner empty split, recent-session… | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
-| PARENT-05 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time | ❌ | Fail | WI-823 |  | Parent bridge child topic/session/recap route entry surfaces were missing or could not return correctly. |
+| PARENT-04 | Child subject → topic drill-down: skeletons, error+retry, `topics-load-unknown` branch, new-learner empty split, recent-session… | ❌ | Fail | WI-878 | ✅ 2026-06-20 | Deterministic and J-16 parent drilldown evidence passed, but mentor-audit BRIDGE-04 Chrome rerun still cannot render the child topic entry surface before backstack assertions. |
+| PARENT-05 | Child session recap detail: narrative/highlight/engagement chip/conversation prompt + copy, AddToMyLearning, active-time | ❌ | Fail | WI-878 | ✅ 2026-06-20 | Deterministic recap/session coverage and J-17 parent recap copy passed, but mentor-audit BRIDGE-04 Chrome rerun still cannot render the child session entry surface before backstack assertions. |
 | PARENT-06 | Child reports list + monthly detail: monthly + weekly merge w/ pinned latest-weekly hero, NEW badge, next-cron-date empty state… | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-08 | Subject raw-input audit | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-09 | Metric tooltips | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-10 | Understanding + retention cards on child topic | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-821 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome partially improved: Recaps list loads rows, but opening a recap still shows We could not load this recap; detail branch remains failing. |
+| PARENT-11 | Family Recaps feed + detail | ❌ | Fail | WI-878 | ✅ 2026-06-20 | API/mobile deterministic recap detail evidence passed, but mentor-audit BRIDGE-04 Chrome rerun still cannot render the recap entry surface before backstack assertions. |
 | PARENT-12 | Child-subject retention badges | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-13 | Child weekly report detail: marks viewed once | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | PARENT-14 | Learn This Too clone | ✅ | Pass | WI-872 | ✅ 06-20 | Deterministic jest, three layers: component `apps/mobile/src/components/family/AddToMyLearningButton.test.tsx` `[PARENT-14]` (gate + clone source context), hook `apps/mobile/src/hooks/use-clone-from-child.test.tsx` (mutation/undo/toast lifecycle), and route `apps/api/src/routes/curriculum.test.ts` `[PARENT-14]` (`POST /v1/curriculum/clone-from-child` clones into the adult profile; ForbiddenError→404 IDOR guard). |
@@ -520,7 +524,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | QA-01 | Quick smoke check | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| QA-02 | Post-auth comprehensive smoke | ⚠️ | Pass w/ issues | WI-857 / WI-873 | ✅ 2026-06-19 | Rerun did not reach flow execution: mentor-audit registry smoke stalled during Expo web export twice on Windows. New infra bug WI-873 tracks the timeout. |
+| QA-02 | Post-auth comprehensive smoke | ❌ | Fail | WI-857 / WI-878 / WI-879 | ✅ 2026-06-20 | Manual-preview Chrome rerun got past the prior export stall: mentor-audit smoke ran 21 checks with 13 pass / 8 fail. Failures split between BRIDGE-04 entry surfaces (WI-878) and registry readiness drift against current Mentor/Family shells (WI-879). |
 | QA-03 | Chat classifier regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage replaces live-LLM evidence: route + service tests pin the classifier miss/suggestion shape (multi-candidate + `suggestedSubjectName` passthrough; proxy-mode 403 guard on classify/resolve). YAML flow is smoke/historical only. |
 | QA-04 | Chat subject picker regression | ✅ | Pass | WI-859 | ✅ 2026-06-19 | Deterministic jest coverage forces the picker branch: hook tests cover single-subject auto-match, multi-candidate picker (learner picks the intended subject, no silent first-subject fallback), and resolve fallback; the session-screen integration test covers the no-enrolled-subjects create-new escape hatch. YAML flow is smoke/historical only. |
 | QA-05 | Return to chat after subject create | ✅ | Pass | WI-860 | ✅ 2026-06-19 | Reconciled — already covered, no new test needed. `create-subject.test.tsx` [BUG-236] asserts `returnTo=chat` after creation routes to `/(app)/session` (freeform, NOT picker), and the no-`returnTo` default routes to `/(app)/pick-book/[subjectId]` (NOT session) — both branches, default behavior unchanged. |
@@ -531,7 +535,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | QA-10 | Dictation full-flow regression | 🚫 | Blocked |  |  | Requires full native dictation camera/audio path. |
 | QA-11 | Quiz full-flow regression | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | QA-12 | Consent deny-confirmation | ✅ | Pass | WI-871 | ✅ 06-20 | Deterministic jest: `apps/api/src/routes/consent-web.test.ts` covers `POST /consent-page/confirm` deny-confirmation (approved=false → denial landing; approved=true → approval landing; missing/invalid token; #868 strict-enum guard). Supersedes the placeholder Maestro yaml — API route/integration tests are authoritative. |
-| QA-13 | Sign-in/out loop regression | ⚠️ | Pass w/ issues | WI-870 | ✅ 2026-06-20 | Issue mapped with auth-provider handoff cluster: covered by browser smoke/source/unit-linked checks; not all native/automation branches completed live. |
+| QA-13 | Sign-in/out loop regression | ✅ | Pass | WI-870 | ✅ 2026-06-20 | Fresh deterministic auth/sign-out pack passed and Chrome auth navigation + deep-link redirect passed; WI-870 is closed. |
 | QA-14 | SSE reconnect | ✅ | Pass | WI-819 | ✅ 06-18 | Rerun 2026-06-18 on staging Chrome via J-08 and J-11 passed: freeform chat, library-to-book session, two live sends, close/summary, and reconnect recovery completed without repeated lost-connection. |
 | QA-15 | Preview/onboarding regression cluster | ✅ | Pass | WI-857 | ✅ 2026-06-19 | Rerun evidence: preview/onboarding unit batch passed for preview layout, value-prop/topic/intent/both routes, seed-preview-state, and signed-out first-open routing. |
 
@@ -560,10 +564,10 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | CC-14 | Envelope-strip render guard at chat-bubble boundary | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-15 | RN Web stale-send block in ChatShell | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-16 | HMR-safe error type guards in `format-api-error.ts` | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ⚠️ | Pass w/ issues | WI-872 | ✅ 2026-06-20 | Issue mapped with parent/profile-lens branch cluster: cross-cutting behavior covered by seeded/source checks; full branch matrix not forced live. |
+| CC-17 | Profile-as-lens navigation: child routes carry `[profileId]`; `useActiveProfileRole()` gates destructive actions under proxy | ✅ | Pass | WI-872 | ✅ 2026-06-20 | Fresh deterministic profile-lens pack passed and Chrome J-07/J-16 parent route reruns passed; WI-872 is closed. |
 | CC-18 | Stable FlatList refs | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 | CC-19 | Mode-navigation contract controls tab shape + route access | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
-| CC-20 | Parent bridge provenance + return targets | ❌ | Fail | WI-823 |  | Parent bridge provenance/return targets failed with missing bridge surfaces. |
+| CC-20 | Parent bridge provenance + return targets | ❌ | Fail | WI-878 | ✅ 2026-06-20 | Deterministic clone/return-target coverage passed, but mentor-audit BRIDGE-04 Chrome rerun still fails before the bridge can prove topic/session/recap return targets. |
 | CC-21 | Post-session pipeline | ✅ | Pass |  |  | Covered in Chrome/browser sweep with seeded scenarios; no product defect found. |
 
 ---
@@ -580,20 +584,20 @@ If a flow is found in the app but is missing from `mobile-app-flow-inventory.md`
 
 ## Master Roll-Up
 
-Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 reruns. Row-level notes remain the source of truth for per-flow evidence and linked Cosmo issues.
+Updated from the 2026-06-18 Chrome/Chromium sweep plus targeted 2026-06-19 and 2026-06-20 reruns. Row-level notes remain the source of truth for per-flow evidence and linked Cosmo issues.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | Auth and Access | 18 | ⚠️ | Rerun updated 2026-06-19: 12 ✅, 5 ⚠️, 0 ❌, 1 🚫. |
-| 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-19: 32 ✅, 17 ⚠️, 0 ❌, 2 🚫. |
-| 3 | Home, Navigation, and Subject Setup | 32 | ⚠️ | Rerun updated 2026-06-19: 30 ✅, 1 ⚠️, 1 ➖. |
+| 2 | Profiles, Family, Consent, and Account | 51 | ⚠️ | Rerun updated 2026-06-20: 31 ✅, 18 ⚠️, 0 ❌, 2 🚫. |
+| 3 | Home, Navigation, and Subject Setup | 32 | ✅ | Rerun updated 2026-06-20: 31 ✅, 0 ⚠️, 0 ❌, 1 ➖. |
 | 4 | Learning, Chat, Library, Retention, and Progress | 55 | ✅ | Rerun updated 2026-06-19: 52 ✅, 0 ⚠️, 0 ❌, 1 🚫, 2 ➖. |
-| 5 | Practice Hub and Practice Activities | 36 | ⚠️ | Rerun updated 2026-06-19: 31 ✅, 1 ⚠️, 0 ❌, 4 🚫. |
+| 5 | Practice Hub and Practice Activities | 36 | ❌ | Rerun updated 2026-06-20: 31 ✅, 0 ⚠️, 1 ❌, 4 🚫. |
 | 6 | Homework and Parent Experience | 36 | ❌ | Rerun updated 2026-06-19: 18 ✅, 9 ⚠️, 3 ❌, 5 🚫, 1 ➖. |
 | 7 | Billing and Monetization | 16 | ✅ | Rerun updated 2026-06-19: 12 ✅, 0 ⚠️, 0 ❌, 4 🚫. |
-| 8 | Regression and System Flows | 15 | ⚠️ | Rerun updated 2026-06-19: 9 ✅, 5 ⚠️, 0 ❌, 1 🚫 (QA-03/QA-04 → deterministic jest, WI-859; QA-15 rerun green; QA-02 infra timeout tracked by WI-873). |
-| 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-19: 17 ✅, 2 ⚠️, 1 ❌, 1 🚫. |
-| **Total** | | **280** | ❌ | 213 pass, 40 pass-w/issues, 4 fail, 19 blocked, 4 removed, 0 untested. |
+| 8 | Regression and System Flows | 15 | ❌ | Rerun updated 2026-06-20: 10 ✅, 3 ⚠️, 1 ❌, 1 🚫 (QA-03/QA-04 → deterministic jest, WI-859; QA-15 rerun green; QA-13 rerun green; QA-02 now executes but fails mentor-audit smoke, WI-857/WI-878/WI-879). |
+| 9 | Cross-Cutting Behaviors | 21 | ❌ | Rerun updated 2026-06-20: 18 ✅, 1 ⚠️, 1 ❌, 1 🚫. |
+| **Total** | | **280** | ❌ | 241 pass, 10 pass-w/issues, 6 fail, 19 blocked, 4 removed, 0 untested. |
 
 ### Coverage Audit
 

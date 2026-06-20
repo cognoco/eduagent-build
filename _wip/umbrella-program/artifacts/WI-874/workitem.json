@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-8105-a8a5-cc1789ef64c5",
+  "id": "WI-874",
+  "name": "[ACCOUNT-06/09/10/11] Complete account settings provider and native branch coverage",
+  "description": "Track the remaining account-settings pass-with-issues rows where Chrome/source checks passed but native or provider-driven branches were not deterministically exercised.",
+  "acceptanceCriteria": "ACCOUNT-06 avatar/media branch has deterministic native-safe evidence or an explicit blocked rationale; ACCOUNT-09 age/security boundary branches are covered; ACCOUNT-10 export regional/provider branch is covered or fixture-backed; ACCOUNT-11 delete-account confirmation/provider branch is covered; master flow plan rows reference this item.",
+  "riskImpact": "Without a tracker item these pass-with-issues rows can disappear from remediation planning, leaving account settings/provider branch coverage permanently source-checked only.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
