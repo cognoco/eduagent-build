@@ -560,4 +560,32 @@ describe('[Issue 836] Apple Family Sharing entitlement block', () => {
       );
     });
   });
+
+  describe('handleNonRenewingPurchase', () => {
+    it('does NOT grant top-up credits and escalates when is_family_share is true', async () => {
+      const result = await handleNonRenewingPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({
+          type: 'NON_RENEWING_PURCHASE',
+          product_id: 'com.eduagent.topup.500',
+          store_transaction_id: 'store-txn-family',
+          is_family_share: true,
+        }),
+      );
+
+      // Family-share copy short-circuits to null before the credit-grant path.
+      expect(result).toBeNull();
+      expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family_share'),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            category: 'revenuecat.family_share_blocked',
+            eventId: 'evt_rc_1',
+          }),
+        }),
+      );
+    });
+  });
 });

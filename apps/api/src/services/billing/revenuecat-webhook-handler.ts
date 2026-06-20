@@ -803,6 +803,9 @@ export async function handleNonRenewingPurchase(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<{ status: number; body: Record<string, unknown> } | null> {
+  // [Issue 836] Block entitlement on Apple Family Sharing shared copies.
+  if (isFamilyShareBlocked(event)) return null;
+
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return null;
 

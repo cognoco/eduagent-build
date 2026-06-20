@@ -31,6 +31,7 @@ import {
   handleInitialPurchaseV2,
   handleRenewalV2,
   handleProductChangeV2,
+  handleNonRenewingPurchaseV2,
 } from './revenuecat-webhook-handler-v2';
 import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
 
@@ -125,6 +126,33 @@ describe('[Issue 836] v2 family-share entitlement block', () => {
       expect.objectContaining({
         extra: expect.objectContaining({
           category: 'revenuecat.family_share_blocked',
+        }),
+      }),
+    );
+  });
+
+  it('handleNonRenewingPurchaseV2 short-circuits and escalates on is_family_share true', async () => {
+    // Returns null (not undefined) on the guarded path — the throwingDb proves
+    // it never reached resolveAccountIdV2 / purchaseTopUpCreditsV2.
+    await expect(
+      handleNonRenewingPurchaseV2(
+        throwingDb,
+        mockKv,
+        baseEvent({
+          type: 'NON_RENEWING_PURCHASE',
+          product_id: 'com.eduagent.topup.500',
+          store_transaction_id: 'store-txn-v2-family',
+          is_family_share: true,
+        }),
+      ),
+    ).resolves.toBeNull();
+
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('family_share'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.family_share_blocked',
+          eventId: 'evt_rc_v2_1',
         }),
       }),
     );
