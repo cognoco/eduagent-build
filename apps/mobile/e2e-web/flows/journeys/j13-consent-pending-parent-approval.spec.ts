@@ -46,9 +46,15 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
     await pressableClick(page.getByTestId('consent-check-again'));
 
     const postApproval = page.getByTestId('post-approval-continue');
-    const postApprovalDestination = page
-      .getByTestId('create-subject-name')
-      .or(page.getByTestId('learner-screen'));
+    // [WI-879] A freshly-approved solo learner now lands on the Mentor home
+    // (`mentor-screen` — app/(app)/mentor.tsx, rendering the `mentorHome.title`
+    // "Mentor" feed) — the current post-approval app shell. The legacy
+    // `create-subject-name` destination encoded the old onboarding funnel and
+    // no longer applies (the approved learner is never auto-routed into
+    // create-subject). Verified against staging Chrome: the post-approval page
+    // snapshot renders the Mentor feed, not the legacy learner/create-subject
+    // screen.
+    const postApprovalDestination = page.getByTestId('mentor-screen');
     await expect(postApproval.or(postApprovalDestination)).toBeVisible({
       timeout: 30_000,
     });
