@@ -194,10 +194,18 @@ async function loadQuotaPool(id: string) {
 
 async function executeTrialExpiry() {
   const executionOrder: string[] = [];
+  // [TRIAL-FANOUT] The cron now fans the per-trial sends out via
+  // step.sendEvent('fan-out-…', events[]) instead of pushing inside step.run,
+  // so the mock step must implement sendEvent or the real fn throws. Capture
+  // the dispatched events so the test can assert the fan-out payloads.
+  const sentEvents: Array<{ name: string; payload: unknown }> = [];
   const step = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       executionOrder.push(name);
       return fn();
+    }),
+    sendEvent: jest.fn(async (name: string, payload: unknown) => {
+      sentEvents.push({ name, payload });
     }),
   };
 
@@ -214,6 +222,7 @@ async function executeTrialExpiry() {
   return {
     result,
     executionOrder,
+    sentEvents,
   };
 }
 
@@ -397,7 +406,7 @@ describe('Integration: trial-expiry Inngest function', () => {
       usedToday: 1,
     });
 
-    const { result, executionOrder } = await executeTrialExpiry();
+    const { result, executionOrder, sentEvents } = await executeTrialExpiry();
 
     expect(executionOrder).toEqual([
       'process-expired-trials',
@@ -415,6 +424,41 @@ describe('Integration: trial-expiry Inngest function', () => {
     expect(result.extendedExpiredCount).toBeGreaterThanOrEqual(1);
     expect(result.warningsSent).toBeGreaterThanOrEqual(1);
     expect(result.softLandingSent).toBeGreaterThanOrEqual(2);
+
+    // [TRIAL-FANOUT] The cron dispatches one fan-out event per step carrying a
+    // per-trial notification array; the actual send happens in the
+    // trial-notification-send handler. Assert the fan-out fired with
+    // well-formed payloads (including the required `timestamp`).
+    const warningFanOut = sentEvents.find(
+      (e) => e.name === 'fan-out-trial-warnings',
+    );
+    const softLandingFanOut = sentEvents.find(
+      (e) => e.name === 'fan-out-soft-landing',
+    );
+    expect(warningFanOut).toBeDefined();
+    expect(softLandingFanOut).toBeDefined();
+    const warningPayload = warningFanOut!.payload as Array<{
+      name: string;
+      data: Record<string, unknown>;
+    }>;
+    const softLandingPayload = softLandingFanOut!.payload as Array<{
+      name: string;
+      data: Record<string, unknown>;
+    }>;
+    expect(warningPayload.length).toBeGreaterThanOrEqual(1);
+    expect(softLandingPayload.length).toBeGreaterThanOrEqual(2);
+    for (const evt of [...warningPayload, ...softLandingPayload]) {
+      expect(evt.name).toBe('app/billing.trial_notification.send');
+      expect(evt.data).toEqual(
+        expect.objectContaining({
+          accountId: expect.any(String),
+          timestamp: expect.any(String),
+          title: expect.any(String),
+          body: expect.any(String),
+          step: expect.stringMatching(/^send-(trial-warnings|soft-landing)$/),
+        }),
+      );
+    }
 
     const updatedExpiredSubscription = await loadSubscription(
       justExpiredSeed.subscription.id,
