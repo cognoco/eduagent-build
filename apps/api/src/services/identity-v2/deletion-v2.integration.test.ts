@@ -1,26 +1,23 @@
 // ---------------------------------------------------------------------------
 // WI-849 — v2 account-deletion GDPR-gap regression tests (integration; real
 // staging Neon). executeDeletionV2 is the GDPR right-to-erasure path wired to
-// prod (flag-on). The WI-825 audit surfaced three gaps; the founder ruling
-// scoped Gaps 2 + 3 to this WI and routed Gap 1 (subscription RESTRICT
-// teardown) to WI-693 / CUT-B3 / billing.
+// prod (flag-on). The WI-825 audit surfaced three gaps:
+//   Gap 1 — subscription RESTRICT teardown → FIXED here (Step G1). Stripe/RC
+//            store-cancellation still deferred to WI-885.
+//   Gap 2 — legacy `accounts` PII residual → MOOT (operator ruling 2026-06-20).
+//            The legacy `accounts`/`profiles` tables do not exist on reset envs
+//            (MMT-ADR-0012 baseline reset). No test; no skipped placeholder.
+//   Gap 3 — guardianship + supportership RESTRICT → FIXED here (Step 2a).
 //
-// SCOPE of this suite = Gap 3 ONLY (guardianship + supportership RESTRICT). Gap
-// 2 ("v2 erasure leaves the legacy `accounts` row + PII") did NOT reproduce on
-// the reset environments where executeDeletionV2 runs — the legacy
-// `accounts`/`profiles` tables do not exist there (MMT-ADR-0012 baseline reset),
-// so there is no legacy PII to survive and the proposed fix would throw
-// `relation "accounts" does not exist`. Gap 2 is escalated as a stale premise;
-// no test is written for it (no skipped/always-failing placeholder — that would
-// violate the test-integrity rule).
+// SCOPE of this suite = Gap 1 + Gap 3.
 //
 // These FK behaviours (ON DELETE RESTRICT abort) only fire in real Postgres, so
 // this suite runs against the staging DB (skipped when DATABASE_URL is absent)
 // and uses the REAL service — no internal mocks (GC1/GC6 clean).
 //
-// Red-green-revert (recorded in the PR): REMOVE the guardianship/supportership
-// teardown block (Step 2a) in executeDeletionV2 → the person delete aborts on the
-// RESTRICT FK and executeDeletionV2 THROWS (RED). Restore → GREEN.
+// Red-green-revert pattern applied for both gaps (recorded in the PR):
+//   Gap 3: remove the guardianship/supportership teardown block (Step 2a) → THROWS (RED).
+//   Gap 1: remove the subscription delete block (Step G1) → THROWS (RED). Restore → GREEN.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
@@ -153,6 +150,48 @@ const RUN = !!process.env.DATABASE_URL;
       });
       return p!.id;
     }
+
+    // -----------------------------------------------------------------------
+    // Gap 1 — a live subscription row must not block whole-org deletion.
+    // `subscription.organization_id` and `subscription.payer_person_id` are
+    // both ON DELETE RESTRICT. Step G1 deletes subscription rows BEFORE the
+    // person/org drops; `subscription_payers` CASCADE off automatically.
+    // -----------------------------------------------------------------------
+
+    it('[GAP1] tears down the org subscription (payers via CASCADE) so person+org drop is not blocked by RESTRICT', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      // Seed a subscription row anchored to this org with the owner as payer.
+      await db.insert(subscription).values({
+        organizationId: orgId,
+        payerPersonId: ownerId,
+        planTier: 'plus',
+        status: 'active',
+      });
+
+      // RED (before G1): DELETE person aborts on payer_person_id RESTRICT.
+      // GREEN (with G1): subscription is deleted first; erasure returns 'deleted'.
+      const result = await executeDeletionV2(db, {
+        organizationId: orgId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: ownerId,
+      });
+      expect(result).toBe('deleted');
+
+      // Subscription row is gone.
+      const remainingSub = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, orgId),
+        columns: { id: true },
+      });
+      expect(remainingSub).toBeUndefined();
+
+      // financial_record written — confirms orgSubscriptions snapshot was reused.
+      const finRec = await db.query.financialRecord.findFirst({
+        where: eq(financialRecord.personId, ownerId),
+        columns: { id: true },
+      });
+      expect(finRec).toBeDefined();
+    });
 
     // -----------------------------------------------------------------------
     // Gap 3a — a guardianship edge must not block whole-org deletion.

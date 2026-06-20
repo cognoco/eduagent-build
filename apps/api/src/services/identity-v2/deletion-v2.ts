@@ -10,31 +10,33 @@
 // makes "delete a person with live grants" fail by design until the grants are
 // re-homed. We NEVER erase grants; we migrate them to `consent_receipt`.
 //
-// executeDeletionV2 sequence (§6.1; WI-849 adds 2a):
+// executeDeletionV2 sequence (§6.1; WI-849 adds 2a + G1):
 //   1. pre-read login.email (memoized step input, as today's getAccountClerkUserId)
 //   2. re-home each consent_grant for every person in the org → consent_receipt
 //   2a. tear down guardianship + supportership edges incident to the org's persons
 //       (WI-849 Gap 3 — both directions; cross-org edges drop the edge, not the
 //        counterpart person). See MMT-ADR-0026.
+//   G1. DELETE subscription WHERE organization_id = $org (WI-849 Gap 1). Satisfies
+//       payer_person_id + organization_id RESTRICT before person/org drops.
+//       subscription_payers cascade off the subscription row automatically.
+//       Stripe/RC store-cancellation deferred to WI-885.
 //   3. delete the live consent_grant rows (RESTRICT now satisfied)
 //   3b. write financial_record rows per person (tax/chargeback retain-tier)
 //   4. write a deletion_audit row per person (deleted_by per path; reason)
 //   5. DELETE person (cascade → consent_request + membership + learning data)
 //   6. erase byok_waitlist WHERE email = login.email  (D2 GDPR Art-17 leg)
 //
-// STILL DEFERRED (WI-849 Gap 1 → WI-693 / CUT-B3): subscription teardown.
-// subscription.{payer_person_id,organization_id} are ON DELETE RESTRICT, so a
-// SUBSCRIBED account still aborts at the person/org drop. Free/unsubscribed
-// accounts delete fully; subscribed-account teardown is owned by billing/WI-693.
+// Gap 1 (WI-849): subscription DB-row teardown is handled here — see Step G1
+// below. The Stripe/RC store-cancellation (billing-domain API call) is deferred
+// to WI-885.
 //
-// NOT BUILT (WI-849 Gap 2 — premise collapsed; escalated): "v2 erasure leaves the
-// legacy `accounts` row + its PII behind." On the reset environments where
+// NOT BUILT (WI-849 Gap 2 — ruled MOOT 2026-06-20 (operator)): "v2 erasure leaves
+// the legacy `accounts` row + its PII behind." On the reset environments where
 // executeDeletionV2 actually runs (staging ep-fancy-cherry, prod — MMT-ADR-0012
-// baseline reset), the legacy `accounts`/`profiles` tables DO NOT EXIST, so there
-// is no legacy PII to survive and a `DELETE FROM accounts` would throw
-// `relation "accounts" does not exist`. The Drizzle schema still declares those
-// tables for the v1 path, but they are physically absent post-reset. Gap 2 is
-// therefore a stale premise for the v2 path; see the PR body / WI-849.
+// baseline reset), the legacy `accounts`/`profiles` tables DO NOT EXIST (verified
+// against stg 2026-06-20), so there is no legacy PII to survive and a
+// `DELETE FROM accounts` would throw `relation "accounts" does not exist`. No
+// v2-live environment retains those tables; Gap 2 CLOSED not deferred.
 //
 // retention_period is counsel-owned (data-model.md §4.9: "counsel fills the
 // value") — the column is nullable with no default, so we re-home with NULL and
@@ -448,6 +450,19 @@ export async function executeDeletionV2(
     // per-person financial_record payload.
     const orgSubscriptions = await readOrgSubscriptionsTx(tx, organizationId);
 
+    // Step G1 — tear down the org's subscription(s) BEFORE the person drops.
+    // `subscription.{organization_id, payer_person_id}` are ON DELETE RESTRICT;
+    // a subscribed account cannot drop either the person (payer FK) or the
+    // organization (org FK) while any subscription row stands. DB-row teardown
+    // is owned here (WI-849 Gap 1). `subscription_payers.subscription_id` is
+    // ON DELETE CASCADE, so deleting the subscription row auto-removes its
+    // payer rows. Stripe/RC store-cancellation deferred to WI-885.
+    if (orgSubscriptions.length > 0) {
+      await tx
+        .delete(subscription)
+        .where(eq(subscription.organizationId, organizationId));
+    }
+
     for (const personId of personIds) {
       // Step 2 — re-home every live grant to the retain-tier receipt. Field
       // copy (snapshot columns carried verbatim); retention_period is left NULL
@@ -497,18 +512,9 @@ export async function executeDeletionV2(
       });
 
       // Step 5 — drop the person (cascade → consent_request, membership,
-      // login, learning data). RESTRICT is now satisfied because the grants
-      // were re-homed (Step 2/3) and the guardianship/supportership edges were
-      // torn down (Step 2a, WI-849 Gap 3) above.
-      //
-      // STILL OUT OF SCOPE (WI-849 Gap 1 → WI-693 / CUT-B3 / billing):
-      // subscription teardown is NOT handled here. `subscription.payer_person_id`
-      // and `subscription.organization_id` are ON DELETE RESTRICT, so a person
-      // who is the primary payer — or the org with a live subscription row —
-      // still cannot be dropped while that subscription stands. For a SUBSCRIBED
-      // account this DELETE therefore still aborts with an FK error; that
-      // billing-domain teardown is deferred to WI-693, intentionally outside this
-      // WI's scope. (Free/unsubscribed accounts — the common case — delete fully.)
+      // login, learning data). RESTRICT is now satisfied: grants re-homed
+      // (Step 2/3), guardianship/supportership torn down (Step 2a, WI-849
+      // Gap 3), subscription deleted (Step G1, WI-849 Gap 1).
       await tx.delete(person).where(eq(person.id, personId));
     }
 

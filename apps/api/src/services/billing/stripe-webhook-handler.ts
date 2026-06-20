@@ -26,6 +26,7 @@ import {
   updateSubscriptionFromWebhook,
   activateSubscriptionFromCheckout,
   updateQuotaPoolLimit,
+  getSubscriptionByStripeCustomerId,
 } from '../billing';
 import type {
   AppliedSubscriptionRow,
@@ -671,6 +672,54 @@ export async function handleCheckoutCompleted(
       },
     );
     return;
+  }
+
+  // [SEC] customer↔account binding check. `metadata.accountId` is set at
+  // checkout-session creation but is operator/dashboard-mutable: a Stripe
+  // Dashboard user (or a compromised dashboard token / future checkout-wiring
+  // bug) can stamp ANOTHER account's id and grant the paid tier on the wrong
+  // account. The Stripe customer (`session.customer`) is NOT operator-editable
+  // in the same way, so it is the trustworthy anchor. If this customer is
+  // already bound to a DIFFERENT account, refuse to activate and escalate.
+  //
+  // First-purchase is legitimate: a brand-new customer has no prior binding
+  // (getSubscriptionByStripeCustomerId returns null), so the check must only
+  // fire when a binding EXISTS and its accountId conflicts — never block a
+  // first-time checkout. A missing session.customer (unexpected for a paid
+  // subscription checkout) leaves the existing accountId-keyed path unchanged.
+  const stripeCustomerId =
+    typeof session.customer === 'string'
+      ? session.customer
+      : session.customer?.id;
+
+  if (stripeCustomerId) {
+    const boundSubscription = await getSubscriptionByStripeCustomerId(
+      db,
+      stripeCustomerId,
+    );
+    if (boundSubscription && boundSubscription.accountId !== accountId) {
+      logger.warn(
+        `[stripe-webhook] checkout.completed REFUSED — customer↔account binding mismatch (customer=${stripeCustomerId} bound to account=${boundSubscription.accountId}, metadata stamped account=${accountId}, sessionId=${session.id})`,
+      );
+      captureException(
+        new Error(
+          `Stripe checkout.session.completed customer↔account binding mismatch — metadata.accountId='${accountId}' but customer '${stripeCustomerId}' is bound to account '${boundSubscription.accountId}'; activation refused`,
+        ),
+        {
+          extra: {
+            context:
+              'stripe.webhook.checkout.completed.account_binding_mismatch',
+            stripeSessionId: session.id,
+            stripeSubscriptionId,
+            stripeCustomerId,
+            metadataAccountId: accountId,
+            boundAccountId: boundSubscription.accountId,
+            tier,
+          },
+        },
+      );
+      return;
+    }
   }
 
   const activated = await activateSubscriptionFromCheckout(

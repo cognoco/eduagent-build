@@ -4080,6 +4080,11 @@
       "message": "Możesz spróbować ponownie lub bezpośrednio przeglądać tematy.",
       "subjects": "Przeglądaj tematy"
     },
+    "homework": {
+      "imageAlt": "Zdjęcie pracy domowej",
+      "helpMeSolve": "Pomóż mi to rozwiązać",
+      "checkMyAnswer": "Sprawdź moją odpowiedź"
+    },
     "homeworkPrompt": "Masz dziś zadanie domowe? Zrób zdjęcie, a rozwiążemy je razem."
   },
   "subjectsBrowse": {

@@ -134,3 +134,27 @@ export function tripwireResponse(category: CatastrophicCategory): string {
       );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Image-screening fail-safe [Issue 894]
+//
+// The catastrophic tripwire is text-only. For image/vision input we OCR the
+// image and run the tripwire over the extracted text before the conversational
+// model ever sees the picture (exchanges.ts). If OCR itself fails we must NOT
+// fall through and hand an unscreened image to the model — the floor would be
+// silently defeated. Instead we fail SAFE: refuse this turn's image with a
+// neutral, non-accusatory message and let the learner continue with text.
+// This is a generic "couldn't screen it" response, NOT a catastrophic-category
+// hit, so it intentionally lives outside CatastrophicCategory.
+// ---------------------------------------------------------------------------
+
+/** Marker recorded in the ExchangeResult.model field for the fail-safe path. */
+export const IMAGE_UNSCREENED_MODEL = 'deterministic:image_unscreened';
+
+/** Neutral safe reply when an attached image could not be screened (OCR error). */
+export function imageUnscreenedResponse(): string {
+  return (
+    "I couldn't check that image just now, so I can't open it. " +
+    'Please type your question instead, or try the photo again in a moment.'
+  );
+}

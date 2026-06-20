@@ -308,12 +308,22 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
 }
 
 // [F-009] Resolve subjectId from topicId — for deep-link resolution
-export function useResolveTopicSubject(topicId: string | undefined) {
+// attempt is incremented by the caller on Retry so the query key changes, forcing a new network
+// request even when the previous query is still in-flight (TanStack Query deduplicates by key).
+export function useResolveTopicSubject(
+  topicId: string | undefined,
+  attempt?: number,
+) {
   const client = useApiClient();
   const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
 
   return useQuery({
-    queryKey: queryKeys.progress.resolveTopicSubject(mode, topicId, profileId),
+    queryKey: queryKeys.progress.resolveTopicSubject(
+      mode,
+      topicId,
+      profileId,
+      attempt,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

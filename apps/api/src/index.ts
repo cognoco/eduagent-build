@@ -94,15 +94,37 @@ import { nowRoutes } from './routes/now';
 import { scopesRoutes } from './routes/scopes';
 import { visibilityRoutes } from './routes/visibility';
 
+// [Issue-888] Bindings must stay in sync with envSchema in config.ts.
+// All string env vars that envSchema declares must appear here so c.env.X
+// accesses are typed rather than implicit `any`. KV bindings (KVNamespace)
+// are not part of envSchema (they are runtime objects, not strings) and are
+// listed separately at the bottom of this type.
+//
+// MAINTENANCE_PRODUCTION_ENABLED is intentionally absent: maintenance.ts uses
+// a local MaintenanceEnv type for deliberate domain separation — it is an
+// operator-only flag, not a global app config key. This is the correct pattern.
 type Bindings = {
+  // Core
   ENVIRONMENT: string;
   DATABASE_URL: string;
+  APP_URL?: string;
+  API_ORIGIN?: string;
+  LOG_LEVEL?: string;
+
+  // Auth (Clerk)
   CLERK_SECRET_KEY?: string;
   CLERK_JWKS_URL?: string;
   CLERK_AUDIENCE?: string;
+
+  // LLM providers
   GEMINI_API_KEY?: string;
   OPENAI_API_KEY?: string;
-  LOG_LEVEL?: string;
+  ANTHROPIC_API_KEY?: string;
+  // Interactive-routing v2 vendors (MMT-ADR-0016 §1.5)
+  CEREBRAS_API_KEY?: string;
+  MISTRAL_API_KEY?: string;
+
+  // Stripe — dormant until web client added
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_PLUS_MONTHLY?: string;
@@ -112,19 +134,50 @@ type Bindings = {
   STRIPE_PRICE_PRO_MONTHLY?: string;
   STRIPE_PRICE_PRO_YEARLY?: string;
   STRIPE_CUSTOMER_PORTAL_URL?: string;
-  SUBSCRIPTION_KV?: KVNamespace;
-  IDEMPOTENCY_KV?: KVNamespace;
+
+  // Voyage AI — embedding provider
   VOYAGE_API_KEY?: string;
+
+  // Resend — transactional email
   RESEND_API_KEY?: string;
   RESEND_WEBHOOK_SECRET?: string;
   EMAIL_FROM?: string;
+
+  // Inngest — background jobs
+  INNGEST_SIGNING_KEY?: string;
+  INNGEST_EVENT_KEY?: string;
+
+  // RevenueCat — IAP webhook
+  REVENUECAT_WEBHOOK_SECRET?: string;
+
+  // Observability
   SENTRY_DSN?: string;
+
+  // Consent policy versioning
+  CONSENT_POLICY_VERSION?: string;
+
+  // Testing & operator tooling
   TEST_SEED_SECRET?: string;
   MAINTENANCE_SECRET?: string;
-  REVENUECAT_WEBHOOK_SECRET?: string;
   SUPPORT_EMAIL?: string;
   DEPLOY_SHA?: string;
-  CONSENT_POLICY_VERSION?: string;
+
+  // Feature flags
+  EMPTY_REPLY_GUARD_ENABLED?: string;
+  RETENTION_PURGE_ENABLED?: string;
+  MEMORY_FACTS_READ_ENABLED?: string;
+  MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
+  MEMORY_FACTS_DEDUP_ENABLED?: string;
+  // Note: these are string at the CF Workers boundary; envSchema uses z.coerce.number()
+  MEMORY_FACTS_DEDUP_THRESHOLD?: string;
+  MAX_DEDUP_LLM_CALLS_PER_SESSION?: string;
+  MEMORY_FACTS_DEDUP_ROLLOUT_PCT?: string;
+  MATCHER_ENABLED?: string;
+  ALLOW_MISSING_IDEMPOTENCY_KV?: string;
+  ADULT_OWNER_GATE_ENABLED?: string;
+  CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+  LLM_ROUTING_V2_ENABLED?: string;
+  MODE_NAV_V2_ENABLED?: string;
   // Identity Foundation cutover (CUT-B / WI-691). Single flag for the whole
   // identity surface; default 'false' in every deployed env until the WI-586
   // convergence flip. Read by the identity seam dispatchers.
@@ -134,6 +187,10 @@ type Bindings = {
   MAINTENANCE_BLOCK_INNGEST?: string;
   // S5 managed visibility tier. Default 'false'.
   MANAGED_TIER_ACTIVE?: string;
+
+  // KV Namespaces — runtime objects, not env strings; listed separately
+  SUBSCRIPTION_KV?: KVNamespace;
+  IDEMPOTENCY_KV?: KVNamespace;
 };
 
 type Variables = {

@@ -3922,6 +3922,11 @@
       "message": "Versuche es erneut oder durchsuche direkt die Themen.",
       "subjects": "Themen durchsuchen"
     },
+    "homework": {
+      "imageAlt": "Foto der Hausaufgabe",
+      "helpMeSolve": "Hilf mir, das zu lösen",
+      "checkMyAnswer": "Überprüfe meine Antwort"
+    },
     "homeworkPrompt": "Hast du heute Hausaufgaben? Mach ein Foto und wir gehen sie zusammen durch."
   },
   "subjectsBrowse": {

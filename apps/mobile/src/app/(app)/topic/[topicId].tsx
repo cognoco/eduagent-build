@@ -285,10 +285,16 @@ export default function TopicDetailScreen() {
     chapter: string;
   }>();
 
+  // [H9] Attempt counter — incremented on Retry to force a new query key and a fresh network call.
+  // Must be declared before useResolveTopicSubject so it can be passed as a key segment.
+  const [resolveTimedOut, setResolveTimedOut] = useState(false);
+  const [resolveAttempt, setResolveAttempt] = useState(0);
+
   // [F-009] Resolve subjectId when deep-linked with topicId only
   const needsResolve = !paramSubjectId && !!topicId;
   const { data: resolved, isLoading: resolveLoading } = useResolveTopicSubject(
     needsResolve ? topicId : undefined,
+    resolveAttempt,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
   const topicBackFallback = useMemo(
@@ -364,7 +370,6 @@ export default function TopicDetailScreen() {
   const [sessionsExpanded, setSessionsExpanded] = useState(false);
 
   // [H9] Timeout escape for the deep-link resolve spinner
-  const [resolveTimedOut, setResolveTimedOut] = useState(false);
   const isResolveSpinning = !!(needsResolve && resolveLoading);
   useEffect(() => {
     if (!isResolveSpinning) {
@@ -373,7 +378,7 @@ export default function TopicDetailScreen() {
     }
     const t = setTimeout(() => setResolveTimedOut(true), 15_000);
     return () => clearTimeout(t);
-  }, [isResolveSpinning]);
+  }, [isResolveSpinning, resolveAttempt]);
 
   const isCriticalLoading = progressLoading || retentionLoading;
   const retentionStatus = deriveRetentionStatus(retentionCard);
@@ -571,7 +576,10 @@ export default function TopicDetailScreen() {
           message={t('topic.resolveTimeoutMessage')}
           primaryAction={{
             label: t('common.retry'),
-            onPress: () => setResolveTimedOut(false),
+            onPress: () => {
+              setResolveTimedOut(false);
+              setResolveAttempt((n) => n + 1);
+            },
             testID: 'topic-resolve-timeout-retry',
           }}
           secondaryAction={{

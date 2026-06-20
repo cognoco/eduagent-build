@@ -7,6 +7,7 @@ import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
 import { sessionStaleCleanup } from './functions/session-stale-cleanup';
 import { trialExpiry } from './functions/trial-expiry';
+import { trialNotificationSend } from './functions/trial-notification-send';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
@@ -124,6 +125,7 @@ export {
   sessionCompleted,
   sessionStaleCleanup,
   trialExpiry,
+  trialNotificationSend,
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
@@ -209,6 +211,7 @@ export const functions = [
   sessionCompleted,
   sessionStaleCleanup,
   trialExpiry,
+  trialNotificationSend,
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,

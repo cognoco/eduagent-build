@@ -27,6 +27,7 @@ jest.mock(
       updateSubscriptionFromWebhook: jest.fn(),
       activateSubscriptionFromCheckout: jest.fn(),
       updateQuotaPoolLimit: jest.fn(),
+      getSubscriptionByStripeCustomerId: jest.fn(),
     };
   },
 );
@@ -57,6 +58,7 @@ import {
   updateSubscriptionFromWebhook,
   activateSubscriptionFromCheckout,
   updateQuotaPoolLimit,
+  getSubscriptionByStripeCustomerId,
 } from '../billing';
 import { safeRefreshKvCache } from '../safe-refresh-kv-cache';
 import { inngest } from '../../inngest/client';
@@ -114,6 +116,9 @@ function mockUpdatedSub(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   (safeRefreshKvCache as jest.Mock).mockResolvedValue(undefined);
+  // Default: no prior customer↔account binding (first-purchase case). Tests
+  // that assert the binding-conflict refusal override this per-case.
+  (getSubscriptionByStripeCustomerId as jest.Mock).mockResolvedValue(null);
 });
 
 describe('handleSubscriptionEvent', () => {
@@ -287,6 +292,136 @@ describe('handleCheckoutCompleted', () => {
         }),
       }),
     );
+  });
+});
+
+describe('handleCheckoutCompleted — customer↔account binding [security break tests]', () => {
+  // A checkout.session.completed carries an externally-mutable metadata.accountId.
+  // Stripe Dashboard operators (or a compromised dashboard token / future
+  // checkout-wiring bug) can stamp ANOTHER user's accountId. If the Stripe
+  // customer (session.customer) is already bound to a DIFFERENT account, we
+  // must REFUSE activation rather than grant paid tier on the wrong account.
+  // First-purchase (no prior binding) and matching-binding must still activate.
+
+  it('REFUSES activation + escalates when session.customer is bound to a DIFFERENT account', async () => {
+    // The Stripe customer cus_attacker is already bound to acc-victim, but the
+    // (mutable) metadata stamps acc-attacker. This is the attack: stamp a
+    // victim's accountId to grant them (or steal) entitlement.
+    (getSubscriptionByStripeCustomerId as jest.Mock).mockResolvedValue({
+      id: 'sub-internal-victim',
+      accountId: 'acc-victim',
+      stripeCustomerId: 'cus_attacker',
+      stripeSubscriptionId: 'sub_stripe_victim',
+      tier: 'plus',
+      status: 'active',
+    });
+
+    const session = {
+      id: 'cs_test_binding_conflict',
+      subscription: 'sub_stripe_new',
+      customer: 'cus_attacker',
+      metadata: { accountId: 'acc-attacker', tier: 'plus' },
+      payment_status: 'paid',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    // MUST NOT activate — the customer is bound to a different account.
+    expect(activateSubscriptionFromCheckout).not.toHaveBeenCalled();
+    expect(safeRefreshKvCache).not.toHaveBeenCalled();
+
+    // MUST escalate the mismatch so it is queryable.
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('customer↔account binding mismatch'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.checkout.completed.account_binding_mismatch',
+          stripeSessionId: 'cs_test_binding_conflict',
+          stripeCustomerId: 'cus_attacker',
+          metadataAccountId: 'acc-attacker',
+          boundAccountId: 'acc-victim',
+        }),
+      }),
+    );
+  });
+
+  it('ACTIVATES when session.customer is already bound to the SAME account (matching binding)', async () => {
+    (getSubscriptionByStripeCustomerId as jest.Mock).mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+      stripeCustomerId: 'cus_match',
+      stripeSubscriptionId: 'sub_stripe_old',
+      tier: 'plus',
+      status: 'active',
+    });
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSub(),
+    );
+
+    const session = {
+      id: 'cs_test_binding_match',
+      subscription: 'sub_stripe_123',
+      customer: 'cus_match',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'paid',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('ACTIVATES a genuine first purchase with a customer that has no prior binding', async () => {
+    // getSubscriptionByStripeCustomerId returns null (default beforeEach) — no
+    // prior binding exists. This is the legitimate first-purchase path; the
+    // check must NOT block it even though session.customer is present.
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSub(),
+    );
+
+    const session = {
+      id: 'cs_test_first_purchase',
+      subscription: 'sub_stripe_123',
+      customer: 'cus_brand_new',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'paid',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompleted(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(safeRefreshKvCache).toHaveBeenCalledTimes(1);
   });
 });
 

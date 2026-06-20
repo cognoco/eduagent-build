@@ -144,6 +144,47 @@ function shouldRefreshRevenuecatKv(
 }
 
 /**
+ * [SEC: revenuecat-webhook is_family_share] Apple Family Sharing and Google
+ * Play family library propagate a single paid purchase to every family
+ * member's account. RevenueCat then fires a purchase event (INITIAL_PURCHASE,
+ * RENEWAL, PRODUCT_CHANGE, NON_RENEWING_PURCHASE) under the family member's
+ * Clerk identity with `is_family_share: true`. The original purchaser already
+ * holds the entitlement — granting again here N-tuples one paid seat into N.
+ *
+ * We never auto-grant entitlement off a family-shared event. Instead we
+ * escalate via the established Sentry observability path (matching the
+ * refund-revocation / topup-rejection conventions in this handler) so ops can
+ * reconcile, and skip activation. Returns true when the event was a
+ * family-share grant the caller must abort on.
+ */
+function escalateAndSkipFamilyShare(
+  event: RevenueCatEvent,
+  accountId: string,
+): boolean {
+  if (event.is_family_share !== true) return false;
+
+  // Silent recovery is banned in billing/webhook code (AGENTS.md). Emit a
+  // queryable Sentry message (no-ops without a DSN, so silent in dev/test)
+  // carrying the event + product context ops need to reconcile — no raw PII
+  // beyond what this handler already logs (accountId, productId).
+  captureMessage(
+    '[revenuecat] purchase event with is_family_share=true — entitlement NOT granted (family-shared purchase)',
+    {
+      level: 'warning',
+      extra: {
+        eventId: event.id,
+        eventType: event.type,
+        accountId,
+        productId: event.product_id ?? event.new_product_id ?? null,
+        category: 'revenuecat.family_share_received',
+      },
+      tags: { surface: 'revenuecat.family_share_received' },
+    },
+  );
+  return true;
+}
+
+/**
  * Resolves a RevenueCat app_user_id to an internal account ID.
  * RevenueCat app_user_id is set to the Clerk user ID via Purchases.logIn().
  *
@@ -173,6 +214,9 @@ export async function handleInitialPurchase(
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
+
+  // Family-shared purchase: original purchaser already holds entitlement. Skip.
+  if (escalateAndSkipFamilyShare(event, accountId)) return;
 
   const tier = extractTierFromProductId(event.product_id);
   if (!tier) {
@@ -231,6 +275,9 @@ export async function handleRenewal(
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
+
+  // Family-shared purchase: original purchaser already holds entitlement. Skip.
+  if (escalateAndSkipFamilyShare(event, accountId)) return;
 
   const eventTier = extractTierFromProductId(event.product_id);
 
@@ -706,6 +753,9 @@ export async function handleProductChange(
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
 
+  // Family-shared purchase: original purchaser already holds entitlement. Skip.
+  if (escalateAndSkipFamilyShare(event, accountId)) return;
+
   const newTier = extractTierFromProductId(event.new_product_id);
   if (!newTier) {
     // [FIX-API-REVENUECAT] Unknown new_product_id — capture to Sentry so product
@@ -758,6 +808,16 @@ export async function handleNonRenewingPurchase(
 
   const credits = getTopUpCreditsForProduct(event.product_id);
   if (credits === null) return null;
+
+  // Family-shared consumable: original purchaser already received the credit.
+  // Escalate + ack 200 (so RevenueCat stops the ~72h retry storm) without
+  // granting. Skip is intentional, not a transient failure.
+  if (escalateAndSkipFamilyShare(event, accountId)) {
+    return {
+      status: 200,
+      body: { received: true, skipped: 'family_share' },
+    };
+  }
 
   // Resolve the transaction ID for idempotency (prefer store_transaction_id)
   const transactionId =

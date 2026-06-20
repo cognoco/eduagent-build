@@ -87,6 +87,43 @@ async function waitForSwitchOutcome(
   return 'timeout';
 }
 
+/**
+ * Wait for the server to persist the mode switch.
+ *
+ * Under the V1 nav contract, `setMode('family')` shows the target screen
+ * *optimistically* (an in-memory override) while it PATCHes
+ * `/v1/profiles/:id/app-context` to persist `defaultAppContext` in the
+ * background (apps/mobile/src/lib/app-context.tsx). The optimistic screen is
+ * visible before that PATCH commits.
+ *
+ * Callers that immediately `page.goto()` after switching (e.g. the BRIDGE-04
+ * backstack probe deep-linking into a child surface) reload the whole app,
+ * wiping the in-memory override; the post-reload profile refetch then derives
+ * the mode from the *persisted* `defaultAppContext`. If that PATCH had not yet
+ * committed, the reload silently reverts to Study mode and the Family-gated
+ * child surfaces never render (WI-878).
+ *
+ * Awaiting the PATCH response before returning closes that race. It is purely
+ * additive: callers that don't reload are unaffected, and the wait is a no-op
+ * timeout for the legacy V0 path (transient-only switch, no PATCH) — which is
+ * why a failed wait is swallowed rather than thrown.
+ */
+async function waitForModePersisted(
+  page: Page,
+  timeout: number,
+): Promise<void> {
+  if (timeout <= 0) return;
+  await page
+    .waitForResponse(
+      (response) =>
+        /\/profiles\/[^/]+\/app-context(?:[/?]|$)/.test(response.url()) &&
+        response.request().method() === 'PATCH' &&
+        response.ok(),
+      { timeout },
+    )
+    .catch(() => undefined);
+}
+
 export async function switchAppMode(
   page: Page,
   mode: AppMode,
@@ -106,16 +143,33 @@ export async function switchAppMode(
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
 
+    // Arm the persisted-mode listener BEFORE activating the toggle so the
+    // PATCH response can't fire-and-vanish between the click and the wait.
+    const persisted = waitForModePersisted(
+      page,
+      Math.min(remaining, SWITCH_SETTLE_TIMEOUT_MS),
+    );
     await activateMode(toggle, mode);
 
     const settleTimeout = Math.min(remaining, SWITCH_SETTLE_TIMEOUT_MS);
     const outcome = await waitForSwitchOutcome(page, mode, settleTimeout);
 
     if (outcome === 'success') {
+      // Block on server-confirmed persistence so a subsequent page.goto()
+      // reload derives the switched mode from the persisted profile, not a
+      // stale pre-switch default. No-op (times out harmlessly) on the
+      // transient V0 path where no PATCH is sent.
+      await persisted;
       return;
     }
 
     if (outcome === 'error') {
+      // Arm the persisted-mode listener before the retry tap (which re-fires
+      // setMode → a fresh app-context PATCH), same race window as above.
+      const retryPersisted = waitForModePersisted(
+        page,
+        Math.min(deadline - Date.now(), SWITCH_SETTLE_TIMEOUT_MS),
+      );
       const retryTapped = await retryModeSwitchIfNeeded(
         page,
         Math.min(remaining, 1_500),
@@ -129,6 +183,7 @@ export async function switchAppMode(
         );
 
         if (retryOutcome === 'success') {
+          await retryPersisted;
           return;
         }
       }

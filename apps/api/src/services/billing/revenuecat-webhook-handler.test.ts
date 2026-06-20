@@ -72,10 +72,12 @@ import {
   handleCancellation,
   handleBillingIssue,
   handleNonRenewingPurchase,
+  handleProductChange,
 } from './revenuecat-webhook-handler';
 import {
   getSubscriptionByAccountId,
   updateSubscriptionFromRevenuecatWebhook,
+  updateSubscriptionAndQuotaFromRevenuecatWebhook,
   activateSubscriptionFromRevenuecat,
   purchaseTopUpCredits,
 } from '../billing';
@@ -435,5 +437,169 @@ describe('[BUG-793] handleNonRenewingPurchase free-tier rejection', () => {
     // handleNonRenewingPurchase returns null on the granted/idempotent paths.
     expect(result).toBeNull();
     expect(captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [SEC: revenuecat-webhook is_family_share] Apple Family Sharing / Google Play
+// family library propagates a paid purchase to a family member's account.
+// RevenueCat then fires a purchase event (INITIAL_PURCHASE / RENEWAL /
+// PRODUCT_CHANGE / NON_RENEWING_PURCHASE) under the family member's Clerk ID
+// with is_family_share=true. The original purchaser already received their
+// entitlement; granting again N-tuples a single purchase into N paid seats.
+// Every grant path must SKIP activation on is_family_share=true and escalate
+// via the established Sentry observability path — never silently drop.
+// The happy path (is_family_share=false / absent) must still activate.
+// ---------------------------------------------------------------------------
+describe('[is_family_share] family-shared purchases must not grant entitlement', () => {
+  beforeEach(() => {
+    (activateSubscriptionFromRevenuecat as jest.Mock).mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+    });
+    (getSubscriptionByAccountId as jest.Mock).mockResolvedValue({
+      id: 'sub-internal-1',
+      tier: 'plus',
+      status: 'active',
+    });
+    (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+      webhookApplied: true,
+      lastRevenuecatEventId: 'evt_rc_1',
+    });
+    (
+      updateSubscriptionAndQuotaFromRevenuecatWebhook as jest.Mock
+    ).mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+      webhookApplied: true,
+      lastRevenuecatEventId: 'evt_rc_1',
+    });
+    (purchaseTopUpCredits as jest.Mock).mockResolvedValue({ id: 'credit-1' });
+  });
+
+  describe('handleInitialPurchase', () => {
+    it('does NOT activate and escalates when is_family_share=true', async () => {
+      await handleInitialPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({ is_family_share: true }),
+      );
+
+      expect(activateSubscriptionFromRevenuecat).not.toHaveBeenCalled();
+      expect(safeRefreshKvCache).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family-shared'),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'revenuecat.family_share_received',
+          }),
+          extra: expect.objectContaining({
+            eventId: 'evt_rc_1',
+            eventType: 'INITIAL_PURCHASE',
+          }),
+        }),
+      );
+    });
+
+    it('still activates on the happy path when is_family_share is absent', async () => {
+      await handleInitialPurchase(mockDb, mockKv, baseEvent());
+
+      expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledTimes(1);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('still activates when is_family_share=false', async () => {
+      await handleInitialPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({ is_family_share: false }),
+      );
+
+      expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledTimes(1);
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleRenewal', () => {
+    it('does NOT update the subscription and escalates when is_family_share=true', async () => {
+      await handleRenewal(
+        mockDb,
+        mockKv,
+        baseEvent({ type: 'RENEWAL', is_family_share: true }),
+      );
+
+      expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
+      expect(
+        updateSubscriptionAndQuotaFromRevenuecatWebhook,
+      ).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family-shared'),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'revenuecat.family_share_received',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('handleProductChange', () => {
+    it('does NOT update the subscription and escalates when is_family_share=true', async () => {
+      await handleProductChange(
+        mockDb,
+        mockKv,
+        baseEvent({
+          type: 'PRODUCT_CHANGE',
+          new_product_id: 'com.eduagent.family.monthly',
+          is_family_share: true,
+        }),
+      );
+
+      expect(
+        updateSubscriptionAndQuotaFromRevenuecatWebhook,
+      ).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family-shared'),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'revenuecat.family_share_received',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('handleNonRenewingPurchase', () => {
+    it('does NOT grant credits and escalates when is_family_share=true', async () => {
+      const result = await handleNonRenewingPurchase(
+        mockDb,
+        mockKv,
+        baseEvent({
+          type: 'NON_RENEWING_PURCHASE',
+          product_id: 'com.eduagent.topup.500',
+          store_transaction_id: 'store-txn-fs',
+          is_family_share: true,
+        }),
+      );
+
+      expect(purchaseTopUpCredits).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        status: 200,
+        body: expect.objectContaining({
+          received: true,
+          skipped: 'family_share',
+        }),
+      });
+      expect(captureMessage).toHaveBeenCalledWith(
+        expect.stringContaining('family-shared'),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'revenuecat.family_share_received',
+          }),
+        }),
+      );
+    });
   });
 });
