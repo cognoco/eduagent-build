@@ -30,6 +30,7 @@ import {
   resolveAssessmentStatus,
   shouldEndAssessmentForReview,
   lockAssessmentForAnswerSubmission,
+  isTerminalAssessmentStatus,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -357,9 +358,7 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
 
     const assessment = await getAssessment(db, profileId, assessmentId);
     if (!assessment) return notFound(c, 'Assessment not found');
-    if (
-      !['passed', 'borderline', 'failed_exhausted'].includes(assessment.status)
-    ) {
+    if (!isTerminalAssessmentStatus(assessment.status)) {
       return c.json(
         {
           code: 'BAD_REQUEST',

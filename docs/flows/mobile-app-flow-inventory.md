@@ -411,7 +411,7 @@ Known gating/correctness gaps found by the audit (verify against `docs/audience-
 | Child-cap notify proxy guard (BILLING-06) | `POST /notifications/child-cap/notify-parent` has owner-reject but no `assertNotProxyMode` | Add proxy guard |
 | SSE reconnect coverage (QA-14) | Yaml is DRAFT, blocked on `session-active` seed + testID — zero effective coverage | Build the seed, promote the flow |
 | First-curriculum polling timeout (LEARN-26) | `first-curriculum-polling-timeout.yaml` still DRAFT (seed + testID) | Same |
-| consent deny placeholder (QA-12 / ACCOUNT-27) | Maestro can't drive the server-web deny page; yaml asserts nothing | Keep API integration tests authoritative; retire or rewrite the yaml |
+| consent deny placeholder (QA-12 / ACCOUNT-27) | Maestro can't drive the server-web deny page; yaml asserts nothing. Deterministic coverage now lives in `apps/api/src/routes/consent-web.test.ts` (route + stubbed-DB boundary) alongside `consent-web.integration.test.ts` (WI-871) | Retire or rewrite the placeholder yaml — API route + integration tests are authoritative |
 | Contract route-key mismatch | `FAMILY_CHILD_ROUTES` key `child/[profileId]/reports/weekly` has no matching screen file (actual: `weekly-report/[weeklyReportId].tsx`) | Reconcile key vs file |
 | `retention/library.yaml` premise | Nightly flow predates retention-pill removal (LEARN-08) | Re-verify assertions |
 
