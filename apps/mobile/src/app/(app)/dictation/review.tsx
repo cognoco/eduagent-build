@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -180,133 +182,145 @@ export default function DictationReviewScreen(): React.ReactElement {
 
   // Remediation screen: mistakes one by one
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.select({ ios: 'padding', android: 'height' })}
       className="flex-1 bg-background"
-      contentContainerStyle={{
-        paddingTop: insets.top + 16,
-        paddingHorizontal: 20,
-        paddingBottom: insets.bottom + 24,
-      }}
-      testID="review-remediation-screen"
     >
-      {/* Header */}
-      <Text
-        className="text-h3 font-bold text-text-primary mb-1"
-        accessibilityRole="header"
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{
+          paddingTop: insets.top + 16,
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+        }}
+        keyboardShouldPersistTaps="handled"
+        testID="review-remediation-screen"
       >
-        {t('dictation.review.mistakesFound', { count: mistakes.length })}
-      </Text>
-      <Text className="text-body-sm text-text-secondary mb-6">
-        {t('dictation.review.correctionProgress', {
-          current: completedCount + 1,
-          total: mistakes.length,
-        })}
-      </Text>
-
-      {/* Current mistake card */}
-      {currentMistake && (
-        <View
-          className="bg-surface-elevated rounded-xl p-4 mb-4"
-          testID="review-mistake-card"
+        {/* Header */}
+        <Text
+          className="text-h3 font-bold text-text-primary mb-1"
+          accessibilityRole="header"
         >
-          {/* Original sentence */}
-          <Text className="text-body-sm text-text-secondary mb-1">
-            {t('dictation.review.original')}
-          </Text>
-          <Text className="text-body text-text-primary mb-3">
-            {currentMistake.original}
-          </Text>
+          {t('dictation.review.mistakesFound', { count: mistakes.length })}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mb-6">
+          {t('dictation.review.correctionProgress', {
+            current: completedCount + 1,
+            total: mistakes.length,
+          })}
+        </Text>
 
-          {/* What was written */}
-          {currentMistake.written ? (
-            <>
-              <Text className="text-body-sm text-text-secondary mb-1">
-                {t('dictation.review.youWrote')}
-              </Text>
-              <Text className="text-body mb-3" style={{ color: colors.danger }}>
-                {currentMistake.written}
-              </Text>
-            </>
-          ) : null}
-
-          {/* Error label */}
-          <Text className="text-body-sm text-text-secondary mb-1">
-            {t('dictation.review.error')}
-          </Text>
-          <Text className="text-body-sm mb-3" style={{ color: colors.danger }}>
-            {currentMistake.error}
-          </Text>
-
-          {/* Correction */}
-          <Text className="text-body-sm text-text-secondary mb-1">
-            {t('dictation.review.correctVersion')}
-          </Text>
-          <Text
-            className="text-body font-semibold mb-3"
-            style={{ color: colors.success }}
+        {/* Current mistake card */}
+        {currentMistake && (
+          <View
+            className="bg-surface-elevated rounded-xl p-4 mb-4"
+            testID="review-mistake-card"
           >
-            {currentMistake.correction}
-          </Text>
+            {/* Original sentence */}
+            <Text className="text-body-sm text-text-secondary mb-1">
+              {t('dictation.review.original')}
+            </Text>
+            <Text className="text-body text-text-primary mb-3">
+              {currentMistake.original}
+            </Text>
 
-          {/* Explanation */}
-          <Text className="text-body-sm text-text-secondary">
-            {currentMistake.explanation}
-          </Text>
-        </View>
-      )}
+            {/* What was written */}
+            {currentMistake.written ? (
+              <>
+                <Text className="text-body-sm text-text-secondary mb-1">
+                  {t('dictation.review.youWrote')}
+                </Text>
+                <Text
+                  className="text-body mb-3"
+                  style={{ color: colors.danger }}
+                >
+                  {currentMistake.written}
+                </Text>
+              </>
+            ) : null}
 
-      {/* Retype input */}
-      <Text className="text-body-sm text-text-secondary mb-2">
-        {t('dictation.review.nowTypeCorrect')}
-      </Text>
-      <TextInput
-        className="bg-surface-elevated border border-border rounded-xl p-4 text-text-primary text-body min-h-[80px]"
-        value={typedSentence}
-        onChangeText={setTypedSentence}
-        multiline
-        textAlignVertical="top"
-        autoCorrect={false}
-        autoCapitalize="none"
-        placeholder={t('dictation.review.typeCorrectedPlaceholder')}
-        placeholderTextColor={colors.textSecondary}
-        accessibilityLabel={t('dictation.review.typeCorrectedLabel')}
-        testID="review-correction-input"
-      />
+            {/* Error label */}
+            <Text className="text-body-sm text-text-secondary mb-1">
+              {t('dictation.review.error')}
+            </Text>
+            <Text
+              className="text-body-sm mb-3"
+              style={{ color: colors.danger }}
+            >
+              {currentMistake.error}
+            </Text>
 
-      {/* Submit button */}
-      <Pressable
-        onPress={handleSubmitCorrection}
-        disabled={!typedSentence.trim()}
-        className={`mt-4 rounded-xl py-4 items-center ${
-          !typedSentence.trim() ? 'opacity-50 bg-primary' : 'bg-primary'
-        }`}
-        testID="review-submit-correction"
-        accessibilityRole="button"
-        accessibilityLabel={
-          currentMistakeIndex < mistakes.length - 1
-            ? t('common.next')
-            : t('dictation.review.finish')
-        }
-      >
-        <Text className="text-text-inverse font-semibold text-body">
-          {currentMistakeIndex < mistakes.length - 1
-            ? t('common.next')
-            : t('dictation.review.finish')}
+            {/* Correction */}
+            <Text className="text-body-sm text-text-secondary mb-1">
+              {t('dictation.review.correctVersion')}
+            </Text>
+            <Text
+              className="text-body font-semibold mb-3"
+              style={{ color: colors.success }}
+            >
+              {currentMistake.correction}
+            </Text>
+
+            {/* Explanation */}
+            <Text className="text-body-sm text-text-secondary">
+              {currentMistake.explanation}
+            </Text>
+          </View>
+        )}
+
+        {/* Retype input */}
+        <Text className="text-body-sm text-text-secondary mb-2">
+          {t('dictation.review.nowTypeCorrect')}
         </Text>
-      </Pressable>
+        <TextInput
+          className="bg-surface-elevated border border-border rounded-xl p-4 text-text-primary text-body min-h-[80px]"
+          value={typedSentence}
+          onChangeText={setTypedSentence}
+          multiline
+          textAlignVertical="top"
+          autoCorrect={false}
+          autoCapitalize="none"
+          placeholder={t('dictation.review.typeCorrectedPlaceholder')}
+          placeholderTextColor={colors.textSecondary}
+          accessibilityLabel={t('dictation.review.typeCorrectedLabel')}
+          testID="review-correction-input"
+        />
 
-      {/* Back link */}
-      <Pressable
-        onPress={handleBack}
-        className="mt-4 py-3 items-center"
-        testID="review-back"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.goBack')}
-      >
-        <Text className="text-body-sm text-text-muted">
-          {t('common.goBack')}
-        </Text>
-      </Pressable>
-    </ScrollView>
+        {/* Submit button */}
+        <Pressable
+          onPress={handleSubmitCorrection}
+          disabled={!typedSentence.trim()}
+          className={`mt-4 rounded-xl py-4 items-center ${
+            !typedSentence.trim() ? 'opacity-50 bg-primary' : 'bg-primary'
+          }`}
+          testID="review-submit-correction"
+          accessibilityRole="button"
+          accessibilityLabel={
+            currentMistakeIndex < mistakes.length - 1
+              ? t('common.next')
+              : t('dictation.review.finish')
+          }
+        >
+          <Text className="text-text-inverse font-semibold text-body">
+            {currentMistakeIndex < mistakes.length - 1
+              ? t('common.next')
+              : t('dictation.review.finish')}
+          </Text>
+        </Pressable>
+
+        {/* Back link */}
+        <Pressable
+          onPress={handleBack}
+          className="mt-4 py-3 items-center"
+          testID="review-back"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+        >
+          <Text className="text-body-sm text-text-muted">
+            {t('common.goBack')}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
