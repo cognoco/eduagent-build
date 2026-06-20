@@ -4076,6 +4076,11 @@
       "title": "Nie udało się wczytać kolejnych kroków",
       "message": "Możesz spróbować ponownie lub bezpośrednio przeglądać tematy.",
       "subjects": "Przeglądaj tematy"
+    },
+    "homework": {
+      "imageAlt": "Zdjęcie pracy domowej",
+      "helpMeSolve": "Pomóż mi to rozwiązać",
+      "checkMyAnswer": "Sprawdź moją odpowiedź"
     }
   },
   "subjectsBrowse": {

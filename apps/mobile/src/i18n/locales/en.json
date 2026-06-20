@@ -3017,6 +3017,11 @@
       "chipAsk": "I have a question",
       "homeworkReply": "Use the camera to capture the problem, or type it here.",
       "firstSessionTeach": "I'll remember what you write here so the next step starts closer to you."
+    },
+    "homework": {
+      "imageAlt": "Captured homework photo",
+      "helpMeSolve": "Help me solve this",
+      "checkMyAnswer": "Check my answer"
     }
   },
   "subjectsBrowse": {

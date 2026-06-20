@@ -3918,6 +3918,11 @@
       "title": "Vi kunne ikke laste inn dine neste steg",
       "message": "Du kan prøve på nytt eller bla gjennom emner direkte.",
       "subjects": "Bla gjennom emner"
+    },
+    "homework": {
+      "imageAlt": "Bilde av fotograferte lekser",
+      "helpMeSolve": "Hjelp meg å løse denne",
+      "checkMyAnswer": "Sjekk svaret mitt"
     }
   },
   "subjectsBrowse": {

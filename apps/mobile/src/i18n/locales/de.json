@@ -3918,6 +3918,11 @@
       "title": "Wir konnten deine nächsten Schritte nicht laden",
       "message": "Versuche es erneut oder durchsuche direkt die Themen.",
       "subjects": "Themen durchsuchen"
+    },
+    "homework": {
+      "imageAlt": "Foto der Hausaufgabe",
+      "helpMeSolve": "Hilf mir, das zu lösen",
+      "checkMyAnswer": "Überprüfe meine Antwort"
     }
   },
   "subjectsBrowse": {
