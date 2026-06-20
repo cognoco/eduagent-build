@@ -1,4 +1,4 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 
 import { ColdStartCard } from './ColdStartCard';
 
@@ -56,5 +56,42 @@ describe('ColdStartCard', () => {
 
     expect(getByTestId('cold-start-homework-camera')).toBeTruthy();
     expect(queryByText(/what subject/i)).toBeNull();
+  });
+
+  it('rotates the input placeholder through more than one distinct example, including a navigational one', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = render(
+        <ColdStartCard
+          onFill={jest.fn()}
+          onSubmitText={jest.fn()}
+          onOpenCamera={jest.fn()}
+          placeholderRotationIntervalMs={1000}
+        />,
+      );
+
+      const input = getByTestId('cold-start-input');
+      const seen = new Set<string>();
+      seen.add(input.props.placeholder);
+
+      // Advance through a full rotation cycle and collect each placeholder.
+      for (let i = 0; i < 3; i += 1) {
+        act(() => {
+          jest.advanceTimersByTime(1000);
+        });
+        seen.add(getByTestId('cold-start-input').props.placeholder);
+      }
+
+      // Rotation surfaces more than one distinct example over time. (We assert
+      // on distinct placeholder values, not rendered English: the new rotation
+      // keys are not yet in en.json during this PR — i18n protocol.)
+      expect(seen.size).toBeGreaterThan(1);
+      // The third rotation entry is the navigational example by contract
+      // (`placeholderRotation.three` -> "Try: show my progress"); presence of a
+      // third distinct value proves the navigational slot is in the cycle.
+      expect(seen.size).toBeGreaterThanOrEqual(3);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

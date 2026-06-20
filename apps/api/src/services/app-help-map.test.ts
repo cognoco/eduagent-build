@@ -416,13 +416,16 @@ describe('buildAppHelpPromptBlock — V2 shell', () => {
 
   it('routes notes / sessions / bookmarks / memory into the Journal tab', () => {
     expect(en.journal.sections.notes).toBe('Saved notes');
-    expect(en.journal.notes.sessions).toBe('Recent learning sessions');
-    expect(en.journal.notes.bookmarks).toBe('Saved mentor replies');
     expect(en.journal.sections.memory).toBe('Mentor memory');
     expect(v2).toContain(en.journal.sections.notes);
-    expect(v2).toContain(en.journal.notes.sessions);
-    expect(v2).toContain(en.journal.notes.bookmarks);
     expect(v2).toContain(en.journal.sections.memory);
+    // #1316 (a2dd04cab) restructured `journal.notes` into a notes-list UI string set,
+    // removing the standalone `journal.notes.sessions` / `.bookmarks` labels. The V2
+    // app-help prompt still routes those concepts to the Journal tab via the literal
+    // wording in app-help-map.ts ("Recent learning sessions" / "Saved mentor replies"),
+    // so assert the shipped prompt strings directly instead of the removed en.json keys.
+    expect(v2).toContain('Recent learning sessions');
+    expect(v2).toContain('Saved mentor replies');
   });
 
   it('routes account/settings to the Account sheet (opened from the profile picture)', () => {
