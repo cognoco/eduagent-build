@@ -1,6 +1,9 @@
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { sessionAutoFileRequestedEventSchema } from '@eduagent/schemas';
+import {
+  sessionAutoFileRequestedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -48,8 +51,31 @@ async function runAutoFileSession({
   event: { data: unknown };
   step: AutoFileStep;
 }): Promise<unknown> {
-  const payload = sessionAutoFileRequestedEventSchema.parse(event.data);
-  const { profileId, sessionId } = payload;
+  // [BUG-844] safeParse, never parse: a ZodError thrown here counts as a
+  // handler failure, and with retries: 2 a malformed (guaranteed-fail) payload
+  // re-parses and re-throws 3 times before onFailure fires — burning the whole
+  // retry budget on a payload that can never succeed. Return a non-retried
+  // terminal result instead (same pattern as billing-trial-subscription-failed).
+  const parsed = sessionAutoFileRequestedEventSchema.safeParse(event.data);
+  if (!parsed.success) {
+    captureException(
+      new Error(
+        `session.auto_file_requested: invalid payload — ${parsed.error.message}`,
+      ),
+      {
+        extra: {
+          site: 'autoFileSession.invalid_payload',
+          rawData: summarizeRawPayload(event.data),
+        },
+      },
+    );
+    logger.warn('auto_file_session.invalid_payload', {
+      issues: parsed.error.issues,
+    });
+    return { status: 'invalid_payload' };
+  }
+
+  const { profileId, sessionId } = parsed.data;
 
   const claim = await step.run('claim-session', async () => {
     const db = getStepDatabase();
