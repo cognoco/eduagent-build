@@ -25,6 +25,7 @@ import {
 import { useRestoreConsent } from '../../../../hooks/use-restore-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
+import { formatApiError } from '../../../../lib/format-api-error';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
@@ -554,10 +555,11 @@ function SubjectCard({
   );
 }
 
+// [Issue 37b8] Consent mutations are legally sensitive. Never surface the raw
+// `err.message` (server-side / Hermes engine strings) to a parent — classify
+// the raw error at the API-client boundary, then format a user-safe message.
 function consentMutationErrorMessage(err: unknown): string {
-  return err instanceof Error
-    ? err.message
-    : 'Could not update consent. Please try again.';
+  return formatApiError(err);
 }
 
 function ConsentManagementSection({
@@ -572,6 +574,12 @@ function ConsentManagementSection({
   const revokeConsent = useRevokeConsent(childProfileId);
   const restoreConsent = useRestoreConsent();
   const [error, setError] = useState('');
+  // [Issue 37b8] Track which mutation failed so the error block can offer a
+  // retry that re-runs the SAME action (per the "primary fallback retries the
+  // specific problem" UX-resilience rule), not a generic dead-end message.
+  const [retryFailedMutation, setRetryFailedMutation] = useState<
+    (() => void) | null
+  >(null);
 
   const consentStatus = consent.data?.consentStatus ?? null;
   const hasConsentRecord =
@@ -587,8 +595,22 @@ function ConsentManagementSection({
     ? getGracePeriodDaysRemaining(consent.data?.respondedAt ?? null)
     : 0;
 
+  // The destructive confirmation has already been granted by the time this
+  // runs, so a retry re-runs the mutation directly without re-prompting.
+  const runWithdraw = (): void => {
+    setError('');
+    setRetryFailedMutation(null);
+    revokeConsent.mutate(undefined, {
+      onError: (err) => {
+        setError(consentMutationErrorMessage(err));
+        setRetryFailedMutation(() => runWithdraw);
+      },
+    });
+  };
+
   const handleWithdraw = (): void => {
     setError('');
+    setRetryFailedMutation(null);
     platformAlert(
       t('parentView.index.withdrawConsentConfirmTitle', {
         childName,
@@ -606,11 +628,7 @@ function ConsentManagementSection({
             defaultValue: 'Withdraw',
           }),
           style: 'destructive',
-          onPress: () => {
-            revokeConsent.mutate(undefined, {
-              onError: (err) => setError(consentMutationErrorMessage(err)),
-            });
-          },
+          onPress: runWithdraw,
         },
       ],
     );
@@ -618,9 +636,15 @@ function ConsentManagementSection({
 
   const handleRestore = (): void => {
     setError('');
+    setRetryFailedMutation(null);
     restoreConsent.mutate(
       { childProfileId },
-      { onError: (err) => setError(consentMutationErrorMessage(err)) },
+      {
+        onError: (err) => {
+          setError(consentMutationErrorMessage(err));
+          setRetryFailedMutation(() => handleRestore);
+        },
+      },
     );
   };
 
@@ -642,13 +666,26 @@ function ConsentManagementSection({
       </Text>
 
       {error !== '' ? (
-        <Text
-          className="text-body-sm text-danger mt-3"
+        <View
+          className="bg-danger/10 border border-danger/30 rounded-card px-3 py-3 mt-3"
           accessibilityRole="alert"
           testID="consent-management-error"
         >
-          {error}
-        </Text>
+          <Text className="text-body-sm text-danger">{error}</Text>
+          {retryFailedMutation ? (
+            <Pressable
+              onPress={retryFailedMutation}
+              className="bg-surface rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.tryAgain')}
+              testID="consent-management-retry"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                {t('common.tryAgain')}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
 
       {consent.isError ? (

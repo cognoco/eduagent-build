@@ -1022,6 +1022,63 @@ describe('ChildDetailScreen — profile overview', () => {
 
     cleanup();
   });
+
+  // [Issue 37b8] A failed consent-withdraw mutation must NOT leak the raw
+  // server/Hermes `err.message` to a parent on this legally-sensitive action.
+  // The error must render the user-safe formatted copy AND expose a retry that
+  // re-runs the same mutation.
+  it('shows a safe formatted error (not the raw message) and a retry when withdraw fails', async () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+    setRoutes();
+
+    // Raw technical string the old code rendered verbatim. `isTechnicalMessage`
+    // rejects it, so it must never reach the parent.
+    const rawLeak = "Cannot read property 'consentId' of undefined";
+    mockFetch.setRoute(
+      '/consent/child-001/revoke',
+      () =>
+        new Response(JSON.stringify({ message: rawLeak }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+
+    const { result, cleanup } = renderChildDetail();
+
+    // platformAlert mock auto-fires the destructive button -> revoke mutation,
+    // which now 500s.
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('withdraw-consent-button')),
+    );
+
+    const errorBlock = await waitFor(() =>
+      result.getByTestId('consent-management-error'),
+    );
+
+    // The raw server/engine string is NOT surfaced...
+    expect(errorBlock).not.toHaveTextContent(rawLeak);
+    // ...the user-safe formatted server-error copy is (regex = substring match,
+    // since the block also contains the retry button label).
+    expect(errorBlock).toHaveTextContent(
+      /Something went wrong on our end\. Please try again in a moment\./,
+    );
+
+    // A retry affordance is exposed and re-runs the SAME revoke mutation.
+    mockFetch.mockClear();
+    mockFetch.setRoute('/consent/child-001/revoke', () => ({
+      message: 'revoked',
+      consentStatus: 'WITHDRAWN',
+    }));
+    fireEvent.press(result.getByTestId('consent-management-retry'));
+
+    await waitFor(() => {
+      const calls = fetchCallsMatching(mockFetch, '/consent/child-001/revoke');
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+      expect(calls[0]?.init?.method).toBe('PUT');
+    });
+
+    cleanup();
+  });
 });
 
 // ---------------------------------------------------------------------------
