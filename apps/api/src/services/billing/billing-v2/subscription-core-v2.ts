@@ -43,6 +43,7 @@ import {
   type Database,
   findSubscriptionByOrganizationId__unscoped,
   findSubscriptionByStripeIdV2__unscoped,
+  findSubscriptionByStripeCustomerIdV2__unscoped,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
@@ -1040,4 +1041,29 @@ export async function activateSubscriptionFromCheckoutV2(
   });
 
   return mapSubscriptionV2Row(updated);
+}
+
+// ---------------------------------------------------------------------------
+// getSubscriptionByStripeCustomerIdV2
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the v2 subscription bound to a given Stripe customer ID.
+ * Returns null if no subscription is bound to that customer.
+ *
+ * SECURITY: the Stripe customer ID arrives in a webhook payload authenticated
+ * by Stripe event signature. The result is used by the v2 checkout-completed
+ * handler to verify that the (operator-mutable) metadata.accountId matches the
+ * account already bound to this customer before granting an entitlement — do
+ * NOT expose this to user-facing routes (it is unscoped by design).
+ */
+export async function getSubscriptionByStripeCustomerIdV2(
+  db: Database,
+  stripeCustomerId: string,
+): Promise<SubscriptionRow | null> {
+  const row = await findSubscriptionByStripeCustomerIdV2__unscoped(
+    db,
+    stripeCustomerId,
+  );
+  return row ? mapSubscriptionV2Row(row) : null;
 }

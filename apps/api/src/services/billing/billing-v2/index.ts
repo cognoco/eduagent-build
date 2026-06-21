@@ -21,6 +21,7 @@ export {
   markSubscriptionCancelledV2,
   updateQuotaPoolLimitV2,
   activateSubscriptionFromCheckoutV2,
+  getSubscriptionByStripeCustomerIdV2,
 } from './subscription-core-v2';
 
 export {
