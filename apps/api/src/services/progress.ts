@@ -147,6 +147,18 @@ function computeThreeStateTopicSets(
   return { masteredTopics, learningTopics };
 }
 
+function firstCurriculumBySubject<T extends { subjectId: string }>(
+  curriculumRows: T[],
+): Map<string, T> {
+  const bySubject = new Map<string, T>();
+  for (const curriculum of curriculumRows) {
+    if (!bySubject.has(curriculum.subjectId)) {
+      bySubject.set(curriculum.subjectId, curriculum);
+    }
+  }
+  return bySubject;
+}
+
 // ---------------------------------------------------------------------------
 // Core functions
 // ---------------------------------------------------------------------------
@@ -520,12 +532,11 @@ export async function getOverallProgress(
   // Fetch all curricula for these subjects in one query
   const allCurricula = await db.query.curricula.findMany({
     where: inArray(curricula.subjectId, subjectIds),
+    orderBy: desc(curricula.version),
   });
 
   const curriculumIds = allCurricula.map((c) => c.id);
-  const curriculumBySubject = new Map(
-    allCurricula.map((c) => [c.subjectId, c]),
-  );
+  const curriculumBySubject = firstCurriculumBySubject(allCurricula);
 
   // Fetch all topics for all curricula in one query
   const allTopics =
@@ -811,12 +822,11 @@ export async function getOverallProgressBatch(
   // 2. Fetch all curricula for all subjects — 1 query
   const allCurricula = await db.query.curricula.findMany({
     where: inArray(curricula.subjectId, allSubjectIds),
+    orderBy: desc(curricula.version),
   });
 
   const curriculumIds = allCurricula.map((c) => c.id);
-  const curriculumBySubject = new Map(
-    allCurricula.map((c) => [c.subjectId, c]),
-  );
+  const curriculumBySubject = firstCurriculumBySubject(allCurricula);
 
   // 3. Fetch all topics for all curricula — 1 query
   const allTopics =

@@ -131,10 +131,8 @@ describe('formatTimer', () => {
   });
 });
 
-// Lock the existing canonical formatters: this PR must leave them
-// byte-for-byte unchanged. A fixed reference date proves no drift.
-describe('formatRelativeDate / formatMinutes (unchanged contract)', () => {
-  it('formatRelativeDate keeps its Nd/Nmo/Ny short output', () => {
+describe('formatRelativeDate / formatMinutes', () => {
+  it('formatRelativeDate uses the same 7-29 day buckets as getRelativeDateParts', () => {
     // Freeze the internal new Date() so the calendar-day diff is deterministic.
     jest.useFakeTimers().setSystemTime(new Date(2026, 4, 29, 14, 0, 0));
     expect(formatRelativeDate(new Date(2026, 4, 29).toISOString())).toBe(
@@ -146,7 +144,18 @@ describe('formatRelativeDate / formatMinutes (unchanged contract)', () => {
     expect(formatRelativeDate(new Date(2026, 4, 26).toISOString())).toBe(
       '3 days ago',
     );
-    expect(formatRelativeDate(new Date(2026, 4, 15).toISOString())).toBe('14d');
+    expect(formatRelativeDate(new Date(2026, 4, 22).toISOString())).toBe(
+      'last week',
+    );
+    expect(formatRelativeDate(new Date(2026, 4, 16).toISOString())).toBe(
+      'last week',
+    );
+    expect(formatRelativeDate(new Date(2026, 4, 15).toISOString())).toBe(
+      '2 weeks ago',
+    );
+    expect(formatRelativeDate(new Date(2026, 4, 0).toISOString())).toBe(
+      '4 weeks ago',
+    );
     expect(formatRelativeDate(new Date(2026, 1, 1).toISOString())).toBe('3mo');
     expect(formatRelativeDate(new Date(2024, 1, 1).toISOString())).toBe('2y');
     expect(formatRelativeDate('not-a-date')).toBe('');

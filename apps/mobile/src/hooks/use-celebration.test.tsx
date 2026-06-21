@@ -3,7 +3,9 @@
 // ---------------------------------------------------------------------------
 
 import { renderHook, act } from '@testing-library/react-native';
+import { isValidElement } from 'react';
 import { useCelebration } from './use-celebration';
+import type { ReactElement, ReactNode } from 'react';
 import type { PendingCelebration } from '@eduagent/schemas';
 
 function makeEntry(
@@ -18,6 +20,40 @@ function makeEntry(
     queuedAt: new Date().toISOString(),
     ...overrides,
   };
+}
+
+function collectText(node: ReactNode): string[] {
+  if (node === null || node === undefined || typeof node === 'boolean') {
+    return [];
+  }
+  if (typeof node === 'string' || typeof node === 'number') {
+    return [String(node)];
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(collectText);
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return collectText(node.props.children);
+  }
+  return [];
+}
+
+function completeActiveCelebration(overlay: ReactElement | null): void {
+  if (!overlay) {
+    throw new Error('Expected an active celebration overlay');
+  }
+
+  const children = (overlay as ReactElement<{ children?: ReactNode }>).props
+    .children;
+  const celebration = Array.isArray(children) ? children[0] : children;
+  if (
+    !isValidElement<{ onComplete?: () => void }>(celebration) ||
+    typeof celebration.props.onComplete !== 'function'
+  ) {
+    throw new Error('Expected overlay celebration child to expose onComplete');
+  }
+
+  celebration.props.onComplete();
 }
 
 describe('useCelebration — trigger()', () => {
@@ -174,6 +210,66 @@ describe('useCelebration — queue prop', () => {
     // verify overlay is showing (at least 1 was queued/shown) and subsequent
     // entries in same batch are throttled.
     expect(result.current.CelebrationOverlay).not.toBeNull();
+  });
+
+  it('keeps over-cap entries eligible for a later batch instead of marking them seen', async () => {
+    const firstBatchTime = '2026-01-01T10:00:00.000Z';
+    const nextBatchTime = '2026-01-01T10:05:00.000Z';
+    const entries: PendingCelebration[] = [
+      makeEntry('polar_star', 'polar_star', {
+        queuedAt: firstBatchTime,
+        detail: 'first capped celebration',
+      }),
+      makeEntry('twin_stars', 'twin_stars', {
+        queuedAt: firstBatchTime,
+        detail: 'second capped celebration',
+      }),
+      makeEntry('comet', 'comet', {
+        queuedAt: firstBatchTime,
+        detail: 'third overflow celebration',
+      }),
+    ];
+    const nextBatchEntry = makeEntry('orions_belt', 'orions_belt', {
+      queuedAt: nextBatchTime,
+      detail: 'new batch celebration',
+    });
+
+    const { result, rerender } = renderHook(
+      ({ queue }: { queue: PendingCelebration[] }) =>
+        useCelebration({ queue, celebrationLevel: 'all' }),
+      { initialProps: { queue: entries } },
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'first capped celebration',
+    );
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'second capped celebration',
+    );
+
+    await act(async () => {
+      completeActiveCelebration(result.current.CelebrationOverlay);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(result.current.CelebrationOverlay).toBeNull();
+
+    rerender({ queue: [...entries, nextBatchEntry] });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(collectText(result.current.CelebrationOverlay)).toContain(
+      'third overflow celebration',
+    );
   });
 
   it('calls onAllComplete when queue is exhausted', async () => {

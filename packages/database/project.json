@@ -4,6 +4,14 @@
   "sourceRoot": "packages/database/src",
   "projectType": "library",
   "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/database",
+        "command": "jest --config jest.config.cjs --testMatch \"**/src/**/*.test.ts\" --testPathIgnorePatterns \"\\.integration\\.test\\.ts$\""
+      },
+      "outputs": ["{workspaceRoot}/coverage/packages/database"]
+    },
     "format:check": {}
   }
 }

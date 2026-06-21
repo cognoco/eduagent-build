@@ -11,6 +11,7 @@ import {
   expandSourceBaselineFile,
   hashSourceString,
   selectGeminiDiffKeys,
+  validatePruneOnlyLocale,
 } from './translate-gemini';
 
 type NestedStrings = { [k: string]: string | NestedStrings };
@@ -245,6 +246,52 @@ describe('locale-specific CLDR plural variants (WI-621 regression)', () => {
       const merged = mergeTranslatedIntoPrevious(previousFlat, {}, sourceFlat);
       expect(merged).toEqual({ 'common.save': 'Zapisz' });
     });
+  });
+});
+
+describe('prune-only validation', () => {
+  it('does not block pruning on unrelated existing Polish glossary violations', () => {
+    const source = {
+      active: { sessionCta: 'Start session' },
+    };
+    const pruned = {
+      active: { sessionCta: 'Rozpocznij spotkanie' },
+    };
+    const glossary = { session: { pl: 'sesja' } };
+
+    const result = validatePruneOnlyLocale({
+      source,
+      pruned,
+      removedKeys: ['legacy.removed'],
+      lang: 'pl',
+      glossary,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('still rejects prune-only output that keeps a removed key', () => {
+    const source = {
+      active: { sessionCta: 'Start session' },
+    };
+    const pruned = {
+      active: { sessionCta: 'Rozpocznij sesję' },
+      legacy: { removed: 'Stara wartość' },
+    };
+
+    const result = validatePruneOnlyLocale({
+      source,
+      pruned,
+      removedKeys: ['legacy.removed'],
+      lang: 'pl',
+      glossary: { session: { pl: 'sesja' } },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContainEqual(
+      expect.objectContaining({ type: 'extra_key', key: 'legacy.removed' }),
+    );
   });
 });
 

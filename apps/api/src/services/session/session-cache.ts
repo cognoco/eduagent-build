@@ -186,7 +186,11 @@ export async function getCachedHomeworkLibraryContext(
   session: LearningSession,
   identityV2Enabled = false,
 ): Promise<string | undefined> {
-  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const key = getSessionStaticContextCacheKey(
+    profileId,
+    sessionId,
+    identityV2Enabled,
+  );
   const entry = await getSessionStaticContext(
     db,
     profileId,
@@ -218,7 +222,11 @@ export async function getCachedBookLearningHistoryContext(
   bookId: string,
   identityV2Enabled = false,
 ): Promise<string | undefined> {
-  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  const key = getSessionStaticContextCacheKey(
+    profileId,
+    sessionId,
+    identityV2Enabled,
+  );
   const entry = await getSessionStaticContext(
     db,
     profileId,
@@ -338,10 +346,15 @@ export async function getOrLoadSessionSupplementary(
   subjectId: string,
   isFreeform: boolean,
   cacheEntry: SessionStaticContextCacheEntry,
+  identityV2Enabled = false,
 ): Promise<SessionSupplementaryData> {
   if (cacheEntry.supplementary) return cacheEntry.supplementary;
 
-  const cacheKey = getSessionStaticContextCacheKey(profileId, sessionId);
+  const cacheKey = getSessionStaticContextCacheKey(
+    profileId,
+    sessionId,
+    identityV2Enabled,
+  );
   const inflight = supplementaryInflight.get(cacheKey);
   if (inflight) return inflight;
 
