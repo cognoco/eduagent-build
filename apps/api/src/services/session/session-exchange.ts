@@ -1689,6 +1689,7 @@ export async function prepareExchangeContext(
     session.subjectId,
     isFreeform,
     staticContext,
+    options?.identityV2Enabled ?? false,
   );
   const ownedSessionTopic = session.topicId
     ? await findOwnedCurriculumTopic(db, {
