@@ -3954,6 +3954,11 @@
       "loadTitle": "Dieses Fach konnte nicht geladen werden",
       "loadMessage": "Versuche es erneut oder gehe zurück zu deinen Fächern."
     },
+    "empty": {
+      "heading": "Noch keine Themen",
+      "body": "Dieses Fach hat noch keine aktiven Themen.",
+      "action": "Themen durchsuchen"
+    },
     "progress": {
       "threeState": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
       "reviewsDue": "{{count}} fällige Wiederholungen",

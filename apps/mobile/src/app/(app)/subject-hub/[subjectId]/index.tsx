@@ -138,6 +138,7 @@ export default function SubjectHubRoute(): React.ReactElement {
         onNextUpPress={handleNextUp}
         onStudyTopic={handleStudyTopic}
         onReviewTopic={handleReviewTopic}
+        onEmptySubjectPress={goBack}
       />
     </View>
   );

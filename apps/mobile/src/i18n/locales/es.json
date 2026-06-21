@@ -3954,6 +3954,11 @@
       "loadTitle": "No se pudo cargar este tema",
       "loadMessage": "Inténtalo de nuevo o vuelve a tus temas."
     },
+    "empty": {
+      "heading": "Aún no hay temas",
+      "body": "Este tema aún no tiene temas activos.",
+      "action": "Explorar temas"
+    },
     "progress": {
       "threeState": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
       "reviewsDue": "{{count}} repasos pendientes",

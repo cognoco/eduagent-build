@@ -3954,6 +3954,11 @@
       "loadTitle": "Não foi possível carregar esta matéria",
       "loadMessage": "Tente novamente ou volte para suas matérias."
     },
+    "empty": {
+      "heading": "Ainda não há tópicos",
+      "body": "Esta matéria ainda não tem tópicos ativos.",
+      "action": "Explorar tópicos"
+    },
     "progress": {
       "threeState": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
       "reviewsDue": "{{count}} revisões pendentes",

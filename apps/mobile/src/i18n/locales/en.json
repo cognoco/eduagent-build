@@ -3054,6 +3054,11 @@
       "loadTitle": "Could not load this subject",
       "loadMessage": "Try again, or go back to your subjects."
     },
+    "empty": {
+      "heading": "No topics yet",
+      "body": "This subject does not have any active topics yet.",
+      "action": "Browse topics"
+    },
     "progress": {
       "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
       "reviewsDue": "{{count}} reviews due",

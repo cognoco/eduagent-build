@@ -4112,6 +4112,11 @@
       "loadTitle": "Nie można załadować tego przedmiotu",
       "loadMessage": "Spróbuj ponownie lub wróć do swoich przedmiotów."
     },
+    "empty": {
+      "heading": "Nie ma jeszcze tematów",
+      "body": "Ten przedmiot nie ma jeszcze aktywnych tematów.",
+      "action": "Przeglądaj tematy"
+    },
     "progress": {
       "threeState": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
       "reviewsDue": "{{count}} zaległych powtórek",

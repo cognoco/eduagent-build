@@ -159,6 +159,61 @@ describe('SubjectHub', () => {
     expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
   });
 
+  it('shows a true-empty subject state instead of search no-results when there are no chapters', () => {
+    const onEmptySubjectPress = jest.fn();
+
+    render(
+      <SubjectHub
+        data={{
+          ...baseData,
+          aggregate: {
+            ...baseData.aggregate,
+            mastered: 0,
+            learning: 0,
+            total: 0,
+            reviewsDue: 0,
+          },
+          nextUp: {
+            kind: 'none',
+            topicId: null,
+            bookId: null,
+            topicTitle: null,
+          },
+          chapters: [],
+          notes: [],
+          showSearchFilter: false,
+        }}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={jest.fn()}
+        onEmptySubjectPress={onEmptySubjectPress}
+      />,
+    );
+
+    screen.getByText('subjectHub.empty.heading');
+    screen.getByText('subjectHub.empty.body');
+    fireEvent.press(screen.getByTestId('subject-hub-empty-action'));
+    expect(onEmptySubjectPress).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('subjectHub.search.noResults')).toBeNull();
+  });
+
+  it('keeps search no-results when an active query filters out existing chapters', () => {
+    render(
+      <SubjectHub
+        data={baseData}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={jest.fn()}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByTestId('subject-hub-search-input'), 'zzz');
+
+    screen.getByText('subjectHub.search.noResults');
+    expect(screen.queryByText('subjectHub.empty.heading')).toBeNull();
+    expect(screen.queryByText('subjectHub.empty.action')).toBeNull();
+  });
+
   it('opens topic details as sheet state rather than route state', () => {
     render(
       <SubjectHub

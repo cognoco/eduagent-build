@@ -3954,6 +3954,11 @@
       "loadTitle": "この科目を読み込めませんでした",
       "loadMessage": "再試行するか、科目一覧に戻ってください。"
     },
+    "empty": {
+      "heading": "まだトピックがありません",
+      "body": "この科目には、まだ有効なトピックがありません。",
+      "action": "トピックを探す"
+    },
     "progress": {
       "threeState": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
       "reviewsDue": "{{count}}件の復習",

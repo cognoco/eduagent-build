@@ -3954,6 +3954,11 @@
       "loadTitle": "Kunne ikke laste inn dette emnet",
       "loadMessage": "Prøv igjen, eller gå tilbake til emnene dine."
     },
+    "empty": {
+      "heading": "Ingen temaer ennå",
+      "body": "Dette emnet har ingen aktive temaer ennå.",
+      "action": "Utforsk temaer"
+    },
     "progress": {
       "threeState": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
       "reviewsDue": "{{count}} repetisjoner forfaller",

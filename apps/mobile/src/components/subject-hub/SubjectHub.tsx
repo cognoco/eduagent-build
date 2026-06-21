@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { withOpacity } from '../../lib/color-opacity';
@@ -27,6 +27,7 @@ interface SubjectHubProps {
   onStudyTopic?: (topicId: string) => void;
   onReviewTopic?: (topicId: string) => void;
   onSearchVoice?: (request: SubjectHubVoiceRequest) => void;
+  onEmptySubjectPress?: () => void;
 }
 
 export function SubjectHub({
@@ -35,6 +36,7 @@ export function SubjectHub({
   onStudyTopic,
   onReviewTopic,
   onSearchVoice,
+  onEmptySubjectPress,
 }: SubjectHubProps): React.ReactElement {
   const { t } = useTranslation();
   const tint = useSubjectTint(data.subjectId);
@@ -61,6 +63,7 @@ export function SubjectHub({
   // there are notes to show (a masked supporter with canStudy=false still sees
   // existing notes read-only). canStudy=false + no notes → nothing to render.
   const showNotes = data.canStudy || data.notes.length > 0;
+  const hasChapters = data.chapters.length > 0;
 
   return (
     <>
@@ -105,10 +108,35 @@ export function SubjectHub({
               onOpenTopic={setOpenTopicId}
             />
           ))
-        ) : (
+        ) : hasChapters ? (
           <Text className="mt-5 text-center text-body-sm text-text-secondary">
             {t('subjectHub.search.noResults')}
           </Text>
+        ) : (
+          <View
+            testID="subject-hub-empty"
+            className="mt-5 items-center rounded-card border border-border bg-surface p-5"
+          >
+            <Text className="text-center text-body font-semibold text-text-primary">
+              {t('subjectHub.empty.heading')}
+            </Text>
+            <Text className="mt-2 text-center text-body-sm text-text-secondary">
+              {t('subjectHub.empty.body')}
+            </Text>
+            {data.canStudy && onEmptySubjectPress ? (
+              <Pressable
+                testID="subject-hub-empty-action"
+                accessibilityRole="button"
+                accessibilityLabel={t('subjectHub.empty.action')}
+                className="mt-4 rounded-full bg-primary px-4 py-2"
+                onPress={onEmptySubjectPress}
+              >
+                <Text className="text-body-sm font-semibold text-text-inverse">
+                  {t('subjectHub.empty.action')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
         )}
 
         {showNotes ? (
