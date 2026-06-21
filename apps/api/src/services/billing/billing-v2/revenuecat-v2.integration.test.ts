@@ -229,6 +229,94 @@ const RUN = !!process.env.DATABASE_URL;
       return { organizationId: org!.id, clerkUserId };
     }
 
+    // Identity graph PLUS an id-aligned dual-store free subscription, returning
+    // the clerk user id for the RevenueCat app_user_id. Used by the Issue 836
+    // CONTROL: in production every org already holds its onboarding-provisioned
+    // subscription before any webhook arrives (activateSubscriptionFromRevenuecatV2
+    // takes the UPDATE/upgrade branch, not the defensive fresh-insert branch).
+    // The aligned legacy `subscriptions` row (id == the v2 `subscription` id)
+    // satisfies the pre-M-REPOINT `quota_pools.subscription_id → subscriptions(id)`
+    // FK so the free→plus upgrade write completes in flag-on CI — identical to the
+    // dual-store freeze state seedAlignedSubscription builds for the fence tests.
+    async function seedIdentityWithFreeSubscription(): Promise<{
+      organizationId: string;
+      clerkUserId: string;
+    }> {
+      const clerkUserId = `clerk_${generateUUIDv7()}`;
+      const email = `wi693rcfs_${generateUUIDv7()}@test.local`;
+      createdClerkIds.push(clerkUserId);
+
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'Issue-836 RC Org' })
+        .returning();
+      createdOrgIds.push(org!.id);
+
+      const [personRow] = await db
+        .insert(person)
+        .values({
+          displayName: 'Owner',
+          birthDate: '1990-01-01',
+          residenceJurisdiction: 'US',
+        })
+        .returning();
+      const [loginRow] = await db
+        .insert(login)
+        .values({ personId: personRow!.id, clerkUserId, email })
+        .returning();
+      await db
+        .update(person)
+        .set({ loginId: loginRow!.id })
+        .where(eq(person.id, personRow!.id));
+      await db.insert(membership).values({
+        personId: personRow!.id,
+        organizationId: org!.id,
+        roles: ['admin', 'learner'],
+      });
+
+      // Legacy accounts + subscriptions (id-aligned) — only to satisfy the
+      // pre-M-REPOINT quota_pools FK to subscriptions(id). The v2 handler never
+      // reads these.
+      const [acct] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `${clerkUserId}_legacy`,
+          email: `legacy_${email}`,
+        })
+        .returning();
+      createdAccountIds.push(acct!.id);
+
+      const subId = generateUUIDv7();
+      seededSubIds.push(subId);
+
+      await db.insert(subscriptions).values({
+        id: subId,
+        accountId: acct!.id,
+        tier: 'free',
+        status: 'active',
+      });
+
+      await db.insert(subscription).values({
+        id: subId,
+        organizationId: org!.id,
+        planTier: 'free',
+        status: 'active',
+        payerPersonId: personRow!.id,
+      });
+
+      const tierConfig = getTierConfig('free');
+      await db.insert(quotaPools).values({
+        subscriptionId: subId,
+        monthlyLimit: tierConfig.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      return { organizationId: org!.id, clerkUserId };
+    }
+
     function familyShareEvent(
       clerkUserId: string,
       overrides: Partial<RevenueCatEvent> = {},
@@ -277,7 +365,9 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     it('[Issue 836 control] DOES grant a subscription when is_family_share is false (v2)', async () => {
-      const seeded = await seedIdentityOnly();
+      // Seed the org's onboarding-provisioned free subscription (dual-store,
+      // id-aligned) — the production precondition before a purchase webhook.
+      const seeded = await seedIdentityWithFreeSubscription();
 
       await handleInitialPurchaseV2(
         db,
@@ -289,10 +379,9 @@ const RUN = !!process.env.DATABASE_URL;
         where: eq(subscription.organizationId, seeded.organizationId),
       });
       expect(after).toBeDefined();
-      // Clean up the granted subscription + its quota pool.
-      if (after) {
-        seededSubIds.push(after.id);
-      }
+      // The non-shared INITIAL_PURCHASE upgraded the seeded free row to the paid
+      // plus tier — a real entitlement was granted (afterEach cleans it up via
+      // the seeded id already tracked in seededSubIds).
       expect(after!.planTier).toBe('plus');
       expect(after!.status).toBe('active');
     });
