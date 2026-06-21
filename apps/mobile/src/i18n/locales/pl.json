@@ -203,7 +203,15 @@
       "verifyButton": "Weryfikuj",
       "resendCode": "Wyślij kod ponownie",
       "useDifferentEmail": "Użyj innego e-maila",
-      "backToSignIn": "Wróć do logowania"
+      "backToSignIn": "Wróć do logowania",
+      "tryAnotherMethod": "Wypróbuj inną metodę",
+      "continueWithGoogle": "Kontynuuj z Google",
+      "continueWithApple": "Kontynuuj z Apple",
+      "continueWithOpenAI": "Kontynuuj z OpenAI",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Utwórz hasło",
+      "signUpButton": "Zarejestruj się",
+      "signInButton": "Zaloguj się"
     },
     "forgotPassword": {
       "title": "Nie pamiętasz hasła?",

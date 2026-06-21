@@ -203,7 +203,15 @@
       "verifyButton": "Bekreft",
       "resendCode": "Send kode på nytt",
       "useDifferentEmail": "Bruk en annen e-post",
-      "backToSignIn": "Tilbake til innlogging"
+      "backToSignIn": "Tilbake til innlogging",
+      "tryAnotherMethod": "Prøv en annen metode",
+      "continueWithGoogle": "Fortsett med Google",
+      "continueWithApple": "Fortsett med Apple",
+      "continueWithOpenAI": "Fortsett med OpenAI",
+      "emailPlaceholder": "du@eksempel.com",
+      "passwordPlaceholder": "Lag et passord",
+      "signUpButton": "Registrer deg",
+      "signInButton": "Logg inn"
     },
     "forgotPassword": {
       "title": "Glemt passord?",

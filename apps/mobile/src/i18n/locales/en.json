@@ -225,7 +225,15 @@
       "verifyButton": "Verify",
       "resendCode": "Resend code",
       "useDifferentEmail": "Use a different email",
-      "backToSignIn": "Back to sign in"
+      "backToSignIn": "Back to sign in",
+      "tryAnotherMethod": "Try another method",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithApple": "Continue with Apple",
+      "continueWithOpenAI": "Continue with OpenAI",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Create a password",
+      "signUpButton": "Sign up",
+      "signInButton": "Sign in"
     },
     "forgotPassword": {
       "title": "Forgot password?",
