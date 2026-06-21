@@ -61,7 +61,7 @@ const EXPECTED_COUNTS: Record<string, number> = {
   'apps/api/src/inngest/functions/topic-probe-extract.ts': 1,
   'apps/api/src/services/assessments.ts': 1, // createAssessment [BUG-460] verify-then-insert
   'apps/api/src/services/curriculum.ts': 1,
-  'apps/api/src/services/family-bridge.ts': 1, // deferred sibling; :546 topicBelongsToProfile migrated (T5)
+  'apps/api/src/services/family-bridge.ts': 0, // fully migrated; :546 topicBelongsToProfile → findOwnedCurriculumTopic (T5, WI-867 collapse)
   'apps/api/src/services/notes.ts': 1,
   'apps/api/src/services/recall-bridge.ts': 1,
   'apps/api/src/services/session/session-crud.ts': 2, // verify-then-use ×2 (subjectId-scoped)
