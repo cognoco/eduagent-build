@@ -315,7 +315,12 @@ describe('generateMonthlyReportData — first month (lastMonth null)', () => {
 });
 
 describe('generateMonthlyReportData — with lastMonth comparison', () => {
-  it('comparison for "Words learned" references last month vocabulary total', () => {
+  // [WI-922] headlineStat.value is a per-month delta, so the comparison copy
+  // must describe that same delta — NOT the prior cumulative total. A
+  // delta-value paired with a cumulative-baseline comparison ("12 words /
+  // up from 340 last month") is self-contradictory; the consistent basis is
+  // delta-on-both-sides, rendered as "N new this month".
+  it('comparison for "Words learned" describes the per-month delta, not the cumulative vocabulary total', () => {
     const lastMonth = makeMetrics({ vocabularyTotal: 15, topicsMastered: 2 });
     const thisMonth = makeMetrics({ vocabularyTotal: 30, topicsMastered: 4 });
     // vocab delta = 15, mastered delta = 2 → Words learned wins
@@ -328,10 +333,15 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
     );
 
     expect(result.headlineStat.label).toBe('Words learned');
-    expect(result.headlineStat.comparison).toBe('up from 15 last month');
+    expect(result.headlineStat.value).toBe(15);
+    // delta-consistent: describes the 15-word delta, never the cumulative 15→30.
+    expect(result.headlineStat.comparison).toBe('15 new this month');
+    // Guard against the old mixed cumulative-baseline phrasing.
+    expect(result.headlineStat.comparison).not.toContain('up from');
+    expect(result.headlineStat.comparison).not.toContain('last month');
   });
 
-  it('comparison for "Topics mastered" references last month mastered total', () => {
+  it('comparison for "Topics mastered" describes the per-month delta, not the cumulative mastered total', () => {
     const lastMonth = makeMetrics({ vocabularyTotal: 5, topicsMastered: 1 });
     const thisMonth = makeMetrics({ vocabularyTotal: 6, topicsMastered: 8 });
     // vocab delta = 1, mastered delta = 7 → Topics mastered wins
@@ -344,10 +354,13 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
     );
 
     expect(result.headlineStat.label).toBe('Topics mastered');
-    expect(result.headlineStat.comparison).toBe('up from 1 last month');
+    expect(result.headlineStat.value).toBe(7);
+    expect(result.headlineStat.comparison).toBe('7 new this month');
+    expect(result.headlineStat.comparison).not.toContain('up from');
+    expect(result.headlineStat.comparison).not.toContain('last month');
   });
 
-  it('comparison for "Topics explored" references last month explored total', () => {
+  it('comparison for "Topics explored" describes the per-month delta, not the cumulative explored total', () => {
     const lastMonth = makeMetrics({
       vocabularyTotal: 0,
       topicsMastered: 0,
@@ -368,9 +381,9 @@ describe('generateMonthlyReportData — with lastMonth comparison', () => {
     );
 
     expect(result.headlineStat.label).toBe('Topics explored');
-    expect(result.headlineStat.comparison).toBe(
-      'up from 3 total topics before this month',
-    );
+    expect(result.headlineStat.value).toBe(7);
+    expect(result.headlineStat.comparison).toBe('7 new this month');
+    expect(result.headlineStat.comparison).not.toContain('before this month');
   });
 
   it('populates lastMonth field with cumulative totals from lastMonth metrics', () => {
