@@ -401,10 +401,13 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
   }
 
   // [WI-901] Timeout — "took too long", retry. Classified before the generic
-  // paths so it never falls through to the offline copy.
+  // paths so it never falls through to the offline copy. Uses the neutral
+  // `requestTimedOut` key (not the LLM-reply-specific `timedOut` at the SSE
+  // path below): a general client timeout has no "reply" and offers a Retry
+  // button, not a "reconnect" action.
   if (isTimeoutError(error)) {
     return {
-      message: i18next.t('errors.timedOut'),
+      message: i18next.t('errors.requestTimedOut'),
       category: 'network',
       recovery: 'retry',
     };

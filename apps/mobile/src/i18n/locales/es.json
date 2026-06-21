@@ -75,7 +75,8 @@
     "emailNotVerified": "Verifica tu dirección de correo electrónico y vuelve a intentarlo.",
     "quotaExceeded": "Cuota excedida",
     "resourceNotFound": "Recurso no encontrado",
-    "conflictState": "La solicitud entra en conflicto con el estado actual"
+    "conflictState": "La solicitud entra en conflicto con el estado actual",
+    "requestTimedOut": "Ha tardado demasiado. Vuelve a intentarlo."
   },
   "errorBoundary": {
     "title": "Algo salió mal",

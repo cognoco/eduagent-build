@@ -75,7 +75,8 @@
     "emailNotVerified": "メールアドレスを確認してから、もう一度お試しください。",
     "quotaExceeded": "クォータを超えました",
     "resourceNotFound": "リソースが見つかりません",
-    "conflictState": "リクエストが現在の状態と競合しています"
+    "conflictState": "リクエストが現在の状態と競合しています",
+    "requestTimedOut": "時間がかかりすぎました。もう一度お試しください。"
   },
   "errorBoundary": {
     "title": "問題が発生しました",

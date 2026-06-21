@@ -140,13 +140,19 @@ describe('classifyFetchRejection', () => {
     try {
       const { signal, cleanup } = createTimeoutSignal(1000);
       jest.advanceTimersByTime(1000); // fire the timeout → signal aborts
-      cleanup();
-      const abortErr = Object.assign(new Error('Aborted'), {
-        name: 'AbortError',
-      });
-      const result = classifyFetchRejection(abortErr, signal);
-      expect(result).toBeInstanceOf(TimeoutError);
-      expect(result).not.toBeInstanceOf(NetworkError);
+      // Mirror the production order: classify in the `catch` BEFORE `cleanup`
+      // runs in the `finally`, so the test exercises the same signal state the
+      // real path sees.
+      try {
+        const abortErr = Object.assign(new Error('Aborted'), {
+          name: 'AbortError',
+        });
+        const result = classifyFetchRejection(abortErr, signal);
+        expect(result).toBeInstanceOf(TimeoutError);
+        expect(result).not.toBeInstanceOf(NetworkError);
+      } finally {
+        cleanup();
+      }
     } finally {
       jest.useRealTimers();
     }

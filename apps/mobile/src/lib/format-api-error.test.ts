@@ -100,6 +100,11 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('retry');
     expect(result.message.toLowerCase()).toContain('too long');
     expect(result.message.toLowerCase()).not.toContain('offline');
+    // [WI-901 review] The general client-timeout path must not reuse the
+    // LLM-reply copy ("That reply took too long. Tap reconnect…") — a
+    // photo-review timeout has no "reply" and surfaces a Retry, not reconnect.
+    expect(result.message.toLowerCase()).not.toContain('reply');
+    expect(result.message.toLowerCase()).not.toContain('reconnect');
   });
 
   it('classifies NotFoundError as not-found / go-back', () => {

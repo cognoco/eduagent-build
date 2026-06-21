@@ -75,7 +75,8 @@
     "emailNotVerified": "Bekreft e-postadressen din, og prøv deretter igjen.",
     "quotaExceeded": "Kvoten er overskredet",
     "resourceNotFound": "Ressurs ikke funnet",
-    "conflictState": "Forespørselen er i konflikt med gjeldende tilstand"
+    "conflictState": "Forespørselen er i konflikt med gjeldende tilstand",
+    "requestTimedOut": "Det tok for lang tid. Prøv igjen."
   },
   "errorBoundary": {
     "title": "Noe gikk galt",

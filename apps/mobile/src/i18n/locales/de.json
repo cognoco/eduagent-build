@@ -75,7 +75,8 @@
     "emailNotVerified": "Bitte bestätige deine E-Mail-Adresse und versuche es dann erneut.",
     "quotaExceeded": "Kontingent überschritten",
     "resourceNotFound": "Ressource nicht gefunden",
-    "conflictState": "Anfrage steht im Widerspruch zum aktuellen Zustand"
+    "conflictState": "Anfrage steht im Widerspruch zum aktuellen Zustand",
+    "requestTimedOut": "Das hat zu lange gedauert. Bitte versuche es erneut."
   },
   "errorBoundary": {
     "title": "Etwas ist schiefgelaufen",

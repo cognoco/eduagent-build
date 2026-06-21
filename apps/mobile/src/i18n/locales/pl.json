@@ -75,7 +75,8 @@
     "emailNotVerified": "Zweryfikuj swój adres e-mail, a następnie spróbuj ponownie.",
     "quotaExceeded": "Przekroczono limit",
     "resourceNotFound": "Nie znaleziono zasobu",
-    "conflictState": "Żądanie jest sprzeczne z bieżącym stanem"
+    "conflictState": "Żądanie jest sprzeczne z bieżącym stanem",
+    "requestTimedOut": "Trwało to zbyt długo. Spróbuj ponownie."
   },
   "errorBoundary": {
     "title": "Coś poszło nie tak",
