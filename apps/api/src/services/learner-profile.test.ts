@@ -2010,8 +2010,9 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
    * whether the transaction was entered (current code path) or bypassed
    * (after the GDPR fix).
    */
+  // ponytail: consentState drives all three v2 reads; null=no-org path (membership→null, early return)
   function makeDb(
-    consentFindFirstResult: { status: string; consentType: string } | null,
+    consentState: 'CONSENTED' | 'WITHDRAWN' | null,
     txReturnValue: {
       finalFieldsUpdated: string[];
       finalNotifications: unknown[];
@@ -2021,20 +2022,42 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
     },
   ) {
     const txMock = jest.fn().mockResolvedValue(txReturnValue);
-    const consentFindFirst = jest
-      .fn()
-      .mockResolvedValue(consentFindFirstResult);
+    // v2: isGdprProcessingAllowedV2 reads membership first, then consentGrant +
+    // consentRequest (via reduceBasisState). Seed all three to avoid hitting the
+    // needsMin db.select() branch (which fires when grant≠null && request==null).
+    const membershipFindFirst =
+      consentState === null
+        ? jest.fn().mockResolvedValue(null) // no-org → allowed, no further reads
+        : jest.fn().mockResolvedValue({ organizationId: 'org-1' });
+    const consentGrantFindFirst =
+      consentState === null
+        ? jest.fn().mockResolvedValue(null)
+        : jest.fn().mockResolvedValue({
+            granted: true,
+            withdrawnAt: consentState === 'WITHDRAWN' ? new Date() : null,
+            grantedAt: new Date(),
+          });
+    const consentRequestFindFirst =
+      consentState === null
+        ? jest.fn().mockResolvedValue(null)
+        : jest.fn().mockResolvedValue({
+            status: 'approved',
+            requestedAt: new Date(),
+            createdAt: new Date(),
+          });
     const db = {
       transaction: txMock,
       query: {
-        consentStates: { findFirst: consentFindFirst },
+        membership: { findFirst: membershipFindFirst },
+        consentGrant: { findFirst: consentGrantFindFirst },
+        consentRequest: { findFirst: consentRequestFindFirst },
       },
     } as unknown as Database;
-    return { db, txMock, consentFindFirst };
+    return { db, txMock };
   }
 
   it('enters the transaction when GDPR consent is CONSENTED (control)', async () => {
-    const { db, txMock } = makeDb({ status: 'CONSENTED', consentType: 'GDPR' });
+    const { db, txMock } = makeDb('CONSENTED');
     await applyAnalysis(db, profileId, validAnalysis, null);
     expect(txMock).toHaveBeenCalled();
   });
@@ -2050,7 +2073,7 @@ describe('applyAnalysis — GDPR consent gate (WI-221)', () => {
     // the txReturnValue — if the transaction fires, the test will see non-empty
     // fieldsUpdated and fail, proving the bug). After the fix the transaction
     // must NOT be entered.
-    const { db, txMock } = makeDb({ status: 'WITHDRAWN', consentType: 'GDPR' });
+    const { db, txMock } = makeDb('WITHDRAWN');
     const result = await applyAnalysis(db, profileId, validAnalysis, null);
     expect(result.fieldsUpdated).toEqual([]);
     expect(result.notifications).toEqual([]);
@@ -2121,25 +2144,39 @@ describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => 
     const whereFn = jest.fn().mockReturnValue({ for: forFn });
     const fromFn = jest.fn().mockReturnValue({ where: whereFn });
 
-    // tx.query.consentStates.findFirst → WITHDRAWN (in-tx check)
-    const txConsentFindFirst = jest
-      .fn()
-      .mockResolvedValue({ status: 'WITHDRAWN', consentType: 'GDPR' });
-
+    // tx.query.* → WITHDRAWN (in-tx re-check). Non-null consentRequest avoids the
+    // needsMin db.select() branch (reduceBasisState fires select only when grant≠null
+    // && request==null). The tx.select chain above handles the profile lock read.
     const tx = {
       select: jest.fn().mockReturnValue({ from: fromFn }),
       update: txUpdate,
       insert: txInsert,
       query: {
-        consentStates: { findFirst: txConsentFindFirst },
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+        },
+        consentGrant: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({
+              granted: true,
+              withdrawnAt: new Date(),
+              grantedAt: new Date(),
+            }),
+        },
+        consentRequest: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({
+              status: 'approved',
+              requestedAt: new Date(),
+              createdAt: new Date(),
+            }),
+        },
       },
     };
 
-    // Outer db.query.consentStates.findFirst → CONSENTED (outer gate passes)
-    const outerConsentFindFirst = jest
-      .fn()
-      .mockResolvedValue({ status: 'CONSENTED', consentType: 'GDPR' });
-
+    // Outer db.query.* → CONSENTED (outer gate passes, tx is entered)
     const db = {
       transaction: jest
         .fn()
@@ -2147,7 +2184,27 @@ describe('applyAnalysis — in-transaction GDPR re-check (WI-82 TOCTOU)', () => 
           async (callback: (tx: unknown) => Promise<unknown>) => callback(tx),
         ),
       query: {
-        consentStates: { findFirst: outerConsentFindFirst },
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+        },
+        consentGrant: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({
+              granted: true,
+              withdrawnAt: null,
+              grantedAt: new Date(),
+            }),
+        },
+        consentRequest: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({
+              status: 'approved',
+              requestedAt: new Date(),
+              createdAt: new Date(),
+            }),
+        },
       },
     } as unknown as Database;
 
