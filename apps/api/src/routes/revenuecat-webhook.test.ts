@@ -2,6 +2,48 @@
 // RevenueCat Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
+// [WI-867] Dispatch seam mock — getRevenuecatWebhookHandlers now unconditionally
+// returns V2 handlers post flag-collapse. V2 handlers call billing-v2 functions
+// that use db.query.subscription (singular) which is not set up in the unit
+// mockDb. Mock dispatch to return the legacy handlers instead; those handlers
+// import from '../billing' and '../account' (already-mocked barrels), so all
+// existing assertions remain valid without change.
+// The route directly calls handlers.isRevenuecatEventProcessed and
+// handlers.ensureFreeSubscription — these delegate to the billing barrel via
+// dynamic require so Jest's module mock is respected at call time.
+// gc1-allow: WI-867 flag-collapse dispatch seam — V2 paths are covered by
+// apps/api/src/services/billing/billing-v2/revenuecat-webhook-handler-v2.integration.test.ts
+jest.mock('../services/billing/billing-v2/dispatch', () => {
+  const legacyHandler = jest.requireActual(
+    '../services/billing/revenuecat-webhook-handler',
+  ) as typeof import('../services/billing/revenuecat-webhook-handler');
+  return {
+    getRevenuecatWebhookHandlers: () => ({
+      resolveAccountId: legacyHandler.resolveAccountId,
+      // Delegate to billing barrel at call time so Jest mocks are respected
+      isRevenuecatEventProcessed: (
+        ...args: Parameters<
+          typeof import('../services/billing').isRevenuecatEventProcessed
+        >
+      ) => require('../services/billing').isRevenuecatEventProcessed(...args),
+      ensureFreeSubscription: (
+        ...args: Parameters<
+          typeof import('../services/billing').ensureFreeSubscription
+        >
+      ) => require('../services/billing').ensureFreeSubscription(...args),
+      handleInitialPurchase: legacyHandler.handleInitialPurchase,
+      handleRenewal: legacyHandler.handleRenewal,
+      handleCancellation: legacyHandler.handleCancellation,
+      handleExpiration: legacyHandler.handleExpiration,
+      handleBillingIssue: legacyHandler.handleBillingIssue,
+      handleSubscriberAlias: legacyHandler.handleSubscriberAlias,
+      handleProductChange: legacyHandler.handleProductChange,
+      handleNonRenewingPurchase: legacyHandler.handleNonRenewingPurchase,
+      handleUncancellation: legacyHandler.handleUncancellation,
+    }),
+  };
+});
+
 jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/kv',

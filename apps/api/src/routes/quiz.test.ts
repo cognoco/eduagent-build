@@ -55,22 +55,75 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue(null),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: 2014,
-      location: null,
-      consentStatus: 'CONSENTED',
-      hasPremiumLlm: false,
-    }),
-  };
-});
+// WI-867 flag-collapse: profile-scope middleware now calls findOwnerPersonScope /
+// getPersonScope from identity-v2/profile-v2 (db.select() join chains,
+// unrunnable on unit mock DB). services/profile seam removed.
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 2014 }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
+// [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
+// unconditionally post-collapse; account middleware calls ensureInitialTrialSubscriptionV2.
+// Both use db.execute()/db.transaction() paths the unit mock DB cannot satisfy.
+const mockSubscriptionRowQuiz = {
+  id: 'test-subscription-id',
+  accountId: 'test-account-id',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  tier: 'free' as const,
+  status: 'active' as const,
+  trialEndsAt: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  lastStripeEventId: null,
+  revenuecatOriginalAppUserId: null,
+  lastRevenuecatEventId: null,
+  lastRevenuecatEventTimestampMs: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+// WI-867 (ic-240): only the genuinely UNSEEDABLE writes are mocked here.
+// ensureFreeSubscriptionV2 / ensureInitialTrialSubscriptionV2 use
+// db.execute()/db.transaction() insert paths the unit mock DB cannot satisfy.
+// getEffectiveAccessForSubscriptionV2 (barrel + direct access-v2) and
+// getOrProvisionProfileQuotaUsageV2 are SEEDABLE reads — they run REAL against
+// the seeded db.query.subscription (beforeEach) and the route-metering-fixture's
+// db.query.profileQuotaUsage accessor (no override).
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureFreeSubscriptionV2/ensureInitialTrialSubscriptionV2 use db.execute()/db.transaction() insert paths the unit mock DB cannot satisfy; real paths covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: jest
+      .fn()
+      .mockResolvedValue(mockSubscriptionRowQuiz),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+// WI-867: direct-path mock for metering-v2 imported by legacy metering.ts without
+// going through the billing-v2 barrel. isPersonUnderSubscriptionV2 uses a
+// db.select().from().innerJoin() join chain that the route-metering-fixture's
+// select mock does not model — genuinely UNSEEDABLE, kept mocked.
+jest.mock(
+  '../services/billing/billing-v2/metering-v2' /* gc1-allow: continuity — metering.ts imports isPersonUnderSubscriptionV2 directly from metering-v2 (not barrel); uses db.select().from().innerJoin() join chain, not supported by route-metering-fixture's select mock; WI-905 gap: covered by metering-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2/metering-v2'),
+    isPersonUnderSubscriptionV2: jest.fn().mockResolvedValue(true),
+  }),
+);
 
 jest.mock('../services/streaks' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -315,6 +368,40 @@ beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
   (mockDb as any).query = {
+    // WI-867: identity tables required — resolveIdentityV2 (now unconditional)
+    // reads db.query.login / membership / organization; beforeEach resets .query
+    // so we must re-seed them here to prevent TypeError on .findFirst.
+    login: {
+      findFirst: jest.fn().mockResolvedValue({
+        personId: 'test-profile-id',
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+      }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    membership: {
+      findFirst: jest.fn().mockResolvedValue({
+        personId: 'test-profile-id',
+        organizationId: 'test-account-id',
+        roles: ['admin', 'learner'],
+      }),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          personId: 'test-profile-id',
+          organizationId: 'test-account-id',
+          roles: ['admin', 'learner'],
+        },
+      ]),
+    },
+    organization: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'test-account-id',
+        timezone: 'UTC',
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-01'),
+      }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     quizRounds: {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(undefined),
@@ -337,6 +424,22 @@ beforeEach(() => {
     },
     quizMissedItems: {
       findFirst: jest.fn().mockResolvedValue(undefined),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    // WI-867: subscription (singular) required — metering middleware calls
+    // getEffectiveAccessForSubscriptionV2 which reads db.query.subscription.findFirst;
+    // beforeEach resets .query so we re-seed here as seedable fallback.
+    subscription: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'test-subscription-id',
+        organizationId: 'test-account-id',
+        planTier: 'free',
+        status: 'active',
+        trialEndsAt: null,
+        periodEndAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
       findMany: jest.fn().mockResolvedValue([]),
     },
   };

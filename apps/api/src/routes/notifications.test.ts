@@ -5,6 +5,25 @@
  * the service tests / integration path.
  */
 
+// WI-867 flag-collapse: route now calls listActiveChildCapNotificationsV2 /
+// recordChildCapNotificationForAccountV2 from billing-v2 (db.select() join
+// chains, unrunnable on unit mock DB). dismissChildCapNotification stays on
+// the legacy service (unchanged). No integration twin yet for the V2 path
+// through this route — tracked as WI-905 gap.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: WI-867 flag-collapse — route calls listActiveChildCapNotificationsV2/recordChildCapNotificationForAccountV2 from billing-v2 (db.select() join chains, unrunnable on unit mock DB); WI-905 gap: no route-level integration twin for listActiveChildCapNotificationsV2/recordChildCapNotificationForAccountV2 */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      listActiveChildCapNotificationsV2: jest.fn(),
+      recordChildCapNotificationForAccountV2: jest.fn(),
+    };
+  },
+);
+
 jest.mock(
   '../services/child-cap-notifications' /* gc1-allow: route unit isolation; service covers DB behavior */,
   () => {
@@ -13,9 +32,7 @@ jest.mock(
     ) as typeof import('../services/child-cap-notifications');
     return {
       ...actual,
-      listActiveChildCapNotifications: jest.fn(),
       dismissChildCapNotification: jest.fn(),
-      recordChildCapNotificationForAccount: jest.fn(),
     };
   },
 );
@@ -27,11 +44,11 @@ import { ERROR_CODES, ForbiddenError, NotFoundError } from '@eduagent/schemas';
 
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
+import { dismissChildCapNotification } from '../services/child-cap-notifications';
 import {
-  dismissChildCapNotification,
-  listActiveChildCapNotifications,
-  recordChildCapNotificationForAccount,
-} from '../services/child-cap-notifications';
+  listActiveChildCapNotificationsV2,
+  recordChildCapNotificationForAccountV2,
+} from '../services/billing/billing-v2';
 import { notificationsRoutes } from './notifications';
 
 const OWNER_PROFILE_ID = 'a0000000-0000-4000-8000-000000000010';
@@ -90,9 +107,11 @@ function makeApp(overrides?: {
   return app;
 }
 
-const listMock = jest.mocked(listActiveChildCapNotifications);
+const listMock = jest.mocked(listActiveChildCapNotificationsV2);
 const dismissMock = jest.mocked(dismissChildCapNotification);
-const recordForAccountMock = jest.mocked(recordChildCapNotificationForAccount);
+const recordForAccountMock = jest.mocked(
+  recordChildCapNotificationForAccountV2,
+);
 
 beforeEach(() => {
   jest.clearAllMocks();
