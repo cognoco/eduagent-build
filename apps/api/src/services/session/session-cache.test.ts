@@ -71,6 +71,24 @@ jest.mock('../learner-profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+const mockBuildHomeworkLibraryContext = jest.fn();
+const mockBuildBookLearningHistoryContext = jest.fn();
+jest.mock(
+  './session-context-builders' /* gc1-allow: session-cache unit test controls context-builder output to verify cache-key writes */,
+  () => {
+    const actual = jest.requireActual(
+      './session-context-builders',
+    ) as typeof import('./session-context-builders');
+    return {
+      ...actual,
+      buildHomeworkLibraryContext: (...args: unknown[]) =>
+        mockBuildHomeworkLibraryContext(...args),
+      buildBookLearningHistoryContext: (...args: unknown[]) =>
+        mockBuildBookLearningHistoryContext(...args),
+    };
+  },
+);
+
 const mockGetSubject = jest.fn();
 jest.mock('../subject' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
@@ -114,7 +132,10 @@ jest.mock(
 
 import {
   clearSessionStaticContextForProfile,
+  getCachedBookLearningHistoryContext,
+  getCachedHomeworkLibraryContext,
   getSessionStaticContext,
+  getSessionStaticContextCacheKey,
   getOrLoadSessionSupplementary,
   resetSessionStaticContextCache,
   _sessionStaticContextCacheSize,
@@ -135,10 +156,13 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     mockGetSubject.mockResolvedValue(null);
     mockLoadProfileRowById.mockResolvedValue(null);
     mockLoadProfileRowByIdV2.mockResolvedValue(null);
+    mockBuildHomeworkLibraryContext.mockResolvedValue('homework context');
+    mockBuildBookLearningHistoryContext.mockResolvedValue('book context');
   });
 
   async function makeCachedEntry(
     overrides: Partial<SessionStaticContextCacheEntry> = {},
+    identityV2Enabled = false,
   ): Promise<SessionStaticContextCacheEntry> {
     return getSessionStaticContext(
       {} as never,
@@ -148,6 +172,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         subjectId: overrides.subjectId ?? 'subject-1',
         topicId: overrides.topicId ?? null,
       } as never,
+      identityV2Enabled,
     );
   }
 
@@ -322,6 +347,69 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
 
     expect(_sessionStaticContextCacheSize()).toBe(0);
     expect(entry.supplementary).toBeUndefined();
+  });
+
+  it('[WI-911] identity-v2 supplementary loads write back to the identity-v2 cache entry', async () => {
+    const entry = await makeCachedEntry({}, true);
+
+    await getOrLoadSessionSupplementary(
+      {} as never,
+      'profile-1',
+      'session-1',
+      'subject-1',
+      false,
+      entry,
+      true,
+    );
+
+    expect(entry.supplementary).toEqual(expect.objectContaining({}));
+  });
+
+  it('[WI-911] identity-v2 homework context touches the identity-v2 key only', async () => {
+    await getCachedHomeworkLibraryContext(
+      {} as never,
+      'profile-1',
+      'session-1',
+      { subjectId: 'subject-1', topicId: null } as never,
+      true,
+    );
+
+    await getSessionStaticContext(
+      {} as never,
+      'profile-1',
+      'session-1',
+      { subjectId: 'subject-1', topicId: null } as never,
+      false,
+    );
+
+    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
+    expect(_sessionStaticContextCacheSize()).toBe(2);
+    expect(
+      getSessionStaticContextCacheKey('profile-1', 'session-1', true),
+    ).toBe('profile-1:session-1:idv2');
+  });
+
+  it('[WI-911] identity-v2 book context touches the identity-v2 key only', async () => {
+    await getCachedBookLearningHistoryContext(
+      {} as never,
+      'profile-1',
+      'session-1',
+      { subjectId: 'subject-1', topicId: null } as never,
+      'topic-1',
+      'book-1',
+      true,
+    );
+
+    await getSessionStaticContext(
+      {} as never,
+      'profile-1',
+      'session-1',
+      { subjectId: 'subject-1', topicId: null } as never,
+      false,
+    );
+
+    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
+    expect(_sessionStaticContextCacheSize()).toBe(2);
   });
 });
 
