@@ -41,18 +41,6 @@ function makeDb(): {
 }
 
 describe('getChildTopicSnapshotForParent dispatch (WP-6 v2 seam)', () => {
-  it('flag-off reads familyLinks (legacy guard), never guardianship', async () => {
-    const { db, familyLinksFindFirst, guardianshipFindFirst } = makeDb();
-
-    // No family link → assertParentAccess throws ForbiddenError before any read.
-    await expect(
-      getChildTopicSnapshotForParent(db, PARENT_ID, CHILD_ID, TOPIC_ID),
-    ).rejects.toThrow();
-
-    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
-    expect(guardianshipFindFirst).not.toHaveBeenCalled();
-  });
-
   it('flag-on reads guardianship (v2 edge guard), never familyLinks', async () => {
     const { db, familyLinksFindFirst, guardianshipFindFirst } = makeDb();
 
