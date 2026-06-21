@@ -2055,12 +2055,12 @@
       "fading_other": "{{count}} listos para repasar"
     },
     "weeklyDelta": {
-      "topicsMastered": "+{{count}} topic this week",
-      "topicsMastered_other": "+{{count}} topics this week",
-      "vocabularyTotal": "+{{count}} word this week",
-      "vocabularyTotal_other": "+{{count}} words this week",
-      "topicsExplored": "+{{count}} topic explored this week",
-      "topicsExplored_other": "+{{count}} topics explored this week"
+      "topicsMastered": "+{{count}} tema esta semana",
+      "topicsMastered_other": "+{{count}} temas esta semana",
+      "vocabularyTotal": "+{{count}} palabra esta semana",
+      "vocabularyTotal_other": "+{{count}} palabras esta semana",
+      "topicsExplored": "+{{count}} tema explorado esta semana",
+      "topicsExplored_other": "+{{count}} temas explorados esta semana"
     },
     "milestones": {
       "pageTitle": "Tus Hitos",
