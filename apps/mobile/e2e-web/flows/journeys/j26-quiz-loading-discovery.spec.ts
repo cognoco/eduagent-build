@@ -78,7 +78,39 @@ async function stubQuizDiscoveryCard(
   });
 }
 
+/**
+ * Neutralise every coach-band source that out-ranks quiz_discovery so the
+ * discovery card is the ONLY branch `LearnerScreen`'s `coachBand` useMemo can
+ * resolve. The priority chain (LearnerScreen.tsx) is:
+ *   1. fresh session-recovery marker  (SecureStore → web localStorage)
+ *   2. server resume target           (GET /v1/progress/resume-target)
+ *   3. overdue review                  (GET /v1/progress/review-summary)
+ *   4. quiz_discovery card             (← the branch under test)
+ * The earlier revision only stubbed (2) and (3); against a backend whose
+ * `onboarding-complete` seed yields a non-null resume target — or any page
+ * that carries a stale recovery marker — a higher-priority card preempted the
+ * discovery route and `home-coach-band-continue` navigated to /session instead
+ * of /quiz (flow-revision-plan QUIZ-16). Blocking ALL THREE higher-priority
+ * arms removes the assert→click race entirely: there is no other card the
+ * shared continue button can be bound to.
+ */
 async function stubQuizDiscoveryPriorityBlockers(page: Page): Promise<void> {
+  // (1) Recovery marker — wipe the SecureStore web-fallback key on every
+  // document load (before app JS runs) so a fresh marker can never win. The
+  // key is `session-recovery-marker[-<profileId>]`; clear every variant.
+  await page.addInitScript(() => {
+    try {
+      for (const key of Object.keys(window.localStorage)) {
+        if (key.startsWith('session-recovery-marker')) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      // localStorage may be unavailable on the very first about:blank; the
+      // app writes the marker only after sign-in, so a later load clears it.
+    }
+  });
+  // (2) Server resume target — always "nothing to resume".
   await page.route(RESUME_TARGET_GLOB, async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -86,6 +118,7 @@ async function stubQuizDiscoveryPriorityBlockers(page: Page): Promise<void> {
       body: JSON.stringify({ target: null }),
     });
   });
+  // (3) Overdue review — always "nothing overdue".
   await page.route(REVIEW_SUMMARY_GLOB, async (route: Route) => {
     await route.fulfill({
       status: 200,
