@@ -104,8 +104,12 @@ const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
 const mockGetNotificationPrefs = jest.fn();
 const mockUpsertNotificationPrefs = jest.fn();
+const mockGetChildCelebrationLevel = jest.fn();
+const mockUpsertCelebrationLevel = jest.fn();
+const mockUpsertChildCelebrationLevel = jest.fn();
 const mockGetWithdrawalArchivePreference = jest.fn();
 const mockUpsertWithdrawalArchivePreference = jest.fn();
+const mockRegisterPushToken = jest.fn();
 
 jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../services/settings');
@@ -119,12 +123,48 @@ jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
       mockGetNotificationPrefs(...args),
     upsertNotificationPrefs: (...args: unknown[]) =>
       mockUpsertNotificationPrefs(...args),
+    getChildCelebrationLevel: (...args: unknown[]) =>
+      mockGetChildCelebrationLevel(...args),
+    upsertCelebrationLevel: (...args: unknown[]) =>
+      mockUpsertCelebrationLevel(...args),
+    upsertChildCelebrationLevel: (...args: unknown[]) =>
+      mockUpsertChildCelebrationLevel(...args),
     getWithdrawalArchivePreference: (...args: unknown[]) =>
       mockGetWithdrawalArchivePreference(...args),
     upsertWithdrawalArchivePreference: (...args: unknown[]) =>
       mockUpsertWithdrawalArchivePreference(...args),
+    registerPushToken: (...args: unknown[]) => mockRegisterPushToken(...args),
   };
 });
+
+const mockNotifyParentToSubscribe = jest.fn();
+
+jest.mock(
+  '../services/notifications' /* gc1-allow: route unit test — side-effecting notification send replaced by behavior-controlled stub */,
+  () => {
+    const actual = jest.requireActual('../services/notifications');
+    return {
+      ...actual,
+      notifyParentToSubscribe: (...args: unknown[]) =>
+        mockNotifyParentToSubscribe(...args),
+    };
+  },
+);
+
+const mockSetAnalogyDomain = jest.fn();
+const mockSetNativeLanguage = jest.fn();
+
+jest.mock(
+  '../services/retention-data' /* gc1-allow: route unit test — DB-bound subject preference writes replaced by behavior-controlled stubs */,
+  () => {
+    const actual = jest.requireActual('../services/retention-data');
+    return {
+      ...actual,
+      setAnalogyDomain: (...args: unknown[]) => mockSetAnalogyDomain(...args),
+      setNativeLanguage: (...args: unknown[]) => mockSetNativeLanguage(...args),
+    };
+  },
+);
 
 import { Hono } from 'hono';
 import { app } from '../index';
@@ -134,6 +174,8 @@ import { ForbiddenError } from '@eduagent/schemas';
 
 const AUTH_HEADERS = makeAuthHeaders();
 const PROFILE_HEADERS = { ...AUTH_HEADERS, 'X-Profile-Id': 'profile-1' };
+const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
+const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   ...BASE_AUTH_ENV,
@@ -194,6 +236,18 @@ beforeEach(() => {
   });
   mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
   mockUpsertWithdrawalArchivePreference.mockResolvedValue({ value: 'auto' });
+  mockGetChildCelebrationLevel.mockResolvedValue('big_only');
+  mockUpsertCelebrationLevel.mockResolvedValue({ celebrationLevel: 'all' });
+  mockUpsertChildCelebrationLevel.mockResolvedValue({
+    celebrationLevel: 'all',
+  });
+  mockRegisterPushToken.mockResolvedValue(undefined);
+  mockNotifyParentToSubscribe.mockResolvedValue({
+    sent: true,
+    rateLimited: false,
+  });
+  mockSetAnalogyDomain.mockResolvedValue('sports');
+  mockSetNativeLanguage.mockResolvedValue('en');
 });
 
 describe('settings routes', () => {
@@ -434,6 +488,132 @@ describe('settings routes', () => {
 
     expect(res.status).toBe(403);
   });
+
+  describe('[BREAK][Issue 901] auto-resolved owner identity is not owner authority', () => {
+    const cases: Array<{
+      name: string;
+      path: string;
+      init?: RequestInit;
+      serviceMock: jest.Mock;
+    }> = [
+      {
+        name: 'GET /settings/withdrawal-archive',
+        path: '/v1/settings/withdrawal-archive',
+        serviceMock: mockGetWithdrawalArchivePreference,
+      },
+      {
+        name: 'GET /settings/celebration-level?childProfileId',
+        path: `/v1/settings/celebration-level?childProfileId=${CHILD_PROFILE_ID}`,
+        serviceMock: mockGetChildCelebrationLevel,
+      },
+      {
+        name: 'PUT /settings/notifications',
+        path: '/v1/settings/notifications',
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({
+            reviewReminders: true,
+            dailyReminders: true,
+            pushEnabled: true,
+          }),
+        },
+        serviceMock: mockUpsertNotificationPrefs,
+      },
+      {
+        name: 'PUT /settings/celebration-level self',
+        path: '/v1/settings/celebration-level',
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({ celebrationLevel: 'all' }),
+        },
+        serviceMock: mockUpsertCelebrationLevel,
+      },
+      {
+        name: 'PUT /settings/celebration-level child',
+        path: '/v1/settings/celebration-level',
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({
+            childProfileId: CHILD_PROFILE_ID,
+            celebrationLevel: 'all',
+          }),
+        },
+        serviceMock: mockUpsertChildCelebrationLevel,
+      },
+      {
+        name: 'PUT /settings/withdrawal-archive',
+        path: '/v1/settings/withdrawal-archive',
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({ value: 'auto' }),
+        },
+        serviceMock: mockUpsertWithdrawalArchivePreference,
+      },
+      {
+        name: 'PUT /settings/family-pool-breakdown-sharing',
+        path: '/v1/settings/family-pool-breakdown-sharing',
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({ value: true }),
+        },
+        serviceMock: mockUpsertFamilyPoolBreakdownSharing,
+      },
+      {
+        name: 'POST /settings/push-token',
+        path: '/v1/settings/push-token',
+        init: {
+          method: 'POST',
+          body: JSON.stringify({ token: 'ExponentPushToken[xxxxxxxxxx]' }),
+        },
+        serviceMock: mockRegisterPushToken,
+      },
+      {
+        name: 'POST /settings/notify-parent-subscribe',
+        path: '/v1/settings/notify-parent-subscribe',
+        init: { method: 'POST' },
+        serviceMock: mockNotifyParentToSubscribe,
+      },
+      {
+        name: 'PUT /settings/subjects/:subjectId/analogy-domain',
+        path: `/v1/settings/subjects/${SUBJECT_ID}/analogy-domain`,
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({ analogyDomain: 'sports' }),
+        },
+        serviceMock: mockSetAnalogyDomain,
+      },
+      {
+        name: 'PUT /settings/subjects/:subjectId/native-language',
+        path: `/v1/settings/subjects/${SUBJECT_ID}/native-language`,
+        init: {
+          method: 'PUT',
+          body: JSON.stringify({ nativeLanguage: 'en' }),
+        },
+        serviceMock: mockSetNativeLanguage,
+      },
+    ];
+
+    it.each(cases)(
+      'returns 403 for auto-resolved owner on $name',
+      async ({ path, init, serviceMock }) => {
+        const res = await app.request(
+          path,
+          {
+            ...init,
+            headers: {
+              ...AUTH_HEADERS,
+              'Content-Type': 'application/json',
+              ...(init?.headers ?? {}),
+            },
+          },
+          { ...TEST_ENV, API_ORIGIN: 'https://api.test' },
+        );
+
+        expect(res.status).toBe(403);
+        expect(serviceMock).not.toHaveBeenCalled();
+      },
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -453,8 +633,6 @@ describe('[WI-173 / DS-084] settings proxy-mode guard', () => {
     proxyApp.route('/', settingsRoutes);
     return proxyApp;
   }
-
-  const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -551,8 +729,6 @@ describe('[WI-173 / DS-084] settings proxy-mode guard', () => {
 // matching the pattern used by consent / learner-profile / onboarding.
 // ---------------------------------------------------------------------------
 describe('[CR LOW] child celebration routes require owner gate', () => {
-  const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
-
   function asNonOwnerProfile() {
     mockFamilyLinksFindFirst.mockResolvedValue({
       parentProfileId: 'profile-1',
