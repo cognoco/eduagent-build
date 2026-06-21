@@ -206,6 +206,7 @@ describe('Integration: assessment routes', () => {
       displayName: 'Assessment Child',
       birthYear: 2000,
       kind: 'child',
+      actingProfileId: ownerProfile.id,
     });
 
     const subject = await seedSubject(childProfile.id, 'Biology');
