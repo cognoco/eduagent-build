@@ -1,4 +1,4 @@
-import { withLock } from './async-mutex';
+import { __getLockCountForTests, withLock } from './async-mutex';
 
 describe('withLock', () => {
   it('serializes work for the same key', async () => {
@@ -17,5 +17,11 @@ describe('withLock', () => {
     ]);
 
     expect(order).toEqual(['a:start', 'a:end', 'b:start', 'b:end']);
+  });
+
+  it('removes completed lock entries', async () => {
+    await withLock('cleanup', async () => undefined);
+
+    expect(__getLockCountForTests()).toBe(0);
   });
 });
