@@ -5,7 +5,7 @@ import {
   type ScopeDescriptor,
 } from '@eduagent/schemas';
 
-import { ErrorFallback } from '../common';
+import { EmptyStateCard, ErrorFallback } from '../common';
 import { useApiQuery } from '../../hooks/use-api-query';
 import { useApiClient } from '../../lib/api-client';
 
@@ -30,6 +30,7 @@ export function PersonScopeStructuralSubjects({
     select: (json: unknown) =>
       supporteeStructuralSubjectsResponseSchema.parse(json),
   });
+  const subjects = query.data?.subjects ?? [];
 
   if (query.isLoading) {
     return (
@@ -76,22 +77,35 @@ export function PersonScopeStructuralSubjects({
       </Text>
 
       <View className="mt-4 gap-3">
-        {(query.data?.subjects ?? []).map((subject) => (
-          <View
-            key={subject.id}
-            className="rounded-card border border-border bg-surface p-4"
-            testID={`person-scope-subject-${subject.id}`}
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              {subject.name}
-            </Text>
-            <Text className="mt-1 text-body-sm text-text-secondary">
-              {t('supportHub.subjects.bookCount', {
-                count: subject.books.length,
-              })}
-            </Text>
-          </View>
-        ))}
+        {subjects.length === 0 ? (
+          <EmptyStateCard
+            title={t('supportHub.subjects.personEmptyTitle')}
+            message={t('supportHub.subjects.personEmptyMessage')}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => void query.refetch(),
+              testID: 'person-scope-subjects-empty-refresh',
+            }}
+            testID="person-scope-subjects-empty-state"
+          />
+        ) : (
+          subjects.map((subject) => (
+            <View
+              key={subject.id}
+              className="rounded-card border border-border bg-surface p-4"
+              testID={`person-scope-subject-${subject.id}`}
+            >
+              <Text className="text-h3 font-semibold text-text-primary">
+                {subject.name}
+              </Text>
+              <Text className="mt-1 text-body-sm text-text-secondary">
+                {t('supportHub.subjects.bookCount', {
+                  count: subject.books.length,
+                })}
+              </Text>
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );
