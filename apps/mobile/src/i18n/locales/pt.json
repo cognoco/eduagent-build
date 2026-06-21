@@ -1247,7 +1247,8 @@
       "repeat": "Repetir",
       "exitDictation": "Sair do ditado",
       "exit": "Sair",
-      "skipToPrevious": "Ir para a frase anterior"
+      "skipToPrevious": "Ir para a frase anterior",
+      "voiceUnavailableMessage": "Este dispositivo ainda não tem uma voz em {{language}} instalada. Adicione essa voz nas configurações do seu dispositivo e tente o ditado novamente."
     },
     "review": {
       "couldNotSaveTitle": "Não foi possível salvar o resultado",

@@ -1220,7 +1220,8 @@
       "repeat": "Gjenta",
       "exitDictation": "Avslutt diktat",
       "exit": "Avslutt",
-      "skipToPrevious": "Gå til forrige setning"
+      "skipToPrevious": "Gå til forrige setning",
+      "voiceUnavailableMessage": "Denne enheten har ikke en {{language}}-stemme installert ennå. Legg til stemmen i enhetsinnstillingene dine, og prøv diktat på nytt."
     },
     "review": {
       "couldNotSaveTitle": "Kunne ikke lagre resultat",

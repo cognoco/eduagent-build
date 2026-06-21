@@ -1220,7 +1220,8 @@
       "repeat": "Repetir",
       "exitDictation": "Salir del dictado",
       "exit": "Salir",
-      "skipToPrevious": "Ir a la oración anterior"
+      "skipToPrevious": "Ir a la oración anterior",
+      "voiceUnavailableMessage": "Este dispositivo todavía no tiene instalada una voz en {{language}}. Agrega esa voz en los ajustes de tu dispositivo y vuelve a intentar el dictado."
     },
     "review": {
       "couldNotSaveTitle": "No se pudo guardar el resultado",

@@ -1,14 +1,26 @@
-import { renderHook, act } from '@testing-library/react-native';
-import * as Speech from 'expo-speech';
+import React from 'react';
+import { Text } from 'react-native';
 import {
+  render,
+  renderHook,
+  act,
+  waitFor,
+} from '@testing-library/react-native';
+import * as Speech from 'expo-speech';
+import { useTranslation } from 'react-i18next';
+import {
+  getDictationVoiceLanguageName,
+  type PlaybackControls,
   useDictationPlayback,
   splitIntoChunks,
 } from './use-dictation-playback';
 import type { DictationSentence } from '@eduagent/schemas';
+import { ensureI18nReady } from '../i18n';
 
 jest.mock('expo-speech');
 const mockSpeak = jest.mocked(Speech.speak);
 const mockStop = jest.mocked(Speech.stop);
+const mockGetAvailableVoicesAsync = jest.mocked(Speech.getAvailableVoicesAsync);
 
 const TEST_SENTENCES: DictationSentence[] = [
   {
@@ -69,6 +81,52 @@ const CHUNKED_SENTENCES: DictationSentence[] = [
   },
 ];
 
+function VoiceUnavailableProbe({
+  language,
+}: {
+  language: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const playback = useDictationPlayback({
+    sentences: TEST_SENTENCES,
+    pace: 'normal',
+    punctuationReadAloud: false,
+    language,
+  });
+  const startedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    playback.start();
+  }, [playback]);
+
+  return React.createElement(
+    Text,
+    { testID: 'voice-unavailable-message' },
+    playback.state === 'unavailable'
+      ? t('dictation.playback.voiceUnavailableMessage', {
+          language: getDictationVoiceLanguageName(playback.voiceLanguage),
+        })
+      : '',
+  );
+}
+
+async function flushVoicePreflight(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+async function startPlayback(result: {
+  current: PlaybackControls;
+}): Promise<void> {
+  act(() => {
+    result.current.start();
+  });
+  await flushVoicePreflight();
+}
+
 describe('splitIntoChunks', () => {
   it('splits text into chunks of the given size', () => {
     expect(splitIntoChunks('one two three four five six', 2)).toEqual([
@@ -112,6 +170,20 @@ describe('useDictationPlayback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockGetAvailableVoicesAsync.mockResolvedValue([
+      {
+        identifier: 'en-US-voice',
+        name: 'English',
+        quality: Speech.VoiceQuality.Default,
+        language: 'en-US',
+      },
+      {
+        identifier: 'es-ES-voice',
+        name: 'Spanish',
+        quality: Speech.VoiceQuality.Default,
+        language: 'es-ES',
+      },
+    ]);
     // Simulate immediate speech completion
     mockSpeak.mockImplementation((_text, options) => {
       options?.onDone?.();
@@ -136,7 +208,63 @@ describe('useDictationPlayback', () => {
     expect(result.current.currentIndex).toBe(0);
   });
 
-  it('transitions to countdown on start', () => {
+  it('[WI-908] shows translated availability copy and does not speak when no target-language TTS voice exists', async () => {
+    await ensureI18nReady();
+    mockGetAvailableVoicesAsync.mockResolvedValue([
+      {
+        identifier: 'en-US-voice',
+        name: 'English',
+        quality: Speech.VoiceQuality.Default,
+        language: 'en-US',
+      },
+    ]);
+
+    const { getByTestId } = render(
+      React.createElement(VoiceUnavailableProbe, { language: 'fr' }),
+    );
+
+    await waitFor(() => {
+      expect(getByTestId('voice-unavailable-message').props.children).toBe(
+        "This device doesn't have a French voice installed yet. Add that voice in your device settings, then try dictation again.",
+      );
+    });
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
+
+  it('[WI-908] keeps playback unavailable when controls are pressed without a target-language voice', async () => {
+    mockGetAvailableVoicesAsync.mockResolvedValue([
+      {
+        identifier: 'en-US-voice',
+        name: 'English',
+        quality: Speech.VoiceQuality.Default,
+        language: 'en-US',
+      },
+    ]);
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'fr',
+      }),
+    );
+
+    await startPlayback(result);
+    expect(result.current.state).toBe('unavailable');
+
+    act(() => {
+      result.current.skip();
+      result.current.repeat();
+      result.current.previous();
+    });
+
+    expect(result.current.state).toBe('unavailable');
+    expect(result.current.currentIndex).toBe(0);
+    expect(mockSpeak).not.toHaveBeenCalled();
+  });
+
+  it('transitions to countdown on start', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: TEST_SENTENCES,
@@ -146,14 +274,12 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
 
     expect(result.current.state).toBe('countdown');
   });
 
-  it('pauses and resumes', () => {
+  it('pauses and resumes', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: TEST_SENTENCES,
@@ -163,9 +289,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     // Advance past countdown
     act(() => {
       jest.advanceTimersByTime(4000);
@@ -184,7 +308,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.state).not.toBe('paused');
   });
 
-  it('uses withPunctuation text when punctuationReadAloud is true', () => {
+  it('uses withPunctuation text when punctuationReadAloud is true', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: TEST_SENTENCES,
@@ -194,9 +318,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     // Advance past countdown
     act(() => {
       jest.advanceTimersByTime(4000);
@@ -209,7 +331,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('uses plain text when punctuationReadAloud is false', () => {
+  it('uses plain text when punctuationReadAloud is false', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: TEST_SENTENCES,
@@ -219,9 +341,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -233,7 +353,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('speaks long sentences in chunks', () => {
+  it('speaks long sentences in chunks', async () => {
     // Don't auto-complete speech — we need to control onDone manually
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
@@ -250,9 +370,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000); // Past countdown
     });
@@ -283,7 +401,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('repeat replays current chunk', () => {
+  it('repeat replays current chunk', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -299,9 +417,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -329,7 +445,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('skip advances to next sentence (not just next chunk)', () => {
+  it('skip advances to next sentence (not just next chunk)', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: LONG_SENTENCES,
@@ -340,9 +456,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -355,7 +469,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.currentIndex).toBe(1);
   });
 
-  it('transitions to complete after last chunk of last sentence', () => {
+  it('transitions to complete after last chunk of last sentence', async () => {
     const singleSentence: DictationSentence[] = [
       {
         text: 'Only one.',
@@ -373,9 +487,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     // Advance past countdown
     act(() => {
       jest.advanceTimersByTime(4000);
@@ -389,7 +501,7 @@ describe('useDictationPlayback', () => {
   });
 
   // RF-02: Test that pace changes mid-playback are picked up via configRef
-  it('uses updated pace when config changes mid-playback', () => {
+  it('uses updated pace when config changes mid-playback', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -406,9 +518,7 @@ describe('useDictationPlayback', () => {
       { initialProps: { pace: 'slow' as 'slow' | 'normal' | 'fast' } },
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000); // Past countdown
     });
@@ -433,7 +543,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.currentIndex).toBe(1);
   });
 
-  it('stop is called on pause', () => {
+  it('stop is called on pause', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({
         sentences: TEST_SENTENCES,
@@ -443,9 +553,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -469,7 +577,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.totalSentences).toBe(3);
   });
 
-  it('advances through all chunks then to next sentence', () => {
+  it('advances through all chunks then to next sentence', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -485,9 +593,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -532,7 +638,7 @@ describe('useDictationPlayback', () => {
     expect(result.current.currentIndex).toBe(1); // Now sentence 1
   });
 
-  it('uses pre-computed LLM chunks instead of mechanical splitting', () => {
+  it('uses pre-computed LLM chunks instead of mechanical splitting', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -548,9 +654,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -588,7 +692,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('uses chunksWithPunctuation when punctuationReadAloud is true', () => {
+  it('uses chunksWithPunctuation when punctuationReadAloud is true', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -603,9 +707,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -647,7 +749,7 @@ describe('useDictationPlayback', () => {
   // refactor re-introduces a stale closure (e.g. moves config back into a
   // useCallback dep array without including these fields), these tests fail.
   // -------------------------------------------------------------------------
-  it('[BREAK / BUG-166] picks up language change mid-playback', () => {
+  it('[BREAK / BUG-166] picks up language change mid-playback', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -664,9 +766,7 @@ describe('useDictationPlayback', () => {
       { initialProps: { language: 'en' } },
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000); // past countdown
     });
@@ -687,6 +787,7 @@ describe('useDictationPlayback', () => {
     act(() => {
       jest.advanceTimersByTime(5500); // sentence pause for slow pace
     });
+    await flushVoicePreflight();
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'Second sentence.',
@@ -694,7 +795,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('[BREAK / BUG-166] picks up punctuationReadAloud change mid-playback', () => {
+  it('[BREAK / BUG-166] picks up punctuationReadAloud change mid-playback', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -711,9 +812,7 @@ describe('useDictationPlayback', () => {
       { initialProps: { punctuationReadAloud: false } },
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -740,7 +839,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('[BREAK / BUG-166] picks up sentences array swap mid-playback', () => {
+  it('[BREAK / BUG-166] picks up sentences array swap mid-playback', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -785,9 +884,7 @@ describe('useDictationPlayback', () => {
       },
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -814,7 +911,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('falls back to splitIntoChunks when no pre-computed chunks exist', () => {
+  it('falls back to splitIntoChunks when no pre-computed chunks exist', async () => {
     mockSpeak.mockImplementation((_text, options) => {
       options?.onDone?.();
     });
@@ -829,9 +926,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -848,7 +943,7 @@ describe('useDictationPlayback', () => {
   // control was repeat() (re-speaks the current chunk); learners had no way to
   // hear the previous sentence again.
   // -------------------------------------------------------------------------
-  it('[WI-903] previous() goes back to the previous sentence and restarts it from the first chunk', () => {
+  it('[WI-903] previous() goes back to the previous sentence and restarts it from the first chunk', async () => {
     mockSpeak.mockImplementation((_text, options) => {
       options?.onDone?.();
     });
@@ -862,9 +957,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -887,7 +980,7 @@ describe('useDictationPlayback', () => {
     );
   });
 
-  it('[WI-903] previous() at the first sentence restarts it (clamps at index 0)', () => {
+  it('[WI-903] previous() at the first sentence restarts it (clamps at index 0)', async () => {
     mockSpeak.mockImplementation((_text, options) => {
       options?.onDone?.();
     });
@@ -901,9 +994,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000);
     });
@@ -926,7 +1017,7 @@ describe('useDictationPlayback', () => {
   // intentionally unchanged — only the gaps grow. The old 'slow' pause budget
   // becomes the new 'normal'.
   // -------------------------------------------------------------------------
-  it('[WI-904] normal pace waits longer between chunks than the old 2000ms/word', () => {
+  it('[WI-904] normal pace waits longer between chunks than the old 2000ms/word', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -942,9 +1033,7 @@ describe('useDictationPlayback', () => {
       }),
     );
 
-    act(() => {
-      result.current.start();
-    });
+    await startPlayback(result);
     act(() => {
       jest.advanceTimersByTime(4000); // past countdown
     });

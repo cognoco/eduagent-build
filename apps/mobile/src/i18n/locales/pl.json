@@ -1261,7 +1261,8 @@
       "repeat": "Powtórz",
       "exitDictation": "Wyjdź z dyktanda",
       "exit": "Wyjdź",
-      "skipToPrevious": "Przejdź do poprzedniego zdania"
+      "skipToPrevious": "Przejdź do poprzedniego zdania",
+      "voiceUnavailableMessage": "To urządzenie nie ma jeszcze zainstalowanego głosu {{language}}. Dodaj ten głos w ustawieniach urządzenia i spróbuj ponownie z dyktandem."
     },
     "review": {
       "couldNotSaveTitle": "Nie można zapisać wyniku",
