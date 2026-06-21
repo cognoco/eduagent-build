@@ -45,15 +45,18 @@ export function useApiReachability(): ApiReachability {
       controllerRef.current = controller;
       const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 
-      const res = await fetch(`${getApiUrl()}/v1/health`, {
-        method: 'GET',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      try {
+        const res = await fetch(`${getApiUrl()}/v1/health`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
 
-      setIsApiReachable(res.ok);
-    } catch {
-      setIsApiReachable(false);
+        setIsApiReachable(res.ok);
+      } catch {
+        setIsApiReachable(false);
+      } finally {
+        clearTimeout(timeout);
+      }
     } finally {
       setIsChecked(true);
       pendingRef.current = false;
