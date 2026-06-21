@@ -10,7 +10,13 @@ function createApp(): InstanceType<typeof Hono> {
   // remains exercised. A separate suite below covers the fail-closed
   // path when profileMeta is intentionally absent.
   app.use('*', async (c, next) => {
-    c.set('profileMeta' as never, { isOwner: true });
+    // [Issue 901] Production profileScopeMiddleware tags an explicitly selected
+    // owner profile with resolvedVia:'explicit-header'; mirror that so the
+    // owner-pass path is exercised faithfully.
+    c.set('profileMeta' as never, {
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    });
     await next();
   });
   app.post('/test', (c) => {
@@ -56,7 +62,10 @@ describe('assertNotProxyMode', () => {
 // (set server-side after verifying X-Profile-Id ownership) is authoritative.
 // ---------------------------------------------------------------------------
 
-function createAppWithProfileMeta(meta: { isOwner: boolean }) {
+function createAppWithProfileMeta(meta: {
+  isOwner: boolean;
+  resolvedVia?: 'auto' | 'explicit-header';
+}) {
   const app = new Hono();
   app.use('*', async (c, next) => {
     c.set('profileMeta' as never, meta);
@@ -88,18 +97,40 @@ describe('assertNotProxyMode — server-derived proxy mode [BUG-718]', () => {
   });
 
   it('allows writes for owner profile when X-Proxy-Mode header is absent', async () => {
-    const app = createAppWithProfileMeta({ isOwner: true });
+    const app = createAppWithProfileMeta({
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    });
     const res = await app.request('/test', { method: 'POST' });
     expect(res.status).toBe(200);
   });
 
   it('still honors X-Proxy-Mode:true on owner profile (cannot relax, can only tighten)', async () => {
-    const app = createAppWithProfileMeta({ isOwner: true });
+    const app = createAppWithProfileMeta({
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    });
     const res = await app.request('/test', {
       method: 'POST',
       headers: { 'X-Proxy-Mode': 'true' },
     });
     expect(res.status).toBe(403);
+  });
+
+  // [Issue 901 / BREAK] An auto-synthesized owner identity (no X-Profile-Id
+  // header → profileScopeMiddleware resolves the account owner with
+  // resolvedVia:'auto') must NOT pass the non-proxy gate, even though
+  // isOwner is true. Otherwise an authenticated non-owner could omit the
+  // header to be auto-resolved to the owner and regain write access.
+  it('[BREAK] rejects writes when owner identity was auto-resolved (resolvedVia:auto)', async () => {
+    const app = createAppWithProfileMeta({
+      isOwner: true,
+      resolvedVia: 'auto',
+    });
+    const res = await app.request('/test', { method: 'POST' });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.message).toBe('Not available in proxy mode');
   });
 });
 
@@ -159,7 +190,7 @@ describe('assertNotProxyMode - real route integration', () => {
       {
         method: 'DELETE',
         headers: { 'X-Proxy-Mode': 'true' },
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -188,7 +219,7 @@ describe('assertNotProxyMode - real route integration', () => {
       '/bookmarks/00000000-0000-4000-8000-000000000000',
       {
         method: 'DELETE',
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -268,7 +299,7 @@ describe('assertNotProxyMode - real route integration', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'note text' }),
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -293,7 +324,7 @@ describe('assertNotProxyMode - real route integration', () => {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: 'updated text' }),
-      }
+      },
     );
 
     expect(res.status).toBe(403);
@@ -314,7 +345,7 @@ describe('assertNotProxyMode - real route integration', () => {
 
     const res = await app.request(
       '/notes/00000000-0000-4000-8000-000000000001',
-      { method: 'DELETE' }
+      { method: 'DELETE' },
     );
 
     expect(res.status).toBe(403);

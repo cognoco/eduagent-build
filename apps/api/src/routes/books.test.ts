@@ -1266,7 +1266,7 @@ describe('[WI-139 / DS-050] books proxy-mode guard', () => {
       c.set('db' as never, {});
       c.set('profileId' as never, 'test-profile-id');
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: false });
+      c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
       await next();
     });
     proxyApp.route('/', bookRoutes);
@@ -1339,7 +1339,10 @@ describe('POST generate-topics — pre-generation dispatch lifetime', () => {
       c.set('db' as never, {});
       c.set('profileId' as never, 'test-profile-id');
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: true });
+      c.set('profileMeta' as never, {
+        isOwner: true,
+        resolvedVia: 'explicit-header',
+      });
       await next();
     });
     ownerApp.route('/', bookRoutes);

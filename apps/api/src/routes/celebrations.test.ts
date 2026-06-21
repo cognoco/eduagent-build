@@ -15,7 +15,15 @@ function makeProxyApp(opts?: { isOwner?: boolean }) {
     c.set('db' as never, {});
     c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
     c.set('user' as never, { id: 'test-user' });
-    c.set('profileMeta' as never, { isOwner: opts?.isOwner ?? false });
+    const isOwner = opts?.isOwner ?? false;
+    // [Issue 901] Owner write sessions in production carry
+    // resolvedVia:'explicit-header' (an explicitly selected, verified owner).
+    // The owner gates reject auto-resolved owner identity, so simulate the
+    // verified path here for the owner case.
+    c.set('profileMeta' as never, {
+      isOwner,
+      resolvedVia: isOwner ? 'explicit-header' : 'auto',
+    });
     await next();
   });
   app.route('/', celebrationRoutes);

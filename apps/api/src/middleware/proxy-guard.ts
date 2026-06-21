@@ -62,6 +62,18 @@ export function assertNotProxyMode(
     });
   }
 
+  // [Issue 901] Reject auto-synthesized owner identity. When no X-Profile-Id
+  // header is sent, profileScopeMiddleware auto-resolves the account OWNER
+  // profile (isOwner:true) — so a non-owner caller could omit the header to
+  // pass the isOwner check above. A true (non-proxy) owner session must carry
+  // an explicitly selected, verified owner profile.
+  if (profileMeta.resolvedVia !== 'explicit-header') {
+    throw new HTTPException(403, {
+      message: PROXY_MODE_MESSAGE,
+      res: c.json(proxyModeBody, 403),
+    });
+  }
+
   // Belt-and-suspenders: client-supplied flag still rejected (cannot relax,
   // can only tighten — useful for owner-profile sessions that the client
   // wants treated as read-only for a switch transition).

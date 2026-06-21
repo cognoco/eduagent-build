@@ -91,6 +91,9 @@ describe('profileScopeMiddleware', () => {
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       isOwner: true,
+      // [Issue 901] An explicitly supplied + verified profile is tagged
+      // 'explicit-header' so the owner-only gates accept it.
+      resolvedVia: 'explicit-header',
     });
   });
 
@@ -107,6 +110,12 @@ describe('profileScopeMiddleware', () => {
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       isOwner: true,
+      // [Issue 901] The no-header auto-resolve path synthesizes the owner
+      // identity, so it is tagged 'auto'. The owner-only gates
+      // (assertOwnerProfile / assertNotProxyMode) reject 'auto' even though
+      // isOwner is true — an authenticated non-owner could otherwise omit the
+      // header to be auto-resolved to the owner (privilege escalation).
+      resolvedVia: 'auto',
     });
   });
 

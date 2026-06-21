@@ -70,16 +70,57 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-// [BUG-94 / A1-HIGH] family/add now gates on isOwner. Mock findOwnerProfile so
-// the profile-scope middleware auto-resolves to an owner profile. Without this,
-// the mock DB returns undefined and profileMeta.isOwner stays false → 403.
+// [BUG-94 / A1-HIGH] family/add gates on isOwner.
+//
+// [Issue 901] After the no-header auto-resolve fix, owner privileges require an
+// EXPLICITLY selected, verified owner profile (resolvedVia:'explicit-header').
+// Owner-gated success tests therefore send OWNER_AUTH_HEADERS (an explicit
+// X-Profile-Id = OWNER_PROFILE_ID); getProfile resolves that id to the owner.
+// findOwnerProfile (the auto-resolve path) is still mocked so the no-header
+// path is exercised by tests that deliberately assert it (e.g. BUG-825).
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
+  // Match the id findOwnerProfile returns ('test-profile-id') so the active
+  // profileId is identical whether resolution was auto (legacy tests) or via
+  // an explicit owner X-Profile-Id (Issue 901). Downstream assertions on the
+  // active profileId therefore stay unchanged.
+  const ownerProfileId = 'test-profile-id';
   return {
     ...actual,
     findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+    getProfile: jest
+      .fn()
+      .mockImplementation(
+        (db: unknown, profileId: string, accountId: string) => {
+          if (profileId === ownerProfileId && accountId === 'test-account-id') {
+            return Promise.resolve({
+              id: ownerProfileId,
+              accountId: 'test-account-id',
+              displayName: 'Owner',
+              avatarUrl: null,
+              birthYear: 1985,
+              location: 'EU',
+              consentStatus: 'CONSENTED',
+              isOwner: true,
+              hasPremiumLlm: false,
+              conversationLanguage: null,
+              pronouns: null,
+              createdAt: new Date('2025-01-01T00:00:00.000Z'),
+              updatedAt: new Date('2025-01-01T00:00:00.000Z'),
+            });
+          }
+          // Delegate to the real getProfile (reads the mocked db.query) so the
+          // non-owner break tests, which set mockProfileFindFirst to a child,
+          // continue to resolve via the DB path unchanged.
+          return (
+            actual.getProfile as unknown as (
+              ...a: unknown[]
+            ) => Promise<unknown>
+          )(db, profileId, accountId);
+        },
+      ),
   };
 });
 
@@ -229,6 +270,14 @@ import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const AUTH_HEADERS = makeAuthHeaders();
 
+// [Issue 901] Owner profile id resolved by the getProfile mock above. Owner-
+// gated success tests must send this as an explicit X-Profile-Id so the owner
+// gate sees a verified (explicit-header) owner, not an auto-synthesized one.
+const OWNER_PROFILE_ID = 'test-profile-id';
+const OWNER_AUTH_HEADERS = makeAuthHeaders({
+  'X-Profile-Id': OWNER_PROFILE_ID,
+});
+
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   ...BASE_AUTH_ENV,
@@ -350,7 +399,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -374,7 +423,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -400,7 +449,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -484,7 +533,7 @@ describe('billing routes', () => {
         '/v1/subscription/checkout',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
         },
         TEST_ENV,
@@ -511,7 +560,7 @@ describe('billing routes', () => {
         '/v1/subscription/checkout',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'yearly' }),
         },
         TEST_ENV,
@@ -533,7 +582,7 @@ describe('billing routes', () => {
         '/v1/subscription/checkout',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ tier: 'invalid', interval: 'monthly' }),
         },
         TEST_ENV,
@@ -547,7 +596,7 @@ describe('billing routes', () => {
         '/v1/subscription/checkout',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'weekly' }),
         },
         TEST_ENV,
@@ -568,6 +617,33 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this synthesized identity passed assertNotProxyMode's isOwner check and
+    // the checkout session would have been created (privilege escalation). The
+    // fix in assertNotProxyMode also requires resolvedVia:'explicit-header',
+    // which an auto-resolved profile lacks, so the request is rejected first.
+    it('[BREAK][Issue 901] POST /subscription/checkout returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ stripeCustomerId: 'cus_existing' }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription/checkout',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe checkout session must never be created.
+      expect(mockCheckoutCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -590,7 +666,7 @@ describe('billing routes', () => {
         '/v1/subscription/cancel',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
         },
         TEST_ENV,
       );
@@ -616,7 +692,7 @@ describe('billing routes', () => {
         '/v1/subscription/cancel',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
         },
         TEST_ENV,
       );
@@ -633,7 +709,7 @@ describe('billing routes', () => {
         '/v1/subscription/cancel',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
         },
         TEST_ENV,
       );
@@ -649,6 +725,27 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this satisfied assertNotProxyMode + assertOwnerProfile and the
+    // subscription was cancelled (privilege escalation). The fix tags
+    // auto-resolved identity resolvedVia:'auto', which the owner gates reject.
+    it('[BREAK] returns 403 and does not cancel when X-Profile-Id is omitted', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+
+      const res = await app.request(
+        '/v1/subscription/cancel',
+        { method: 'POST', headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The cancellation side effects must never fire.
+      expect(mockSubscriptionsUpdate).not.toHaveBeenCalled();
+      expect(mockMarkSubscriptionCancelled).not.toHaveBeenCalled();
     });
   });
 
@@ -668,7 +765,7 @@ describe('billing routes', () => {
         '/v1/subscription/top-up',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ amount: 500 }),
         },
         TEST_ENV,
@@ -687,7 +784,7 @@ describe('billing routes', () => {
         '/v1/subscription/top-up',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ amount: 999 }),
         },
         TEST_ENV,
@@ -709,6 +806,31 @@ describe('billing routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this auto-resolved identity satisfied assertOwnerProfile and the top-up
+    // payment intent would have been created (privilege escalation). The fix
+    // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
+    // and assertNotProxyMode both reject.
+    it('[BREAK][Issue 901] POST /subscription/top-up returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+
+      const res = await app.request(
+        '/v1/subscription/top-up',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ amount: 500 }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe payment intent must never be created.
+      expect(mockPaymentIntentsCreate).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -721,7 +843,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/usage',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -754,7 +876,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/usage',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -782,6 +904,10 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/usage',
+        // [Issue 901] /usage is intentionally NOT owner-gated; this test
+        // exercises the no-X-Profile-Id auto-resolve path (findOwnerProfile
+        // returns null → no active profile → 400). Must NOT send an explicit
+        // owner header or getProfile would resolve an active profile.
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -812,6 +938,8 @@ describe('billing routes', () => {
 
         const res = await app.request(
           '/v1/usage',
+          // [Issue 901] /usage not owner-gated; auto-resolve path with no owner
+          // (findOwnerProfile null) → no active profile → 400. Keep AUTH_HEADERS.
           { headers: AUTH_HEADERS },
           TEST_ENV,
         );
@@ -911,7 +1039,7 @@ describe('billing routes', () => {
         '/v1/subscription/portal',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
         },
         TEST_ENV,
       );
@@ -933,7 +1061,7 @@ describe('billing routes', () => {
         '/v1/subscription/portal',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
         },
         TEST_ENV,
       );
@@ -950,6 +1078,30 @@ describe('billing routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this auto-resolved identity satisfied assertOwnerProfile and the billing
+    // portal session would have been created (privilege escalation). The fix
+    // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
+    // and assertNotProxyMode both reject.
+    it('[BREAK][Issue 901] POST /subscription/portal returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+
+      const res = await app.request(
+        '/v1/subscription/portal',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe billing portal session must never be created.
+      expect(mockPortalCreate).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -962,7 +1114,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -982,7 +1134,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -1018,7 +1170,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
       );
 
@@ -1059,7 +1211,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
       );
 
@@ -1157,7 +1309,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
       );
 
@@ -1198,6 +1350,9 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
+        // [Issue 901] No X-Profile-Id → auto-resolve, and findOwnerProfile is
+        // null so no owner is resolved → 403. Keep AUTH_HEADERS to exercise the
+        // no-owner-resolvable path this test asserts.
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -1225,7 +1380,7 @@ describe('billing routes', () => {
         '/v1/byok-waitlist',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({}),
         },
         TEST_ENV,
@@ -1291,7 +1446,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/family',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -1311,7 +1466,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/family',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -1324,7 +1479,7 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/family',
-        { headers: AUTH_HEADERS },
+        { headers: OWNER_AUTH_HEADERS },
         TEST_ENV,
       );
 
@@ -1375,6 +1530,28 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body).not.toHaveProperty('family');
     });
+
+    // [Issue 901 / BREAK] Omitting X-Profile-Id auto-resolves the OWNER profile
+    // (isOwner:true). Before the fix, a non-owner caller could omit the header
+    // to read the family pool + member list (sibling identities, billing data).
+    // The fix rejects auto-resolved owner identity at the owner gate.
+    it('[BREAK] returns 403 and reads no family data when X-Profile-Id is omitted', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ tier: 'family' }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription/family',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockListFamilyMembers).not.toHaveBeenCalled();
+      expect(mockGetFamilyPoolStatus).not.toHaveBeenCalled();
+      const body = await res.json();
+      expect(body).not.toHaveProperty('family');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1392,7 +1569,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/add',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1415,7 +1592,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/add',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1433,7 +1610,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/add',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1449,7 +1626,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/add',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ profileId: 'not-a-uuid' }),
         },
         TEST_ENV,
@@ -1510,7 +1687,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/remove',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1577,7 +1754,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/remove',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1596,7 +1773,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/remove',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
@@ -1614,7 +1791,7 @@ describe('billing routes', () => {
         '/v1/subscription/family/remove',
         {
           method: 'POST',
-          headers: AUTH_HEADERS,
+          headers: OWNER_AUTH_HEADERS,
           body: JSON.stringify({ profileId: 'not-a-uuid' }),
         },
         TEST_ENV,

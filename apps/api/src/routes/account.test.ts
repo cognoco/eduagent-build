@@ -93,24 +93,46 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-// [CR-2026-05-19-H1] Mock findOwnerProfile so profileScopeMiddleware auto-resolve
-// path sets isOwner:true on profileMeta, allowing owner-gated routes to pass.
+// Shared owner profile id. Owner-gated route tests send this as an explicit
+// X-Profile-Id (see OWNER_AUTH_HEADERS) so profileScopeMiddleware resolves it
+// via the verified `getProfile` path (resolvedVia:'explicit-header'). The
+// auto-resolve (no-header) path is deliberately NOT used for owner-gated routes
+// — after the Issue 901 fix, an auto-synthesized owner is rejected by the owner
+// gates (a non-owner can omit X-Profile-Id; auto-resolution must not confer
+// owner privileges).
+const OWNER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
+
+// [CR-2026-05-19-H1] Mock findOwnerProfile (auto-resolve path) and getProfile
+// (explicit-header path) so owner-gated routes resolve an owner profile.
+// NOTE: the OWNER_PROFILE_ID literal is duplicated inside this factory because
+// jest hoists jest.mock() above the const declaration above; referencing the
+// const here would throw "Cannot access before initialization". The two must
+// stay in sync — enforced implicitly: the success-path tests fail
+// (getProfile/findOwnerProfile returns null → 403) if the literals diverge.
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
+  const ownerProfileId = 'a0000000-0000-4000-a000-000000000001';
+  const ownerProfile = {
+    id: ownerProfileId,
+    accountId: 'test-account-id',
+    displayName: 'Owner',
+    birthYear: 1990,
+    location: null,
+    consentStatus: null,
+    isOwner: true,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+  };
   return {
     ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'owner-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Owner',
-      birthYear: 1990,
-      location: null,
-      consentStatus: null,
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
+    findOwnerProfile: jest.fn().mockResolvedValue(ownerProfile),
+    getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
+      if (profileId === ownerProfileId && accountId === 'test-account-id') {
+        return Promise.resolve(ownerProfile);
+      }
+      return Promise.resolve(null);
     }),
   };
 });
@@ -182,7 +204,7 @@ jest.mock(
   '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
   () => ({
     findOwnerPersonScope: jest.fn().mockResolvedValue({
-      profileId: 'owner-profile-id',
+      profileId: 'a0000000-0000-4000-a000-000000000001',
       meta: {
         birthYear: 1990,
         location: null,
@@ -192,7 +214,29 @@ jest.mock(
         isOwner: true,
       },
     }),
-    getPersonScope: jest.fn().mockResolvedValue(null),
+    // [Issue 901] Resolve the explicit owner X-Profile-Id to the owner scope so
+    // v2 owner-gated route tests exercise the verified explicit-header path.
+    getPersonScope: jest
+      .fn()
+      .mockImplementation((_db, profileId, organizationId) => {
+        if (
+          profileId === 'a0000000-0000-4000-a000-000000000001' &&
+          organizationId === 'test-account-id'
+        ) {
+          return Promise.resolve({
+            profileId: 'a0000000-0000-4000-a000-000000000001',
+            meta: {
+              birthYear: 1990,
+              location: null,
+              consentStatus: null,
+              hasPremiumLlm: false,
+              conversationLanguage: 'en',
+              isOwner: true,
+            },
+          });
+        }
+        return Promise.resolve(null);
+      }),
   }),
 );
 
@@ -241,6 +285,7 @@ import {
   getDeletionStatus,
   scheduleDeletion,
 } from '../services/deletion';
+import { generateExport } from '../services/export';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
 import { findOwnerProfile } from '../services/profile';
@@ -258,6 +303,13 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost/test',
   CLERK_SECRET_KEY: 'sk_test',
 };
+
+// [Issue 901] Owner-gated route success-path tests must send an explicit owner
+// X-Profile-Id. After the fix, an auto-synthesized owner (no X-Profile-Id) is
+// rejected by the owner gates, so the no-header path no longer confers owner
+// privileges. These headers exercise the verified explicit-header path.
+const ownerAuthHeaders = (extra?: Record<string, string>) =>
+  makeAuthHeaders({ 'X-Profile-Id': OWNER_PROFILE_ID, ...extra });
 
 describe('account routes', () => {
   beforeAll(() => {
@@ -280,7 +332,7 @@ describe('account routes', () => {
     it('returns the authenticated account deletion status', async () => {
       const res = await app.request(
         '/v1/account/deletion-status',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         TEST_ENV,
       );
 
@@ -300,7 +352,7 @@ describe('account routes', () => {
 
       const res = await app.request(
         '/v1/account/deletion-status',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         TEST_ENV,
       );
 
@@ -336,7 +388,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -357,7 +409,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -391,7 +443,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -426,7 +478,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -461,7 +513,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -495,7 +547,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -529,7 +581,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -554,7 +606,7 @@ describe('account routes', () => {
         '/v1/account/delete',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -585,7 +637,7 @@ describe('account routes', () => {
         '/v1/account/cancel-deletion',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -616,7 +668,7 @@ describe('account routes', () => {
         '/v1/account/cancel-deletion',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
         },
         TEST_ENV,
       );
@@ -635,7 +687,7 @@ describe('account routes', () => {
     it('returns 200 with data export', async () => {
       const res = await app.request(
         '/v1/account/export',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         TEST_ENV,
       );
 
@@ -675,7 +727,7 @@ describe('account routes', () => {
         '/v1/account/email',
         {
           method: 'PATCH',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
           body: JSON.stringify({ email: 'new@example.com' }),
         },
         TEST_ENV,
@@ -700,7 +752,7 @@ describe('account routes', () => {
         '/v1/account/email',
         {
           method: 'PATCH',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
           body: JSON.stringify({ email: 'not-an-email' }),
         },
         TEST_ENV,
@@ -722,7 +774,7 @@ describe('account routes', () => {
         '/v1/account/email',
         {
           method: 'PATCH',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
           body: JSON.stringify({ email: 'new@example.com' }),
         },
         TEST_ENV,
@@ -742,7 +794,7 @@ describe('account routes', () => {
     it('returns the persisted account email for the owner', async () => {
       const res = await app.request(
         '/v1/account/email',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         TEST_ENV,
       );
 
@@ -775,7 +827,7 @@ describe('account routes', () => {
         '/v1/account/security-event',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
           body: JSON.stringify({ event: 'password_added' }),
         },
         TEST_ENV,
@@ -799,7 +851,7 @@ describe('account routes', () => {
         '/v1/account/security-event',
         {
           method: 'POST',
-          headers: makeAuthHeaders(),
+          headers: ownerAuthHeaders(),
           body: JSON.stringify({ event: 'email_changed' }),
         },
         TEST_ENV,
@@ -984,6 +1036,154 @@ describe('account routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [Issue 901] BREAK — owner-gated routes must NOT be reachable by simply
+  // omitting X-Profile-Id. profileScopeMiddleware auto-resolves the account
+  // OWNER profile (isOwner:true) on the no-header path; before the fix an
+  // authenticated NON-OWNER caller could exploit this to pass the owner gates
+  // (privilege escalation). These tests send a valid auth token but NO
+  // X-Profile-Id and NO X-Proxy-Mode header — the exact attack — and assert a
+  // 403 plus that the side-effecting service was never invoked.
+  //
+  // The findOwnerProfile mock (top of file) still returns isOwner:true, so the
+  // auto-resolve succeeds; the rejection comes purely from resolvedVia:'auto'
+  // being refused by assertOwnerProfile / assertNotProxyMode.
+  // -------------------------------------------------------------------------
+
+  describe('[Issue 901] no-header auto-resolve must not confer owner privileges', () => {
+    // [Issue 901 / CONSIDER] makeAuthHeaders() here represents ANY account-level
+    // JWT (owner OR child) — the vulnerability is header ABSENCE, not caller
+    // identity: any authenticated caller who omits X-Profile-Id is auto-resolved
+    // to the owner. The non-owner-CALLER path (a child's own JWT omitting the
+    // header) is covered by the account-deletion integration negative test.
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockUpdateAccountEmailFromClerk.mockClear();
+      // Reproduce the EXACT attack: findOwnerProfile DOES succeed and returns
+      // the OWNER (isOwner:true) — the no-header auto-resolve path. The prior
+      // describe block leaves findOwnerProfile resolving null, so restore the
+      // owner here. The rejection must therefore come from resolvedVia:'auto',
+      // not from an absent profileMeta.
+      (findOwnerProfile as jest.Mock).mockResolvedValue({
+        id: OWNER_PROFILE_ID,
+        accountId: 'test-account-id',
+        displayName: 'Owner',
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+    });
+
+    it('[BREAK] POST /v1/account/delete returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/delete',
+        { method: 'POST', headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can delete the account.',
+      });
+      // The destructive side effect must never have been scheduled.
+      expect(scheduleDeletion).not.toHaveBeenCalled();
+      expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] GET /v1/account/export returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/export',
+        { headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can export account data.',
+      });
+      expect(generateExport).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /v1/account/cancel-deletion returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/cancel-deletion',
+        { method: 'POST', headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can cancel account deletion.',
+      });
+      expect(cancelDeletion).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] PATCH /v1/account/email returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/email',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ email: 'new@example.com' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can change account email.',
+      });
+      expect(mockUpdateAccountEmailFromClerk).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /v1/account/security-event returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/security-event',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ event: 'password_added' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can manage account security.',
+      });
+      expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] GET /v1/account/deletion-status returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/account/deletion-status',
+        { headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toEqual({
+        code: ERROR_CODES.FORBIDDEN,
+        message: 'Only the account owner can view deletion status.',
+      });
+      expect(getDeletionStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [CUT-B2] v2 dispatch — flag=true routes to v2 twins
   // -------------------------------------------------------------------------
 
@@ -997,7 +1197,7 @@ describe('account routes', () => {
     it('[CUT-B2] GET /v1/account/deletion-status calls getDeletionStatusV2 when flag on', async () => {
       const res = await app.request(
         '/v1/account/deletion-status',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1017,7 +1217,7 @@ describe('account routes', () => {
     it('[CUT-B2] POST /v1/account/delete calls scheduleDeletionV2 + getPersonIdsForOrganizationV2 when flag on', async () => {
       const res = await app.request(
         '/v1/account/delete',
-        { method: 'POST', headers: makeAuthHeaders() },
+        { method: 'POST', headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1052,7 +1252,7 @@ describe('account routes', () => {
 
       const res = await app.request(
         '/v1/account/delete',
-        { method: 'POST', headers: makeAuthHeaders() },
+        { method: 'POST', headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1066,7 +1266,7 @@ describe('account routes', () => {
     it('[CUT-B2] POST /v1/account/cancel-deletion calls cancelDeletionV2 when flag on', async () => {
       const res = await app.request(
         '/v1/account/cancel-deletion',
-        { method: 'POST', headers: makeAuthHeaders() },
+        { method: 'POST', headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1087,7 +1287,7 @@ describe('account routes', () => {
 
       const res = await app.request(
         '/v1/account/cancel-deletion',
-        { method: 'POST', headers: makeAuthHeaders() },
+        { method: 'POST', headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1099,7 +1299,7 @@ describe('account routes', () => {
     it('[CUT-B2] GET /v1/account/export calls generateExportV2 when flag on', async () => {
       const res = await app.request(
         '/v1/account/export',
-        { headers: makeAuthHeaders() },
+        { headers: ownerAuthHeaders() },
         V2_TEST_ENV,
       );
 
@@ -1127,7 +1327,7 @@ describe('account routes', () => {
         '/v1/account/export',
         {
           headers: {
-            ...makeAuthHeaders(),
+            ...ownerAuthHeaders(),
             // Attacker supplies a different org id in a custom header —
             // the route must ignore it and use account.id from auth context.
             'X-Org-Id': 'attacker-org-id',
@@ -1157,7 +1357,7 @@ describe('account routes', () => {
         {
           method: 'POST',
           headers: {
-            ...makeAuthHeaders(),
+            ...ownerAuthHeaders(),
             'X-Org-Id': 'attacker-org-id',
           },
         },

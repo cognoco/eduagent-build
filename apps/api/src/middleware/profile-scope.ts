@@ -47,6 +47,20 @@ export interface ProfileMeta {
   // X-Proxy-Mode header. A non-owner profile being accessed via a parent's
   // account session is treated as a proxy session regardless of any header.
   isOwner: boolean;
+  // [Issue 901] How the profile identity was resolved by profileScopeMiddleware:
+  //   - 'explicit-header': X-Profile-Id was supplied and verified to belong to
+  //     the authenticated account (the caller actively selected this profile).
+  //   - 'auto': no X-Profile-Id header was sent, so the middleware synthesized
+  //     the account OWNER profile as a convenience for learner-scoped reads.
+  //
+  // The owner-only gates (assertOwnerProfile / assertNotProxyMode) MUST reject
+  // 'auto' resolution: an authenticated NON-OWNER caller can simply omit
+  // X-Profile-Id to be auto-resolved to the owner profile (isOwner:true),
+  // bypassing owner gating (privilege escalation). Owner privileges therefore
+  // require an EXPLICITLY selected, verified owner profile — never a synthesized
+  // one. Learner/self routes that auto-resolve do not call the owner gates, so
+  // their behavior is unchanged.
+  resolvedVia: 'auto' | 'explicit-header';
 }
 
 export type ProfileScopeEnv = {
@@ -134,7 +148,12 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
             const ownerScope = await findOwnerPersonScope(db, account.id);
             if (ownerScope) {
               c.set('profileId', ownerScope.profileId);
-              c.set('profileMeta', ownerScope.meta);
+              // [Issue 901] Auto-synthesized owner identity — mark it so the
+              // owner-only gates refuse it (see ProfileMeta.resolvedVia).
+              c.set('profileMeta', {
+                ...ownerScope.meta,
+                resolvedVia: 'auto',
+              });
             }
             // fall through to the shared `await next()` below (outside try).
           } else {
@@ -153,6 +172,10 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
                 // (no is_owner=true row in DB). The service now returns the real
                 // flag; the caller must not override it.
                 isOwner: owner.isOwner,
+                // [Issue 901] Auto-synthesized owner identity (no X-Profile-Id
+                // header) — mark it so the owner-only gates refuse it even
+                // though isOwner is true (see ProfileMeta.resolvedVia).
+                resolvedVia: 'auto',
               });
             }
           }
@@ -218,7 +241,9 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
         return forbidden(c, 'Profile does not belong to this account');
       }
       c.set('profileId', scope.profileId);
-      c.set('profileMeta', scope.meta);
+      // [Issue 901] Explicitly selected + verified profile — eligible for the
+      // owner-only gates if it is in fact the owner.
+      c.set('profileMeta', { ...scope.meta, resolvedVia: 'explicit-header' });
       await next();
       return;
     }
@@ -239,6 +264,9 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       hasPremiumLlm: profile.hasPremiumLlm ?? false,
       conversationLanguage: profile.conversationLanguage,
       isOwner: profile.isOwner,
+      // [Issue 901] Explicitly selected + verified profile — eligible for the
+      // owner-only gates if it is in fact the owner.
+      resolvedVia: 'explicit-header',
     });
     await next();
     return;
