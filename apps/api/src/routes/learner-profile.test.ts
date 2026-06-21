@@ -748,7 +748,12 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockDeleteAllMemory).toHaveBeenCalled();
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
 
     it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
@@ -763,7 +768,13 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        'granted',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
   });
 
@@ -919,7 +930,12 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockDeleteAllMemory).toHaveBeenCalled();
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
 
     it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
@@ -934,7 +950,13 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        'granted',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
   });
 
