@@ -284,7 +284,7 @@ export default function TopicDetailScreen() {
             subjectName={subjectName}
             topicId={topicId}
             topicTitle={title}
-            triggerPath={`/child/${profileId}/curriculum/topic/${topicId}`}
+            triggerPath={`/child/${profileId}/topic/${topicId}`}
           />
         ) : null}
 

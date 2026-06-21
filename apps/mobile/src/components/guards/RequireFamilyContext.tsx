@@ -32,6 +32,7 @@ export function RequireFamilyContext({
   const router = useRouter();
   const enterFamilyMode = useEnterFamilyMode();
   const contract = useNavigationContract();
+  const [switchingToFamily, setSwitchingToFamily] = useState(false);
   const [switchFailed, setSwitchFailed] = useState(false);
   const { t } = useTranslation();
 
@@ -48,7 +49,7 @@ export function RequireFamilyContext({
       : contract.shape === 'family'
     : contract.effectiveAppContext === 'family';
 
-  if (canRender) {
+  if (canRender && !switchingToFamily) {
     return children;
   }
 
@@ -62,13 +63,17 @@ export function RequireFamilyContext({
 
   function handleSwitchToFamily(): void {
     setSwitchFailed(false);
+    setSwitchingToFamily(true);
     enterFamilyMode({
-      onSuccess: () => undefined,
+      onSuccess: () => {
+        setSwitchingToFamily(false);
+      },
       onError: () => {
         // Server rejected the family-context switch (e.g. owner lost
         // family-link, or under-18 — the API guard in profile.ts.
         // Stay on this screen and surface an actionable error so the
         // user does not silently land on Home with mode unchanged.
+        setSwitchingToFamily(false);
         setSwitchFailed(true);
       },
     });
@@ -99,6 +104,8 @@ export function RequireFamilyContext({
         <Pressable
           testID="family-route-switch-cta"
           className="mt-2 bg-primary rounded-xl px-6 py-3"
+          accessibilityState={{ disabled: switchingToFamily }}
+          disabled={switchingToFamily}
           onPress={handleSwitchToFamily}
         >
           <Text className="text-body font-semibold text-text-inverse">
