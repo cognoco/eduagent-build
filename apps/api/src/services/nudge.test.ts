@@ -216,13 +216,11 @@ function makeDb({
     .mockResolvedValue(
       fromDisplayName !== null ? [{ displayName: fromDisplayName }] : [],
     );
-  const selectWhereCount = jest
-    .fn()
-    .mockReturnValue(
-      Object.assign(Promise.resolve([{ count: nudgeCount }]), {
-        limit: selectLimitAfterCount,
-      }),
-    );
+  const selectWhereCount = jest.fn().mockReturnValue(
+    Object.assign(Promise.resolve([{ count: nudgeCount }]), {
+      limit: selectLimitAfterCount,
+    }),
+  );
 
   // .from() returns an object that can serve ALL shapes depending on what
   // the caller chains next. For nudge.ts the rate-limit call chains .where()
@@ -298,13 +296,11 @@ function makeDb({
       },
       consentGrant: { findFirst: jest.fn().mockResolvedValue(consentGrantRow) },
       consentRequest: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({
-            status: 'requested',
-            requestedAt: new Date(),
-            createdAt: new Date(),
-          }),
+        findFirst: jest.fn().mockResolvedValue({
+          status: 'requested',
+          requestedAt: new Date(),
+          createdAt: new Date(),
+        }),
       },
       // listUnreadNudges calls getGuardianPersonIds → db.query.guardianship.findMany.
       // Seed one guardian (the fromProfileId) so the early-return guard passes.
@@ -937,11 +933,12 @@ describe('[WI-803] listUnreadNudges v2 dispatch', () => {
     const db = makeDb({ listRows: [] });
     await listUnreadNudges(db, TO_PROFILE_ID);
     expect(
-      (db.query as { guardianship?: { findMany: jest.Mock } }).guardianship,
+      (db.query as unknown as { guardianship?: { findMany: jest.Mock } })
+        .guardianship,
     ).toBeDefined();
     expect(
-      (db.query as { guardianship: { findMany: jest.Mock } }).guardianship
-        .findMany,
+      (db.query as unknown as { guardianship: { findMany: jest.Mock } })
+        .guardianship.findMany,
     ).toHaveBeenCalled();
   });
 
