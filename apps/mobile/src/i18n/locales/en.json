@@ -1294,6 +1294,7 @@
       "keepGoing": "Keep going",
       "leave": "Leave",
       "noDataMessage": "No dictation data found. Please go back and try again.",
+      "voiceUnavailableMessage": "This device doesn't have a {{language}} voice installed yet. Add that voice in your device settings, then try dictation again.",
       "paceLabel": "Pace: {{pace}}. Tap to change.",
       "pace": {
         "slow": "Slow",

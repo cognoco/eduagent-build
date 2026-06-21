@@ -1220,7 +1220,8 @@
       "repeat": "Wiederholen",
       "exitDictation": "Diktat beenden",
       "exit": "Beenden",
-      "skipToPrevious": "Gehe zum vorherigen Satz"
+      "skipToPrevious": "Gehe zum vorherigen Satz",
+      "voiceUnavailableMessage": "Auf diesem Gerät ist noch keine {{language}}-Stimme installiert. Füge diese Stimme in den Geräteeinstellungen hinzu und versuche das Diktat dann erneut."
     },
     "review": {
       "couldNotSaveTitle": "Ergebnis konnte nicht gespeichert werden",

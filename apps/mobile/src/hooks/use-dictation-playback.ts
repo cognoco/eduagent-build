@@ -8,7 +8,14 @@ export type PlaybackState =
   | 'speaking'
   | 'waiting'
   | 'paused'
+  | 'unavailable'
   | 'complete';
+
+export type VoiceAvailabilityState =
+  | 'unknown'
+  | 'checking'
+  | 'available'
+  | 'unavailable';
 
 export interface PlaybackConfig {
   sentences: DictationSentence[];
@@ -23,6 +30,8 @@ export interface PlaybackControls {
   state: PlaybackState;
   currentIndex: number;
   totalSentences: number;
+  voiceAvailability: VoiceAvailabilityState;
+  voiceLanguage: string;
   start: () => void;
   pause: () => void;
   resume: () => void;
@@ -30,6 +39,8 @@ export interface PlaybackControls {
   previous: () => void;
   skip: () => void;
 }
+
+type VoiceAvailabilityResult = boolean | Promise<boolean>;
 
 // [WI-904] The gaps between chunks/sentences (writing time) were too short:
 // learners reported the default 'normal' pace felt rushed. The pauses are
@@ -48,6 +59,47 @@ const PACE_CONFIG: Record<
 
 // 3-second countdown before first sentence
 const COUNTDOWN_MS = 3500;
+
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  cs: 'Czech',
+  de: 'German',
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  it: 'Italian',
+  ja: 'Japanese',
+  nb: 'Norwegian',
+  pl: 'Polish',
+  pt: 'Portuguese',
+};
+
+function normalizeLanguageTag(language: string): string {
+  return language.trim().toLowerCase().replace(/_/g, '-');
+}
+
+function getBaseLanguage(language: string): string {
+  return normalizeLanguageTag(language).split('-')[0] ?? '';
+}
+
+function voiceMatchesLanguage(
+  voiceLanguage: string,
+  targetLanguage: string,
+): boolean {
+  const voice = normalizeLanguageTag(voiceLanguage);
+  const target = normalizeLanguageTag(targetLanguage);
+  if (!voice || !target) return false;
+  return (
+    voice === target ||
+    voice.startsWith(`${target}-`) ||
+    target.startsWith(`${voice}-`) ||
+    getBaseLanguage(voice) === getBaseLanguage(target)
+  );
+}
+
+export function getDictationVoiceLanguageName(language: string): string {
+  const base = getBaseLanguage(language);
+  return LANGUAGE_DISPLAY_NAMES[base] ?? language;
+}
 
 /**
  * Fallback: split text into chunks of approximately `size` words.
@@ -68,9 +120,16 @@ export function splitIntoChunks(text: string, size: number): string[] {
 export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   const [state, setState] = useState<PlaybackState>('idle');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [voiceAvailability, setVoiceAvailability] =
+    useState<VoiceAvailabilityState>('unknown');
 
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const voiceAvailabilityRef = useRef(voiceAvailability);
+  voiceAvailabilityRef.current = voiceAvailability;
+
+  const checkedVoiceLanguageRef = useRef<string | null>(null);
 
   const indexRef = useRef(currentIndex);
   indexRef.current = currentIndex;
@@ -95,6 +154,55 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
       pauseTimerRef.current = null;
     }
   }, []);
+
+  const setVoiceAvailabilityState = useCallback(
+    (next: VoiceAvailabilityState) => {
+      voiceAvailabilityRef.current = next;
+      setVoiceAvailability(next);
+    },
+    [],
+  );
+
+  const ensureVoiceAvailable = useCallback((): VoiceAvailabilityResult => {
+    const targetLanguage = normalizeLanguageTag(configRef.current.language);
+    if (!targetLanguage) {
+      setVoiceAvailabilityState('available');
+      checkedVoiceLanguageRef.current = targetLanguage;
+      return true;
+    }
+
+    if (
+      voiceAvailabilityRef.current === 'available' &&
+      checkedVoiceLanguageRef.current === targetLanguage
+    ) {
+      return true;
+    }
+
+    setVoiceAvailabilityState('checking');
+
+    return (async () => {
+      let voices: Speech.Voice[] = [];
+      try {
+        voices = await Speech.getAvailableVoicesAsync();
+      } catch {
+        voices = [];
+      }
+
+      const hasMatchingVoice = voices.some((voice) =>
+        voiceMatchesLanguage(voice.language, targetLanguage),
+      );
+      checkedVoiceLanguageRef.current = targetLanguage;
+
+      if (hasMatchingVoice) {
+        setVoiceAvailabilityState('available');
+        return true;
+      }
+
+      setVoiceAvailabilityState('unavailable');
+      setState('unavailable');
+      return false;
+    })();
+  }, [setVoiceAvailabilityState]);
 
   const getSentenceText = (index: number): string => {
     const sentence = configRef.current.sentences[index];
@@ -133,68 +241,84 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   });
 
   speakChunkRef.current = (sentenceIndex: number, chunkIndex: number) => {
-    const chunks = getChunksForSentence(sentenceIndex);
-    chunkIndexRef.current = chunkIndex;
+    const speakAfterVoiceCheck = () => {
+      const chunks = getChunksForSentence(sentenceIndex);
+      chunkIndexRef.current = chunkIndex;
 
-    if (chunkIndex >= chunks.length || chunks.length === 0) {
-      setState('complete');
+      if (chunkIndex >= chunks.length || chunks.length === 0) {
+        setState('complete');
+        return;
+      }
+
+      setState('speaking');
+      const { rate } = PACE_CONFIG[configRef.current.pace];
+
+      Speech.speak(chunks[chunkIndex] ?? '', {
+        language: configRef.current.language,
+        rate,
+        onDone: () => {
+          if (stateRef.current === 'paused') return;
+
+          // RF-02: Read pace config fresh — user may have changed pace mid-speech
+          const paceConfig = PACE_CONFIG[configRef.current.pace];
+
+          const isLastChunk = chunkIndex >= chunks.length - 1;
+          const isLastSentence =
+            sentenceIndex >= configRef.current.sentences.length - 1;
+
+          if (isLastChunk && isLastSentence) {
+            setState('complete');
+            return;
+          }
+
+          setState('waiting');
+
+          if (isLastChunk) {
+            // Sentence boundary — longer pause, advance to next sentence
+            const nextSentenceIndex = sentenceIndex + 1;
+            const action = () => {
+              setCurrentIndex(nextSentenceIndex);
+              speakChunkRef.current(nextSentenceIndex, 0);
+            };
+            nextActionRef.current = action;
+            pauseTimerRef.current = setTimeout(
+              action,
+              paceConfig.sentencePause,
+            );
+          } else {
+            // Chunk boundary — writing pause proportional to chunk word count
+            const chunkWordCount = (chunks[chunkIndex] ?? '')
+              .split(/\s+/)
+              .filter(Boolean).length;
+            const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
+            const nextChunkIndex = chunkIndex + 1;
+            const action = () => {
+              speakChunkRef.current(sentenceIndex, nextChunkIndex);
+            };
+            nextActionRef.current = action;
+            pauseTimerRef.current = setTimeout(action, chunkPause);
+          }
+        },
+        // H6: Reset state on TTS failure so playback never stays frozen in 'speaking'.
+        // onStopped fires when Speech.stop() is called externally (pause/skip),
+        // which is already handled by the pause/skip callbacks, so no extra reset needed there.
+        onError: () => {
+          if (stateRef.current !== 'paused') {
+            setState('idle');
+          }
+        },
+      });
+    };
+
+    const voiceAvailable = ensureVoiceAvailable();
+    if (voiceAvailable === true) {
+      speakAfterVoiceCheck();
       return;
     }
+    if (voiceAvailable === false) return;
 
-    setState('speaking');
-    const { rate } = PACE_CONFIG[configRef.current.pace];
-
-    Speech.speak(chunks[chunkIndex] ?? '', {
-      language: configRef.current.language,
-      rate,
-      onDone: () => {
-        if (stateRef.current === 'paused') return;
-
-        // RF-02: Read pace config fresh — user may have changed pace mid-speech
-        const paceConfig = PACE_CONFIG[configRef.current.pace];
-
-        const isLastChunk = chunkIndex >= chunks.length - 1;
-        const isLastSentence =
-          sentenceIndex >= configRef.current.sentences.length - 1;
-
-        if (isLastChunk && isLastSentence) {
-          setState('complete');
-          return;
-        }
-
-        setState('waiting');
-
-        if (isLastChunk) {
-          // Sentence boundary — longer pause, advance to next sentence
-          const nextSentenceIndex = sentenceIndex + 1;
-          const action = () => {
-            setCurrentIndex(nextSentenceIndex);
-            speakChunkRef.current(nextSentenceIndex, 0);
-          };
-          nextActionRef.current = action;
-          pauseTimerRef.current = setTimeout(action, paceConfig.sentencePause);
-        } else {
-          // Chunk boundary — writing pause proportional to chunk word count
-          const chunkWordCount = (chunks[chunkIndex] ?? '')
-            .split(/\s+/)
-            .filter(Boolean).length;
-          const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
-          const nextChunkIndex = chunkIndex + 1;
-          const action = () => {
-            speakChunkRef.current(sentenceIndex, nextChunkIndex);
-          };
-          nextActionRef.current = action;
-          pauseTimerRef.current = setTimeout(action, chunkPause);
-        }
-      },
-      // H6: Reset state on TTS failure so playback never stays frozen in 'speaking'.
-      // onStopped fires when Speech.stop() is called externally (pause/skip),
-      // which is already handled by the pause/skip callbacks, so no extra reset needed there.
-      onError: () => {
-        if (stateRef.current !== 'paused') {
-          setState('idle');
-        }
-      },
+    void voiceAvailable.then((available) => {
+      if (available) speakAfterVoiceCheck();
     });
   };
 
@@ -211,15 +335,30 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   );
 
   const start = useCallback(() => {
-    setState('countdown');
+    clearPauseTimer();
     setCurrentIndex(0);
     chunkIndexRef.current = 0;
-    pauseTimerRef.current = setTimeout(() => {
-      speakChunk(0, 0);
-    }, COUNTDOWN_MS);
-  }, [speakChunk]);
+    const beginCountdown = () => {
+      setState('countdown');
+      pauseTimerRef.current = setTimeout(() => {
+        speakChunk(0, 0);
+      }, COUNTDOWN_MS);
+    };
+
+    const voiceAvailable = ensureVoiceAvailable();
+    if (voiceAvailable === true) {
+      beginCountdown();
+      return;
+    }
+    if (voiceAvailable === false) return;
+
+    void voiceAvailable.then((available) => {
+      if (available) beginCountdown();
+    });
+  }, [speakChunk, clearPauseTimer, ensureVoiceAvailable]);
 
   const pause = useCallback(() => {
+    if (stateRef.current === 'unavailable') return;
     preStateRef.current = stateRef.current;
     setState('paused');
     clearPauseTimer();
@@ -227,6 +366,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   }, [clearPauseTimer]);
 
   const resume = useCallback(() => {
+    if (stateRef.current === 'unavailable') return;
     const prev = preStateRef.current;
     if (prev === 'speaking') {
       // Re-speak the current chunk
@@ -242,12 +382,14 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   }, [speakChunk]);
 
   const repeat = useCallback(() => {
+    if (stateRef.current === 'unavailable') return;
     clearPauseTimer();
     Speech.stop();
     speakChunk(indexRef.current, chunkIndexRef.current);
   }, [speakChunk, clearPauseTimer]);
 
   const skip = useCallback(() => {
+    if (stateRef.current === 'unavailable') return;
     clearPauseTimer();
     Speech.stop();
     const isLast = indexRef.current >= configRef.current.sentences.length - 1;
@@ -265,6 +407,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
   // chunk. Mirrors skip() in reverse. Clamps at index 0 — calling previous on
   // the first sentence restarts that sentence rather than going negative.
   const previous = useCallback(() => {
+    if (stateRef.current === 'unavailable') return;
     clearPauseTimer();
     Speech.stop();
     const prevIndex = Math.max(0, indexRef.current - 1);
@@ -285,6 +428,8 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     state,
     currentIndex,
     totalSentences: config.sentences.length,
+    voiceAvailability,
+    voiceLanguage: config.language,
     start,
     pause,
     resume,

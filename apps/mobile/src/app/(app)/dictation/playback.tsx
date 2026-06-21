@@ -5,7 +5,10 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { computeAgeBracket } from '@eduagent/schemas';
-import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
+import {
+  getDictationVoiceLanguageName,
+  useDictationPlayback,
+} from '../../../hooks/use-dictation-playback';
 import { useDictationPreferences } from '../../../hooks/use-dictation-preferences';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useProfile } from '../../../lib/profile';
@@ -81,6 +84,7 @@ export default function PlaybackScreen(): React.ReactElement {
 
   const isPaused = playback.state === 'paused';
   const isCountdown = playback.state === 'countdown';
+  const isVoiceUnavailable = playback.state === 'unavailable';
 
   if (!data) {
     return (
@@ -193,6 +197,7 @@ export default function PlaybackScreen(): React.ReactElement {
       <Pressable
         className="flex-1 items-center justify-center px-8"
         onPress={() => {
+          if (isVoiceUnavailable) return;
           if (isPaused) {
             playback.resume();
           } else {
@@ -201,13 +206,33 @@ export default function PlaybackScreen(): React.ReactElement {
         }}
         accessibilityRole="button"
         accessibilityLabel={
-          isPaused
-            ? t('dictation.playback.resumeDictation')
-            : t('dictation.playback.pauseDictation')
+          isVoiceUnavailable
+            ? t('dictation.playback.voiceUnavailableMessage', {
+                language: getDictationVoiceLanguageName(playback.voiceLanguage),
+              })
+            : isPaused
+              ? t('dictation.playback.resumeDictation')
+              : t('dictation.playback.pauseDictation')
         }
         testID="playback-tap-area"
       >
-        {isCountdown ? (
+        {isVoiceUnavailable ? (
+          <View
+            className="items-center max-w-sm"
+            testID="playback-voice-unavailable"
+          >
+            <Ionicons
+              name="volume-mute"
+              size={48}
+              color={colors.textSecondary}
+            />
+            <Text className="text-body text-text-secondary text-center mt-4 leading-relaxed">
+              {t('dictation.playback.voiceUnavailableMessage', {
+                language: getDictationVoiceLanguageName(playback.voiceLanguage),
+              })}
+            </Text>
+          </View>
+        ) : isCountdown ? (
           <Text className="text-h1 font-bold text-text-primary">
             {t('dictation.playback.ready')}
           </Text>

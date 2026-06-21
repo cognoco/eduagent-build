@@ -1220,7 +1220,8 @@
       "repeat": "リピート",
       "exitDictation": "ディクテーションを終了",
       "exit": "終了",
-      "skipToPrevious": "前の文に戻る"
+      "skipToPrevious": "前の文に戻る",
+      "voiceUnavailableMessage": "この端末にはまだ{{language}}の音声がインストールされていません。端末の設定でその音声を追加してから、ディクテーションをもう一度お試しください。"
     },
     "review": {
       "couldNotSaveTitle": "結果を保存できませんでした",
