@@ -3934,6 +3934,7 @@
   },
   "subjectsBrowse": {
     "title": "Temas",
+    "subtitle": "Todo lo que estás aprendiendo, en un solo lugar.",
     "searchPlaceholder": "Buscar temas",
     "showEverything": "Muéstramelo todo",
     "emptyTitle": "Aún no hay temas",

@@ -3934,6 +3934,7 @@
   },
   "subjectsBrowse": {
     "title": "Emner",
+    "subtitle": "Alt du lærer, samlet på ett sted.",
     "searchPlaceholder": "Søk i emner",
     "showEverything": "Vis meg alt",
     "emptyTitle": "Ingen emner ennå",

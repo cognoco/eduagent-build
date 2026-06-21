@@ -30,6 +30,9 @@ export function SubjectsBrowse({
       <Text className="text-h2 font-semibold text-text-primary">
         {t('subjectsBrowse.title')}
       </Text>
+      <Text className="mt-1 text-body-sm text-text-secondary">
+        {t('subjectsBrowse.subtitle')}
+      </Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
