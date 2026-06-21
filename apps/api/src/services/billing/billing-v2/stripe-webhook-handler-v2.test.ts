@@ -33,7 +33,7 @@ jest.mock(
 );
 
 jest.mock(
-  './safe-refresh-kv-cache-v2' /* gc1-allow: mirrors route-level test pattern */,
+  './safe-refresh-kv-cache-v2' /* gc1-allow: KV binding (Cloudflare Workers KV) is unavailable in the jest context; boundary under test is the handler refusing the binding mismatch, not the cache refresh */,
   () => ({
     safeRefreshKvCacheV2: jest.fn().mockResolvedValue(undefined),
   }),
@@ -195,6 +195,46 @@ describe('handleCheckoutCompletedV2 — customer↔account binding [security bre
       '2026-01-01T00:00:00.000Z',
     );
 
+    expect(activateSubscriptionFromCheckoutV2).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      '2026-01-01T00:00:00.000Z',
+    );
+    expect(captureException).not.toHaveBeenCalled();
+  });
+
+  it('ACTIVATES and skips the binding check when session.customer is null (unexpected, non-exploitable)', async () => {
+    // A paid subscription checkout normally carries a customer, but the Stripe
+    // type allows `string | Stripe.Customer | Stripe.DeletedCustomer | null`.
+    // When customer is null there is no anchor to verify against, so the guard
+    // short-circuits (no binding lookup) and the existing accountId-keyed
+    // activation proceeds unchanged. This exercises the security-critical
+    // skip branch: a missing customer must NOT block a legitimate activation,
+    // and must NOT escalate.
+    (activateSubscriptionFromCheckoutV2 as jest.Mock).mockResolvedValue(
+      mockActivatedSub(),
+    );
+
+    const session = {
+      id: 'cs_test_v2_null_customer',
+      subscription: 'sub_stripe_123',
+      customer: null,
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+      payment_status: 'paid',
+    } as unknown as Stripe.Checkout.Session;
+
+    await handleCheckoutCompletedV2(
+      mockDb,
+      mockKv,
+      session,
+      '2026-01-01T00:00:00.000Z',
+    );
+
+    // Guard skipped: the binding lookup is never consulted for a null customer.
+    expect(getSubscriptionByStripeCustomerIdV2).not.toHaveBeenCalled();
+    // Existing activation path proceeds unchanged; no escalation.
     expect(activateSubscriptionFromCheckoutV2).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
