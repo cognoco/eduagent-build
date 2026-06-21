@@ -618,6 +618,33 @@ describe('billing routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this synthesized identity passed assertNotProxyMode's isOwner check and
+    // the checkout session would have been created (privilege escalation). The
+    // fix in assertNotProxyMode also requires resolvedVia:'explicit-header',
+    // which an auto-resolved profile lacks, so the request is rejected first.
+    it('[BREAK][Issue 901] POST /subscription/checkout returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(
+        mockSubscription({ stripeCustomerId: 'cus_existing' }),
+      );
+
+      const res = await app.request(
+        '/v1/subscription/checkout',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe checkout session must never be created.
+      expect(mockCheckoutCreate).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -778,6 +805,31 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this auto-resolved identity satisfied assertOwnerProfile and the top-up
+    // payment intent would have been created (privilege escalation). The fix
+    // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
+    // and assertNotProxyMode both reject.
+    it('[BREAK][Issue 901] POST /subscription/top-up returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+
+      const res = await app.request(
+        '/v1/subscription/top-up',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ amount: 500 }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe payment intent must never be created.
+      expect(mockPaymentIntentsCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -1025,6 +1077,30 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+
+    // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
+    // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
+    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // this auto-resolved identity satisfied assertOwnerProfile and the billing
+    // portal session would have been created (privilege escalation). The fix
+    // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
+    // and assertNotProxyMode both reject.
+    it('[BREAK][Issue 901] POST /subscription/portal returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+
+      const res = await app.request(
+        '/v1/subscription/portal',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      // The Stripe billing portal session must never be created.
+      expect(mockPortalCreate).not.toHaveBeenCalled();
     });
   });
 
