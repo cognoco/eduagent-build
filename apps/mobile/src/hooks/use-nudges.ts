@@ -71,6 +71,7 @@ export function useMarkNudgeRead(): UseMutationResult<
       return { ...data, profileId };
     },
     onSuccess: (_data, _nudgeId, _context) => {
+      if (!_data.profileId) return;
       void queryClient.invalidateQueries({
         queryKey: ['nudges', 'unread', _data.profileId],
       });
@@ -96,6 +97,7 @@ export function useMarkAllNudgesRead(): UseMutationResult<
       return { ...data, profileId };
     },
     onSuccess: (_data) => {
+      if (!_data.profileId) return;
       void queryClient.invalidateQueries({
         queryKey: ['nudges', 'unread', _data.profileId],
       });
