@@ -1,6 +1,12 @@
-# App Launch smoke test — for dev-client APK on emulator
-# Assumes seed-and-run.sh has already gotten the app to the sign-in screen
-# (per the migration noted in _setup/launch-devclient.yaml's deprecation header).
+# App Launch smoke test — for dev-client APK on emulator.
+#
+# seed-and-run.sh runs `pm clear` before every launch, which wipes the
+# device-scoped preAuthIntroSeen.v1 flag. Since the 2026-05-27 pre-auth welcome
+# refactor (docs/plans/2026-05-27-pre-auth-welcome-flow.md), a freshly cleared
+# app therefore lands on the welcome-chooser — NOT directly on the sign-in
+# screen. This flow walks that pre-auth path first (shared, verified sub-flow:
+# chooser → 3-card deck → bridge → sign-in), then asserts the sign-in screen.
+#
 # DO NOT call this directly via `maestro test`; always invoke via:
 #   bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed apps/mobile/e2e/flows/app-launch-devclient.yaml
 appId: com.mentomate.app
@@ -8,7 +14,10 @@ tags:
   - smoke
   - devclient
 ---
-# Wait for sign-in screen (seed-and-run.sh already gets us here).
+# Navigate the pre-auth welcome flow to the sign-in screen.
+- runFlow: _setup/nav-welcome-to-sign-in.yaml
+
+# Wait for sign-in screen.
 # Use testID, not heading text — heading varies by first-time vs returning user.
 - extendedWaitUntil:
     visible:
