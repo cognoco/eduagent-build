@@ -258,9 +258,8 @@ export async function getSessionXpEntry(
     };
   }
 
-  const reflectedAmount = Math.round(entry.amount * REFLECTION_XP_MULTIPLIER);
   return {
     baseXp: entry.amount,
-    reflectionBonusXp: reflectedAmount - entry.amount,
+    reflectionBonusXp: 0,
   };
 }
