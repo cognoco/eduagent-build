@@ -55,13 +55,8 @@ async function retryModeSwitchIfNeeded(
   return true;
 }
 
-async function activateMode(toggle: Locator, mode: AppMode): Promise<void> {
-  if (mode === 'study') {
-    await domClick(toggle);
-    return;
-  }
-
-  await pressableClick(toggle);
+async function activateMode(toggle: Locator): Promise<void> {
+  await domClick(toggle);
 }
 
 async function waitForSwitchOutcome(
@@ -163,7 +158,7 @@ export async function switchAppMode(
       page,
       Math.min(remaining, SWITCH_SETTLE_TIMEOUT_MS),
     );
-    await activateMode(toggle, mode);
+    await activateMode(toggle);
 
     const settleTimeout = Math.min(remaining, SWITCH_SETTLE_TIMEOUT_MS);
     const outcome = await waitForSwitchOutcome(page, mode, settleTimeout);
