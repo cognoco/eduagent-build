@@ -22,6 +22,7 @@ import { useProfile } from '../../../lib/profile';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { getOnboardingStepLabels } from '../../../lib/onboarding-step-labels';
 import { platformAlert } from '../../../lib/platform-alert';
+import { Sentry } from '../../../lib/sentry';
 import { useThemeColors } from '../../../lib/theme';
 
 const PRESETS = ['she/her', 'he/him', 'they/them'] as const;
@@ -180,7 +181,19 @@ export default function PronounsScreen(): React.ReactElement {
     // forwards. Never blocks onboarding progress per spec, so navigate before
     // the best-effort clear can be delayed by network or cache refresh work.
     navigateForward();
-    updatePronouns.mutate({ pronouns: null });
+    updatePronouns.mutate(
+      { pronouns: null },
+      {
+        onError: (error) => {
+          Sentry.captureException(error, {
+            tags: {
+              screen: 'onboarding_pronouns',
+              action: 'skip_clear_pronouns',
+            },
+          });
+        },
+      },
+    );
   }, [updatePronouns, navigateForward]);
 
   const effectivePronouns = useMemo(() => {

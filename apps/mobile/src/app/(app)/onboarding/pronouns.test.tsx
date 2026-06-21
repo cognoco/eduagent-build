@@ -10,6 +10,7 @@ import {
   type Profile,
   type ProfileContextValue,
 } from '../../../lib/profile';
+import { Sentry } from '../../../lib/sentry';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -303,13 +304,37 @@ describe('PronounsScreen', () => {
         onError: expect.any(Function),
       }),
     );
-    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
+      { pronouns: null },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
     const startCallOrder =
       mockStartFirstCurriculumMutate.mock.invocationCallOrder[0];
     const clearCallOrder = mockUpdatePronounsMutate.mock.invocationCallOrder[0];
     expect(startCallOrder).toBeDefined();
     expect(clearCallOrder).toBeDefined();
     expect(startCallOrder!).toBeLessThan(clearCallOrder!);
+  });
+
+  it('captures skip clear failures to Sentry without blocking navigation', () => {
+    const clearError = new Error('pronoun clear failed');
+    const { getByTestId } = renderPronouns();
+
+    fireEvent.press(getByTestId('pronouns-skip'));
+    const skipClearCall = mockUpdatePronounsMutate.mock.calls[0];
+    skipClearCall[1].onError(clearError);
+
+    expect(mockStartFirstCurriculumMutate).toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      clearError,
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          screen: 'onboarding_pronouns',
+          action: 'skip_clear_pronouns',
+        }),
+      }),
+    );
+    expect(mockPlatformAlert).not.toHaveBeenCalled();
   });
 
   it('shows error alert on save failure', () => {
@@ -349,7 +374,10 @@ describe('PronounsScreen', () => {
     const { getByTestId, queryByTestId } = renderPronouns();
     fireEvent.press(getByTestId('pronouns-skip'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
-    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
+      { pronouns: null },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
     expect(queryByTestId('pronouns-skip')).toBeNull();
   });
 
@@ -474,7 +502,10 @@ describe('PronounsScreen', () => {
     ).toBeTruthy();
     // Skip remains the explicit-clear / skip path.
     fireEvent.press(getByTestId('pronouns-skip'));
-    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith({ pronouns: null });
+    expect(mockUpdatePronounsMutate).toHaveBeenCalledWith(
+      { pronouns: null },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   it('[BUG-799] an explicit user change wins over a late profile resolve', () => {
