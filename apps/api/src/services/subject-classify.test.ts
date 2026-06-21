@@ -150,25 +150,84 @@ describe('classifySubject', () => {
     );
   });
 
-  it('auto-matches with 0.9 confidence when learner has a single subject', async () => {
-    mockListSubjects.mockResolvedValueOnce([
-      makeSubject('sub-001', 'Mathematics'),
-    ]);
+  // A single enrolled subject previously short-circuited the LLM entirely and
+  // auto-assigned that subject to ANY text at 0.9 confidence with
+  // needsConfirmation=false — so an off-topic question (e.g. a chemistry
+  // question on a Statistics-only account) was silently filed under the wrong
+  // subject. Single-subject now runs the same LLM relevance check as the
+  // multi-subject path and respects the confidence threshold.
+  describe('single enrolled subject runs the LLM relevance check', () => {
+    it('assigns the subject without confirmation when the text clearly matches', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Mathematics'),
+      ]);
+      llmResponse({
+        matches: [{ subjectName: 'Mathematics', confidence: 0.95 }],
+        suggestedSubjectName: null,
+      });
 
-    const result = await classifySubject(
-      FAKE_DB,
-      PROFILE_ID,
-      'solve 2x + 5 = 15',
-    );
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'solve 2x + 5 = 15',
+      );
 
-    expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0]).toEqual({
-      subjectId: 'sub-001',
-      subjectName: 'Mathematics',
-      confidence: 0.9,
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]).toEqual({
+        subjectId: 'sub-001',
+        subjectName: 'Mathematics',
+        confidence: 0.95,
+      });
+      expect(result.needsConfirmation).toBe(false);
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
     });
-    expect(result.needsConfirmation).toBe(false);
-    expect(mockRouteAndCall).not.toHaveBeenCalled();
+
+    // [BREAK] Reproduces the reported bug: "why is water so unique" (chemistry)
+    // on a Statistics-only account was silently filed under Statistics. With the
+    // relevance check, an off-topic message the LLM does not match must NOT be
+    // auto-assigned — it asks instead and offers the suggested subject.
+    it('[BREAK] does not silently assign an off-topic message; asks instead', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Statistics'),
+      ]);
+      llmResponse({
+        matches: [],
+        suggestedSubjectName: 'Chemistry',
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'why is water so unique',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Chemistry');
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+    });
+
+    // A generous but low-confidence match (< 0.8) must still prompt for
+    // confirmation rather than committing the wrong subject silently.
+    it('asks for confirmation when the only match is below the confidence threshold', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Statistics'),
+      ]);
+      llmResponse({
+        matches: [{ subjectName: 'Statistics', confidence: 0.5 }],
+        suggestedSubjectName: null,
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'why is water so unique',
+      );
+
+      expect(result.candidates).toHaveLength(1);
+      expect(result.candidates[0]!.confidence).toBe(0.5);
+      expect(result.needsConfirmation).toBe(true);
+    });
   });
 
   it('returns high-confidence match from LLM with needsConfirmation=false', async () => {
@@ -568,7 +627,7 @@ describe('classifySubject', () => {
     );
 
     it('provides suggestedSubjectName when LLM returns no matches for a valid topic', async () => {
-      // Must have 2+ subjects to trigger LLM classification (single subject auto-matches)
+      // Two enrolled subjects exercise the LLM classification path
       mockListSubjects.mockResolvedValueOnce([
         makeSubject('sub-001', 'Mathematics'),
         makeSubject('sub-002', 'Physics'),
