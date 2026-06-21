@@ -2082,12 +2082,12 @@
       "fading_other": "{{count}} prontos para revisar"
     },
     "weeklyDelta": {
-      "topicsMastered": "+{{count}} topic this week",
-      "topicsMastered_other": "+{{count}} topics this week",
-      "vocabularyTotal": "+{{count}} word this week",
-      "vocabularyTotal_other": "+{{count}} words this week",
-      "topicsExplored": "+{{count}} topic explored this week",
-      "topicsExplored_other": "+{{count}} topics explored this week"
+      "topicsMastered": "+{{count}} tópico esta semana",
+      "topicsMastered_other": "+{{count}} tópicos esta semana",
+      "vocabularyTotal": "+{{count}} palavra esta semana",
+      "vocabularyTotal_other": "+{{count}} palavras esta semana",
+      "topicsExplored": "+{{count}} tópico explorado esta semana",
+      "topicsExplored_other": "+{{count}} tópicos explorados esta semana"
     },
     "milestones": {
       "pageTitle": "Seus Marcos",

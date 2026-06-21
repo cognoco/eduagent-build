@@ -2055,12 +2055,12 @@
       "fading_other": "{{count}}件復習の準備完了"
     },
     "weeklyDelta": {
-      "topicsMastered": "+{{count}} topic this week",
-      "topicsMastered_other": "+{{count}} topics this week",
-      "vocabularyTotal": "+{{count}} word this week",
-      "vocabularyTotal_other": "+{{count}} words this week",
-      "topicsExplored": "+{{count}} topic explored this week",
-      "topicsExplored_other": "+{{count}} topics explored this week"
+      "topicsMastered": "今週+{{count}}個のトピックを習得",
+      "topicsMastered_other": "今週+{{count}}個のトピックを習得",
+      "vocabularyTotal": "今週+{{count}}語",
+      "vocabularyTotal_other": "今週+{{count}}語",
+      "topicsExplored": "今週+{{count}}個のトピックを探索",
+      "topicsExplored_other": "今週+{{count}}個のトピックを探索"
     },
     "milestones": {
       "pageTitle": "あなたのマイルストーン",

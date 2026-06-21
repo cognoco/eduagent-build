@@ -2055,12 +2055,12 @@
       "fading_other": "{{count}} bereit zur Wiederholung"
     },
     "weeklyDelta": {
-      "topicsMastered": "+{{count}} topic this week",
-      "topicsMastered_other": "+{{count}} topics this week",
-      "vocabularyTotal": "+{{count}} word this week",
-      "vocabularyTotal_other": "+{{count}} words this week",
-      "topicsExplored": "+{{count}} topic explored this week",
-      "topicsExplored_other": "+{{count}} topics explored this week"
+      "topicsMastered": "+{{count}} Thema diese Woche",
+      "topicsMastered_other": "+{{count}} Themen diese Woche",
+      "vocabularyTotal": "+{{count}} Wort diese Woche",
+      "vocabularyTotal_other": "+{{count}} Wörter diese Woche",
+      "topicsExplored": "+{{count}} Thema diese Woche erkundet",
+      "topicsExplored_other": "+{{count}} Themen diese Woche erkundet"
     },
     "milestones": {
       "pageTitle": "Deine Meilensteine",
