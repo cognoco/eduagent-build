@@ -186,6 +186,19 @@ describe('onboarding routes', () => {
     mockFindConsentState.mockResolvedValue(undefined);
   });
 
+  function mockAutoResolvedOwnerProfile() {
+    const { findOwnerProfile } = jest.requireMock('../services/profile');
+    findOwnerProfile.mockResolvedValueOnce({
+      id: 'test-profile-id',
+      birthYear: 1990,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      isOwner: true,
+    });
+  }
+
   // ---- PATCH /v1/onboarding/language (self) --------------------------------
 
   describe('PATCH /v1/onboarding/language', () => {
@@ -935,6 +948,115 @@ describe('onboarding routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('[BREAK][Issue 901] auto-resolved owner identity is not owner authority', () => {
+    const validInterests = [{ label: 'Math', context: 'school' as const }];
+
+    it('returns 403 on self language when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/language',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child language when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/language`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on self pronouns when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/pronouns',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ pronouns: 'they/them' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child pronouns when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/pronouns`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ pronouns: 'they/them' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on self interests when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/interests/context',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ interests: validInterests }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateInterestsContext).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child interests when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/interests/context`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ interests: validInterests }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdateInterestsContext).not.toHaveBeenCalled();
     });
   });
 });
