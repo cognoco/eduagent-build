@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm';
 import {
   assessments,
   curricula,
@@ -474,8 +474,14 @@ export function buildSubjectMetric(
 export async function computeProgressMetrics(
   db: Database,
   profileId: string,
+  // [WI-878] Optional pre-loaded state. `buildKnowledgeInventory` already
+  // loads the full ProgressState for its own subject-inventory build; passing
+  // it in here avoids a redundant second `loadProgressState` (6+ table reads)
+  // on the no-snapshot and divergence recompute paths. When omitted (cron /
+  // refresh callers) the state is loaded as before.
+  preloadedState?: ProgressState,
 ): Promise<ProgressMetrics> {
-  const state = await loadProgressState(db, profileId);
+  const state = preloadedState ?? (await loadProgressState(db, profileId));
 
   if (state.subjects.length === 0) {
     return defaultMetrics();
@@ -717,9 +723,15 @@ export async function buildKnowledgeInventory(
   profileId: string,
 ): Promise<KnowledgeInventory> {
   const latestSnapshot = await getLatestSnapshot(db, profileId);
-  let metrics =
-    latestSnapshot?.metrics ?? (await computeProgressMetrics(db, profileId));
+  // [WI-878] Load the progress state once and reuse it for both the metrics
+  // computation (when there is no cached snapshot or a divergence forces a
+  // recompute) and the per-subject inventory build below. Previously this
+  // function could call `loadProgressState` twice — once transitively through
+  // `computeProgressMetrics` and once here — doubling the table reads.
   const state = await loadProgressState(db, profileId);
+  let metrics =
+    latestSnapshot?.metrics ??
+    (await computeProgressMetrics(db, profileId, state));
 
   // [BUG-872] When the cached snapshot's subject set diverges from live
   // state.subjects (e.g., a subject was added after the last snapshot was
@@ -737,7 +749,7 @@ export async function buildKnowledgeInventory(
       (s) => !liveSubjectIds.has(s.subjectId),
     );
     if (hasMissingLiveSubject || hasStaleCachedSubject) {
-      metrics = await computeProgressMetrics(db, profileId);
+      metrics = await computeProgressMetrics(db, profileId, state);
     }
   }
 
@@ -939,19 +951,27 @@ export async function getSnapshotsInRange(
   from: string,
   to: string,
 ): Promise<Array<{ snapshotDate: string; metrics: ProgressMetrics }>> {
+  // [WI-878] Push the date-range filter into SQL (backed by the existing
+  // (profile_id, snapshot_date) index) instead of materialising every lifetime
+  // snapshot for the profile and discarding out-of-range rows in JS. The
+  // `snapshotDate` column is a `date` whose string form is lexicographically
+  // ordered, so `gte`/`lte` against the ISO `from`/`to` strings return exactly
+  // the same inclusive set the old `>= from && <= to` JS predicate did.
   const rows = await db.query.progressSnapshots.findMany({
-    where: eq(progressSnapshots.profileId, profileId),
+    where: and(
+      eq(progressSnapshots.profileId, profileId),
+      gte(progressSnapshots.snapshotDate, from),
+      lte(progressSnapshots.snapshotDate, to),
+    ),
     orderBy: asc(progressSnapshots.snapshotDate),
   });
 
   // Range consumers (history chart) don't need `updatedAt`; strip to the
   // narrower shape so the public API stays intentional.
-  return rows
-    .filter((row) => row.snapshotDate >= from && row.snapshotDate <= to)
-    .map((row) => ({
-      snapshotDate: row.snapshotDate,
-      metrics: parseMetrics(row.metrics),
-    }));
+  return rows.map((row) => ({
+    snapshotDate: row.snapshotDate,
+    metrics: parseMetrics(row.metrics),
+  }));
 }
 
 function metricsToHistoryPoint(
@@ -1137,23 +1157,23 @@ async function previousSnapshotForToday(
   profileId: string,
   snapshotDate: string,
 ): Promise<ProgressMetrics | null> {
+  // [WI-878] Single targeted lookup for the most recent snapshot strictly
+  // before `snapshotDate`. The previous implementation fetched the latest row
+  // and, whenever it was today's (or a future) snapshot, fell back to loading
+  // EVERY snapshot for the profile to scan for the first earlier one. Pushing
+  // `lt(snapshotDate)` into SQL with desc ordering + an implicit limit-1
+  // returns exactly that earlier row in one round-trip, backed by the
+  // (profile_id, snapshot_date) index. Semantics are identical: both paths
+  // resolve to the newest row whose date is `< snapshotDate`, or null.
   const row = await db.query.progressSnapshots.findFirst({
-    where: eq(progressSnapshots.profileId, profileId),
+    where: and(
+      eq(progressSnapshots.profileId, profileId),
+      lt(progressSnapshots.snapshotDate, snapshotDate),
+    ),
     orderBy: desc(progressSnapshots.snapshotDate),
   });
 
-  if (!row || row.snapshotDate >= snapshotDate) {
-    const rows = await db.query.progressSnapshots.findMany({
-      where: eq(progressSnapshots.profileId, profileId),
-      orderBy: desc(progressSnapshots.snapshotDate),
-    });
-    const previous = rows.find(
-      (candidate) => candidate.snapshotDate < snapshotDate,
-    );
-    return previous ? parseMetrics(previous.metrics) : null;
-  }
-
-  return parseMetrics(row.metrics);
+  return row ? parseMetrics(row.metrics) : null;
 }
 
 // [FR237.6] Age-adapted detail text for milestone celebrations.

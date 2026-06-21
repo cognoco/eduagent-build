@@ -363,6 +363,73 @@ function makeSubjectMetric(
 }
 
 // ---------------------------------------------------------------------------
+// where-clause introspection
+// ---------------------------------------------------------------------------
+
+/**
+ * [WI-878] Drizzle SQL expressions are opaque objects, but the string-literal
+ * bound values (`eq(col, 'p')`, `gte(date, '2026-04-01')`, ...) are reachable
+ * by walking the chunk graph. Extracting them lets tests assert that a date
+ * range predicate was actually pushed into SQL — which is exactly the signal
+ * that distinguishes the new SQL-filtered query from the old
+ * "fetch all rows for the profile + filter in JS" implementation, whose `where`
+ * carried only the profileId literal.
+ */
+function extractStringLiterals(where: unknown): string[] {
+  const found: string[] = [];
+  const seen = new Set<unknown>();
+  const walk = (node: unknown, depth: number): void => {
+    if (node == null || depth > 8) return;
+    if (typeof node === 'object') {
+      if (seen.has(node)) return;
+      seen.add(node);
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item, depth + 1);
+      return;
+    }
+    if (typeof node === 'object') {
+      const rec = node as Record<string, unknown>;
+      if (typeof rec.value === 'string') found.push(rec.value);
+      for (const key of Object.keys(rec)) walk(rec[key], depth + 1);
+    }
+  };
+  walk(where, 0);
+  return found;
+}
+
+/**
+ * [WI-878] Simulate the real DB's date-range filtering so the unit mock matches
+ * production SQL semantics. `getSnapshotsInRange` now pushes `gte(from)`/
+ * `lte(to)` into the query; the DB returns only in-range rows. We mirror that
+ * by reading the literal bounds out of the `where` and applying them. With the
+ * OLD JS-filter implementation the `where` carried no date bounds, so this
+ * helper would return every row — and the range assertions would fail, which is
+ * the intended divergence signal.
+ */
+function applySnapshotRangeFilter(
+  rows: ReturnType<typeof makeSnapshotRow>[],
+  where: unknown,
+): ReturnType<typeof makeSnapshotRow>[] {
+  const literals = extractStringLiterals(where);
+  // Date literals are ISO yyyy-mm-dd; profileId is a uuid. Pick the dates.
+  const dateBounds = literals
+    .filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v))
+    .sort();
+  if (dateBounds.length < 2) {
+    // No range predicate present (e.g. profileId-only) — return all rows, which
+    // makes the inclusive/exclusive range tests fail. This is deliberate: it
+    // proves the filter is being done in SQL, not JS.
+    return rows;
+  }
+  const from = dateBounds[0]!;
+  const to = dateBounds[dateBounds.length - 1]!;
+  return rows.filter(
+    (row) => row.snapshotDate >= from && row.snapshotDate <= to,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // DB Mock builders
 // ---------------------------------------------------------------------------
 
@@ -378,7 +445,14 @@ function createSnapshotDb({
     query: {
       progressSnapshots: {
         findFirst: jest.fn().mockResolvedValue(findFirst),
-        findMany: jest.fn().mockResolvedValue(findMany),
+        // [WI-878] Apply the date-range predicate the production query pushes
+        // into SQL, so out-of-range fixture rows are excluded by the "DB",
+        // not by a JS filter inside the function under test.
+        findMany: jest
+          .fn()
+          .mockImplementation((args?: { where?: unknown }) =>
+            Promise.resolve(applySnapshotRangeFilter(findMany, args?.where)),
+          ),
       },
       milestones: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -694,6 +768,85 @@ describe('getSnapshotsInRange', () => {
 
     expect(result).toEqual([]);
   });
+
+  it('[WI-878] pushes the date range into the SQL where clause (not a JS filter)', async () => {
+    // The fixture rows span dates outside the requested range. The mock DB only
+    // excludes them when the `where` carries the `gte(from)`/`lte(to)` bounds —
+    // exactly what the SQL-filtered implementation passes. The OLD code queried
+    // by profileId alone and filtered in JS, so its `where` had no date
+    // literals: this assertion (and the range tests above, via the mock's
+    // applySnapshotRangeFilter) fails on that implementation.
+    const db = createSnapshotDb({
+      findMany: [
+        makeSnapshotRow({ snapshotDate: '2026-03-15' }),
+        makeSnapshotRow({ snapshotDate: '2026-04-10' }),
+        makeSnapshotRow({ snapshotDate: '2026-05-20' }),
+      ],
+    });
+
+    const result = await getSnapshotsInRange(
+      db,
+      profileId,
+      '2026-04-01',
+      '2026-04-30',
+    );
+
+    // Only the in-range row survives — proving the bounds reached the DB.
+    expect(result.map((r: SnapshotInRange) => r.snapshotDate)).toEqual([
+      '2026-04-10',
+    ]);
+
+    const findManyMock = db.query.progressSnapshots.findMany as jest.Mock;
+    const callArg = findManyMock.mock.calls[0]?.[0] as { where?: unknown };
+    const literals = extractStringLiterals(callArg.where);
+    // Both bounds must be present in the predicate the function handed to SQL.
+    expect(literals).toContain('2026-04-01');
+    expect(literals).toContain('2026-04-30');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// previousSnapshotForToday (exercised via refreshProgressSnapshot)
+// ---------------------------------------------------------------------------
+
+describe('previousSnapshotForToday query shape [WI-878]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (storeMilestones as jest.Mock).mockResolvedValue([]);
+    (detectMilestones as jest.Mock).mockReturnValue([]);
+  });
+
+  it('looks up the previous snapshot with a single lt(snapshotDate) query, not a full-table scan', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    // Latest stored snapshot IS today's — the scenario where the OLD code fell
+    // back to loading every snapshot row to find an earlier one.
+    const db = createSnapshotDb({
+      findFirst: makeSnapshotRow({
+        snapshotDate: today,
+        metrics: makeMetrics({ totalSessions: 9 }),
+      }),
+    });
+
+    await refreshProgressSnapshot(db, profileId);
+
+    const findFirstMock = db.query.progressSnapshots.findFirst as jest.Mock;
+    const findManyMock = db.query.progressSnapshots.findMany as jest.Mock;
+
+    // The previous-snapshot lookup is a findFirst carrying a date bound …
+    expect(findFirstMock).toHaveBeenCalled();
+    const datePredicateCall = findFirstMock.mock.calls.find((call) => {
+      const arg = call[0] as { where?: unknown } | undefined;
+      return extractStringLiterals(arg?.where).some((v) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(v),
+      );
+    });
+    expect(datePredicateCall).toBeDefined();
+
+    // … and crucially the function never falls back to a findMany scan of the
+    // snapshots table (the old second query). refreshProgressSnapshot itself
+    // issues no progressSnapshots.findMany at all.
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -764,7 +917,13 @@ describe('buildKnowledgeInventory', () => {
         subjects: [],
       }),
     );
-    expect(db.query.subjects.findMany).toHaveBeenCalledTimes(2);
+    // [WI-878] The divergence recompute reuses the ProgressState already loaded
+    // by buildKnowledgeInventory rather than re-loading it inside
+    // computeProgressMetrics. The whole call therefore loads progress state
+    // exactly once — subjects.findMany fires a single time, not twice as it did
+    // before the pre-loaded-state plumbing (which double-read every state table
+    // on this path). A regression to the old double-load would make this 2.
+    expect(db.query.subjects.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('includes currently working on entries from the learning profile', async () => {
@@ -791,6 +950,17 @@ describe('buildKnowledgeInventory', () => {
     const result = await buildKnowledgeInventory(db, profileId);
 
     expect(result.currentlyWorkingOn).toEqual(['fractions']);
+  });
+
+  it('[WI-878] loads progress state once when no cached snapshot exists', async () => {
+    // No snapshot → computeProgressMetrics must run. With the pre-loaded-state
+    // plumbing, buildKnowledgeInventory loads state once and hands it to
+    // computeProgressMetrics; the old code loaded it twice (once each).
+    const db = createSnapshotDb({ findFirst: undefined });
+
+    await buildKnowledgeInventory(db, profileId);
+
+    expect(db.query.subjects.findMany).toHaveBeenCalledTimes(1);
   });
 });
 
