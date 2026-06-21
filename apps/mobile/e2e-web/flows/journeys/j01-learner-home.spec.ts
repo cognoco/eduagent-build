@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('J-01 seeded learner lands on V2 mentor home @smoke', async ({ page }) => {
-  await page.goto('/home', { waitUntil: 'commit' });
+  await page.goto('/mentor', { waitUntil: 'commit' });
 
-  await expect(page).toHaveURL(/\/home(?:\?.*)?$/);
+  await expect(page).toHaveURL(/\/mentor(?:\?.*)?$/);
   await expect(page.getByTestId('mentor-screen')).toBeVisible({
     timeout: 60_000,
   });

@@ -10,6 +10,7 @@
 - **Quartet mechanics extracted (2026-06-20)** → `_wip/umbrella-program/quartet-learning-tracker.md` (PRG-05 productization input; 5 drained memories deleted, residual-bearing ones retained below).
 
 - **Cosmo WI finalization drained (2026-06-20)** → `_wip/umbrella-program/cosmo-finalization-guide.md` (3 memories merged: shepherd-finalization + execute-complete-finalize + reviewer-reads-objective). Covers: `complete` vs `replace_content`, parser-clean completion-summary, `Fixed In`, re-finalize after a bounce, closure-verification reads OBJECTIVE/NAME, append-parse deadlock → operator force-close.
+- [feedback_cosmo_refine_requires_code_inspection.md](feedback_cosmo_refine_requires_code_inspection.md) — Cosmo refinement must inspect current affected code/docs before `--to-ready`; do not promote from fields/DoR mechanics alone.
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
 - [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons moved to quartet-learning-tracker §E9): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
 

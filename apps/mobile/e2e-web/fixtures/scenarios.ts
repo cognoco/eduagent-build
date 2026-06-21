@@ -7,8 +7,7 @@ export const authScenarios = {
     seedScenario: 'onboarding-complete',
     email: buildSeedEmail('solo-learner'),
     storageStatePath: path.join(authStateDir, 'solo-learner.json'),
-    landingPath: '/home',
-    // V2 keeps /home as a compatible route but renders the Mentor shell.
+    landingPath: '/mentor',
     landingTestId: 'mentor-screen',
   },
   ownerWithChildren: {
@@ -16,13 +15,11 @@ export const authScenarios = {
     seedScenario: 'parent-multi-child',
     email: buildSeedEmail('owner-with-children'),
     storageStatePath: path.join(authStateDir, 'owner-with-children.json'),
-    landingPath: '/home',
-    // [WI-801] Under flag-on / V1-nav an adult owner with linked children resolves
-    // as a guardian and lands directly on FamilyHome (parent-home-screen) — the
-    // documented V1 guardian shell (FAMILY_TABS) — with no intermediate Study-mode
-    // step. The readiness assertion therefore waits for parent-home-screen; the
-    // prior learner-screen + ensureFamilyHome switch encoded the stale V0 flow.
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    // V2 removes the Family/Study mode switcher from chrome. This fixture is
+    // an adult owner with linked children, not a supporter-scope fixture, so it
+    // lands in the owner's own Mentor shell.
+    landingTestId: 'mentor-screen',
   },
 } as const;
 
