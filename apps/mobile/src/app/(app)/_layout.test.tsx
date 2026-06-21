@@ -1083,6 +1083,53 @@ describe('AppLayout', () => {
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
   });
+
+  // Accessibility: VoiceOver language annotation
+  // The root <View> must carry accessibilityLanguage so iOS VoiceOver uses the
+  // correct TTS voice for all descendants via inheritance — instead of falling
+  // back to the device's system-default language (which produces nonsensical
+  // TTS for e.g. German text read by a Japanese-configured device).
+  //
+  // Strategy: the test-setup initializes i18next with 'en'. We register a
+  // minimal 'de' bundle and call changeLanguage('de') synchronously (no async
+  // backend required) BEFORE rendering, then assert the rendered root view
+  // carries accessibilityLanguage='de'.
+  it('sets accessibilityLanguage on the root view to match the active i18n locale', async () => {
+    // i18next is a singleton exported as module.exports from the CJS build;
+    // require() returns the instance directly.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const i18n = require('i18next') as {
+      language: string;
+      addResourceBundle: (
+        lng: string,
+        ns: string,
+        resources: Record<string, string>,
+        deep?: boolean,
+        overwrite?: boolean,
+      ) => void;
+      changeLanguage: (lang: string) => Promise<void>;
+    };
+
+    const originalLanguage = i18n.language;
+
+    // Register a minimal stub so changeLanguage('de') does not trigger a
+    // missing-backend async load that never resolves.
+    i18n.addResourceBundle('de', 'translation', {}, false, true);
+    // changeLanguage is synchronous when the resource bundle is already loaded.
+    i18n.changeLanguage('de');
+
+    try {
+      renderLayout();
+
+      // await probe-state effect before the tab shell mounts.
+      await screen.findByTestId('tabs');
+
+      const rootView = screen.getByTestId('app-root-view');
+      expect(rootView.props.accessibilityLanguage).toBe('de');
+    } finally {
+      i18n.changeLanguage(originalLanguage);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

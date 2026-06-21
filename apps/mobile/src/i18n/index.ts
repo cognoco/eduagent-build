@@ -120,8 +120,10 @@ export function ensureI18nReady(): Promise<void> {
 }
 
 i18next.on('languageChanged', (lang) => {
-  // Per-component accessibilityLanguage propagation deferred — TODO: full
-  // screen-reader locale wiring for TalkBack/VoiceOver.
+  // iOS VoiceOver: root <View accessibilityLanguage> in (app)/_layout.tsx now
+  // propagates the BCP-47 locale to all descendants via VoiceOver inheritance.
+  // TODO: Android TalkBack requires per-<Text> accessibilityLanguage — no
+  // single-root inheritance mechanism; that propagation is a follow-up.
   if (__DEV__) console.log(`[i18n] languageChanged → ${lang}`);
 });
 
