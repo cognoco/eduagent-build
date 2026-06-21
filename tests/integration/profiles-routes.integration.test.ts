@@ -267,10 +267,16 @@ describe('Integration: PATCH /v1/profiles/:id', () => {
       `/v1/profiles/${created.id}`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders({
-          sub: PROFILE_USER.userId,
-          email: PROFILE_USER.email,
-        }),
+        // [Issue 901] Self-edit requires an explicitly selected profile — the
+        // real mobile client always sends X-Profile-Id (api-client.ts). The
+        // owner-update guard now rejects auto-resolved (headerless) callers.
+        headers: buildAuthHeaders(
+          {
+            sub: PROFILE_USER.userId,
+            email: PROFILE_USER.email,
+          },
+          created.id,
+        ),
         body: JSON.stringify({ displayName: 'Updated Name' }),
       },
       TEST_ENV,
