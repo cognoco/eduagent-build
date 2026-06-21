@@ -14,8 +14,17 @@ import { useDictationData } from './_layout';
 import {
   useReviewDictation,
   useRecordDictationResult,
+  DICTATION_REVIEW_TIMEOUT_MS,
 } from '../../../hooks/use-dictation-api';
 import { toLocalDateString } from '../../../lib/local-date';
+
+// [WI-901] The on-screen "took too long" backstop must sit ABOVE the review
+// request's own timeout, otherwise it would cancel a still-valid grading
+// before the (now longer) request budget elapses. When the request itself
+// times out first it rejects with a TimeoutError, which the catch below
+// surfaces as an honest "took too long / try again" alert; this UI timer only
+// fires in the pathological case where the request neither resolves nor aborts.
+const REVIEW_UI_TIMEOUT_MS = DICTATION_REVIEW_TIMEOUT_MS + 3_000;
 
 // RF-09: Dictation result is NOT auto-recorded on mount.
 // "I'm done" is an explicit user action that records the result.
@@ -47,7 +56,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
         reviewCancelledRef.current = true;
         latestReviewAttemptRef.current += 1;
         setReviewTimedOut(true);
-      }, 20_000);
+      }, REVIEW_UI_TIMEOUT_MS);
     } else {
       if (reviewTimeoutRef.current) clearTimeout(reviewTimeoutRef.current);
       setReviewTimedOut(false);

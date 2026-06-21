@@ -44,6 +44,13 @@ function isNetworkError(error: unknown): error is Error {
   return error instanceof Error && error.name === 'NetworkError';
 }
 
+// [WI-901] TimeoutError is distinct from NetworkError: the device is online,
+// the request just ran past its budget. Classify it to the timeout copy, not
+// the "you're offline" copy.
+function isTimeoutError(error: unknown): error is Error {
+  return error instanceof Error && error.name === 'TimeoutError';
+}
+
 function isNotFoundError(error: unknown): error is Error {
   return error instanceof Error && error.name === 'NotFoundError';
 }
@@ -388,6 +395,19 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
   if (isNetworkError(error)) {
     return {
       message: NETWORK_MESSAGE(),
+      category: 'network',
+      recovery: 'retry',
+    };
+  }
+
+  // [WI-901] Timeout — "took too long", retry. Classified before the generic
+  // paths so it never falls through to the offline copy. Uses the neutral
+  // `requestTimedOut` key (not the LLM-reply-specific `timedOut` at the SSE
+  // path below): a general client timeout has no "reply" and offers a Retry
+  // button, not a "reconnect" action.
+  if (isTimeoutError(error)) {
+    return {
+      message: i18next.t('errors.requestTimedOut'),
       category: 'network',
       recovery: 'retry',
     };

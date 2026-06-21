@@ -19,9 +19,12 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  TimeoutError,
   UpstreamError,
+  classifyFetchRejection,
 } from './api-errors';
 import { ForbiddenError, ConflictError } from './api-errors';
+import { createTimeoutSignal } from './query-timeout';
 
 const QUOTA_DETAILS = {
   tier: 'free' as const,
@@ -103,6 +106,62 @@ describe('NetworkError', () => {
     const fake = new Error('network');
     fake.name = 'NetworkError';
     expect(fake).not.toBeInstanceOf(NetworkError);
+  });
+});
+
+describe('TimeoutError', () => {
+  it('is instanceof TimeoutError and Error', () => {
+    const cause = Object.assign(new Error('Aborted'), { name: 'AbortError' });
+    const err = new TimeoutError(undefined, cause);
+    expect(err).toBeInstanceOf(TimeoutError);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.cause).toBe(cause);
+    expect(err.name).toBe('TimeoutError');
+  });
+
+  it('is NOT a NetworkError (distinct class)', () => {
+    expect(new TimeoutError()).not.toBeInstanceOf(NetworkError);
+  });
+
+  it('spoofed name does not pass instanceof', () => {
+    const fake = new Error('timeout');
+    fake.name = 'TimeoutError';
+    expect(fake).not.toBeInstanceOf(TimeoutError);
+  });
+});
+
+// [WI-901] A request aborted by our own timeout signal must classify as a
+// TimeoutError ("took too long"), NOT a NetworkError ("you're offline") — the
+// dictation photo-review was showing the misleading offline copy when the
+// vision-LLM call simply ran long.
+describe('classifyFetchRejection', () => {
+  it('classifies a timeout-signal abort as TimeoutError, not NetworkError', () => {
+    jest.useFakeTimers();
+    try {
+      const { signal, cleanup } = createTimeoutSignal(1000);
+      jest.advanceTimersByTime(1000); // fire the timeout → signal aborts
+      // Mirror the production order: classify in the `catch` BEFORE `cleanup`
+      // runs in the `finally`, so the test exercises the same signal state the
+      // real path sees.
+      try {
+        const abortErr = Object.assign(new Error('Aborted'), {
+          name: 'AbortError',
+        });
+        const result = classifyFetchRejection(abortErr, signal);
+        expect(result).toBeInstanceOf(TimeoutError);
+        expect(result).not.toBeInstanceOf(NetworkError);
+      } finally {
+        cleanup();
+      }
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('classifies a genuine fetch failure (TypeError, no abort) as NetworkError', () => {
+    const result = classifyFetchRejection(new TypeError('Failed to fetch'));
+    expect(result).toBeInstanceOf(NetworkError);
+    expect(result).not.toBeInstanceOf(TimeoutError);
   });
 });
 

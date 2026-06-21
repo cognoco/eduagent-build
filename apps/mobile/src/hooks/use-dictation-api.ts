@@ -18,10 +18,18 @@ export type RecordDictationResultInput = SchemaRecordDictationResultInput;
 // [FCR-2026-05-23-L6.L5] Dictation/drill mutation timeout guard.
 // Same class as L6.M4 (recall-test hung submission): without a hard timeout,
 // a hung API call leaves the dictation playback/review/complete screens stuck
-// on "submitting" indefinitely. The default 12s window matches the read-path
-// timeout in query-timeout.ts and is plenty for these short JSON submits.
-// Mutation throws AbortError on timeout; screens already surface error UIs.
-const DICTATION_MUTATION_TIMEOUT_MS = 15_000;
+// on "submitting" indefinitely. The 15s window is plenty for these short JSON
+// submits. Mutation throws AbortError on timeout; screens already surface
+// error UIs.
+export const DICTATION_MUTATION_TIMEOUT_MS = 15_000;
+
+// [WI-901] The photo-review call is NOT a short JSON submit — it uploads an
+// image and waits on a server-side vision-LLM grading whose provider timeout
+// is ~25s. The shared 15s budget aborted the client before a still-valid
+// grading returned, and that abort surfaced as a misleading "you're offline"
+// error. Give review its own budget comfortably above the server's 25s so the
+// client only times out when the server genuinely has.
+export const DICTATION_REVIEW_TIMEOUT_MS = 35_000;
 
 export function usePrepareHomework() {
   const client = useApiClient();
@@ -77,7 +85,7 @@ export function useReviewDictation() {
       input: DictationReviewInput,
     ): Promise<DictationReviewResult> => {
       const { signal, cleanup } = createTimeoutSignal(
-        DICTATION_MUTATION_TIMEOUT_MS,
+        DICTATION_REVIEW_TIMEOUT_MS,
       );
       try {
         const res = await client.dictation.review.$post(

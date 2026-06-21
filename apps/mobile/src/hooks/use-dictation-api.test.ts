@@ -2,7 +2,12 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId, setProxyMode } from '../lib/api-client';
-import { usePrepareHomework, useGenerateDictation } from './use-dictation-api';
+import {
+  usePrepareHomework,
+  useGenerateDictation,
+  DICTATION_MUTATION_TIMEOUT_MS,
+  DICTATION_REVIEW_TIMEOUT_MS,
+} from './use-dictation-api';
 
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
@@ -136,6 +141,19 @@ describe('usePrepareHomework', () => {
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBeDefined();
     expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+// [WI-901] The photo-review call makes a server-side vision-LLM request whose
+// provider timeout is ~25s. The client request timeout must exceed that so the
+// client never aborts a still-valid grading first (the old shared 15s timeout
+// did, surfacing a misleading "offline" error).
+describe('dictation review timeout (WI-901)', () => {
+  it('gives the photo review a client timeout longer than the server vision budget (25s) and the other dictation mutations', () => {
+    expect(DICTATION_REVIEW_TIMEOUT_MS).toBeGreaterThan(25_000);
+    expect(DICTATION_REVIEW_TIMEOUT_MS).toBeGreaterThan(
+      DICTATION_MUTATION_TIMEOUT_MS,
+    );
   });
 });
 
