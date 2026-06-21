@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { validateTranslation } from './translate';
+import { validateTranslation, type ValidationResult } from './translate';
 
 type NestedStrings = { [k: string]: string | NestedStrings };
 type SourceBaseline = Record<string, string>;
@@ -258,6 +258,23 @@ export function mergeTranslatedIntoPrevious(
     }
   }
   return merged;
+}
+
+export function validatePruneOnlyLocale(args: {
+  source: NestedStrings;
+  pruned: NestedStrings;
+  removedKeys: readonly string[];
+  lang: string;
+  glossary: Record<string, Record<string, string>>;
+}): ValidationResult {
+  const prunedFlat = flattenKeys(args.pruned);
+  const errors: ValidationResult['errors'] = [];
+  for (const key of args.removedKeys) {
+    if (key in prunedFlat) {
+      errors.push({ type: 'extra_key', key });
+    }
+  }
+  return { valid: errors.length === 0, errors, warnings: [] };
 }
 
 export function selectGeminiDiffKeys(args: {
@@ -588,12 +605,13 @@ async function main(): Promise<void> {
 
         if (translateKeys.length === 0) {
           const pruned = unflattenKeys(previousFlat);
-          const validation = validateTranslation(
+          const validation = validatePruneOnlyLocale({
             source,
             pruned,
+            removedKeys,
             lang,
             glossary,
-          );
+          });
           if (!validation.valid) {
             console.error(`[${lang}] Validation FAILED after pruning:`);
             for (const e of validation.errors) {
