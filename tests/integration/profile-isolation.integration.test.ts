@@ -44,6 +44,8 @@ async function createProfile(input: {
   displayName: string;
   birthYear: number;
   kind?: 'owner' | 'child';
+  /** Owner's profile id — required when kind === 'child'. */
+  actingProfileId?: string;
 }): Promise<{
   id: string;
   isOwner: boolean;
@@ -52,7 +54,10 @@ async function createProfile(input: {
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders({ sub: input.userId, email: input.email }),
+      headers: buildAuthHeaders(
+        { sub: input.userId, email: input.email },
+        input.actingProfileId,
+      ),
       body: JSON.stringify({
         ...(input.kind ? { kind: input.kind } : {}),
         displayName: input.displayName,
@@ -213,6 +218,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Second Profile',
       birthYear: 2012,
       kind: 'child',
+      actingProfileId: ownerProfile.id,
     });
 
     expect(ownerProfile.isOwner).toBe(true);
@@ -250,6 +256,7 @@ describe('Integration: Profile Isolation (P0-006)', () => {
       displayName: 'Teen Profile',
       birthYear: 2001,
       kind: 'child',
+      actingProfileId: ownerProfile.id,
     });
 
     await seedSubject(ownerProfile.id, 'Owner Mathematics');

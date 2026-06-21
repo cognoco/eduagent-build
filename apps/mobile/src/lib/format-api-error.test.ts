@@ -14,6 +14,7 @@ import {
   QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
+  TimeoutError,
   UpstreamError,
 } from './api-errors';
 import { ensureI18nReady } from '../i18n';
@@ -87,6 +88,23 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('retry');
     expect(result.blocksManualEntry).toBe(false);
     expect(result.message).toContain('offline');
+  });
+
+  // [WI-901] A timeout must read as "took too long / try again", never the
+  // "you're offline" copy — that misled dictation photo-review users whose
+  // device was online but whose vision-LLM grading ran long.
+  it('classifies TimeoutError as network / retry with a "took too long" message', () => {
+    const err = new TimeoutError();
+    const result = classifyApiError(err);
+    expect(result.category).toBe('network');
+    expect(result.recovery).toBe('retry');
+    expect(result.message.toLowerCase()).toContain('too long');
+    expect(result.message.toLowerCase()).not.toContain('offline');
+    // [WI-901 review] The general client-timeout path must not reuse the
+    // LLM-reply copy ("That reply took too long. Tap reconnect…") — a
+    // photo-review timeout has no "reply" and surfaces a Retry, not reconnect.
+    expect(result.message.toLowerCase()).not.toContain('reply');
+    expect(result.message.toLowerCase()).not.toContain('reconnect');
   });
 
   it('classifies NotFoundError as not-found / go-back', () => {

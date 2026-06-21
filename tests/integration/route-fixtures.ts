@@ -91,6 +91,11 @@ export function buildAuthHeaders(
 
 /**
  * Creates a profile through the real route.
+ *
+ * When creating a child profile (`kind:'child'`), pass `actingProfileId` set to
+ * the owner's profile id so the route receives `X-Profile-Id` — the real mobile
+ * client always sends this header and the route now requires it for child creates
+ * (Issue 901 guard: `resolvedVia === 'explicit-header'`).
  */
 export async function createProfileViaRoute(input: {
   app: AppLike;
@@ -99,6 +104,8 @@ export async function createProfileViaRoute(input: {
   displayName: string;
   birthYear: number;
   kind?: 'owner' | 'child';
+  /** Owner's profile id — required when kind === 'child'. */
+  actingProfileId?: string;
 }): Promise<{
   id: string;
   accountId: string;
@@ -111,10 +118,10 @@ export async function createProfileViaRoute(input: {
     '/v1/profiles',
     {
       method: 'POST',
-      headers: buildAuthHeaders({
-        sub: input.user.userId,
-        email: input.user.email,
-      }),
+      headers: buildAuthHeaders(
+        { sub: input.user.userId, email: input.user.email },
+        input.actingProfileId,
+      ),
       body: JSON.stringify({
         ...(input.kind ? { kind: input.kind } : {}),
         displayName: input.displayName,

@@ -75,7 +75,8 @@
     "emailNotVerified": "メールアドレスを確認してから、もう一度お試しください。",
     "quotaExceeded": "クォータを超えました",
     "resourceNotFound": "リソースが見つかりません",
-    "conflictState": "リクエストが現在の状態と競合しています"
+    "conflictState": "リクエストが現在の状態と競合しています",
+    "requestTimedOut": "時間がかかりすぎました。もう一度お試しください。"
   },
   "errorBoundary": {
     "title": "問題が発生しました",
@@ -1218,7 +1219,8 @@
       "repeatLastPhrase": "最後のフレーズを繰り返す",
       "repeat": "リピート",
       "exitDictation": "ディクテーションを終了",
-      "exit": "終了"
+      "exit": "終了",
+      "skipToPrevious": "前の文に戻る"
     },
     "review": {
       "couldNotSaveTitle": "結果を保存できませんでした",

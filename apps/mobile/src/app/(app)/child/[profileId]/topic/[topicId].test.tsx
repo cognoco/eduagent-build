@@ -91,7 +91,7 @@ describe('TopicDetailScreen', () => {
         subjectName: 'Mathematics',
         topicId: 'topic-1',
         topicTitle: 'Fractions',
-        triggerPath: '/child/child-1/curriculum/topic/topic-1',
+        triggerPath: '/child/child-1/topic/topic-1',
       }),
     );
   });

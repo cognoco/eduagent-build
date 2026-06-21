@@ -420,6 +420,36 @@ describe('RequireFamilyContext [PARENT-22] switch-to-family CTA', () => {
     cleanup();
   });
 
+  it('keeps protected child content unmounted while the app-context write is pending', async () => {
+    let resolvePatch: ((value: { profile: Profile }) => void) | undefined;
+    const pendingPatch = new Promise<{ profile: Profile }>((resolve) => {
+      resolvePatch = resolve;
+    });
+    const { result, routedFetch, cleanup } = mountBlockedGuard(
+      () => pendingPatch,
+    );
+
+    fireEvent.press(
+      await waitFor(() => result.getByTestId('family-route-switch-cta')),
+    );
+
+    await waitFor(() => {
+      const patches = fetchCallsMatching(routedFetch, '/app-context');
+      expect(patches.length).toBeGreaterThanOrEqual(1);
+    });
+    expect(result.queryByTestId('child-sentinel')).toBeNull();
+    expect(
+      result.getByTestId('family-route-switch-cta').props.accessibilityState
+        ?.disabled,
+    ).toBe(true);
+
+    resolvePatch?.({
+      profile: { ...studyGuardian, defaultAppContext: 'family' },
+    });
+
+    cleanup();
+  });
+
   it('switch CTA surfaces an inline error and does NOT navigate when the server rejects the family-context switch', async () => {
     const { result, cleanup } = mountBlockedGuard(
       () =>

@@ -180,7 +180,12 @@ describe('useCloneFromChild', () => {
 
     act(() => result.current.toast?.primaryAction?.onPress());
 
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(
+      1,
+      `/(app)/child/${CHILD_PROFILE_ID}/curriculum`,
+    );
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
       pathname: '/(app)/topic/relearn',
       params: {
         childProfileId: CHILD_PROFILE_ID,
@@ -519,6 +524,11 @@ describe('triggerSurface', () => {
     {
       label: 'child curriculum landing (trailing /curriculum)',
       triggerPath: `/child/${CHILD_PROFILE_ID}/curriculum`,
+      expected: 'child_curriculum_detail',
+    },
+    {
+      label: 'child topic detail',
+      triggerPath: `/child/${CHILD_PROFILE_ID}/topic/topic-9`,
       expected: 'child_curriculum_detail',
     },
     {

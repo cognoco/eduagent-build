@@ -88,6 +88,7 @@ const profileMeta: ProfileMeta = {
   hasPremiumLlm: false,
   conversationLanguage: 'en',
   isOwner: true,
+  resolvedVia: 'explicit-header',
 };
 
 describe('[F-097 break-test] buildAndGenerateRound — IDOR ownership check', () => {

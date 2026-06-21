@@ -24,6 +24,7 @@ import {
   ForbiddenError,
   fetchOrThrowNetworkError,
   NetworkError,
+  TimeoutError,
   UnauthorizedError,
   UpstreamError,
   QuotaExceededError,
@@ -215,7 +216,7 @@ describe('useApiClient abort classification [WI-819]', () => {
     cleanup();
   });
 
-  it('still wraps timeout AbortError as NetworkError', async () => {
+  it('[WI-901] classifies a timeout AbortError as TimeoutError, not NetworkError', async () => {
     jest.useFakeTimers();
     const { signal, cleanup } = combinedSignal(undefined, 25);
     globalThis.fetch = jest.fn(
@@ -237,7 +238,8 @@ describe('useApiClient abort classification [WI-819]', () => {
     jest.advanceTimersByTime(25);
     const err = await request;
 
-    expect(err).toBeInstanceOf(NetworkError);
+    expect(err).toBeInstanceOf(TimeoutError);
+    expect(err).not.toBeInstanceOf(NetworkError);
     cleanup();
   });
 });

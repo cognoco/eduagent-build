@@ -320,11 +320,18 @@ async function teardownV2Family(
     });
 
     it('[WI-821] correctly-seeded v2 guardian gets 200 + ≥1 recap', async () => {
+      // Owner-only /recaps now requires an explicit X-Profile-Id (the real
+      // mobile client always sends the active-profile snapshot). The guardian
+      // is the account owner (membership roles @> ['admin']); under v2
+      // profiles.id === person.id, so guardianId is the owner profileId.
       const res = await app.request(
         '/v1/recaps',
         {
           method: 'GET',
-          headers: buildAuthHeaders({ sub: CLERK_USER_ID, email: EMAIL }),
+          headers: buildAuthHeaders(
+            { sub: CLERK_USER_ID, email: EMAIL },
+            fixture.guardianId,
+          ),
         },
         ENV,
       );

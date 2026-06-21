@@ -139,7 +139,7 @@ describe('Integration: POST /v1/profiles', () => {
   });
 
   it('returns 402 when profile limit is exceeded', async () => {
-    await createProfileViaRoute({
+    const owner = await createProfileViaRoute({
       app,
       env: TEST_ENV,
       user: PROFILE_USER,
@@ -153,16 +153,17 @@ describe('Integration: POST /v1/profiles', () => {
       displayName: 'Second Profile',
       birthYear: 2010,
       kind: 'child',
+      actingProfileId: owner.id,
     });
 
     const res = await app.request(
       '/v1/profiles',
       {
         method: 'POST',
-        headers: buildAuthHeaders({
-          sub: PROFILE_USER.userId,
-          email: PROFILE_USER.email,
-        }),
+        headers: buildAuthHeaders(
+          { sub: PROFILE_USER.userId, email: PROFILE_USER.email },
+          owner.id,
+        ),
         body: JSON.stringify({
           kind: 'child',
           displayName: 'Third Profile',
@@ -266,10 +267,16 @@ describe('Integration: PATCH /v1/profiles/:id', () => {
       `/v1/profiles/${created.id}`,
       {
         method: 'PATCH',
-        headers: buildAuthHeaders({
-          sub: PROFILE_USER.userId,
-          email: PROFILE_USER.email,
-        }),
+        // [Issue 901] Self-edit requires an explicitly selected profile — the
+        // real mobile client always sends X-Profile-Id (api-client.ts). The
+        // owner-update guard now rejects auto-resolved (headerless) callers.
+        headers: buildAuthHeaders(
+          {
+            sub: PROFILE_USER.userId,
+            email: PROFILE_USER.email,
+          },
+          created.id,
+        ),
         body: JSON.stringify({ displayName: 'Updated Name' }),
       },
       TEST_ENV,

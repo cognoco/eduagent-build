@@ -27,16 +27,23 @@ export interface PlaybackControls {
   pause: () => void;
   resume: () => void;
   repeat: () => void;
+  previous: () => void;
   skip: () => void;
 }
 
+// [WI-904] The gaps between chunks/sentences (writing time) were too short:
+// learners reported the default 'normal' pace felt rushed. The pauses are
+// lengthened by one notch — the old 'slow' pause budget is now 'normal' — while
+// the articulation `rate` is left unchanged (the words are NOT drawn out, only
+// the silence between them grows). `chunkPausePerWord` is multiplied by the
+// chunk's word count to size the writing pause.
 const PACE_CONFIG: Record<
   DictationPace,
   { rate: number; chunkPausePerWord: number; sentencePause: number }
 > = {
-  slow: { rate: 0.5, chunkPausePerWord: 3000, sentencePause: 4000 },
-  normal: { rate: 0.6, chunkPausePerWord: 2000, sentencePause: 3000 },
-  fast: { rate: 0.75, chunkPausePerWord: 1200, sentencePause: 2000 },
+  slow: { rate: 0.5, chunkPausePerWord: 4000, sentencePause: 5500 },
+  normal: { rate: 0.6, chunkPausePerWord: 3000, sentencePause: 4000 },
+  fast: { rate: 0.75, chunkPausePerWord: 2000, sentencePause: 3000 },
 };
 
 // 3-second countdown before first sentence
@@ -254,6 +261,18 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     speakChunk(nextIndex, 0);
   }, [speakChunk, clearPauseTimer]);
 
+  // [WI-903] Go back to the previous sentence and restart it from its first
+  // chunk. Mirrors skip() in reverse. Clamps at index 0 — calling previous on
+  // the first sentence restarts that sentence rather than going negative.
+  const previous = useCallback(() => {
+    clearPauseTimer();
+    Speech.stop();
+    const prevIndex = Math.max(0, indexRef.current - 1);
+    setCurrentIndex(prevIndex);
+    chunkIndexRef.current = 0;
+    speakChunk(prevIndex, 0);
+  }, [speakChunk, clearPauseTimer]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -270,6 +289,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     pause,
     resume,
     repeat,
+    previous,
     skip,
   };
 }

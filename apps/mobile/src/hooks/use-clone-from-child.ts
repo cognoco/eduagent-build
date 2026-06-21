@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
 import * as Crypto from 'expo-crypto';
@@ -52,6 +53,21 @@ type OpenTarget = {
   topicTitle?: string | null;
   subjectName?: string | null;
   returnTarget: BridgeReturnTarget;
+  triggerPath: string;
+};
+
+type BrowserHistoryWindow = {
+  history?: {
+    state: unknown;
+    pushState: (
+      data: unknown,
+      unused: string,
+      url?: string | URL | null,
+    ) => void;
+  };
+  location?: {
+    assign: (url: string) => void;
+  };
 };
 
 export type CloneToastAction = {
@@ -89,7 +105,8 @@ export function triggerSurface(triggerPath: string): BridgeTriggerSurface {
   }
   if (
     triggerPath.includes('/curriculum/') ||
-    triggerPath.endsWith('/curriculum')
+    triggerPath.endsWith('/curriculum') ||
+    (triggerPath.includes('/child/') && triggerPath.includes('/topic/'))
   ) {
     return 'child_curriculum_detail';
   }
@@ -113,6 +130,61 @@ function returnTargetForTriggerPath(triggerPath: string): BridgeReturnTarget {
   }
 
   return { returnTo: FAMILY_CHILDREN_RETURN_TO };
+}
+
+function appHrefForTriggerPath(triggerPath: string): Href {
+  const normalizedPath = triggerPath.startsWith('/')
+    ? triggerPath
+    : `/${triggerPath}`;
+
+  if (normalizedPath.startsWith('/(app)/')) {
+    return normalizedPath as Href;
+  }
+
+  if (
+    normalizedPath.startsWith('/child/') ||
+    normalizedPath.startsWith('/recaps/') ||
+    normalizedPath === '/progress' ||
+    normalizedPath.startsWith('/progress/')
+  ) {
+    return `/(app)${normalizedPath}` as Href;
+  }
+
+  return '/(app)/home' as Href;
+}
+
+function publicPathForTriggerPath(triggerPath: string): string {
+  const normalizedPath = triggerPath.startsWith('/')
+    ? triggerPath
+    : `/${triggerPath}`;
+
+  if (normalizedPath.startsWith('/(app)/')) {
+    return normalizedPath.slice('/(app)'.length) || '/home';
+  }
+
+  return normalizedPath;
+}
+
+function publicRelearnPathForTarget(target: OpenTarget): string {
+  const params = new URLSearchParams({
+    childProfileId: target.childProfileId,
+    topicId: target.topicId,
+    subjectId: target.subjectId,
+    returnTo: target.returnTarget.returnTo,
+    source: 'parent_bridge',
+  });
+
+  if (target.topicTitle) {
+    params.set('topicName', target.topicTitle);
+  }
+  if (target.subjectName) {
+    params.set('subjectName', target.subjectName);
+  }
+  if (target.returnTarget.returnId) {
+    params.set('returnId', target.returnTarget.returnId);
+  }
+
+  return `/topic/relearn?${params.toString()}`;
 }
 
 function invalidateAdultLearningCaches(
@@ -200,6 +272,21 @@ export function useCloneFromChild(): {
 
   const openTarget = useCallback(
     (target: OpenTarget): void => {
+      // Cross-stack pushes on web can otherwise synthesize Home as the browser
+      // back target. Seed the exact family origin first, then push relearn.
+      if (Platform.OS === 'web') {
+        const browserWindow = (globalThis as { window?: BrowserHistoryWindow })
+          .window;
+        browserWindow?.history?.pushState(
+          browserWindow.history.state,
+          '',
+          publicPathForTriggerPath(target.triggerPath),
+        );
+        browserWindow?.location?.assign(publicRelearnPathForTarget(target));
+        return;
+      } else {
+        router.push(appHrefForTriggerPath(target.triggerPath));
+      }
       router.push({
         pathname: '/(app)/topic/relearn',
         params: {
@@ -341,6 +428,7 @@ export function useCloneFromChild(): {
         topicTitle: args.topicTitle,
         subjectName: args.subjectName,
         returnTarget: returnTargetForTriggerPath(args.triggerPath),
+        triggerPath: args.triggerPath,
       };
       lastOpenTargetRef.current = target;
       lastCloneArgsRef.current = args;

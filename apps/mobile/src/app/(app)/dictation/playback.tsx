@@ -152,6 +152,20 @@ export default function PlaybackScreen(): React.ReactElement {
         </Pressable>
 
         <Pressable
+          onPress={playback.previous}
+          className="px-3 py-2 rounded-lg bg-surface-elevated mr-2"
+          testID="playback-previous"
+          accessibilityRole="button"
+          accessibilityLabel={t('dictation.playback.skipToPrevious')}
+        >
+          <Ionicons
+            name="play-skip-back"
+            size={18}
+            color={colors.textPrimary}
+          />
+        </Pressable>
+
+        <Pressable
           onPress={playback.skip}
           className="px-3 py-2 rounded-lg bg-surface-elevated mr-2"
           testID="playback-skip"

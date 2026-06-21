@@ -271,9 +271,9 @@ describe('useDictationPlayback', () => {
     // Should be in waiting state (chunk pause)
     expect(result.current.state).toBe('waiting');
 
-    // Advance past the chunk pause (3 words * 2000ms = 6000ms for normal pace)
+    // Advance past the chunk pause (3 words * 3000ms = 9000ms for normal pace)
     act(() => {
-      jest.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(9000);
     });
 
     // Second chunk: "ran through the"
@@ -312,7 +312,7 @@ describe('useDictationPlayback', () => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(9000);
     });
 
     // Now speaking "ran through the"
@@ -424,9 +424,9 @@ describe('useDictationPlayback', () => {
     // After onDone, we should be in 'waiting' state (sentence pause before next sentence)
     expect(result.current.state).toBe('waiting');
 
-    // Advance by fast sentence pause (2000ms)
+    // Advance by fast sentence pause (3000ms)
     act(() => {
-      jest.advanceTimersByTime(2000);
+      jest.advanceTimersByTime(3000);
     });
 
     // Should have advanced to next sentence using fast pace
@@ -496,12 +496,12 @@ describe('useDictationPlayback', () => {
     // Chunk 0: "The little rabbit"
     expect(result.current.currentIndex).toBe(0);
 
-    // Complete chunk 0 → chunk pause → chunk 1
+    // Complete chunk 0 → chunk pause (3 words × 2000ms fast = 6000ms) → chunk 1
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(6000);
     });
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'ran through the',
@@ -509,12 +509,12 @@ describe('useDictationPlayback', () => {
     );
     expect(result.current.currentIndex).toBe(0); // Still sentence 0
 
-    // Complete chunk 1 → chunk pause → chunk 2
+    // Complete chunk 1 → chunk pause (3 words × 2000ms fast = 6000ms) → chunk 2
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(6000);
     });
     expect(mockSpeak).toHaveBeenLastCalledWith(
       'forest.',
@@ -561,12 +561,12 @@ describe('useDictationPlayback', () => {
       expect.objectContaining({ language: 'en' }),
     );
 
-    // Complete chunk 0 → chunk pause (3 words × 2000ms = 6000ms) → chunk 1
+    // Complete chunk 0 → chunk pause (3 words × 3000ms = 9000ms) → chunk 1
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(9000);
     });
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
@@ -574,12 +574,12 @@ describe('useDictationPlayback', () => {
       expect.objectContaining({ language: 'en' }),
     );
 
-    // Complete chunk 1 → chunk pause (7 words × 2000ms = 14000ms) → chunk 2
+    // Complete chunk 1 → chunk pause (7 words × 3000ms = 21000ms) → chunk 2
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(14000);
+      jest.advanceTimersByTime(21000);
     });
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
@@ -616,20 +616,20 @@ describe('useDictationPlayback', () => {
       expect.objectContaining({ language: 'en' }),
     );
 
-    // Complete chunk 0 → pause (3 words × 2000ms) → chunk 1
+    // Complete chunk 0 → pause (3 words × 3000ms) → chunk 1
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(9000);
     });
 
-    // Complete chunk 1 → pause (7 words × 2000ms) → chunk 2
+    // Complete chunk 1 → pause (7 words × 3000ms) → chunk 2
     act(() => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(14000);
+      jest.advanceTimersByTime(21000);
     });
 
     // Last chunk uses spoken punctuation: "period" instead of "."
@@ -685,7 +685,7 @@ describe('useDictationPlayback', () => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(5000); // sentence pause for slow pace
+      jest.advanceTimersByTime(5500); // sentence pause for slow pace
     });
 
     expect(mockSpeak).toHaveBeenLastCalledWith(
@@ -730,7 +730,7 @@ describe('useDictationPlayback', () => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(5500);
     });
 
     // Next sentence must use withPunctuation text
@@ -804,7 +804,7 @@ describe('useDictationPlayback', () => {
       capturedOnDone?.();
     });
     act(() => {
-      jest.advanceTimersByTime(5000);
+      jest.advanceTimersByTime(5500);
     });
 
     // Next sentence must come from the NEW sentences array, not the captured one
@@ -839,6 +839,136 @@ describe('useDictationPlayback', () => {
     // Should fall back to mechanical 3-word splitting
     expect(mockSpeak).toHaveBeenCalledWith(
       'The little rabbit',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-903] Go back to the previous sentence. Before this, the only backward
+  // control was repeat() (re-speaks the current chunk); learners had no way to
+  // hear the previous sentence again.
+  // -------------------------------------------------------------------------
+  it('[WI-903] previous() goes back to the previous sentence and restarts it from the first chunk', () => {
+    mockSpeak.mockImplementation((_text, options) => {
+      options?.onDone?.();
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    // Move forward to sentence 1
+    act(() => {
+      result.current.skip();
+    });
+    expect(result.current.currentIndex).toBe(1);
+
+    mockSpeak.mockClear();
+    act(() => {
+      result.current.previous();
+    });
+
+    expect(result.current.currentIndex).toBe(0);
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  it('[WI-903] previous() at the first sentence restarts it (clamps at index 0)', () => {
+    mockSpeak.mockImplementation((_text, options) => {
+      options?.onDone?.();
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    mockSpeak.mockClear();
+    act(() => {
+      result.current.previous();
+    });
+
+    expect(result.current.currentIndex).toBe(0);
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // [WI-904] Lengthen the pauses between chunks/sentences so the default
+  // ('normal') pace gives learners enough time to write. Articulation rate is
+  // intentionally unchanged — only the gaps grow. The old 'slow' pause budget
+  // becomes the new 'normal'.
+  // -------------------------------------------------------------------------
+  it('[WI-904] normal pace waits longer between chunks than the old 2000ms/word', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: LONG_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'en',
+        chunkSize: 3,
+      }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000); // past countdown
+    });
+
+    // Complete chunk 0 ("The little rabbit", 3 words) → enter the writing pause
+    act(() => {
+      capturedOnDone?.();
+    });
+    expect(result.current.state).toBe('waiting');
+
+    mockSpeak.mockClear();
+    // Old normal pause was 3 × 2000 = 6000ms. The new normal pause is longer,
+    // so nothing should have advanced at the old boundary.
+    act(() => {
+      jest.advanceTimersByTime(6000);
+    });
+    expect(mockSpeak).not.toHaveBeenCalled();
+
+    // New normal pause is 3 × 3000 = 9000ms — advancing the remainder fires it.
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'ran through the',
       expect.objectContaining({ language: 'en' }),
     );
   });

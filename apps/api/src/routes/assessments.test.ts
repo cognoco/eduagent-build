@@ -182,6 +182,7 @@ function makeApp(opts?: { isOwner?: boolean; profileId?: string }) {
       hasPremiumLlm: false,
       conversationLanguage: 'en',
       isOwner,
+      resolvedVia: isOwner ? 'explicit-header' : 'auto',
     });
     await next();
   });
@@ -248,6 +249,7 @@ function makeMeteredApp(opts?: {
       hasPremiumLlm: false,
       conversationLanguage: 'en',
       isOwner,
+      resolvedVia: isOwner ? 'explicit-header' : 'auto',
     });
     // Inject quota context as the metering middleware would set it.
     c.set('subscriptionId', subscriptionId);
@@ -370,6 +372,7 @@ describe('POST /v1/subjects/:subjectId/topics/:topicId/assessments', () => {
         hasPremiumLlm: false,
         conversationLanguage: 'en',
         isOwner: true,
+        resolvedVia: 'explicit-header',
       });
       await next();
     });
@@ -664,6 +667,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
           hasPremiumLlm: false,
           conversationLanguage: 'en',
           isOwner: true,
+          resolvedVia: 'explicit-header',
         });
         await next();
       });
@@ -786,6 +790,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
           hasPremiumLlm: false,
           conversationLanguage: 'en',
           isOwner: true,
+          resolvedVia: 'explicit-header',
         });
         c.set('subscriptionId', SUBSCRIPTION_ID);
         c.set('quotaDecrementSource', 'monthly');
@@ -886,6 +891,7 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
           hasPremiumLlm: false,
           conversationLanguage: 'en',
           isOwner: true,
+          resolvedVia: 'explicit-header',
         });
         c.set('subscriptionId', SUBSCRIPTION_ID);
         c.set('quotaDecrementSource', 'monthly');

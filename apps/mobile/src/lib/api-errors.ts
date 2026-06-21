@@ -25,7 +25,7 @@ import {
   type UpgradeOption,
 } from '@eduagent/schemas';
 import { CancelledError } from '@tanstack/react-query';
-import { isQueryCancellationAbort } from './query-timeout';
+import { isQueryCancellationAbort, isQueryTimeoutAbort } from './query-timeout';
 
 export {
   BadRequestError,
@@ -60,6 +60,28 @@ export class NetworkError extends Error {
   }
 }
 
+/**
+ * [WI-901] Thrown when a request is aborted by our own timeout signal (the
+ * fetch took longer than the client budget). Kept distinct from NetworkError
+ * so the UI can say "took too long / try again" instead of the misleading
+ * "you're offline" copy — the symptom dictation photo-review users hit when a
+ * vision-LLM grading simply ran long on an online device.
+ */
+export class TimeoutError extends Error {
+  readonly errorCode = 'TIMEOUT_ERROR' as const;
+  override readonly cause: unknown;
+
+  constructor(
+    message = 'The request took too long. Please try again.',
+    cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'TimeoutError';
+    this.cause = cause;
+    Object.setPrototypeOf(this, TimeoutError.prototype);
+  }
+}
+
 function isAbortError(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -73,8 +95,14 @@ export function classifyFetchRejection(
   error: unknown,
   signal?: AbortSignal,
 ): Error {
-  if (isAbortError(error) && isQueryCancellationAbort(signal)) {
-    return new CancelledError({ revert: true, silent: true });
+  if (isAbortError(error)) {
+    if (isQueryCancellationAbort(signal)) {
+      return new CancelledError({ revert: true, silent: true });
+    }
+    // [WI-901] Our own timeout fired — not an offline/network failure.
+    if (isQueryTimeoutAbort(signal)) {
+      return new TimeoutError(undefined, error);
+    }
   }
 
   return new NetworkError(undefined, error);

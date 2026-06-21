@@ -75,7 +75,8 @@
     "emailNotVerified": "Verifique o seu endereço de e-mail e tente novamente.",
     "quotaExceeded": "Quota excedida",
     "resourceNotFound": "Recurso não encontrado",
-    "conflictState": "O pedido entra em conflito com o estado atual"
+    "conflictState": "O pedido entra em conflito com o estado atual",
+    "requestTimedOut": "Demorou muito. Tente novamente."
   },
   "errorBoundary": {
     "title": "Algo deu errado",
@@ -1245,7 +1246,8 @@
       "repeatLastPhrase": "Repetir última frase",
       "repeat": "Repetir",
       "exitDictation": "Sair do ditado",
-      "exit": "Sair"
+      "exit": "Sair",
+      "skipToPrevious": "Ir para a frase anterior"
     },
     "review": {
       "couldNotSaveTitle": "Não foi possível salvar o resultado",
