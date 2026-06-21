@@ -100,13 +100,46 @@ describe('useApiReachability', () => {
   });
 
   it('marks API unreachable when fetch rejects', async () => {
-    mockFetch.mockRejectedValue(new Error('network down'));
+    let rejectFetch: ((reason?: unknown) => void) | undefined;
+    mockFetch.mockImplementation(
+      () =>
+        new Promise<Response>((_resolve, reject) => {
+          rejectFetch = reject;
+        }),
+    );
     const { result } = renderHook(() => useApiReachability());
 
-    await waitFor(() => {
-      expect(result.current.isChecked).toBe(true);
+    await act(async () => {
+      rejectFetch?.(new Error('network down'));
+      await Promise.resolve();
     });
+
+    expect(result.current.isChecked).toBe(true);
     expect(result.current.isApiReachable).toBe(false);
+  });
+
+  it('clears the health timeout when fetch rejects', async () => {
+    const clearTimeoutSpy = jest.spyOn(globalThis, 'clearTimeout');
+    try {
+      let rejectFetch: ((reason?: unknown) => void) | undefined;
+      mockFetch.mockImplementation(
+        () =>
+          new Promise<Response>((_resolve, reject) => {
+            rejectFetch = reject;
+          }),
+      );
+      const { result } = renderHook(() => useApiReachability());
+
+      await act(async () => {
+        rejectFetch?.(new Error('network down'));
+        await Promise.resolve();
+      });
+
+      expect(result.current.isChecked).toBe(true);
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+    } finally {
+      clearTimeoutSpy.mockRestore();
+    }
   });
 
   it('marks API reachable when fetch responds ok', async () => {
