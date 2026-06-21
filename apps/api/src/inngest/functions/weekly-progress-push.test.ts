@@ -206,7 +206,7 @@ const mockListEligibleSelfReportPersonIdsAtLocalHour9V2 = jest
   .fn()
   .mockResolvedValue([]);
 jest.mock(
-  '../../services/identity-v2/solo-progress-reports-v2' /* gc1-allow: listEligibleSelfReportPersonIdsV2 / ...AtLocalHour9V2 each open with db.selectDistinct().from(learningSessions).where(...) (then db.select joins) — db.SELECT shapes, unseedable on the Proxy unit-mock. NO .integration.test.ts twin currently exercises the v2 self-report eligibility SQL against a real DB (coverage gap — follow-up); the closest existing coverage is unit-level (weekly-self-reports.test.ts / solo-progress-reports.test.ts cover the v1 names). */,
+  '../../services/identity-v2/solo-progress-reports-v2' /* gc1-allow: listEligibleSelfReportPersonIdsV2 / ...AtLocalHour9V2 each open with db.selectDistinct().from(learningSessions).where(...) (then db.select joins) — db.SELECT shapes, unseedable on the Proxy unit-mock. NO .integration.test.ts twin currently exercises the v2 self-report eligibility SQL against a real DB (coverage gap tracked WI-905); the closest existing coverage is unit-level (weekly-self-reports.test.ts / solo-progress-reports.test.ts cover the v1 names). */,
   () => {
     const actual = jest.requireActual(
       '../../services/identity-v2/solo-progress-reports-v2',
