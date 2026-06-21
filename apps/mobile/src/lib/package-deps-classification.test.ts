@@ -68,7 +68,7 @@ function parseVersion(version: string): [number, number, number] {
 function isAtLeast(version: string, minimum: string): boolean {
   const actualParts = parseVersion(version);
   const minimumParts = parseVersion(minimum);
-  for (let index = 0; index < minimumParts.length; index += 1) {
+  for (const index of [0, 1, 2] as const) {
     if (actualParts[index] > minimumParts[index]) return true;
     if (actualParts[index] < minimumParts[index]) return false;
   }
