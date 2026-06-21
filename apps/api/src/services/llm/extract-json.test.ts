@@ -100,6 +100,12 @@ describe('extractFirstJsonArray', () => {
     expect(extractFirstJsonArray(input)).toBe(inner);
   });
 
+  it('ignores a non-array fenced block before the first valid array', () => {
+    const json = '[{"a": 1}]';
+    const input = `Here is a note:\n\`\`\`json\n{"not": "an array"}\n\`\`\`\nActual result:\n\`\`\`json\n${json}\n\`\`\``;
+    expect(extractFirstJsonArray(input)).toBe(json);
+  });
+
   it('strips markdown fenced json without language tag', () => {
     const inner = '[1, 2, 3]';
     const input = `\`\`\`\n${inner}\n\`\`\``;
@@ -109,6 +115,12 @@ describe('extractFirstJsonArray', () => {
   it('extracts JSON array from prose before and after', () => {
     const json = '[1, 2, 3]';
     const input = `Here are the results: ${json} and some trailing text.`;
+    expect(extractFirstJsonArray(input)).toBe(json);
+  });
+
+  it('ignores invalid bracket placeholders before the first valid array', () => {
+    const json = '[{"term": "photosynthesis"}]';
+    const input = `Template [topic]: ${json}`;
     expect(extractFirstJsonArray(input)).toBe(json);
   });
 
