@@ -28,6 +28,7 @@ import {
   createDatabase,
   generateUUIDv7,
   accounts,
+  profiles,
   organization,
   person,
   login,
@@ -39,6 +40,8 @@ import {
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
+import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
+import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -183,6 +186,220 @@ const RUN = !!process.env.DATABASE_URL;
 
       return { subscriptionId: subId, organizationId: org!.id };
     }
+
+    // Identity-only seed (org + person + login + membership), NO subscription.
+    // Used by the Issue 836 family-share tests: a freshly-purchasing learner who
+    // does NOT yet hold a paid subscription. Returns the clerk user id so it can
+    // be passed as the RevenueCat app_user_id (resolveIdentityV2 maps it → org).
+    async function seedIdentityOnly(): Promise<{
+      organizationId: string;
+      clerkUserId: string;
+    }> {
+      const clerkUserId = `clerk_${generateUUIDv7()}`;
+      const email = `wi693rcfs_${generateUUIDv7()}@test.local`;
+      createdClerkIds.push(clerkUserId);
+
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'Issue-836 RC Org' })
+        .returning();
+      createdOrgIds.push(org!.id);
+
+      const [personRow] = await db
+        .insert(person)
+        .values({
+          displayName: 'Owner',
+          birthDate: '1990-01-01',
+          residenceJurisdiction: 'US',
+        })
+        .returning();
+      const [loginRow] = await db
+        .insert(login)
+        .values({ personId: personRow!.id, clerkUserId, email })
+        .returning();
+      await db
+        .update(person)
+        .set({ loginId: loginRow!.id })
+        .where(eq(person.id, personRow!.id));
+      await db.insert(membership).values({
+        personId: personRow!.id,
+        organizationId: org!.id,
+        roles: ['admin', 'learner'],
+      });
+
+      return { organizationId: org!.id, clerkUserId };
+    }
+
+    // Identity graph PLUS an id-aligned dual-store free subscription, returning
+    // the clerk user id for the RevenueCat app_user_id. Used by the Issue 836
+    // CONTROL: in production every org already holds its onboarding-provisioned
+    // subscription before any webhook arrives (activateSubscriptionFromRevenuecatV2
+    // takes the UPDATE/upgrade branch, not the defensive fresh-insert branch).
+    // The aligned legacy `subscriptions` row (id == the v2 `subscription` id)
+    // satisfies the pre-M-REPOINT `quota_pools.subscription_id → subscriptions(id)`
+    // FK so the free→plus upgrade write completes in flag-on CI — identical to the
+    // dual-store freeze state seedAlignedSubscription builds for the fence tests.
+    async function seedIdentityWithFreeSubscription(): Promise<{
+      organizationId: string;
+      clerkUserId: string;
+    }> {
+      const clerkUserId = `clerk_${generateUUIDv7()}`;
+      const email = `wi693rcfs_${generateUUIDv7()}@test.local`;
+      createdClerkIds.push(clerkUserId);
+
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'Issue-836 RC Org' })
+        .returning();
+      createdOrgIds.push(org!.id);
+
+      const [personRow] = await db
+        .insert(person)
+        .values({
+          displayName: 'Owner',
+          birthDate: '1990-01-01',
+          residenceJurisdiction: 'US',
+        })
+        .returning();
+      const [loginRow] = await db
+        .insert(login)
+        .values({ personId: personRow!.id, clerkUserId, email })
+        .returning();
+      await db
+        .update(person)
+        .set({ loginId: loginRow!.id })
+        .where(eq(person.id, personRow!.id));
+      await db.insert(membership).values({
+        personId: personRow!.id,
+        organizationId: org!.id,
+        roles: ['admin', 'learner'],
+      });
+
+      // Legacy accounts + subscriptions (id-aligned) — only to satisfy the
+      // pre-M-REPOINT quota_pools FK to subscriptions(id). The v2 handler never
+      // reads these.
+      const [acct] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `${clerkUserId}_legacy`,
+          email: `legacy_${email}`,
+        })
+        .returning();
+      createdAccountIds.push(acct!.id);
+
+      // Legacy `profiles` row, id-aligned to person.id (the org admin), so the
+      // grant path's profile_quota_usage INSERT
+      // (reconcileQuotaStateForSubscriptionV2 → provisionProfileQuotaUsageV2,
+      // profile_id = person.id) satisfies its FK to legacy profiles(id). Same
+      // dual-store id-alignment the seed already applies to subscriptions; the
+      // v2 handler never reads this row. Cascades away with `acct` in afterEach.
+      await db.insert(profiles).values({
+        id: personRow!.id,
+        accountId: acct!.id,
+        displayName: 'Owner',
+        birthYear: 1990,
+        isOwner: true,
+      });
+
+      const subId = generateUUIDv7();
+      seededSubIds.push(subId);
+
+      await db.insert(subscriptions).values({
+        id: subId,
+        accountId: acct!.id,
+        tier: 'free',
+        status: 'active',
+      });
+
+      await db.insert(subscription).values({
+        id: subId,
+        organizationId: org!.id,
+        planTier: 'free',
+        status: 'active',
+        payerPersonId: personRow!.id,
+      });
+
+      const tierConfig = getTierConfig('free');
+      await db.insert(quotaPools).values({
+        subscriptionId: subId,
+        monthlyLimit: tierConfig.monthlyQuota,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      return { organizationId: org!.id, clerkUserId };
+    }
+
+    function familyShareEvent(
+      clerkUserId: string,
+      overrides: Partial<RevenueCatEvent> = {},
+    ): RevenueCatEvent {
+      return {
+        id: `rc_evt_fs_${generateUUIDv7()}`,
+        type: 'INITIAL_PURCHASE',
+        app_user_id: clerkUserId,
+        product_id: 'com.eduagent.plus.monthly',
+        period_type: 'NORMAL',
+        purchased_at_ms: Date.now() - 86400000,
+        expiration_at_ms: Date.now() + 2592000000,
+        event_timestamp_ms: Date.now(),
+        ...overrides,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // [Issue 836] Apple Family Sharing entitlement block (v2 handler, real DB).
+    // A shared copy (is_family_share === true) must NOT create a paid
+    // subscription row; the original purchaser is the only one entitled, and
+    // families are steered to the dedicated Family plan product. Control: a
+    // non-shared purchase (false) DOES create the paid subscription.
+    // -----------------------------------------------------------------------
+    it('[Issue 836] does NOT grant a subscription when is_family_share is true (v2)', async () => {
+      const seeded = await seedIdentityOnly();
+
+      // Track any subscription that might (wrongly) be created so afterEach can
+      // clean it up if the guard regresses.
+      const before = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      expect(before).toBeUndefined();
+
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, { is_family_share: true }),
+      );
+
+      const after = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      // No paid entitlement was written — the shared copy is blocked.
+      expect(after).toBeUndefined();
+    });
+
+    it('[Issue 836 control] DOES grant a subscription when is_family_share is false (v2)', async () => {
+      // Seed the org's onboarding-provisioned free subscription (dual-store,
+      // id-aligned) — the production precondition before a purchase webhook.
+      const seeded = await seedIdentityWithFreeSubscription();
+
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, { is_family_share: false }),
+      );
+
+      const after = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      expect(after).toBeDefined();
+      // The non-shared INITIAL_PURCHASE upgraded the seeded free row to the paid
+      // plus tier — a real entitlement was granted (afterEach cleans it up via
+      // the seeded id already tracked in seededSubIds).
+      expect(after!.planTier).toBe('plus');
+      expect(after!.status).toBe('active');
+    });
 
     it('[BREAK BUG-116] concurrent same-event-id RevenueCat deliveries write only once (v2)', async () => {
       const seeded = await seedAlignedSubscription();
