@@ -1,5 +1,10 @@
 const locks = new Map<string, Promise<void>>();
 
+/** @internal - exported for tests only */
+export function __getLockCountForTests(): number {
+  return locks.size;
+}
+
 export async function withLock<T>(
   key: string,
   work: () => Promise<T> | T,
@@ -10,13 +15,11 @@ export async function withLock<T>(
   const current = new Promise<void>((resolve) => {
     release = resolve;
   });
-  locks.set(
-    key,
-    previous.then(
-      () => current,
-      () => current,
-    ),
+  const next = previous.then(
+    () => current,
+    () => current,
   );
+  locks.set(key, next);
 
   await previous;
 
@@ -24,7 +27,7 @@ export async function withLock<T>(
     return await work();
   } finally {
     release();
-    if (locks.get(key) === current) {
+    if (locks.get(key) === next) {
       locks.delete(key);
     }
   }
