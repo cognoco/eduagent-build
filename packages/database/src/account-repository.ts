@@ -248,3 +248,23 @@ export async function findSubscriptionByStripeIdV2__unscoped(
     where: eq(subscription.stripeSubscriptionId, stripeSubscriptionId),
   });
 }
+
+/**
+ * Find a subscription (v2 table) by its Stripe customer ID.
+ *
+ * SECURITY: caller MUST verify ownership before returning data to a client;
+ * intended for Stripe webhook handlers that authenticate via event signature.
+ * Used by the v2 checkout-completed handler to assert the (operator-mutable)
+ * metadata.accountId matches the account already bound to this Stripe customer
+ * before granting an entitlement. `stripe_customer_id` is unique (partial
+ * unique index `subscription_stripe_customer_id_idx`), so this returns at most
+ * one row.
+ */
+export async function findSubscriptionByStripeCustomerIdV2__unscoped(
+  db: Database,
+  stripeCustomerId: string,
+) {
+  return db.query.subscription.findFirst({
+    where: eq(subscription.stripeCustomerId, stripeCustomerId),
+  });
+}
