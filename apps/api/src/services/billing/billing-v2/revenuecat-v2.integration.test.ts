@@ -28,6 +28,7 @@ import {
   createDatabase,
   generateUUIDv7,
   accounts,
+  profiles,
   organization,
   person,
   login,
@@ -285,6 +286,20 @@ const RUN = !!process.env.DATABASE_URL;
         })
         .returning();
       createdAccountIds.push(acct!.id);
+
+      // Legacy `profiles` row, id-aligned to person.id (the org admin), so the
+      // grant path's profile_quota_usage INSERT
+      // (reconcileQuotaStateForSubscriptionV2 → provisionProfileQuotaUsageV2,
+      // profile_id = person.id) satisfies its FK to legacy profiles(id). Same
+      // dual-store id-alignment the seed already applies to subscriptions; the
+      // v2 handler never reads this row. Cascades away with `acct` in afterEach.
+      await db.insert(profiles).values({
+        id: personRow!.id,
+        accountId: acct!.id,
+        displayName: 'Owner',
+        birthYear: 1990,
+        isOwner: true,
+      });
 
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
