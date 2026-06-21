@@ -963,6 +963,69 @@ describe('progress routes', () => {
       expect(res.status).toBe(200);
     });
 
+    it('returns 200 when all scope params are omitted (baseline)', async () => {
+      mockGetLearningResumeTarget.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/progress/resume-target',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetLearningResumeTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 for invalid subjectId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?subjectId=not-a-uuid',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid bookId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?bookId=123',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid topicId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?topicId=abc',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('passes validated scope params through to the service', async () => {
+      mockGetLearningResumeTarget.mockResolvedValueOnce(null);
+      const subjectId = '550e8400-e29b-41d4-a716-446655440010';
+      const bookId = '550e8400-e29b-41d4-a716-446655440011';
+      const topicId = '550e8400-e29b-41d4-a716-446655440012';
+
+      const res = await app.request(
+        `/v1/progress/resume-target?subjectId=${subjectId}&bookId=${bookId}&topicId=${topicId}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetLearningResumeTarget).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, scopeArg] =
+        mockGetLearningResumeTarget.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(scopeArg).toMatchObject({ subjectId, bookId, topicId });
+    });
+
     it('returns 401 without auth', async () => {
       const res = await app.request('/v1/progress/resume-target', {}, TEST_ENV);
       expect(res.status).toBe(401);
