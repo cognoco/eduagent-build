@@ -26,12 +26,10 @@ import { apiBaseUrl, buildSeedEmail } from '../../helpers/runtime';
  * **Opt-in only.** Not part of the default Playwright run; invoke explicitly
  * via `--project=mentor-audit-registry-smoke` (see playwright.config.ts).
  *
- * **Flag matrix.** Plan §"Navigation Contract Flag Matrix" requires the
- * guardian-shell scenarios to be exercised under both V0 and V1. The smoke
- * project flips `EXPO_PUBLIC_ENABLE_MODE_NAV_V1` via the
- * `MENTOR_AUDIT_NAV_V1` env var; CI runs the suite twice (once per flag
- * position). Pre-shell entries (`empty-adult`, `session-expired`,
- * `session-revoked`, `mfa-totp`) are flag-independent and only run once.
+ * **Flag posture.** Release runs export the app with V2 enabled
+ * (`EXPO_PUBLIC_ENABLE_MODE_NAV`, `_V1`, and `_V2` all true). Historical
+ * V0/V1 matrix reruns are useful for legacy-shell changes, but the publish
+ * gate for the mentor shell is the V2 posture.
  */
 
 const includeChromeOnly = process.env.PLAYWRIGHT_INCLUDE_CHROME_ONLY === '1';
@@ -58,8 +56,8 @@ for (const [registryName, scenario] of entries) {
       const baseSeeded = await seedAndSignIn(page, {
         scenario: scenario.seedScenario,
         alias: `${scenario.key}-base`,
-        landingTestId: 'learner-screen',
-        landingPath: '/home',
+        landingTestId: 'mentor-screen',
+        landingPath: '/mentor',
       });
       const basePath = testInfo.outputPath(
         `mentor-audit-base-${scenario.key}.json`,
@@ -129,6 +127,18 @@ for (const [registryName, scenario] of entries) {
       await expect(
         page.getByRole('heading', { name: /Consent required for/i }),
       ).toBeVisible();
+      return;
+    }
+
+    if (scenario.seedScenario === 'mentor-audit-paywall-child-notify') {
+      await seedAndSignIn(page, {
+        scenario: scenario.seedScenario,
+        alias: scenario.key,
+        landingTestId: 'mentor-screen',
+        landingPath: '/mentor',
+      });
+      await page.goto(scenario.landingPath);
+      await expect(page.getByTestId(scenario.landingTestId)).toBeVisible();
       return;
     }
 

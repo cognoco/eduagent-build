@@ -7,21 +7,19 @@ export const authScenarios = {
     seedScenario: 'onboarding-complete',
     email: buildSeedEmail('solo-learner'),
     storageStatePath: path.join(authStateDir, 'solo-learner.json'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   ownerWithChildren: {
     key: 'owner-with-children',
     seedScenario: 'parent-multi-child',
     email: buildSeedEmail('owner-with-children'),
     storageStatePath: path.join(authStateDir, 'owner-with-children.json'),
-    landingPath: '/home',
-    // [WI-801] Under flag-on / V1-nav an adult owner with linked children resolves
-    // as a guardian and lands directly on FamilyHome (parent-home-screen) — the
-    // documented V1 guardian shell (FAMILY_TABS) — with no intermediate Study-mode
-    // step. The readiness assertion therefore waits for parent-home-screen; the
-    // prior learner-screen + ensureFamilyHome switch encoded the stale V0 flow.
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    // V2 removes the Family/Study mode switcher from chrome. This fixture is
+    // an adult owner with linked children, not a supporter-scope fixture, so it
+    // lands in the owner's own Mentor shell.
+    landingTestId: 'mentor-screen',
   },
 } as const;
 
@@ -74,52 +72,53 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-empty-adult',
     email: buildSeedEmail('mentor-audit-empty-adult'),
     // Pre-profile lands the user on the create-profile gate, NOT the learner
-    // home — `pre-profile` seeder docstring (`test-seed.ts`).
-    landingPath: '/home',
+    // home. V2 redirects authenticated app entries through Mentor before the
+    // root layout gate renders.
+    landingPath: '/mentor',
     landingTestId: 'create-profile-gate',
   },
   familyNoChildren: {
     key: 'mentor-audit-family-no-children',
     seedScenario: 'mentor-audit-family-no-children',
     email: buildSeedEmail('mentor-audit-family-no-children'),
-    // Current mode navigation lands solo-family accounts on My Learning.
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    // V2 normal app-shell landings route through the Mentor tab.
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   consentPendingChild: {
     key: 'mentor-audit-consent-pending-child',
     seedScenario: 'mentor-audit-consent-pending-child',
     email: buildSeedEmail('mentor-audit-consent-pending-child'),
-    landingPath: '/home',
+    landingPath: '/mentor',
     landingTestId: 'consent-pending-gate',
   },
   consentWithdrawnChild: {
     key: 'mentor-audit-consent-withdrawn-child',
     seedScenario: 'mentor-audit-consent-withdrawn-child',
     email: buildSeedEmail('mentor-audit-consent-withdrawn-child'),
-    landingPath: '/home',
+    landingPath: '/mentor',
     landingTestId: 'consent-withdrawn-gate',
   },
   postApprovalSteadyState: {
     key: 'mentor-audit-post-approval-steady-state',
     seedScenario: 'mentor-audit-post-approval-steady-state',
     email: buildSeedEmail('mentor-audit-post-approval-steady-state'),
-    landingPath: '/home',
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   deletionScheduledOwner: {
     key: 'mentor-audit-deletion-scheduled-owner',
     seedScenario: 'mentor-audit-deletion-scheduled-owner',
     email: buildSeedEmail('mentor-audit-deletion-scheduled-owner'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   familyAtProfileLimit: {
     key: 'mentor-audit-family-at-profile-limit',
     seedScenario: 'mentor-audit-family-at-profile-limit',
     email: buildSeedEmail('mentor-audit-family-at-profile-limit'),
-    landingPath: '/home',
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   postApprovalRedirect: {
     key: 'mentor-audit-post-approval-redirect',
@@ -148,36 +147,36 @@ export const mentorAuditScenarios = {
     key: 'mentor-audit-consent-us-under-threshold',
     seedScenario: 'mentor-audit-consent-us-under-threshold',
     email: buildSeedEmail('mentor-audit-consent-us-under-threshold'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   consentEuUnderThreshold: {
     key: 'mentor-audit-consent-eu-under-threshold',
     seedScenario: 'mentor-audit-consent-eu-under-threshold',
     email: buildSeedEmail('mentor-audit-consent-eu-under-threshold'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   consentOverThreshold: {
     key: 'mentor-audit-consent-over-threshold',
     seedScenario: 'mentor-audit-consent-over-threshold',
     email: buildSeedEmail('mentor-audit-consent-over-threshold'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   quotaOwnerDaily: {
     key: 'mentor-audit-quota-owner-daily',
     seedScenario: 'mentor-audit-quota-owner-daily',
     email: buildSeedEmail('mentor-audit-quota-owner-daily'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   quotaFamilyMonthly: {
     key: 'mentor-audit-quota-family-monthly',
     seedScenario: 'mentor-audit-quota-family-monthly',
     email: buildSeedEmail('mentor-audit-quota-family-monthly'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   paywallChildNotify: {
     key: 'mentor-audit-paywall-child-notify',
@@ -190,15 +189,15 @@ export const mentorAuditScenarios = {
     key: 'mentor-audit-resumable-session',
     seedScenario: 'mentor-audit-resumable-session',
     email: buildSeedEmail('mentor-audit-resumable-session'),
-    landingPath: '/home',
-    landingTestId: 'home-coach-band',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   richChildHistory: {
     key: 'mentor-audit-rich-child-history',
     seedScenario: 'mentor-audit-rich-child-history',
     email: buildSeedEmail('mentor-audit-rich-child-history'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   sessionExpired: {
     key: 'mentor-audit-session-expired',
@@ -236,21 +235,21 @@ export const mentorAuditScenarios = {
     key: 'mentor-audit-family-pool-members',
     seedScenario: 'mentor-audit-family-pool-members',
     email: buildSeedEmail('mentor-audit-family-pool-members'),
-    landingPath: '/home',
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   familyOwnerDailyQuotaWithChild: {
     key: 'mentor-audit-family-owner-daily-quota-with-child',
     seedScenario: 'mentor-audit-family-owner-daily-quota-with-child',
     email: buildSeedEmail('mentor-audit-family-owner-daily-quota-with-child'),
-    landingPath: '/home',
-    landingTestId: 'learner-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
   bridgeBackstack: {
     key: 'mentor-audit-bridge-backstack',
     seedScenario: 'mentor-audit-bridge-backstack',
     email: buildSeedEmail('mentor-audit-bridge-backstack'),
-    landingPath: '/home',
-    landingTestId: 'parent-home-screen',
+    landingPath: '/mentor',
+    landingTestId: 'mentor-screen',
   },
 } as const satisfies Record<string, MentorAuditScenario>;

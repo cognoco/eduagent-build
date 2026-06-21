@@ -7,9 +7,12 @@ These Playwright specs run the Expo web export against either the local API or t
 Shared staging full suite:
 
 ```bash
-CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 \
+CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging \
   PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
   EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_ENABLE_MODE_NAV=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true \
   doppler run --project mentomate --config stg -- \
   pnpm run test:e2e:web --reporter=list,json
 ```
@@ -17,9 +20,12 @@ CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 \
 Target opt-in P1B coverage without retries:
 
 ```bash
-CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 PLAYWRIGHT_INCLUDE_P1B=1 \
+CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging PLAYWRIGHT_INCLUDE_P1B=1 \
   PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
   EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_ENABLE_MODE_NAV=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true \
   doppler run --project mentomate --config stg -- \
   pnpm exec playwright test -c apps/mobile/playwright.config.ts \
   apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts \
@@ -43,15 +49,18 @@ the audit silently go stale.
 CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 E2E_ENV=staging-cf \
   PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
   EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_ENABLE_MODE_NAV=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true \
+  EXPO_PUBLIC_ENABLE_MODE_NAV_V2=true \
   doppler run --project mentomate --config stg -- \
   pnpm exec playwright test -c apps/mobile/playwright.config.ts \
   --project=mentor-audit-registry-smoke --workers=1 --reporter=list
 ```
 
-Flag-matrix coverage (plan §"Navigation Contract Flag Matrix") requires
-re-running with both `MODE_NAV_V1_ENABLED=false` (V0, current production)
-and `MODE_NAV_V1_ENABLED=true` (V1). Set the matching `MENTOR_AUDIT_NAV_V1`
-env var per run and record both results.
+Release coverage should run with V2 enabled (`EXPO_PUBLIC_ENABLE_MODE_NAV`,
+`EXPO_PUBLIC_ENABLE_MODE_NAV_V1`, and `EXPO_PUBLIC_ENABLE_MODE_NAV_V2` all
+`true`). Historical V0/V1 matrix reruns are still useful before legacy-shell
+changes, but they are not the publish gate for the V2 shell.
 
 The smoke project is independent of `solo-learner` / `owner-with-children`
 storage states; a single mentor-audit failure cannot poison the rest of the

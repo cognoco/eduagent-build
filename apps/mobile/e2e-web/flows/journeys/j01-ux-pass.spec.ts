@@ -40,13 +40,13 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   const seed = await readSeedData('solo-learner');
   const subjectId = seed.ids.subjectId;
 
-  await gotoScreen(page, '/home', 'learner-screen');
+  await gotoScreen(page, '/mentor', 'mentor-screen');
   await capture(page, '01-home');
 
   await gotoScreen(page, '/practice', 'practice-screen');
   await capture(page, '02-practice-entry');
 
-  await gotoScreen(page, '/home', 'learner-screen');
+  await gotoScreen(page, '/mentor', 'mentor-screen');
   await gotoScreen(page, '/create-subject', 'create-subject-name');
   await capture(page, '03-study-new-click');
 

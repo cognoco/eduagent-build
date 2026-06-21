@@ -547,7 +547,9 @@ function JournalNotesArchive(): React.ReactElement {
   const { isListening, transcript, startListening, stopListening } =
     useSpeechRecognition();
 
-  // Fold the recognized transcript into the search filter as it arrives.
+  // Fold the recognized transcript into the search filter as it arrives. STT
+  // replaces the typed filter wholesale; voice and text are mutually exclusive
+  // entry modes, so anything typed by hand before switching to voice is discarded.
   useEffect(() => {
     if (transcript) setFilter(transcript);
   }, [transcript]);

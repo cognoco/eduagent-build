@@ -2,7 +2,7 @@
 name: Never switch branches without explicit permission
 description: NEVER run git checkout/switch to change branches unless the user explicitly asks — this has caused repeated frustration
 type: feedback
-last_confirmed: 2026-06-11 (PM re-confirmation, WI-587)
+last_confirmed: 2026-06-21 (shared-checkout PR work correction)
 ---
 
 NEVER switch git branches (git checkout, git switch, or any equivalent) unless the user explicitly asks to change branches.
@@ -11,6 +11,8 @@ NEVER switch git branches (git checkout, git switch, or any equivalent) unless t
 
 **How to apply:**
 - Before ANY git checkout/switch command, ask yourself: "Did the user ask me to change branches?" If not, DON'T.
+- If working in the shared/current checkout and a different branch seems necessary, ask for permission first and wait.
+- For existing PR work from the shared/current checkout, prefer `gh` commands (`gh pr view`, `gh pr checks`, `gh pr diff`, `gh pr checkout` only after permission) instead of changing branches.
 - This applies to the main agent AND all subagents/parallel agents.
 - If a task seems like it needs a different branch, ASK the user first — never assume.
 - When dispatching subagents, explicitly instruct them to stay on the current branch.

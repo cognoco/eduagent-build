@@ -10,6 +10,7 @@ import {
   resolveExportTimeoutMs,
   waitForProcessExit,
 } from './serve-exported-web-control.mjs';
+import { applyExpoPublicEnvOverrides } from './serve-exported-web-env.mjs';
 
 const projectRoot = process.cwd();
 const distDir = path.join(projectRoot, 'dist');
@@ -67,7 +68,10 @@ async function startServer() {
     // [I-17] Path traversal containment
     const resolvedCandidate = path.resolve(candidate);
     const resolvedDist = path.resolve(distDir);
-    if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
+    if (
+      !resolvedCandidate.startsWith(resolvedDist + path.sep) &&
+      resolvedCandidate !== resolvedDist
+    ) {
       response.statusCode = 403;
       response.end('Forbidden');
       return;
@@ -87,7 +91,10 @@ async function startServer() {
     }
 
     const extension = path.extname(candidate).toLowerCase();
-    response.setHeader('Content-Type', mimeTypes[extension] ?? 'application/octet-stream');
+    response.setHeader(
+      'Content-Type',
+      mimeTypes[extension] ?? 'application/octet-stream',
+    );
     const stream = createReadStream(candidate);
     stream.on('error', () => {
       if (!response.headersSent) {
@@ -128,7 +135,7 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
   (name) => ({
     path: path.join(projectRoot, name),
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
-  })
+  }),
 );
 const require = createRequire(import.meta.url);
 const { defaultApiUrl } = require('./e2e-defaults.js');
@@ -139,25 +146,24 @@ const apiUrl =
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 const generatedEnvFiles = new Set();
 
-function overrideApiUrl(contents) {
-  const replacement = `EXPO_PUBLIC_API_URL="${apiUrl}"`;
-  if (/^EXPO_PUBLIC_API_URL=.*/m.test(contents)) {
-    return contents.replace(/^EXPO_PUBLIC_API_URL=.*/m, replacement);
-  }
-  const suffix = contents.endsWith('\n') || contents.length === 0 ? '' : '\n';
-  return `${contents}${suffix}${replacement}\n`;
-}
-
 async function overrideEnvFiles() {
   for (const envFile of envFilesToOverride) {
     if (await fileExists(envFile.path)) {
       const original = await readFile(envFile.path, 'utf-8');
       await rename(envFile.path, envFile.backupPath);
-      await writeFile(envFile.path, overrideApiUrl(original), 'utf-8');
+      await writeFile(
+        envFile.path,
+        applyExpoPublicEnvOverrides(original, process.env),
+        'utf-8',
+      );
       continue;
     }
     generatedEnvFiles.add(envFile.path);
-    await writeFile(envFile.path, `EXPO_PUBLIC_API_URL="${apiUrl}"\n`, 'utf-8');
+    await writeFile(
+      envFile.path,
+      applyExpoPublicEnvOverrides('', process.env),
+      'utf-8',
+    );
   }
 }
 
@@ -177,7 +183,12 @@ async function restoreEnvFiles() {
 await overrideEnvFiles();
 
 const exportProcess = spawnPnpm([
-  'exec', 'expo', 'export', '--platform', 'web', '--clear',
+  'exec',
+  'expo',
+  'export',
+  '--platform',
+  'web',
+  '--clear',
 ]);
 
 try {

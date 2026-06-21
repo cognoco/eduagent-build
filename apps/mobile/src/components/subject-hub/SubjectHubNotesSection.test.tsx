@@ -43,8 +43,8 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByText('Cells split in phases.')).toBeNull();
   });
 
-  it('renders an empty state with an add affordance when there are no notes', () => {
-    render(<SubjectHubNotesSection notes={[]} />);
+  it('renders an empty state with an add affordance when there are no notes and add is wired', () => {
+    render(<SubjectHubNotesSection notes={[]} onAddNote={jest.fn()} />);
 
     screen.getByTestId('subject-hub-notes-empty');
     // Empty state still offers a way to add a note (not a dead end).
@@ -53,12 +53,13 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByTestId('subject-hub-notes-tabs')).toBeNull();
   });
 
-  it('renders the add-note input + transcription-only mic when canStudy is true', () => {
+  it('renders the add-note input + transcription-only mic when canStudy and add is wired', () => {
     const onNoteVoice = jest.fn();
     render(
       <SubjectHubNotesSection
         notes={[selfNote]}
         canStudy
+        onAddNote={jest.fn()}
         onNoteVoice={onNoteVoice}
       />,
     );
@@ -71,6 +72,18 @@ describe('SubjectHubNotesSection', () => {
       analyzesTone: false,
       analyzesEmotion: false,
     });
+  });
+
+  it('omits the add input, mic, and empty-add when canStudy but no persistence handler is wired', () => {
+    // Subject-hub note persistence is deferred, so SubjectHub renders this section
+    // without onAddNote. The add affordance must NOT appear — an input with no
+    // handler would clear the draft on submit and silently lose what was typed.
+    render(<SubjectHubNotesSection notes={[]} canStudy />);
+
+    screen.getByTestId('subject-hub-notes-empty');
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+    expect(screen.queryByTestId('notes-mic')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-notes-empty-add')).toBeNull();
   });
 
   it('submits a trimmed draft through onAddNote and clears the input', () => {
