@@ -130,6 +130,18 @@ for (const [registryName, scenario] of entries) {
       return;
     }
 
+    if (scenario.seedScenario === 'mentor-audit-paywall-child-notify') {
+      await seedAndSignIn(page, {
+        scenario: scenario.seedScenario,
+        alias: scenario.key,
+        landingTestId: 'mentor-screen',
+        landingPath: '/mentor',
+      });
+      await page.goto(scenario.landingPath);
+      await expect(page.getByTestId(scenario.landingTestId)).toBeVisible();
+      return;
+    }
+
     await seedAndSignIn(page, {
       scenario: scenario.seedScenario,
       alias: scenario.key,

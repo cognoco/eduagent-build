@@ -72,8 +72,9 @@ export const mentorAuditScenarios = {
     seedScenario: 'mentor-audit-empty-adult',
     email: buildSeedEmail('mentor-audit-empty-adult'),
     // Pre-profile lands the user on the create-profile gate, NOT the learner
-    // home — `pre-profile` seeder docstring (`test-seed.ts`).
-    landingPath: '/home',
+    // home. V2 redirects authenticated app entries through Mentor before the
+    // root layout gate renders.
+    landingPath: '/mentor',
     landingTestId: 'create-profile-gate',
   },
   familyNoChildren: {
@@ -88,14 +89,14 @@ export const mentorAuditScenarios = {
     key: 'mentor-audit-consent-pending-child',
     seedScenario: 'mentor-audit-consent-pending-child',
     email: buildSeedEmail('mentor-audit-consent-pending-child'),
-    landingPath: '/home',
+    landingPath: '/mentor',
     landingTestId: 'consent-pending-gate',
   },
   consentWithdrawnChild: {
     key: 'mentor-audit-consent-withdrawn-child',
     seedScenario: 'mentor-audit-consent-withdrawn-child',
     email: buildSeedEmail('mentor-audit-consent-withdrawn-child'),
-    landingPath: '/home',
+    landingPath: '/mentor',
     landingTestId: 'consent-withdrawn-gate',
   },
   postApprovalSteadyState: {
