@@ -152,16 +152,20 @@ function createMockDb({
     | undefined,
   hasParentLink = true,
 } = {}): Database {
+  const guardianshipRow = hasParentLink
+    ? { id: 'guard-1', revokedAt: null }
+    : undefined;
   return {
     query: {
       monthlyReports: {
         findMany: jest.fn().mockResolvedValue(findManyResult),
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
       },
-      familyLinks: {
-        findFirst: jest
+      guardianship: {
+        findFirst: jest.fn().mockResolvedValue(guardianshipRow),
+        findMany: jest
           .fn()
-          .mockResolvedValue(hasParentLink ? { id: 'link-1' } : undefined),
+          .mockResolvedValue(guardianshipRow ? [guardianshipRow] : []),
       },
     },
     update: jest.fn().mockReturnValue({
@@ -1268,8 +1272,13 @@ describe('markMonthlyReportViewed', () => {
 
     const db = {
       query: {
-        familyLinks: {
-          findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
+        guardianship: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ id: 'guard-1', revokedAt: null }),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ id: 'guard-1', revokedAt: null }]),
         },
       },
       update: mockUpdate,
