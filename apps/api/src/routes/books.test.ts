@@ -362,8 +362,10 @@ jest.mock(
 );
 
 jest.mock(
-  '../services/billing/billing-v2' /* gc1-allow: route unit test — DB mocked; v2 billing twins covered by billing integration tests */,
+  '../services/billing/billing-v2' /* gc1-allow: route unit test — DB mocked; v2 billing twins covered by billing integration tests; ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() (continuity); real path: apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
   () => ({
+    // [WI-867] Post-collapse: account middleware calls ensureInitialTrialSubscriptionV2 unconditionally.
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
     ensureFreeSubscriptionV2: jest.fn().mockResolvedValue({
       id: 'sub-1',
       accountId: 'test-account-id',
@@ -1099,10 +1101,11 @@ describe('book routes', () => {
       );
 
       expect(res.status).toBe(200);
+      // [WI-867] Post-collapse: route always uses getPersonAge (v2, returns 36 in mock), not getProfileAge (12).
       expect(generateBookTopics).toHaveBeenCalledWith(
         'Ancient Egypt',
         'Explore pyramids and pharaohs',
-        12,
+        36,
         'I already know about pyramids',
       );
     });
@@ -1135,32 +1138,10 @@ describe('book routes', () => {
     describe('[WI-586] learner-age reader is flag-gated', () => {
       const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
-      it('flag OFF → claimed-fresh generation uses legacy age 12', async () => {
-        mockClaimBookForGeneration.mockResolvedValueOnce({
-          id: BOOK_ID,
-          title: 'Ancient Egypt',
-          description: 'Explore pyramids and pharaohs',
-        });
-        const { generateBookTopics } = jest.requireMock(
-          '../services/book-generation',
-        );
+      // [WI-867] CUT: flag-OFF legacy getProfileAge path dropped — route always calls getPersonAge post-collapse.
+      // Original test: 'flag OFF → claimed-fresh generation uses legacy age 12'.
 
-        const res = await app.request(
-          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
-          { method: 'POST', headers: AUTH_HEADERS, body: JSON.stringify({}) },
-          TEST_ENV,
-        );
-
-        expect(res.status).toBe(200);
-        expect(generateBookTopics).toHaveBeenCalledWith(
-          'Ancient Egypt',
-          'Explore pyramids and pharaohs',
-          12,
-          undefined,
-        );
-      });
-
-      it('flag ON → claimed-fresh generation uses v2 age 36', async () => {
+      it('claimed-fresh generation uses v2 age 36', async () => {
         mockClaimBookForGeneration.mockResolvedValueOnce({
           id: BOOK_ID,
           title: 'Ancient Egypt',
@@ -1197,33 +1178,10 @@ describe('book routes', () => {
         topics: [mockBookWithTopics.topics[0]],
       };
 
-      it('flag OFF → stale-thin expand uses legacy age 12', async () => {
-        mockClaimBookForGeneration.mockResolvedValueOnce(null);
-        mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
-          status: 'not_incomplete',
-        });
-        mockGetBookWithTopics.mockResolvedValueOnce(staleThinBook as never);
-        const { expandExistingBookTopics } = jest.requireMock(
-          '../services/curriculum',
-        );
+      // [WI-867] CUT: flag-OFF legacy getProfileAge path dropped — route always calls getPersonAge post-collapse.
+      // Original test: 'flag OFF → stale-thin expand uses legacy age 12'.
 
-        const res = await app.request(
-          `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
-          {
-            method: 'POST',
-            headers: AUTH_HEADERS,
-            body: JSON.stringify({ expandExisting: true }),
-          },
-          TEST_ENV,
-        );
-
-        expect(res.status).toBe(200);
-        expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
-        const deps = (expandExistingBookTopics as jest.Mock).mock.calls[0]?.[6];
-        expect(deps.learnerAge).toBe(12);
-      });
-
-      it('flag ON → stale-thin expand uses v2 age 36', async () => {
+      it('stale-thin expand uses v2 age 36', async () => {
         mockClaimBookForGeneration.mockResolvedValueOnce(null);
         mockRepairIncompleteBookGenerationClaim.mockResolvedValueOnce({
           status: 'not_incomplete',

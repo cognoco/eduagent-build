@@ -70,33 +70,36 @@ jest.mock(
   }),
 );
 
-// [WI-774] v2 profile-scope resolver — profile-scope middleware uses these under
-// flag-on. Mocked so the X-Profile-Id resolution does not hit the unmocked DB.
+// [WI-774, WI-867] v2 profile-scope resolver — post-collapse always calls these.
+// Module-level refs so per-test overrides work after jest.clearAllMocks().
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'profile-1',
+  meta: {
+    birthYear: 1990,
+    location: 'EU',
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
+  },
+});
+const mockGetPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'profile-1',
+  meta: {
+    birthYear: 1990,
+    location: 'EU',
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
+  },
+});
 jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
   () => ({
-    findOwnerPersonScope: jest.fn().mockResolvedValue({
-      profileId: 'profile-1',
-      meta: {
-        birthYear: 1990,
-        location: 'EU',
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    }),
-    getPersonScope: jest.fn().mockResolvedValue({
-      profileId: 'profile-1',
-      meta: {
-        birthYear: 1990,
-        location: 'EU',
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    }),
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
   }),
 );
 
@@ -106,6 +109,15 @@ const mockGetNotificationPrefs = jest.fn();
 const mockUpsertNotificationPrefs = jest.fn();
 const mockGetWithdrawalArchivePreference = jest.fn();
 const mockUpsertWithdrawalArchivePreference = jest.fn();
+
+// [WI-867] Post-collapse: account middleware calls ensureInitialTrialSubscriptionV2 unconditionally.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() paths the unit mock DB cannot satisfy; real path covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../services/settings');
@@ -198,24 +210,18 @@ beforeEach(() => {
 
 describe('settings routes', () => {
   it('GET /v1/settings/withdrawal-archive returns 403 for non-owner callers (I5)', async () => {
-    const nonOwnerProfile = {
-      id: 'profile-1',
-      accountId: 'test-account-id',
-      displayName: 'Alex',
-      avatarUrl: null,
-      birthYear: 1990,
-      location: 'EU',
-      isOwner: false,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      archivedAt: null,
-    };
-    mockProfileFindFirst
-      .mockResolvedValueOnce(nonOwnerProfile)
-      .mockResolvedValueOnce(nonOwnerProfile);
+    // [WI-867] Post-collapse: isOwner comes from getPersonScope meta, not legacy profile row.
+    mockGetPersonScope.mockResolvedValueOnce({
+      profileId: 'profile-1',
+      meta: {
+        birthYear: 1990,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: false,
+      },
+    });
 
     const res = await app.request(
       '/v1/settings/withdrawal-archive',
@@ -252,12 +258,13 @@ describe('settings routes', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ value: true });
+    // [WI-867] Post-collapse: callerPersonId always set (resolveIdentityV2 always runs).
     expect(mockUpsertFamilyPoolBreakdownSharing).toHaveBeenCalledWith(
       expect.anything(),
       'profile-1',
       'test-account-id',
       true,
-      { identityV2Enabled: false },
+      { identityV2Enabled: false, callerPersonId: 'person-test-id' },
     );
   });
 
@@ -417,9 +424,9 @@ describe('settings routes', () => {
   });
 
   it('routes return 403 when a profile that belongs to a different account is used (wrong-profile access)', async () => {
-    // profileScopeMiddleware calls getProfile(db, profileId, account.id).
-    // When it returns null (profile not owned by this account), middleware 403s.
-    mockProfileFindFirst.mockResolvedValueOnce(null);
+    // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (v2).
+    // When it returns null (profile not in this account's person graph), middleware 403s.
+    mockGetPersonScope.mockResolvedValueOnce(null);
 
     const res = await app.request(
       '/v1/settings/notifications',
@@ -554,24 +561,17 @@ describe('[CR LOW] child celebration routes require owner gate', () => {
   const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
 
   function asNonOwnerProfile() {
-    mockFamilyLinksFindFirst.mockResolvedValue({
-      parentProfileId: 'profile-1',
-      childProfileId: CHILD_PROFILE_ID,
-    });
-    mockProfileFindFirst.mockResolvedValue({
-      id: 'profile-1',
-      accountId: 'test-account-id',
-      displayName: 'Kid',
-      avatarUrl: null,
-      birthYear: 2014,
-      location: 'EU',
-      isOwner: false,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-      archivedAt: null,
+    // [WI-867] Post-collapse: isOwner comes from getPersonScope meta, not legacy profile row.
+    mockGetPersonScope.mockResolvedValue({
+      profileId: 'profile-1',
+      meta: {
+        birthYear: 2014,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: false,
+      },
     });
   }
 
