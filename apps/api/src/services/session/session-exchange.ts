@@ -525,10 +525,59 @@ function buildFallbackDraft(
   };
 }
 
+/**
+ * [BUG-483] Re-fetch DB-verified event content for every SOLID concept's
+ * answer, so the note-draft hallucination guard always compares the LLM draft
+ * against real learner text read from `session_events` — never against text the
+ * request supplied for itself.
+ *
+ * Why this is needed: `decision.solidAnswerQuotes` is NOT uniformly
+ * DB-verified. For PERSISTED answers it is (quotes are DB-substituted in
+ * `validateEvaluationEventIds`), but for the answer the learner gives on the
+ * FINAL challenge turn, `validateChallengeRoundEvaluationItems` substitutes the
+ * route-supplied `currentUserMessage.content` (= `input.message`) — the request
+ * vouching for itself. Passing those quotes as `verifiedEventContents` (the old
+ * call site) made the guard a no-op for the current-turn concept, violating the
+ * documented "always DB-verified" invariant on `validateNoteDraft`.
+ *
+ * `validateEvaluationEventIds` re-reads each `answerEventId` from
+ * `session_events` (scoped to `profileId`) and replaces `learnerQuote` with the
+ * real `content`. It throws if ANY id is unresolved — which is exactly the
+ * same-turn case where the current-turn answer has not been persisted yet
+ * (`persistExchangeResult` runs AFTER `applyChallengeRoundRuntimeSignals`). In
+ * that case we return `null` so the caller fails closed to the learner-writes
+ * fallback draft, rather than accepting an LLM draft validated against
+ * route-trusted text.
+ */
+async function fetchVerifiedSolidContents(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  evaluations: ChallengeRoundEvaluationItem[],
+): Promise<string[] | null> {
+  const solidItems = evaluations.filter((item) => item.result === 'solid');
+  if (solidItems.length === 0) return [];
+  try {
+    const verified = await validateEvaluationEventIds(
+      db,
+      profileId,
+      sessionId,
+      solidItems,
+    );
+    return verified.map((item) => item.learnerQuote);
+  } catch {
+    // A solid answer's event is not (yet) readable from the DB — most commonly
+    // the current-turn answer on a same-turn finalize. Cannot honour the
+    // "always DB-verified" invariant for the draft, so signal fail-closed.
+    return null;
+  }
+}
+
 function buildValidatedDraft(
   noteDraft: ChallengeRoundNoteDraftHint | null | undefined,
   decision: MasteryDecision,
   evaluations: ChallengeRoundEvaluationItem[],
+  verifiedSolidContents: string[] | null,
 ): DraftedChallengeNote | undefined {
   const solidEventIds = new Set(
     evaluations
@@ -554,11 +603,18 @@ function buildValidatedDraft(
   const allSourcesAreSolid =
     draftSourceIds.length === noteDraft.source_answer_event_ids.length &&
     draftSourceIds.length > 0;
-  const validation = validateNoteDraft(
-    noteDraft.content,
-    decision.solidAnswerQuotes,
-    decision.solidAnswerQuotes,
-  );
+  // [BUG-483] When DB-verified content is unavailable for a solid concept
+  // (verifiedSolidContents === null), do NOT validate against the route-trusted
+  // `solidAnswerQuotes` — that is the invariant gap. Fail closed to the
+  // learner-writes fallback by treating validation as failed.
+  const validation =
+    verifiedSolidContents === null
+      ? { ok: false as const }
+      : validateNoteDraft(
+          noteDraft.content,
+          decision.solidAnswerQuotes,
+          verifiedSolidContents,
+        );
 
   if (!allSourcesAreSolid || !validation.ok) {
     return {
@@ -910,7 +966,24 @@ export async function finalizeChallengeRoundIfReady(
     );
   }
 
-  const draftedNote = buildValidatedDraft(noteDraft, decision, evaluations);
+  // [BUG-483] Source the note-draft hallucination guard from DB-verified event
+  // text for every solid concept — including the current-turn answer — so the
+  // guard never compares the draft against text the request supplied for
+  // itself. `null` means a solid answer's event is not readable from the DB
+  // yet (same-turn finalize); buildValidatedDraft then fails closed to the
+  // learner-writes fallback rather than trusting route-supplied quotes.
+  const verifiedSolidContents = await fetchVerifiedSolidContents(
+    db,
+    profileId,
+    session.id,
+    evaluations,
+  );
+  const draftedNote = buildValidatedDraft(
+    noteDraft,
+    decision,
+    evaluations,
+    verifiedSolidContents,
+  );
   // The terminal `complete` state was already persisted by the claim above
   // (single source of truth). Recompute the same value for the return payload.
   const complete = transitionChallengeState(

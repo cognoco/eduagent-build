@@ -51,6 +51,7 @@ jest.mock(
 import type { Database } from '@eduagent/database';
 import type {
   ChallengeRoundEvaluationItem,
+  ChallengeRoundNoteDraftHint,
   ChallengeRoundSessionState,
   LearningSession,
 } from '@eduagent/schemas';
@@ -84,12 +85,25 @@ interface DeepeningRow {
   createdAt: Date;
 }
 
+interface SessionEventRow {
+  id: string;
+  profileId: string;
+  sessionId: string;
+  eventType: string;
+  content: string;
+}
+
 interface FakeDbState {
   // Persisted session metadata. The claim/lock operates on this.
   sessionMetadata: Record<string, unknown>;
   masteryInserts: Array<Record<string, unknown>>;
   deepeningRows: DeepeningRow[];
   deepeningInsertCount: number;
+  // [BUG-483] session_events rows readable by validateEvaluationEventIds when
+  // finalize re-fetches DB-verified answer content for the note-draft guard.
+  // Omitted → no rows (models the same-turn case where the current-turn answer
+  // is not yet persisted).
+  sessionEventRows?: SessionEventRow[];
   // When set, the NEXT matching terminal insert throws — models a transient DB
   // error / constraint violation on the post-claim mastery or deepening write.
   failNextMasteryInsert?: boolean;
@@ -257,6 +271,13 @@ function makeFakeDb(state: FakeDbState): Database {
               r.source === 'challenge_round' &&
               (r.status === 'active' || r.status === 'pending_review'),
           ),
+      },
+      // [BUG-483] createScopedRepository(...).sessionEvents.findMany routes here.
+      // The opaque WHERE is built by the real scoped repo; we return the seeded
+      // rows and let the REAL validateEvaluationEventIds do its id→content
+      // mapping + strict-missing rejection in JS.
+      sessionEvents: {
+        findMany: async () => state.sessionEventRows ?? [],
       },
     },
   };
@@ -514,5 +535,148 @@ describe('finalizeChallengeRoundIfReady — releases the claim + escalates on a 
     expect(persistedChallengeState(state)?.state).toBe('complete');
     expect(state.deepeningInsertCount).toBe(1);
     expect(state.deepeningRows).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-483] The note-draft hallucination guard must validate against
+// DB-verified event text — never against the route-supplied current-turn
+// answer text the request vouched for itself.
+//
+// `decision.solidAnswerQuotes` is NOT uniformly DB-verified: for the answer the
+// learner gives on the FINAL challenge turn,
+// `validateChallengeRoundEvaluationItems` substitutes the route-supplied
+// `currentUserMessage.content` (= `input.message`). The pre-fix call site passed
+// those quotes as `verifiedEventContents`, so for the current-turn concept the
+// lexical-overlap guard compared the LLM draft against text the request supplied
+// for itself — a no-op.
+//
+// RED (pre-fix): the guard tokenizes the rich route-trusted `learnerQuote`, the
+// draft overlaps it strongly, validation passes, and `draftedNote.body` is the
+// LLM draft.
+// GREEN (post-fix): the guard tokenizes the sparse DB-verified `content`
+// ("yeah ok"), the draft does NOT overlap, validation fails, and
+// `draftedNote.body` is null with a learner-writes fallbackPrompt.
+// ---------------------------------------------------------------------------
+
+describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified content [BUG-483]', () => {
+  // The LLM-supplied learnerQuote (route-trusted) is rich and overlaps the
+  // draft strongly. The REAL DB event content is sparse — the learner barely
+  // said anything. The fabricated draft asserts far more than the learner did.
+  const ROUTE_TRUSTED_QUOTE =
+    'Photosynthesis happens in chloroplasts where plants convert light energy carbon dioxide and water into glucose and oxygen.';
+  const SPARSE_DB_CONTENT = 'yeah ok sounds right';
+  const FABRICATED_DRAFT =
+    'Photosynthesis happens in chloroplasts where plants convert light energy carbon dioxide and water into glucose and oxygen.';
+
+  const evalsWithRouteQuote: ChallengeRoundEvaluationItem[] = [
+    {
+      concept: 'photosynthesis',
+      result: 'solid',
+      evidence: 'Described the light-to-chemical energy conversion.',
+      answerEventId: ANSWER_EVENT_ID,
+      // Route-supplied (current-turn) text — NOT the real DB content.
+      learnerQuote: ROUTE_TRUSTED_QUOTE,
+    },
+  ];
+
+  const noteDraft: ChallengeRoundNoteDraftHint = {
+    content: FABRICATED_DRAFT,
+    source_concepts: ['photosynthesis'],
+    source_answer_event_ids: [ANSWER_EVENT_ID],
+  };
+
+  it('REJECTS a draft that only overlaps route-trusted text, validating against the sparse DB event content instead', async () => {
+    const challengeRound = draftingState(evalsWithRouteQuote);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      // The answer's REAL persisted content is sparse — finalize re-reads this.
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: SPARSE_DB_CONTENT,
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    // The guard, now sourced from DB-verified sparse text, rejects the draft:
+    // body is null (fallback), not the fabricated LLM draft.
+    expect(outcome?.draftedNote).toBeDefined();
+    expect(outcome?.draftedNote?.body).toBeNull();
+    expect(outcome?.draftedNote?.fallbackPrompt).toBeTruthy();
+  });
+
+  it('ACCEPTS a draft that overlaps the real DB event content', async () => {
+    const challengeRound = draftingState(evalsWithRouteQuote);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      // Real DB content matches the draft well → guard passes against DB text.
+      sessionEventRows: [
+        {
+          id: ANSWER_EVENT_ID,
+          profileId: PROFILE_ID,
+          sessionId: SESSION_ID,
+          eventType: 'user_message',
+          content: ROUTE_TRUSTED_QUOTE,
+        },
+      ],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    expect(outcome?.draftedNote?.body).toBe(FABRICATED_DRAFT);
+  });
+
+  it('fails closed to the fallback when the answer event is not yet readable from the DB (same-turn finalize)', async () => {
+    const challengeRound = draftingState(evalsWithRouteQuote);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      // No session_events rows seeded — models the current-turn answer not yet
+      // persisted. validateEvaluationEventIds throws → fail closed.
+      sessionEventRows: [],
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    const outcome = await finalizeChallengeRoundIfReady(
+      db,
+      PROFILE_ID,
+      session,
+      challengeRound,
+      noteDraft,
+    );
+
+    expect(outcome?.draftedNote?.body).toBeNull();
+    expect(outcome?.draftedNote?.fallbackPrompt).toBeTruthy();
   });
 });
