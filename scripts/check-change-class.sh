@@ -220,9 +220,10 @@ if hit '^packages/database/src/schema/'; then
 fi
 
 # ── DB Migrations ────────────────────────────────────────────────────────
-if hit '^packages/database/drizzle/'; then
+if hit '^apps/api/drizzle/.*\.sql$'; then
   CLASSES+=("db-migrations")
   add_cmd fast  "pnpm db:migrate:dev"        "Apply migration to dev DB"
+  add_cmd fast  "pnpm exec nx run @eduagent/database:test" "Database package tests (RLS coverage)"
   add_cmd slow  "pnpm test:api:integration"  "API integration tests"
   note "db-migrations: Apply migration BEFORE deploying code that reads new columns"
   note "db-migrations: Include Rollback section if dropping columns/tables/types"

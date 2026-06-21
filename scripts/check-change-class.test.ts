@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
@@ -11,8 +11,68 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const BASH =
+  process.platform === 'win32'
+    ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+    : 'bash';
+
 function git(repo: string, args: string[]): void {
   execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+}
+
+function runChangeClass(
+  repo: string,
+  args: string[],
+  options: Omit<ExecFileSyncOptions, 'cwd'> = {},
+): Buffer | string {
+  const command = [
+    options.env?.GITHUB_OUTPUT
+      ? `GITHUB_OUTPUT=${shellQuote(toBashPath(String(options.env.GITHUB_OUTPUT)))}`
+      : '',
+    ['./scripts/check-change-class.sh', ...args].map(shellQuote).join(' '),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return execFileSync(BASH, ['-c', command], {
+    cwd: repo,
+    ...options,
+  });
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function toBashPath(path: string): string {
+  if (process.platform !== 'win32') return path;
+  return path
+    .replace(/^([A-Za-z]):\\/, (_, drive: string) => {
+      return `/${drive.toLowerCase()}/`;
+    })
+    .replace(/\\/g, '/');
+}
+
+function removeTempRepo(path: string): void {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      rmSync(path, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (
+        !(
+          error instanceof Error &&
+          'code' in error &&
+          (error as NodeJS.ErrnoException).code === 'EBUSY'
+        )
+      ) {
+        throw error;
+      }
+      if (attempt === 19) {
+        return;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+    }
+  }
 }
 
 describe('check-change-class.sh', () => {
@@ -44,7 +104,7 @@ describe('check-change-class.sh', () => {
   });
 
   afterEach(() => {
-    rmSync(repo, { recursive: true, force: true });
+    removeTempRepo(repo);
   });
 
   it('requires the Husky typecheck gate for any changed TypeScript file', () => {
@@ -53,14 +113,9 @@ describe('check-change-class.sh', () => {
       'export const a = 2;\n',
     );
 
-    const output = execFileSync(
-      './scripts/check-change-class.sh',
-      ['--branch'],
-      {
-        cwd: repo,
-        encoding: 'utf8',
-      },
-    );
+    const output = runChangeClass(repo, ['--branch'], {
+      encoding: 'utf8',
+    });
 
     expect(output).toContain('typescript');
     expect(output).toContain('pnpm exec tsc --build');
@@ -74,15 +129,10 @@ describe('check-change-class.sh', () => {
   function runRouter(cwd: string): Record<string, string> {
     const outFile = join(cwd, 'github-output.txt');
     writeFileSync(outFile, '');
-    execFileSync(
-      './scripts/check-change-class.sh',
-      ['--branch', '--github-output'],
-      {
-        cwd,
-        encoding: 'utf8',
-        env: { ...process.env, GITHUB_OUTPUT: outFile },
-      },
-    );
+    runChangeClass(cwd, ['--branch', '--github-output'], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_OUTPUT: toBashPath(outFile) },
+    });
     return Object.fromEntries(
       readFileSync(outFile, 'utf8')
         .trim()
@@ -105,6 +155,28 @@ describe('check-change-class.sh', () => {
     const flags = runRouter(repo);
     expect(flags.classes).toContain('db-schema');
     expect(flags.integration).toBe('true');
+  });
+
+  it('routes API migration SQL changes through db migrations and database RLS tests', () => {
+    mkdirSync(join(repo, 'apps', 'api', 'drizzle'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'api', 'drizzle', '9999_uncovered_profile_table.sql'),
+      'CREATE TABLE uncovered_profile_table (profile_id uuid NOT NULL);\n',
+    );
+    git(repo, ['add', '.']);
+
+    const flags = runRouter(repo);
+    expect(flags.classes).toContain('db-migrations');
+    expect(flags.integration).toBe('true');
+
+    const output = runChangeClass(repo, ['--branch'], {
+      encoding: 'utf8',
+    });
+    expect(output).toContain('pnpm db:migrate:dev');
+    expect(output).toContain('pnpm exec nx run @eduagent/database:test');
+    expect(output).toContain('pnpm test:api:integration');
   });
 
   it('emits eval=true when prompt builders are touched, including services/llm subdirectories', () => {
@@ -175,7 +247,21 @@ describe('check-change-class.sh', () => {
       expect(flags.integration).toBe('true');
       expect(flags.eval).toBe('true');
     } finally {
-      rmSync(orphan, { recursive: true, force: true });
+      removeTempRepo(orphan);
     }
+  });
+
+  it('declares a database package test target for RLS coverage', () => {
+    const project = JSON.parse(
+      readFileSync(
+        join(__dirname, '..', 'packages', 'database', 'project.json'),
+        'utf8',
+      ),
+    );
+
+    const command = project.targets.test.options.command;
+    expect(command).toContain('jest --config jest.config.cjs');
+    expect(command).toContain('**/src/**/*.test.ts');
+    expect(command).toContain('\\.integration\\.test\\.ts$');
   });
 });
