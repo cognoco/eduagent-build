@@ -2,6 +2,13 @@
 // Metering Middleware Tests
 // ---------------------------------------------------------------------------
 
+// WI-867 flag-collapse: profile-scope middleware now calls findOwnerPersonScope /
+// getPersonScope from identity-v2/profile-v2 instead of findOwnerProfile/getProfile.
+// Import personScope shape helper here so the jest.mock factory below can close
+// over it (factory is hoisted; factory body runs lazily at request time when
+// const is already initialized).
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
 // KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
 // Use Record<string, unknown> as a structural stand-in so `fakeKV.namespace` compiles.
 // Proper fix: add @cloudflare/workers-types to tsconfig.spec.json.
@@ -12,7 +19,11 @@ type KVNamespace = Record<string, unknown>;
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+// WI-867: includeActual:true spreads jest.requireActual('@eduagent/database')
+// into the mock so schema column objects (login, membership, organization, etc.)
+// resolve correctly in identity-resolve.ts / profile-v2.ts calls. Without it,
+// the schema imports resolve to undefined and eq(undefined, x) throws TypeError.
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit test — real Neon DB unavailable; db injected via middleware chain
 
@@ -228,6 +239,61 @@ jest.mock(
       linkStripeCustomer: jest.fn(),
     };
   },
+);
+
+// WI-867: After IDENTITY_V2_ENABLED flag collapse, metering.ts imports
+// ensureFreeSubscriptionV2 / getEffectiveAccessForSubscriptionV2 /
+// getOrProvisionProfileQuotaUsageV2 / getQuotaPoolV2 directly from
+// ../services/billing/billing-v2. Wire them to the same V1 spies already used
+// throughout this suite so all per-test state injection (mockGetQuotaPool,
+// mockGetEffectiveAccessForSubscription, mockGetOrProvisionProfileQuotaUsage)
+// continues to work without per-test changes.
+//
+// Shape compatibility:
+//   ensureFreeSubscriptionV2 → mockEnsureFreeSubscription (SubscriptionRow)
+//   getEffectiveAccessForSubscriptionV2 → mockGetEffectiveAccessForSubscription
+//     (metering.ts reads only .effectiveAccessTier + .billingAccess — present in
+//     mockEffectiveAccess(); extra .subscription field from real impl is unused)
+//   getOrProvisionProfileQuotaUsageV2 → mockGetOrProvisionProfileQuotaUsage
+//     (role/monthlyLimit/usedThisMonth/dailyLimit/usedToday/cycleResetAt — all
+//     present in mockProfileQuota())
+//   getQuotaPoolV2 → mockGetQuotaPool (shared-pool path; monthlyLimit/
+//     usedThisMonth/dailyLimit/usedToday/cycleResetAt — all in mockQuota())
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: ensureFreeSubscriptionV2 uses db.transaction/FOR UPDATE/inserts (unrunnable on unit mock DB); getEffectiveAccessForSubscriptionV2/getOrProvisionProfileQuotaUsageV2/getQuotaPoolV2 are wired to V1 spies for per-test state injection; no integration twin exists (rg billing-v2 src/**\/*.integration.test.ts → 0 hits for these fns, 2026-06-21) */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: (...args: unknown[]) =>
+      mockEnsureFreeSubscription(...args),
+    getEffectiveAccessForSubscriptionV2: (...args: unknown[]) =>
+      mockGetEffectiveAccessForSubscription(...args),
+    getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
+      mockGetOrProvisionProfileQuotaUsage(...args),
+    getQuotaPoolV2: (...args: unknown[]) => mockGetQuotaPool(...args),
+    // ensureInitialTrialSubscriptionV2 is called by accountMiddleware on every
+    // authed request — it uses db.transaction() paths unrunnable on the unit
+    // mock DB. Mock to a noop (account.ts catches and ignores its throw anyway,
+    // but a noop avoids the log noise and avoids hitting the retry loop).
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+// WI-867 flag-collapse: profile-scope middleware now calls findOwnerPersonScope
+// (auto-resolve, no X-Profile-Id) and getPersonScope (explicit X-Profile-Id)
+// from identity-v2/profile-v2. Both use db.select() join chains that return []
+// on the Proxy unit-mock. Continuity mock — the same guard these tests had via
+// findOwnerProfile/getProfile in services/profile (which profile-scope no longer
+// calls). Real path covered by the identity integration suite.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(personScope());
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by apps/api/src/services/identity-v2/profile-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...args: unknown[]) =>
+      mockFindOwnerPersonScope(...args),
+    getPersonScope: (...args: unknown[]) => mockGetPersonScope(...args),
+  }),
 );
 
 // KV: use in-memory fake that exercises real services/kv Zod parsing.
@@ -580,10 +646,9 @@ describe('metering middleware', () => {
     });
 
     it('rejects unresolved profile-only LLM routes before quota lookup/decrement', async () => {
-      const { findOwnerProfile } = jest.requireMock('../services/profile') as {
-        findOwnerProfile: jest.Mock;
-      };
-      findOwnerProfile.mockResolvedValueOnce(null);
+      // WI-867: post-collapse, profile-scope calls findOwnerPersonScope (V2);
+      // findOwnerProfile (V1) is no longer on the hot path. Inject via V2 mock.
+      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
 
       const res = await app.request(
         '/v1/dictation/prepare-homework',
@@ -604,18 +669,11 @@ describe('metering middleware', () => {
     });
 
     it('rejects non-owner child-profile LLM requests before quota lookup/decrement', async () => {
-      const { getProfile } = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-      };
-      getProfile.mockResolvedValueOnce({
-        id: 'child-profile-id',
-        birthYear: 2012,
-        location: 'EU',
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        conversationLanguage: null,
-        isOwner: false,
-      });
+      // WI-867: post-collapse, profile-scope calls getPersonScope (V2) for explicit
+      // X-Profile-Id headers; getProfile (V1) is no longer on the hot path.
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ profileId: 'child-profile-id', isOwner: false }),
+      );
 
       const res = await app.request(
         '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
@@ -750,7 +808,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 is now hardcoded true post-flag-collapse
       );
       expect(mockSafeRefundQuota).toHaveBeenCalledWith(
         expect.anything(),
@@ -913,7 +971,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -947,7 +1005,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -1039,7 +1097,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -1099,7 +1157,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -1315,7 +1373,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -1563,7 +1621,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-free',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
   });
@@ -1774,7 +1832,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -2381,7 +2439,7 @@ describe('metering middleware', () => {
           expect.anything(),
           'sub-1',
           'test-profile-id',
-          false,
+          true, // WI-867: identityV2 hardcoded true post-flag-collapse
         );
       },
     );
@@ -2459,7 +2517,7 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        false,
+        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
