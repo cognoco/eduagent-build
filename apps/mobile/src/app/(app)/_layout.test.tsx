@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import i18n from 'i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import {
@@ -1095,21 +1096,8 @@ describe('AppLayout', () => {
   // backend required) BEFORE rendering, then assert the rendered root view
   // carries accessibilityLanguage='de'.
   it('sets accessibilityLanguage on the root view to match the active i18n locale', async () => {
-    // i18next is a singleton exported as module.exports from the CJS build;
-    // require() returns the instance directly.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const i18n = require('i18next') as {
-      language: string;
-      addResourceBundle: (
-        lng: string,
-        ns: string,
-        resources: Record<string, string>,
-        deep?: boolean,
-        overwrite?: boolean,
-      ) => void;
-      changeLanguage: (lang: string) => Promise<void>;
-    };
-
+    // i18next's default export is the shared singleton instance (same one the
+    // app and test-setup initialize), so changeLanguage here drives the render.
     const originalLanguage = i18n.language;
 
     // Register a minimal stub so changeLanguage('de') does not trigger a
