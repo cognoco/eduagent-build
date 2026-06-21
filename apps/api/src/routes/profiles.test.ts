@@ -1018,6 +1018,9 @@ describe('PATCH /v1/profiles/:id', () => {
   });
 
   // [CR-2026-05-19-H1] Non-owner self-update must still be allowed.
+  // [Issue 901] resolvedVia:'explicit-header' is required — the mobile client
+  // always sends X-Profile-Id (api-client.ts:209); an explicit-header non-owner
+  // self-editing their own profile is a legitimate operation.
   it('allows a non-owner to update their own profile', async () => {
     const updated = makeProfileRow({ id: PROFILE_ID_A, displayName: 'Self' });
     updateProfileMock.mockResolvedValue(updated);
@@ -1032,7 +1035,9 @@ describe('PATCH /v1/profiles/:id', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       } as Account);
-      // Non-owner active profile = PROFILE_ID_A; patching own profile
+      // Non-owner active profile = PROFILE_ID_A; patching own profile.
+      // resolvedVia:'explicit-header' mirrors real mobile client behaviour
+      // (X-Profile-Id always sent). Without it the first guard (Issue 901) fires.
       c.set('profileId', PROFILE_ID_A);
       c.set('profileMeta', {
         isOwner: false,
@@ -1040,6 +1045,7 @@ describe('PATCH /v1/profiles/:id', () => {
         location: null,
         consentStatus: null,
         hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
       } as ProfileMeta);
       await next();
     });
@@ -1056,6 +1062,63 @@ describe('PATCH /v1/profiles/:id', () => {
 
     expect(res.status).toBe(200);
     expect(updateProfileMock).toHaveBeenCalled();
+  });
+
+  // [BREAK][Issue 901] Auto-resolved owner self-edit — the closed attack vector.
+  // When no X-Profile-Id header is sent, profileScopeMiddleware sets
+  // resolvedVia:'auto' and resolves activeProfileId to the owner's profile id.
+  // A non-owner who sends PATCH /v1/profiles/{ownerProfileId} with no header
+  // gets id === activeProfileId (both the owner id) and would previously pass
+  // the old compound gate. The new unconditional resolvedVia guard must fire
+  // BEFORE the self-edit exception is evaluated, returning 403 and never calling
+  // the update service.
+  // Red→green: temporarily revert the resolvedVia guard in the PATCH handler
+  // (restore the old single compound `if ((isOwner !== true || resolvedVia !== 'explicit-header') && id !== activeProfileId)`)
+  // → this test passes (request goes through) → restore the fix → green.
+  it('[BREAK][Issue 901] returns 403 when auto-resolved owner edits own (auto) profileId', async () => {
+    const appAutoSelf = new Hono<TestEnv>();
+    appAutoSelf.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('account', {
+        id: ACCOUNT_ID,
+        clerkUserId: 'user_test',
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Account);
+      // Auto-resolved owner: activeProfileId = PROFILE_ID_A (the owner),
+      // resolvedVia:'auto' (no X-Profile-Id header was sent).
+      // id (route param) also = PROFILE_ID_A → id === activeProfileId.
+      // Under the old guard this bypassed the 403; the new guard must catch it.
+      c.set('profileId', PROFILE_ID_A);
+      c.set('profileMeta', {
+        isOwner: true,
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'auto',
+      } as ProfileMeta);
+      await next();
+    });
+    appAutoSelf.onError((err, c) =>
+      c.json({ code: 'INTERNAL_ERROR', message: err.message }, 500),
+    );
+    appAutoSelf.route('/v1', profileRoutes);
+
+    // PATCH the owner's own profile id (id === activeProfileId) without an
+    // explicit header → must be 403 and must NOT call the update service.
+    const res = await appAutoSelf.request(`/v1/profiles/${PROFILE_ID_A}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: 'ShouldBeBlocked' }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    // The update service must not be called — the gate fires before the DB write.
+    expect(updateProfileMock).not.toHaveBeenCalled();
   });
 });
 
@@ -1180,6 +1243,9 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
   // app-context is permitted (self-update is always allowed; only sibling
   // edits are blocked). Paired with the break test above so the gate's two
   // clauses (isOwner + self-id) are both covered.
+  // [Issue 901] resolvedVia:'explicit-header' is required — mirrors real mobile
+  // client behaviour (X-Profile-Id always sent, api-client.ts:209). Without it
+  // the unconditional resolvedVia guard fires first and returns 403.
   it('[CR-2026-05-19-H1] allows a non-owner to update their own app context', async () => {
     const updated = makeProfileRow({
       id: PROFILE_ID_A,
@@ -1200,6 +1266,7 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
         location: null,
         consentStatus: null,
         hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
       } as ProfileMeta,
     });
 

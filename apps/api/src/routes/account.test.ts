@@ -107,7 +107,8 @@ const OWNER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
 // NOTE: the OWNER_PROFILE_ID literal is duplicated inside this factory because
 // jest hoists jest.mock() above the const declaration above; referencing the
 // const here would throw "Cannot access before initialization". The two must
-// stay in sync (asserted by a guard test below).
+// stay in sync — enforced implicitly: the success-path tests fail
+// (getProfile/findOwnerProfile returns null → 403) if the literals diverge.
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
