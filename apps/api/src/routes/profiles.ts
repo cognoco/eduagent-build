@@ -164,7 +164,15 @@ export const profileRoutes = new Hono<ProfileEnv>()
         // assertProfileCreationAllowed — flag-on its profileMeta-absent fallback
         // counts the EMPTY legacy `profiles` table → 0 → fails OPEN; and an
         // add-child is provably never a first-profile bootstrap.
-        if (input.kind === 'child' && c.get('profileMeta')?.isOwner !== true) {
+        // [Issue 901] Require an explicitly selected owner profile, not an
+        // auto-synthesized one. profileScopeMiddleware auto-resolves the account
+        // OWNER (isOwner:true) when no X-Profile-Id header is sent — so a
+        // non-owner caller could omit the header to satisfy the isOwner check.
+        if (
+          input.kind === 'child' &&
+          (c.get('profileMeta')?.isOwner !== true ||
+            c.get('profileMeta')?.resolvedVia !== 'explicit-header')
+        ) {
           return apiError(
             c,
             403,
@@ -347,6 +355,23 @@ export const profileRoutes = new Hono<ProfileEnv>()
 
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
+      // [Issue 901] Reject auto-resolved (headerless) identities unconditionally.
+      // profileScopeMiddleware auto-resolves the account owner (isOwner:true) when
+      // no X-Profile-Id is sent — so a non-owner omitting the header gets
+      // id === activeProfileId (both resolve to the owner id), bypassing the
+      // self-edit exception below. Checking resolvedVia first closes that hole:
+      // only explicitly-selected identities (the mobile client always sends the
+      // header) may proceed. Auto-resolved owner self-edit is intentionally 403.
+      if (profileMeta?.resolvedVia !== 'explicit-header') {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can update other profiles.',
+        );
+      }
+      // Owner-or-self check: explicit-header owner may edit any profile; any other
+      // explicit-header caller may only edit their own profile (self-update).
       if (profileMeta?.isOwner !== true && id !== activeProfileId) {
         return apiError(
           c,
@@ -393,6 +418,23 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // so a non-owner can still update their own displayName/avatar/colorScheme.
       const activeProfileId = c.get('profileId');
       const profileMeta = c.get('profileMeta');
+      // [Issue 901] Reject auto-resolved (headerless) identities unconditionally.
+      // profileScopeMiddleware auto-resolves the account owner (isOwner:true) when
+      // no X-Profile-Id is sent — so a non-owner omitting the header gets
+      // id === activeProfileId (both resolve to the owner id), bypassing the
+      // self-edit exception below. Checking resolvedVia first closes that hole:
+      // only explicitly-selected identities (the mobile client always sends the
+      // header) may proceed. Auto-resolved owner self-edit is intentionally 403.
+      if (profileMeta?.resolvedVia !== 'explicit-header') {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can update other profiles.',
+        );
+      }
+      // Owner-or-self check: explicit-header owner may edit any profile; any other
+      // explicit-header caller may only edit their own profile (self-update).
       if (profileMeta?.isOwner !== true && id !== activeProfileId) {
         return apiError(
           c,

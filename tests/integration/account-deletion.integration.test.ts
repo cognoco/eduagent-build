@@ -204,13 +204,16 @@ afterAll(async () => {
 
 describe('Integration: POST /v1/account/delete (P0-004)', () => {
   it('returns 200 with gracePeriodEnds', async () => {
-    await createOwnerProfile();
+    const ownerProfileId = await createOwnerProfile();
 
     const res = await app.request(
       '/v1/account/delete',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
       },
       TEST_ENV,
     );
@@ -229,7 +232,7 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
   });
 
   it('sets deletionScheduledAt on the account row', async () => {
-    const { accountId } = await createOwnerProfileRecord();
+    const { profileId, accountId } = await createOwnerProfileRecord();
 
     // Before deletion: no scheduledAt
     const before = await loadDeletionState(accountId);
@@ -240,7 +243,10 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
       '/v1/account/delete',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -257,7 +263,10 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
       '/v1/account/delete',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -283,6 +292,31 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
     expect(res.status).toBe(401);
     expect(getCapturedInngestEvents()).toHaveLength(0);
   });
+
+  // [Issue 901] Privilege-escalation regression. An authenticated caller who
+  // OMITS X-Profile-Id is auto-resolved to the owner profile (isOwner:true) by
+  // profileScopeMiddleware. Before the fix, that auto-resolved owner identity
+  // satisfied assertOwnerProfile, letting any non-owner reach this owner-only
+  // route simply by dropping the header. The fix tags auto-resolution
+  // `resolvedVia:'auto'` and assertOwnerProfile now rejects it (403). Owner
+  // privileges require an EXPLICITLY selected, verified owner profile — exactly
+  // what the real mobile client always sends (api-client.ts X-Profile-Id).
+  it('[BREAK] returns 403 when X-Profile-Id is omitted (no auto-resolve to owner)', async () => {
+    await createOwnerProfile();
+
+    const res = await app.request(
+      '/v1/account/delete',
+      {
+        method: 'POST',
+        // No X-Profile-Id header — the exact attack the fix prevents.
+        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+    expect(getCapturedInngestEvents()).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -291,14 +325,17 @@ describe('Integration: POST /v1/account/delete (P0-004)', () => {
 
 describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
   it('returns 200 with cancellation message', async () => {
-    const { accountId } = await createOwnerProfileRecord();
+    const { profileId } = await createOwnerProfileRecord();
 
     // Schedule first, then cancel
     await app.request(
       '/v1/account/delete',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -307,7 +344,10 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
       '/v1/account/cancel-deletion',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -318,14 +358,17 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
   });
 
   it('sets deletionCancelledAt on the account row', async () => {
-    const { accountId } = await createOwnerProfileRecord();
+    const { profileId, accountId } = await createOwnerProfileRecord();
 
     // Schedule then cancel
     await app.request(
       '/v1/account/delete',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -333,7 +376,10 @@ describe('Integration: POST /v1/account/cancel-deletion (P0-004)', () => {
       '/v1/account/cancel-deletion',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );
@@ -370,7 +416,10 @@ describe('Integration: GET /v1/account/export', () => {
       '/v1/account/export',
       {
         method: 'GET',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
       },
       TEST_ENV,
     );

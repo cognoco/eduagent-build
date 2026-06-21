@@ -746,10 +746,13 @@ describe('assertProfileCreationAllowed', () => {
     } as unknown as Database;
   }
 
-  it('allows the owner (profileMeta present, isOwner true) without hitting the DB', async () => {
+  it('allows the owner (profileMeta present, isOwner true, explicit-header) without hitting the DB', async () => {
     const db = makeCountDb(5);
     await expect(
-      assertProfileCreationAllowed(db, 'account-123', { isOwner: true }),
+      assertProfileCreationAllowed(db, 'account-123', {
+        isOwner: true,
+        resolvedVia: 'explicit-header',
+      }),
     ).resolves.toBeUndefined();
     // Owner short-circuits — no count query needed.
     expect(db.select).not.toHaveBeenCalled();
@@ -758,8 +761,30 @@ describe('assertProfileCreationAllowed', () => {
   it('[BREAK] denies a non-owner (profileMeta present, isOwner false) with ForbiddenError', async () => {
     const db = makeCountDb(3);
     await expect(
-      assertProfileCreationAllowed(db, 'account-123', { isOwner: false }),
+      assertProfileCreationAllowed(db, 'account-123', {
+        isOwner: false,
+        resolvedVia: 'explicit-header',
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  // [BREAK / Issue 901] An auto-resolved owner (no X-Profile-Id header,
+  // resolvedVia:'auto') is isOwner:true and so passes the isOwner check — but the
+  // identity was synthesized for a HEADERLESS caller. When the account already
+  // has profiles, a non-owner caller could omit the header to be auto-resolved to
+  // the owner and create additional profiles. The explicit-header requirement
+  // must reject it. Red-green: drop the resolvedVia clause in profile.ts → the
+  // owner branch returns without throwing → this flips to a resolved promise.
+  it('[BREAK][Issue 901] denies an auto-resolved owner (no X-Profile-Id header) with ForbiddenError', async () => {
+    const db = makeCountDb(5);
+    await expect(
+      assertProfileCreationAllowed(db, 'account-123', {
+        isOwner: true,
+        resolvedVia: 'auto',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    // Rejection is from the explicit-header clause, not a DB count.
     expect(db.select).not.toHaveBeenCalled();
   });
 

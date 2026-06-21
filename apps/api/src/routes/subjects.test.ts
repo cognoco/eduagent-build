@@ -107,19 +107,24 @@ type TestEnv = {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
-    profileMeta: { isOwner: boolean } | undefined;
+    profileMeta:
+      | { isOwner: boolean; resolvedVia: 'auto' | 'explicit-header' }
+      | undefined;
   };
 };
 
 function makeApp(opts?: {
   profileId?: string;
-  profileMeta?: { isOwner: boolean };
+  profileMeta?: { isOwner: boolean; resolvedVia: 'auto' | 'explicit-header' };
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
     c.set('profileId', opts?.profileId ?? PROFILE_ID);
-    c.set('profileMeta', opts?.profileMeta ?? { isOwner: true });
+    c.set(
+      'profileMeta',
+      opts?.profileMeta ?? { isOwner: true, resolvedVia: 'explicit-header' },
+    );
     await next();
   });
   app.onError((err, c) =>
@@ -700,7 +705,7 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
       c.set('db' as never, {});
       c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: false });
+      c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
       await next();
     });
     proxyApp.route('/', subjectRoutes);

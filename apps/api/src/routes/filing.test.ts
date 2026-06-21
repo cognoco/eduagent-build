@@ -286,7 +286,7 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://mock/test',
 };
 
-const AUTH_HEADERS = makeAuthHeaders();
+const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 describe('filing routes', () => {
   // LLM transport stays real — registerLlmProviderFixture keeps routeAndCall
@@ -933,7 +933,7 @@ describe('[WI-153 / DS-064] filing proxy-mode guard', () => {
       c.set('db' as never, {});
       c.set('profileId' as never, 'test-profile-id');
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: false });
+      c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
       await next();
     });
     proxyApp.route('/', filingRoutes);

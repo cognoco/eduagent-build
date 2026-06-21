@@ -41,6 +41,7 @@ function makeApp(options: { isOwner?: boolean } = {}) {
       consentStatus: 'CONSENTED',
       hasPremiumLlm: false,
       isOwner: options.isOwner ?? true,
+      resolvedVia: (options.isOwner ?? true) ? 'explicit-header' : 'auto',
     });
     await next();
   });

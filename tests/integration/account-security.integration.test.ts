@@ -85,11 +85,16 @@ afterAll(async () => {
 
 describe('Integration: GET /v1/account/email [CRITICAL-1]', () => {
   it('returns the persisted account email for the owner', async () => {
-    await createOwnerProfile();
+    const ownerProfileId = await createOwnerProfile();
 
     const res = await app.request(
       '/v1/account/email',
-      { headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }) },
+      {
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
+      },
       TEST_ENV,
     );
 
@@ -105,13 +110,16 @@ describe('Integration: GET /v1/account/email [CRITICAL-1]', () => {
 
 describe('Integration: POST /v1/account/security-event [CRITICAL-2a]', () => {
   it('emits app/account.security-event to the account email on password_added', async () => {
-    await createOwnerProfile();
+    const ownerProfileId = await createOwnerProfile();
 
     const res = await app.request(
       '/v1/account/security-event',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
         body: JSON.stringify({ event: 'password_added' }),
       },
       TEST_ENV,
@@ -135,13 +143,16 @@ describe('Integration: POST /v1/account/security-event [CRITICAL-2a]', () => {
   });
 
   it('rejects a server-only / unknown event type with 400', async () => {
-    await createOwnerProfile();
+    const ownerProfileId = await createOwnerProfile();
 
     const res = await app.request(
       '/v1/account/security-event',
       {
         method: 'POST',
-        headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          ownerProfileId,
+        ),
         body: JSON.stringify({ event: 'email_changed' }),
       },
       TEST_ENV,

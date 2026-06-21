@@ -1014,6 +1014,78 @@ describe('learner-profile routes', () => {
   });
 
   // -------------------------------------------------------------------------
+  // [Issue 901] BREAK — owner/parent-admin gates must NOT be reachable by simply
+  // omitting X-Profile-Id. profileScopeMiddleware auto-resolves the account OWNER
+  // (isOwner:true, resolvedVia:'auto') on the no-header path; before the fix an
+  // authenticated NON-OWNER caller (a child on the account, or anyone holding the
+  // account JWT) could omit the header to pass assertOwnerAndParentAccess /
+  // assertCanManageOwnConsent. These tests send a valid auth token but NO
+  // X-Profile-Id — the exact attack — and assert a 403 plus that the side-effect
+  // service was never invoked.
+  //
+  // findOwnerProfile is overridden to return the OWNER so the auto-resolve
+  // SUCCEEDS (isOwner:true); the rejection therefore comes purely from
+  // resolvedVia:'auto', not from an absent profileMeta.
+  // -------------------------------------------------------------------------
+  describe('[Issue 901] no-header auto-resolve must not confer owner/parent-admin privileges', () => {
+    beforeEach(() => {
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+      profileServiceMock['findOwnerProfile']!.mockResolvedValue({
+        id: PARENT_PROFILE_ID,
+        accountId: 'test-account-id',
+        birthYear: 1985,
+        location: null,
+        consentStatus: 'CONSENTED',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+      // A valid parent->child family link exists; the rejection must come from
+      // the explicit-header requirement, NOT a missing link.
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: PARENT_PROFILE_ID,
+        childProfileId: OWN_CHILD_PROFILE_ID,
+      });
+    });
+
+    it('[BREAK] POST /learner-profile/:profileId/consent (assertOwnerAndParentAccess) returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/consent`,
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /learner-profile/consent (assertCanManageOwnConsent) returns 403 when X-Profile-Id is omitted', async () => {
+      const res = await app.request(
+        '/v1/learner-profile/consent',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // [WI-371 / DS-185 / WI-274] Tell-Mentor self-write must be proxy-blocked at
   // the ROUTE layer. In the full app the metering middleware already calls
   // assertNotProxyMode for /learner-profile/tell (it is an LLM-metered route),

@@ -120,6 +120,7 @@ function buildApp(
       consentStatus: null,
       isOwner: true,
       hasPremiumLlm: false,
+      resolvedVia: 'explicit-header' as const,
     });
     await next();
   });

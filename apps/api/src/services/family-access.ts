@@ -101,7 +101,20 @@ export function assertCanManageOwnConsent<
   I extends Input,
 >(c: Context<E, P, I>): void {
   const profileMeta = c.get('profileMeta');
-  if (profileMeta?.isOwner === true) {
+  // [Issue 901] Reject auto-synthesized owner identity. profileScopeMiddleware
+  // auto-resolves the account OWNER profile (isOwner:true) when no X-Profile-Id
+  // header is sent. Because the synthesized identity IS the owner, BOTH the
+  // isOwner early-return below AND the adult-fallthrough would pass for a
+  // headerless caller (privilege escalation). Consent management therefore
+  // requires an explicitly selected, verified profile. A legit adult non-owner
+  // still works: they send their OWN X-Profile-Id → resolvedVia:'explicit-header',
+  // isOwner:false → falls to the age check → adult → permitted.
+  if (profileMeta?.resolvedVia !== 'explicit-header') {
+    throw new ForbiddenError(
+      'Consent management requires an explicitly selected profile.',
+    );
+  }
+  if (profileMeta.isOwner === true) {
     // Account owner always allowed to manage own consent.
     return;
   }
@@ -162,6 +175,16 @@ export async function assertOwnerAndParentAccess<
       'Only the account owner can perform administrative actions on child profiles.',
     );
   }
+  // [Issue 901] Reject auto-synthesized owner identity. profileScopeMiddleware
+  // auto-resolves the account OWNER (isOwner:true) when no X-Profile-Id header
+  // is sent — so an authenticated NON-OWNER caller could omit the header to
+  // satisfy the isOwner check above (privilege escalation). Parent-admin actions
+  // on child profiles require an explicitly selected, verified owner profile.
+  if (profileMeta.resolvedVia !== 'explicit-header') {
+    throw new ForbiddenError(
+      'Only the account owner can perform administrative actions on child profiles.',
+    );
+  }
   await assertParentAccess(db, parentProfileId, childProfileId, opts);
 }
 
@@ -175,6 +198,14 @@ export function assertOwnerProfile<
 ): void {
   const profileMeta = c.get('profileMeta');
   if (profileMeta?.isOwner !== true) {
+    throw new ForbiddenError(message);
+  }
+  // [Issue 901] Reject auto-synthesized owner identity. profileScopeMiddleware
+  // auto-resolves the account OWNER profile (isOwner:true) when no X-Profile-Id
+  // header is sent — so an authenticated NON-OWNER caller could omit the header
+  // to satisfy the isOwner check above (privilege escalation). Owner privileges
+  // require an explicitly selected, verified owner profile.
+  if (profileMeta.resolvedVia !== 'explicit-header') {
     throw new ForbiddenError(message);
   }
 }

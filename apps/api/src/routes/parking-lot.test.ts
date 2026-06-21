@@ -74,7 +74,11 @@ function createApp(
     // server-derived proxy-mode guard can read isOwner. Default to owner so the
     // pre-existing assertions still pass; tests that exercise the guard opt in
     // with `{ isOwner: false }`.
-    c.set('profileMeta' as never, { isOwner: opts?.isOwner ?? true });
+    const isOwner = opts?.isOwner ?? true;
+    c.set('profileMeta' as never, {
+      isOwner,
+      resolvedVia: isOwner ? 'explicit-header' : 'auto',
+    });
     await next();
   });
   app.route('/', parkingLotRoutes);

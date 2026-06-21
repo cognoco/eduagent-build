@@ -34,7 +34,11 @@ function makeProxyApp(opts?: { isOwner?: boolean }) {
     c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
     c.set('account' as never, { id: 'test-account-id' });
     c.set('user' as never, { id: 'test-user' });
-    c.set('profileMeta' as never, { isOwner: opts?.isOwner ?? false });
+    const isOwner = opts?.isOwner ?? false;
+    c.set('profileMeta' as never, {
+      isOwner,
+      resolvedVia: isOwner ? 'explicit-header' : 'auto',
+    });
     await next();
   });
   app.route('/', snapshotProgressRoutes);
@@ -66,7 +70,10 @@ describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
       c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
       c.set('account' as never, { id: 'test-account-id' });
       c.set('user' as never, { id: 'test-user' });
-      c.set('profileMeta' as never, { isOwner: true });
+      c.set('profileMeta' as never, {
+        isOwner: true,
+        resolvedVia: 'explicit-header',
+      });
       // The account middleware seeds callerPersonId on the v2 path.
       c.set('callerPersonId' as never, 'person-test-id');
       await next();
@@ -141,14 +148,20 @@ describe('[F-144] GET /progress/milestones backfill is fail-closed on ownership'
   });
 
   it('suppresses backfill when isOwner is false (proxy)', async () => {
-    const { app, snapshotFindFirst } = makeMilestonesApp({ isOwner: false });
+    const { app, snapshotFindFirst } = makeMilestonesApp({
+      isOwner: false,
+      resolvedVia: 'auto',
+    });
     const res = await app.request('/progress/milestones', { method: 'GET' });
     expect(res.status).toBe(200);
     expect(snapshotFindFirst).not.toHaveBeenCalled();
   });
 
   it('allows backfill when isOwner is true (legitimate self-read)', async () => {
-    const { app, snapshotFindFirst } = makeMilestonesApp({ isOwner: true });
+    const { app, snapshotFindFirst } = makeMilestonesApp({
+      isOwner: true,
+      resolvedVia: 'explicit-header',
+    });
     const res = await app.request('/progress/milestones', { method: 'GET' });
     expect(res.status).toBe(200);
     // Backfill path entered — getLatestSnapshot queried the snapshot.

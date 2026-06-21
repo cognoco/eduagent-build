@@ -257,15 +257,30 @@ export async function countProfiles(
  * enforcement still happens inside {@link createProfileWithLimitCheck}.
  *
  * Note: this is intentionally decoupled from the full `ProfileMeta` shape —
- * the only field the authorization decision reads is `isOwner`.
+ * the only fields the authorization decision reads are `isOwner` and
+ * `resolvedVia` ([Issue 901]).
  */
 export async function assertProfileCreationAllowed(
   db: Database,
   accountId: string,
-  profileMeta: { isOwner: boolean } | undefined,
+  profileMeta:
+    | { isOwner: boolean; resolvedVia: 'auto' | 'explicit-header' }
+    | undefined,
 ): Promise<void> {
   if (profileMeta) {
     if (profileMeta.isOwner !== true) {
+      throw new ForbiddenError(
+        'Only the account owner can create additional profiles.',
+      );
+    }
+    // [Issue 901] Reject auto-synthesized owner identity. When the account
+    // already has profiles, profileScopeMiddleware auto-resolves the OWNER
+    // (isOwner:true) for a headerless request — so a non-owner caller could omit
+    // X-Profile-Id to pass the isOwner check above. Creating additional profiles
+    // requires an explicitly selected, verified owner profile. (The genuine
+    // first-profile bootstrap sends no header AND has no profiles yet → it lands
+    // in the profileMeta-absent / existingCount === 0 branch below, unaffected.)
+    if (profileMeta.resolvedVia !== 'explicit-header') {
       throw new ForbiddenError(
         'Only the account owner can create additional profiles.',
       );
