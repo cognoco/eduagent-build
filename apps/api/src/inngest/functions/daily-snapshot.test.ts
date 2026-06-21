@@ -314,9 +314,8 @@ describe('dailySnapshotRefresh', () => {
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
       'profile-001',
-      // [CUT-B1] the refresh now carries the identity-cutover flag (false in
-      // the flag-off legacy path the test exercises).
-      { identityV2Enabled: false },
+      // [WI-867] flag collapsed to v2-always; identityV2Enabled is always true.
+      { identityV2Enabled: true },
     );
     expect(result).toEqual({
       status: 'completed',
@@ -355,7 +354,9 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('returns skipped status when profile does not exist', async () => {
-    mockSnapshotDb.query.profiles.findFirst.mockResolvedValue(null);
+    // [WI-867] flag collapsed — liveness now reads person, not profiles.
+    // Use Once so subsequent tests still see the default { id: 'profile-001' }.
+    mockSnapshotDb.query.person.findFirst.mockResolvedValueOnce(null);
 
     const { result } = await executeRefreshSteps({
       profileId: 'profile-missing',
@@ -382,8 +383,10 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('propagates DB lookup errors so Inngest retries (no silent swallow)', async () => {
+    // [WI-867] flag collapsed — liveness now reads person, not profiles.
+    // Use Once to avoid bleeding the rejection into subsequent tests.
     const error = new Error('DB connection error');
-    mockSnapshotDb.query.profiles.findFirst.mockRejectedValue(error);
+    mockSnapshotDb.query.person.findFirst.mockRejectedValueOnce(error);
 
     await expect(
       executeRefreshSteps({ profileId: 'profile-001' }),

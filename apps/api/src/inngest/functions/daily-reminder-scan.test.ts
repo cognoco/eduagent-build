@@ -476,7 +476,8 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
     }
   });
 
-  it('flag-off: legacy path stays intact — query reads `profiles`, not `person`', async () => {
+  // [WI-867] flag collapsed — legacy path is dead; flag-off now routes to v2.
+  it('flag-off → v2: query still reads `person`, not legacy `profiles`', async () => {
     const prev = process.env['IDENTITY_V2_ENABLED'];
     delete process.env['IDENTITY_V2_ENABLED'];
     try {
@@ -487,8 +488,9 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
       const handler = (dailyReminderScan as any).fn;
       await handler({ event: { id: 'evt-v2-off' }, step });
 
-      expect(db.builder.from).toHaveBeenCalledWith(profiles);
-      expect(db.builder.from).not.toHaveBeenCalledWith(person);
+      // Flag is collapsed; source always uses person even when env var is absent.
+      expect(db.builder.from).toHaveBeenCalledWith(person);
+      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
     } finally {
       restoreFlag(prev);
     }
