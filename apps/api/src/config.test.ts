@@ -3,6 +3,7 @@ import {
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
+  isManagedTierActive,
   isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionBindings,
@@ -346,6 +347,25 @@ describe('validateEnv', () => {
     expect(enabledEnv.MODE_NAV_V2_ENABLED).toBe('true');
   });
 
+  it('MANAGED_TIER_ACTIVE defaults to "false" and parses with strict helper semantics', () => {
+    const defaultEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(defaultEnv.MANAGED_TIER_ACTIVE).toBe('false');
+    expect(isManagedTierActive(defaultEnv.MANAGED_TIER_ACTIVE)).toBe(false);
+
+    const enabledEnv = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MANAGED_TIER_ACTIVE: 'true',
+    });
+    expect(enabledEnv.MANAGED_TIER_ACTIVE).toBe('true');
+    expect(isManagedTierActive('true')).toBe(true);
+    expect(isManagedTierActive('false')).toBe(false);
+    expect(isManagedTierActive(undefined)).toBe(false);
+  });
+
   it('MEMORY_FACTS_RELEVANCE_RETRIEVAL defaults to "false" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
@@ -606,6 +626,7 @@ describe('validateProductionBindings', () => {
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
     MODE_NAV_V2_ENABLED: 'false',
+    MANAGED_TIER_ACTIVE: 'false',
     IDENTITY_V2_ENABLED: 'false',
     MAINTENANCE_READONLY: 'false',
     MAINTENANCE_BLOCK_INNGEST: 'false',
@@ -640,27 +661,29 @@ describe('validateProductionBindings', () => {
     expect(overrideApplied).toBe(false);
   });
 
-  it('returns no missing bindings when IDEMPOTENCY_KV is present in production', () => {
+  it('returns no missing bindings when IDEMPOTENCY_KV and SUBSCRIPTION_KV are present in production', () => {
     const { missing, overrideApplied } = validateProductionBindings(PROD_ENV, {
       IDEMPOTENCY_KV: fakeKv,
+      SUBSCRIPTION_KV: fakeKv,
     });
     expect(missing).toEqual([]);
     expect(overrideApplied).toBe(false);
   });
 
-  it('honours ALLOW_MISSING_IDEMPOTENCY_KV=true override and flags overrideApplied', () => {
+  it('honours ALLOW_MISSING_IDEMPOTENCY_KV=true override and flags overrideApplied (SUBSCRIPTION_KV still required)', () => {
     const { missing, overrideApplied } = validateProductionBindings(
       { ...PROD_ENV, ALLOW_MISSING_IDEMPOTENCY_KV: 'true' },
-      {},
+      { SUBSCRIPTION_KV: fakeKv },
     );
+    // IDEMPOTENCY_KV is overridden; SUBSCRIPTION_KV is present — no missing
     expect(missing).toEqual([]);
     expect(overrideApplied).toBe(true);
   });
 
-  it('does NOT flag overrideApplied when the binding is actually present', () => {
+  it('does NOT flag overrideApplied when IDEMPOTENCY_KV is actually present (and SUBSCRIPTION_KV present)', () => {
     const { missing, overrideApplied } = validateProductionBindings(
       { ...PROD_ENV, ALLOW_MISSING_IDEMPOTENCY_KV: 'true' },
-      { IDEMPOTENCY_KV: fakeKv },
+      { IDEMPOTENCY_KV: fakeKv, SUBSCRIPTION_KV: fakeKv },
     );
     expect(missing).toEqual([]);
     expect(overrideApplied).toBe(false);
@@ -677,6 +700,71 @@ describe('validateProductionBindings', () => {
     );
     expect(missing).toEqual([]);
     expect(overrideApplied).toBe(false);
+  });
+
+  // [Issue-888] SUBSCRIPTION_KV — subscription-status cache binding.
+  // Absent in production means safeRefreshKvCache skips every refresh and
+  // emits a Sentry warning, creating a silent billing-cache drift. Production
+  // must refuse to serve when the binding is missing (same hard-gate pattern
+  // as IDEMPOTENCY_KV; wrangler.toml §env.production.kv_namespaces confirms
+  // the binding is provisioned for prod).
+  it('[Issue-888] reports SUBSCRIPTION_KV missing in production', () => {
+    const { missing } = validateProductionBindings(PROD_ENV, {
+      IDEMPOTENCY_KV: fakeKv,
+      // SUBSCRIPTION_KV deliberately absent
+    });
+    expect(missing).toContain('SUBSCRIPTION_KV');
+  });
+
+  it('[Issue-888] does not report SUBSCRIPTION_KV when present in production', () => {
+    const { missing } = validateProductionBindings(PROD_ENV, {
+      IDEMPOTENCY_KV: fakeKv,
+      SUBSCRIPTION_KV: fakeKv,
+    });
+    expect(missing).not.toContain('SUBSCRIPTION_KV');
+  });
+
+  it('[Issue-888] does not check SUBSCRIPTION_KV outside production', () => {
+    const { missing } = validateProductionBindings(
+      { ...PROD_ENV, ENVIRONMENT: 'staging' },
+      {
+        IDEMPOTENCY_KV: fakeKv,
+        // SUBSCRIPTION_KV absent in staging — should not fail
+      },
+    );
+    expect(missing).toEqual([]);
+  });
+
+  // [Issue-888] SENTRY_DSN warning check. SENTRY_DSN is intentionally optional
+  // (the SDK no-ops gracefully when absent), but a missing DSN in production
+  // means all Sentry events silently drop. The gate emits a non-blocking
+  // warning (not a hard 500) so ops can detect misconfiguration in telemetry
+  // without refusing traffic. The `warnings` field on BindingValidationResult
+  // carries these non-fatal advisories.
+  it('[Issue-888] warns when SENTRY_DSN is absent in production (non-blocking)', () => {
+    const result = validateProductionBindings(PROD_ENV, {
+      IDEMPOTENCY_KV: fakeKv,
+      SUBSCRIPTION_KV: fakeKv,
+      // SENTRY_DSN absent — should produce a warning, not a missing entry
+    });
+    expect(result.missing).not.toContain('SENTRY_DSN');
+    expect(result.warnings).toContain('SENTRY_DSN');
+  });
+
+  it('[Issue-888] does not warn about SENTRY_DSN when it is present in production', () => {
+    const result = validateProductionBindings(
+      { ...PROD_ENV, SENTRY_DSN: 'https://abc@sentry.io/123' },
+      { IDEMPOTENCY_KV: fakeKv, SUBSCRIPTION_KV: fakeKv },
+    );
+    expect(result.warnings ?? []).not.toContain('SENTRY_DSN');
+  });
+
+  it('[Issue-888] does not warn about SENTRY_DSN outside production', () => {
+    const result = validateProductionBindings(
+      { ...PROD_ENV, ENVIRONMENT: 'staging' },
+      {},
+    );
+    expect(result.warnings ?? []).not.toContain('SENTRY_DSN');
   });
 });
 

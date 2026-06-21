@@ -47,6 +47,7 @@ beforeEach(() => {
   mockValidateProductionBindings.mockReturnValue({
     missing: [],
     overrideApplied: false,
+    warnings: [],
   });
 });
 
@@ -238,6 +239,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: ['IDEMPOTENCY_KV'],
         overrideApplied: false,
+        warnings: [],
       });
 
       await envValidationMiddleware(c, next);
@@ -268,6 +270,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: [],
         overrideApplied: false,
+        warnings: [],
       });
 
       await envValidationMiddleware(c, next);
@@ -288,6 +291,7 @@ describe('envValidationMiddleware', () => {
       mockValidateProductionBindings.mockReturnValue({
         missing: [],
         overrideApplied: true,
+        warnings: [],
       });
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
@@ -298,6 +302,37 @@ describe('envValidationMiddleware', () => {
       expect(warnSpy).toHaveBeenCalled();
       const warnArgs = warnSpy.mock.calls.flat().join(' ');
       expect(warnArgs).toMatch(/idempotency_kv_override_active/);
+
+      warnSpy.mockRestore();
+    });
+
+    // [Issue-888] Non-empty warnings path: optional bindings absent must be
+    // logged per-key but must NOT block the request.
+    it('[Issue-888] passes through and logs each optional missing binding as a structured warning', async () => {
+      process.env['NODE_ENV'] = 'production';
+      const env = {
+        ENVIRONMENT: 'production',
+        DATABASE_URL: 'postgresql://prod/db',
+      };
+      const c = createMockContext(env);
+      const next = jest.fn().mockResolvedValue(undefined);
+      mockValidateEnv.mockReturnValue(env as any);
+      mockValidateProductionBindings.mockReturnValue({
+        missing: [],
+        overrideApplied: false,
+        warnings: ['SENTRY_DSN'],
+      });
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      await envValidationMiddleware(c, next);
+
+      // warnings are non-blocking — request must proceed
+      expect(next).toHaveBeenCalled();
+      expect(c.json).not.toHaveBeenCalled();
+      // structured event + key must appear in the logged JSON
+      const warnArgs = warnSpy.mock.calls.flat().join(' ');
+      expect(warnArgs).toMatch(/env-validation\.optional_binding_absent/);
+      expect(warnArgs).toMatch(/SENTRY_DSN/);
 
       warnSpy.mockRestore();
     });

@@ -157,6 +157,11 @@ const envSchema = z.object({
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // S5 managed visibility tier. Built dark for launch: day-one visibility
+  // links are credentialed/consent-capable only; managed handoff activation is
+  // a separate server-enforced flag flip.
+  MANAGED_TIER_ACTIVE: z.enum(['true', 'false']).default('false'),
+
   // Identity Foundation cutover (CUT-B WP). The SINGLE flag for the whole
   // identity surface (auth/account/person/consent-read/billing) — never
   // per-domain flags (partial activation = split-brain, banned). Default-OFF:
@@ -275,6 +280,10 @@ export function isIdentityV2Enabled(value: string | undefined): boolean {
   return value === 'true';
 }
 
+export function isManagedTierActive(value: string | undefined): boolean {
+  return value === 'true';
+}
+
 /**
  * Stage-1 convergence gate. When 'true', the maintenance middleware 503s every
  * request except the health check and the signed `/v1/inngest` delivery
@@ -388,21 +397,34 @@ export function validateProductionKeys(env: Env): string[] {
 // ---------------------------------------------------------------------------
 // Production KV-binding gate
 //
-// IDEMPOTENCY_KV is a runtime KVNamespace object on c.env, not a string —
-// it cannot be parsed by the zod env schema. This validator runs in the
-// env-validation middleware after validateEnv() and short-circuits with
-// 500 ENV_VALIDATION_ERROR if production is missing the binding without
-// the explicit prelaunch override. Override use is escalated via a
-// structured warning so it remains visible in telemetry.
+// KVNamespace bindings are runtime objects on c.env — they cannot be parsed
+// by the zod env schema. This validator runs in the env-validation middleware
+// after validateEnv() and short-circuits with 500 ENV_VALIDATION_ERROR if
+// production is missing a required binding.
+//
+// [Issue-888] Added SUBSCRIPTION_KV to the required set. wrangler.toml
+// §env.production.kv_namespaces confirms the binding is provisioned; without
+// it safeRefreshKvCache silently skips every cache refresh and emits a Sentry
+// warning — a "silent billing-cache drift" violation. Added to the same
+// hard-gate pattern as IDEMPOTENCY_KV.
+//
+// SENTRY_DSN is intentionally a WARNING (not a hard missing entry): the Sentry
+// SDK no-ops gracefully when the DSN is absent, so it is safe to serve traffic.
+// But a missing DSN in production means ALL error events silently drop — ops
+// cannot detect incidents. The `warnings` field carries non-fatal advisories
+// that the middleware logs loudly without returning a 500.
 // ---------------------------------------------------------------------------
 
 export interface ProductionBindings {
   IDEMPOTENCY_KV?: unknown;
+  SUBSCRIPTION_KV?: unknown;
 }
 
 export interface BindingValidationResult {
   missing: string[];
   overrideApplied: boolean;
+  /** Non-fatal advisories — logged as warnings but do not block traffic. */
+  warnings: string[];
 }
 
 export function validateProductionBindings(
@@ -410,10 +432,11 @@ export function validateProductionBindings(
   bindings: ProductionBindings,
 ): BindingValidationResult {
   if (env.ENVIRONMENT !== 'production') {
-    return { missing: [], overrideApplied: false };
+    return { missing: [], overrideApplied: false, warnings: [] };
   }
 
   const missing: string[] = [];
+  const warnings: string[] = [];
   let overrideApplied = false;
 
   if (bindings.IDEMPOTENCY_KV == null) {
@@ -424,7 +447,20 @@ export function validateProductionBindings(
     }
   }
 
-  return { missing, overrideApplied };
+  // [Issue-888] SUBSCRIPTION_KV is provisioned in wrangler.toml for production.
+  // Absence means every safeRefreshKvCache call silently falls through to the
+  // DB path with a Sentry warning — billing-cache drift risk.
+  if (bindings.SUBSCRIPTION_KV == null) {
+    missing.push('SUBSCRIPTION_KV');
+  }
+
+  // [Issue-888] SENTRY_DSN warning (non-blocking). SDK gracefully no-ops when
+  // absent, but all error events drop silently. Ops must know about this.
+  if (!env.SENTRY_DSN) {
+    warnings.push('SENTRY_DSN');
+  }
+
+  return { missing, overrideApplied, warnings };
 }
 
 export function validateEnv(raw: Record<string, string | undefined>): Env {

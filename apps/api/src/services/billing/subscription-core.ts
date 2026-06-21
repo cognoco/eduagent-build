@@ -13,6 +13,7 @@ import {
   type Database,
   createAccountRepository,
   findSubscriptionByStripeId__unscoped,
+  findSubscriptionByStripeCustomerId__unscoped,
   findQuotaPool__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
@@ -346,6 +347,31 @@ export async function linkStripeCustomer(
   if (!updated)
     throw new Error('Stripe customer link update did not return a row');
   return mapSubscriptionRow(updated);
+}
+
+// ---------------------------------------------------------------------------
+// getSubscriptionByStripeCustomerId
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads the subscription bound to a given Stripe customer ID.
+ * Returns null if no subscription is bound to that customer.
+ *
+ * SECURITY: the Stripe customer ID arrives in a webhook payload authenticated
+ * by Stripe event signature. The result is used by the checkout-completed
+ * handler to verify that the (operator-mutable) metadata.accountId matches the
+ * account already bound to this customer before granting an entitlement — do
+ * NOT expose this to user-facing routes (it is unscoped by design).
+ */
+export async function getSubscriptionByStripeCustomerId(
+  db: Database,
+  stripeCustomerId: string,
+): Promise<SubscriptionRow | null> {
+  const row = await findSubscriptionByStripeCustomerId__unscoped(
+    db,
+    stripeCustomerId,
+  );
+  return row ? mapSubscriptionRow(row) : null;
 }
 
 // ---------------------------------------------------------------------------

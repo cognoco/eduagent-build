@@ -24,7 +24,7 @@ export const mentorActivityLedger = pgTable(
     id: uuid('id')
       .primaryKey()
       .$defaultFn(() => generateUUIDv7()),
-    // S0 is profile-keyed. S4 repoints to person_id and adds edge_id.
+    // ADR-0022 keeps S4 ledger visibility self-only; relationship visibility is read-time derived.
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),

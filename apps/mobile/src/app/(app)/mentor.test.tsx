@@ -13,6 +13,24 @@ let mockNowFeed: {
   refetch: jest.Mock;
 };
 let mockSubjectsCount = 1;
+let mockScopeContext: {
+  activeScope:
+    | { kind: 'me' }
+    | { kind: 'supporter-hub' }
+    | {
+        kind: 'person';
+        personId: string;
+        edgeId: string;
+        displayName: string;
+      };
+  availableScopes: Array<{
+    kind: 'person';
+    personId: string;
+    edgeId: string;
+    displayName: string;
+  }>;
+  setActiveScope: jest.Mock;
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -38,6 +56,39 @@ jest.mock(
       refetch: jest.fn(),
     }),
   }),
+);
+
+jest.mock(
+  '../../lib/scope-context' /* gc1-allow: route branch test fixes the active V2 scope without exercising provider persistence */,
+  () => ({
+    useScopeContext: () => mockScopeContext,
+  }),
+);
+
+jest.mock(
+  '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
+  () => {
+    const { Text, View } = require('react-native');
+    return {
+      SupportHubMentorTab: ({
+        activePersonScope,
+      }: {
+        activePersonScope?: { displayName: string };
+      }) => (
+        <View
+          testID={
+            activePersonScope
+              ? 'person-scope-mentor-tab'
+              : 'support-hub-mentor-tab'
+          }
+        >
+          {activePersonScope ? (
+            <Text>{activePersonScope.displayName}</Text>
+          ) : null}
+        </View>
+      ),
+    };
+  },
 );
 
 const MentorScreen = require('./mentor').default;
@@ -79,6 +130,18 @@ describe('MentorScreen', () => {
       isSlowFallback: false,
       refetch: mockNowRefetch,
     };
+    mockScopeContext = {
+      activeScope: { kind: 'me' },
+      availableScopes: [
+        {
+          kind: 'person',
+          personId: '550e8400-e29b-41d4-a716-446655440101',
+          edgeId: '550e8400-e29b-41d4-a716-446655440201',
+          displayName: 'Emma',
+        },
+      ],
+      setActiveScope: jest.fn(),
+    };
   });
 
   it('renders the feed stack, on-track badge, and pinned input affordances', () => {
@@ -91,6 +154,36 @@ describe('MentorScreen', () => {
     screen.getByTestId('mentor-bar-camera');
     screen.getByTestId('mentor-bar-homework-chip');
     screen.getByTestId('mentor-bar-mic');
+  });
+
+  it('renders the Support hub Mentor variant without loading the Me feed', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+
+    render(<MentorScreen />);
+
+    screen.getByTestId('support-hub-mentor-tab');
+    expect(screen.queryByTestId('mentor-screen')).toBeNull();
+  });
+
+  it('renders the person-scope Mentor variant without loading the Me feed', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: {
+        kind: 'person',
+        personId: '550e8400-e29b-41d4-a716-446655440101',
+        edgeId: '550e8400-e29b-41d4-a716-446655440201',
+        displayName: 'Emma',
+      },
+    };
+
+    render(<MentorScreen />);
+
+    screen.getByTestId('person-scope-mentor-tab');
+    screen.getByText('Emma');
+    expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
   it('surfaces the school-day-evening homework highlight above the feed, tappable to camera [T11]', () => {

@@ -136,6 +136,25 @@ export async function findSubscriptionByStripeId__unscoped(
 }
 
 /**
+ * Find a subscription by its Stripe customer ID.
+ *
+ * SECURITY: caller MUST verify ownership before returning data to a client;
+ * intended for Stripe webhook handlers that authenticate via event signature.
+ * Used by the checkout-completed handler to assert the (mutable) metadata
+ * accountId matches the account already bound to this Stripe customer before
+ * granting an entitlement. `stripe_customer_id` is UNIQUE, so this returns at
+ * most one row.
+ */
+export async function findSubscriptionByStripeCustomerId__unscoped(
+  db: Database,
+  stripeCustomerId: string,
+) {
+  return db.query.subscriptions.findFirst({
+    where: eq(subscriptions.stripeCustomerId, stripeCustomerId),
+  });
+}
+
+/**
  * Find the quota pool for a subscription.
  *
  * SECURITY: caller MUST verify ownership before returning data to a client;

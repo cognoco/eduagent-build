@@ -270,7 +270,6 @@ describe('autoFileSession', () => {
         bookId: '00000000-0000-4000-8000-000000000010',
         topicId: '00000000-0000-4000-8000-000000000011',
       },
-      visibility: 'self',
     });
     const filingFinalizedOrder =
       mockMarkSessionAutoFiled.mock.invocationCallOrder[0]!;

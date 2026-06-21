@@ -7,6 +7,7 @@ import { scheduledDeletion } from './functions/account-deletion';
 import { sessionCompleted } from './functions/session-completed';
 import { sessionStaleCleanup } from './functions/session-stale-cleanup';
 import { trialExpiry } from './functions/trial-expiry';
+import { trialNotificationSend } from './functions/trial-notification-send';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
@@ -110,6 +111,8 @@ import {
 import { needsDeepeningExpirePending } from './functions/needs-deepening-expire-pending';
 import { notifyParentChildCapHit } from './functions/notify-parent-child-cap-hit';
 import { accountSecurityNotification } from './functions/account-security-notification';
+import { supportershipRevocation } from './functions/supportership-revocation';
+import { graduationNarration } from './functions/graduation-narration';
 
 export {
   inngest,
@@ -122,6 +125,7 @@ export {
   sessionCompleted,
   sessionStaleCleanup,
   trialExpiry,
+  trialNotificationSend,
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
@@ -192,6 +196,8 @@ export {
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  supportershipRevocation,
+  graduationNarration,
 };
 
 // All Inngest functions to register with the serve handler
@@ -205,6 +211,7 @@ export const functions = [
   sessionCompleted,
   sessionStaleCleanup,
   trialExpiry,
+  trialNotificationSend,
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
@@ -276,4 +283,6 @@ export const functions = [
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  supportershipRevocation,
+  graduationNarration,
 ];

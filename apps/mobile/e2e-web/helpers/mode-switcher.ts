@@ -18,6 +18,23 @@ function targetScreen(page: Page, mode: AppMode): Locator {
   );
 }
 
+function selectedModeTab(page: Page, mode: AppMode): Locator {
+  return page.getByRole('tab', {
+    name: mode === 'study' ? 'My Learning' : 'Family',
+  });
+}
+
+async function modeIsVisible(page: Page, mode: AppMode): Promise<boolean> {
+  return (
+    (await targetScreen(page, mode)
+      .isVisible()
+      .catch(() => false)) ||
+    (await selectedModeTab(page, mode)
+      .isVisible()
+      .catch(() => false))
+  );
+}
+
 async function retryModeSwitchIfNeeded(
   page: Page,
   timeout = 1_500,
@@ -52,12 +69,11 @@ async function waitForSwitchOutcome(
   mode: AppMode,
   timeout: number,
 ): Promise<'success' | 'error' | 'timeout'> {
-  const target = targetScreen(page, mode);
   const error = page.getByTestId('mode-switcher-error');
   const deadline = Date.now() + timeout;
 
   while (Date.now() < deadline) {
-    if (await target.isVisible().catch(() => false)) {
+    if (await modeIsVisible(page, mode)) {
       return 'success';
     }
 
@@ -131,7 +147,7 @@ export async function switchAppMode(
   const target = targetScreen(page, mode);
   await expect(toggle).toBeVisible({ timeout });
 
-  if (await target.isVisible().catch(() => false)) {
+  if (await modeIsVisible(page, mode)) {
     return;
   }
 
@@ -195,7 +211,19 @@ export async function switchAppMode(
     }
   }
 
-  await expect(target).toBeVisible({
+  await expect(target.or(selectedModeTab(page, mode)).first()).toBeVisible({
     timeout: Math.max(deadline - Date.now(), 1_000),
+  });
+}
+
+export async function expectAppMode(
+  page: Page,
+  mode: AppMode,
+  timeout = 15_000,
+): Promise<void> {
+  await expect(
+    targetScreen(page, mode).or(selectedModeTab(page, mode)).first(),
+  ).toBeVisible({
+    timeout,
   });
 }

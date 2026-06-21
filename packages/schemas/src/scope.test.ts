@@ -1,6 +1,7 @@
 import {
   scopeDescriptorSchema,
   scopeKindSchema,
+  supporterColdStartSchema,
   supporterScopeListSchema,
 } from './scope.js';
 
@@ -61,6 +62,104 @@ describe('scope schemas', () => {
         shape: 'supporter',
         scopes,
         defaultScopeIndex: 2,
+      }),
+    ).toThrow();
+  });
+});
+
+describe('supporter cold-start schema', () => {
+  it('parses the variant-zero add-child doorway', () => {
+    expect(
+      supporterColdStartSchema.parse({
+        variant: 'variant-zero',
+        cards: [{ state: 'none', anchor: 'add-child' }],
+        selfLearningDoorway: true,
+      }),
+    ).toEqual({
+      variant: 'variant-zero',
+      cards: [{ state: 'none', anchor: 'add-child' }],
+      selfLearningDoorway: true,
+    });
+  });
+
+  it('parses accepted-edge cold-start cards', () => {
+    expect(
+      supporterColdStartSchema.parse({
+        variant: 'per-child',
+        cards: [
+          {
+            personId: '00000000-0000-4000-8000-000000000101',
+            edgeId: '00000000-0000-4000-8000-000000000201',
+            displayName: 'Emma',
+            state: 'granted-idle',
+            anchor: 'kickstart',
+            staleIdleStep: 2,
+          },
+        ],
+        selfLearningDoorway: true,
+      }).cards[0],
+    ).toEqual({
+      personId: '00000000-0000-4000-8000-000000000101',
+      edgeId: '00000000-0000-4000-8000-000000000201',
+      displayName: 'Emma',
+      state: 'granted-idle',
+      anchor: 'kickstart',
+      staleIdleStep: 2,
+    });
+  });
+
+  it('keeps pending-link cards separate from accepted supportership edges', () => {
+    expect(
+      supporterColdStartSchema.parse({
+        variant: 'per-child',
+        cards: [
+          {
+            pendingLinkId: '00000000-0000-4000-8000-000000000301',
+            displayName: 'Emma',
+            state: 'consent-pending',
+            anchor: 'approve',
+          },
+        ],
+        selfLearningDoorway: true,
+      }).cards[0],
+    ).toEqual({
+      pendingLinkId: '00000000-0000-4000-8000-000000000301',
+      displayName: 'Emma',
+      state: 'consent-pending',
+      anchor: 'approve',
+    });
+
+    expect(() =>
+      supporterColdStartSchema.parse({
+        variant: 'per-child',
+        cards: [
+          {
+            edgeId: '00000000-0000-4000-8000-000000000201',
+            displayName: 'Emma',
+            state: 'consent-pending',
+            anchor: 'approve',
+          },
+        ],
+        selfLearningDoorway: true,
+      }),
+    ).toThrow();
+  });
+
+  it('rejects stale-idle state on non-kickstart cards', () => {
+    expect(() =>
+      supporterColdStartSchema.parse({
+        variant: 'per-child',
+        cards: [
+          {
+            personId: '00000000-0000-4000-8000-000000000101',
+            edgeId: '00000000-0000-4000-8000-000000000201',
+            displayName: 'Emma',
+            state: 'managed',
+            anchor: 'handoff',
+            staleIdleStep: 1,
+          },
+        ],
+        selfLearningDoorway: true,
       }),
     ).toThrow();
   });

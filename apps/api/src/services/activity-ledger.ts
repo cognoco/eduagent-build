@@ -1,11 +1,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { mentorActivityLedger, type Database } from '@eduagent/database';
-import type {
-  LedgerKind,
-  LedgerTemplateKey,
-  LedgerVisibility,
-} from '@eduagent/schemas';
+import type { LedgerKind, LedgerTemplateKey } from '@eduagent/schemas';
 
 import { safeWrite } from './safe-non-core';
 
@@ -16,14 +12,12 @@ export interface WriteActivityMomentInput {
   kind: LedgerKind;
   templateKey: LedgerTemplateKey;
   params?: Record<string, unknown>;
-  visibility?: LedgerVisibility;
 }
 
 export async function writeActivityMoment(
   input: WriteActivityMomentInput,
 ): Promise<void> {
-  const { db, profileId, actorJob, kind, templateKey, params, visibility } =
-    input;
+  const { db, profileId, actorJob, kind, templateKey, params } = input;
 
   await safeWrite(
     () =>
@@ -33,7 +27,7 @@ export async function writeActivityMoment(
         kind,
         templateKey,
         params: params ?? {},
-        visibility: visibility ?? 'self',
+        visibility: 'self',
       }),
     'activity-ledger.write',
     { profileId, actorJob, kind },

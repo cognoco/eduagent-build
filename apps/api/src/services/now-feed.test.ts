@@ -4,6 +4,7 @@ import {
   PARKED_AGING_WINDOW_DAYS,
   RANKING,
   ROUTE_CATALOG,
+  orderSupporterHubCandidates,
   buildNowFeedFromCandidates,
   buildNowOverflowFromCandidates,
   rankCandidates,
@@ -28,7 +29,9 @@ function candidate(
       resolveDeepLink('subject.hub', {
         subjectId: '00000000-0000-4000-8000-000000000001',
       }),
-    scope: 'self',
+    scope: overrides.scope ?? 'self',
+    personId: overrides.personId,
+    edgeId: overrides.edgeId,
     ledgerId: overrides.ledgerId,
   };
 }
@@ -139,6 +142,101 @@ describe('now feed ranking', () => {
     ]);
     expect(feed.overflowCount).toBe(1);
     expect(overflow.items.map((item) => item.kind)).toEqual(['parked_item']);
+  });
+
+  it('keeps one slot for each supportership edge before filling globally', () => {
+    const edgeA = '00000000-0000-4000-8000-0000000000a1';
+    const edgeB = '00000000-0000-4000-8000-0000000000b1';
+    const ordered = orderSupporterHubCandidates(
+      [
+        candidate({
+          id: 'a1-session',
+          kind: 'unfinished_session',
+          edgeId: edgeA,
+          personId: '00000000-0000-4000-8000-000000000101',
+        }),
+        candidate({
+          id: 'a2-retention',
+          kind: 'retention_due',
+          edgeId: edgeA,
+          personId: '00000000-0000-4000-8000-000000000101',
+        }),
+        candidate({
+          id: 'a3-needs',
+          kind: 'needs_deepening',
+          edgeId: edgeA,
+          personId: '00000000-0000-4000-8000-000000000101',
+        }),
+        candidate({
+          id: 'b1-challenge',
+          kind: 'challenge_ready',
+          edgeId: edgeB,
+          personId: '00000000-0000-4000-8000-000000000102',
+        }),
+      ],
+      now,
+    );
+
+    expect(ordered.slice(0, 3).map((item) => item.id)).toEqual([
+      'a1-session',
+      'b1-challenge',
+      'a2-retention',
+    ]);
+  });
+
+  it('builds a non-empty supporter-hub feed from derived person-scope candidates', () => {
+    const ordered = orderSupporterHubCandidates(
+      [
+        candidate({
+          id: 'edge-retention',
+          kind: 'retention_due',
+          scope: 'person',
+          edgeId: '00000000-0000-4000-8000-0000000000a1',
+          personId: '00000000-0000-4000-8000-000000000101',
+        }),
+      ],
+      now,
+    );
+
+    const feed = buildNowFeedFromCandidates(ordered, 'supporter-hub', now);
+
+    expect(feed.scope).toBe('supporter-hub');
+    expect(feed.cards).toHaveLength(1);
+    expect(feed.cards[0]).toMatchObject({
+      scope: 'person',
+      edgeId: '00000000-0000-4000-8000-0000000000a1',
+      personId: '00000000-0000-4000-8000-000000000101',
+    });
+  });
+
+  it('represents the Me-scope support hub pointer as one link card', () => {
+    const feed = buildNowFeedFromCandidates(
+      [
+        candidate({ id: 'session', kind: 'unfinished_session' }),
+        candidate({
+          id: 'pointer',
+          kind: 'support_hub_pointer',
+          templateKey: 'now.support_hub_pointer.default',
+          deepLink: resolveDeepLink('support.hub', {}),
+          params: { count: 1 },
+        }),
+        candidate({ id: 'retention', kind: 'retention_due' }),
+        candidate({ id: 'needs', kind: 'needs_deepening' }),
+      ],
+      'self',
+      now,
+    );
+
+    expect(feed.cards).toHaveLength(3);
+    expect(feed.cards).toContainEqual(
+      expect.objectContaining({
+        kind: 'support_hub_pointer',
+        deepLink: { route: 'support.hub', params: {}, chain: [] },
+      }),
+    );
+    expect(
+      feed.cards.find((item) => item.kind === 'support_hub_pointer'),
+    ).not.toHaveProperty('edgeId');
   });
 });
 

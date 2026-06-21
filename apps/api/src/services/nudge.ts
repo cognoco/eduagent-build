@@ -21,10 +21,10 @@ import { getGuardianPersonIds } from './identity-v2/guardianship';
 
 const logger = createLogger();
 
-const NUDGE_RATE_LIMIT = 4;
-const NUDGE_WINDOW_HOURS = 24;
-const QUIET_HOURS_START = 21;
-const QUIET_HOURS_END = 7;
+export const NUDGE_RATE_LIMIT = 4;
+export const NUDGE_WINDOW_HOURS = 24;
+export const NUDGE_QUIET_HOURS_START = 21;
+export const NUDGE_QUIET_HOURS_END = 7;
 
 const TEMPLATE_COPY: Record<NudgeTemplate, string> = {
   you_got_this: 'You got this',
@@ -68,7 +68,7 @@ function isQuietHours(now: Date, timezone: string | null | undefined): boolean {
     });
     const hour = Number(formatter.format(now));
     if (!Number.isFinite(hour)) return false;
-    return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
+    return hour >= NUDGE_QUIET_HOURS_START || hour < NUDGE_QUIET_HOURS_END;
   } catch (error) {
     logger.warn('nudge_quiet_hours_invalid_timezone', {
       metric: 'nudge_quiet_hours_invalid_timezone',

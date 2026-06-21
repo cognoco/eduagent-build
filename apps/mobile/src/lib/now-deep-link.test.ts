@@ -77,6 +77,18 @@ describe('pushNowDeepLink', () => {
     expect(router.push).toHaveBeenCalledWith('/(app)/journal');
   });
 
+  it('pushes support hub pointers to the Mentor tab', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'support.hub',
+      params: {},
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/(app)/mentor');
+  });
+
   it('throws before indexing a missing or unknown chain key', () => {
     const router = { push: jest.fn() };
 
