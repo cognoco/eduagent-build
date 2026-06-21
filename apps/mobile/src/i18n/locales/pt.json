@@ -3933,6 +3933,7 @@
   },
   "subjectsBrowse": {
     "title": "Matérias",
+    "subtitle": "Tudo o que você está aprendendo, em um só lugar.",
     "searchPlaceholder": "Pesquisar matérias",
     "showEverything": "Mostre-me tudo",
     "emptyTitle": "Nenhuma matéria ainda",

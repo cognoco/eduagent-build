@@ -3933,6 +3933,7 @@
   },
   "subjectsBrowse": {
     "title": "科目",
+    "subtitle": "学んでいることすべてを、一つの場所に。",
     "searchPlaceholder": "科目を検索",
     "showEverything": "すべて表示",
     "emptyTitle": "科目がまだありません",

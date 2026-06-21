@@ -4091,6 +4091,7 @@
   },
   "subjectsBrowse": {
     "title": "Przedmioty",
+    "subtitle": "Wszystko, czego się uczysz, w jednym miejscu.",
     "searchPlaceholder": "Szukaj przedmiotów",
     "showEverything": "Pokaż mi wszystko",
     "emptyTitle": "Brak przedmiotów",

@@ -3933,6 +3933,7 @@
   },
   "subjectsBrowse": {
     "title": "Fächer",
+    "subtitle": "Alles, was du lernst, an einem Ort.",
     "searchPlaceholder": "Fächer suchen",
     "showEverything": "Zeig mir alles",
     "emptyTitle": "Noch keine Fächer",

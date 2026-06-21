@@ -683,10 +683,25 @@ export default function AppLayout() {
                 // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
                 // An opaque sceneStyle prevents the previous tab from bleeding
                 // through when switching to a full-screen route (session, quiz, etc.).
+                //
+                // V2 tab scenes (mentor/subjects/journal) own their header row,
+                // but the shell renders no native header (headerShown:false) and
+                // the floating chrome (account avatar, scope chip) is absolutely
+                // positioned — it reserves no layout space. Without a top inset the
+                // screen's own header rides up under the status bar. Pad the scene
+                // down by chromeTopInset so the header aligns with the chrome band.
+                // Full-screen routes (session/quiz/etc.) manage their own layout, and
+                // proxy chrome uses the ProxyBanner for top spacing — both opt out.
                 sceneStyle: {
                   backgroundColor: isProxyChromeActive
                     ? proxyColors.sceneBackground
                     : colors.background,
+                  paddingTop:
+                    FEATURE_FLAGS.MODE_NAV_V2_ENABLED &&
+                    !isProxyChromeActive &&
+                    !isFullScreen
+                      ? chromeTopInset
+                      : 0,
                 },
                 tabBarStyle: isFullScreen
                   ? {

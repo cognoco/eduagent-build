@@ -3032,6 +3032,7 @@
   },
   "subjectsBrowse": {
     "title": "Subjects",
+    "subtitle": "Everything you're learning, in one place.",
     "searchPlaceholder": "Search subjects",
     "showEverything": "Show me everything",
     "emptyTitle": "No subjects yet",
