@@ -168,23 +168,12 @@ export async function classifySubject(
     };
   }
 
-  // If only one subject, auto-match with high confidence
-  if (subjects.length === 1) {
-    const onlySubject = subjects[0];
-    if (!onlySubject)
-      throw new Error('Expected subjects[0] to exist when length is 1');
-    return {
-      candidates: [
-        {
-          subjectId: onlySubject.id,
-          subjectName: onlySubject.name,
-          confidence: 0.9,
-        },
-      ],
-      needsConfirmation: false,
-      suggestedSubjectName: null,
-    };
-  }
+  // A single enrolled subject still runs the LLM relevance check below rather
+  // than blind-assigning. The old short-circuit auto-matched that subject to
+  // ANY text at 0.9 confidence with needsConfirmation=false, so an off-topic
+  // message (e.g. a chemistry question on a Statistics-only account) was
+  // silently filed under the wrong subject. The shared path respects the
+  // confidence threshold and surfaces a confirmation / suggestion instead.
 
   // [PROMPT-INJECT-8] subjects.name is learner-owned text stored in DB —
   // sanitize each entry before joining so a crafted subject name cannot
