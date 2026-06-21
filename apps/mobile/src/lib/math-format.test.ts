@@ -25,6 +25,10 @@ describe('formatMathContent', () => {
       expect(formatMathContent('$x^{23}$')).toBe('x\u00B2\u00B3');
     });
 
+    it('converts unbraced multi-digit exponents', () => {
+      expect(formatMathContent('$x^23$')).toBe('x\u00B2\u00B3');
+    });
+
     it('converts n exponent', () => {
       expect(formatMathContent('$x^{n}$')).toBe('x\u207F');
     });
@@ -41,6 +45,10 @@ describe('formatMathContent', () => {
 
     it('converts braced subscripts', () => {
       expect(formatMathContent('$a_{12}$')).toBe('a\u2081\u2082');
+    });
+
+    it('converts unbraced multi-digit subscripts', () => {
+      expect(formatMathContent('$a_12$')).toBe('a\u2081\u2082');
     });
 
     it('converts n subscript', () => {

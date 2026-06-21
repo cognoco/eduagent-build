@@ -103,11 +103,11 @@ function formatExpression(expr: string): string {
   result = result.replace(/\^{([^}]+)}/g, (_, exp: string) =>
     toSuperscript(exp),
   );
-  result = result.replace(/\^(\d)/g, (_, exp: string) => toSuperscript(exp));
+  result = result.replace(/\^(\d+)/g, (_, exp: string) => toSuperscript(exp));
 
   // Subscripts: x_{2n} or x_2
   result = result.replace(/_{([^}]+)}/g, (_, sub: string) => toSubscript(sub));
-  result = result.replace(/_(\d)/g, (_, sub: string) => toSubscript(sub));
+  result = result.replace(/_(\d+)/g, (_, sub: string) => toSubscript(sub));
 
   // Symbol replacements
   for (const [pattern, replacement] of SYMBOL_MAP) {
