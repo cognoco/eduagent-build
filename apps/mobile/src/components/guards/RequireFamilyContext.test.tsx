@@ -397,7 +397,7 @@ describe('RequireFamilyContext [PARENT-22] switch-to-family CTA', () => {
     cleanup();
   });
 
-  it('switch CTA enters family mode and navigates home on a successful app-context write', async () => {
+  it('switch CTA writes family mode without navigating away on a successful app-context write', async () => {
     const { result, routedFetch, cleanup } = mountBlockedGuard(() => ({
       profile: { ...studyGuardian, defaultAppContext: 'family' },
     }));
@@ -407,15 +407,14 @@ describe('RequireFamilyContext [PARENT-22] switch-to-family CTA', () => {
     );
 
     // The real useUpdateProfileAppContext fires a PATCH to the app-context
-    // endpoint, and on success the guard navigates home.
+    // endpoint. The guard must not replace the current URL; the real app tree
+    // re-renders the protected route in place when app context updates.
     await waitFor(() => {
       const patches = fetchCallsMatching(routedFetch, '/app-context');
       expect(patches.length).toBeGreaterThanOrEqual(1);
       expect(patches[0]?.init?.method).toBe('PATCH');
     });
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
-    });
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(result.queryByTestId('family-route-switch-error')).toBeNull();
 
     cleanup();

@@ -91,6 +91,14 @@ jest.mock('../../../components/family/AddToMyLearningButton', () => ({ // gc1-al
   AddToMyLearningButton: () => null,
 }));
 
+// prettier-ignore
+jest.mock('../../../components/guards/RequireFamilyContext', () => ({ // gc1-allow: guard owns app-context mutation + i18n; this unit verifies recap detail delegates to the guard
+  RequireFamilyContext: ({ route }: { route: string }) => {
+    const { View } = require('react-native');
+    return <View testID={`mock-family-guard-${route}`} />;
+  },
+}));
+
 const mockUseNavigationContract = jest.fn();
 // prettier-ignore
 jest.mock('../../../hooks/use-navigation-contract', () => ({ // gc1-allow: wraps multiple context hooks (profile, subscription, app-context) requiring full provider tree
@@ -207,7 +215,7 @@ describe('RecapDetailScreen', () => {
   });
 
   describe('access control', () => {
-    it('redirects to home when canEnter returns false', () => {
+    it('renders the family guard when canEnter returns false', () => {
       mockUseNavigationContract.mockReturnValue({
         canEnter: () => false,
         effectiveAppContext: 'learner',
@@ -220,7 +228,9 @@ describe('RecapDetailScreen', () => {
       });
 
       render(<RecapDetailScreen />);
-      expect(screen.getByTestId('mock-redirect-/(app)/home')).toBeTruthy();
+      expect(
+        screen.getByTestId('mock-family-guard-recaps/[recapId]'),
+      ).toBeTruthy();
     });
   });
 });
