@@ -542,7 +542,7 @@ describe('getSessionXpEntry', () => {
     jest.clearAllMocks();
   });
 
-  it('returns base and bonus XP before reflection is applied', async () => {
+  it('returns base XP and no bonus before reflection is applied', async () => {
     const { db } = createMockReflectionDb({
       entry: {
         id: 'xp-001',
@@ -553,7 +553,7 @@ describe('getSessionXpEntry', () => {
 
     const result = await getSessionXpEntry(db, 'profile-001', 'session-1');
 
-    expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 50 });
+    expect(result).toEqual({ baseXp: 100, reflectionBonusXp: 0 });
   });
 
   it('derives the original base XP after reflection is applied by this session', async () => {
