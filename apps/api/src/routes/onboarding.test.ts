@@ -58,7 +58,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -74,7 +74,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -100,23 +100,20 @@ const mockUpdateConversationLanguage = jest.fn();
 const mockUpdatePronouns = jest.fn();
 const mockUpdateInterestsContext = jest.fn();
 
-jest.mock(
-  '../services/onboarding' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/onboarding',
-    ) as typeof import('../services/onboarding');
-    return {
-      ...actual,
-      // Preserve the error class so instanceof checks work in the route handler
-      updateConversationLanguage: (...args: unknown[]) =>
-        mockUpdateConversationLanguage(...args),
-      updatePronouns: (...args: unknown[]) => mockUpdatePronouns(...args),
-      updateInterestsContext: (...args: unknown[]) =>
-        mockUpdateInterestsContext(...args),
-    };
-  },
-);
+jest.mock('../services/onboarding', () => {
+  const actual = jest.requireActual(
+    '../services/onboarding',
+  ) as typeof import('../services/onboarding');
+  return {
+    ...actual,
+    // Preserve the error class so instanceof checks work in the route handler
+    updateConversationLanguage: (...args: unknown[]) =>
+      mockUpdateConversationLanguage(...args),
+    updatePronouns: (...args: unknown[]) => mockUpdatePronouns(...args),
+    updateInterestsContext: (...args: unknown[]) =>
+      mockUpdateInterestsContext(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Inngest framework boundary mock (required by index.ts import chain)
@@ -127,7 +124,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

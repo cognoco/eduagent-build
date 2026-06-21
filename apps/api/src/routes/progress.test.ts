@@ -30,7 +30,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -46,7 +46,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -76,7 +76,7 @@ const mockGetLearningResumeTarget = jest.fn();
 const mockGetActiveSessionForTopic = jest.fn();
 const mockResolveTopicSubject = jest.fn();
 
-jest.mock('../services/progress' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/progress', () => {
   const actual = jest.requireActual(
     '../services/progress',
   ) as typeof import('../services/progress');
@@ -102,19 +102,16 @@ jest.mock('../services/progress' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockListProfileSessions = jest.fn();
 
-jest.mock(
-  '../services/session/session-crud' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/session/session-crud',
-    ) as typeof import('../services/session/session-crud');
-    return {
-      ...actual,
-      listProfileSessions: (...args: unknown[]) =>
-        mockListProfileSessions(...args),
-    };
-  },
-);
+jest.mock('../services/session/session-crud', () => {
+  const actual = jest.requireActual(
+    '../services/session/session-crud',
+  ) as typeof import('../services/session/session-crud');
+  return {
+    ...actual,
+    listProfileSessions: (...args: unknown[]) =>
+      mockListProfileSessions(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Monthly / weekly report service mocks
@@ -127,41 +124,35 @@ const mockListWeeklyReports = jest.fn();
 const mockGetWeeklyReport = jest.fn();
 const mockMarkWeeklyReportViewedForProfile = jest.fn();
 
-jest.mock(
-  '../services/monthly-report' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/monthly-report',
-    ) as typeof import('../services/monthly-report');
-    return {
-      ...actual,
-      listMonthlyReportsForProfile: (...args: unknown[]) =>
-        mockListMonthlyReports(...args),
-      getMonthlyReportForProfile: (...args: unknown[]) =>
-        mockGetMonthlyReport(...args),
-      markMonthlyReportViewedForProfile: (...args: unknown[]) =>
-        mockMarkMonthlyReportViewedForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/monthly-report', () => {
+  const actual = jest.requireActual(
+    '../services/monthly-report',
+  ) as typeof import('../services/monthly-report');
+  return {
+    ...actual,
+    listMonthlyReportsForProfile: (...args: unknown[]) =>
+      mockListMonthlyReports(...args),
+    getMonthlyReportForProfile: (...args: unknown[]) =>
+      mockGetMonthlyReport(...args),
+    markMonthlyReportViewedForProfile: (...args: unknown[]) =>
+      mockMarkMonthlyReportViewedForProfile(...args),
+  };
+});
 
-jest.mock(
-  '../services/weekly-report' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/weekly-report',
-    ) as typeof import('../services/weekly-report');
-    return {
-      ...actual,
-      listWeeklyReportsForProfile: (...args: unknown[]) =>
-        mockListWeeklyReports(...args),
-      getWeeklyReportForProfile: (...args: unknown[]) =>
-        mockGetWeeklyReport(...args),
-      markWeeklyReportViewedForProfile: (...args: unknown[]) =>
-        mockMarkWeeklyReportViewedForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/weekly-report', () => {
+  const actual = jest.requireActual(
+    '../services/weekly-report',
+  ) as typeof import('../services/weekly-report');
+  return {
+    ...actual,
+    listWeeklyReportsForProfile: (...args: unknown[]) =>
+      mockListWeeklyReports(...args),
+    getWeeklyReportForProfile: (...args: unknown[]) =>
+      mockGetWeeklyReport(...args),
+    markWeeklyReportViewedForProfile: (...args: unknown[]) =>
+      mockMarkWeeklyReportViewedForProfile(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Overdue + retention mocks
@@ -170,33 +161,27 @@ jest.mock(
 const mockGetOverdueTopicsGrouped = jest.fn();
 const mockGetProfileOverdueCount = jest.fn();
 
-jest.mock(
-  '../services/overdue-topics' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/overdue-topics',
-    ) as typeof import('../services/overdue-topics');
-    return {
-      ...actual,
-      getOverdueTopicsGrouped: (...args: unknown[]) =>
-        mockGetOverdueTopicsGrouped(...args),
-    };
-  },
-);
+jest.mock('../services/overdue-topics', () => {
+  const actual = jest.requireActual(
+    '../services/overdue-topics',
+  ) as typeof import('../services/overdue-topics');
+  return {
+    ...actual,
+    getOverdueTopicsGrouped: (...args: unknown[]) =>
+      mockGetOverdueTopicsGrouped(...args),
+  };
+});
 
-jest.mock(
-  '../services/retention-data' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/retention-data',
-    ) as typeof import('../services/retention-data');
-    return {
-      ...actual,
-      getProfileOverdueCount: (...args: unknown[]) =>
-        mockGetProfileOverdueCount(...args),
-    };
-  },
-);
+jest.mock('../services/retention-data', () => {
+  const actual = jest.requireActual(
+    '../services/retention-data',
+  ) as typeof import('../services/retention-data');
+  return {
+    ...actual,
+    getProfileOverdueCount: (...args: unknown[]) =>
+      mockGetProfileOverdueCount(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Inngest framework boundary mock (required by index.ts import chain)

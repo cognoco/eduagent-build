@@ -35,7 +35,7 @@ jest.mock(
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('../services/account', () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -50,7 +50,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('../services/profile', () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -76,21 +76,18 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
 // Mock suggestion services — stub for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock(
-  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/suggestions'),
-    getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
-      {
-        id: TEST_TOPIC_ID,
-        bookId: 'a0000000-0000-4000-a000-000000000401',
-        title: 'Suggested Topic',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        usedAt: null,
-      },
-    ]),
-  }),
-);
+jest.mock('../services/suggestions', () => ({
+  ...jest.requireActual('../services/suggestions'),
+  getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
+    {
+      id: TEST_TOPIC_ID,
+      bookId: 'a0000000-0000-4000-a000-000000000401',
+      title: 'Suggested Topic',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      usedAt: null,
+    },
+  ]),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware

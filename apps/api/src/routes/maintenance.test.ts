@@ -4,7 +4,7 @@ const { createInngestTransportCapture } =
 const mockInngestTransport = createInngestTransportCapture();
 const mockCaptureException = jest.fn();
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

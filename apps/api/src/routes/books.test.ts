@@ -25,7 +25,7 @@ jest.mock(
 // Mock account + profile services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -41,7 +41,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -147,70 +147,64 @@ const mockBookWithTopics = {
   status: 'NOT_STARTED' as const,
 };
 
-jest.mock(
-  '../services/curriculum' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/curriculum',
-    ) as typeof import('../services/curriculum');
-    return {
-      ...actual,
-      getBooks: jest.fn().mockResolvedValue([]),
-      getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
-      getBookWithTopics: jest.fn().mockResolvedValue(null),
-      persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
-      claimBookForGeneration: jest.fn().mockResolvedValue(null),
-      releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
-      repairIncompleteBookGenerationClaim: jest
-        .fn()
-        .mockResolvedValue({ status: 'not_incomplete' }),
-      moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
-      deleteBook: jest.fn().mockResolvedValue({
-        deleted: true,
-        bookId: mockBook.id,
-        subjectId: mockBook.subjectId,
-        topicCount: 0,
-        startedTopicCount: 0,
-      }),
-      // expandExistingBookTopics is the extracted orchestration service.
-      // We stub it here so the route test isolates the route's dispatch
-      // contract (forwarding inputs + returning the persisted shape).
-      // End-to-end coverage of the orchestration lives in
-      // curriculum.test.ts → describe('expandExistingBookTopics').
-      expandExistingBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
-    };
-  },
-);
+jest.mock('../services/curriculum', () => {
+  const actual = jest.requireActual(
+    '../services/curriculum',
+  ) as typeof import('../services/curriculum');
+  return {
+    ...actual,
+    getBooks: jest.fn().mockResolvedValue([]),
+    getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
+    getBookWithTopics: jest.fn().mockResolvedValue(null),
+    persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
+    claimBookForGeneration: jest.fn().mockResolvedValue(null),
+    releaseBookGenerationClaimIfEmpty: jest.fn().mockResolvedValue(undefined),
+    repairIncompleteBookGenerationClaim: jest
+      .fn()
+      .mockResolvedValue({ status: 'not_incomplete' }),
+    moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
+    deleteBook: jest.fn().mockResolvedValue({
+      deleted: true,
+      bookId: mockBook.id,
+      subjectId: mockBook.subjectId,
+      topicCount: 0,
+      startedTopicCount: 0,
+    }),
+    // expandExistingBookTopics is the extracted orchestration service.
+    // We stub it here so the route test isolates the route's dispatch
+    // contract (forwarding inputs + returning the persisted shape).
+    // End-to-end coverage of the orchestration lives in
+    // curriculum.test.ts → describe('expandExistingBookTopics').
+    expandExistingBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
+  };
+});
 
-jest.mock(
-  '../services/book-generation' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/book-generation',
-    ) as typeof import('../services/book-generation');
-    return {
-      ...actual,
-      generateBookTopics: jest.fn().mockResolvedValue({
-        topics: [
-          {
-            title: 'Timeline of Egypt',
-            description: 'How it all began',
-            chapter: 'The Story',
-            sortOrder: 1,
-            estimatedMinutes: 30,
-          },
-        ],
-        connections: [],
-      }),
-    };
-  },
-);
+jest.mock('../services/book-generation', () => {
+  const actual = jest.requireActual(
+    '../services/book-generation',
+  ) as typeof import('../services/book-generation');
+  return {
+    ...actual,
+    generateBookTopics: jest.fn().mockResolvedValue({
+      topics: [
+        {
+          title: 'Timeline of Egypt',
+          description: 'How it all began',
+          chapter: 'The Story',
+          sortOrder: 1,
+          estimatedMinutes: 30,
+        },
+      ],
+      connections: [],
+    }),
+  };
+});
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -226,7 +220,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 // Billing mock — required by metering middleware now that
 // POST /v1/subjects/:subjectId/books/:bookId/generate-topics is metered
 // [WI-141 / WI-77 allowlist sweep].
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');

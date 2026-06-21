@@ -22,7 +22,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -38,7 +38,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -56,7 +56,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 // Mock the dictation services — they are the internal boundary
-jest.mock('../services/dictation' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/dictation', () => {
   const actual = jest.requireActual(
     '../services/dictation',
   ) as typeof import('../services/dictation');
