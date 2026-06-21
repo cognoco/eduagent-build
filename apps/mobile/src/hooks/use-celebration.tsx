@@ -70,6 +70,12 @@ function filterByLevel(
   return true;
 }
 
+function getQueueEntryKey(entry: QueueEntry): string {
+  return `${entry.celebration}:${entry.reason}:${entry.detail ?? ''}:${
+    entry.queuedAt
+  }`;
+}
+
 export function useCelebration(options?: {
   queue?: QueueEntry[];
   celebrationLevel?: CelebrationLevel;
@@ -123,16 +129,13 @@ export function useCelebration(options?: {
       lastBatchIdRef.current = batchId;
     }
 
-    const unseen = options.queue.filter((entry) => {
-      const key = `${entry.celebration}:${entry.reason}:${entry.detail ?? ''}:${
-        entry.queuedAt
-      }`;
-      if (seenQueueKeysRef.current.has(key)) {
-        return false;
-      }
-      seenQueueKeysRef.current.add(key);
-      return filterByLevel(entry, celebrationLevel);
-    });
+    const unseen = options.queue
+      .map((entry) => ({ entry, key: getQueueEntryKey(entry) }))
+      .filter(
+        ({ entry, key }) =>
+          !seenQueueKeysRef.current.has(key) &&
+          filterByLevel(entry, celebrationLevel),
+      );
 
     if (unseen.length === 0) return;
 
@@ -144,8 +147,14 @@ export function useCelebration(options?: {
     if (toShow.length === 0) return;
 
     shownFromCurrentBatchRef.current += toShow.length;
+    for (const { key } of toShow) {
+      seenQueueKeysRef.current.add(key);
+    }
 
-    setPendingQueue((current) => [...current, ...toShow]);
+    setPendingQueue((current) => [
+      ...current,
+      ...toShow.map(({ entry }) => entry),
+    ]);
   }, [celebrationLevel, options?.queue]);
 
   useEffect(() => {
