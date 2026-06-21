@@ -68,6 +68,48 @@ function shouldRefreshRevenuecatKv(
 }
 
 // ---------------------------------------------------------------------------
+// isFamilyShareBlocked (v2 — local copy of the module-private legacy helper)
+// ---------------------------------------------------------------------------
+
+/**
+ * [Issue 836] Apple Family Sharing / Google Play family-library entitlement
+ * block. See the legacy handler's escalateAndSkipFamilyShare for the full
+ * product rationale: a single paid purchase propagates to every family member,
+ * firing a purchase event (INITIAL_PURCHASE, RENEWAL, PRODUCT_CHANGE,
+ * NON_RENEWING_PURCHASE) under the family member's identity with
+ * `is_family_share: true`. The original purchaser already holds the
+ * entitlement — granting again N-tuples one paid seat into N.
+ *
+ * v2 re-implements the guard locally (the legacy copy is module-private) so the
+ * behavior is identical across both handler files. We never auto-grant off a
+ * family-shared event; we escalate via the established Sentry boundary
+ * (matching the refund-revocation / topup-rejection conventions in this file —
+ * `console.warn` alone is banned in billing code) and skip activation. The
+ * caller returns afterward so the route still 200-acks (no RevenueCat retry
+ * storm). is_family_share is UNRELATED to the com.eduagent.family.* product
+ * IDs — only the shared-copy flag is blocked.
+ */
+function isFamilyShareBlocked(event: RevenueCatEvent): boolean {
+  if (event.is_family_share !== true) return false;
+
+  captureMessage(
+    '[revenuecat] entitlement skipped — is_family_share shared copy (steer to Family plan)',
+    {
+      level: 'warning',
+      extra: {
+        eventId: event.id,
+        eventType: event.type,
+        appUserId: event.app_user_id,
+        productId: event.product_id ?? event.new_product_id ?? null,
+        category: 'revenuecat.family_share_blocked',
+      },
+      tags: { surface: 'billing.revenuecat.family_share' },
+    },
+  );
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // resolveAccountId (v2 seam): app_user_id → login → membership → organization.
 // Returns organization.id (= accounts.id by the reseed) or null.
 // ---------------------------------------------------------------------------
@@ -101,6 +143,9 @@ export async function handleInitialPurchaseV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple/Google family-shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 
@@ -151,6 +196,9 @@ export async function handleRenewalV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple/Google family-shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 
@@ -508,6 +556,9 @@ export async function handleProductChangeV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<void> {
+  // [Issue 836] Block entitlement on Apple/Google family-shared copies.
+  if (isFamilyShareBlocked(event)) return;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return;
 
@@ -552,6 +603,9 @@ export async function handleNonRenewingPurchaseV2(
   kv: KVNamespace | undefined,
   event: RevenueCatEvent,
 ): Promise<{ status: number; body: Record<string, unknown> } | null> {
+  // [Issue 836] Block top-up credit grant on Apple/Google family-shared copies.
+  if (isFamilyShareBlocked(event)) return null;
+
   const accountId = await resolveAccountIdV2(db, event.app_user_id);
   if (!accountId) return null;
 

@@ -39,6 +39,8 @@ import {
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
+import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
+import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -183,6 +185,117 @@ const RUN = !!process.env.DATABASE_URL;
 
       return { subscriptionId: subId, organizationId: org!.id };
     }
+
+    // Identity-only seed (org + person + login + membership), NO subscription.
+    // Used by the Issue 836 family-share tests: a freshly-purchasing learner who
+    // does NOT yet hold a paid subscription. Returns the clerk user id so it can
+    // be passed as the RevenueCat app_user_id (resolveIdentityV2 maps it → org).
+    async function seedIdentityOnly(): Promise<{
+      organizationId: string;
+      clerkUserId: string;
+    }> {
+      const clerkUserId = `clerk_${generateUUIDv7()}`;
+      const email = `wi693rcfs_${generateUUIDv7()}@test.local`;
+      createdClerkIds.push(clerkUserId);
+
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'Issue-836 RC Org' })
+        .returning();
+      createdOrgIds.push(org!.id);
+
+      const [personRow] = await db
+        .insert(person)
+        .values({
+          displayName: 'Owner',
+          birthDate: '1990-01-01',
+          residenceJurisdiction: 'US',
+        })
+        .returning();
+      const [loginRow] = await db
+        .insert(login)
+        .values({ personId: personRow!.id, clerkUserId, email })
+        .returning();
+      await db
+        .update(person)
+        .set({ loginId: loginRow!.id })
+        .where(eq(person.id, personRow!.id));
+      await db.insert(membership).values({
+        personId: personRow!.id,
+        organizationId: org!.id,
+        roles: ['admin', 'learner'],
+      });
+
+      return { organizationId: org!.id, clerkUserId };
+    }
+
+    function familyShareEvent(
+      clerkUserId: string,
+      overrides: Partial<RevenueCatEvent> = {},
+    ): RevenueCatEvent {
+      return {
+        id: `rc_evt_fs_${generateUUIDv7()}`,
+        type: 'INITIAL_PURCHASE',
+        app_user_id: clerkUserId,
+        product_id: 'com.eduagent.plus.monthly',
+        period_type: 'NORMAL',
+        purchased_at_ms: Date.now() - 86400000,
+        expiration_at_ms: Date.now() + 2592000000,
+        event_timestamp_ms: Date.now(),
+        ...overrides,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // [Issue 836] Apple Family Sharing entitlement block (v2 handler, real DB).
+    // A shared copy (is_family_share === true) must NOT create a paid
+    // subscription row; the original purchaser is the only one entitled, and
+    // families are steered to the dedicated Family plan product. Control: a
+    // non-shared purchase (false) DOES create the paid subscription.
+    // -----------------------------------------------------------------------
+    it('[Issue 836] does NOT grant a subscription when is_family_share is true (v2)', async () => {
+      const seeded = await seedIdentityOnly();
+
+      // Track any subscription that might (wrongly) be created so afterEach can
+      // clean it up if the guard regresses.
+      const before = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      expect(before).toBeUndefined();
+
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, { is_family_share: true }),
+      );
+
+      const after = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      // No paid entitlement was written — the shared copy is blocked.
+      expect(after).toBeUndefined();
+    });
+
+    it('[Issue 836 control] DOES grant a subscription when is_family_share is false (v2)', async () => {
+      const seeded = await seedIdentityOnly();
+
+      await handleInitialPurchaseV2(
+        db,
+        undefined,
+        familyShareEvent(seeded.clerkUserId, { is_family_share: false }),
+      );
+
+      const after = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, seeded.organizationId),
+      });
+      expect(after).toBeDefined();
+      // Clean up the granted subscription + its quota pool.
+      if (after) {
+        seededSubIds.push(after.id);
+      }
+      expect(after!.planTier).toBe('plus');
+      expect(after!.status).toBe('active');
+    });
 
     it('[BREAK BUG-116] concurrent same-event-id RevenueCat deliveries write only once (v2)', async () => {
       const seeded = await seedAlignedSubscription();
