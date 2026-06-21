@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import i18n from 'i18next';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import {
@@ -1082,6 +1083,40 @@ describe('AppLayout', () => {
       screen.getByTestId('tabs');
     });
     expect(screen.queryByTestId('permission-setup-gate')).toBeNull();
+  });
+
+  // Accessibility: VoiceOver language annotation
+  // The root <View> must carry accessibilityLanguage so iOS VoiceOver uses the
+  // correct TTS voice for all descendants via inheritance — instead of falling
+  // back to the device's system-default language (which produces nonsensical
+  // TTS for e.g. German text read by a Japanese-configured device).
+  //
+  // Strategy: the test-setup initializes i18next with 'en'. We register a
+  // minimal 'de' bundle and call changeLanguage('de') synchronously (no async
+  // backend required) BEFORE rendering, then assert the rendered root view
+  // carries accessibilityLanguage='de'.
+  it('sets accessibilityLanguage on the root view to match the active i18n locale', async () => {
+    // i18next's default export is the shared singleton instance (same one the
+    // app and test-setup initialize), so changeLanguage here drives the render.
+    const originalLanguage = i18n.language;
+
+    // Register a minimal stub so changeLanguage('de') does not trigger a
+    // missing-backend async load that never resolves.
+    i18n.addResourceBundle('de', 'translation', {}, false, true);
+    // changeLanguage is synchronous when the resource bundle is already loaded.
+    i18n.changeLanguage('de');
+
+    try {
+      renderLayout();
+
+      // await probe-state effect before the tab shell mounts.
+      await screen.findByTestId('tabs');
+
+      const rootView = screen.getByTestId('app-root-view');
+      expect(rootView.props.accessibilityLanguage).toBe('de');
+    } finally {
+      i18n.changeLanguage(originalLanguage);
+    }
   });
 });
 

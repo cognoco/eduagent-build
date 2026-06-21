@@ -158,7 +158,7 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const tokenVars = useTokenVars();
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -637,7 +637,11 @@ export default function AppLayout() {
   return (
     <FeedbackProvider>
       <ScopeContextProvider>
-        <View style={[{ flex: 1 }, tokenVars]}>
+        <View
+          style={[{ flex: 1 }, tokenVars]}
+          accessibilityLanguage={i18n.language}
+          testID="app-root-view"
+        >
           {proxyBanner && (
             <ProxyBanner
               childName={proxyBanner.childName}
