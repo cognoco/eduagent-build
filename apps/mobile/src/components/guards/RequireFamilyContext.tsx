@@ -63,9 +63,7 @@ export function RequireFamilyContext({
   function handleSwitchToFamily(): void {
     setSwitchFailed(false);
     enterFamilyMode({
-      onSuccess: () => {
-        router.replace('/(app)/home');
-      },
+      onSuccess: () => undefined,
       onError: () => {
         // Server rejected the family-context switch (e.g. owner lost
         // family-link, or under-18 — the API guard in profile.ts.

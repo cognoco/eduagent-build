@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mentorAuditScenarios } from '../../fixtures/scenarios';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
-import { switchAppMode } from '../../helpers/mode-switcher';
+import { pressableClick } from '../../helpers/pressable';
 
 /**
  * Mentor Chrome audit — BRIDGE-04 backstack contract
@@ -67,10 +67,22 @@ async function exerciseBridgeBackstack(
   ids: Record<string, string>,
 ): Promise<void> {
   const entryPath = surface.buildPath(ids);
+  const entrySurface = page.getByTestId(surface.entryTestId);
 
   await page.goto(entryPath);
+  if (!(await entrySurface.isVisible().catch(() => false))) {
+    const switchCta = page.getByTestId('family-route-switch-cta');
+    if (
+      await switchCta
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      await pressableClick(switchCta);
+    }
+  }
   await expect(
-    page.getByTestId(surface.entryTestId),
+    entrySurface,
     `entry surface ${surface.key} did not render at ${entryPath}`,
   ).toBeVisible();
   const entryUrl = new URL(page.url()).pathname;
@@ -84,7 +96,7 @@ async function exerciseBridgeBackstack(
     bridgeButton,
     `Add-to-my-learning button missing on ${surface.key} — bridge gate regressed?`,
   ).toBeVisible();
-  await bridgeButton.click();
+  await pressableClick(bridgeButton);
 
   // Success toast must render with the Open action — the action's testID is
   // the contract for the back-stack push we then unwind.
@@ -92,7 +104,7 @@ async function exerciseBridgeBackstack(
   await expect(toast).toBeVisible();
   const openAction = page.getByTestId('clone-toast-open');
   await expect(openAction).toBeVisible();
-  await openAction.click();
+  await pressableClick(openAction);
 
   // Adult copy lives at /(app)/topic/relearn — verified at
   // apps/mobile/src/hooks/use-clone-from-child.ts:201-220. Asserting on the
@@ -111,7 +123,7 @@ async function exerciseBridgeBackstack(
   //   2. The entry testID is visible (not learner-screen alone).
   await expect(page).toHaveURL((url) => url.pathname === entryUrl);
   await expect(
-    page.getByTestId(surface.entryTestId),
+    entrySurface,
     `back-target regressed on ${surface.key}: expected ${surface.entryTestId}, found something else`,
   ).toBeVisible();
 }
@@ -137,14 +149,6 @@ test.describe('Mentor audit BRIDGE-04 — bridge backstack contract', () => {
         alias: `${scenario.key}-${surface.key}`,
         landingTestId: ['parent-home-screen', 'learner-screen'],
         landingPath: scenario.landingPath,
-      });
-
-      if (!(await page.getByTestId('parent-home-screen').isVisible())) {
-        await switchAppMode(page, 'family');
-      }
-      await page.goto('/home', { waitUntil: 'commit' });
-      await expect(page.getByTestId('parent-home-screen')).toBeVisible({
-        timeout: 60_000,
       });
 
       await exerciseBridgeBackstack(page, surface, seeded.ids);

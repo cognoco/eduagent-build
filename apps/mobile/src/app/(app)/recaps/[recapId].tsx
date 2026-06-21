@@ -1,16 +1,12 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import {
-  Redirect,
-  useLocalSearchParams,
-  useRouter,
-  type Href,
-} from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { AddToMyLearningButton } from '../../../components/family/AddToMyLearningButton';
+import { RequireFamilyContext } from '../../../components/guards/RequireFamilyContext';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecap } from '../../../hooks/use-recaps';
 import {
@@ -33,7 +29,11 @@ export default function RecapDetailScreen(): React.ReactElement {
   const colors = useThemeColors();
 
   if (!navigationContract.canEnter('recaps/[recapId]')) {
-    return <Redirect href="/(app)/home" />;
+    return (
+      <RequireFamilyContext route="recaps/[recapId]">
+        <View />
+      </RequireFamilyContext>
+    );
   }
 
   const handleBack = (): void => {
