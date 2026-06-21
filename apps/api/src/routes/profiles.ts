@@ -54,6 +54,9 @@ type ProfileEnv = {
     // [OPT-C] Kill switch for the server-side adult-owner rule. Set to 'false'
     // in Doppler to disable the gate (emergency rollback). Default 'true'.
     ADULT_OWNER_GATE_ENABLED?: string;
+    // [WI-301] Kill switch for non-owner -> owner profile elevation.
+    // Default-on; set to 'false' for emergency rollback.
+    OWNER_ELEVATION_GATE_ENABLED?: string;
     // [CUT-B1] Identity cutover flag — selects the v2 owner-bootstrap path.
     IDENTITY_V2_ENABLED?: string;
   };
@@ -67,6 +70,28 @@ type ProfileEnv = {
     clerkIdentity: ClerkIdentity | undefined;
   };
 };
+
+const OWNER_ELEVATION_MAX_FVA_MINUTES = 10;
+
+function isOwnerElevationGateEnabled(value: string | undefined): boolean {
+  return value !== 'false';
+}
+
+function hasRecentOwnerElevation(user: AuthUser | undefined): boolean {
+  const primaryFactorAge = user?.factorVerificationAge?.[0];
+  return (
+    typeof primaryFactorAge === 'number' &&
+    primaryFactorAge >= 0 &&
+    primaryFactorAge <= OWNER_ELEVATION_MAX_FVA_MINUTES
+  );
+}
+
+function isExplicitOwnerContext(profileMeta: ProfileMeta | undefined): boolean {
+  return (
+    profileMeta?.isOwner === true &&
+    profileMeta.resolvedVia === 'explicit-header'
+  );
+}
 
 /**
  * [CUT-B1] Map the v2 bootstrap result + the create input to the byte-identical
@@ -462,11 +487,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
       const { profileId } = c.req.valid('json');
-      // No isOwner check here by design: switching the active profile is
-      // account-scoped and purely per-device (not destructive). Any profile on
-      // the account can legitimately switch to another profile on the same
-      // account — e.g., a child handing the device back to a parent.
-      // [CR-2026-05-19-H1 note: intentionally left without owner gate]
+      // [WI-301 / MMT-ADR-0025] Switching into owner context is account-scoped
+      // but security-sensitive: it unlocks Billing, Security, Export/Delete,
+      // and Add-child. A non-owner caller therefore needs fresh primary-factor
+      // reverification, proven by Clerk fva, before targeting the owner profile.
       // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
       // (no profiles table touch). Returns null when not found → same 403.
       const found = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
@@ -474,6 +498,23 @@ export const profileRoutes = new Hono<ProfileEnv>()
         : await switchProfile(db, profileId, account.id);
       if (!found)
         return forbidden(c, 'Profile does not belong to this account');
+
+      const targetIsOwner =
+        'meta' in found ? found.meta.isOwner : found.isOwner;
+      if (
+        isOwnerElevationGateEnabled(c.env?.OWNER_ELEVATION_GATE_ENABLED) &&
+        targetIsOwner &&
+        !isExplicitOwnerContext(c.get('profileMeta')) &&
+        !hasRecentOwnerElevation(c.get('user'))
+      ) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.OWNER_ELEVATION_REQUIRED,
+          'Owner context requires recent reverification.',
+        );
+      }
+
       return c.json(
         profileSwitchResponseSchema.parse({
           message: 'Profile switched',

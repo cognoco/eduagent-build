@@ -716,12 +716,12 @@ describe('switchProfile', () => {
     expect(result).toBeNull();
   });
 
-  it('returns profileId when found', async () => {
-    const row = mockProfileRow({ id: 'profile-123' });
+  it('returns profileId and owner status when found', async () => {
+    const row = mockProfileRow({ id: 'profile-123', isOwner: false });
     const db = createMockDb({ findFirstResult: row });
     const result = await switchProfile(db, 'profile-123', 'account-123');
 
-    expect(result).toEqual({ profileId: 'profile-123' });
+    expect(result).toEqual({ profileId: 'profile-123', isOwner: false });
   });
 });
 
