@@ -427,4 +427,31 @@ describe('usePushTokenRegistration', () => {
 
     expect(mockMutateAsync).not.toHaveBeenCalled();
   });
+
+  it('[regression] does not retry in a loop after the API rejects the token (no 400 storm)', async () => {
+    // Emulator-style failure: the API rejects every registration attempt with a
+    // 400 (no valid FCM token). Before the fix, the mutation result object's
+    // identity changed on each state transition, recreating registerIfAllowed
+    // and re-firing the effect ~1/sec forever.
+    mockMutateAsync.mockRejectedValue(new Error('400 invalid push token'));
+
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: 'failed',
+        reason: 'api_registration_failed',
+      });
+    });
+
+    // Give any (buggy) re-fire loop ample time to run additional attempts.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // Exactly one attempt: a loop would call the mutation repeatedly.
+    expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+  });
 });

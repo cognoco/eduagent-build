@@ -203,20 +203,50 @@ export function useApiClient(): ApiClient {
       const snapshotProfileId = _activeProfileId;
       const snapshotProxyMode = _proxyMode;
       const signal = requestSignal(input, init);
-      const token = await getTokenRef.current();
-      const headers = new Headers(init?.headers);
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      if (snapshotProfileId && !headers.has('X-Profile-Id'))
-        headers.set('X-Profile-Id', snapshotProfileId);
-      if (snapshotProxyMode) headers.set('X-Proxy-Mode', 'true');
 
-      // Wrap the underlying fetch in try/catch so network-layer rejections
-      // (no response received) become typed NetworkError instead of raw TypeError.
-      let res: Response;
-      try {
-        res = await globalThis.fetch(input, { ...init, headers, signal });
-      } catch (fetchErr) {
-        throw classifyFetchRejection(fetchErr, signal);
+      // Token of the most recent attempt. The 401 handling below branches on
+      // whether a token was actually sent (session-expired vs. token-not-ready),
+      // so it must reflect the FINAL attempt after any stale-token retry.
+      let lastToken: string | null = null;
+
+      // One fetch attempt with a freshly-resolved Clerk token. `forceFreshToken`
+      // passes `skipCache` so Clerk bypasses its in-memory token cache and mints
+      // a new JWT — used by the stale-token retry below. The identity snapshot
+      // (profile id + proxy mode) is captured once above and reused across
+      // attempts so a profile switch mid-flight can't desync the headers.
+      const attempt = async (forceFreshToken: boolean): Promise<Response> => {
+        const token = await getTokenRef.current(
+          forceFreshToken ? { skipCache: true } : undefined,
+        );
+        lastToken = token;
+        const headers = new Headers(init?.headers);
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        if (snapshotProfileId && !headers.has('X-Profile-Id'))
+          headers.set('X-Profile-Id', snapshotProfileId);
+        if (snapshotProxyMode) headers.set('X-Proxy-Mode', 'true');
+
+        // Wrap the underlying fetch in try/catch so network-layer rejections
+        // (no response received) become typed NetworkError, not raw TypeError.
+        try {
+          return await globalThis.fetch(input, { ...init, headers, signal });
+        } catch (fetchErr) {
+          throw classifyFetchRejection(fetchErr, signal);
+        }
+      };
+
+      let res = await attempt(false);
+
+      // [WI-STALE-TOKEN] Stale-token recovery. A cached Clerk JWT can already be
+      // expired on the first authenticated request after a cold start (the SDK
+      // has not refreshed it yet). The server rejects it with 401 even though
+      // the Clerk session is still valid. Retry exactly once with a
+      // force-refreshed token BEFORE the sign-out path below runs — without this
+      // a transient startup 401 spuriously signs the user out and hangs the
+      // subject-classify flow on the first message. A retry that also 401s falls
+      // through to the existing auth-expired handling unchanged. Aborted requests
+      // are never retried.
+      if (res.status === 401 && !signal?.aborted) {
+        res = await attempt(true);
       }
 
       if (!res.ok) {
@@ -261,13 +291,13 @@ export function useApiClient(): ApiClient {
             // the ternary below to log the token itself.
             console.warn(
               `[AUTH-DEBUG] 401 received | token=${
-                token ? 'present' : 'null'
+                lastToken ? 'present' : 'null'
               } | onAuthExpired=${!!_onAuthExpired} | alreadyFiring=${_authExpiredFiring} | url=${
                 typeof input === 'string' ? input : (input as Request).url
               }`,
             );
           }
-          if (token && _onAuthExpired && !_authExpiredFiring) {
+          if (lastToken && _onAuthExpired && !_authExpiredFiring) {
             if (__DEV__) {
               console.warn(
                 '[AUTH-DEBUG] >>> FIRING onAuthExpired — will sign out',
@@ -282,7 +312,7 @@ export function useApiClient(): ApiClient {
           // the bare Error discarded all structured signal — screens had to
           // string-match the message to detect 401s.
           throw new UnauthorizedError(
-            token ? 'session-expired' : 'token-not-ready',
+            lastToken ? 'session-expired' : 'token-not-ready',
             {
               ...(apiMessage !== undefined ? { message: apiMessage } : {}),
               ...(code !== undefined ? { apiCode: code } : {}),

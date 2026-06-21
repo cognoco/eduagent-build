@@ -475,3 +475,90 @@ describe('useApiClient 401 account-verification classification [BUG-1016]', () =
     expect(unauth.responseBody).toBe('');
   });
 });
+
+// ---------------------------------------------------------------------------
+// [stale-token recovery] A cached Clerk JWT can already be expired on the
+// first authenticated request after a cold start, which the server rejects
+// with 401 even though the session is still valid. customFetch must retry once
+// with a force-refreshed token (Clerk `skipCache`) BEFORE running the
+// auth-expired/sign-out path — otherwise a transient startup 401 spuriously
+// signs the user out and hangs the subject-classify flow on the first message.
+// ---------------------------------------------------------------------------
+
+describe('useApiClient stale-token recovery', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    setActiveProfileId('profile-A');
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    clearOnAuthExpired();
+    resetAuthExpiredGuard();
+    setActiveProfileId(undefined);
+    mockGetToken.mockReset();
+  });
+
+  function makeClient() {
+    const { result } = renderHook(() => useApiClient());
+    return result.current as unknown as {
+      v1: { health: { $get: () => Promise<Response> } };
+    };
+  }
+
+  it('[BREAK] retries a 401 once with a force-refreshed token and succeeds without signing out', async () => {
+    const onAuthExpired = jest.fn();
+    setOnAuthExpired(onAuthExpired);
+
+    // First call returns the stale cached token; the skipCache retry mints fresh.
+    mockGetToken.mockResolvedValueOnce('stale-token');
+    mockGetToken.mockResolvedValueOnce('fresh-token');
+
+    const fetchMock = jest.fn(async (_input, init) => {
+      const auth = new Headers(init?.headers).get('Authorization');
+      // Reject the stale token, accept the freshly-minted one.
+      return auth === 'Bearer fresh-token'
+        ? new Response('{}', { status: 200 })
+        : new Response(
+            JSON.stringify({ code: 'UNAUTHORIZED', message: 'token expired' }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          );
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const res = await client.v1.health.$get();
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Retry forced a cache-skipping token refresh.
+    expect(mockGetToken).toHaveBeenNthCalledWith(2, { skipCache: true });
+    // A recoverable stale token must never reach the sign-out path.
+    expect(onAuthExpired).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK] when the refreshed token also 401s, fires auth-expired exactly once', async () => {
+    const onAuthExpired = jest.fn();
+    setOnAuthExpired(onAuthExpired);
+    mockGetToken.mockResolvedValue('still-bad-token');
+
+    const fetchMock = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ code: 'UNAUTHORIZED', message: 'token expired' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onAuthExpired).toHaveBeenCalledTimes(1);
+    expect(err).toBeInstanceOf(UnauthorizedError);
+    expect((err as UnauthorizedError).reason).toBe('session-expired');
+  });
+});
