@@ -56,8 +56,8 @@ for (const [registryName, scenario] of entries) {
       const baseSeeded = await seedAndSignIn(page, {
         scenario: scenario.seedScenario,
         alias: `${scenario.key}-base`,
-        landingTestId: 'learner-screen',
-        landingPath: '/home',
+        landingTestId: 'mentor-screen',
+        landingPath: '/mentor',
       });
       const basePath = testInfo.outputPath(
         `mentor-audit-base-${scenario.key}.json`,

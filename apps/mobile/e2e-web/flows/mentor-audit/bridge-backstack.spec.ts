@@ -16,7 +16,7 @@ import { pressableClick } from '../../helpers/pressable';
  *      `/topic/relearn`.
  *   4. `page.goBack()` — the user must land back on the original Family
  *      child/recap surface they came from, not on the Tabs first-route
- *      (`learner-screen`) and not on a proxy/child active-profile state.
+ *      (`mentor-screen`) and not on a proxy/child active-profile state.
  *
  * Why this exists separately from `registry-smoke.spec.ts`:
  * - The registry smoke verifies *landing* — what testID renders on first
@@ -119,7 +119,7 @@ async function exerciseBridgeBackstack(
 
   // Back-target assertions:
   //   1. URL is the original entry path (not /home, not /library).
-  //   2. The entry testID is visible (not learner-screen alone).
+  //   2. The entry testID is visible (not mentor-screen alone).
   await expect(page).toHaveURL((url) => url.pathname === entryUrl);
   await expect(
     entrySurface,
@@ -146,7 +146,7 @@ test.describe('Mentor audit BRIDGE-04 — bridge backstack contract', () => {
         // Per-surface alias prevents Clerk email collisions when the project
         // runs serially (fullyParallel: false on this Playwright project).
         alias: `${scenario.key}-${surface.key}`,
-        landingTestId: ['parent-home-screen', 'learner-screen'],
+        landingTestId: scenario.landingTestId,
         landingPath: scenario.landingPath,
       });
 
