@@ -166,6 +166,14 @@ function createMockDb({
         findMany: jest.fn().mockResolvedValue(familyFindManyResult),
         findFirst: jest.fn().mockResolvedValue(familyFindFirstResult),
       },
+      // [WI-867] loadProfileFamilyMeta reads guardianship unconditionally
+      // post-IDENTITY_V2_ENABLED collapse. Stub returns no active edges so the
+      // legacy profile-shaped tests (getProfile, updateProfile, findOwnerProfile)
+      // continue to assert their intended outcomes (no family links).
+      guardianship: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
     },
     select: jest.fn().mockReturnValue(selectChain),
     insert: jest.fn().mockReturnValue({
@@ -560,21 +568,76 @@ describe('updateProfile', () => {
   });
 });
 
+// [WI-867] Legacy updateProfileAppContext tests migrated to v2 DB stubs
+// post-IDENTITY_V2_ENABLED collapse. The v2 path reads person + membership +
+// guardianship (via getChargePersonIds / direct findFirst) + consentGrant +
+// consentRequest, and writes person (not profiles). Each inline stub mirrors
+// the makeV2Db pattern in the WI-803 block below.
 describe('updateProfileAppContext', () => {
+  // Inline v2 DB builder for this describe scope — mirrors makeV2Db in WI-803 block.
+  function makePersonRow(opts: {
+    id: string;
+    birthDate: string;
+    isOwner: boolean;
+    defaultAppContext?: 'study' | 'family' | null;
+  }) {
+    return {
+      id: opts.id,
+      birthDate: opts.birthDate,
+      displayName: 'Test User',
+      avatarUrl: null as string | null,
+      residenceJurisdiction: null as string | null,
+      conversationLanguage: 'en',
+      pronouns: null as string | null,
+      defaultAppContext: opts.defaultAppContext ?? null,
+      archivedAt: null as Date | null,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+  }
+
+  function makeV2DbLocal(
+    personRow: ReturnType<typeof makePersonRow>,
+    isOwner: boolean,
+    opts: {
+      chargeRows?: Array<{ chargePersonId: string }>;
+      guardianshipEdge?: { grantedAt: Date };
+    } = {},
+  ) {
+    return {
+      query: {
+        person: { findFirst: jest.fn().mockResolvedValue(personRow) },
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({
+            roles: isOwner ? ['admin', 'learner'] : ['learner'],
+          }),
+        },
+        consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue(opts.chargeRows ?? []),
+          findFirst: jest.fn().mockResolvedValue(opts.guardianshipEdge),
+        },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue([personRow]),
+          }),
+        }),
+      }),
+    } as unknown as Database;
+  }
+
   it('returns mapped profile after persisting the default app context', async () => {
-    const row = mockProfileRow({
+    const personRow = makePersonRow({
       id: 'owner-1',
-      birthYear: 1985,
+      birthDate: '1985-01-01',
       isOwner: true,
       defaultAppContext: 'family',
     });
-    const db = createMockDb({
-      findFirstResult: row,
-      updateReturning: [row],
-      familyFindFirstResult: {
-        childProfileId: 'child-1',
-        createdAt: new Date('2026-02-03T04:05:06.000Z'),
-      },
+    const db = makeV2DbLocal(personRow, true, {
+      chargeRows: [{ chargePersonId: 'child-1' }],
     });
 
     const result = await updateProfileAppContext(
@@ -590,16 +653,13 @@ describe('updateProfileAppContext', () => {
   });
 
   it('allows study context for profiles that are not family-capable', async () => {
-    const row = mockProfileRow({
+    const personRow = makePersonRow({
       id: 'child-1',
-      birthYear: 2014,
+      birthDate: '2014-05-15',
       isOwner: false,
       defaultAppContext: 'study',
     });
-    const db = createMockDb({
-      findFirstResult: row,
-      updateReturning: [row],
-    });
+    const db = makeV2DbLocal(personRow, false);
 
     const result = await updateProfileAppContext(
       db,
@@ -613,12 +673,12 @@ describe('updateProfileAppContext', () => {
   });
 
   it('[BREAK] rejects family context for non-owner profiles', async () => {
-    const row = mockProfileRow({
+    const personRow = makePersonRow({
       id: 'child-1',
-      birthYear: 2014,
+      birthDate: '2014-05-15',
       isOwner: false,
     });
-    const db = createMockDb({ findFirstResult: row });
+    const db = makeV2DbLocal(personRow, false);
 
     await expect(
       updateProfileAppContext(db, 'child-1', 'account-123', 'family'),
@@ -627,12 +687,12 @@ describe('updateProfileAppContext', () => {
   });
 
   it('[BREAK] rejects family context for adult owners without family links', async () => {
-    const row = mockProfileRow({
+    const personRow = makePersonRow({
       id: 'owner-1',
-      birthYear: 1985,
+      birthDate: '1985-01-01',
       isOwner: true,
     });
-    const db = createMockDb({ findFirstResult: row });
+    const db = makeV2DbLocal(personRow, true, { chargeRows: [] });
 
     await expect(
       updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
@@ -641,17 +701,13 @@ describe('updateProfileAppContext', () => {
   });
 
   it('[BREAK] rejects family context for under-18 owners with family links', async () => {
-    const row = mockProfileRow({
+    const personRow = makePersonRow({
       id: 'owner-1',
-      birthYear: 2012,
+      birthDate: '2012-05-15',
       isOwner: true,
     });
-    const db = createMockDb({
-      findFirstResult: row,
-      familyFindFirstResult: {
-        childProfileId: 'child-1',
-        createdAt: new Date('2026-02-03T04:05:06.000Z'),
-      },
+    const db = makeV2DbLocal(personRow, true, {
+      chargeRows: [{ chargePersonId: 'child-1' }],
     });
 
     await expect(
@@ -661,7 +717,20 @@ describe('updateProfileAppContext', () => {
   });
 
   it('returns null when the profile does not exist', async () => {
-    const db = createMockDb({ updateReturning: [] });
+    // person.findFirst returns undefined → short-circuit null return
+    const db = {
+      query: {
+        person: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        membership: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+      },
+      update: jest.fn(),
+    } as unknown as Database;
 
     const result = await updateProfileAppContext(
       db,
@@ -674,27 +743,32 @@ describe('updateProfileAppContext', () => {
   });
 
   it('[BREAK] WHERE clause includes archived_at IS NULL guard', async () => {
+    // The v2 path writes to the `person` table. Capture the WHERE from
+    // db.update(person).set(...).where(condition).
     let capturedWhere: unknown;
+    const personRow = makePersonRow({
+      id: 'profile-1',
+      birthDate: '1985-01-01',
+      isOwner: false,
+    });
     const db = {
       query: {
-        profiles: {
-          findFirst: jest.fn().mockResolvedValue(
-            mockProfileRow({
-              id: 'profile-1',
-              accountId: 'account-1',
-              birthYear: 1985,
-            }),
-          ),
+        person: { findFirst: jest.fn().mockResolvedValue(personRow) },
+        membership: {
+          findFirst: jest.fn().mockResolvedValue({ roles: ['learner'] }),
         },
-        familyLinks: {
-          findFirst: jest.fn(),
+        consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockImplementation((condition: unknown) => {
             capturedWhere = condition;
-            return { returning: jest.fn().mockResolvedValue([]) };
+            return { returning: jest.fn().mockResolvedValue([personRow]) };
           }),
         }),
       }),
@@ -826,6 +900,11 @@ describe('findOwnerProfile', () => {
         familyLinks: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
+        // [WI-867] loadProfileFamilyMeta reads guardianship unconditionally post-collapse
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
       },
     } as unknown as Database;
 
@@ -853,6 +932,11 @@ describe('findOwnerProfile', () => {
         familyLinks: {
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
+        // [WI-867] loadProfileFamilyMeta reads guardianship unconditionally post-collapse
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
       },
     } as unknown as Database;
 
@@ -875,6 +959,11 @@ describe('findOwnerProfile', () => {
           }),
         },
         familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        // [WI-867] loadProfileFamilyMeta reads guardianship unconditionally post-collapse
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },
@@ -906,6 +995,11 @@ describe('findOwnerProfile', () => {
           }),
         },
         familyLinks: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        // [WI-867] loadProfileFamilyMeta reads guardianship unconditionally post-collapse
+        guardianship: {
+          findMany: jest.fn().mockResolvedValue([]),
           findFirst: jest.fn().mockResolvedValue(undefined),
         },
       },
@@ -1295,33 +1389,5 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
     expect(result).not.toBeNull();
     expect(result!.hasFamilyLinks).toBe(false);
     expect(result!.linkCreatedAt).toBeNull();
-  });
-
-  it('[WI-803] flag-off: reads familyLinks, never guardianship', async () => {
-    const ownerRow = mockProfileRow({
-      id: 'owner-3',
-      birthYear: 1985,
-      isOwner: true,
-      defaultAppContext: 'study',
-    });
-    const db = createMockDb({
-      findFirstResult: ownerRow,
-      updateReturning: [ownerRow],
-      familyFindFirstResult: {
-        childProfileId: 'child-1',
-        createdAt: new Date('2026-02-03T04:05:06.000Z'),
-      },
-    });
-
-    await updateProfileAppContext(db, 'owner-3', 'account-123', 'study');
-
-    // guardianship must NOT have been queried (legacy path)
-    expect(
-      (db.query as { guardianship?: unknown }).guardianship,
-    ).toBeUndefined();
-    // familyLinks WAS queried (legacy path)
-    expect(
-      (db.query.familyLinks as unknown as { findFirst: jest.Mock }).findFirst,
-    ).toHaveBeenCalled();
   });
 });
