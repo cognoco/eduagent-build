@@ -66,15 +66,25 @@ export function usePushTokenRegistration(): PushRegistrationHandle {
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
   const registerPushToken = useRegisterPushToken();
+  // Read the mutation through refs so `registerIfAllowed` does NOT depend on the
+  // mutation result object. React Query returns a NEW result object on every
+  // mutation state transition (idle → pending → error); depending on it
+  // recreated the callback on each transition, which re-fired the effect below
+  // and retried registration in a tight ~1/sec loop whenever the API rejected
+  // the token (e.g. a 400 on an emulator with no valid FCM push token).
+  const mutateAsyncRef = useRef(registerPushToken.mutateAsync);
+  mutateAsyncRef.current = registerPushToken.mutateAsync;
+  const isPendingRef = useRef(registerPushToken.isPending);
+  isPendingRef.current = registerPushToken.isPending;
   const activeProfileIdRef = useRef<string | null>(null);
   const isParentProxyRef = useRef(false);
   activeProfileIdRef.current = activeProfile?.id ?? null;
   isParentProxyRef.current = isParentProxy;
 
   const registerIfAllowed = useCallback(async () => {
-    // React Query keeps mutation objects stable; this prevents duplicate
-    // registrations while a foreground/AppState retry is already in flight.
-    if (registerPushToken.isPending) return;
+    // Prevents duplicate registrations while a foreground/AppState retry is
+    // already in flight. Read via ref so it does not re-create this callback.
+    if (isPendingRef.current) return;
 
     const activeProfileId = activeProfile?.id ?? null;
     if (!activeProfileId) return;
@@ -151,7 +161,7 @@ export function usePushTokenRegistration(): PushRegistrationHandle {
           pendingProfileToken.current = null;
           return;
         }
-        await registerPushToken.mutateAsync({
+        await mutateAsyncRef.current({
           profileId: activeProfileId,
           token: tokenData.data,
         });
@@ -177,7 +187,7 @@ export function usePushTokenRegistration(): PushRegistrationHandle {
       setState({ status: 'failed', reason: 'unsupported_device' });
       capturePushRegistrationFailure(err, 'unsupported_device');
     }
-  }, [activeProfile?.id, registerPushToken]);
+  }, [activeProfile?.id]);
 
   useEffect(() => {
     void registerIfAllowed();
