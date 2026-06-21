@@ -49,10 +49,9 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
     // [WI-879] A freshly-approved learner lands on the Mentor home feed
     // (`mentor-screen` — app/(app)/mentor.tsx:233, rendering the `mentorHome.title`
     // "Mentor" header + "What do you want to work on?" composer). Verified
-    // empirically against staging Chrome under the e2e-web nav posture
-    // (EXPO_PUBLIC_ENABLE_MODE_NAV + _V1 = true, V2 off — sourced from Doppler
-    // stg, which both the local `doppler run -c stg` flow and the CI e2e-web
-    // job inject into the `expo export`): the post-approval page
+    // empirically against staging Chrome under the e2e-web V2 nav posture
+    // (EXPO_PUBLIC_ENABLE_MODE_NAV + _V1 + _V2 = true, injected by the local
+    // `doppler run -c stg` flow and the CI e2e-web job): the post-approval page
     // snapshot renders the Mentor feed (title "Mentor", "useful next steps",
     // homework/teach/question prompts), NOT the LearnerScreen (which would show
     // `home-action-homework`/`home-action-study-new`) and NOT the legacy

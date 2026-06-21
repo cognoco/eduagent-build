@@ -8,7 +8,8 @@ export const authScenarios = {
     email: buildSeedEmail('solo-learner'),
     storageStatePath: path.join(authStateDir, 'solo-learner.json'),
     landingPath: '/home',
-    landingTestId: 'learner-screen',
+    // V2 keeps /home as a compatible route but renders the Mentor shell.
+    landingTestId: 'mentor-screen',
   },
   ownerWithChildren: {
     key: 'owner-with-children',

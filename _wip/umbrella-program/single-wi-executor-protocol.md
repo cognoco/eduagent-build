@@ -5,7 +5,7 @@
 > `/execute`). This protocol is the next rung: instead of stopping where `/execute`
 > stops, you wrap it in the full single-item lifecycle and play the **shepherd's role
 > for that one item** — including the two things `/execute` never did for you:
-> **merging to `main`** and **handling the review verdict**.
+> **merging to `main`** and **handling the review verdict**. Avoid WI 301 and 696.
 >
 > **Where it sits.** Atomic commands (where you were) → **shepherd-of-one (here)** →
 > real multi-item shepherds (later). One layer at a time.

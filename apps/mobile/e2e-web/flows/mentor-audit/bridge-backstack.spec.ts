@@ -26,10 +26,9 @@ import { pressableClick } from '../../helpers/pressable';
  *   or the relearn screen rewrites the back target) would silently break
  *   the audit's BRIDGE-04 row without failing the landing smoke.
  *
- * Flag matrix: the back-target testIDs live on the entry screens themselves
- * (not the tab shell), so they are stable across V0 and V1 nav-contract
- * positions. CI runs the suite twice via `MENTOR_AUDIT_NAV_V1`; both
- * positions are expected to pass with no per-flag branching here.
+ * Flag posture: the back-target testIDs live on the entry screens themselves
+ * (not the tab shell), so they are stable across V1 and V2 nav-contract
+ * positions. Release runs export the app with the V2 shell enabled.
  */
 
 interface EntrySurface {
