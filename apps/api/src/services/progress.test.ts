@@ -200,7 +200,11 @@ function createMockDb({
   curriculumFindFirst = undefined as
     | { id: string; subjectId: string }
     | undefined,
-  curriculaFindMany = [] as Array<{ id: string; subjectId: string }>,
+  curriculaFindMany = [] as Array<{
+    id: string;
+    subjectId: string;
+    version?: number;
+  }>,
   curriculumSelectRows = [] as Array<{
     id: string;
     subjectId: string;
@@ -212,7 +216,11 @@ function createMockDb({
   ownedTopicRows,
 }: {
   curriculumFindFirst?: { id: string; subjectId: string } | undefined;
-  curriculaFindMany?: Array<{ id: string; subjectId: string }>;
+  curriculaFindMany?: Array<{
+    id: string;
+    subjectId: string;
+    version?: number;
+  }>;
   curriculumSelectRows?: Array<{
     id: string;
     subjectId: string;
@@ -1102,6 +1110,60 @@ describe('getOverallProgress', () => {
     expect(science!.topicsTotal).toBe(1);
     expect(science!.topicsCompleted).toBe(1);
     expect(science!.topicsVerified).toBe(0);
+  });
+
+  it('[WI-916] uses the latest curriculum when a subject has multiple versions', async () => {
+    const subject = mockSubjectRow({ id: 'sub-1', name: 'Math' });
+    const olderCurriculumId = 'curr-v1';
+    const latestCurriculumId = 'curr-v2';
+    const olderTopic = {
+      ...mockTopicRow({
+        id: 'topic-v1',
+        title: 'Old outline topic',
+        sortOrder: 1,
+      }),
+      curriculumId: olderCurriculumId,
+    };
+    const latestTopicA = {
+      ...mockTopicRow({
+        id: 'topic-v2-a',
+        title: 'Current outline topic A',
+        sortOrder: 1,
+      }),
+      curriculumId: latestCurriculumId,
+    };
+    const latestTopicB = {
+      ...mockTopicRow({
+        id: 'topic-v2-b',
+        title: 'Current outline topic B',
+        sortOrder: 2,
+      }),
+      curriculumId: latestCurriculumId,
+    };
+
+    setupScopedRepo({
+      subjectsFindMany: [subject],
+      retentionCardsFindMany: [],
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+    });
+    const db = createMockDb({
+      curriculaFindMany: [
+        { id: latestCurriculumId, subjectId: 'sub-1', version: 2 },
+        { id: olderCurriculumId, subjectId: 'sub-1', version: 1 },
+      ],
+      topicsFindMany: [latestTopicA, latestTopicB, olderTopic],
+    });
+
+    const result = await getOverallProgress(db, profileId);
+
+    expect(result.subjects).toHaveLength(1);
+    expect(result.subjects[0]).toMatchObject({
+      subjectId: 'sub-1',
+      topicsTotal: 2,
+      topicsCompleted: 0,
+      topicsVerified: 0,
+    });
   });
 
   it('[WI-80] excludes mixed-parent topics from overall progress aggregation', async () => {
