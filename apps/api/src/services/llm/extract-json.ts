@@ -111,10 +111,26 @@ function isJsonObject(candidate: string): boolean {
  * inside markdown fences.
  */
 export function extractFirstJsonArray(text: string): string | null {
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = (fenceMatch?.[1] ?? text).trim();
+  const trimmed = text.trim();
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/);
+  const body = (fenceMatch?.[1] ?? trimmed).trim();
 
-  const start = body.indexOf('[');
+  let searchFrom = 0;
+  while (searchFrom < body.length) {
+    const candidate = extractFirstBalancedArray(body, searchFrom);
+    if (!candidate) return null;
+    if (isJsonArray(candidate.value)) return candidate.value;
+    searchFrom = candidate.end;
+  }
+
+  return null;
+}
+
+function extractFirstBalancedArray(
+  body: string,
+  fromIndex: number,
+): { value: string; end: number } | null {
+  const start = body.indexOf('[', fromIndex);
   if (start === -1) return null;
 
   let depth = 0;
@@ -141,9 +157,17 @@ export function extractFirstJsonArray(text: string): string | null {
     if (ch === '[') depth++;
     else if (ch === ']') {
       depth--;
-      if (depth === 0) return body.slice(start, i + 1);
+      if (depth === 0) return { value: body.slice(start, i + 1), end: i + 1 };
     }
   }
 
   return null;
+}
+
+function isJsonArray(candidate: string): boolean {
+  try {
+    return Array.isArray(JSON.parse(candidate));
+  } catch {
+    return false;
+  }
 }
