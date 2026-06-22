@@ -37,7 +37,8 @@
     "goBackAction": "戻る",
     "tryAgainAction": "再試行",
     "dismiss": "閉じる",
-    "pleaseTryAgain": "もう一度お試しください。"
+    "pleaseTryAgain": "もう一度お試しください。",
+    "mentorImageAlt": "あなたのメンター"
   },
   "quota": {
     "parent": {

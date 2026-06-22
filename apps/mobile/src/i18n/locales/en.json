@@ -53,7 +53,8 @@
     "goBackAction": "Go back",
     "tryAgainAction": "Try again",
     "dismiss": "Dismiss",
-    "pleaseTryAgain": "Please try again."
+    "pleaseTryAgain": "Please try again.",
+    "mentorImageAlt": "Your mentor"
   },
   "quota": {
     "parent": {

@@ -37,7 +37,8 @@
     "goBackAction": "Gå tilbake",
     "tryAgainAction": "Prøv igjen",
     "dismiss": "Avvis",
-    "pleaseTryAgain": "Prøv igjen."
+    "pleaseTryAgain": "Prøv igjen.",
+    "mentorImageAlt": "Mentoren din"
   },
   "quota": {
     "parent": {

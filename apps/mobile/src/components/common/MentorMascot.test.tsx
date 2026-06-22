@@ -1,4 +1,5 @@
 import { render } from '@testing-library/react-native';
+import i18next from 'i18next';
 import { MentorMascot } from './MentorMascot';
 
 describe('MentorMascot', () => {
@@ -15,6 +16,31 @@ describe('MentorMascot', () => {
   it('renders with testID', () => {
     const { getByTestId } = render(<MentorMascot testID="mentor-mascot" />);
     getByTestId('mentor-mascot');
+  });
+
+  it('uses localized copy for the image accessibility label', async () => {
+    const originalLanguage = i18next.language;
+    i18next.addResourceBundle(
+      'de',
+      'translation',
+      { common: { mentorImageAlt: 'Dein Mentor' } },
+      true,
+      true,
+    );
+
+    await i18next.changeLanguage('de');
+    const { getByTestId, unmount } = render(
+      <MentorMascot testID="mentor-mascot" />,
+    );
+
+    try {
+      expect(getByTestId('mentor-mascot').props.accessibilityLabel).toBe(
+        'Dein Mentor',
+      );
+    } finally {
+      unmount();
+      await i18next.changeLanguage(originalLanguage);
+    }
   });
 
   it('accepts size prop in both poses', () => {
