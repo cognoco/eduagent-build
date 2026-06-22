@@ -358,6 +358,29 @@ describe('generateCurriculum', () => {
     }
   });
 
+  it('rejects malformed LLM topic objects before persistence', async () => {
+    registerProvider(
+      providerReturning(
+        JSON.stringify([
+          {
+            title: 'Unsafe Topic',
+            description: 'Looks plausible',
+            estimatedMinutes: '30',
+          },
+        ]),
+      ),
+    );
+
+    await expect(generateCurriculum(defaultInput)).rejects.toMatchObject({
+      issues: expect.arrayContaining([
+        expect.objectContaining({ path: [0, 'relevance'] }),
+        expect.objectContaining({ path: [0, 'estimatedMinutes'] }),
+      ]),
+    });
+
+    registerProvider(createCurriculumMockProvider());
+  });
+
   it('throws when LLM response contains no JSON array', async () => {
     // Temporarily register a provider that returns non-JSON
     const badProvider: LLMProvider = {
