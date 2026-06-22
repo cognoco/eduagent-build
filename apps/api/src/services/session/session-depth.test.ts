@@ -1,12 +1,8 @@
 import type { SessionTranscript } from '@eduagent/schemas';
 import { TEST_SESSION_ID, TEST_SUBJECT_ID } from '@eduagent/test-utils';
 
-import {
-  registerProvider,
-  _clearProviders,
-  _resetCircuits,
-  createMockProvider,
-} from '../llm';
+import { registerProvider, _clearProviders, _resetCircuits } from '../llm';
+import { createMockProvider } from '../llm/test-utils';
 import type { LLMProvider } from '../llm';
 import { evaluateSessionDepth } from './session-depth';
 

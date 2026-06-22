@@ -58,11 +58,11 @@ import {
 } from './adaptive-teaching';
 import {
   registerProvider,
-  createMockProvider,
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
 } from './llm';
+import { createMockProvider } from './llm/test-utils';
 import { makeChatStreamResult } from './llm/types';
 import type { ChatResult, ChatStreamResult, StopReason } from './llm/types';
 import {

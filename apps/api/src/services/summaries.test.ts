@@ -1,4 +1,5 @@
-import { registerProvider, createMockProvider, _resetCircuits } from './llm';
+import { registerProvider, _resetCircuits } from './llm';
+import { createMockProvider } from './llm/test-utils';
 import { evaluateSummary } from './summaries';
 import {
   llmPlainText,

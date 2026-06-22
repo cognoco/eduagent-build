@@ -42,10 +42,8 @@ import {
   jsonResponse,
 } from './fetch-interceptor';
 import { mockVoyageAI, type MockHandle } from './external-mocks';
-import {
-  createMockProvider,
-  registerProvider,
-} from '../../apps/api/src/services/llm';
+import { registerProvider } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 
 const mockCaptureException = jest.fn();
 const mockSetTag = jest.fn();
