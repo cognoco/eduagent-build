@@ -278,6 +278,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
               style: 'cancel',
               onPress: () => {
                 reviewCancelledRef.current = true;
+                void handleDone();
               },
             },
           ],
@@ -290,7 +291,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     }
   };
 
-  const handleDone = async () => {
+  async function handleDone() {
     if (doneInFlightRef.current) return;
     doneInFlightRef.current = true;
 
@@ -333,7 +334,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
     }
 
     router.replace('/(app)/practice' as Href);
-  };
+  }
 
   return (
     <View
