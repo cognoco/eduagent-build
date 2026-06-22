@@ -6,6 +6,7 @@ import {
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
 import { setActiveProfileId } from '../lib/api-client';
+import type { Profile } from '../lib/profile';
 import { useMarkAllNudgesRead, useMarkNudgeRead } from './use-nudges';
 
 const mockFetch = jest.fn();
@@ -13,7 +14,7 @@ const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
-function createWrapper(activeProfile = createTestProfile()) {
+function createWrapper(activeProfile: Profile | null = createTestProfile()) {
   const wrapped = createHookWrapper({ activeProfile });
   queryClient = wrapped.queryClient;
   return wrapped.wrapper;
