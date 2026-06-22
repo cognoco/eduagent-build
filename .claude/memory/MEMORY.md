@@ -13,6 +13,7 @@
 - [feedback_cosmo_refine_requires_code_inspection.md](feedback_cosmo_refine_requires_code_inspection.md) — Cosmo refinement must inspect current affected code/docs before `--to-ready`; do not promote from fields/DoR mechanics alone.
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
 - [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons moved to quartet-learning-tracker §E9): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
+- [feedback_never_auto_pick_wi_301.md](feedback_never_auto_pick_wi_301.md) — WI-301 (owner-elevation gate) HARD-EXCLUDED from any rework/reviewer-returned sweep; never claim/land/merge autonomously — its gate defaults ON and breaks owner-switching without the Clerk `fva` template (user-ruled 2026-06-21).
 
 ## Identity Foundation (re-platform)
 
