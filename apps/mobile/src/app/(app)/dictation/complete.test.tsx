@@ -675,6 +675,48 @@ describe('DictationCompleteScreen', () => {
     );
   });
 
+  it('[WI-949] review-failed Skip records an unreviewed result and finishes', async () => {
+    const reviewErr = new Error('Review service unavailable');
+    const picker = require('expo-image-picker');
+    (picker.launchCameraAsync as jest.Mock).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///photo.jpg', mimeType: 'image/jpeg' }],
+    });
+    mockReviewMutateAsync.mockRejectedValueOnce(reviewErr);
+    mockRecordMutateAsync.mockResolvedValueOnce(undefined);
+
+    const { getByTestId } = render(<DictationCompleteScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('complete-check-writing'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const buttons = mockPlatformAlert.mock.calls[0]?.[2] as
+      | Array<{ text: string; style?: string; onPress?: () => void }>
+      | undefined;
+    const skipButton = buttons?.find((button) => button.style === 'cancel');
+
+    await act(async () => {
+      skipButton?.onPress?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockRecordMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        completionKey: COMPLETION_KEY,
+        reviewed: false,
+        sentenceCount: 1,
+        mistakeCount: null,
+        mode: 'surprise',
+      }),
+    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+  });
+
   it('[F-110] routes record-result error through formatApiError boundary, not raw instanceof check', async () => {
     const recordErr = new Error('Server unavailable');
     mockRecordMutateAsync.mockRejectedValueOnce(recordErr);
