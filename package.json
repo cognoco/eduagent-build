@@ -134,7 +134,8 @@
       "@xmldom/xmldom": ">=0.9.0",
       "glob@<9": "^10.0.0",
       "@tanstack/query-core": "5.100.11",
-      "@types/node@^12": "^22.0.0"
+      "@types/node@^12": "^22.0.0",
+      "handlebars": ">=4.7.9"
     },
     "patchedDependencies": {
       "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
