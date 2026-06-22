@@ -6,11 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 interface NudgeUnreadModalProps {
   nudges: ReadonlyArray<Nudge>;
   onDismiss: () => void;
+  errorMessage?: string | null;
+  isDismissing?: boolean;
 }
 
 export function NudgeUnreadModal({
   nudges,
   onDismiss,
+  errorMessage,
+  isDismissing = false,
 }: NudgeUnreadModalProps): React.ReactElement {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -47,15 +51,32 @@ export function NudgeUnreadModal({
               </View>
             ))}
           </ScrollView>
+          {errorMessage ? (
+            <View
+              className="bg-danger/10 border border-danger/30 rounded-card px-3 py-3 mt-3"
+              accessibilityRole="alert"
+              testID="nudge-unread-dismiss-error"
+            >
+              <Text className="text-body-sm text-danger">{errorMessage}</Text>
+            </View>
+          ) : null}
           <Pressable
             onPress={onDismiss}
+            disabled={isDismissing}
             className="bg-primary rounded-button min-h-[48px] items-center justify-center mt-3"
             accessibilityRole="button"
-            accessibilityLabel={t('common.done')}
+            accessibilityLabel={
+              errorMessage ? t('common.tryAgain') : t('common.done')
+            }
+            accessibilityState={{ disabled: isDismissing }}
             testID="nudge-unread-dismiss"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              {t('common.done')}
+              {isDismissing
+                ? t('common.loading')
+                : errorMessage
+                  ? t('common.tryAgain')
+                  : t('common.done')}
             </Text>
           </Pressable>
         </View>
