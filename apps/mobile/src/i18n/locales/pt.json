@@ -4140,6 +4140,8 @@
       "empty": "Adicione um aluno para ver as suas disciplinas aqui.",
       "openPerson": "Abrir disciplinas de {{name}}",
       "personHint": "Abrir a vista estrutural da disciplina.",
+      "personEmptyTitle": "Ainda não há disciplinas",
+      "personEmptyMessage": "Este aluno ainda não tem uma estrutura de disciplinas visível.",
       "structuralOnly": "Apenas estrutura de disciplina, capítulo e tópico.",
       "bookCount": "{{count}} livro",
       "bookCount_other": "{{count}} livros",

@@ -4140,6 +4140,8 @@
       "empty": "Legg til en elev for å se fagene deres her.",
       "openPerson": "Åpne {{name}}s fag",
       "personHint": "Åpne den strukturelle fagoversikten.",
+      "personEmptyTitle": "Ingen fag ennå",
+      "personEmptyMessage": "Denne eleven har ingen synlig fagstruktur ennå.",
       "structuralOnly": "Kun struktur for fag, kapittel og emne.",
       "bookCount": "{{count}} bok",
       "bookCount_other": "{{count}} bøker",

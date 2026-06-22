@@ -4298,6 +4298,8 @@
       "empty": "Dodaj ucznia, aby zobaczyć tutaj jego przedmioty.",
       "openPerson": "Zobacz przedmioty {{name}}",
       "personHint": "Otwórz strukturalny widok przedmiotów.",
+      "personEmptyTitle": "Nie ma jeszcze przedmiotów",
+      "personEmptyMessage": "Ten uczeń nie ma jeszcze widocznej struktury przedmiotów.",
       "structuralOnly": "Tylko struktura przedmiotów, rozdziałów i tematów.",
       "bookCount": "{{count}} książka",
       "bookCount_few": "{{count}} książki",

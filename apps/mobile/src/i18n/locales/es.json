@@ -4140,6 +4140,8 @@
       "empty": "Añade un estudiante para ver sus asignaturas aquí.",
       "openPerson": "Abrir asignaturas de {{name}}",
       "personHint": "Abre la vista estructural de la asignatura.",
+      "personEmptyTitle": "Aún no hay asignaturas",
+      "personEmptyMessage": "Este estudiante aún no tiene una estructura de asignaturas visible.",
       "structuralOnly": "Solo la estructura de asignatura, capítulo y tema.",
       "bookCount": "{{count}} libro",
       "bookCount_other": "{{count}} libros",

@@ -4140,6 +4140,8 @@
       "empty": "Füge einen Lernenden hinzu, um hier seine Fächer zu sehen.",
       "openPerson": "Fächer von {{name}} öffnen",
       "personHint": "Die strukturelle Fächeransicht öffnen.",
+      "personEmptyTitle": "Noch keine Fächer",
+      "personEmptyMessage": "Für diesen Lernenden ist noch keine sichtbare Fächerstruktur vorhanden.",
       "structuralOnly": "Nur Fächer-, Kapitel- und Themenstruktur.",
       "bookCount": "{{count}} Buch",
       "bookCount_other": "{{count}} Bücher",

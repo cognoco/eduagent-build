@@ -4140,6 +4140,8 @@
       "empty": "学習者を追加すると、ここに科目が表示されます。",
       "openPerson": "{{name}}の科目を開く",
       "personHint": "科目の構造ビューを開きます。",
+      "personEmptyTitle": "まだ科目がありません",
+      "personEmptyMessage": "この学習者には、まだ表示できる科目構造がありません。",
       "structuralOnly": "科目、章、トピックの構造のみです。",
       "bookCount": "{{count}}冊のブック",
       "bookCount_other": "{{count}}冊のブック",

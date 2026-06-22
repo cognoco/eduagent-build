@@ -3894,6 +3894,8 @@
       "empty": "Add a learner to see their subjects here.",
       "openPerson": "Open {{name}}'s subjects",
       "personHint": "Open the structural subject view.",
+      "personEmptyTitle": "No subjects yet",
+      "personEmptyMessage": "This learner does not have any visible subject structure yet.",
       "structuralOnly": "Subject, chapter and topic structure only.",
       "bookCount": "{{count}} book",
       "bookCount_other": "{{count}} books",
