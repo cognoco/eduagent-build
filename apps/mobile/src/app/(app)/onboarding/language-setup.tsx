@@ -261,7 +261,7 @@ export default function LanguageSetup() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => goBackOrReplace(router, '/(app)/home')}
+                onPress={handleBack}
                 className="bg-surface rounded-button px-4 py-2.5 items-center flex-1 min-h-[44px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('common.cancel')}
