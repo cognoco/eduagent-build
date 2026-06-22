@@ -396,5 +396,36 @@ function stripeSub(input: {
       });
       expect(updatedSub!.planTier).toBe('free');
     });
+
+    it('[BREAK F-124-v2] deleted branch: family to free re-attributes null credits to owner person', async () => {
+      const stripeSubscriptionId = `sub_wi1006_deleted_reattrib_${generateUUIDv7()}`;
+      const seeded = await seedAlignedSubscription({
+        tier: 'family',
+        stripeSubscriptionId,
+      });
+      await seedTopUpCredit({
+        subscriptionId: seeded.subscriptionId,
+        profileId: null,
+        amount: 500,
+        remaining: 250,
+      });
+
+      await handleSubscriptionDeletedV2(
+        db,
+        undefined,
+        stripeSub({ id: stripeSubscriptionId, status: 'canceled' }),
+        '2026-06-20T00:00:00.000Z',
+        `evt_wi1006_deleted_reattrib_${generateUUIDv7()}`,
+      );
+
+      const credits = await loadTopUpCredits(seeded.subscriptionId);
+      expect(credits).toHaveLength(1);
+      expect(credits[0]!.profileId).toBe(seeded.ownerPersonId);
+
+      const updatedSub = await db.query.subscription.findFirst({
+        where: eq(subscription.id, seeded.subscriptionId),
+      });
+      expect(updatedSub!.planTier).toBe('free');
+    });
   },
 );
