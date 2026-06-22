@@ -20,6 +20,17 @@ import {
 import { HTTPException } from 'hono/http-exception';
 import { captureException } from '../services/sentry';
 
+function captureHttpException(callback: () => unknown): HTTPException {
+  let thrown: unknown;
+  try {
+    callback();
+  } catch (err) {
+    thrown = err;
+  }
+  expect(thrown).toBeInstanceOf(HTTPException);
+  return thrown as HTTPException;
+}
+
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
@@ -267,13 +278,12 @@ describe('requireProfileId', () => {
   });
 
   it('throws HTTPException(400) when profileId is undefined', () => {
-    expect(() => requireProfileId(undefined)).toThrow(HTTPException);
-    try {
-      requireProfileId(undefined);
-    } catch (err) {
-      expect(err).toBeInstanceOf(HTTPException);
-      expect((err as HTTPException).status).toBe(400);
-    }
+    const invokeRequireProfileId = jest.fn(() => requireProfileId(undefined));
+
+    expect(captureHttpException(invokeRequireProfileId)).toEqual(
+      expect.objectContaining({ status: 400 }),
+    );
+    expect(invokeRequireProfileId).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -290,13 +300,14 @@ describe('requireAccount', () => {
   });
 
   it('[CR-657] throws HTTPException(401) when account is undefined', () => {
-    expect(() => requireAccount(undefined)).toThrow(HTTPException);
-    try {
-      requireAccount(undefined);
-    } catch (err) {
-      expect(err).toBeInstanceOf(HTTPException);
-      expect((err as HTTPException).status).toBe(401);
-      expect((err as HTTPException).message).toMatch(/account required/i);
-    }
+    const invokeRequireAccount = jest.fn(() => requireAccount(undefined));
+
+    expect(captureHttpException(invokeRequireAccount)).toEqual(
+      expect.objectContaining({
+        message: expect.stringMatching(/account required/i),
+        status: 401,
+      }),
+    );
+    expect(invokeRequireAccount).toHaveBeenCalledTimes(1);
   });
 });
