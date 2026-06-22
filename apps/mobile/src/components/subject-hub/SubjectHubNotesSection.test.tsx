@@ -53,6 +53,40 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByTestId('subject-hub-notes-tabs')).toBeNull();
   });
 
+  it('disables the empty-state add action until the draft has text', () => {
+    const onAddNote = jest.fn();
+    render(<SubjectHubNotesSection notes={[]} onAddNote={onAddNote} />);
+
+    const input = screen.getByTestId('subject-hub-notes-input');
+    const emptyAdd = screen.getByTestId('subject-hub-notes-empty-add');
+
+    expect(emptyAdd.props.accessibilityState).toEqual({ disabled: true });
+    fireEvent.press(emptyAdd);
+    expect(onAddNote).not.toHaveBeenCalled();
+
+    fireEvent.changeText(input, '   ');
+    expect(
+      screen.getByTestId('subject-hub-notes-empty-add').props
+        .accessibilityState,
+    ).toEqual({
+      disabled: true,
+    });
+    fireEvent.press(screen.getByTestId('subject-hub-notes-empty-add'));
+    expect(onAddNote).not.toHaveBeenCalled();
+
+    fireEvent.changeText(input, '  remember mitosis  ');
+    expect(
+      screen.getByTestId('subject-hub-notes-empty-add').props
+        .accessibilityState,
+    ).toEqual({
+      disabled: false,
+    });
+    fireEvent.press(screen.getByTestId('subject-hub-notes-empty-add'));
+
+    expect(onAddNote).toHaveBeenCalledWith('remember mitosis');
+    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe('');
+  });
+
   it('renders the add-note input + transcription-only mic when canStudy and add is wired', () => {
     const onNoteVoice = jest.fn();
     render(
@@ -94,6 +128,7 @@ describe('SubjectHubNotesSection', () => {
     fireEvent.changeText(input, '  remember mitosis  ');
     fireEvent(input, 'submitEditing');
     expect(onAddNote).toHaveBeenCalledWith('remember mitosis');
+    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe('');
   });
 
   it('omits the add input and mic when canStudy is false (masked supporter view)', () => {
