@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   completedRoundDetailResponseSchema,
   type CompletedRoundDetailResponse,
+  type ValidatedQuestionResult,
 } from '@eduagent/schemas';
 import { useRoundDetail } from '../../../hooks/use-quiz';
 import { useThemeColors } from '../../../lib/theme';
@@ -63,6 +64,23 @@ export default function QuizRoundDetailScreen() {
     });
   };
 
+  // Resolve the completed round detail eagerly so useMemo can be called
+  // unconditionally (Rules of Hooks — hooks must not follow conditional returns).
+  const detail = resolveCompletedRoundDetail(round ?? null);
+
+  // O(n) Map built once per round data change; replaces O(n²) per-render find().
+  // Depends on `round` (stable query-cache reference) rather than the derived
+  // `detail?.results` (new object reference each render from resolveCompletedRoundDetail).
+  // Key matches the join predicate used by the original find(): r.questionIndex === i.
+  const resultByIndex = useMemo(() => {
+    const m = new Map<number, ValidatedQuestionResult>();
+    const results = resolveCompletedRoundDetail(round ?? null)?.results;
+    for (const r of results ?? []) {
+      m.set(r.questionIndex, r);
+    }
+    return m;
+  }, [round]);
+
   // B1.3: timeout guard — no bare loading text
   if (isLoading) {
     return (
@@ -103,7 +121,6 @@ export default function QuizRoundDetailScreen() {
 
   // Reject incomplete, active, abandoned, or unparseable round responses
   // with the existing error fallback.
-  const detail = resolveCompletedRoundDetail(round);
   if (detail === null) {
     return (
       <View
@@ -123,7 +140,7 @@ export default function QuizRoundDetailScreen() {
       </View>
     );
   }
-  const { questions, results } = detail;
+  const { questions } = detail;
 
   return (
     <ScrollView testID="round-detail-screen" className="flex-1">
@@ -150,7 +167,7 @@ export default function QuizRoundDetailScreen() {
         </Text>
       </View>
       {questions.map((q, i: number) => {
-        const result = results.find((r) => r.questionIndex === i);
+        const result = resultByIndex.get(i);
         const isExpanded = expanded.has(i);
         const hasHints = q.type === 'guess_who' || !!q.funFact;
         return (
