@@ -15,7 +15,6 @@ export function MentorInputBar({
   onSubmitText,
   onOpenCamera,
   onOpenHomework,
-  onTranscript,
 }: MentorInputBarProps) {
   const { t } = useTranslation();
   const [value, setValue] = useState('');
@@ -62,7 +61,8 @@ export function MentorInputBar({
           testID="mentor-bar-mic"
           accessibilityRole="button"
           accessibilityLabel={t('mentorHome.bar.micLabel')}
-          onPress={() => onTranscript(value.trim())}
+          disabled
+          accessibilityState={{ disabled: true }}
           className="rounded-full border border-border px-3 py-2"
         >
           <Text className="text-text-primary">
