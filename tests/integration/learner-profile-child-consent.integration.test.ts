@@ -133,6 +133,10 @@ describe('Integration: WI-156 — learner-profile child consent gate', () => {
     );
 
     expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      profile: { profileId: string };
+    };
+    expect(body.profile.profileId).toBe(childProfileId);
   });
 
   it('[BREAK] GET /v1/learner-profile/:childId → 403 when child consent is PENDING', async () => {
