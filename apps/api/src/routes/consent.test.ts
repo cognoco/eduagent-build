@@ -1702,6 +1702,22 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
     );
 
     expect(res.status).toBe(201);
-    expect(mockRequestConsent).toHaveBeenCalled();
+    expect(mockRequestConsent).toHaveBeenCalledWith(
+      undefined,
+      {
+        childProfileId: SIBLING_PROFILE_ID,
+        parentEmail: 'my-parent@example.com',
+        consentType: 'GDPR',
+      },
+      'https://api.test.mentomate.com',
+      expect.objectContaining({
+        resendApiKey: undefined,
+        emailFrom: undefined,
+      }),
+      'test-account-id',
+      expect.objectContaining({
+        policyVersion: undefined,
+      }),
+    );
   });
 });
