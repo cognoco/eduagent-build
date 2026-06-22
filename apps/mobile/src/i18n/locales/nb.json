@@ -4003,7 +4003,11 @@
       "done": "Ferdig",
       "mastered": "Mestret"
     },
-    "linkLabel": "Åpne fag-hub"
+    "linkLabel": "Åpne fag-hub",
+    "empty": {
+      "title": "Ingenting å studere her ennå",
+      "message": "Dette faget har ingen emner ennå. Prøv igjen om et øyeblikk, eller gå tilbake til fagene dine."
+    }
   },
   "journal": {
     "title": "Journal",

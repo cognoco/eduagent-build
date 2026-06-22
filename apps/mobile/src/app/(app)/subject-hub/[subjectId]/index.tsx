@@ -1,9 +1,13 @@
 import { useCallback } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ErrorFallback } from '../../../../components/common';
+import {
+  EmptyStateCard,
+  ErrorFallback,
+  QueryStateView,
+} from '../../../../components/common';
 import { SubjectHub, type HubNextUp } from '../../../../components/subject-hub';
 import { useSubjectHub } from '../../../../hooks/use-subject-hub';
 import {
@@ -97,48 +101,64 @@ export default function SubjectHubRoute(): React.ReactElement {
     );
   }
 
-  if (hub.isError) {
-    return (
-      <ErrorFallback
-        variant="centered"
-        testID="subject-hub-error"
-        title={t('subjectHub.errors.loadTitle')}
-        message={t('subjectHub.errors.loadMessage')}
-        primaryAction={{
-          label: t('common.retry'),
-          onPress: hub.refetch,
-          testID: 'subject-hub-retry',
-        }}
-        secondaryAction={{
-          label: t('common.goBack'),
-          onPress: goBack,
-          testID: 'subject-hub-back',
-        }}
-      />
-    );
-  }
-
-  if (hub.isLoading || !hub.data) {
-    return (
-      <View
-        className="flex-1 items-center justify-center bg-bg px-6"
-        testID="subject-hub-loading"
-      >
-        <Text className="text-body text-text-secondary">
-          {t('subjectHub.loading')}
-        </Text>
-      </View>
-    );
-  }
+  // QueryStateView consolidates loading + error into actionable states:
+  //   loading → TimeoutLoader (spinner escapes to retry/back after the timeout,
+  //             so a stalled hub query is never a spinner-forever dead-end)
+  //   error   → ErrorFallback with retry + back
+  // Children render only once the hub has settled without error. The settled
+  // hub data is non-null (the `!subjectId` guard above is the only null case),
+  // so an empty subject still surfaces a recoverable empty state below rather
+  // than handing blank data to SubjectHub.
+  const hubData = hub.data;
+  const hasUsableData =
+    !!hubData && (hubData.aggregate.total > 0 || hubData.chapters.length > 0);
 
   return (
-    <View className="flex-1" testID="subject-hub-screen">
-      <SubjectHub
-        data={hub.data}
-        onNextUpPress={handleNextUp}
-        onStudyTopic={handleStudyTopic}
-        onReviewTopic={handleReviewTopic}
-      />
-    </View>
+    <QueryStateView
+      isLoading={hub.isLoading || !hubData}
+      error={hub.isError ? true : undefined}
+      loadingTitle={t('subjectHub.loading')}
+      errorTitle={t('subjectHub.errors.loadTitle')}
+      errorMessage={t('subjectHub.errors.loadMessage')}
+      testID="subject-hub-error"
+      retry={{
+        onPress: hub.refetch,
+        label: t('common.retry'),
+        testID: 'subject-hub-retry',
+      }}
+      back={{
+        onPress: goBack,
+        label: t('common.goBack'),
+        testID: 'subject-hub-back',
+      }}
+    >
+      {hubData && !hasUsableData ? (
+        <EmptyStateCard
+          variant="centered"
+          testID="subject-hub-empty"
+          title={t('subjectHub.empty.title')}
+          message={t('subjectHub.empty.message')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: hub.refetch,
+            testID: 'subject-hub-empty-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: goBack,
+            testID: 'subject-hub-empty-back',
+          }}
+        />
+      ) : hubData ? (
+        <View className="flex-1" testID="subject-hub-screen">
+          <SubjectHub
+            data={hubData}
+            onNextUpPress={handleNextUp}
+            onStudyTopic={handleStudyTopic}
+            onReviewTopic={handleReviewTopic}
+          />
+        </View>
+      ) : null}
+    </QueryStateView>
   );
 }

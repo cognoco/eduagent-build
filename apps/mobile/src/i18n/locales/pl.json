@@ -4161,7 +4161,11 @@
       "done": "Gotowe",
       "mastered": "Opanowane"
     },
-    "linkLabel": "Otwórz centrum tematyczne"
+    "linkLabel": "Otwórz centrum tematyczne",
+    "empty": {
+      "title": "Jeszcze nic tu nie ma do nauki",
+      "message": "Ten przedmiot nie ma jeszcze żadnych tematów. Spróbuj ponownie za chwilę lub wróć do swoich przedmiotów."
+    }
   },
   "journal": {
     "title": "Dziennik",
