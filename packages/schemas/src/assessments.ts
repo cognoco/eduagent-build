@@ -431,8 +431,8 @@ export type NeedsDeepeningResponse = z.infer<
 // Teaching preference response shape (GET + PUT share the same envelope)
 export const teachingPreferenceResponseDataSchema = z.object({
   subjectId: z.string().uuid(),
-  method: z.string(),
-  analogyDomain: z.string().nullable().optional(),
+  method: teachingMethodSchema,
+  analogyDomain: analogyDomainSchema.nullable().optional(),
   nativeLanguage: z.string().nullable().optional(),
 });
 
