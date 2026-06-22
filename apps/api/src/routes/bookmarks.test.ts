@@ -30,7 +30,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -46,7 +46,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -73,7 +73,7 @@ const mockDeleteBookmark = jest.fn();
 const mockListBookmarks = jest.fn();
 const mockListSessionBookmarks = jest.fn();
 
-jest.mock('../services/bookmarks' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/bookmarks', () => {
   const actual = jest.requireActual(
     '../services/bookmarks',
   ) as typeof import('../services/bookmarks');
@@ -96,7 +96,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

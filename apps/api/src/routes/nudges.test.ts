@@ -25,7 +25,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -47,7 +47,7 @@ const mockListUnreadNudges = jest.fn();
 const mockMarkNudgeRead = jest.fn();
 const mockMarkAllNudgesRead = jest.fn();
 
-jest.mock('../services/nudge' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/nudge', () => {
   const actual = jest.requireActual(
     '../services/nudge',
   ) as typeof import('../services/nudge');

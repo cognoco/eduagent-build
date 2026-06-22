@@ -2,7 +2,7 @@
 // RevenueCat Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/kv', () => {
   const actual = jest.requireActual(
     '../services/kv',
   ) as typeof import('../services/kv');
@@ -12,7 +12,7 @@ jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');
@@ -55,7 +55,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -65,28 +65,25 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/subscription' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/subscription',
-    ) as typeof import('../services/subscription');
-    return {
-      ...actual,
-      getTierConfig: jest.fn().mockReturnValue({
-        monthlyQuota: 500,
-        dailyLimit: null,
-        maxProfiles: 1,
-        priceMonthly: 18.99,
-        priceYearly: 168,
-        topUpPrice: 10,
-        topUpAmount: 500,
-      }),
-    };
-  },
-);
+jest.mock('../services/subscription', () => {
+  const actual = jest.requireActual(
+    '../services/subscription',
+  ) as typeof import('../services/subscription');
+  return {
+    ...actual,
+    getTierConfig: jest.fn().mockReturnValue({
+      monthlyQuota: 500,
+      dailyLimit: null,
+      maxProfiles: 1,
+      priceMonthly: 18.99,
+      priceYearly: 168,
+      topUpPrice: 10,
+      topUpAmount: 500,
+    }),
+  };
+});
 
-jest.mock('../services/trial' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/trial', () => {
   const actual = jest.requireActual(
     '../services/trial',
   ) as typeof import('../services/trial');
@@ -96,7 +93,7 @@ jest.mock('../services/trial' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -109,23 +106,20 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockSafeSend = jest.fn().mockResolvedValue(undefined);
-jest.mock(
-  '../services/safe-non-core' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/safe-non-core',
-    ) as typeof import('../services/safe-non-core');
-    return {
-      ...actual,
-      safeSend: (...args: unknown[]) => mockSafeSend(...args),
-    };
-  },
-);
+jest.mock('../services/safe-non-core', () => {
+  const actual = jest.requireActual(
+    '../services/safe-non-core',
+  ) as typeof import('../services/safe-non-core');
+  return {
+    ...actual,
+    safeSend: (...args: unknown[]) => mockSafeSend(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');

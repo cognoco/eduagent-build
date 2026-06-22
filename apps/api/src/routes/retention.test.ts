@@ -17,7 +17,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -33,7 +33,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -49,31 +49,28 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/retention-data' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/retention-data',
-    ) as typeof import('../services/retention-data');
-    return {
-      ...actual,
-      getSubjectRetention: jest.fn(),
-      getAllSubjectsRetention: jest.fn(),
-      getTopicRetention: jest.fn(),
-      processRecallTest: jest.fn(),
-      startRelearn: jest.fn(),
-      getSubjectNeedsDeepening: jest.fn(),
-      getTeachingPreference: jest.fn(),
-      setTeachingPreference: jest.fn(),
-      deleteTeachingPreference: jest.fn(),
-      getStableTopics: jest.fn(),
-    };
-  },
-);
+jest.mock('../services/retention-data', () => {
+  const actual = jest.requireActual(
+    '../services/retention-data',
+  ) as typeof import('../services/retention-data');
+  return {
+    ...actual,
+    getSubjectRetention: jest.fn(),
+    getAllSubjectsRetention: jest.fn(),
+    getTopicRetention: jest.fn(),
+    processRecallTest: jest.fn(),
+    startRelearn: jest.fn(),
+    getSubjectNeedsDeepening: jest.fn(),
+    getTeachingPreference: jest.fn(),
+    setTeachingPreference: jest.fn(),
+    deleteTeachingPreference: jest.fn(),
+    getStableTopics: jest.fn(),
+  };
+});
 
 // Billing mock — required by metering middleware now that
 // POST /v1/retention/recall-test is metered [WI-168 / WI-77 allowlist sweep].
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');

@@ -2,7 +2,7 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest', () => {
   const actual = jest.requireActual(
     '../inngest',
   ) as typeof import('../inngest');

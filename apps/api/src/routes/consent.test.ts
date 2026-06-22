@@ -6,7 +6,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -21,7 +21,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -31,29 +31,26 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/notifications',
-    ) as typeof import('../services/notifications');
-    return {
-      ...actual,
-      sendEmail: jest.fn().mockResolvedValue({ sent: true }),
-      formatConsentRequestEmail: jest.fn().mockReturnValue({
-        to: 'parent@example.com',
-        subject: 'Test',
-        body: 'Test',
-        type: 'consent_request',
-      }),
-      sendPushNotification: jest.fn().mockResolvedValue({ sent: true }),
-      formatReviewReminderBody: jest.fn(),
-      formatDailyReminderBody: jest.fn(),
-      formatConsentReminderEmail: jest.fn(),
-      MAX_DAILY_PUSH: 3,
-    };
-  },
-);
+jest.mock('../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../services/notifications',
+  ) as typeof import('../services/notifications');
+  return {
+    ...actual,
+    sendEmail: jest.fn().mockResolvedValue({ sent: true }),
+    formatConsentRequestEmail: jest.fn().mockReturnValue({
+      to: 'parent@example.com',
+      subject: 'Test',
+      body: 'Test',
+      type: 'consent_request',
+    }),
+    sendPushNotification: jest.fn().mockResolvedValue({ sent: true }),
+    formatReviewReminderBody: jest.fn(),
+    formatDailyReminderBody: jest.fn(),
+    formatConsentReminderEmail: jest.fn(),
+    MAX_DAILY_PUSH: 3,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Real JWT + real auth middleware — no jwt module mock
@@ -82,7 +79,7 @@ jest.mock(
 // Mock account + consent services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -98,7 +95,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -135,7 +132,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/consent' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/consent', () => {
   const actual = jest.requireActual(
     '../services/consent',
   ) as typeof import('../services/consent');

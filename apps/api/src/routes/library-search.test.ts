@@ -25,7 +25,7 @@ jest.mock(
 // Mock account + profile services (required by auth middleware)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -41,7 +41,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -64,18 +64,15 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockSearchLibrary = jest.fn();
 
-jest.mock(
-  '../services/library-search' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/library-search',
-    ) as typeof import('../services/library-search');
-    return {
-      ...actual,
-      searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
-    };
-  },
-);
+jest.mock('../services/library-search', () => {
+  const actual = jest.requireActual(
+    '../services/library-search',
+  ) as typeof import('../services/library-search');
+  return {
+    ...actual,
+    searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)

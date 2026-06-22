@@ -32,7 +32,7 @@ jest.mock(
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -52,7 +52,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -83,43 +83,40 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 // Mock suggestion services — stubs for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock(
-  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/suggestions',
-    ) as typeof import('../services/suggestions');
-    const stubSuggestion = {
-      id: 'a0000000-0000-4000-a000-000000000001',
-      subjectId: 'a0000000-0000-4000-a000-000000000201',
-      title: 'Suggested Book',
-      emoji: '📖',
-      description: 'A suggested book',
-      category: null,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      pickedAt: null,
-    };
-    return {
-      ...actual,
-      getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
-        suggestions: [stubSuggestion],
-        curriculumBookCount: 3,
-      }),
-      getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
-        suggestions: [stubSuggestion],
-        curriculumBookCount: 3,
-      }),
-      getAllBookSuggestions: jest.fn().mockResolvedValue([stubSuggestion]),
-    };
-  },
-);
+jest.mock('../services/suggestions', () => {
+  const actual = jest.requireActual(
+    '../services/suggestions',
+  ) as typeof import('../services/suggestions');
+  const stubSuggestion = {
+    id: 'a0000000-0000-4000-a000-000000000001',
+    subjectId: 'a0000000-0000-4000-a000-000000000201',
+    title: 'Suggested Book',
+    emoji: '📖',
+    description: 'A suggested book',
+    category: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    pickedAt: null,
+  };
+  return {
+    ...actual,
+    getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
+      suggestions: [stubSuggestion],
+      curriculumBookCount: 3,
+    }),
+    getUnpickedBookSuggestionsWithTopup: jest.fn().mockResolvedValue({
+      suggestions: [stubSuggestion],
+      curriculumBookCount: 3,
+    }),
+    getAllBookSuggestions: jest.fn().mockResolvedValue([stubSuggestion]),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — routeAndCall is the external LLM HTTP boundary;
 // all other exports (registerProvider, _clearProviders, etc.) run real code.
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/llm', () => {
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');
@@ -139,7 +136,7 @@ jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
 // boundary; override only captureException to prevent Sentry SDK init noise.
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');

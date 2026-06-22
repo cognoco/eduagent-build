@@ -30,7 +30,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -107,7 +107,7 @@ const mockUpsertNotificationPrefs = jest.fn();
 const mockGetWithdrawalArchivePreference = jest.fn();
 const mockUpsertWithdrawalArchivePreference = jest.fn();
 
-jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/settings', () => {
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,

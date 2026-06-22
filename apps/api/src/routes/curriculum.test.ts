@@ -30,7 +30,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -46,7 +46,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -78,28 +78,24 @@ const mockAdaptCurriculumFromPerformance = jest.fn();
 const mockCloneTopicFromChild = jest.fn();
 const mockUndoCloneFromChild = jest.fn();
 
-jest.mock(
-  '../services/curriculum' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/curriculum',
-    ) as typeof import('../services/curriculum');
-    return {
-      ...actual,
-      getCurriculum: (...args: unknown[]) => mockGetCurriculum(...args),
-      skipTopic: (...args: unknown[]) => mockSkipTopic(...args),
-      unskipTopic: (...args: unknown[]) => mockUnskipTopic(...args),
-      challengeCurriculum: (...args: unknown[]) =>
-        mockChallengeCurriculum(...args),
-      explainTopicOrdering: (...args: unknown[]) =>
-        mockExplainTopicOrdering(...args),
-      addCurriculumTopic: (...args: unknown[]) =>
-        mockAddCurriculumTopic(...args),
-      adaptCurriculumFromPerformance: (...args: unknown[]) =>
-        mockAdaptCurriculumFromPerformance(...args),
-    };
-  },
-);
+jest.mock('../services/curriculum', () => {
+  const actual = jest.requireActual(
+    '../services/curriculum',
+  ) as typeof import('../services/curriculum');
+  return {
+    ...actual,
+    getCurriculum: (...args: unknown[]) => mockGetCurriculum(...args),
+    skipTopic: (...args: unknown[]) => mockSkipTopic(...args),
+    unskipTopic: (...args: unknown[]) => mockUnskipTopic(...args),
+    challengeCurriculum: (...args: unknown[]) =>
+      mockChallengeCurriculum(...args),
+    explainTopicOrdering: (...args: unknown[]) =>
+      mockExplainTopicOrdering(...args),
+    addCurriculumTopic: (...args: unknown[]) => mockAddCurriculumTopic(...args),
+    adaptCurriculumFromPerformance: (...args: unknown[]) =>
+      mockAdaptCurriculumFromPerformance(...args),
+  };
+});
 
 jest.mock(
   '../services/family-bridge' /* gc1-allow: route unit test — bridge service has DB transaction logic covered separately */,
@@ -123,7 +119,7 @@ jest.mock(
 // [WI-149, WI-149, WI-149 in the WI-77 allowlist sweep].
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');
@@ -195,7 +191,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

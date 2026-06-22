@@ -54,7 +54,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: external boundary — unit test, real Neon DB unavailable; db injected via middleware
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -78,7 +78,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 // X-Profile-Id = OWNER_PROFILE_ID); getProfile resolves that id to the owner.
 // findOwnerProfile (the auto-resolve path) is still mocked so the no-header
 // path is exercised by tests that deliberately assert it (e.g. BUG-825).
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -155,7 +155,7 @@ const mockBuildUsageDateLabels = jest.fn((input) => ({
   renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');
@@ -202,7 +202,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockReadSubscriptionStatus = jest.fn();
 
-jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/kv', () => {
   const actual = jest.requireActual(
     '../services/kv',
   ) as typeof import('../services/kv');
@@ -219,7 +219,7 @@ jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -239,7 +239,7 @@ const mockCustomersCreate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/stripe', () => {
   const actual = jest.requireActual(
     '../services/stripe',
   ) as typeof import('../services/stripe');

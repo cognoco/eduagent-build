@@ -1,31 +1,25 @@
-jest.mock(
-  '../services/support/spillover' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/support/spillover',
-    ) as typeof import('../services/support/spillover');
-    return {
-      ...actual,
-      recordOutboxSpillover: jest.fn(),
-    };
-  },
-);
+jest.mock('../services/support/spillover', () => {
+  const actual = jest.requireActual(
+    '../services/support/spillover',
+  ) as typeof import('../services/support/spillover');
+  return {
+    ...actual,
+    recordOutboxSpillover: jest.fn(),
+  };
+});
 
 // [WI-179] Stub the rate-limit primitive so this fast unit test does not
 // hit the real notification_log table. The DB-backed integration coverage
 // for `checkAndLogRateLimit` lives in `services/settings.integration.test.ts`.
-jest.mock(
-  '../services/settings' /* gc1-allow: pattern-a — DB-bound primitive replaced by behavior-controlled stub; real check covered by settings.integration.test.ts */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/settings',
-    ) as typeof import('../services/settings');
-    return {
-      ...actual,
-      checkAndLogRateLimit: jest.fn().mockResolvedValue(false),
-    };
-  },
-);
+jest.mock('../services/settings', () => {
+  const actual = jest.requireActual(
+    '../services/settings',
+  ) as typeof import('../services/settings');
+  return {
+    ...actual,
+    checkAndLogRateLimit: jest.fn().mockResolvedValue(false),
+  };
+});
 
 import { Hono } from 'hono';
 import { supportRoutes } from './support';
