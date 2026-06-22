@@ -3062,6 +3062,10 @@
       "loadTitle": "Could not load this subject",
       "loadMessage": "Try again, or go back to your subjects."
     },
+    "empty": {
+      "title": "Nothing to study here yet",
+      "message": "This subject has no topics yet. Try again in a moment, or go back to your subjects."
+    },
     "progress": {
       "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
       "reviewsDue": "{{count}} reviews due",

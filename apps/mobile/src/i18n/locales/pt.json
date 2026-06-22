@@ -4011,7 +4011,11 @@
       "done": "Concluído",
       "mastered": "Dominado"
     },
-    "linkLabel": "Abrir centro de matérias"
+    "linkLabel": "Abrir centro de matérias",
+    "empty": {
+      "title": "Nada para estudar aqui ainda",
+      "message": "Esta matéria ainda não tem tópicos. Tente novamente em instantes ou volte para as suas matérias."
+    }
   },
   "journal": {
     "title": "Diário",

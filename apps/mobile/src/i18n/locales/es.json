@@ -4011,7 +4011,11 @@
       "done": "Hecho",
       "mastered": "Dominado"
     },
-    "linkLabel": "Abrir centro de asignaturas"
+    "linkLabel": "Abrir centro de asignaturas",
+    "empty": {
+      "title": "Aún no hay nada que estudiar aquí",
+      "message": "Esta asignatura aún no tiene temas. Inténtalo de nuevo en un momento o vuelve a tus asignaturas."
+    }
   },
   "journal": {
     "title": "Diario",
