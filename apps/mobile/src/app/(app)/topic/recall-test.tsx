@@ -110,6 +110,15 @@ export default function RecallTestScreen() {
     return () => clearTimeout(timer);
   }, [submitRecallTest.isPending]);
 
+  // [PERF-879] Cancel any in-flight animateResponse interval on unmount so it
+  // cannot tick setMessages/setIsStreaming after the screen is gone (leak +
+  // state-update-after-unmount warning). Capture the ref object so the cleanup
+  // reads the latest stored cleanup fn at teardown.
+  useEffect(() => {
+    const ref = cleanupRef;
+    return () => ref.current?.();
+  }, []);
+
   const handleSend = useCallback(
     (text: string) => {
       if (!topicId) return;

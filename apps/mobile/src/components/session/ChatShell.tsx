@@ -1,5 +1,5 @@
 import type { InputMode } from '@eduagent/schemas';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AccessibilityInfo,
@@ -117,6 +117,16 @@ interface ChatShellProps {
 /**
  * Simulates token-by-token streaming animation for non-SSE responses.
  * Returns a cleanup function to cancel the animation.
+ *
+ * [PERF-879] Two correctness/perf properties this implementation guarantees:
+ *  1. Cleanup is idempotent and cancels permanently — once the returned
+ *     function runs, the interval is cleared AND a `cancelled` latch blocks any
+ *     in-flight tick from calling `setMessages` / `setIsStreaming` / `onDone`.
+ *     Callers that wire the cleanup to an unmount effect therefore cannot leak
+ *     a state-update-after-unmount, even if a tick was already scheduled.
+ *  2. The growing prefix is accumulated incrementally instead of rebuilt with
+ *     `tokens.slice(0, i + 1).join(' ')` every tick, which was O(N²) over the
+ *     response length and janked long replies.
  */
 export function animateResponse(
   response: string,
@@ -133,10 +143,19 @@ export function animateResponse(
 
   const tokens = response.split(' ');
   let tokenIndex = 0;
+  // Accumulate the prefix incrementally so each tick is O(token length), not
+  // O(prefix length) — the old slice/join rebuilt the whole prefix each tick.
+  let partial = '';
+  let cancelled = false;
 
   const interval = setInterval(() => {
+    // A tick can still be in flight when cleanup runs (e.g. component unmount).
+    // The latch makes that tick a no-op so no setState fires after teardown.
+    if (cancelled) return;
+
     if (tokenIndex >= tokens.length) {
       clearInterval(interval);
+      cancelled = true;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === streamId ? { ...m, streaming: false, content: response } : m,
@@ -146,15 +165,96 @@ export function animateResponse(
       onDone?.();
       return;
     }
-    const partial = tokens.slice(0, tokenIndex + 1).join(' ');
+    const token = tokens[tokenIndex] ?? '';
+    partial = partial ? `${partial} ${token}` : token;
     setMessages((prev) =>
       prev.map((m) => (m.id === streamId ? { ...m, content: partial } : m)),
     );
     tokenIndex++;
   }, 40);
 
-  return () => clearInterval(interval);
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+  };
 }
+
+/**
+ * A single FlatList row: optional homework-image thumbnail (with its own
+ * load-failure fallback) plus the MessageBubble.
+ *
+ * [PERF-879] Image-failure state is LOCAL to the row. Previously ChatShell held
+ * one shared `failedImages` Set and the `renderItem` callback depended on it, so
+ * a single image `onError` produced a new Set → new callback identity → FlatList
+ * re-rendered EVERY row. Scoping the failed flag here means a broken image only
+ * re-renders its own row, and `renderItem`'s identity stays stable. Wrapped in
+ * `memo` so unrelated parent re-renders (input typing, voice toggles) don't
+ * re-render rows whose props are unchanged.
+ */
+interface ChatMessageRowProps {
+  msg: ChatMessage;
+  index: number;
+  mutedColor: string;
+  renderMessageActions?: (message: ChatMessage) => React.ReactNode;
+}
+
+const ChatMessageRow = memo(function ChatMessageRow({
+  msg,
+  index,
+  mutedColor,
+  renderMessageActions,
+}: ChatMessageRowProps) {
+  const { t } = useTranslation();
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <View>
+      {msg.imageUri && !imageFailed && (
+        <View className="self-end max-w-[85%] mb-1">
+          {/* [BUG-NOTION-257] Hint the platform image cache so homework
+              thumbnails are not re-decoded on every FlatList scroll-back.
+              expo-image is not in the workspace (only expo-image-picker /
+              expo-image-manipulator), so we rely on the RN Image cache
+              policy. `force-cache` instructs iOS to serve from disk cache
+              when present; on Android the prop is a no-op but harmless.
+              If/when expo-image is added, swap to <Image contentFit="contain"
+              cachePolicy="memory-disk" /> from expo-image. */}
+          <Image
+            testID={`message-image-${msg.id}`}
+            source={{ uri: msg.imageUri, cache: 'force-cache' }}
+            className="w-full aspect-[4/3] rounded-lg"
+            resizeMode="contain"
+            accessibilityLabel={t('session.chatShell.a11yHomeworkImage')}
+            onError={() => setImageFailed(true)}
+          />
+        </View>
+      )}
+      {msg.imageUri && imageFailed && (
+        <View className="self-end max-w-[85%] mb-1">
+          <View
+            testID={`message-image-fallback-${msg.id}`}
+            className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
+          >
+            <Ionicons name="camera-outline" size={32} color={mutedColor} />
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {t('session.chatShell.imageUnavailable')}
+            </Text>
+          </View>
+        </View>
+      )}
+      <MessageBubble
+        sender={msg.role}
+        content={msg.content}
+        streaming={msg.streaming}
+        outboxStatus={msg.outboxStatus}
+        escalationRung={msg.escalationRung}
+        verificationBadge={msg.verificationBadge}
+        actions={renderMessageActions?.(msg)}
+        testID={`message-bubble-${msg.role}-${index}`}
+      />
+    </View>
+  );
+});
 
 export function ChatShell({
   title,
@@ -211,7 +311,6 @@ export function ChatShell({
   const scrollRef = useRef<FlatList<ChatMessage>>(null);
   const [input, setInput] = useState('');
   const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
-  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   // Hold the desk-lamp "thinking" indicator long enough to perceive even
   // when streaming is fast. The streamed reply renders alongside it for a
@@ -233,55 +332,14 @@ export function ChatShell({
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
   const renderMessageItem = useCallback(
     ({ item: msg, index }: ListRenderItemInfo<ChatMessage>) => (
-      <View>
-        {msg.imageUri && !failedImages.has(msg.id) && (
-          <View className="self-end max-w-[85%] mb-1">
-            {/* [BUG-NOTION-257] Hint the platform image cache so homework
-                thumbnails are not re-decoded on every FlatList scroll-back.
-                expo-image is not in the workspace (only expo-image-picker /
-                expo-image-manipulator), so we rely on the RN Image cache
-                policy. `force-cache` instructs iOS to serve from disk cache
-                when present; on Android the prop is a no-op but harmless.
-                If/when expo-image is added, swap to <Image contentFit="contain"
-                cachePolicy="memory-disk" /> from expo-image. */}
-            <Image
-              testID={`message-image-${msg.id}`}
-              source={{ uri: msg.imageUri, cache: 'force-cache' }}
-              className="w-full aspect-[4/3] rounded-lg"
-              resizeMode="contain"
-              accessibilityLabel={t('session.chatShell.a11yHomeworkImage')}
-              onError={() => {
-                setFailedImages((prev) => new Set(prev).add(msg.id));
-              }}
-            />
-          </View>
-        )}
-        {msg.imageUri && failedImages.has(msg.id) && (
-          <View className="self-end max-w-[85%] mb-1">
-            <View
-              testID={`message-image-fallback-${msg.id}`}
-              className="w-full aspect-[4/3] rounded-lg bg-surface items-center justify-center"
-            >
-              <Ionicons name="camera-outline" size={32} color={colors.muted} />
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t('session.chatShell.imageUnavailable')}
-              </Text>
-            </View>
-          </View>
-        )}
-        <MessageBubble
-          sender={msg.role}
-          content={msg.content}
-          streaming={msg.streaming}
-          outboxStatus={msg.outboxStatus}
-          escalationRung={msg.escalationRung}
-          verificationBadge={msg.verificationBadge}
-          actions={renderMessageActions?.(msg)}
-          testID={`message-bubble-${msg.role}-${index}`}
-        />
-      </View>
+      <ChatMessageRow
+        msg={msg}
+        index={index}
+        mutedColor={colors.muted}
+        renderMessageActions={renderMessageActions}
+      />
     ),
-    [failedImages, colors.muted, renderMessageActions, t],
+    [colors.muted, renderMessageActions],
   );
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.

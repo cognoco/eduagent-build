@@ -98,4 +98,66 @@ describe('animateResponse', () => {
     // onDone must NOT have fired because we cancelled before completion.
     expect(r.isDone()).toBe(false);
   });
+
+  // [PERF-879] After cleanup, NO further state updates may fire — this is the
+  // property callers rely on when they wire cleanup to an unmount effect. A
+  // tick already scheduled when cleanup runs must become a no-op so it cannot
+  // setMessages/setIsStreaming after the component is gone. Spy on the setters
+  // directly so we catch any post-cleanup invocation.
+  it('does not call any setter after cleanup (no state-update-after-unmount)', () => {
+    const response = 'a b c d e f g h i j';
+    const setMessages = jest.fn();
+    const setIsStreaming = jest.fn();
+    const onDone = jest.fn();
+
+    const cleanup = animateResponse(
+      response,
+      setMessages as unknown as React.Dispatch<
+        React.SetStateAction<ChatMessage[]>
+      >,
+      setIsStreaming as unknown as React.Dispatch<
+        React.SetStateAction<boolean>
+      >,
+      onDone,
+    );
+
+    // Let a couple of ticks fire, then cancel.
+    jest.advanceTimersByTime(40 * 2);
+    cleanup();
+    const messagesCallsAtCleanup = setMessages.mock.calls.length;
+    const streamingCallsAtCleanup = setIsStreaming.mock.calls.length;
+
+    // Drain every remaining timer the old code would have run.
+    jest.runAllTimers();
+
+    expect(setMessages.mock.calls.length).toBe(messagesCallsAtCleanup);
+    expect(setIsStreaming.mock.calls.length).toBe(streamingCallsAtCleanup);
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('cleanup is idempotent (calling it twice is safe and stays cancelled)', () => {
+    const response = 'a b c d e';
+    const setMessages = jest.fn();
+    const setIsStreaming = jest.fn();
+
+    const cleanup = animateResponse(
+      response,
+      setMessages as unknown as React.Dispatch<
+        React.SetStateAction<ChatMessage[]>
+      >,
+      setIsStreaming as unknown as React.Dispatch<
+        React.SetStateAction<boolean>
+      >,
+    );
+
+    jest.advanceTimersByTime(40);
+    expect(() => {
+      cleanup();
+      cleanup();
+    }).not.toThrow();
+
+    const callsAfterCleanup = setMessages.mock.calls.length;
+    jest.runAllTimers();
+    expect(setMessages.mock.calls.length).toBe(callsAfterCleanup);
+  });
 });
