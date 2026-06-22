@@ -483,6 +483,22 @@ export async function handleSubscriberAliasV2(
       const fromSub = await getSubscriptionByAccountIdV2(db, fromAccountId);
       if (!fromSub) continue;
 
+      // [BUG-783] Pre-downgrade snapshot for the alias-merge worker. NOTE: the
+      // worker currently reconciles the LEGACY `subscriptions` table; a v2
+      // merge twin (reading the `subscription` table) is owed when identity-v2
+      // cuts over — same split pattern as quota-reset's v2 path. This v2 path
+      // is inert behind IDENTITY_V2_ENABLED today, so the worker never runs on
+      // v2-shaped data in production yet. `topUpRemaining` floors at 0 (no v2
+      // remaining-credits reader exists yet) so the merge never grants phantom
+      // credits before the twin lands.
+      const fromSnapshot = {
+        tier: fromSub.tier,
+        status: fromSub.status,
+        currentPeriodEnd: fromSub.currentPeriodEnd,
+        trialEndsAt: fromSub.trialEndsAt,
+        topUpRemaining: 0,
+      };
+
       const nowIso = new Date().toISOString();
       const freeConfig = getTierConfig('free');
       const downgraded =
@@ -513,14 +529,14 @@ export async function handleSubscriberAliasV2(
         );
       }
 
-      captureException(
-        new Error(
-          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
-        ),
+      // [BUG-783] Handled by the billing-alias-merge worker — informational
+      // breadcrumb, no longer the high-severity "merge not implemented" alert.
+      captureMessage(
+        '[revenuecat] SUBSCRIBER_ALIAS: transferred_from had an active subscription — dispatching alias merge',
         {
+          level: 'info',
           extra: {
-            tag: 'revenuecat.alias.unhandled',
-            severity: 'high',
+            tag: 'revenuecat.alias.merge_dispatched',
             eventId: event.id,
             fromAppUserId: fromUserId,
             toAppUserId: event.app_user_id,
@@ -541,6 +557,7 @@ export async function handleSubscriberAliasV2(
               toAppUserId: event.app_user_id,
               fromAccountId,
               fromSubscriptionId: fromSub.id,
+              fromSnapshot,
               timestamp: new Date().toISOString(),
             },
           }),
