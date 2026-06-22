@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -32,27 +32,41 @@ export function FeedbackSheet({
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const submit = useFeedbackSubmit();
+  const { isPending, mutate, reset } = useFeedbackSubmit();
   const [category, setCategory] = useState<FeedbackCategory>('bug');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const canSubmit = message.trim().length > 0 && !submit.isPending;
+  const canSubmit = message.trim().length > 0 && !isPending;
 
-  function handleClose() {
+  const resetSheetState = useCallback(() => {
     setMessage('');
     setCategory('bug');
     setSubmitted(false);
     setError('');
-    submit.reset();
+    reset();
+  }, [reset]);
+
+  useEffect(() => {
+    if (visible) resetSheetState();
+  }, [resetSheetState, visible]);
+
+  function handleClose() {
+    resetSheetState();
     onClose();
+  }
+
+  function handleMessageChange(value: string) {
+    setMessage(value);
+    setSubmitted(false);
+    setError('');
   }
 
   function handleSubmit() {
     if (!canSubmit) return;
     setError('');
-    submit.mutate(
+    mutate(
       {
         category,
         message: message.trim(),
@@ -185,11 +199,11 @@ export function FeedbackSheet({
                 placeholder={t('feedbackSheet.messagePlaceholder')}
                 placeholderTextColor={colors.muted}
                 value={message}
-                onChangeText={setMessage}
+                onChangeText={handleMessageChange}
                 multiline
                 maxLength={2000}
                 autoFocus
-                editable={!submit.isPending}
+                editable={!isPending}
                 testID="feedback-message-input"
                 accessibilityLabel={t('feedbackSheet.messageLabel')}
               />
@@ -218,7 +232,7 @@ export function FeedbackSheet({
                 accessibilityLabel={t('feedbackSheet.sendButtonLabel')}
                 testID="feedback-submit"
               >
-                {submit.isPending ? (
+                {isPending ? (
                   <ActivityIndicator
                     color={colors.textInverse}
                     accessibilityLabel={t('common.loading')}

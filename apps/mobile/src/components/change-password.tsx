@@ -29,6 +29,35 @@ export function ChangePassword(): React.JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const clearBanners = useCallback(() => {
+    setError(null);
+    setSuccess(false);
+  }, []);
+
+  const handleCurrentPasswordChange = useCallback(
+    (value: string) => {
+      setCurrentPassword(value);
+      clearBanners();
+    },
+    [clearBanners],
+  );
+
+  const handleNewPasswordChange = useCallback(
+    (value: string) => {
+      setNewPassword(value);
+      clearBanners();
+    },
+    [clearBanners],
+  );
+
+  const handleConfirmPasswordChange = useCallback(
+    (value: string) => {
+      setConfirmPassword(value);
+      clearBanners();
+    },
+    [clearBanners],
+  );
+
   const handleSubmit = useCallback(async () => {
     setError(null);
     setSuccess(false);
@@ -109,7 +138,7 @@ export function ChangePassword(): React.JSX.Element {
     <View className="mt-3">
       <PasswordInput
         value={currentPassword}
-        onChangeText={setCurrentPassword}
+        onChangeText={handleCurrentPasswordChange}
         placeholder={t('changePassword.currentPlaceholder')}
         testID="current-password"
       />
@@ -128,7 +157,7 @@ export function ChangePassword(): React.JSX.Element {
 
       <PasswordInput
         value={newPassword}
-        onChangeText={setNewPassword}
+        onChangeText={handleNewPasswordChange}
         placeholder={t('changePassword.newPlaceholder')}
         testID="new-password"
         showRequirements
@@ -137,7 +166,7 @@ export function ChangePassword(): React.JSX.Element {
       <View className="mt-2">
         <PasswordInput
           value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          onChangeText={handleConfirmPasswordChange}
           placeholder={t('changePassword.confirmPlaceholder')}
           testID="confirm-password"
         />
