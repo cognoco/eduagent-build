@@ -32,6 +32,11 @@ export {
   activateSubscriptionFromRevenuecatV2,
 } from './revenuecat-v2';
 
+// [WI-1057] v2 twin of the RevenueCat SUBSCRIBER_ALIAS merge — reconciles the
+// surviving identity onto the `subscription` table. Selected by the
+// billing-alias-merge worker under IDENTITY_V2_ENABLED (quota-reset split).
+export { mergeAliasedSubscriptionV2 } from './alias-merge-v2';
+
 export { getEffectiveAccessForSubscriptionV2 } from './access-v2';
 
 export {

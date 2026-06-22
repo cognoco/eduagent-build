@@ -22,8 +22,9 @@ import {
 } from '@eduagent/schemas';
 
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { mergeAliasedSubscription } from '../../services/billing/alias-merge';
+import { mergeAliasedSubscriptionV2 } from '../../services/billing/billing-v2';
 import { createLogger } from '../../services/logger';
 
 const logger = createLogger();
@@ -54,7 +55,13 @@ export const billingAliasMerge = inngest.createFunction(
 
     const result = await step.run('merge-aliased-subscription', async () => {
       const db = getStepDatabase();
-      return mergeAliasedSubscription(db, parsed.data);
+      // [WI-1057] flag-on routes to the v2 merge twin (reconciles the
+      // `subscription` table); flag-off stays on the legacy `subscriptions`
+      // path and is byte-identical to today. Same split pattern as
+      // quota-reset's resetExpiredQuotaCyclesV2.
+      return isIdentityV2EnabledInStep()
+        ? mergeAliasedSubscriptionV2(db, parsed.data)
+        : mergeAliasedSubscription(db, parsed.data);
     });
 
     return {

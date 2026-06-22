@@ -29,6 +29,7 @@ import {
   type RevenueCatEvent,
 } from '../revenuecat-webhook-handler';
 import { purchaseTopUpCreditsV2 } from './top-up-v2';
+import { getTopUpCreditsRemaining } from '../top-up';
 import { getTierConfig } from '../../subscription';
 import { captureException, captureMessage } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -483,20 +484,24 @@ export async function handleSubscriberAliasV2(
       const fromSub = await getSubscriptionByAccountIdV2(db, fromAccountId);
       if (!fromSub) continue;
 
-      // [BUG-783] Pre-downgrade snapshot for the alias-merge worker. NOTE: the
-      // worker currently reconciles the LEGACY `subscriptions` table; a v2
-      // merge twin (reading the `subscription` table) is owed when identity-v2
-      // cuts over — same split pattern as quota-reset's v2 path. This v2 path
-      // is inert behind IDENTITY_V2_ENABLED today, so the worker never runs on
-      // v2-shaped data in production yet. `topUpRemaining` floors at 0 (no v2
-      // remaining-credits reader exists yet) so the merge never grants phantom
-      // credits before the twin lands.
+      // [BUG-783 / WI-1057] Pre-downgrade snapshot for the alias-merge worker.
+      // The BUG-833 downgrade below force-resets the from-side to free/expired,
+      // so the worker reconciles the survivor from THIS snapshot — it can no
+      // longer re-read the original tier/credits. With identity-v2 cut over
+      // (IDENTITY_V2_ENABLED='true' in stg+prd), the worker routes to
+      // mergeAliasedSubscriptionV2 against the `subscription` table. `top_up_credits`
+      // is a shared, non-forked satellite keyed by subscription id, so the same
+      // getTopUpCreditsRemaining reader reads the v2 from-side correctly — mirror
+      // the legacy handler exactly so the credit-migration half actually fires
+      // (the prior `topUpRemaining: 0` floor silently dropped carried credits on
+      // the now-live v2 path).
+      const fromTopUpRemaining = await getTopUpCreditsRemaining(db, fromSub.id);
       const fromSnapshot = {
         tier: fromSub.tier,
         status: fromSub.status,
         currentPeriodEnd: fromSub.currentPeriodEnd,
         trialEndsAt: fromSub.trialEndsAt,
-        topUpRemaining: 0,
+        topUpRemaining: fromTopUpRemaining,
       };
 
       const nowIso = new Date().toISOString();
