@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { challengeRoundSessionStateSchema } from '@eduagent/schemas';
 
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
@@ -31,7 +32,9 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
         profileId,
         c.req.valid('json'),
       );
-      return c.json({ challengeRound });
+      return c.json({
+        challengeRound: challengeRoundSessionStateSchema.parse(challengeRound),
+      });
     },
   )
   .post(
@@ -45,7 +48,9 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
         profileId,
         c.req.valid('json'),
       );
-      return c.json({ challengeRound });
+      return c.json({
+        challengeRound: challengeRoundSessionStateSchema.parse(challengeRound),
+      });
     },
   )
   .post(
@@ -59,6 +64,13 @@ export const challengeRoundRoutes = new Hono<RouteEnv>()
         profileId,
         c.req.valid('json'),
       );
-      return c.json({ challengeRound });
+      // abort returns `undefined` when no round ever existed for the session,
+      // so the schema must tolerate the absent case while still catching a
+      // malformed defined shape.
+      return c.json({
+        challengeRound: challengeRoundSessionStateSchema
+          .optional()
+          .parse(challengeRound),
+      });
     },
   );
