@@ -258,19 +258,35 @@ export function InterestContextRow({
   const [selectedContext, setSelectedContext] = useState<InterestContext>(
     interest.context,
   );
+  const [failedContext, setFailedContext] = useState<InterestContext | null>(
+    null,
+  );
 
   useEffect(() => {
     setSelectedContext(interest.context);
+    setFailedContext(null);
   }, [interest.context]);
+
+  const updateContext = (
+    context: InterestContext,
+    previousContext: InterestContext,
+  ) => {
+    setFailedContext(null);
+    setSelectedContext(context);
+    void onContextChange(interest.label, context)
+      .then(() => {
+        setFailedContext(null);
+      })
+      .catch(() => {
+        setSelectedContext(previousContext);
+        setFailedContext(context);
+      });
+  };
 
   const handlePress = (context: InterestContext) => {
     if (disabled || context === selectedContext) return;
 
-    const previousContext = selectedContext;
-    setSelectedContext(context);
-    void onContextChange(interest.label, context).catch(() => {
-      setSelectedContext(previousContext);
-    });
+    updateContext(context, selectedContext);
   };
 
   return (
@@ -304,6 +320,25 @@ export function InterestContextRow({
           );
         })}
       </View>
+      {failedContext ? (
+        <View className="mt-3 rounded-card bg-danger/10 px-3 py-2">
+          <Text className="text-caption font-semibold text-danger">
+            {t('session.mentorMemory.errors.updateFailed')}
+          </Text>
+          <Pressable
+            onPress={() => updateContext(failedContext, selectedContext)}
+            disabled={disabled}
+            className="self-start mt-2"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.tryAgain')}
+            accessibilityState={{ disabled }}
+          >
+            <Text className="text-caption font-semibold text-danger">
+              {t('common.tryAgain')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </MemoryRow>
   );
 }
