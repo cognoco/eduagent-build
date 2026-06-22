@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { readFileSync } from 'fs';
 import type { RetentionStatus } from './RetentionSignal';
 import { RemediationCard } from './RemediationCard';
 
@@ -7,15 +8,12 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock(
-  './RetentionSignal' /* gc1-allow: Ionicons (native vector-icon asset) + ThemeContext provider not available in JSDOM test env */,
-  () => ({
-    RetentionSignal: ({ status }: { status: string }) => {
-      const { View } = require('react-native');
-      return <View testID={`retention-signal-${status}`} />;
-    },
-  }),
-);
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: ({ name }: { name: string }) => {
+    const { Text } = require('react-native');
+    return <Text>{name}</Text>;
+  },
+}));
 
 const defaultProps = {
   retentionStatus: 'fading' as RetentionStatus,
@@ -24,6 +22,13 @@ const defaultProps = {
 };
 
 beforeEach(() => jest.clearAllMocks());
+
+function getReviewRetestPressableSource() {
+  const source = readFileSync(`${__dirname}/RemediationCard.tsx`, 'utf8');
+  return source.match(
+    /<Pressable[\s\S]*?testID="review-retest-button"[\s\S]*?>/,
+  )?.[0];
+}
 
 describe('without cooldown', () => {
   it('renders the card with retention signal', () => {
@@ -42,6 +47,14 @@ describe('without cooldown', () => {
     render(<RemediationCard {...defaultProps} />);
     fireEvent.press(screen.getByTestId('review-retest-button'));
     expect(defaultProps.onReviewRetest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mark review-retest button disabled for accessibility', () => {
+    render(<RemediationCard {...defaultProps} />);
+    expect(
+      screen.getByTestId('review-retest-button').props.accessibilityState
+        ?.disabled,
+    ).not.toBe(true);
   });
 
   it('does not render cooldown message', () => {
@@ -73,6 +86,23 @@ describe('with active cooldown', () => {
     const btn = screen.getByTestId('review-retest-button');
     fireEvent.press(btn);
     expect(onReviewRetest).not.toHaveBeenCalled();
+  });
+
+  it('marks review-retest button disabled for accessibility during cooldown', () => {
+    render(
+      <RemediationCard
+        {...defaultProps}
+        cooldownEndsAt={inFuture(30 * 60_000)}
+      />,
+    );
+    expect(
+      screen.getByTestId('review-retest-button').props.accessibilityState
+        ?.disabled,
+    ).toBe(true);
+  });
+
+  it('passes explicit accessibilityState to review-retest Pressable', () => {
+    expect(getReviewRetestPressableSource()).toContain('accessibilityState');
   });
 
   it('still fires onRelearnTopic during cooldown', () => {
