@@ -35,6 +35,7 @@ import { createLogger } from '../../logger';
 import { captureException } from '../../sentry';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
 import { getEffectiveAccessForSubscriptionV2 } from './access-v2';
+import { parseSubscriptionV2PlanTier } from './types-v2';
 
 const logger = createLogger();
 
@@ -106,10 +107,9 @@ export async function canAddProfileV2(
   });
   if (!sub) return false;
 
+  const tier = parseSubscriptionV2PlanTier(sub.planTier);
   const access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
-  const tierConfig = getTierConfig(
-    access?.effectiveAccessTier ?? (sub.planTier as SubscriptionTier),
-  );
+  const tierConfig = getTierConfig(access?.effectiveAccessTier ?? tier);
   const current = await getProfileCountForSubscriptionV2(db, subscriptionId);
 
   return current < tierConfig.maxProfiles;
@@ -179,7 +179,8 @@ export async function addProfileToSubscriptionV2(
   });
 
   if (!sub) return null;
-  if (sub.planTier !== 'family' && sub.planTier !== 'pro') return null;
+  const tier = parseSubscriptionV2PlanTier(sub.planTier);
+  if (tier !== 'family' && tier !== 'pro') return null;
 
   const personOrg = await organizationOfPerson(db, profileId);
   // Never re-parent persons across organizations (no invite/claim flow yet).
@@ -219,7 +220,8 @@ export async function removeProfileFromSubscriptionV2(
   });
 
   if (!sub) return null;
-  if (sub.planTier !== 'family' && sub.planTier !== 'pro') return null;
+  const tier = parseSubscriptionV2PlanTier(sub.planTier);
+  if (tier !== 'family' && tier !== 'pro') return null;
 
   const membershipRow = await db.query.membership.findFirst({
     where: and(
@@ -289,15 +291,14 @@ export async function getFamilyPoolStatusV2(
   });
 
   if (!sub) return null;
-  if (sub.planTier !== 'family' && sub.planTier !== 'pro') return null;
+  const tier = parseSubscriptionV2PlanTier(sub.planTier);
+  if (tier !== 'family' && tier !== 'pro') return null;
 
   const pool = await findQuotaPool__unscoped(db, subscriptionId);
   if (!pool) return null;
 
   const access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
-  const tierConfig = getTierConfig(
-    access?.effectiveAccessTier ?? (sub.planTier as SubscriptionTier),
-  );
+  const tierConfig = getTierConfig(access?.effectiveAccessTier ?? tier);
   const profileCount = await getProfileCountForSubscriptionV2(
     db,
     subscriptionId,
@@ -305,7 +306,7 @@ export async function getFamilyPoolStatusV2(
   const remaining = Math.max(0, pool.monthlyLimit - pool.usedThisMonth);
 
   return {
-    tier: sub.planTier as SubscriptionTier,
+    tier,
     monthlyLimit: pool.monthlyLimit,
     usedThisMonth: pool.usedThisMonth,
     remainingQuestions: remaining,

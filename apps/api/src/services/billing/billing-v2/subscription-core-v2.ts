@@ -64,7 +64,7 @@ import {
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from '../types';
-import { mapSubscriptionV2Row } from './types-v2';
+import { mapSubscriptionV2Row, parseSubscriptionV2Status } from './types-v2';
 import { reconcileQuotaStateForSubscriptionV2 } from './quota-reconcile-v2';
 
 const logger = createLogger();
@@ -223,7 +223,7 @@ export async function createSubscriptionV2(
       subscriptionId: subRow.id,
       organizationId,
       tier,
-      status: subRow.status as SubscriptionStatus,
+      status: parseSubscriptionV2Status(subRow.status),
       stripeCustomerId: options?.stripeCustomerId ?? null,
       stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
       trialEndsAt: subRow.trialEndsAt ?? null,
@@ -321,12 +321,8 @@ export async function updateSubscriptionFromWebhookV2(
       setValues.planTier = updates.tier;
     }
     if (updates.status !== undefined && updates.status !== existing.status) {
-      if (
-        !isValidTransition(
-          existing.status as SubscriptionStatus,
-          updates.status,
-        )
-      ) {
+      const existingStatus = parseSubscriptionV2Status(existing.status);
+      if (!isValidTransition(existingStatus, updates.status)) {
         // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
         const transitionErr = new Error(
           `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,

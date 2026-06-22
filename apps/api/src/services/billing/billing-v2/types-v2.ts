@@ -13,8 +13,9 @@
 //   - subscription.periodEndAt     → SubscriptionRow.currentPeriodEnd
 //
 // planTier/status are TEXT on the new table (CHECK-constrained to the same value
-// sets the legacy pgEnums use), so the cast to SubscriptionTier/SubscriptionStatus
-// is sound — the DB constraint is the hard floor.
+// sets the legacy pgEnums use). Parse them through the shared schema contract
+// before exposing the legacy typed shape so DB/fixture drift fails closed at the
+// billing boundary.
 //
 // This is a flag-gated v2 module: it is reachable only when
 // IDENTITY_V2_ENABLED='true', which no deployed environment sets until the
@@ -22,8 +23,29 @@
 // ---------------------------------------------------------------------------
 
 import { subscription } from '@eduagent/database';
-import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import {
+  subscriptionStatusSchema,
+  subscriptionTierSchema,
+  type SubscriptionTier,
+  type SubscriptionStatus,
+} from '@eduagent/schemas';
 import type { SubscriptionRow } from '../types';
+
+export function parseSubscriptionV2PlanTier(value: string): SubscriptionTier {
+  const result = subscriptionTierSchema.safeParse(value);
+  if (!result.success) {
+    throw new Error('Invalid billing v2 subscription planTier from database');
+  }
+  return result.data;
+}
+
+export function parseSubscriptionV2Status(value: string): SubscriptionStatus {
+  const result = subscriptionStatusSchema.safeParse(value);
+  if (!result.success) {
+    throw new Error('Invalid billing v2 subscription status from database');
+  }
+  return result.data;
+}
 
 /**
  * Maps a new-table `subscription` row to the legacy `SubscriptionRow` contract
@@ -32,6 +54,9 @@ import type { SubscriptionRow } from '../types';
 export function mapSubscriptionV2Row(
   row: typeof subscription.$inferSelect,
 ): SubscriptionRow {
+  const tier = parseSubscriptionV2PlanTier(row.planTier);
+  const status = parseSubscriptionV2Status(row.status);
+
   return {
     id: row.id,
     // organization.id = accounts.id by the reseed — the contract field stays
@@ -39,8 +64,8 @@ export function mapSubscriptionV2Row(
     accountId: row.organizationId,
     stripeCustomerId: row.stripeCustomerId,
     stripeSubscriptionId: row.stripeSubscriptionId,
-    tier: row.planTier as SubscriptionTier,
-    status: row.status as SubscriptionStatus,
+    tier,
+    status,
     trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
     currentPeriodStart: row.periodStartAt?.toISOString() ?? null,
     currentPeriodEnd: row.periodEndAt?.toISOString() ?? null,
