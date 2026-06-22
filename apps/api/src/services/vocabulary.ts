@@ -462,19 +462,77 @@ export async function upsertExtractedVocabulary(
     }
   >,
 ): Promise<Vocabulary[]> {
-  const created: Vocabulary[] = [];
+  if (items.length === 0) return [];
 
-  for (const item of items) {
-    const vocabItem = await createVocabulary(db, profileId, subjectId, item);
-    created.push(vocabItem);
-    if (item.quality != null) {
-      await reviewVocabulary(db, profileId, vocabItem.id, {
-        quality: item.quality,
-      });
-    }
-  }
+  // 1. Subject ownership check — once for the whole batch, not per item.
+  await ensureLanguageSubject(db, profileId, subjectId);
 
-  return created;
+  // 2. Milestone ownership — per item, but all checks are reads so they run
+  //    concurrently. Any failure aborts before the insert.
+  await Promise.all(
+    items.map((item) => verifyMilestoneOwnership(db, item.milestoneId, subjectId)),
+  );
+
+  // 3. Batch insert — one DB round-trip for all items instead of N.
+  //    ON CONFLICT preserves existing cefrLevel/milestoneId when the incoming
+  //    value is NULL (same logic as the serial createVocabulary, expressed via
+  //    CASE WHEN excluded.col IS NOT NULL so each row's value is independent).
+  const now = new Date();
+  const rows = await db
+    .insert(vocabulary)
+    .values(
+      items.map((item) => ({
+        profileId,
+        subjectId,
+        term: item.term.trim(),
+        termNormalized: normalizeVocabTerm(item.term),
+        translation: item.translation.trim(),
+        type: item.type,
+        cefrLevel: item.cefrLevel ?? null,
+        milestoneId: item.milestoneId ?? null,
+      })),
+    )
+    .onConflictDoUpdate({
+      target: [
+        vocabulary.profileId,
+        vocabulary.subjectId,
+        vocabulary.termNormalized,
+      ],
+      set: {
+        translation: sql`excluded.translation`,
+        type: sql`excluded.type`,
+        // Preserve existing value when the incoming value is NULL — mirrors the
+        // per-item logic in createVocabulary (input.cefrLevel != null ? ... : keep).
+        cefrLevel: sql`CASE WHEN excluded.cefr_level IS NOT NULL THEN excluded.cefr_level ELSE ${vocabulary.cefrLevel} END`,
+        milestoneId: sql`CASE WHEN excluded.milestone_id IS NOT NULL THEN excluded.milestone_id ELSE ${vocabulary.milestoneId} END`,
+        updatedAt: now,
+      },
+    })
+    .returning();
+
+  // Re-index by normalised term so we can restore INPUT order regardless of
+  // the order Postgres returns rows (Postgres preserves VALUES order for batch
+  // inserts in practice, but this makes the contract explicit and safe).
+  const byNorm = new Map(rows.map((r) => [r.termNormalized, r]));
+  const ordered = items.map((item) => {
+    const row = byNorm.get(normalizeVocabTerm(item.term));
+    if (!row) throw new Error(`Batch insert did not return a row for term "${item.term}"`);
+    return mapVocabularyRow(row);
+  });
+
+  // 4. SM-2 reviews — concurrent (each locks a DIFFERENT vocabularyId row,
+  //    so there is no inter-item contention). Items without quality are skipped.
+  await Promise.all(
+    items.flatMap((item, idx) => {
+      if (item.quality == null) return [];
+      const vocabItem = ordered[idx];
+      if (!vocabItem) return [];
+      const { quality } = item;
+      return [reviewVocabulary(db, profileId, vocabItem.id, { quality })];
+    }),
+  );
+
+  return ordered;
 }
 
 export async function getVocabularyDueForReview(
