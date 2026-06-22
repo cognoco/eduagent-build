@@ -291,6 +291,41 @@ describe('LanguageSetup', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('[WI-950] routes error Cancel back to More when returnTo=settings', async () => {
+    mockReturnTo = 'settings';
+    mockMutateAsync.mockRejectedValue(new Error('save failed'));
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      screen.getByTestId('language-setup-error-cancel');
+    });
+    fireEvent.press(screen.getByTestId('language-setup-error-cancel'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/more',
+    );
+  });
+
+  it('[WI-950] routes error Cancel to Home by default', async () => {
+    mockMutateAsync.mockRejectedValue(new Error('save failed'));
+    render(<LanguageSetup />);
+
+    fireEvent.press(screen.getByTestId('language-setup-continue'));
+
+    await waitFor(() => {
+      screen.getByTestId('language-setup-error-cancel');
+    });
+    fireEvent.press(screen.getByTestId('language-setup-error-cancel'));
+
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/home',
+    );
+  });
+
   it('[BUG-692-FOLLOWUP] router.replace does not fire when user presses Back during configureLanguageSubject', async () => {
     // Arrange: deferred mutation — stays pending until we resolve it.
     let resolveMutation!: (value: { subject: { id: string } }) => void;
