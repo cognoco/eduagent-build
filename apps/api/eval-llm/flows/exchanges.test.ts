@@ -118,6 +118,10 @@ describe('exchangesFlow', () => {
       const s8 = scenarios.find((s) => s.scenarioId === 'S8-casual-freeform');
       expect(s8?.input.context.topicTitle).toBeUndefined();
       expect(s8?.input.context.sessionType).toBe('learning');
+      // Production "ask anything" sends effectiveMode 'freeform'; the scenario
+      // must too, or it renders the generic LEARNING branch instead of the
+      // ASK ANYTHING guidance.
+      expect(s8?.input.context.effectiveMode).toBe('freeform');
     });
 
     it('exchangeHistory substitutes profile-specific tokens', () => {

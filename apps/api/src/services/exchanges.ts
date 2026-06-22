@@ -796,6 +796,27 @@ function isAcknowledgementOnlyTurn(
   );
 }
 
+// A "stuck reaction" is the learner telling you they cannot answer YOUR
+// question — "I don't know", "no idea", "not sure", "I forget". It is a
+// conversational move, not a factual query: there is no claim to ground and
+// no question to quote back. The `$`-anchored clauses deliberately exclude a
+// trailing question ("I don't know why water expands") so a genuine question
+// that merely opens with "I don't know" is NOT swallowed. Mirrors the phrase
+// set in the NO-RECALL RECOVERY prompt block (exchange-prompts.ts).
+const STUCK_REACTION_CLAUSE =
+  /^(i (don't|dont|do not) know( it| that| this| the answer| anything| any of (it|this|that))?|i have no idea|no idea|i'm not sure|i am not sure|not sure|dunno|idk|i forget|i forgot|i (don't|dont|do not|can't|cant|cannot) remember|no clue|not a clue|i give up|beats me)$/;
+
+function isStuckReactionTurn(value: string): boolean {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (!compact) return false;
+  const clauses = compact
+    .split(/[.!?;,]+|\s+-\s+/)
+    .map(normalizeAcknowledgementClause)
+    .filter(Boolean);
+  if (clauses.length === 0 || clauses.length > 2) return false;
+  return clauses.every((clause) => STUCK_REACTION_CLAUSE.test(clause));
+}
+
 function buildUnsupportedFactualReply(
   sourceAudit: ExchangeSourceAudit,
 ): string {
@@ -814,6 +835,18 @@ function buildUnsupportedFactualReply(
   );
   if (isAcknowledgementOnlyTurn(learnerQuestion, hasPriorAssistantTurn)) {
     return "You're welcome. Want to keep going with this, or end here?";
+  }
+
+  // "I don't know" / "not sure" is a reaction to the mentor's question, not a
+  // factual query — there is nothing to source-check and nothing to quote back.
+  // Offer to scaffold instead of demanding a textbook (mirrors NO-RECALL
+  // RECOVERY). Must run before the keyword branches below so a reaction never
+  // falls through into the source-request fallbacks.
+  if (isStuckReactionTurn(learnerQuestion)) {
+    return (
+      'No problem — not being sure is a normal part of learning, not a wrong answer. ' +
+      'Want a small hint to get started, or should I walk you through it step by step?'
+    );
   }
 
   if (/\b(remember|takeaway|summary|recap)\b/.test(lower)) {
@@ -848,9 +881,19 @@ function buildUnsupportedFactualReply(
     );
   }
 
+  // Only quote the learner turn back as "your question" when it actually reads
+  // as one. A non-question turn (a reaction, a bare statement) quoted as
+  // `frame your question: "..."` is nonsensical — fall back to the generic
+  // framing instead. Stuck reactions are already handled above; this guards the
+  // remaining non-question cases.
+  const looksLikeQuestion =
+    /\?/.test(learnerQuestion) ||
+    /^(what|why|how|when|where|who|which|can|could|do|does|did|is|are|was|were|should|would|explain|tell me|help me|give me|describe)\b/i.test(
+      learnerQuestion.trim(),
+    );
   return (
     "I don't have reliable source material for that yet, so I won't invent the facts. " +
-    (learnerQuestion
+    (learnerQuestion && looksLikeQuestion
       ? `What I can safely do now is frame your question: "${learnerQuestion}" `
       : 'What I can safely do now is help frame the question. ') +
     "Share the textbook passage, worksheet, photo, or trusted source, and I'll help turn it into a clear answer with evidence."
