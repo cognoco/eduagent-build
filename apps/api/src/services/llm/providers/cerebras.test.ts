@@ -1,6 +1,7 @@
 import { createCerebrasProvider } from './cerebras';
 import type { ChatMessage, ModelConfig } from '../types';
 import { parseEnvelope } from '../envelope';
+import { normalizeModelRefusal } from './refusal-envelope';
 import { SafetyFilterError } from '../../../errors';
 
 const mockFetch = jest.fn();
@@ -133,6 +134,58 @@ describe('Cerebras Provider', () => {
       const reqBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(reqBody.stream).toBe(true);
       expect(reqBody.reasoning_effort).toBe('high');
+    });
+
+    it('rewrites a bare {"type":"refusal"} stream into the localized safe envelope', async () => {
+      // gpt-oss occasionally emits its native refusal shape mid-stream instead
+      // of our envelope. Without normalization the bare object fails the
+      // downstream parseEnvelope and the learner hits DEFAULT_FALLBACK_TEXT in
+      // English. The streaming path must localize the decline by
+      // conversationLanguage just like chat() does.
+      const body = sse(
+        'data: {"choices":[{"delta":{"content":"{\\"type\\":"}}]}',
+        'data: {"choices":[{"delta":{"content":"\\"refusal\\"}"}}]}',
+        'data: [DONE]',
+      );
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+      let streamed = '';
+      for await (const chunk of provider.chatStream(MESSAGES, {
+        ...CFG,
+        conversationLanguage: 'pl',
+      })) {
+        streamed += chunk;
+      }
+
+      // The emitted content must be a parseable envelope (not the bare refusal).
+      const parsed = parseEnvelope(streamed);
+      expect(parsed.ok).toBe(true);
+      if (!parsed.ok) throw new Error('expected a parseable envelope');
+      // And it must be the Polish decline, not the English one.
+      const plReply = parsed.envelope.reply;
+      const enReply = normalizeModelRefusal('{"type":"refusal"}', 'en');
+      const enParsed = parseEnvelope(enReply!);
+      if (!enParsed.ok) throw new Error('expected parseable English envelope');
+      expect(plReply).not.toBe(enParsed.envelope.reply);
+      expect(plReply.length).toBeGreaterThan(0);
+    });
+
+    it('passes a normal streamed envelope through unchanged (no buffering regression)', async () => {
+      const body = sse(
+        'data: {"choices":[{"delta":{"content":"{\\"reply\\":\\"Hel"}}]}',
+        'data: {"choices":[{"delta":{"content":"lo\\",\\"signals\\":{}}"}}]}',
+        'data: [DONE]',
+      );
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
+
+      let streamed = '';
+      for await (const chunk of provider.chatStream(MESSAGES, {
+        ...CFG,
+        conversationLanguage: 'pl',
+      })) {
+        streamed += chunk;
+      }
+      expect(streamed).toBe('{"reply":"Hello","signals":{}}');
     });
 
     it('throws SafetyFilterError when the stream finishes with content_filter', async () => {
