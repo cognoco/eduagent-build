@@ -134,6 +134,8 @@ const mockGetEffectiveAccessForSubscription = jest.fn();
 const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockLinkStripeCustomer = jest.fn();
+// [BUG-827] Race-safe customer resolver — the new mocked service boundary.
+const mockGetOrCreateStripeCustomer = jest.fn();
 const mockAddToByokWaitlist = jest.fn().mockResolvedValue(undefined);
 const mockMarkSubscriptionCancelled = jest.fn().mockResolvedValue(undefined);
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
@@ -171,6 +173,8 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       mockGetOrProvisionProfileQuotaUsage(...args),
     getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
     linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
+    getOrCreateStripeCustomer: (...args: unknown[]) =>
+      mockGetOrCreateStripeCustomer(...args),
     addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
     markSubscriptionCancelled: (...args: unknown[]) =>
       mockMarkSubscriptionCancelled(...args),
@@ -367,6 +371,9 @@ beforeEach(() => {
   mockGetOrProvisionProfileQuotaUsage.mockResolvedValue(mockProfileQuota());
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
+  // Default: resolve to a freshly-created customer id. Tests asserting the
+  // already-linked path override this with the existing id.
+  mockGetOrCreateStripeCustomer.mockResolvedValue('cus_new');
   mockReadSubscriptionStatus.mockResolvedValue(null);
   mockCaptureException.mockReset();
   mockListFamilyMembers.mockResolvedValue([]);
@@ -524,6 +531,9 @@ describe('billing routes', () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
         mockSubscription({ stripeCustomerId: 'cus_existing' }),
       );
+      // [BUG-827] The route resolves the customer via the race-safe service;
+      // here it already exists, so the resolver returns the linked id.
+      mockGetOrCreateStripeCustomer.mockResolvedValue('cus_existing');
       mockCheckoutCreate.mockResolvedValue({
         url: 'https://checkout.stripe.com/session_123',
         id: 'cs_test_123',
@@ -544,13 +554,19 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.checkoutUrl).toBe('https://checkout.stripe.com/session_123');
       expect(body.sessionId).toBe('cs_test_123');
+      // The checkout session is bound to the resolved customer.
+      expect(mockCheckoutCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: 'cus_existing' }),
+      );
     });
 
-    it('creates a new Stripe customer if none exists', async () => {
+    it('[BUG-827] resolves the Stripe customer race-safely before checkout', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
         mockSubscription({ stripeCustomerId: null }),
       );
-      mockCustomersCreate.mockResolvedValue({ id: 'cus_new' });
+      // The race-safe resolver creates+links exactly one customer (asserted at
+      // the service level in subscription-core.test.ts) and returns its id.
+      mockGetOrCreateStripeCustomer.mockResolvedValue('cus_new');
       mockCheckoutCreate.mockResolvedValue({
         url: 'https://checkout.stripe.com/new_session',
         id: 'cs_test_new',
@@ -567,13 +583,18 @@ describe('billing routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockCustomersCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ email: 'test@example.com' }),
-      );
-      expect(mockLinkStripeCustomer).toHaveBeenCalledWith(
+      // The route delegates customer resolution to the race-safe service,
+      // passing the account id and the account email — never a raw inline
+      // customers.create + link (the TOCTOU race that orphaned customers).
+      expect(mockGetOrCreateStripeCustomer).toHaveBeenCalledWith(
         mockDatabaseModule.db,
         'test-account-id',
-        'cus_new',
+        expect.anything(),
+        expect.objectContaining({ email: 'test@example.com' }),
+      );
+      // The checkout session binds to the resolved customer.
+      expect(mockCheckoutCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: 'cus_new' }),
       );
     });
 
@@ -756,6 +777,8 @@ describe('billing routes', () => {
   describe('POST /v1/subscription/top-up', () => {
     it('creates a Stripe payment intent for top-up', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      // [BUG-827] Customer resolution goes through the race-safe service.
+      mockGetOrCreateStripeCustomer.mockResolvedValue('cus_test123');
       mockPaymentIntentsCreate.mockResolvedValue({
         client_secret: 'pi_secret_test',
         id: 'pi_test_123',
@@ -777,6 +800,11 @@ describe('billing routes', () => {
       expect(body.topUp.amount).toBe(500);
       expect(body.topUp.clientSecret).toBe('pi_secret_test');
       expect(body.topUp.paymentIntentId).toBe('pi_test_123');
+      // The payment intent is charged against the race-safely resolved customer.
+      expect(mockGetOrCreateStripeCustomer).toHaveBeenCalled();
+      expect(mockPaymentIntentsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: 'cus_test123' }),
+      );
     });
 
     it('returns 400 with invalid amount', async () => {

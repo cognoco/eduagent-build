@@ -413,10 +413,15 @@ describe('Integration: billing lifecycle routes', () => {
     expect(body.checkoutUrl).toBe('https://stripe.test/checkout');
     expect(body.sessionId).toBe('cs_checkout');
 
-    expect(mockCustomersCreate).toHaveBeenCalledWith({
-      email: AUTH_EMAIL,
-      metadata: { accountId: account.id },
-    });
+    // [BUG-827] customers.create now carries a stable per-account idempotency
+    // key (second arg) so concurrent creates dedupe to one Stripe customer.
+    expect(mockCustomersCreate).toHaveBeenCalledWith(
+      {
+        email: AUTH_EMAIL,
+        metadata: { accountId: account.id },
+      },
+      { idempotencyKey: `customer-create-${account.id}` },
+    );
     expect(mockCheckoutCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         customer: 'cus_checkout',
