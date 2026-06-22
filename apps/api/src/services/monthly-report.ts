@@ -69,13 +69,20 @@ export function generateMonthlyReportData(
     lastMonth?.totalSessions,
   );
 
+  // [WI-922] The headline `value` is a per-month DELTA (e.g. vocabularyDelta).
+  // The comparison copy must describe that SAME delta — pairing a delta value
+  // with a prior CUMULATIVE total ("12 words / up from 340 last month") is
+  // self-contradictory. We only have this month + last month here (not the
+  // month-before-last), so a true delta-vs-delta comparison isn't computable;
+  // the truthful, consistent basis is to restate the delta as "N new this
+  // month". First-month copy (no previous month) is unchanged.
   const headlineMode =
     vocabularyDelta > topicsMasteredDelta
       ? {
           label: 'Words learned',
           value: vocabularyDelta,
           comparison: lastMonth
-            ? `up from ${lastMonth.vocabularyTotal} last month`
+            ? `${vocabularyDelta} new this month`
             : 'in a first month',
         }
       : topicsExploredDelta > topicsMasteredDelta
@@ -83,16 +90,14 @@ export function generateMonthlyReportData(
             label: 'Topics explored',
             value: topicsExploredDelta,
             comparison: lastMonth
-              ? `up from ${subjectExploredTotal(
-                  lastMonth,
-                )} total topics before this month`
+              ? `${topicsExploredDelta} new this month`
               : 'in a first month',
           }
         : {
             label: 'Topics mastered',
             value: topicsMasteredDelta,
             comparison: lastMonth
-              ? `up from ${lastMonth.topicsMastered} last month`
+              ? `${topicsMasteredDelta} new this month`
               : 'in a first month',
           };
 
