@@ -45,8 +45,10 @@ import {
   findSubscriptionByStripeIdV2__unscoped,
   findSubscriptionByStripeCustomerIdV2__unscoped,
   findQuotaPool__unscoped,
+  lockSubscriptionByOrganizationId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import type { StripeCustomerCreator } from '../subscription-core';
 import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -450,6 +452,61 @@ export async function linkStripeCustomerV2(
   if (!updated)
     throw new Error('Stripe customer link update did not return a row');
   return mapSubscriptionV2Row(updated);
+}
+
+// ---------------------------------------------------------------------------
+// getOrCreateStripeCustomerV2
+// ---------------------------------------------------------------------------
+
+/**
+ * [BUG-827] v2 twin of getOrCreateStripeCustomer. Same TOCTOU fix (row lock +
+ * re-check + idempotency-keyed create), against the organization-keyed
+ * `subscription` table. See the legacy doc comment in subscription-core.ts for
+ * the full rationale. Reachable only under IDENTITY_V2_ENABLED.
+ */
+export async function getOrCreateStripeCustomerV2(
+  db: Database,
+  organizationId: string,
+  stripe: StripeCustomerCreator,
+  params: { email: string },
+): Promise<string> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    // safe-caller: billing route — organizationId === account.id resolved from
+    // the authenticated owner account under the cutover flag.
+    const locked = await lockSubscriptionByOrganizationId__unscoped(
+      txDb,
+      organizationId,
+    );
+    if (!locked) {
+      throw new Error(
+        'getOrCreateStripeCustomerV2: no subscription row for organization',
+      );
+    }
+
+    if (locked.stripeCustomerId) {
+      return locked.stripeCustomerId;
+    }
+
+    const customer = await stripe.customers.create(
+      {
+        email: params.email,
+        metadata: { accountId: organizationId },
+      },
+      { idempotencyKey: `customer-create-${organizationId}` },
+    );
+
+    const [updated] = await tx
+      .update(subscriptionTable)
+      .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+      .where(eq(subscriptionTable.id, locked.id))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Stripe customer link update did not return a row');
+    }
+    return customer.id;
+  });
 }
 
 // ---------------------------------------------------------------------------

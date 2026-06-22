@@ -15,6 +15,7 @@ import {
   findSubscriptionByStripeId__unscoped,
   findSubscriptionByStripeCustomerId__unscoped,
   findQuotaPool__unscoped,
+  lockSubscriptionByAccountId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
@@ -347,6 +348,107 @@ export async function linkStripeCustomer(
   if (!updated)
     throw new Error('Stripe customer link update did not return a row');
   return mapSubscriptionRow(updated);
+}
+
+// ---------------------------------------------------------------------------
+// getOrCreateStripeCustomer
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal structural slice of the Stripe SDK this service needs: the ability to
+ * create a customer (with an idempotency-key option). Declared locally so the
+ * service does not put the full `Stripe` SDK type in its public signature, and
+ * so route callers can pass the real `stripe.customers.create` directly (its
+ * type is assignable to this).
+ */
+export interface StripeCustomerCreator {
+  customers: {
+    create: (
+      params: { email?: string; metadata?: Record<string, string> },
+      options?: { idempotencyKey?: string },
+    ) => Promise<{ id: string }>;
+  };
+}
+
+/**
+ * Resolves the Stripe customer for an account, creating one if absent — race-safe.
+ *
+ * [BUG-827] TOCTOU race: the previous inline route logic did
+ * read-subscription → if no `stripeCustomerId`, `stripe.customers.create` →
+ * `linkStripeCustomer`. Two concurrent billing requests for the same account
+ * (e.g. /checkout + /top-up, or a double-tapped /checkout) both observed "no
+ * customer", both created a Stripe customer, and one became an orphaned,
+ * unlinked duplicate customer in Stripe (the second link UPDATE overwrote the
+ * first). Orphan customers are a real-money/data hazard and silently inflate the
+ * Stripe customer list.
+ *
+ * Fix (two independent guards):
+ *   1. Row lock. The whole resolve-create-link runs inside a `db.transaction`
+ *      that opens with `SELECT … FOR UPDATE` on the account's subscription row
+ *      (`lockSubscriptionByAccountId__unscoped`). The second concurrent request
+ *      blocks on the lock until the first commits, then re-reads the row and
+ *      sees the now-linked `stripeCustomerId` — so it never calls
+ *      `customers.create` at all. This serializes within a single Postgres.
+ *   2. Idempotency key. The `customers.create` call carries a stable
+ *      idempotency key derived from the accountId, so even across separate
+ *      Worker isolates / connections that don't share the row lock, two creates
+ *      with the same key return the SAME Stripe customer rather than two — no
+ *      orphan. (Stripe idempotency keys live 24h, which covers any concurrent
+ *      burst; after linking we never call create again.)
+ *
+ * The row lock is deliberately held across the Stripe HTTP call. The general
+ * rule is to avoid external calls inside a held lock, but this is the dormant,
+ * low-concurrency web-billing path and correctness (no orphan customer) is worth
+ * the brief connection pin; the lock is what guarantees the loser skips the
+ * create entirely.
+ *
+ * Returns the resolved Stripe customer id. Throws if the account has no
+ * subscription row (callers must `ensureFreeSubscription` first, as the routes
+ * already do).
+ */
+export async function getOrCreateStripeCustomer(
+  db: Database,
+  accountId: string,
+  stripe: StripeCustomerCreator,
+  params: { email: string },
+): Promise<string> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    // safe-caller: billing route — accountId resolved from the authenticated
+    // owner account (requireAccount + assertNotProxyMode upstream).
+    const locked = await lockSubscriptionByAccountId__unscoped(txDb, accountId);
+    if (!locked) {
+      throw new Error(
+        'getOrCreateStripeCustomer: no subscription row for account',
+      );
+    }
+
+    // Re-check under the lock. If a concurrent request already created and
+    // linked a customer, return it without touching Stripe.
+    if (locked.stripeCustomerId) {
+      return locked.stripeCustomerId;
+    }
+
+    const customer = await stripe.customers.create(
+      {
+        email: params.email,
+        metadata: { accountId },
+      },
+      // Stable per-account key so concurrent creates dedupe to one customer.
+      { idempotencyKey: `customer-create-${accountId}` },
+    );
+
+    const [updated] = await tx
+      .update(subscriptions)
+      .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+      .where(eq(subscriptions.id, locked.id))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Stripe customer link update did not return a row');
+    }
+    return customer.id;
+  });
 }
 
 // ---------------------------------------------------------------------------

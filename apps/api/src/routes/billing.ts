@@ -26,7 +26,7 @@ import type { ClerkIdentity } from '../middleware/account';
 import {
   getSubscriptionByAccountId,
   getQuotaPool,
-  linkStripeCustomer,
+  getOrCreateStripeCustomer,
   addToByokWaitlist,
   ensureFreeSubscription,
   markSubscriptionCancelled,
@@ -51,7 +51,7 @@ import {
 import {
   getSubscriptionByAccountIdV2,
   getQuotaPoolV2,
-  linkStripeCustomerV2,
+  getOrCreateStripeCustomerV2,
   ensureFreeSubscriptionV2,
   markSubscriptionCancelledV2,
   getEffectiveAccessForSubscriptionV2,
@@ -269,24 +269,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         await ensureFreeSubscription(db, account.id);
       }
 
-      // Resolve or create Stripe customer
-      const subscription = v2
-        ? await getSubscriptionByAccountIdV2(db, account.id)
-        : await getSubscriptionByAccountId(db, account.id);
-      let customerId = subscription?.stripeCustomerId;
-
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: account.email,
-          metadata: { accountId: account.id },
-        });
-        customerId = customer.id;
-        if (v2) {
-          await linkStripeCustomerV2(db, account.id, customerId);
-        } else {
-          await linkStripeCustomer(db, account.id, customerId);
-        }
-      }
+      // [BUG-827] Resolve or create the Stripe customer race-safely. The
+      // previous inline read-then-create-then-link was a TOCTOU race: two
+      // concurrent billing requests both saw "no customer" and both created
+      // one, orphaning a duplicate in Stripe. getOrCreateStripeCustomer*
+      // serializes this under a row lock + idempotency key inside a txn.
+      const customerId = v2
+        ? await getOrCreateStripeCustomerV2(db, account.id, stripe, {
+            email: account.email,
+          })
+        : await getOrCreateStripeCustomer(db, account.id, stripe, {
+            email: account.email,
+          });
 
       // [BUG-101 / A1-LOW] Fail loudly instead of silently redirecting to
       // production. Previously a missing APP_URL on staging would route the
@@ -454,21 +448,17 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
       const stripe = createStripeClient(stripeKey);
 
-      // Resolve Stripe customer
-      let customerId = subscription?.stripeCustomerId;
-
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: account.email,
-          metadata: { accountId: account.id },
-        });
-        customerId = customer.id;
-        if (v2) {
-          await linkStripeCustomerV2(db, account.id, customerId);
-        } else {
-          await linkStripeCustomer(db, account.id, customerId);
-        }
-      }
+      // [BUG-827] Resolve or create the Stripe customer race-safely (see the
+      // /checkout handler above and getOrCreateStripeCustomer's doc comment).
+      // A concurrent /checkout + /top-up for the same account previously raced
+      // to create two customers; this serializes them under a row lock.
+      const customerId = v2
+        ? await getOrCreateStripeCustomerV2(db, account.id, stripe, {
+            email: account.email,
+          })
+        : await getOrCreateStripeCustomer(db, account.id, stripe, {
+            email: account.email,
+          });
 
       // Tier-based pricing: Plus EUR10/500, Family/Pro EUR5/500
       const paymentIntent = await stripe.paymentIntents.create({
