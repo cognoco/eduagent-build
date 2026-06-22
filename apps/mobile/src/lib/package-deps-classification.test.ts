@@ -30,7 +30,14 @@ const pkg = JSON.parse(
 const rootLockfile = parse(
   readFileSync(resolve(__dirname, '../../../../pnpm-lock.yaml'), 'utf8'),
 ) as {
+  packages?: Record<string, unknown>;
   snapshots?: Record<string, { dependencies?: Record<string, string> }>;
+};
+
+const rootPkg = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../../package.json'), 'utf8'),
+) as {
+  pnpm?: { overrides?: Record<string, string> };
 };
 
 const BUILD_ONLY_DEPS = [
@@ -101,6 +108,40 @@ describe('mobile Clerk dependency security floor [WI-909]', () => {
         sharedVersion: expect.stringMatching(/^\d+\.\d+\.\d+/),
       });
       expect(isAtLeast(snapshot.sharedVersion ?? '', '3.47.4')).toBe(true);
+    }
+  });
+});
+
+describe('workspace protobufjs dependency security floor [WI-1029]', () => {
+  it('uses parent-scoped overrides for vulnerable OpenTelemetry protobufjs paths', () => {
+    expect(rootPkg.pnpm?.overrides).toEqual(
+      expect.objectContaining({
+        '@opentelemetry/otlp-transformer>protobufjs': '8.6.4',
+        '@grpc/proto-loader>protobufjs': '7.6.4',
+      }),
+    );
+  });
+
+  it('lockfile no longer resolves vulnerable protobufjs versions', () => {
+    const packageKeys = Object.keys(rootLockfile.packages ?? {});
+
+    expect(packageKeys).not.toContain('protobufjs@8.0.1');
+    expect(packageKeys).not.toContain('protobufjs@7.5.6');
+    expect(packageKeys).toContain('protobufjs@8.6.4');
+    expect(packageKeys).toContain('protobufjs@7.6.4');
+  });
+
+  it('OpenTelemetry and gRPC snapshots resolve patched protobufjs versions', () => {
+    const snapshots = rootLockfile.snapshots ?? {};
+
+    for (const [key, snapshot] of Object.entries(snapshots)) {
+      if (key.startsWith('@opentelemetry/otlp-transformer@')) {
+        expect(snapshot.dependencies?.protobufjs).toBe('8.6.4');
+      }
+
+      if (key.startsWith('@grpc/proto-loader@')) {
+        expect(snapshot.dependencies?.protobufjs).toBe('7.6.4');
+      }
     }
   });
 });
