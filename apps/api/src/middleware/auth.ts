@@ -8,6 +8,14 @@ import { createLogger } from '../services/logger';
 
 const logger = createLogger();
 
+// [BUG-902] Max age (seconds) accepted for a Clerk session token, measured from
+// its `iat`. Clerk rotates session tokens every ~1 min; this 10-minute ceiling
+// gives generous headroom over that TTL (clock skew, refresh races) while
+// bounding how long a leaked-but-unexpired token can be replayed. Passed
+// explicitly to verifyJWT so the generic 24h default (for arbitrary IdPs) does
+// not apply to the Clerk auth path.
+const CLERK_TOKEN_MAX_AGE_SEC = 10 * 60; // 10 minutes
+
 // ---------------------------------------------------------------------------
 // JWT claims schema
 // ---------------------------------------------------------------------------
@@ -131,7 +139,18 @@ async function verifyClerkJWT(
 
   // Verify signature and validate claims (issuer + audience)
   const issuer = deriveIssuerFromJwksUrl(jwksUrl);
-  const rawPayload = await verifyJWT(token, jwk, { issuer, audience });
+  // [BUG-902] Tighten the iat max-age ceiling for Clerk tokens. The generic
+  // verifyJWT default is 24h (a conservative bound for arbitrary IdPs), but
+  // Clerk rotates session tokens every ~1 min, so a leaked-but-unexpired token
+  // should never be accepted for anywhere near 24h. 10 minutes leaves ample
+  // headroom over the ~1 min TTL (clock skew, refresh races) while shrinking the
+  // leaked-token acceptance window ~144x. This is defense-in-depth on top of the
+  // exp check — a legitimate Clerk token (iat ≈ now) always passes.
+  const rawPayload = await verifyJWT(token, jwk, {
+    issuer,
+    audience,
+    maxAgeSec: CLERK_TOKEN_MAX_AGE_SEC,
+  });
 
   // [F-021] Runtime validation at the JWT trust boundary. verifyJWT returns a
   // JSON.parse cast; sub/email may be absent or wrong type in a malformed token.
