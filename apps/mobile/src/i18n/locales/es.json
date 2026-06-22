@@ -37,7 +37,8 @@
     "goBackAction": "Volver",
     "tryAgainAction": "Intentar de nuevo",
     "dismiss": "Descartar",
-    "pleaseTryAgain": "Inténtalo de nuevo."
+    "pleaseTryAgain": "Inténtalo de nuevo.",
+    "mentorImageAlt": "Tu mentor"
   },
   "quota": {
     "parent": {
