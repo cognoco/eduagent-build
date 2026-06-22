@@ -1,8 +1,8 @@
 /**
  * recall-nudge-send — integration test (real database)
  *
- * [BUG-900] The unit test (recall-nudge-send.test.ts) used to
- * `jest.mock('drizzle-orm')` + `jest.mock('@eduagent/database')`, so the real
+ * [BUG-900] The unit test (recall-nudge-send.test.ts) used to mock the
+ * `drizzle-orm` and `@eduagent/database` modules, so the real
  * parent-chain join (curriculumTopics → curriculumBooks → curricula → subjects)
  * and its `eq(subjects.profileId, profileId)` ownership filter NEVER executed —
  * a scoping bug that leaked Profile B's topic *title* into Profile A's recall
