@@ -25,6 +25,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import {
   generateUUIDv7,
   subscription as subscriptionTable,
+  subscriptions,
   quotaPools,
   topUpCredits,
   webhookIdempotencyKeys,
@@ -50,6 +51,9 @@ import {
 } from './index';
 import {
   ensureV2IdentityForLegacyProfileTest,
+  ensureLegacyProfileAnchorForTest,
+  deleteLegacyAccountsForTest,
+  legacyIdentityTableExistsForTest,
   deleteV2IdentitiesForTest,
 } from '../../../test-utils/legacy-identity-anchors';
 
@@ -87,6 +91,21 @@ async function seedSurvivorIdentity(suffix: string, clerkUserId: string) {
   seededProfileIds.push(profileId);
 
   await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: organizationId,
+    profileId,
+    clerkUserId,
+    email: `${PREFIX}-${suffix}@integration.test`,
+    displayName: `AliasMergeV2 ${suffix}`,
+    birthYear: 1990,
+    isOwner: true,
+  });
+
+  // createSubscriptionV2 dual-writes a legacy `subscriptions` parent row
+  // (account_id → accounts) whenever the pre-cutover legacy tables still exist
+  // (true in CI; the legacy tables are not yet dropped). Seed the legacy
+  // accounts/profiles anchor so that FK resolves. Table-guarded inside the
+  // helper, so this is a no-op against the identity-only stg DB.
+  await ensureLegacyProfileAnchorForTest(db, {
     accountId: organizationId,
     profileId,
     clerkUserId,
@@ -159,11 +178,21 @@ async function cleanup() {
         .delete(quotaPools)
         .where(inArray(quotaPools.subscriptionId, subIds));
     }
+    // Remove the legacy `subscriptions` parent rows createSubscriptionV2 writes
+    // when the pre-cutover legacy tables still exist (CI), before the accounts
+    // rows they FK to. Table-guarded → no-op on the identity-only stg DB.
+    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+      await db
+        .delete(subscriptions)
+        .where(inArray(subscriptions.accountId, orgIds));
+    }
     // Removes the v2 subscription rows (by organization) AND the v2 identities.
     await deleteV2IdentitiesForTest(db, {
       accountIds: orgIds,
       profileIds: [...new Set(seededProfileIds)],
     });
+    // Remove the legacy accounts/profiles anchor (table-guarded; no-op on stg).
+    await deleteLegacyAccountsForTest(db, orgIds);
   }
   const events = [...new Set(seededEventIds)];
   for (const eventId of events) {
