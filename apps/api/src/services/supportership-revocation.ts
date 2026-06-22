@@ -46,42 +46,46 @@ export async function requestSelfUnlink(
     throw new ForbiddenError('Only the supportee can end this support link.');
   }
 
-  await db
-    .update(supportership)
-    .set({ revokedAt: now, updatedAt: now })
-    .where(eq(supportership.id, input.supportershipId));
-
-  if (row.contract) {
-    await db
-      .update(supportVisibilityContracts)
-      .set({ status: 'revoked', updatedAt: now })
-      .where(eq(supportVisibilityContracts.id, row.contract.id));
-  }
-
   const graceEndsAt = new Date(
     now.getTime() + SUPPORTERSHIP_GRACE_DAYS * 24 * 60 * 60 * 1000,
   );
-  await writeVisibilityAuditEvent(db, {
-    supportershipId: row.edge.id,
-    contractId: row.contract?.id,
-    actorPersonId: input.callerPersonId,
-    eventType: 'supportership_revoked',
-    payload: {
-      revokedAt: now.toISOString(),
-      graceEndsAt: graceEndsAt.toISOString(),
-    },
-  });
-  await createVisibilityNotice(db, {
-    supportershipId: row.edge.id,
-    contractId: row.contract?.id,
-    noticeType: 'support_link_ended',
-    targetAudience: 'supporter',
-    targetPersonId: row.edge.supporterPersonId,
-    payload: {
-      supporteePersonId: row.edge.supporteePersonId,
-      revokedAt: now.toISOString(),
-      graceEndsAt: graceEndsAt.toISOString(),
-    },
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+
+    await tx
+      .update(supportership)
+      .set({ revokedAt: now, updatedAt: now })
+      .where(eq(supportership.id, input.supportershipId));
+
+    if (row.contract) {
+      await tx
+        .update(supportVisibilityContracts)
+        .set({ status: 'revoked', updatedAt: now })
+        .where(eq(supportVisibilityContracts.id, row.contract.id));
+    }
+
+    await writeVisibilityAuditEvent(txDb, {
+      supportershipId: row.edge.id,
+      contractId: row.contract?.id,
+      actorPersonId: input.callerPersonId,
+      eventType: 'supportership_revoked',
+      payload: {
+        revokedAt: now.toISOString(),
+        graceEndsAt: graceEndsAt.toISOString(),
+      },
+    });
+    await createVisibilityNotice(txDb, {
+      supportershipId: row.edge.id,
+      contractId: row.contract?.id,
+      noticeType: 'support_link_ended',
+      targetAudience: 'supporter',
+      targetPersonId: row.edge.supporterPersonId,
+      payload: {
+        supporteePersonId: row.edge.supporteePersonId,
+        revokedAt: now.toISOString(),
+        graceEndsAt: graceEndsAt.toISOString(),
+      },
+    });
   });
 
   return {
