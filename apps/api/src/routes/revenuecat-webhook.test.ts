@@ -48,6 +48,10 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       revenuecatTransactionId: 'txn_test_123',
       createdAt: new Date().toISOString(),
     }),
+    // [BUG-783] handleSubscriberAlias snapshots the from-side top-up balance
+    // before downgrade; the real reader does a db.select aggregate the route's
+    // mockDb does not model, so stub it on the existing pattern-a seam.
+    getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
   };
 });
 
@@ -1545,12 +1549,13 @@ describe('SUBSCRIBER_ALIAS', () => {
     }
   });
 
-  // [BUG-449] BREAK TEST: when SUBSCRIBER_ALIAS arrives and transferred_from
-  // has an existing subscription, captureException MUST be called with the
-  // high-severity tag (revenuecat.alias.unhandled), and safeSend MUST be
-  // called to dispatch the app/billing.alias_received event. Pre-fix,
-  // handleSubscriberAlias only logged — silent revenue loss.
-  it('[BUG-449] calls captureException with high-severity tag when transferred_from has subscription', async () => {
+  // [BUG-449 / BUG-783] When SUBSCRIBER_ALIAS arrives and transferred_from has
+  // an existing subscription, the handler emits a queryable breadcrumb
+  // (captureMessage, tag revenuecat.alias.merge_dispatched — no longer the
+  // high-severity "merge not implemented" alert, since the billing-alias-merge
+  // worker now handles it) AND safeSends app/billing.alias_received carrying
+  // the pre-downgrade fromSnapshot the worker reconciles from.
+  it('[BUG-449 / BUG-783] dispatches the alias merge with a pre-downgrade snapshot when transferred_from has subscription', async () => {
     // transferred_from user has an existing subscription
     (findAccountByClerkId as jest.Mock).mockImplementation(
       (_db: unknown, userId: string) => {
@@ -1580,7 +1585,7 @@ describe('SUBSCRIBER_ALIAS', () => {
       },
     );
 
-    mockCaptureException.mockClear();
+    mockCaptureMessage.mockClear();
     mockSafeSend.mockClear();
 
     const res = await makeRequest(
@@ -1592,28 +1597,48 @@ describe('SUBSCRIBER_ALIAS', () => {
     );
     expect(res.status).toBe(200);
 
-    // captureException must be called with the high-severity alias tag
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
+    // captureMessage must be called with the merge-dispatched breadcrumb tag
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('SUBSCRIBER_ALIAS'),
       expect.objectContaining({
         extra: expect.objectContaining({
-          tag: 'revenuecat.alias.unhandled',
-          severity: 'high',
+          tag: 'revenuecat.alias.merge_dispatched',
           fromAppUserId: 'old_clerk_user',
         }),
       }),
     );
 
-    // safeSend must be called to dispatch the alias_received event
+    // safeSend must dispatch the alias_received event with the pre-downgrade
+    // snapshot the worker reconciles from.
     expect(mockSafeSend).toHaveBeenCalledWith(
       expect.any(Function),
       'revenuecat.alias_received',
       expect.objectContaining({ fromAppUserId: 'old_clerk_user' }),
     );
+    // The dispatched payload (first arg is a thunk returning inngest.send(...))
+    // must carry fromSnapshot with the pre-downgrade tier.
+    const sendThunk =
+      (mockSafeSend.mock.calls[0]?.[0] as () => unknown) ?? null;
+    expect(sendThunk).toBeInstanceOf(Function);
+    await sendThunk?.();
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/billing.alias_received',
+        data: expect.objectContaining({
+          fromAppUserId: 'old_clerk_user',
+          toAppUserId: 'new_clerk_user',
+          fromSnapshot: expect.objectContaining({
+            tier: 'plus',
+            status: 'active',
+            topUpRemaining: 0,
+          }),
+        }),
+      }),
+    );
   });
 
   it('[BUG-449] does NOT escalate when transferred_from is anonymous ($RCAnonymousID)', async () => {
-    mockCaptureException.mockClear();
+    mockCaptureMessage.mockClear();
     mockSafeSend.mockClear();
 
     const res = await makeRequest(
@@ -1625,11 +1650,13 @@ describe('SUBSCRIBER_ALIAS', () => {
     );
     expect(res.status).toBe(200);
 
-    // Anonymous transferred_from — no subscription can exist there, no escalation
-    expect(mockCaptureException).not.toHaveBeenCalledWith(
-      expect.any(Error),
+    // Anonymous transferred_from — no subscription can exist there, no merge dispatch
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      expect.any(String),
       expect.objectContaining({
-        extra: expect.objectContaining({ tag: 'revenuecat.alias.unhandled' }),
+        extra: expect.objectContaining({
+          tag: 'revenuecat.alias.merge_dispatched',
+        }),
       }),
     );
     expect(mockSafeSend).not.toHaveBeenCalled();
@@ -1655,7 +1682,7 @@ describe('SUBSCRIBER_ALIAS', () => {
       },
     );
 
-    mockCaptureException.mockClear();
+    mockCaptureMessage.mockClear();
     mockSafeSend.mockClear();
 
     const res = await makeRequest(
@@ -1667,10 +1694,12 @@ describe('SUBSCRIBER_ALIAS', () => {
     );
     expect(res.status).toBe(200);
     expect(mockSafeSend).not.toHaveBeenCalled();
-    expect(mockCaptureException).not.toHaveBeenCalledWith(
-      expect.any(Error),
+    expect(mockCaptureMessage).not.toHaveBeenCalledWith(
+      expect.any(String),
       expect.objectContaining({
-        extra: expect.objectContaining({ tag: 'revenuecat.alias.unhandled' }),
+        extra: expect.objectContaining({
+          tag: 'revenuecat.alias.merge_dispatched',
+        }),
       }),
     );
   });

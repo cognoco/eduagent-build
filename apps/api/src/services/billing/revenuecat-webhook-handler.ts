@@ -27,6 +27,7 @@ import {
   activateSubscriptionFromRevenuecat,
   transitionToExtendedTrialFromRevenuecatEvent,
   purchaseTopUpCredits,
+  getTopUpCreditsRemaining,
   type AppliedSubscriptionRow,
 } from '../billing';
 import { findAccountByClerkId } from '../account';
@@ -646,6 +647,19 @@ export async function handleSubscriberAlias(
       const fromSub = await getSubscriptionByAccountId(db, fromAccount.id);
       if (!fromSub) continue;
 
+      // [BUG-783] Capture the PRE-DOWNGRADE entitlement snapshot. The BUG-833
+      // downgrade below force-resets the from-side to free/expired, so the
+      // alias-merge worker can no longer re-read the original tier/credits —
+      // it must reconcile the survivor from this snapshot.
+      const fromTopUpRemaining = await getTopUpCreditsRemaining(db, fromSub.id);
+      const fromSnapshot = {
+        tier: fromSub.tier,
+        status: fromSub.status,
+        currentPeriodEnd: fromSub.currentPeriodEnd,
+        trialEndsAt: fromSub.trialEndsAt,
+        topUpRemaining: fromTopUpRemaining,
+      };
+
       // [BUG-833] Strict downgrade of the transferred_from subscription.
       // Without this, after RC merges two subscriber records, the
       // transferred_from account still has status='active' + a paid tier
@@ -687,16 +701,20 @@ export async function handleSubscriberAlias(
         );
       }
 
-      // A subscription exists on the transferred_from identity — this is the
-      // revenue-loss scenario. Escalate immediately.
-      captureException(
-        new Error(
-          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
-        ),
+      // [BUG-783] A subscription existed on the transferred_from identity —
+      // the revenue-loss scenario. This is now HANDLED: we dispatch
+      // app/billing.alias_received (below) and the billing-alias-merge worker
+      // (services/billing/alias-merge.ts) reconciles the survivor atomically
+      // and idempotently. Emit a queryable breadcrumb (no longer the
+      // high-severity "merge not implemented" alert) so ops can still audit
+      // alias merges; the worker's own Sentry escalations cover the
+      // unrecoverable branches (no surviving subscription, both-active-paid).
+      captureMessage(
+        '[revenuecat] SUBSCRIBER_ALIAS: transferred_from had an active subscription — dispatching alias merge',
         {
+          level: 'info',
           extra: {
-            tag: 'revenuecat.alias.unhandled',
-            severity: 'high',
+            tag: 'revenuecat.alias.merge_dispatched',
             eventId: event.id,
             fromAppUserId: fromUserId,
             toAppUserId: event.app_user_id,
@@ -707,24 +725,17 @@ export async function handleSubscriberAlias(
         },
       );
 
-      // Dispatch alias_received so a future migration worker can consume it.
-      //
-      // MANUAL REMEDIATION POLICY (no automated worker by design — see below).
-      // This fires ~0×/month at current volume, so the queued event is handled
-      // by hand from the Sentry alert. When it does fire, reconcile toward the
-      // surviving (transferred_to) identity using "best of both, user-favorable,
-      // never refund":
-      //   - Subscription: keep the more valuable of the two — higher tier
-      //     (free < plus < family < pro), tiebreak by latest currentPeriodEnd.
-      //     Never downgrade a paying user as a merge side effect.
-      //   - Top-up credits: take the MAX of the two balances, not the sum
-      //     (summing invites abuse via deliberate re-aliasing).
-      //   - Quota counters: reset to the more generous cycle; don't carry "used".
-      //   - Never refund/cancel — Apple/Google own IAP billing. If BOTH are
-      //     genuinely active paid store subs, route to support, don't auto-cancel.
-      //   - Mark the from-side record superseded (pointer to survivor); don't delete.
-      // Build an automated, idempotent worker only once these alerts arrive often
-      // enough that manual handling is a burden (> a handful/week).
+      // [BUG-783 / BUG-449] Dispatch alias_received with the PRE-DOWNGRADE
+      // snapshot. Consumed by the billing-alias-merge Inngest worker, which
+      // reconciles the surviving (transferred_to) identity toward "best of
+      // both, user-favorable, never refund":
+      //   - subscription: keep the more valuable tier (free<plus<family<pro),
+      //     tiebreak by latest currentPeriodEnd; never downgrade the survivor.
+      //   - top-up credits: survivor ends with MAX(from,to), never the sum.
+      //   - never refund/cancel — if BOTH are live paid store subs the worker
+      //     escalates to support rather than auto-cancelling a second charge.
+      // Non-core dispatch: a swallowed send is captured in Sentry by safeSend
+      // and the from-side breadcrumb above keeps the merge auditable.
       await safeSend(
         () =>
           inngest.send({
@@ -735,6 +746,7 @@ export async function handleSubscriberAlias(
               toAppUserId: event.app_user_id,
               fromAccountId: fromAccount.id,
               fromSubscriptionId: fromSub.id,
+              fromSnapshot,
               timestamp: new Date().toISOString(),
             },
           }),

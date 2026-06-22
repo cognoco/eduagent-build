@@ -14,6 +14,7 @@ import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send'
 import { billingTrialSubscriptionFailed } from './functions/billing-trial-subscription-failed';
 import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
 import { paymentFailedObserve } from './functions/payment-failed-observe';
+import { billingAliasMerge } from './functions/billing-alias-merge';
 import { exchangeEmptyReplyFallback } from './functions/exchange-empty-reply-fallback';
 import {
   askClassificationCompletedObserve,
@@ -132,6 +133,7 @@ export {
   billingTrialSubscriptionFailed,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  billingAliasMerge,
   exchangeEmptyReplyFallback,
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
@@ -218,6 +220,7 @@ export const functions = [
   billingTrialSubscriptionFailed,
   trialExpiryFailureObserve,
   paymentFailedObserve,
+  billingAliasMerge,
   exchangeEmptyReplyFallback,
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
