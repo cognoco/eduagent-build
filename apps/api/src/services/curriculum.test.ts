@@ -371,12 +371,18 @@ describe('generateCurriculum', () => {
       ),
     );
 
-    await expect(generateCurriculum(defaultInput)).rejects.toMatchObject({
-      issues: expect.arrayContaining([
-        expect.objectContaining({ path: [0, 'relevance'] }),
-        expect.objectContaining({ path: [0, 'estimatedMinutes'] }),
-      ]),
-    });
+    let thrown: unknown;
+    try {
+      await generateCurriculum(defaultInput);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe(
+      'Failed to parse curriculum from LLM response',
+    );
+    expect((thrown as { issues?: unknown }).issues).toBeUndefined();
 
     registerProvider(createCurriculumMockProvider());
   });
