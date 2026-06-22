@@ -11,6 +11,11 @@ on:
   workflow_dispatch:
     inputs:
       profile:
+        # 'production' is intentionally NOT offered here. This workflow's
+        # build-manual job has no `environment:` gate, so a production option
+        # would let a manual dispatch ship a store build while bypassing the
+        # approval gate. Production mobile builds go only through deploy.yml's
+        # gated `mobile-confirm-production` (environment: production) path.
         description: 'EAS build profile'
         required: true
         default: 'preview'
@@ -18,7 +23,6 @@ on:
         options:
           - development
           - preview
-          - production
       platform:
         description: 'Target platform'
         required: true
