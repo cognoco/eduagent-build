@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { WithdrawalCountdownBanner } from './WithdrawalCountdownBanner';
 
@@ -87,6 +87,33 @@ describe('WithdrawalCountdownBanner', () => {
         onSuccess: expect.any(Function),
       }),
     );
+  });
+
+  it('clears restore success when the child list changes', () => {
+    const { rerender } = render(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c1', displayName: 'Liam', respondedAt },
+        ]}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('withdrawal-countdown-reverse-c1'));
+    const callbacks = mockMutate.mock.calls[0][1];
+    act(() => {
+      callbacks.onSuccess();
+      callbacks.onSettled();
+    });
+    expect(screen.getByText('Withdrawal reversed for Liam'));
+
+    rerender(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c2', displayName: 'Mia', respondedAt },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText('Withdrawal reversed for Liam')).toBeNull();
   });
 
   it('uses singular day when 1 day is left', () => {

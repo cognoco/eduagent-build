@@ -65,6 +65,19 @@ describe('ChangePassword', () => {
     screen.getByText('Passwords do not match');
   });
 
+  it('clears validation error when a password field changes', () => {
+    active = renderWithProviders(<ChangePassword />);
+    fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
+    fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
+    fireEvent.changeText(screen.getByTestId('confirm-password'), 'Different1!');
+    fireEvent.press(screen.getByTestId('update-password-button'));
+    screen.getByText('Passwords do not match');
+
+    fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
+
+    expect(screen.queryByText('Passwords do not match')).toBeNull();
+  });
+
   it('does not submit when new password is too short', () => {
     active = renderWithProviders(<ChangePassword />);
     fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
@@ -138,6 +151,21 @@ describe('ChangePassword', () => {
     await waitFor(() => {
       screen.getByText('Password updated');
     });
+  });
+
+  it('clears success message when a password field changes after update', async () => {
+    active = renderWithProviders(<ChangePassword />);
+    fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
+    fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
+    fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
+    fireEvent.press(screen.getByTestId('update-password-button'));
+    await waitFor(() => {
+      screen.getByText('Password updated');
+    });
+
+    fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
+
+    expect(screen.queryByText('Password updated')).toBeNull();
   });
 
   it('renders forgot password link', () => {

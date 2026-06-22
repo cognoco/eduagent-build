@@ -27,6 +27,11 @@ export function WithdrawalCountdownBanner({
   const [restoredName, setRestoredName] = React.useState<string | null>(null);
 
   const inGrace = childrenInGracePeriod;
+  const inGraceChildIds = inGrace.map((child) => child.profileId).join('|');
+
+  React.useEffect(() => {
+    setRestoredName(null);
+  }, [inGraceChildIds]);
 
   if (inGrace.length === 0) return null;
 
