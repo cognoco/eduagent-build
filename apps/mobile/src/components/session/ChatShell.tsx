@@ -165,7 +165,8 @@ export function animateResponse(
       onDone?.();
       return;
     }
-    partial = partial ? `${partial} ${tokens[tokenIndex]}` : tokens[tokenIndex];
+    const token = tokens[tokenIndex] ?? '';
+    partial = partial ? `${partial} ${token}` : token;
     setMessages((prev) =>
       prev.map((m) => (m.id === streamId ? { ...m, content: partial } : m)),
     );
@@ -195,7 +196,6 @@ interface ChatMessageRowProps {
   index: number;
   mutedColor: string;
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
-  t: ReturnType<typeof useTranslation>['t'];
 }
 
 const ChatMessageRow = memo(function ChatMessageRow({
@@ -203,8 +203,8 @@ const ChatMessageRow = memo(function ChatMessageRow({
   index,
   mutedColor,
   renderMessageActions,
-  t,
 }: ChatMessageRowProps) {
+  const { t } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
@@ -337,10 +337,9 @@ export function ChatShell({
         index={index}
         mutedColor={colors.muted}
         renderMessageActions={renderMessageActions}
-        t={t}
       />
     ),
-    [colors.muted, renderMessageActions, t],
+    [colors.muted, renderMessageActions],
   );
 
   // Voice toggle — explicit initialVoiceEnabled (from input mode toggle) takes precedence.
