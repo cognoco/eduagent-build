@@ -17,6 +17,7 @@ export function NudgeBanner(): React.ReactElement | null {
   const unread = useUnreadNudges();
   const markAllRead = useMarkAllNudgesRead();
   const [modalOpen, setModalOpen] = useState(false);
+  const [dismissError, setDismissError] = useState<string | null>(null);
 
   const nudges = unread.data ?? [];
   const top = nudges[0];
@@ -36,8 +37,15 @@ export function NudgeBanner(): React.ReactElement | null {
   if (!isConsented || !top) return null;
 
   const closeModal = (): void => {
-    setModalOpen(false);
-    markAllRead.mutate();
+    setDismissError(null);
+    markAllRead.mutate(undefined, {
+      onSuccess: () => {
+        setModalOpen(false);
+      },
+      onError: () => {
+        setDismissError(t('errors.generic'));
+      },
+    });
   };
 
   return (
@@ -91,7 +99,12 @@ export function NudgeBanner(): React.ReactElement | null {
         ) : null}
       </Pressable>
       {modalOpen ? (
-        <NudgeUnreadModal nudges={nudges} onDismiss={closeModal} />
+        <NudgeUnreadModal
+          nudges={nudges}
+          onDismiss={closeModal}
+          errorMessage={dismissError}
+          isDismissing={markAllRead.isPending}
+        />
       ) : null}
     </>
   );
