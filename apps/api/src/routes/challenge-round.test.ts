@@ -1,6 +1,12 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { ERROR_CODES, ConflictError, NotFoundError } from '@eduagent/schemas';
+import { z } from 'zod';
+import {
+  ERROR_CODES,
+  ConflictError,
+  NotFoundError,
+  challengeRoundSessionStateSchema,
+} from '@eduagent/schemas';
 
 import { challengeRoundRoutes } from './challenge-round';
 import {
@@ -53,6 +59,16 @@ function makeApp(options: { isOwner?: boolean } = {}) {
     }
     if (err instanceof ConflictError) {
       return c.json({ code: ERROR_CODES.CONFLICT, message: err.message }, 409);
+    }
+    // Mirror the production catch-all (apps/api/src/index.ts onError): an
+    // unclassified fault — including a ZodError thrown by an outbound
+    // response-schema `.parse()` — surfaces as a 500 server fault rather than
+    // shipping a malformed body to the client.
+    if (err instanceof z.ZodError) {
+      return c.json(
+        { code: ERROR_CODES.INTERNAL_ERROR, message: err.message },
+        500,
+      );
     }
     throw err;
   });
@@ -189,5 +205,76 @@ describe('challenge-round routes', () => {
       code: ERROR_CODES.NOT_FOUND,
       message: 'Session not found',
     });
+  });
+});
+
+// WI-977 — challenge-round.ts returns responses with no schema validation.
+// These routes now parse the service result through
+// challengeRoundSessionStateSchema before c.json(), so a valid response is
+// guaranteed schema-conformant and a drifted/malformed service shape is caught
+// as a 500 server fault rather than shipped to the client.
+describe('challenge-round routes — outbound schema validation (WI-977)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    ['/v1/challenge-round/accept', acceptChallengeRound, 'accepted'],
+    ['/v1/challenge-round/decline', declineChallengeRound, 'declined'],
+    ['/v1/challenge-round/abort', abortChallengeRound, 'aborted'],
+  ] as const)(
+    'returns a schema-valid challengeRound for %s',
+    async (path, service, state) => {
+      (service as jest.Mock).mockResolvedValue({ ...offeredState, state });
+
+      const res = await postJson(path, {
+        sessionId: SESSION_ID,
+        topicId: TOPIC_ID,
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { challengeRound: unknown };
+      // The response body's challengeRound must itself satisfy the contract.
+      expect(
+        challengeRoundSessionStateSchema.safeParse(body.challengeRound).success,
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    ['/v1/challenge-round/accept', acceptChallengeRound],
+    ['/v1/challenge-round/decline', declineChallengeRound],
+    ['/v1/challenge-round/abort', abortChallengeRound],
+  ] as const)(
+    'rejects a malformed service shape with a 500 for %s',
+    async (path, service) => {
+      // `state: 'frobnicated'` is not in challengeRoundStateEnum — a drifted
+      // service contract that must never reach the wire.
+      (service as jest.Mock).mockResolvedValue({
+        ...offeredState,
+        state: 'frobnicated',
+      });
+
+      const res = await postJson(path, {
+        sessionId: SESSION_ID,
+        topicId: TOPIC_ID,
+      });
+
+      expect(res.status).toBe(500);
+    },
+  );
+
+  it('tolerates abort returning undefined (no round ever existed)', async () => {
+    // abortChallengeRound returns `undefined` when the session never had a
+    // round; the optional parse must pass it through, not throw.
+    (abortChallengeRound as jest.Mock).mockResolvedValue(undefined);
+
+    const res = await postJson('/v1/challenge-round/abort', {
+      sessionId: SESSION_ID,
+      topicId: TOPIC_ID,
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ challengeRound: undefined });
   });
 });
