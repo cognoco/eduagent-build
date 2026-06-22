@@ -203,7 +203,15 @@
       "verifyButton": "認証",
       "resendCode": "コードを再送信",
       "useDifferentEmail": "別のメールアドレスを使用",
-      "backToSignIn": "サインインに戻る"
+      "backToSignIn": "サインインに戻る",
+      "tryAnotherMethod": "別の方法を試す",
+      "continueWithGoogle": "Googleで続ける",
+      "continueWithApple": "Appleで続ける",
+      "continueWithOpenAI": "OpenAIで続ける",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "パスワードを作成",
+      "signUpButton": "新規登録",
+      "signInButton": "ログイン"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",

@@ -203,7 +203,15 @@
       "verifyButton": "Bestätigen",
       "resendCode": "Code erneut senden",
       "useDifferentEmail": "Andere E-Mail verwenden",
-      "backToSignIn": "Zurück zur Anmeldung"
+      "backToSignIn": "Zurück zur Anmeldung",
+      "tryAnotherMethod": "Andere Methode versuchen",
+      "continueWithGoogle": "Mit Google fortfahren",
+      "continueWithApple": "Mit Apple fortfahren",
+      "continueWithOpenAI": "Mit OpenAI fortfahren",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Passwort erstellen",
+      "signUpButton": "Registrieren",
+      "signInButton": "Anmelden"
     },
     "forgotPassword": {
       "title": "Passwort vergessen?",
