@@ -274,15 +274,16 @@ jobs:
           pnpm exec drizzle-kit migrate
           echo "✓ Database migrations applied"
 
-      - name: Deploy to Cloudflare Workers
-        working-directory: apps/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
-          echo "Deploying API to ${DEPLOY_ENV}"
-          pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
-
+      # [BUG-803] Sync secrets to the (already-deployed) Worker BEFORE switching
+      # traffic to the new code. This step previously ran AFTER `wrangler deploy`,
+      # so a missing-token hard fail (or any sync failure) surfaced only once the
+      # new code was already live and serving traffic with stale secrets. Syncing
+      # first means the hard fail aborts before any traffic switch, and the
+      # subsequent `wrangler deploy` inherits the freshly-synced secrets. The
+      # stg/prd Workers already exist, so `wrangler secret bulk` has a script to
+      # target. Migrations still run first (above) — schema before secrets before
+      # code.
+      #
       # [BUG-238] When the Doppler token is missing the sync step previously
       # degraded to a GitHub Actions warning and exited 0, leaving Worker
       # secrets stale — any value set in Doppler since the gap opened never
@@ -330,6 +331,15 @@ jobs:
           sudo tar -xzf "${DOPPLER_ARCHIVE}" -C /usr/local/bin doppler
           doppler --version
           pnpm secrets:sync "$SYNC_TARGET"
+
+      - name: Deploy to Cloudflare Workers
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
+          echo "Deploying API to ${DEPLOY_ENV}"
+          pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
       # [BUG-953] Notify on deploy failure — creates a GitHub issue so silent
       # failures (like run 25225160580 which went unnoticed for 24h) surface
