@@ -1,12 +1,12 @@
 import {
   registerProvider,
-  createMockProvider,
   type LLMProvider,
   type ChatMessage,
   type MessagePart,
   type ModelConfig,
   type StopReason,
 } from './llm';
+import { createMockProvider } from './llm/test-utils';
 import { makeChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,

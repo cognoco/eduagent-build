@@ -21,11 +21,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { like } from 'drizzle-orm';
-import {
-  registerProvider,
-  createMockProvider,
-  unregisterProvider,
-} from './llm';
+import { registerProvider, unregisterProvider } from './llm';
+import { createMockProvider } from './llm/test-utils';
 import { generateRecallBridge } from './recall-bridge';
 
 // ---------------------------------------------------------------------------
