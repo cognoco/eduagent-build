@@ -3,11 +3,18 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { RecentSessionsList } from './RecentSessionsList';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  replace: mockReplace,
+  back: mockBack,
+  canGoBack: mockCanGoBack,
+};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock('react-i18next', () => ({
@@ -73,6 +80,7 @@ describe('RecentSessionsList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useActiveProfileRole.mockReturnValue('owner');
+    mockCanGoBack.mockReturnValue(false);
   });
 
   it('shows a clear self-serve CTA when the active profile has no sessions', () => {
@@ -185,5 +193,36 @@ describe('RecentSessionsList', () => {
 
     expect(refetch).toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('routes parent-viewing-child load errors back toward family home instead of child curriculum', () => {
+    const refetch = jest.fn();
+    useProfile.mockReturnValue({
+      activeProfile: {
+        id: 'owner-profile',
+        displayName: 'Parent',
+      },
+    });
+
+    render(
+      <RecentSessionsList
+        profileId="child-profile"
+        sessionsQuery={
+          makeQuery({
+            isError: true,
+            error: new Error('offline'),
+            refetch,
+          }) as never
+        }
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('recent-sessions-go-home'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockPush).not.toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/curriculum',
+      params: { profileId: 'child-profile' },
+    });
   });
 });
