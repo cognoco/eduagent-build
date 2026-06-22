@@ -22,6 +22,7 @@ import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
 import { safeSend } from '../safe-non-core';
+import { buildStripeCustomerCreateKey } from '../dedupe-key';
 import { inngest } from '../../inngest/client';
 import {
   mapSubscriptionRow,
@@ -429,13 +430,14 @@ export async function getOrCreateStripeCustomer(
       return locked.stripeCustomerId;
     }
 
+    // Stable per-account key so concurrent creates dedupe to one customer.
+    const idempotencyKey = buildStripeCustomerCreateKey(accountId);
     const customer = await stripe.customers.create(
       {
         email: params.email,
         metadata: { accountId },
       },
-      // Stable per-account key so concurrent creates dedupe to one customer.
-      { idempotencyKey: `customer-create-${accountId}` },
+      { idempotencyKey },
     );
 
     const [updated] = await tx

@@ -53,6 +53,7 @@ import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
 import { safeSend } from '../../safe-non-core';
+import { buildStripeCustomerCreateKey } from '../../dedupe-key';
 import { computeTrialEndDate } from '../../trial';
 import { inngest } from '../../../inngest/client';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
@@ -488,12 +489,13 @@ export async function getOrCreateStripeCustomerV2(
       return locked.stripeCustomerId;
     }
 
+    const idempotencyKey = buildStripeCustomerCreateKey(organizationId);
     const customer = await stripe.customers.create(
       {
         email: params.email,
         metadata: { accountId: organizationId },
       },
-      { idempotencyKey: `customer-create-${organizationId}` },
+      { idempotencyKey },
     );
 
     const [updated] = await tx

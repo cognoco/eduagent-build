@@ -36,3 +36,14 @@ export function buildLegacyEmailIdempotencyKey(
 ): string {
   return joinDedupeKey([prefix, ...segments], '-');
 }
+
+/**
+ * Stripe idempotency key for the per-account / per-organization
+ * "create customer" call. Stable so concurrent billing requests dedupe to a
+ * single Stripe customer instead of orphaning a duplicate (BUG-827). Owner IDs
+ * are UUIDs, so encoding is identity; the helper keeps the key construction in
+ * this file as the dedupe-key guard requires.
+ */
+export function buildStripeCustomerCreateKey(ownerId: string): string {
+  return joinDedupeKey(['customer-create', encodeDedupeSegment(ownerId)], '-');
+}
