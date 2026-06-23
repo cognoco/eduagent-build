@@ -6,20 +6,24 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => {
-  const actual = jest.requireActual(
-    '../inngest/client',
-  ) as typeof import('../inngest/client');
-  return {
-    ...actual,
-    inngest: {
-      send: jest.fn().mockResolvedValue(undefined),
-    },
-  };
-});
+jest.mock(
+  '../inngest/client' /* gc1-allow: inngest-boundary: Inngest client requires a live event key at construction time; no real Inngest server is available in the Node.js unit test environment */,
+  () => {
+    const actual = jest.requireActual(
+      '../inngest/client',
+    ) as typeof import('../inngest/client');
+    return {
+      ...actual,
+      inngest: {
+        send: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+  },
+);
 
 import { Hono } from 'hono';
 import { feedbackRoutes } from './feedback';
+import { validateEnv } from '../config';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const TEST_API_KEY = 'test-resend-key';
@@ -442,5 +446,49 @@ describe('POST /feedback', () => {
       return url === RESEND_API_URL;
     });
     expect(resendCalls).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [WI-1050] SUPPORT_EMAIL schema default + validation regression tests.
+  // SUPPORT_EMAIL was previously absent from envSchema (config.ts), so a
+  // missing or mistyped value was only caught at send time — not at startup.
+  // ---------------------------------------------------------------------------
+
+  it('[WI-1050] when SUPPORT_EMAIL binding is absent the email goes to the schema default support@mentomate.com', async () => {
+    // createTestApp without a SUPPORT_EMAIL binding — mimics CF environment
+    // where the binding is not set and the schema default must apply.
+    const app = createTestApp({ SUPPORT_EMAIL: undefined });
+    await app.request('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: 'bug',
+        message: 'Schema default test',
+      }),
+    });
+
+    const resendCalls = fetchSpy.mock.calls.filter(([input]) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      return url === RESEND_API_URL;
+    });
+    expect(resendCalls).toHaveLength(1);
+    const [, init] = resendCalls[0]!;
+    const sentBody = JSON.parse(init?.body as string) as { to: string[] };
+    // Must go to the schema default, not undefined/null
+    expect(sentBody.to).toEqual(['support@mentomate.com']);
+  });
+
+  it('[WI-1050] validateEnv throws when SUPPORT_EMAIL is not a valid email', () => {
+    expect(() =>
+      validateEnv({
+        DATABASE_URL: 'postgresql://localhost/test',
+        SUPPORT_EMAIL: 'not-an-email',
+      }),
+    ).toThrow(/SUPPORT_EMAIL/);
   });
 });
