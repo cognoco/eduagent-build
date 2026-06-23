@@ -21,6 +21,8 @@ import {
   type StrengthEntry,
   type FocusAreaEntry,
   focusAreaEntrySchema,
+  parseStrengthArray,
+  parseFocusAreaArray,
 } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 import {
@@ -176,15 +178,10 @@ function asStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
-function asStrengthArray(value: unknown): StrengthEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is StrengthEntry => Boolean(item));
-}
-
-function asStruggleArray(value: unknown): FocusAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is FocusAreaEntry => Boolean(item));
-}
+// [WI-986] Replaced Boolean(item)-only filter with per-element Zod validation.
+// Invalid elements are dropped and logged by parseStrengthArray / parseFocusAreaArray.
+const asStrengthArray = parseStrengthArray;
+const asStruggleArray = parseFocusAreaArray;
 
 function asLearningStyle(value: unknown): LearningStyle {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;

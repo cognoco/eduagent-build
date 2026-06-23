@@ -15,7 +15,12 @@ import type {
   StrengthEntry,
   FocusAreaEntry,
 } from '@eduagent/schemas';
-import { interestsArraySchema, learningStyleSchema } from '@eduagent/schemas';
+import {
+  interestsArraySchema,
+  learningStyleSchema,
+  parseStrengthArray,
+  parseFocusAreaArray,
+} from '@eduagent/schemas';
 import type { CuratedMemoryView } from '../curated-memory';
 import { buildCuratedMemoryView } from '../curated-memory';
 import {
@@ -148,21 +153,10 @@ function asStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
-function asStrengthArray(value: unknown): StrengthEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is StrengthEntry =>
-      Boolean(item) && typeof item === 'object' && 'subject' in item,
-  );
-}
-
-function asStruggleArray(value: unknown): FocusAreaEntry[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is FocusAreaEntry =>
-      Boolean(item) && typeof item === 'object' && 'topic' in item,
-  );
-}
+// [WI-986] Replaced minimal structural guards with per-element Zod validation.
+// Invalid elements are dropped and logged by parseStrengthArray / parseFocusAreaArray.
+const asStrengthArray = parseStrengthArray;
+const asStruggleArray = parseFocusAreaArray;
 
 function asInterestTimestamps(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
