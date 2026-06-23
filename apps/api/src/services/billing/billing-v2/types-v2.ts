@@ -34,7 +34,9 @@ import type { SubscriptionRow } from '../types';
 export function parseSubscriptionV2PlanTier(value: string): SubscriptionTier {
   const result = subscriptionTierSchema.safeParse(value);
   if (!result.success) {
-    throw new Error('Invalid billing v2 subscription planTier from database');
+    throw new Error(
+      `Invalid billing v2 subscription planTier from database: "${value}"`,
+    );
   }
   return result.data;
 }
@@ -42,7 +44,9 @@ export function parseSubscriptionV2PlanTier(value: string): SubscriptionTier {
 export function parseSubscriptionV2Status(value: string): SubscriptionStatus {
   const result = subscriptionStatusSchema.safeParse(value);
   if (!result.success) {
-    throw new Error('Invalid billing v2 subscription status from database');
+    throw new Error(
+      `Invalid billing v2 subscription status from database: "${value}"`,
+    );
   }
   return result.data;
 }
