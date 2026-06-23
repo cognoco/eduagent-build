@@ -116,6 +116,7 @@
     "tsx": "^4.20.6",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8.40.0",
+    "vitest": "3.2.6",
     "wrangler": "^4.0.0",
     "yaml": "2.8.4"
   },
@@ -137,7 +138,8 @@
       "glob@<9": "^10.0.0",
       "@tanstack/query-core": "5.100.11",
       "@types/node@^12": "^22.0.0",
-      "handlebars": ">=4.7.9"
+      "handlebars": ">=4.7.9",
+      "vitest": "3.2.6"
     },
     "patchedDependencies": {
       "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
