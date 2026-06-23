@@ -320,7 +320,11 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
       message: 'Quota exceeded',
       details: {
         tier: 'free',
+        effectiveAccessTier: 'free',
+        quotaModel: 'per-profile',
+        profileRole: 'owner',
         reason: 'monthly',
+        resetsAt: '2026-05-27T01:00:00.000Z',
         monthlyLimit: 100,
         usedThisMonth: 100,
         dailyLimit: 10,
@@ -342,6 +346,33 @@ describe('useApiClient 402 error classification [CR-API-402-04]', () => {
 
     expect(err).toBeInstanceOf(QuotaExceededError);
     expect(err).not.toBeInstanceOf(UpstreamError);
+  });
+
+  it('[WI-976 / break-test] quota-coded 402 with malformed details fails closed as UpstreamError', async () => {
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            code: 'QUOTA_EXCEEDED',
+            message: 'Quota exceeded',
+            details: {
+              tier: 'free',
+              reason: 'monthly',
+            },
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } },
+        ),
+    ) as unknown as typeof globalThis.fetch;
+
+    const client = makeClient();
+    const err = await client.v1.health.$get().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UpstreamError);
+    expect(err).not.toBeInstanceOf(QuotaExceededError);
+    const upstream = err as UpstreamError;
+    expect(upstream.status).toBe(402);
+    expect(upstream.code).toBe('QUOTA_EXCEEDED');
+    expect(upstream.message).toBe('Quota exceeded');
   });
 });
 
