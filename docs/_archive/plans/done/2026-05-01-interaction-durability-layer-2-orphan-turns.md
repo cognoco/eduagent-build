@@ -10,6 +10,8 @@
 
 **Spec:** `docs/specs/2026-05-01-interaction-durability.md` — Layer 2 scope. **Finding ID:** `[INTERACTION-DUR-L2]`. **Dependencies:** Layer 1 must have shipped — Layer 2 reuses Layer 1's `session_events.client_id` column, the `session_events_session_client_id_uniq` unique index, and the `Idempotency-Key` middleware that ensures every request reaching an orphan-persist branch carries a `clientId`. Layer 2 helpers REJECT empty `clientId` with `BadRequestError` rather than generating a server-side ULID — generating one would defeat Layer 1's retry dedup. Layer 3 should also have shipped so `persist_curriculum_failed` becomes a read-only enum value for back-compat (no new writes set it).
 
+> **Supersession note (WI-516, 2026-06-23):** The interview-side portions of this plan are superseded. The interview route/service/draft writer were deleted before this plan shipped, so no new code should add `onboarding_drafts.exchange_history` orphan handling or `services/interview.ts` helpers. Session-side durability work must be designed against the current `learning_sessions` / `session_events` pipeline instead.
+
 ---
 
 ## Pre-flight
