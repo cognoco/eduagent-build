@@ -2383,7 +2383,8 @@
       "birthDateAccessLabel": "生年月日",
       "selectChildBirthDateLabel": "お子さんの生年月日を選択",
       "selectBirthDateLabel": "生年月日を選択",
-      "addChildButton": "お子さんを追加"
+      "addChildButton": "お子さんを追加",
+      "birthDatePlaceholder": "年-月-日"
     },
     "profiles": {
       "roleParent": "保護者",

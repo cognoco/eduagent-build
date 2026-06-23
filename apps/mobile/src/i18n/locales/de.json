@@ -2383,7 +2383,8 @@
       "birthDateAccessLabel": "Geburtsdatum",
       "selectChildBirthDateLabel": "Geburtsdatum des Kindes auswählen",
       "selectBirthDateLabel": "Geburtsdatum auswählen",
-      "addChildButton": "Kind hinzufügen"
+      "addChildButton": "Kind hinzufügen",
+      "birthDatePlaceholder": "JJJJ-MM-TT"
     },
     "profiles": {
       "roleParent": "Elternteil",

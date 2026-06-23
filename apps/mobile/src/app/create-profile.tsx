@@ -659,7 +659,7 @@ export default function CreateProfileScreen() {
           <View className="mb-2" onLayout={onFieldLayout('birthdate')}>
             <TextInput
               className="bg-surface text-text-primary text-body rounded-input px-4 py-3"
-              placeholder="YYYY-MM-DD"
+              placeholder={t('onboarding.createProfile.birthDatePlaceholder')}
               placeholderTextColor={colors.muted}
               value={birthDateText}
               onChangeText={onWebBirthDateChange}

@@ -2383,7 +2383,8 @@
       "birthDateAccessLabel": "Fødselsdato",
       "selectChildBirthDateLabel": "Velg barnets fødselsdato",
       "selectBirthDateLabel": "Velg fødselsdato",
-      "addChildButton": "Legg til barn"
+      "addChildButton": "Legg til barn",
+      "birthDatePlaceholder": "ÅÅÅÅ-MM-DD"
     },
     "profiles": {
       "roleParent": "Forelder",

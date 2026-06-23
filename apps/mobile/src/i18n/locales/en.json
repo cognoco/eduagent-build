@@ -2479,6 +2479,7 @@
       "namePlaceholder": "Enter name",
       "childBirthDateAccessLabel": "Child's birth date",
       "birthDateAccessLabel": "Birth date",
+      "birthDatePlaceholder": "YYYY-MM-DD",
       "selectChildBirthDateLabel": "Select child's birth date",
       "selectBirthDateLabel": "Select birth date",
       "addChildButton": "Add child"
