@@ -511,7 +511,8 @@ describe('Integration: Learning Session Lifecycle', () => {
       const body = await res.json();
       expect(body.sessionId).toBe(session.id);
       expect(body.summaryStatus).toBe('pending');
-      expect(body.wallClockSeconds).toBeDefined();
+      expect(body.wallClockSeconds).toEqual(expect.any(Number));
+      expect(body.wallClockSeconds).toBeGreaterThanOrEqual(0);
       expect(getCapturedInngestEvents()).toHaveLength(0);
 
       const persistedSession = await loadSession(session.id);
