@@ -21,6 +21,7 @@ import {
 import { getTierConfig } from '../../subscription';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
 import type { TopUpCreditRow } from '../top-up';
+import { parseSubscriptionV2PlanTier } from './types-v2';
 
 const TOP_UP_EXPIRY_MONTHS = 12;
 
@@ -59,13 +60,16 @@ export async function purchaseTopUpCreditsV2(
     where: eq(subscriptionTable.id, subscriptionId),
   });
 
-  if (!sub || sub.planTier === 'free') {
+  if (!sub) {
     return null;
   }
 
-  const quotaModel = getTierConfig(
-    sub.planTier as 'free' | 'plus' | 'family' | 'pro',
-  ).quotaModel;
+  const tier = parseSubscriptionV2PlanTier(sub.planTier);
+  if (tier === 'free') {
+    return null;
+  }
+
+  const quotaModel = getTierConfig(tier).quotaModel;
   let buyerProfileId: string | null = profileId ?? null;
   if (quotaModel === 'per-profile') {
     const ownerPersonId = await findOwnerPersonId(db, sub.organizationId);

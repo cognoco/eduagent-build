@@ -20,6 +20,10 @@ import { subscription as subscriptionTable } from '@eduagent/database';
 import type { BillingAccess, SubscriptionTier } from '@eduagent/schemas';
 
 import { resolveEffectiveAccessTier } from '../../subscription';
+import {
+  parseSubscriptionV2PlanTier,
+  parseSubscriptionV2Status,
+} from './types-v2';
 
 export interface EffectiveSubscriptionAccessV2 {
   /**
@@ -52,11 +56,13 @@ export async function getEffectiveAccessForSubscriptionV2(
   });
   if (!row) return null;
 
+  const tier = parseSubscriptionV2PlanTier(row.planTier);
+  const status = parseSubscriptionV2Status(row.status);
+
   const access = resolveEffectiveAccessTier(
     {
-      tier: row.planTier as SubscriptionTier,
-      status:
-        row.status as EffectiveSubscriptionAccessV2['subscription']['status'],
+      tier,
+      status,
       trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
       currentPeriodEnd: row.periodEndAt?.toISOString() ?? null,
     },
@@ -70,8 +76,8 @@ export async function getEffectiveAccessForSubscriptionV2(
   const legacyShaped = {
     ...row,
     accountId: row.organizationId,
-    tier: row.planTier,
-    status: row.status,
+    tier,
+    status,
     currentPeriodStart: row.periodStartAt,
     currentPeriodEnd: row.periodEndAt,
   } as unknown as EffectiveSubscriptionAccessV2['subscription'];

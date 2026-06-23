@@ -32,6 +32,10 @@ import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig, resolveEffectiveAccessTier } from '../../subscription';
 import { reconcileQuotaStateForEffectiveTier } from '../quota-reconcile';
 import { provisionProfileQuotaUsageV2 } from './quota-provision-v2';
+import {
+  parseSubscriptionV2PlanTier,
+  parseSubscriptionV2Status,
+} from './types-v2';
 
 type ReconcileQuotaOptions = {
   resetExpiredSharedPoolUsage?: boolean;
@@ -54,15 +58,13 @@ export async function reconcileQuotaStateForSubscriptionV2(
   });
   if (!row) return null;
 
+  const tier = parseSubscriptionV2PlanTier(row.planTier);
+  const status = parseSubscriptionV2Status(row.status);
+
   const { effectiveAccessTier } = resolveEffectiveAccessTier(
     {
-      tier: row.planTier as SubscriptionTier,
-      status: row.status as
-        | 'trial'
-        | 'active'
-        | 'past_due'
-        | 'cancelled'
-        | 'expired',
+      tier,
+      status,
       trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
       currentPeriodEnd: row.periodEndAt?.toISOString() ?? null,
     },
