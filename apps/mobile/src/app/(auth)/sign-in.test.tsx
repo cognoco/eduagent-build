@@ -6,8 +6,10 @@ import {
   act,
 } from '@testing-library/react-native';
 import { useSignIn, useSSO, useClerk } from '@clerk/clerk-expo';
+import i18n from 'i18next';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
+import deCatalog from '../../i18n/locales/de.json';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -1402,6 +1404,28 @@ describe('SignInScreen — Try MentoMate CTA (PREVIEW_ONBOARDING_ENABLED × PREV
     render(<SignInScreen />);
     await act(async () => undefined);
     expect(screen.getByTestId('try-mentomate-cta')).toBeTruthy();
+  });
+
+  it('uses the localized CTA copy for the accessibility label', async () => {
+    const originalLanguage = i18n.language;
+    let unmount: (() => void) | undefined;
+
+    try {
+      i18n.addResourceBundle('de', 'translation', deCatalog, false, true);
+      await i18n.changeLanguage('de');
+
+      mockPreviewOnboardingEnabled = true;
+      mockPreviewEntryCtaEnabled = true;
+      ({ unmount } = render(<SignInScreen />));
+      await act(async () => undefined);
+
+      const cta = screen.getByTestId('try-mentomate-cta');
+      expect(cta.props.accessibilityLabel).toBe('MentoMate ausprobieren');
+      expect(cta.props.accessibilityLabel).not.toBe('Try MentoMate');
+    } finally {
+      unmount?.();
+      await i18n.changeLanguage(originalLanguage);
+    }
   });
 
   it('hides the CTA when PREVIEW_ENTRY_CTA_ENABLED is off (default product state)', async () => {
