@@ -14,12 +14,33 @@ jest.mock(
   }),
 );
 
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  '../services/sentry' /* gc1-allow: sentry-boundary: @sentry/cloudflare SDK initializes a Worker-scoped client that cannot run in Node.js test environment; guards observable behavior via mock */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/sentry',
+    ) as typeof import('../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
+
 import {
   closeStepDatabases,
   enterWithEnvBindings,
   getStepAppUrl,
+  getStepClerkSecretKey,
   getStepDatabase,
+  getStepEmailFrom,
+  getStepMemoryFactsDedupConfig,
+  getStepResendApiKey,
+  getStepRetentionPurgeEnabled,
   getStepSupportEmail,
+  isIdentityV2EnabledInStep,
   resetDatabaseUrl,
   runWithStepDatabaseScope,
   setDatabaseUrl,
@@ -129,6 +150,151 @@ describe('Inngest helpers', () => {
           expect(() => getStepDatabase()).toThrow(/DATABASE_URL not available/);
         }),
       ]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [WI-1045] Binding-absent guards: helpers that fall back to process.env
+  // must call captureException when the AsyncLocalStorage binding is absent
+  // outside NODE_ENV=test (i.e., when the Inngest middleware is not wired or
+  // the async context is lost across a step boundary).
+  //
+  // Each test:
+  //   1. Sets NODE_ENV to 'production' to enable the guard path.
+  //   2. Calls the helper with no binding in the ALS context AND no process.env.
+  //   3. Asserts captureException was called with the binding key in extras.
+  //   4. Restores NODE_ENV and process.env in the finally block.
+  //
+  // Red-green: without the warnMissingBinding guard the helpers return a
+  // default silently and captureException is never called.
+  // ---------------------------------------------------------------------------
+  describe('[WI-1045] env binding-absent guards fire captureException in prod', () => {
+    let originalNodeEnv: string | undefined;
+
+    beforeEach(() => {
+      originalNodeEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
+      // Ensure no process.env fallbacks are present
+      delete process.env['APP_URL'];
+      delete process.env['SUPPORT_EMAIL'];
+      delete process.env['EMAIL_FROM'];
+      delete process.env['RESEND_API_KEY'];
+      delete process.env['RETENTION_PURGE_ENABLED'];
+      delete process.env['CLERK_SECRET_KEY'];
+      delete process.env['MEMORY_FACTS_DEDUP_ENABLED'];
+      delete process.env['IDENTITY_V2_ENABLED'];
+    });
+
+    afterEach(() => {
+      process.env['NODE_ENV'] = originalNodeEnv;
+    });
+
+    it('getStepAppUrl: captureException called when binding absent', () => {
+      getStepAppUrl();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('appUrl'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'appUrl' }),
+        }),
+      );
+    });
+
+    it('getStepSupportEmail: captureException called when binding absent', () => {
+      getStepSupportEmail();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('supportEmail'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'supportEmail' }),
+        }),
+      );
+    });
+
+    it('getStepEmailFrom: captureException called when binding absent', () => {
+      getStepEmailFrom();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('emailFrom'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'emailFrom' }),
+        }),
+      );
+    });
+
+    it('getStepResendApiKey: captureException called when binding absent', () => {
+      getStepResendApiKey();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('resendApiKey'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'resendApiKey' }),
+        }),
+      );
+    });
+
+    it('getStepRetentionPurgeEnabled: captureException called when binding absent', () => {
+      getStepRetentionPurgeEnabled();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('retentionPurgeEnabled'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            bindingKey: 'retentionPurgeEnabled',
+          }),
+        }),
+      );
+    });
+
+    it('getStepClerkSecretKey: captureException called when binding absent', () => {
+      getStepClerkSecretKey();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('clerkSecretKey'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'clerkSecretKey' }),
+        }),
+      );
+    });
+
+    it('getStepMemoryFactsDedupConfig: captureException called when binding absent', () => {
+      getStepMemoryFactsDedupConfig();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('memoryFactsDedupEnabled'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            bindingKey: 'memoryFactsDedupEnabled',
+          }),
+        }),
+      );
+    });
+
+    it('isIdentityV2EnabledInStep: captureException called when binding absent', () => {
+      isIdentityV2EnabledInStep();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('identityV2Enabled'),
+        }),
+        expect.objectContaining({
+          extra: expect.objectContaining({ bindingKey: 'identityV2Enabled' }),
+        }),
+      );
+    });
+
+    it('guards do NOT fire when NODE_ENV=test (normal unit test env)', () => {
+      // Restore to test mode to verify the guard is skipped
+      process.env['NODE_ENV'] = 'test';
+      getStepAppUrl();
+      getStepSupportEmail();
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
   });
 });

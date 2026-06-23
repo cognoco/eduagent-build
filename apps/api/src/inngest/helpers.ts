@@ -4,6 +4,7 @@ import {
   createDatabase,
   type Database,
 } from '@eduagent/database';
+import { captureException } from '../services/sentry';
 
 const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
 
@@ -81,6 +82,34 @@ function getEnvBinding<K extends keyof EnvBindings>(
 }
 
 /**
+ * Emits a structured Sentry warning when a per-invocation binding is absent
+ * outside the test environment. In production, absent bindings indicate that
+ * the Inngest middleware is not wired or the AsyncLocalStorage context was
+ * lost across a step boundary — both are middleware failures, not expected
+ * runtime states.
+ *
+ * Called by optional helpers (those that fall back to process.env or a
+ * hardcoded default) when `getEnvBinding(key)` returns undefined.
+ *
+ * Skipped in NODE_ENV=test — tests exercise helpers directly without the
+ * middleware and rely on process.env / hardcoded defaults.
+ */
+function warnMissingBinding(bindingKey: keyof EnvBindings): void {
+  if (process.env['NODE_ENV'] === 'test') return;
+  captureException(
+    new Error(
+      `Inngest env binding absent: ${String(bindingKey)} — middleware may not be wired or AsyncLocalStorage context lost`,
+    ),
+    {
+      extra: {
+        event: 'inngest.env_binding_absent',
+        bindingKey: String(bindingKey),
+      },
+    },
+  );
+}
+
+/**
  * Injects the DATABASE_URL binding into the current async context.
  * Test helper — production injection goes through
  * {@link enterWithEnvBindings} in the Inngest middleware.
@@ -97,8 +126,11 @@ export function setDatabaseUrl(url: string): void {
  * `isIdentityV2Enabled` in config.ts (the string 'false' must never select v2).
  */
 export function isIdentityV2EnabledInStep(): boolean {
-  const value =
-    getEnvBinding('identityV2Enabled') ?? process.env['IDENTITY_V2_ENABLED'];
+  const bound = getEnvBinding('identityV2Enabled');
+  if (bound === undefined) {
+    warnMissingBinding('identityV2Enabled');
+  }
+  const value = bound ?? process.env['IDENTITY_V2_ENABLED'];
   return value === 'true';
 }
 
@@ -146,6 +178,12 @@ export function getStepMemoryFactsDedupConfig(): {
   maxLlmCalls: number;
   rolloutPct: number;
 } {
+  // Warn once per call if the primary binding bundle is absent — a missing
+  // memoryFactsDedupEnabled binding is a reliable proxy for the whole
+  // dedup-config bundle being unpopulated.
+  if (getEnvBinding('memoryFactsDedupEnabled') === undefined) {
+    warnMissingBinding('memoryFactsDedupEnabled');
+  }
   return {
     enabled:
       getEnvBinding('memoryFactsDedupEnabled') ??
@@ -194,11 +232,11 @@ export function getStepVoyageApiKey(): string {
  * production domain.
  */
 export function getStepAppUrl(): string {
-  return (
-    getEnvBinding('appUrl') ??
-    process.env['APP_URL'] ??
-    'https://www.mentomate.com'
-  );
+  const bound = getEnvBinding('appUrl');
+  if (bound === undefined) {
+    warnMissingBinding('appUrl');
+  }
+  return bound ?? process.env['APP_URL'] ?? 'https://www.mentomate.com';
 }
 
 /**
@@ -207,18 +245,22 @@ export function getStepAppUrl(): string {
  * Returns undefined if not configured — callers should degrade gracefully.
  */
 export function getStepResendApiKey(): string | undefined {
-  return getEnvBinding('resendApiKey') ?? process.env['RESEND_API_KEY'];
+  const bound = getEnvBinding('resendApiKey');
+  if (bound === undefined) {
+    warnMissingBinding('resendApiKey');
+  }
+  return bound ?? process.env['RESEND_API_KEY'];
 }
 
 /**
  * Returns the EMAIL_FROM address for use within Inngest step functions.
  */
 export function getStepEmailFrom(): string {
-  return (
-    getEnvBinding('emailFrom') ??
-    process.env['EMAIL_FROM'] ??
-    'noreply@mentomate.com'
-  );
+  const bound = getEnvBinding('emailFrom');
+  if (bound === undefined) {
+    warnMissingBinding('emailFrom');
+  }
+  return bound ?? process.env['EMAIL_FROM'] ?? 'noreply@mentomate.com';
 }
 
 /**
@@ -229,22 +271,27 @@ export function getStepEmailFrom(): string {
  * the canonical default.
  */
 export function getStepSupportEmail(): string {
-  return (
-    getEnvBinding('supportEmail') ??
-    process.env['SUPPORT_EMAIL'] ??
-    'support@mentomate.com'
-  );
+  const bound = getEnvBinding('supportEmail');
+  if (bound === undefined) {
+    warnMissingBinding('supportEmail');
+  }
+  return bound ?? process.env['SUPPORT_EMAIL'] ?? 'support@mentomate.com';
 }
 
 export function getStepRetentionPurgeEnabled(): boolean {
-  return (
-    (getEnvBinding('retentionPurgeEnabled') ??
-      process.env['RETENTION_PURGE_ENABLED']) === 'true'
-  );
+  const bound = getEnvBinding('retentionPurgeEnabled');
+  if (bound === undefined) {
+    warnMissingBinding('retentionPurgeEnabled');
+  }
+  return (bound ?? process.env['RETENTION_PURGE_ENABLED']) === 'true';
 }
 
 // [R1] CLERK_SECRET_KEY is used by the scheduled-deletion job to erase the
 // Clerk login identity (GDPR Art 17).
 export function getStepClerkSecretKey(): string | undefined {
-  return getEnvBinding('clerkSecretKey') ?? process.env['CLERK_SECRET_KEY'];
+  const bound = getEnvBinding('clerkSecretKey');
+  if (bound === undefined) {
+    warnMissingBinding('clerkSecretKey');
+  }
+  return bound ?? process.env['CLERK_SECRET_KEY'];
 }
