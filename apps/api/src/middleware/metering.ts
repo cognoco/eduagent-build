@@ -812,6 +812,24 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       );
     } catch (err) {
       if (err instanceof MeteringError) {
+        // [WI-1008] Silent recovery in billing code is banned (AGENTS.md).
+        // Capture to Sentry so billing MeteringErrors are visible in alerting.
+        captureException(err, {
+          extra: {
+            code: err.code,
+            meta: err.meta,
+            subscriptionId,
+            profileId,
+            route: c.req.path,
+          },
+        });
+        logger.warn('Metering error during quota decrement', {
+          event: 'metering.metering_error',
+          code: err.code,
+          subscriptionId,
+          profileId,
+          route: c.req.path,
+        });
         return c.json({ error: err.code, meta: err.meta }, 500);
       }
       throw err;

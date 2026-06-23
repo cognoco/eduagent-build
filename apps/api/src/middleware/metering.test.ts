@@ -277,6 +277,22 @@ jest.mock(
   },
 );
 
+// [WI-1008] Sentry spy — assertion mechanism for MeteringError observability.
+// captureException must be called when decrementQuota throws a MeteringError.
+const mockCaptureException = jest.fn();
+jest.mock(
+  '../services/sentry' /* gc1-allow: sentry-boundary: @sentry/cloudflare SDK initializes a Worker-scoped client that cannot run in Node.js test environment */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/sentry',
+    ) as typeof import('../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
+
 jest.mock(
   '../services/logger' /* gc1-allow: metering unit test — logger spy is the assertion mechanism for KV observability (BUG-753) */,
   () => {
@@ -1474,6 +1490,46 @@ describe('metering middleware', () => {
           tier: 'free',
         },
       });
+    });
+
+    // [WI-1008] captureException regression: silent recovery in billing is
+    // banned (AGENTS.md). When decrementQuota throws a MeteringError the
+    // catch block must escalate to Sentry before returning the 500 response.
+    // Red-green: captureException is NOT called before this fix; IS called after.
+    it('[WI-1008] MeteringError catch block calls captureException before returning 500', async () => {
+      mockDecrementQuota.mockRejectedValue(
+        new MeteringError('PROFILE_QUOTA_ROW_MISSING', {
+          subscriptionId: 'sub-metering-err',
+          tier: 'plus',
+        }),
+      );
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'trigger metering error' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      // captureException must have been called with the MeteringError instance
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'PROFILE_QUOTA_ROW_MISSING' }),
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            code: 'PROFILE_QUOTA_ROW_MISSING',
+          }),
+        }),
+      );
+      // logger.warn must also have been called with the structured event field
+      expect(mockLoggerWarn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ event: 'metering.metering_error' }),
+      );
     });
 
     it('includes upgrade options in 402 response', async () => {
