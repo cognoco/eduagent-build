@@ -493,7 +493,15 @@ describe('idempotency', () => {
 
     const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
     expect(res.status).toBe(200);
-    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+    // Default payload: product_id='com.eduagent.plus.monthly' → tier='plus',
+    // period_type='NORMAL' → isTrial=false, app_user_id='clerk_user_123' → accountId='acc-1'
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'plus',
+      expect.any(String),
+      expect.objectContaining({ isTrial: false }),
+    );
   });
 
   it('skips out-of-order events (newer event already processed) [4C.3]', async () => {
@@ -660,8 +668,20 @@ describe('late event observation [CR-049]', () => {
     const body = await res.json();
     expect(body.received).toBe(true);
     expect(body.stale).toBeUndefined();
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
-    expect(ensureFreeSubscription).toHaveBeenCalled();
+    // Default payload: product_id='com.eduagent.plus.monthly' → same tier as existing
+    // sub ('plus'), so tierChanged=false → updateSubscriptionFromRevenuecatWebhook path.
+    // period_type='NORMAL' → trialEndsAt: null included.
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: null,
+        trialEndsAt: null,
+      }),
+    );
+    // Route calls ensureFreeSubscription(db, accountId) before dispatch.
+    expect(ensureFreeSubscription).toHaveBeenCalledWith(mockDb, 'acc-1');
   });
 
   it('[CR-049] processes recent events normally (within 48h window)', async () => {
@@ -673,7 +693,17 @@ describe('late event observation [CR-049]', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    // Default product 'com.eduagent.plus.monthly' matches existing tier 'plus'
+    // → no tier change → updateSubscriptionFromRevenuecatWebhook path.
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: null,
+        trialEndsAt: null,
+      }),
+    );
   });
 
   it('[CR-049] processes events with no event_timestamp_ms (missing field passes through)', async () => {
@@ -685,7 +715,14 @@ describe('late event observation [CR-049]', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    // Default product 'com.eduagent.plus.monthly' → same tier as existing sub ('plus')
+    // → no tier change → updateSubscriptionFromRevenuecatWebhook path with
+    // eventTimestampMs: undefined (absent from event), period_type='NORMAL' → trialEndsAt: null.
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'active', cancelledAt: null }),
+    );
   });
 });
 
@@ -1211,7 +1248,16 @@ describe('EXPIRATION', () => {
       makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' }),
     );
     expect(res.status).toBe(200);
-    expect(updateSubscriptionAndQuotaFromRevenuecatWebhook).toHaveBeenCalled();
+    // Non-trial expiration: handler calls updateSubscriptionAndQuotaFromRevenuecatWebhook
+    // with tier='free' / status='expired' AND the free-tier quota config atomically.
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
+      expect.objectContaining({ monthlyQuota: expect.any(Number) }),
+    );
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
@@ -1421,7 +1467,13 @@ describe('BILLING_ISSUE', () => {
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
 
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    // BILLING_ISSUE is exempt from the ordering skip; the handler still calls
+    // updateSubscriptionFromRevenuecatWebhook with status='past_due' and the correct accountId.
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'past_due' }),
+    );
     expect(inngest.send).toHaveBeenCalledWith({
       id: 'revenuecat-payment-failed:evt_rc_payment_failed_route_retry',
       name: 'app/payment.failed',
@@ -1812,7 +1864,17 @@ describe('PRODUCT_CHANGE', () => {
       }),
     );
     expect(res.status).toBe(200);
-    expect(updateSubscriptionAndQuotaFromRevenuecatWebhook).toHaveBeenCalled();
+    // new_product_id 'com.eduagent.pro.yearly' → newTier='pro'; handler calls
+    // updateSubscriptionAndQuotaFromRevenuecatWebhook with tier='pro' / status='active'
+    // AND the pro-tier quota config atomically — not via the separate updateQuotaPoolLimit.
+    expect(
+      updateSubscriptionAndQuotaFromRevenuecatWebhook,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ tier: 'pro', status: 'active' }),
+      expect.objectContaining({ monthlyQuota: expect.any(Number) }),
+    );
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
 
@@ -2067,8 +2129,16 @@ describe('NON_RENEWING_PURCHASE', () => {
 
     const res = await makeRequest(payload);
     expect(res.status).toBe(200);
-    // purchaseTopUpCredits IS called, but returns null (duplicate detected atomically)
-    expect(purchaseTopUpCredits).toHaveBeenCalled();
+    // purchaseTopUpCredits IS called with the correct args — duplicate detected
+    // atomically by ON CONFLICT DO NOTHING (returns null). Wrong account or
+    // transaction ID would pass the bare toHaveBeenCalled check but is still a bug.
+    expect(purchaseTopUpCredits).toHaveBeenCalledWith(
+      mockDb,
+      'sub-internal-1',
+      500,
+      expect.any(Date),
+      'txn_apple_duplicate',
+    );
   });
 
   it('refreshes KV cache after top-up', async () => {
@@ -2327,7 +2397,15 @@ describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
     expect(res.status).toBe(200);
 
     // Core DB activation still happened — only the cache refresh failed.
-    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalled();
+    // Default payload: product_id='com.eduagent.plus.monthly' → tier='plus',
+    // period_type='NORMAL' → isTrial=false, accountId='acc-1'.
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      'plus',
+      expect.any(String),
+      expect.objectContaining({ isTrial: false }),
+    );
 
     // The failure must be captured to Sentry.
     const sentryCall = mockCaptureException.mock.calls.find(
@@ -2352,7 +2430,13 @@ describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
     const res = await makeRequest(makeWebhookPayload('RENEWAL'));
 
     expect(res.status).toBe(200);
-    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalled();
+    // Default payload: product_id='com.eduagent.plus.monthly' → same tier as
+    // existing sub ('plus') → no tier change → updateSubscriptionFromRevenuecatWebhook path.
+    expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
+      mockDb,
+      'acc-1',
+      expect.objectContaining({ status: 'active', cancelledAt: null }),
+    );
     expect(mockCaptureException).toHaveBeenCalled();
   });
 
