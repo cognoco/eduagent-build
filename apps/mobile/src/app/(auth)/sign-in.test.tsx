@@ -1409,10 +1409,11 @@ describe('SignInScreen — Try MentoMate CTA (PREVIEW_ONBOARDING_ENABLED × PREV
   it('uses the localized CTA copy for the accessibility label', async () => {
     const originalLanguage = i18n.language;
     let unmount: (() => void) | undefined;
-    i18n.addResourceBundle('de', 'translation', deCatalog, false, true);
-    await i18n.changeLanguage('de');
 
     try {
+      i18n.addResourceBundle('de', 'translation', deCatalog, false, true);
+      await i18n.changeLanguage('de');
+
       mockPreviewOnboardingEnabled = true;
       mockPreviewEntryCtaEnabled = true;
       ({ unmount } = render(<SignInScreen />));
