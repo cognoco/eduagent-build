@@ -336,7 +336,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     // Session metadata should record the calibration
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
     expect(metadata['reviewCalibrationAttempts']).toBe(1);
 
     // Run the Inngest handler against the real DB
@@ -406,7 +408,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
     expect(metadata['reviewCalibrationAttempts']).toBe(2);
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
 
     // Handler updates the card
     const result = await executeHandler(eventData);
@@ -435,7 +439,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
     expect(metadata['reviewCalibrationAttempts']).toBe(2);
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
 
     // Retention card untouched — no grading happened
     const card = await loadRetentionCard(profileId, topicId);
