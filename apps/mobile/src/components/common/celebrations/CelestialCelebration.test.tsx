@@ -65,7 +65,7 @@ describe('CelestialCelebration', () => {
     mockReduceMotion.mockReturnValue(false);
   });
 
-  it('renders with provided testID and accessibility attributes', () => {
+  it('is hidden from assistive technology (decorative animation)', () => {
     render(
       <CelestialCelebration
         color="#f7c948"
@@ -74,9 +74,15 @@ describe('CelestialCelebration', () => {
       />,
     );
 
-    const element = screen.getByTestId('test-celebration');
-    expect(element.props.accessibilityRole).toBe('image');
-    expect(element.props.accessibilityLabel).toBe('Celebration animation');
+    // accessibilityElementsHidden hides the subtree from a11y queries;
+    // use includeHiddenElements:true to reach the element by testID.
+    const element = screen.getByTestId('test-celebration', {
+      includeHiddenElements: true,
+    });
+    expect(element.props.accessibilityElementsHidden).toBe(true);
+    expect(element.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(element.props.accessibilityRole).toBeUndefined();
+    expect(element.props.accessibilityLabel).toBeUndefined();
   });
 
   it('renders children inside the SVG', () => {
@@ -138,7 +144,11 @@ describe('CelestialCelebration', () => {
       />,
     );
 
-    const element = screen.getByTestId('test-celebration');
+    // accessibilityElementsHidden hides the subtree from a11y queries;
+    // use includeHiddenElements:true to reach the element by testID.
+    const element = screen.getByTestId('test-celebration', {
+      includeHiddenElements: true,
+    });
     const styles = [element.props.style].flat(Infinity);
     expect(styles).toEqual(
       expect.arrayContaining([
@@ -155,12 +165,14 @@ describe('PolarStar', () => {
 
   it('renders with default testID', () => {
     render(<PolarStar />);
-    screen.getByTestId('celebration-polar-star');
+    screen.getByTestId('celebration-polar-star', {
+      includeHiddenElements: true,
+    });
   });
 
   it('accepts custom testID', () => {
     render(<PolarStar testID="custom-polar" />);
-    screen.getByTestId('custom-polar');
+    screen.getByTestId('custom-polar', { includeHiddenElements: true });
   });
 
   it('passes onComplete to CelestialCelebration', () => {
@@ -175,35 +187,39 @@ describe('PolarStar', () => {
 describe('TwinStars', () => {
   it('renders with default testID', () => {
     render(<TwinStars />);
-    screen.getByTestId('celebration-twin-stars');
+    screen.getByTestId('celebration-twin-stars', {
+      includeHiddenElements: true,
+    });
   });
 
   it('accepts custom testID', () => {
     render(<TwinStars testID="custom-twins" />);
-    screen.getByTestId('custom-twins');
+    screen.getByTestId('custom-twins', { includeHiddenElements: true });
   });
 });
 
 describe('Comet', () => {
   it('renders with default testID', () => {
     render(<Comet />);
-    screen.getByTestId('celebration-comet');
+    screen.getByTestId('celebration-comet', { includeHiddenElements: true });
   });
 
   it('accepts custom testID', () => {
     render(<Comet testID="custom-comet" />);
-    screen.getByTestId('custom-comet');
+    screen.getByTestId('custom-comet', { includeHiddenElements: true });
   });
 });
 
 describe('OrionsBelt', () => {
   it('renders with default testID', () => {
     render(<OrionsBelt />);
-    screen.getByTestId('celebration-orions-belt');
+    screen.getByTestId('celebration-orions-belt', {
+      includeHiddenElements: true,
+    });
   });
 
   it('accepts custom testID', () => {
     render(<OrionsBelt testID="custom-orion" />);
-    screen.getByTestId('custom-orion');
+    screen.getByTestId('custom-orion', { includeHiddenElements: true });
   });
 });
