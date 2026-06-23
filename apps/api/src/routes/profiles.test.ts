@@ -42,6 +42,7 @@ jest.mock('../services/identity-v2/profile-v2', () => {
 // GC1 Pattern A: requireActual + targeted override (real orchestrator covered by
 // child-profile-v2.integration.test.ts; route tests only stub createChildProfileV2).
 jest.mock('../services/identity-v2/child-profile-v2', () => {
+  // gc1-allow: unit-route isolation; real orchestrator covered by child-profile-v2.integration.test.ts
   const actual = jest.requireActual(
     '../services/identity-v2/child-profile-v2',
   ) as typeof import('../services/identity-v2/child-profile-v2');
@@ -55,6 +56,7 @@ jest.mock('../services/identity-v2/child-profile-v2', () => {
 // by identity-graph integration tests; route tests only observe whether the
 // pre-graph branch reaches createIdentityGraph).
 jest.mock('../services/identity-v2/identity-graph', () => {
+  // gc1-allow: unit-route isolation; real graph bootstrap covered by identity-graph integration tests
   const actual = jest.requireActual(
     '../services/identity-v2/identity-graph',
   ) as typeof import('../services/identity-v2/identity-graph');

@@ -30,6 +30,7 @@ import {
 } from '@eduagent/database';
 import type {
   CelebrationReason,
+  ChildSession,
   LearningSession,
   SessionStartInput,
   FirstCurriculumSessionStartInput,
@@ -44,6 +45,7 @@ import type {
   BookTopicGenerationResult,
   SystemPromptIntent,
 } from '@eduagent/schemas';
+export type { ChildSession } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
   extractedInterviewSignalsSchema,
@@ -2001,39 +2003,8 @@ export async function getResumeNudgeCandidate(
 // (parent-proxy view, which adds its own access guard before delegating here).
 // ---------------------------------------------------------------------------
 
-export interface ChildSessionDrillScore {
-  correct: number;
-  total: number;
-  createdAt: string;
-}
-
-export interface ChildSession {
-  sessionId: string;
-  subjectId: string;
-  subjectName: string | null;
-  topicId: string | null;
-  topicTitle: string | null;
-  sessionType: string;
-  startedAt: string;
-  endedAt: string | null;
-  exchangeCount: number;
-  escalationRung: number;
-  durationSeconds: number | null;
-  wallClockSeconds: number | null;
-  displayTitle: string;
-  displaySummary: string | null;
-  homeworkSummary: HomeworkSummary | null;
-  highlight: string | null;
-  narrative: string | null;
-  conversationPrompt: string | null;
-  engagementSignal: EngagementSignal | null;
-  /**
-   * Fluency-drill outcomes recorded during this session, oldest first.
-   * Empty when no scored drill happened. Used by per-topic detail to render
-   * a "Recent drills: 4/5, 3/5, 5/5" strip without a separate endpoint.
-   */
-  drills: ChildSessionDrillScore[];
-}
+/** Derived from the canonical ChildSession type in @eduagent/schemas. */
+export type ChildSessionDrillScore = ChildSession['drills'][number];
 
 type LearningSessionRow = typeof learningSessions.$inferSelect;
 

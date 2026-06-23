@@ -41,6 +41,7 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 
 const mockCaptureException = jest.fn();
 jest.mock('@sentry/cloudflare', () => ({
+  // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
   withScope: (fn) =>
     fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
   captureException: (...args) => mockCaptureException(...args),
@@ -335,7 +336,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     // Session metadata should record the calibration
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
     expect(metadata['reviewCalibrationAttempts']).toBe(1);
 
     // Run the Inngest handler against the real DB
@@ -405,7 +408,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
     expect(metadata['reviewCalibrationAttempts']).toBe(2);
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
 
     // Handler updates the card
     const result = await executeHandler(eventData);
@@ -434,7 +439,9 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const session = await loadSession(sessionId);
     const metadata = session!.metadata as Record<string, unknown>;
     expect(metadata['reviewCalibrationAttempts']).toBe(2);
-    expect(metadata['reviewCalibrationFiredAt']).toBeDefined();
+    expect(metadata['reviewCalibrationFiredAt']).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+    );
 
     // Retention card untouched — no grading happened
     const card = await loadRetentionCard(profileId, topicId);
