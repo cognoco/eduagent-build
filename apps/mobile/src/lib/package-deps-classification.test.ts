@@ -27,17 +27,19 @@ const pkg = JSON.parse(
   devDependencies?: Record<string, string>;
 };
 
+const rootPkg = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../../package.json'), 'utf8'),
+) as {
+  pnpm?: {
+    overrides?: Record<string, string>;
+  };
+};
+
 const rootLockfile = parse(
   readFileSync(resolve(__dirname, '../../../../pnpm-lock.yaml'), 'utf8'),
 ) as {
   packages?: Record<string, unknown>;
   snapshots?: Record<string, { dependencies?: Record<string, string> }>;
-};
-
-const rootPkg = JSON.parse(
-  readFileSync(resolve(__dirname, '../../../../package.json'), 'utf8'),
-) as {
-  pnpm?: { overrides?: Record<string, string> };
 };
 
 const BUILD_ONLY_DEPS = [
@@ -143,5 +145,31 @@ describe('workspace protobufjs dependency security floor [WI-1029]', () => {
         expect(snapshot.dependencies?.protobufjs).toBe('7.6.4');
       }
     }
+  });
+});
+
+describe('workspace ws dependency security floor [WI-1028]', () => {
+  it('uses range overrides that catch all vulnerable ws 6.x, 7.x, and 8.x selectors', () => {
+    const overrides = rootPkg.pnpm?.overrides ?? {};
+
+    expect(overrides['ws@>=6.0.0 <7.0.0']).toBe('6.2.4');
+    expect(overrides['ws@>=7.0.0 <8.0.0']).toBe('7.5.11');
+    expect(overrides['ws@^8.0.0']).toBe('8.21.0');
+    expect(overrides['ws@~6.0.0']).toBeUndefined();
+    expect(overrides['ws@~7.0.0']).toBeUndefined();
+  });
+
+  it('lockfile does not retain ws versions vulnerable to CVE-2026-48779', () => {
+    const wsPackages = Object.keys(rootLockfile.packages ?? {}).filter((key) =>
+      key.startsWith('ws@'),
+    );
+
+    expect(wsPackages.length).toBeGreaterThan(0);
+    expect(wsPackages).not.toEqual(
+      expect.arrayContaining(['ws@6.2.3', 'ws@7.5.10', 'ws@8.20.0']),
+    );
+    expect(wsPackages).toEqual(
+      expect.arrayContaining(['ws@6.2.4', 'ws@7.5.11', 'ws@8.21.0']),
+    );
   });
 });
