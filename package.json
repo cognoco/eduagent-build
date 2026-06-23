@@ -141,6 +141,10 @@
       "@types/node@^12": "^22.0.0",
       "handlebars": ">=4.7.9",
       "vitest": "3.2.6",
+      "minimatch@3": "9.0.9",
+      "minimatch@5": "9.0.9",
+      "minimatch@9": "9.0.9",
+      "minimatch@10": "10.2.5",
       "tar": ">=7.5.16",
       "node-forge": ">=1.4.0"
     },
