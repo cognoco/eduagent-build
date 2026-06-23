@@ -60,7 +60,10 @@ import { listStruggleTopicNames } from '../../services/learner-profile';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
-import { progressMetricsSchema } from '@eduagent/schemas';
+import {
+  monthlyReportGenerateEventSchema,
+  progressMetricsSchema,
+} from '@eduagent/schemas';
 import { parseConversationLanguage } from '../../services/llm';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
@@ -297,7 +300,12 @@ export const monthlyReportGenerate = inngest.createFunction(
   },
   { event: 'app/monthly-report.generate' },
   async ({ event, step }) => {
-    const { parentId, childId } = event.data;
+    // [WI-985] Parse at the Inngest function boundary. Throws ZodError on
+    // malformed data — Inngest will retry; avoids silent NaN/undefined
+    // propagation from bare destructuring.
+    const { parentId, childId } = monthlyReportGenerateEventSchema.parse(
+      event.data,
+    );
     const isSelfReport = parentId === childId;
 
     // [J-6] Step 1: Generate and persist report data.

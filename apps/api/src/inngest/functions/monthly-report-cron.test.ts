@@ -534,12 +534,25 @@ function restoreIdentityV2Flag(prev: string | undefined): void {
   }
 }
 
+// [WI-985] Valid UUIDs so monthlyReportGenerateEventSchema.parse() succeeds.
+// These replace the previous non-UUID strings PARENT_ID_1 / CHILD_ID_1 etc.
+const PARENT_ID_1 = '00000000-0000-4000-8000-000000000001';
+const CHILD_ID_1 = '00000000-0000-4000-8000-000000000011';
+const PARENT_ID_2 = '00000000-0000-4000-8000-000000000002';
+const CHILD_ID_2 = '00000000-0000-4000-8000-000000000012';
+const LEGACY_PARENT_ID = '00000000-0000-4000-8000-000000000003';
+const CHILD_ID_XYZ = '00000000-0000-4000-8000-000000000099';
+const PARENT_ID_XYZ = '00000000-0000-4000-8000-0000000000a1';
+const CHILD_ID_XYZ2 = '00000000-0000-4000-8000-0000000000a2';
+const PARENT_ID_999 = '00000000-0000-4000-8000-0000000000b1';
+const CHILD_ID_999 = '00000000-0000-4000-8000-0000000000b2';
+
 function makeGenerateEvent(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
-    parentId: 'parent-001',
-    childId: 'child-001',
+    parentId: PARENT_ID_1,
+    childId: CHILD_ID_1,
     ...overrides,
   };
 }
@@ -708,8 +721,8 @@ describe('monthlyReportCron', () => {
       (
         mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
       ).mockResolvedValue([
-        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
-        { parentProfileId: 'parent-002', childProfileId: 'child-002' },
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
       ]);
       // selectDistinct returns empty — no active children
       mockSelectDistinctWhere.mockResolvedValue([]);
@@ -723,12 +736,12 @@ describe('monthlyReportCron', () => {
       (
         mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
       ).mockResolvedValue([
-        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
-        { parentProfileId: 'parent-002', childProfileId: 'child-002' },
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
       ]);
       // child-001 is active, child-002 is not
       mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: 'child-001' },
+        { childProfileId: CHILD_ID_1 },
       ]);
 
       const { result } = await executeCronSteps();
@@ -740,10 +753,10 @@ describe('monthlyReportCron', () => {
       (
         mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
       ).mockResolvedValue([
-        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
       ]);
       mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: 'child-001' },
+        { childProfileId: CHILD_ID_1 },
       ]);
       mockListEligibleSelfReportProfileIds.mockResolvedValue([
         '11111111-1111-4111-8111-111111111111',
@@ -759,7 +772,7 @@ describe('monthlyReportCron', () => {
             payload: expect.arrayContaining([
               expect.objectContaining({
                 name: 'app/monthly-report.generate',
-                data: { parentId: 'parent-001', childId: 'child-001' },
+                data: { parentId: PARENT_ID_1, childId: CHILD_ID_1 },
               }),
               expect.objectContaining({
                 name: 'app/monthly-report.generate',
@@ -778,12 +791,12 @@ describe('monthlyReportCron', () => {
       (
         mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
       ).mockResolvedValue([
-        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
-        { parentProfileId: 'parent-002', childProfileId: 'child-002' },
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
       ]);
       mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: 'child-001' },
-        { childProfileId: 'child-002' },
+        { childProfileId: CHILD_ID_1 },
+        { childProfileId: CHILD_ID_2 },
       ]);
 
       const { runner } = await executeCronSteps();
@@ -795,11 +808,11 @@ describe('monthlyReportCron', () => {
             payload: expect.arrayContaining([
               expect.objectContaining({
                 name: 'app/monthly-report.generate',
-                data: { parentId: 'parent-001', childId: 'child-001' },
+                data: { parentId: PARENT_ID_1, childId: CHILD_ID_1 },
               }),
               expect.objectContaining({
                 name: 'app/monthly-report.generate',
-                data: { parentId: 'parent-002', childId: 'child-002' },
+                data: { parentId: PARENT_ID_2, childId: CHILD_ID_2 },
               }),
             ]),
           },
@@ -811,12 +824,12 @@ describe('monthlyReportCron', () => {
       (
         mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
       ).mockResolvedValue([
-        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
-        { parentProfileId: 'parent-002', childProfileId: 'child-002' },
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
         { parentProfileId: 'parent-003', childProfileId: 'child-003' },
       ]);
       mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: 'child-001' },
+        { childProfileId: CHILD_ID_1 },
         { childProfileId: 'child-003' },
       ]);
 
@@ -868,18 +881,18 @@ describe('monthlyReportCron', () => {
       try {
         // Active children (progressSnapshots scan).
         mockSelectDistinctWhere.mockResolvedValue([
-          { childProfileId: 'child-001' },
+          { childProfileId: CHILD_ID_1 },
         ]);
         // Guardianship edge: guardian → charge maps to parent → child.
         mockSelectFromGuardianshipWhere.mockResolvedValue([
-          { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+          { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
         ]);
         // Legacy familyLinks read, if (wrongly) taken, would yield a different
         // pair — seed it so a regression to the legacy path is observable.
         (
           mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
         ).mockResolvedValue([
-          { parentProfileId: 'LEGACY-parent', childProfileId: 'child-001' },
+          { parentProfileId: LEGACY_PARENT_ID, childProfileId: CHILD_ID_1 },
         ]);
 
         const { result, runner } = await executeCronSteps();
@@ -896,7 +909,7 @@ describe('monthlyReportCron', () => {
               payload: expect.arrayContaining([
                 expect.objectContaining({
                   name: 'app/monthly-report.generate',
-                  data: { parentId: 'parent-001', childId: 'child-001' },
+                  data: { parentId: PARENT_ID_1, childId: CHILD_ID_1 },
                 }),
               ]),
             },
@@ -912,12 +925,12 @@ describe('monthlyReportCron', () => {
       delete process.env['IDENTITY_V2_ENABLED'];
       try {
         mockSelectDistinctWhere.mockResolvedValue([
-          { childProfileId: 'child-001' },
+          { childProfileId: CHILD_ID_1 },
         ]);
         (
           mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
         ).mockResolvedValue([
-          { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+          { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
         ]);
 
         const { result } = await executeCronSteps();
@@ -1100,8 +1113,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'skipped',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
         reason: 'parent_child_link_missing',
       });
       expect(mockGenerateMonthlyReportData).not.toHaveBeenCalled();
@@ -1165,8 +1178,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'completed',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
       });
     });
 
@@ -1204,13 +1217,13 @@ describe('monthlyReportGenerate', () => {
       expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
         1,
         mockMonthlyReportDb,
-        'child-001',
+        CHILD_ID_1,
         SAMPLE_METRICS,
       );
       expect(mockFilterProgressMetricsToActiveSubjects).toHaveBeenNthCalledWith(
         2,
         mockMonthlyReportDb,
-        'child-001',
+        CHILD_ID_1,
         SAMPLE_METRICS,
       );
       expect(mockGenerateMonthlyReportData).toHaveBeenCalledWith(
@@ -1228,7 +1241,7 @@ describe('monthlyReportGenerate', () => {
       expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
         mockMonthlyReportDb,
         {
-          profileId: 'child-001',
+          profileId: CHILD_ID_1,
           period: {
             start: new Date('2026-03-01T00:00:00.000Z'),
             endExclusive: new Date('2026-04-01T00:00:00.000Z'),
@@ -1256,8 +1269,8 @@ describe('monthlyReportGenerate', () => {
       expect(mockInsert).toHaveBeenCalledTimes(1);
       expect(mockInsertValues).toHaveBeenCalledWith(
         expect.objectContaining({
-          profileId: 'parent-001',
-          childProfileId: 'child-001',
+          profileId: PARENT_ID_1,
+          childProfileId: CHILD_ID_1,
           reportMonth: expect.any(String),
           reportData: expect.objectContaining({ childName: 'Emma' }),
         }),
@@ -1271,7 +1284,7 @@ describe('monthlyReportGenerate', () => {
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(), // db
         expect.objectContaining({
-          profileId: 'parent-001',
+          profileId: PARENT_ID_1,
           type: 'monthly_report',
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
@@ -1286,13 +1299,13 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValueOnce(null);
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ id: 'parent-001' })
-        .mockResolvedValueOnce({ id: 'parent-001' })
-        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' })
+        .mockResolvedValueOnce({ id: PARENT_ID_1 })
+        .mockResolvedValueOnce({ id: PARENT_ID_1 })
+        .mockResolvedValueOnce({ id: CHILD_ID_1, displayName: 'Emma' })
         .mockResolvedValueOnce({ accountId: 'account-parent' })
         // Email step rehydrates the child name here instead of reading it
         // from the memoized generate-step return.
-        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' });
+        .mockResolvedValueOnce({ id: CHILD_ID_1, displayName: 'Emma' });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
@@ -1311,7 +1324,7 @@ describe('monthlyReportGenerate', () => {
         }),
         expect.objectContaining({
           resendApiKey: 'resend-test-key',
-          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
+          idempotencyKey: expect.stringContaining(`monthly-${PARENT_ID_1}-`),
         }),
       );
     });
@@ -1399,7 +1412,7 @@ describe('monthlyReportGenerate', () => {
         ])
         .mockResolvedValueOnce([]); // no previous
 
-      await executeGenerateSteps(makeGenerateEvent({ childId: 'child-002' }));
+      await executeGenerateSteps(makeGenerateEvent({ childId: CHILD_ID_2 }));
 
       expect(mockGenerateMonthlyReportData).toHaveBeenCalledWith(
         'Sam',
@@ -1428,8 +1441,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'completed',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
       });
       expect(mockInsert).toHaveBeenCalled();
       expect(mockSendPushNotification).toHaveBeenCalled();
@@ -1544,7 +1557,7 @@ describe('monthlyReportGenerate', () => {
 
       expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
         expect.anything(),
-        'parent-001',
+        PARENT_ID_1,
         'monthly_report',
         24,
       );
@@ -1577,8 +1590,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'completed',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
       });
       expect(mockSendPushNotification).not.toHaveBeenCalled();
       expect(mockSendEmail).not.toHaveBeenCalled();
@@ -1587,7 +1600,7 @@ describe('monthlyReportGenerate', () => {
     it('[WI-86] skips monthly push and email when child is archived after report generation', async () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
-        .mockResolvedValueOnce({ id: 'parent-001' })
+        .mockResolvedValueOnce({ id: PARENT_ID_1 })
         .mockResolvedValueOnce(null);
 
       const { result } = await executeGenerateSteps(makeGenerateEvent(), {
@@ -1602,8 +1615,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'completed',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
       });
       expect(mockSendPushNotification).not.toHaveBeenCalled();
       expect(mockSendEmail).not.toHaveBeenCalled();
@@ -1613,12 +1626,12 @@ describe('monthlyReportGenerate', () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
 
       await executeGenerateSteps(
-        makeGenerateEvent({ parentId: 'parent-XYZ', childId: 'child-XYZ' }),
+        makeGenerateEvent({ parentId: PARENT_ID_XYZ, childId: CHILD_ID_XYZ2 }),
       );
 
       expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
         expect.anything(),
-        'parent-XYZ',
+        PARENT_ID_XYZ,
         'monthly_report',
         24,
       );
@@ -1732,7 +1745,7 @@ describe('monthlyReportGenerate', () => {
       expect(mockSendEmail).toHaveBeenCalledWith(
         expect.objectContaining({ to: 'parent@example.test' }),
         expect.objectContaining({
-          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
+          idempotencyKey: expect.stringContaining(`monthly-${PARENT_ID_1}-`),
         }),
       );
     });
@@ -1797,8 +1810,8 @@ describe('monthlyReportGenerate', () => {
 
       expect(result).toEqual({
         status: 'completed',
-        parentId: 'parent-001',
-        childId: 'child-001',
+        parentId: PARENT_ID_1,
+        childId: CHILD_ID_1,
       });
     });
   });
@@ -1826,7 +1839,7 @@ describe('monthlyReportGenerate', () => {
 
       await expect(
         executeGenerateSteps(
-          makeGenerateEvent({ parentId: 'parent-999', childId: 'child-999' }),
+          makeGenerateEvent({ parentId: PARENT_ID_999, childId: CHILD_ID_999 }),
         ),
       ).rejects.toThrow('DB connection lost');
 
@@ -1836,8 +1849,8 @@ describe('monthlyReportGenerate', () => {
         expect.objectContaining({ message: 'DB connection lost' }),
         expect.objectContaining({
           extra: expect.objectContaining({
-            parentId: 'parent-999',
-            childId: 'child-999',
+            parentId: PARENT_ID_999,
+            childId: CHILD_ID_999,
             context: 'monthly-report-generate',
           }),
         }),
@@ -1932,19 +1945,19 @@ describe('monthlyReportGenerate', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      await executeGenerateSteps(makeGenerateEvent({ childId: 'child-xyz' }));
+      await executeGenerateSteps(makeGenerateEvent({ childId: CHILD_ID_XYZ }));
 
       expect(mockGetSnapshotsInRange).toHaveBeenNthCalledWith(
         1,
         expect.anything(), // db
-        'child-xyz',
+        CHILD_ID_XYZ,
         expect.any(String), // from date
         expect.any(String), // to date
       );
       expect(mockGetSnapshotsInRange).toHaveBeenNthCalledWith(
         2,
         expect.anything(),
-        'child-xyz',
+        CHILD_ID_XYZ,
         expect.any(String),
         expect.any(String),
       );
@@ -2033,11 +2046,11 @@ describe('monthlyReportGenerate', () => {
       ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
       (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
         .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ id: 'parent-001' })
-        .mockResolvedValueOnce({ id: 'parent-001' })
-        .mockResolvedValueOnce({ id: 'child-001' })
+        .mockResolvedValueOnce({ id: PARENT_ID_1 })
+        .mockResolvedValueOnce({ id: PARENT_ID_1 })
+        .mockResolvedValueOnce({ id: CHILD_ID_1 })
         .mockResolvedValueOnce({ accountId: 'account-parent' })
-        .mockResolvedValueOnce({ id: 'child-001' });
+        .mockResolvedValueOnce({ id: CHILD_ID_1 });
       (
         mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
@@ -2131,7 +2144,7 @@ describe('memoized step-state PII break test [F-086]', () => {
     (
       mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
     ).mockResolvedValue({
-      id: 'child-001',
+      id: CHILD_ID_1,
       displayName: 'Emma',
       accountId: 'account-parent',
     });
@@ -2190,5 +2203,19 @@ describe('memoized step-state PII break test [F-086]', () => {
     expect(serialized).not.toContain('Fractions');
     expect(JSON.stringify(result)).not.toContain('Emma');
     expect(JSON.stringify(result)).not.toContain('Fractions');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-985] monthlyReportGenerate — Zod boundary parse regression test
+// ---------------------------------------------------------------------------
+
+describe('[WI-985] monthlyReportGenerate — event.data parse guard', () => {
+  it('throws ZodError when parentId and childId are not UUIDs', async () => {
+    // The parse call is outside any `step.run`, so it runs synchronously
+    // before any step is scheduled and throws immediately. Inngest will retry.
+    await expect(
+      executeGenerateSteps({ parentId: 'not-a-uuid', childId: 'also-bad' }),
+    ).rejects.toThrow(/invalid_string|uuid/i);
   });
 });

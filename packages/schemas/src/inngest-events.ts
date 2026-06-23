@@ -451,3 +451,23 @@ export const summaryReconciliationScannedEventSchema = z.object({
 export type SummaryReconciliationScannedEvent = z.infer<
   typeof summaryReconciliationScannedEventSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Cron fan-out event schemas — [WI-985] typed event data for parse-at-boundary
+// ---------------------------------------------------------------------------
+
+/** Fan-out payload fired by monthlyReportCron → monthlyReportGenerate. */
+export const monthlyReportGenerateEventSchema = z.object({
+  parentId: z.string().uuid(),
+  childId: z.string().uuid(),
+});
+export type MonthlyReportGenerateEvent = z.infer<
+  typeof monthlyReportGenerateEventSchema
+>;
+
+/** Fan-out payload fired by dailySnapshotCron → dailySnapshotRefresh. */
+export const snapshotRefreshEventSchema = z.object({
+  profileId: z.string().uuid(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type SnapshotRefreshEvent = z.infer<typeof snapshotRefreshEventSchema>;
