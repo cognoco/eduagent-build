@@ -3,6 +3,7 @@ import { isoDateField } from './common.ts';
 import { profileSchema } from './profiles.ts';
 import { consentStatusSchema, consentTypeSchema } from './consent.ts';
 import { learningProfileSchema } from './learning-profiles.ts';
+import { subscriptionTierSchema, subscriptionStatusSchema } from './billing.ts';
 
 /**
  * [BUG-206] Narrowed export row shape.
@@ -22,10 +23,93 @@ import { learningProfileSchema } from './learning-profiles.ts';
 export const dataExportRowSchema = z.record(z.string(), z.unknown());
 export type DataExportRow = z.infer<typeof dataExportRowSchema>;
 
+// ---------------------------------------------------------------------------
+// [WI-978] Tightened per-table export row schemas.
+//
+// Highest-sensitivity tables (subscriptions, assessments) are given real
+// z.object schemas matching the Drizzle column types.
+//
+// Deferred tables — still z.record stubs awaiting a future PR to tighten:
+//   subjects, curricula, curriculumTopics, learningSessions, sessionEvents,
+//   sessionSummaries, retentionCards, xpLedger, streaks,
+//   notificationPreferences, learningModes, teachingPreferences,
+//   parkingLotItems, sessionEmbeddings, quotaPools, topUpCredits,
+//   needsDeepeningTopics, familyLinks, mentorActivityLedger.
+//
+// Tracked backlog: these 19 deferred aliases should be tightened in future
+// WIs once the boundary value of each schema is evaluated. Priority order:
+// retentionCards (mastery data) > learningSessions (usage) > the rest.
+// ---------------------------------------------------------------------------
+
 /**
- * Per-table row schemas. Today they are all aliases of `dataExportRowSchema`;
- * PRs that author a stricter schema for, e.g., `subjects` should replace
- * the alias here.
+ * [WI-978] Subscriptions export row — billing-sensitive table tightened.
+ * Matches the `subscriptions` Drizzle table columns. Optional fields mirror
+ * nullable/absent DB columns (Stripe / RevenueCat fields may be absent for
+ * IAP-only or free-tier accounts).
+ */
+export const dataExportSubscriptionRowSchema = z.object({
+  id: z.string().uuid(),
+  accountId: z.string().uuid(),
+  stripeCustomerId: z.string().nullable().optional(),
+  stripeSubscriptionId: z.string().nullable().optional(),
+  tier: subscriptionTierSchema,
+  status: subscriptionStatusSchema,
+  trialEndsAt: isoDateField.nullable().optional(),
+  currentPeriodStart: isoDateField.nullable().optional(),
+  currentPeriodEnd: isoDateField.nullable().optional(),
+  cancelledAt: isoDateField.nullable().optional(),
+  lastStripeEventTimestamp: isoDateField.nullable().optional(),
+  lastStripeEventId: z.string().nullable().optional(),
+  revenuecatOriginalAppUserId: z.string().nullable().optional(),
+  lastRevenuecatEventId: z.string().nullable().optional(),
+  lastRevenuecatEventTimestampMs: z.string().nullable().optional(),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
+});
+export type DataExportSubscriptionRow = z.infer<
+  typeof dataExportSubscriptionRowSchema
+>;
+
+/**
+ * [WI-978] Assessments export row — learning-data-sensitive table tightened.
+ * Matches the `assessments` Drizzle table columns. The `exchangeHistory`
+ * JSONB column is typed as an unknown array (the full ChatExchange schema
+ * lives in db-jsonb.ts — use z.array(z.unknown()) here to avoid a circular
+ * dependency through the schema package barrel).
+ */
+export const dataExportAssessmentRowSchema = z.object({
+  id: z.string().uuid(),
+  profileId: z.string().uuid(),
+  subjectId: z.string().uuid(),
+  topicId: z.string().uuid(),
+  sessionId: z.string().uuid().nullable().optional(),
+  verificationDepth: z
+    .enum(['recall', 'explain', 'transfer'])
+    .default('recall'),
+  status: z.enum([
+    'in_progress',
+    'passed',
+    'failed',
+    'borderline',
+    'failed_exhausted',
+  ]),
+  masteryScore: z.number().nullable().optional(),
+  masteryChallengeVerifiedAt: isoDateField.nullable().optional(),
+  qualityRating: z.number().int().nullable().optional(),
+  exchangeHistory: z.array(z.unknown()).default([]),
+  createdAt: isoDateField,
+  updatedAt: isoDateField,
+});
+export type DataExportAssessmentRow = z.infer<
+  typeof dataExportAssessmentRowSchema
+>;
+
+/**
+ * Per-table row schemas.
+ *
+ * Tightened (WI-978): dataExportSubscriptionRowSchema, dataExportAssessmentRowSchema.
+ * Deferred (19 tables — see backlog comment above): all below are still
+ * dataExportRowSchema aliases awaiting future per-table tightening.
  */
 export const dataExportSubjectRowSchema = dataExportRowSchema;
 export const dataExportCurriculumRowSchema = dataExportRowSchema;
@@ -34,7 +118,6 @@ export const dataExportLearningSessionRowSchema = dataExportRowSchema;
 export const dataExportSessionEventRowSchema = dataExportRowSchema;
 export const dataExportSessionSummaryRowSchema = dataExportRowSchema;
 export const dataExportRetentionCardRowSchema = dataExportRowSchema;
-export const dataExportAssessmentRowSchema = dataExportRowSchema;
 export const dataExportXpLedgerRowSchema = dataExportRowSchema;
 export const dataExportStreakRowSchema = dataExportRowSchema;
 export const dataExportNotificationPreferenceRowSchema = dataExportRowSchema;
@@ -42,7 +125,6 @@ export const dataExportLearningModeRowSchema = dataExportRowSchema;
 export const dataExportTeachingPreferenceRowSchema = dataExportRowSchema;
 export const dataExportParkingLotItemRowSchema = dataExportRowSchema;
 export const dataExportSessionEmbeddingRowSchema = dataExportRowSchema;
-export const dataExportSubscriptionRowSchema = dataExportRowSchema;
 export const dataExportQuotaPoolRowSchema = dataExportRowSchema;
 export const dataExportTopUpCreditRowSchema = dataExportRowSchema;
 export const dataExportNeedsDeepeningTopicRowSchema = dataExportRowSchema;

@@ -39,7 +39,12 @@ import {
   topUpCredits,
   type Database,
 } from '@eduagent/database';
-import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
+import type {
+  ConsentStatus,
+  DataExport,
+  Profile,
+  DataExportSubscriptionRow,
+} from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
 import {
   resolveLatestConsentStatusAnyBasis,
@@ -245,8 +250,11 @@ export async function generateExportV2(
         createdAt: g.createdAt,
       }),
     ),
-    subscriptions: subscriptionRows.map((s) =>
-      serializeDates(s as Record<string, unknown>),
+    subscriptions: subscriptionRows.map(
+      (s) =>
+        serializeDates(
+          s as Record<string, unknown>,
+        ) as DataExportSubscriptionRow,
     ),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),

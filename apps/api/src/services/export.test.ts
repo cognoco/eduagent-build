@@ -545,13 +545,17 @@ describe('generateExport', () => {
       // always queried regardless of profileIds — ideal for a Date-serialisation
       // schema-parse test that doesn't depend on profileSchema.
       const date = new Date('2025-05-01T00:00:00.000Z');
+      // [WI-978] Row must match the tightened dataExportSubscriptionRowSchema:
+      // real column names (`tier`/`status`) and valid UUIDs for id/accountId.
+      const subUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f701';
+      const acctUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f702';
       const subscriptionRow = {
-        id: 'sub-1',
-        accountId: 'account-1',
-        plan: 'plus',
+        id: subUuid,
+        accountId: acctUuid,
+        tier: 'plus',
+        status: 'active',
         createdAt: date,
         updatedAt: date,
-        expiresAt: date,
       };
       const db = createMockDb({
         profiles: [],
