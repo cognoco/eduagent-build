@@ -120,7 +120,7 @@ export {
   markSessionFiled,
   backfillSessionTopicId,
 } from './session-book';
-export type { BookSession } from './session-book';
+export type { BookSession } from '@eduagent/schemas';
 
 // Depth evaluation
 export { evaluateSessionDepth } from './session-depth';

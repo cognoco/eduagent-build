@@ -10,16 +10,8 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { type BookSession } from '@eduagent/schemas';
 import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
-
-export interface BookSession {
-  id: string;
-  topicId: string | null;
-  topicTitle: string;
-  chapter: string | null;
-  exchangeCount: number;
-  createdAt: string;
-}
 
 /**
  * Returns sessions for a specific book, including both properly completed
