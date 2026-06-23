@@ -131,9 +131,24 @@ describe('NowCardStack', () => {
     );
 
     expect(getByTestId('now-card-slot-module-0')).toBeTruthy();
-    expect(getByTestId('now-card-slot-module-0').props.accessibilityLabel).toBe(
-      'module',
+  });
+
+  it('slot wrapper Views expose no debug accessibilityLabel to screen readers', () => {
+    const { queryByLabelText } = render(
+      <NowCardStack
+        feed={feed([
+          card('unfinished_session', 'topic-1'),
+          card('retention_due', 'topic-2'),
+        ])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
     );
+
+    expect(queryByLabelText('anchor')).toBeNull();
+    expect(queryByLabelText('module')).toBeNull();
   });
 
   it('threads anchor arc state and completion events into actionable cards', () => {
