@@ -401,7 +401,8 @@
         "accessibilityLabel": "Adicionar um aluno à sua família"
       },
       "childProfileLabel": "Perfil de {{name}}",
-      "greetingFallbackName": "Olá"
+      "greetingFallbackName": "Olá",
+      "greetingNoName": "Olá!"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",

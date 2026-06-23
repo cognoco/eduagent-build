@@ -401,7 +401,8 @@
         "accessibilityLabel": "Legg til en elev i familien din"
       },
       "childProfileLabel": "{{name}}s profil",
-      "greetingFallbackName": "der"
+      "greetingFallbackName": "der",
+      "greetingNoName": "Hei på deg!"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
