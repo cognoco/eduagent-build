@@ -18,7 +18,10 @@ const dropWorktreeGuards = (patterns) =>
 const ciDefaults = process.env.CI
   ? {
       silent: true,
-      reporters: ['default', join(__dirname, '../../scripts/jest-ci-reporter.cjs')],
+      reporters: [
+        'default',
+        join(__dirname, '../../scripts/jest-ci-reporter.cjs'),
+      ],
     }
   : {};
 
@@ -28,12 +31,18 @@ module.exports = {
   testEnvironment: 'node',
   ...ciDefaults,
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
+    '^.+\\.ts$': [
+      'ts-jest',
+      { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' },
+    ],
   },
   // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
   // localhost (CI container). Unit tests override with their own jest.mock.
   // File lives outside apps/api/ to avoid NX module-boundary lint cascade.
-  setupFilesAfterEnv: [join(__dirname, '../../tests/integration/api-setup.ts')],
+  setupFilesAfterEnv: [
+    join(__dirname, '../../tests/integration/api-setup.ts'),
+    join(__dirname, '../../tests/unit/api-env-setup.ts'),
+  ],
   passWithNoTests: true,
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
