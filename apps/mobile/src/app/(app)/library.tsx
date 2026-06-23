@@ -721,6 +721,8 @@ function LibraryScreenContent({
           <Pressable
             onPress={handleRetry}
             className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
             testID="library-retry-button"
           >
             <Text className="text-text-inverse text-body font-semibold">
@@ -730,6 +732,8 @@ function LibraryScreenContent({
           <Pressable
             onPress={() => router.replace('/(app)/home' as Href)}
             className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.goHome')}
             testID="library-home-button"
           >
             <Text className="text-text-primary text-body font-semibold">
@@ -761,6 +765,8 @@ function LibraryScreenContent({
               } as Href)
             }
             className="bg-primary rounded-button px-6 py-3 mt-6 items-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('library.empty.createFirstSubject')}
             testID="library-empty-go-home"
           >
             <Text className="text-text-inverse text-body font-semibold">
@@ -800,6 +806,8 @@ function LibraryScreenContent({
           <Pressable
             onPress={handleRetry}
             className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('library.staleBanner.message')}
             testID="library-stale-banner"
           >
             <Text className="text-body-sm text-text-secondary flex-1">
@@ -819,6 +827,8 @@ function LibraryScreenContent({
           <Pressable
             onPress={handleRetry}
             className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('library.inactiveFallbackBanner.message')}
             testID="library-inactive-fallback-banner"
           >
             <Text className="text-body-sm text-text-secondary flex-1">
@@ -862,6 +872,8 @@ function LibraryScreenContent({
                   } as Href)
                 }
                 className="bg-primary rounded-button py-3 mt-4 items-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('library.curriculumComplete.addSubject')}
                 testID="library-add-subject"
               >
                 <Text className="text-text-inverse text-body font-semibold">
@@ -1108,6 +1120,8 @@ function LibraryScreenContent({
                   <Pressable
                     onPress={handleRetry}
                     className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('library.staleBanner.message')}
                     testID="library-stale-banner"
                   >
                     <Text className="text-body-sm text-text-secondary flex-1">
@@ -1145,6 +1159,10 @@ function LibraryScreenContent({
                         } as Href)
                       }
                       className="bg-primary rounded-button py-3 mt-4 items-center"
+                      accessibilityRole="button"
+                      accessibilityLabel={t(
+                        'library.curriculumComplete.addSubject',
+                      )}
                       testID="library-add-subject"
                     >
                       <Text className="text-text-inverse text-body font-semibold">
