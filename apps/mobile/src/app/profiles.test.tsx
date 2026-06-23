@@ -6,7 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { Profile } from '../lib/profile';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useReverification } from '@clerk/clerk-expo';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -148,6 +148,7 @@ const { useProfile } = require('../lib/profile') as {
 };
 
 const ProfilesScreen = require('./profiles').default;
+const mockUseReverification = useReverification as jest.Mock;
 
 describe('ProfilesScreen', () => {
   beforeEach(() => {
@@ -159,6 +160,9 @@ describe('ProfilesScreen', () => {
       isLoaded: true,
       isSignedIn: true,
     });
+    mockUseReverification.mockImplementation(
+      (fn: (...args: unknown[]) => unknown) => fn,
+    );
   });
 
   it('shows empty state when no profiles', () => {
@@ -268,7 +272,27 @@ describe('ProfilesScreen', () => {
     expect(screen.queryByTestId('proxy-confirm-cancel')).toBeNull();
   });
 
-  it('switches immediately when a child taps the owner row', async () => {
+  it('[BREAK][WI-301] requires reverification before a child switches into the owner row', async () => {
+    let runReverifiedAction!: () => Promise<unknown>;
+    let capturedAction:
+      | ((profileId: string) => Promise<unknown> | unknown)
+      | undefined;
+    const reverifiedOwnerSwitch = jest.fn(
+      (profileId: string) =>
+        new Promise((resolve, reject) => {
+          runReverifiedAction = async () => {
+            try {
+              resolve(await capturedAction?.(profileId));
+            } catch (err) {
+              reject(err);
+            }
+          };
+        }),
+    );
+    mockUseReverification.mockImplementation((fn) => {
+      capturedAction = fn;
+      return reverifiedOwnerSwitch;
+    });
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],
       activeProfile: childProfile,
@@ -279,6 +303,13 @@ describe('ProfilesScreen', () => {
     render(<ProfilesScreen />);
 
     fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    expect(reverifiedOwnerSwitch).toHaveBeenCalledWith('owner-id');
+    expect(mockSwitchProfile).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await runReverifiedAction();
+    });
 
     await waitFor(() => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');

@@ -205,9 +205,9 @@ const V0_FALLBACK_FILES: readonly LegitimateRawNavigationGateFile[] = [
     file: 'apps/mobile/src/app/profiles.tsx',
     category: 'v0-fallback',
     reason:
-      'V0-fallback: profile switcher resets legacy app context and still needs owner/child profile filtering until V0 is retired.',
+      'V0-fallback: profile switcher resets legacy app context and still needs owner/child profile filtering until V0 is retired. Two additional owner reads (WI-301) detect a non-owner→owner elevation switch to require fresh primary-factor reverification.',
     expectedFindings: {
-      'profile-owner-read': 4,
+      'profile-owner-read': 6,
       'raw-hook-call': 1,
       'raw-hook-import': 1,
     },

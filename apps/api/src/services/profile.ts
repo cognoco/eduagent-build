@@ -828,7 +828,7 @@ export async function switchProfile(
   db: Database,
   profileId: string,
   accountId: string,
-): Promise<{ profileId: string } | null> {
+): Promise<{ profileId: string; isOwner: boolean } | null> {
   const row = await db.query.profiles.findFirst({
     where: and(
       eq(profiles.id, profileId),
@@ -836,7 +836,7 @@ export async function switchProfile(
       isNull(profiles.archivedAt),
     ),
   });
-  return row ? { profileId: row.id } : null;
+  return row ? { profileId: row.id, isOwner: row.isOwner } : null;
 }
 
 /**

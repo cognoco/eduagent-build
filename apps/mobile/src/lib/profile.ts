@@ -55,6 +55,7 @@ export function isFamilyCapableProfile(
 export interface SwitchProfileResult {
   success: boolean;
   error?: string;
+  errorCode?: string;
   // [BUG-828] True when the in-memory switch succeeded but the SecureStore
   // write failed — the change won't survive an app restart. Callers should
   // surface a non-blocking warning so the user knows they may need to re-pick
@@ -341,7 +342,26 @@ export function ProfileProvider({
           json: { profileId },
         });
         if (!res.ok) {
-          return { success: false, error: 'Failed to switch profile' };
+          let error = 'Failed to switch profile';
+          let errorCode: string | undefined;
+          const bodyText = await res.text().catch(() => '');
+          if (bodyText) {
+            try {
+              const body = JSON.parse(bodyText) as {
+                code?: unknown;
+                message?: unknown;
+              };
+              if (typeof body.message === 'string') error = body.message;
+              if (typeof body.code === 'string') errorCode = body.code;
+            } catch {
+              // Keep the stable fallback above for non-JSON API failures.
+            }
+          }
+          return {
+            success: false,
+            error,
+            ...(errorCode !== undefined ? { errorCode } : {}),
+          };
         }
       } catch (err) {
         return {
