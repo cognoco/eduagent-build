@@ -169,14 +169,9 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
     });
   });
 
-  it('handles empty payload gracefully (all fields optional)', async () => {
+  it('[BREAK] rejects empty payload — type and to are required', async () => {
     const result = await invoke(emailBouncedObserve, {});
-    expect(result).toMatchObject({
-      status: 'logged',
-      type: null,
-      emailId: null,
-    });
-    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'schema_error' });
   });
 
   it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
