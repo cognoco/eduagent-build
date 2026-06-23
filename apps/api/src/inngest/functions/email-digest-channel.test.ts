@@ -14,8 +14,10 @@
 
 // ---------------------------------------------------------------------------
 // Valid UUID constants (weekly handler validates parentId via z.string().uuid())
+// Monthly handler also validates via monthlyReportGenerateEventSchema.parse()
 // ---------------------------------------------------------------------------
 const PARENT_ID = 'aaaaaaaa-0000-4000-8000-000000000001';
+const PARENT_ID_ALT = 'aaaaaaaa-0000-4000-8000-000000000002'; // used in T6-monthly idempotency-key test
 const CHILD_ID_A = 'bbbbbbbb-0000-4000-8000-000000000001';
 const CHILD_ID_B = 'bbbbbbbb-0000-4000-8000-000000000002';
 const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
@@ -809,7 +811,7 @@ describe('Email digest channel — monthly', () => {
   it('(T1-monthly) sends monthly email when monthly_progress_email=true and parent email present', async () => {
     const db = buildMonthlyMockDb();
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledWith(
@@ -827,7 +829,7 @@ describe('Email digest channel — monthly', () => {
       monthlyProgressEmail: false,
     });
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).not.toHaveBeenCalled();
@@ -837,7 +839,7 @@ describe('Email digest channel — monthly', () => {
   it('(T3-monthly) skips email silently when parent has no email — no Sentry noise', async () => {
     const db = buildMonthlyMockDb(undefined, null);
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockSendEmail).not.toHaveBeenCalled();
     const noEmailCalls = mockCaptureException.mock.calls.filter((call) => {
@@ -858,7 +860,7 @@ describe('Email digest channel — monthly', () => {
       .fn()
       .mockResolvedValue({ struggles: [{ topic: 'long division' }] });
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
       'parent@example.com',
@@ -879,7 +881,7 @@ describe('Email digest channel — monthly', () => {
       .fn()
       .mockResolvedValue({ struggles: [] });
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
       'parent@example.com',
@@ -892,13 +894,13 @@ describe('Email digest channel — monthly', () => {
   it('(T6-monthly) sets Resend Idempotency-Key from monthly + parentId + reportMonth', async () => {
     const db = buildMonthlyMockDb();
 
-    await executeMonthlyGenerate('parent-xyz', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID_ALT, CHILD_ID_A, db);
 
     const emailCallArgs = mockSendEmail.mock.calls[0];
     expect(emailCallArgs).toBeDefined();
     const options = emailCallArgs![1] as { idempotencyKey?: string };
     expect(options.idempotencyKey).toMatch(
-      /^monthly-parent-xyz-\d{4}-\d{2}-\d{2}$/,
+      new RegExp(`^monthly-${PARENT_ID_ALT}-\\d{4}-\\d{2}-\\d{2}$`),
     );
   });
 
@@ -912,8 +914,8 @@ describe('Email digest channel — monthly', () => {
       const db = buildMonthlyMockDb({ status: consentStatus });
 
       const result = (await executeMonthlyGenerate(
-        'parent-001',
-        'child-restricted',
+        PARENT_ID,
+        CHILD_ID_RESTRICTED,
         db,
       )) as { status: string; reason?: string };
 
@@ -928,7 +930,7 @@ describe('Email digest channel — monthly', () => {
   it('(T9-monthly) sends digest when consent row is missing (pre-consent-flow account)', async () => {
     const db = buildMonthlyMockDb(null); // null = no row
 
-    await executeMonthlyGenerate('parent-001', 'child-001', db);
+    await executeMonthlyGenerate(PARENT_ID, CHILD_ID_A, db);
 
     expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
