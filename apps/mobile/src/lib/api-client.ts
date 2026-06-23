@@ -9,6 +9,7 @@
  * is erased at compile time, so zero API code enters the mobile bundle.
  */
 import type { AppType } from '@eduagent/api';
+import { quotaExceededSchema } from '@eduagent/schemas';
 import { hc } from 'hono/client';
 import { useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
@@ -32,7 +33,6 @@ import {
   UnauthorizedError,
   UpstreamError,
 } from './api-errors';
-import type { QuotaExceededDetails } from './api-errors';
 import { i18next } from '../i18n';
 
 export {
@@ -328,10 +328,11 @@ export function useApiClient(): ApiClient {
         }
 
         if (res.status === 402) {
-          if (code === 'QUOTA_EXCEEDED' && parsed?.details) {
+          const quotaExceeded = quotaExceededSchema.safeParse(parsed);
+          if (quotaExceeded.success) {
             throw new QuotaExceededError(
-              apiMessage ?? i18next.t('errors.quotaExceeded'),
-              parsed.details as QuotaExceededDetails,
+              quotaExceeded.data.message,
+              quotaExceeded.data.details,
             );
           }
           // [CR-API-402-04] Non-quota 402 — preserve status code so callers

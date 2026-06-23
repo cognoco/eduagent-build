@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81ff-81c1-e246b94c0392",
+  "id": "WI-976",
+  "name": "mobile api-client casts quota error details without parsing",
+  "description": "[FCR 2026-06-21 · L8-05] parsed.details as QuotaExceededDetails (details typed unknown); SSE path uses quotaExceededSchema.safeParse but this path diverges. Malformed details crashes paywall UI. Fix: quotaExceededDetailsSchema.safeParse + fallback.",
+  "acceptanceCriteria": "Root cause: apps/mobile/src/lib/api-client.ts ~line 334 casts `parsed.details as QuotaExceededDetails` with no Zod validation; the truthy guard `parsed?.details` does not check shape. Two sibling paths (sse.ts:408–414, assert-ok.ts:94–98) correctly use `quotaExceededSchema.safeParse` and serve as the fix template.\n\nVariants: (a) single variant — the 402/QUOTA_EXCEEDED branch in `customFetch`; no other unguarded cast exists for this type.\n\nFix: replace the bare `as` cast with `quotaExceededSchema.safeParse(parsed)` (or `quotaExceededDetailsSchema` once exported); on parse failure, fall through to a generic ApiError without crashing the paywall render.\n\nRegression test: in apps/mobile/src/lib/api-client.test.ts (or new file), mock a 402 QUOTA_EXCEEDED response with malformed details (e.g. `details: { tier: 123 }` instead of the expected shape); assert the call rejects with an ApiError (not an uncaught render crash) and does NOT throw an unhandled runtime exception. Must fail without the fix (bare cast) and pass with it (safeParse + fallback). Run: `cd apps/mobile && pnpm exec jest --findRelatedTests src/lib/api-client.ts --no-coverage`.",
+  "riskImpact": "Paywall UI crash on malformed quota details; inconsistent with the SSE sibling.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
