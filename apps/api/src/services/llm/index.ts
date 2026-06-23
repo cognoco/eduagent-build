@@ -13,14 +13,13 @@ export {
   OPENAI_ADVANCED_MODEL_MIN_RUNG,
   ANTHROPIC_SONNET_MODEL,
   getOpenAIAdvancedModel,
-  _setOpenAIAdvancedModelForTesting,
   setLlmRoutingV2Enabled,
-  _getLlmRoutingV2Enabled,
-  getFallbackConfigForTest,
-  getModelConfigForTest,
 } from './router';
 export { parseConversationLanguage } from './conversation-language';
-export { mockProvider, createMockProvider } from './providers/mock';
+// Test-only helpers (createMockProvider, mockProvider, getFallbackConfigForTest,
+// getModelConfigForTest, _setOpenAIAdvancedModelForTesting, _getLlmRoutingV2Enabled)
+// are intentionally NOT exported here — they live in './test-utils' so test
+// scaffolding never ships in the production worker bundle. [BUG-900]
 export { createGeminiProvider } from './providers/gemini';
 export { createOpenAIProvider } from './providers/openai';
 export { createAnthropicProvider } from './providers/anthropic';

@@ -29,7 +29,7 @@ import {
   findSubscriptionByOrganizationId__unscoped,
   lockSubscriptionByOrganizationId__unscoped,
 } from '@eduagent/database';
-import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -41,7 +41,11 @@ import type {
 } from '../revenuecat';
 import { emitTopUpCreditsReattributedMetric } from '../tier';
 import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
-import { mapSubscriptionV2Row } from './types-v2';
+import {
+  mapSubscriptionV2Row,
+  parseSubscriptionV2PlanTier,
+  parseSubscriptionV2Status,
+} from './types-v2';
 import { reconcileQuotaStateForSubscriptionV2 } from './quota-reconcile-v2';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
 
@@ -129,7 +133,9 @@ export async function updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
       txDb,
       organizationId,
     );
-    previousTier = existing?.planTier as SubscriptionTier | undefined;
+    previousTier = existing
+      ? parseSubscriptionV2PlanTier(existing.planTier)
+      : undefined;
 
     const updated = await applySubscriptionUpdateFromRevenuecatV2(
       txDb,
@@ -210,9 +216,8 @@ async function applySubscriptionUpdateFromRevenuecatV2(
     setValues.planTier = updates.tier;
   }
   if (updates.status !== undefined && updates.status !== existing.status) {
-    if (
-      !isValidTransition(existing.status as SubscriptionStatus, updates.status)
-    ) {
+    const existingStatus = parseSubscriptionV2Status(existing.status);
+    if (!isValidTransition(existingStatus, updates.status)) {
       // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
       const transitionErr = new Error(
         `Invalid subscription transition: ${existing.status} -> ${updates.status}`,

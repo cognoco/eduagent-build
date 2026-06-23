@@ -562,7 +562,7 @@ export default function SignUpScreen() {
               <View className="mb-3">
                 <Button
                   variant="secondary"
-                  label="Try Again"
+                  label={t('common.tryAgain')}
                   onPress={() => void retrySessionActivation()}
                   disabled={loading || oauthLoading !== null}
                   testID="sign-up-oauth-retry"
@@ -571,7 +571,7 @@ export default function SignUpScreen() {
               <View className="mb-4">
                 <Button
                   variant="tertiary"
-                  label="Try another method"
+                  label={t('auth.signUp.tryAnotherMethod')}
                   onPress={() => {
                     clearActivationFailure();
                     setError('');
@@ -586,7 +586,7 @@ export default function SignUpScreen() {
             <View className="mb-3">
               <Button
                 variant="secondary"
-                label="Continue with Google"
+                label={t('auth.signUp.continueWithGoogle')}
                 onPress={() => onSSOPress('oauth_google')}
                 disabled={oauthLoading !== null}
                 loading={oauthLoading === 'oauth_google'}
@@ -599,7 +599,7 @@ export default function SignUpScreen() {
             <View className="mb-3">
               <Button
                 variant="secondary"
-                label="Continue with Apple"
+                label={t('auth.signUp.continueWithApple')}
                 onPress={() => onSSOPress('oauth_apple')}
                 disabled={oauthLoading !== null}
                 loading={oauthLoading === 'oauth_apple'}
@@ -612,7 +612,7 @@ export default function SignUpScreen() {
             <View className="mb-3">
               <Button
                 variant="secondary"
-                label="Continue with OpenAI"
+                label={t('auth.signUp.continueWithOpenAI')}
                 onPress={() => onSSOPress(openAIStrategy)}
                 disabled={oauthLoading !== null}
                 loading={oauthLoading === openAIStrategy}
@@ -638,7 +638,7 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
-              placeholder="you@example.com"
+              placeholder={t('auth.signUp.emailPlaceholder')}
               placeholderTextColor={colors.muted}
               value={emailAddress}
               onChangeText={setEmailAddress}
@@ -656,7 +656,7 @@ export default function SignUpScreen() {
               <PasswordInput
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Create a password"
+                placeholder={t('auth.signUp.passwordPlaceholder')}
                 editable={!loading}
                 testID="sign-up-password"
                 showRequirements
@@ -674,7 +674,7 @@ export default function SignUpScreen() {
 
           <Button
             variant="primary"
-            label="Sign up"
+            label={t('auth.signUp.signUpButton')}
             onPress={onSignUpPress}
             disabled={!canSubmitSignUp}
             loading={loading}
@@ -691,7 +691,7 @@ export default function SignUpScreen() {
             <Button
               variant="tertiary"
               size="small"
-              label="Sign in"
+              label={t('auth.signUp.signInButton')}
               onPress={() => router.replace('/(auth)/sign-in')}
               testID="sign-in-link"
             />

@@ -1201,6 +1201,7 @@ describe('sessionCompleted', () => {
 
     function setupSubjectMock(subjectData: Record<string, unknown> | null) {
       resetDatabaseUrl();
+      const subjectFindFirst = jest.fn().mockResolvedValue(subjectData);
       // Override the createDatabase mock to return a db with the desired subject.
       // Multiple session-completed steps call getStepDatabase(); a one-shot mock
       // can be consumed before update-vocabulary-retention runs.
@@ -1220,7 +1221,7 @@ describe('sessionCompleted', () => {
             sessionEvents: { findMany: jest.fn().mockResolvedValue([]) },
             curriculumTopics: { findFirst: jest.fn().mockResolvedValue(null) },
             subjects: {
-              findFirst: jest.fn().mockResolvedValue(subjectData),
+              findFirst: subjectFindFirst,
             },
             learningProfiles: {
               findFirst: jest.fn().mockResolvedValue({
@@ -1238,6 +1239,7 @@ describe('sessionCompleted', () => {
           .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
         return db;
       });
+      return subjectFindFirst;
     }
 
     const fourStrandsSubject = {
@@ -1286,6 +1288,22 @@ describe('sessionCompleted', () => {
       );
       expect(outcome.status).toBe('ok');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
+    });
+
+    it('scopes subject lookup to the event profileId', async () => {
+      const subjectFindFirst = setupSubjectMock(fourStrandsSubject);
+
+      await executeSteps(createEventData());
+
+      const whereCondition = subjectFindFirst.mock.calls[0]?.[0]?.where as {
+        getSQL: () => import('drizzle-orm').SQL;
+      };
+      expect(typeof whereCondition?.getSQL).toBe('function');
+
+      const dialect = new PgDialect();
+      const { params } = dialect.sqlToQuery(whereCondition.getSQL());
+      expect(params).toContain(SUBJECT_ID);
+      expect(params).toContain(PROFILE_ID);
     });
 
     it('skips when subject pedagogyMode is not four_strands', async () => {

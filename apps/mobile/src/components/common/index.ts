@@ -10,6 +10,7 @@ export { ErrorFallback } from './ErrorFallback';
 export { GateContent, GATE_WEB_MAX_WIDTH } from './GateContent';
 export { OfflineBanner } from './OfflineBanner';
 export { PasswordInput } from './PasswordInput';
+export { QueryStateView } from './QueryStateView';
 export { DeskLampAnimation } from './DeskLampAnimation';
 export { EmptyStateCard } from './EmptyStateCard';
 export { ExplainedRedirect } from './ExplainedRedirect';

@@ -37,7 +37,8 @@
     "goBackAction": "戻る",
     "tryAgainAction": "再試行",
     "dismiss": "閉じる",
-    "pleaseTryAgain": "もう一度お試しください。"
+    "pleaseTryAgain": "もう一度お試しください。",
+    "mentorImageAlt": "あなたのメンター"
   },
   "quota": {
     "parent": {
@@ -203,7 +204,15 @@
       "verifyButton": "認証",
       "resendCode": "コードを再送信",
       "useDifferentEmail": "別のメールアドレスを使用",
-      "backToSignIn": "サインインに戻る"
+      "backToSignIn": "サインインに戻る",
+      "tryAnotherMethod": "別の方法を試す",
+      "continueWithGoogle": "Googleで続ける",
+      "continueWithApple": "Appleで続ける",
+      "continueWithOpenAI": "OpenAIで続ける",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "パスワードを作成",
+      "signUpButton": "新規登録",
+      "signInButton": "ログイン"
     },
     "forgotPassword": {
       "title": "パスワードをお忘れですか？",
@@ -4003,7 +4012,11 @@
       "done": "完了",
       "mastered": "習得済み"
     },
-    "linkLabel": "教科ハブを開く"
+    "linkLabel": "教科ハブを開く",
+    "empty": {
+      "title": "まだ学習する内容がありません",
+      "message": "この科目にはまだトピックがありません。しばらくしてからもう一度試すか、科目一覧に戻ってください。"
+    }
   },
   "journal": {
     "title": "ジャーナル",
@@ -4128,6 +4141,8 @@
       "empty": "学習者を追加すると、ここに科目が表示されます。",
       "openPerson": "{{name}}の科目を開く",
       "personHint": "科目の構造ビューを開きます。",
+      "personEmptyTitle": "まだ科目がありません",
+      "personEmptyMessage": "この学習者には、まだ表示できる科目構造がありません。",
       "structuralOnly": "科目、章、トピックの構造のみです。",
       "bookCount": "{{count}}冊のブック",
       "bookCount_other": "{{count}}冊のブック",

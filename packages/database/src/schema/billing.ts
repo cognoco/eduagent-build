@@ -152,6 +152,11 @@ export const profileQuotaUsage = pgTable(
       table.profileId,
     ),
     index('profile_quota_usage_subscription_idx').on(table.subscriptionId),
+    // [BUG-886] profile_id has ON DELETE CASCADE -> profiles(id) but no index
+    // with profile_id leftmost; without this the profile-delete cascade (GDPR
+    // erasure path) seq-scans this table. The composite sub_profile idx above
+    // has subscription_id leftmost, so it does not serve the cascade.
+    index('profile_quota_usage_profile_id_idx').on(table.profileId),
     check(
       'profile_quota_usage_role_valid',
       sql`${table.role} IN ('owner', 'child')`,
@@ -235,6 +240,11 @@ export const topUpCredits = pgTable(
       table.profileId,
       table.expiresAt,
     ),
+    // [BUG-886] profile_id has ON DELETE CASCADE -> profiles(id) but no index
+    // with profile_id leftmost; the composite idx above has subscription_id
+    // leftmost, so the profile-delete cascade (GDPR erasure path) seq-scans
+    // this table without a dedicated profile_id index.
+    index('top_up_credits_profile_id_idx').on(table.profileId),
     uniqueIndex('top_up_credits_rc_txn_id_idx').on(
       table.revenuecatTransactionId,
     ),

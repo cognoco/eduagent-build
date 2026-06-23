@@ -1,12 +1,12 @@
 import {
   registerProvider,
-  createMockProvider,
   type LLMProvider,
   type ChatMessage,
   type MessagePart,
   type ModelConfig,
   type StopReason,
 } from './llm';
+import { createMockProvider } from './llm/test-utils';
 import { makeChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,
@@ -2348,6 +2348,89 @@ describe('source provenance audit', () => {
     expect(safe.response).toMatch(/You're welcome/i);
     expect(safe.response).not.toMatch(/source-check question/i);
     expect(safe.response).not.toMatch(/reliable source material/i);
+  });
+
+  // [BREAK] "I don't know" is a reaction to the mentor's question, not a
+  // factual query. It used to fall through the source-grounding fallback and
+  // get quoted back as `frame your question: "I don't know"` plus a demand to
+  // "share the textbook passage" — nonsensical. Remove the isStuckReactionTurn
+  // branch in buildUnsupportedFactualReply to confirm this test fails.
+  it("treats a bare 'I don't know' as a stuck reaction, not a source-check question", () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I don't know",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/reliable source material/i);
+    expect(safe.response).not.toMatch(/frame your question/i);
+    expect(safe.response).not.toMatch(/textbook passage/i);
+    expect(safe.response).not.toContain("I don't know");
+    expect(safe.response).toMatch(/hint|walk you through/i);
+  });
+
+  it.each(['no idea', 'not sure', 'dunno', 'i forget', "i can't remember"])(
+    'treats the stuck reaction %p as scaffolding, not a source demand',
+    (reaction) => {
+      const audit = auditExchangeSources(
+        {
+          relied_on: ['learner_message'],
+          insufficient: true,
+          reason: 'No trusted source was provided.',
+        },
+        buildExchangeSourceEvidence(
+          {
+            ...baseContext,
+            topicTitle: undefined,
+            topicDescription: undefined,
+          },
+          reaction,
+        ),
+      );
+
+      const safe = applySourceAuditSafetyFallback(
+        'Please share your source material.',
+        audit,
+      );
+
+      expect(safe.response).not.toMatch(/reliable source material/i);
+      expect(safe.response).toMatch(/hint|walk you through/i);
+    },
+  );
+
+  // A genuine question that merely opens with "I don't know" must NOT be
+  // swallowed by the stuck-reaction branch — it still needs the source-grounding
+  // fallback because it asks for an outside-world fact.
+  it("does not treat 'I don't know why ...' as a stuck reaction", () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        "I don't know why the Roman Empire collapsed",
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/reliable source material/i);
   });
 
   it('removes source-bound example terms that are not present in reliable source excerpts', () => {

@@ -692,7 +692,11 @@ function getFallbackConfig(
 
   const shared = {
     responseFormat: primary.responseFormat,
-  } satisfies Pick<ModelConfig, 'responseFormat'>;
+    // [BUG-895] Carry the tutor-prose language onto the fallback config so a
+    // fallback adapter localizes synthesized replies (e.g. a bare refusal)
+    // the same way the primary would.
+    conversationLanguage: primary.conversationLanguage,
+  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
 
   if (primary.provider === 'anthropic' && providers.has('gemini')) {
     const isLight = rung <= 2;
@@ -764,7 +768,10 @@ function getFallbackConfigV2(
 ): ModelConfig | null {
   const shared = {
     responseFormat: primary.responseFormat,
-  } satisfies Pick<ModelConfig, 'responseFormat'>;
+    // [BUG-895] See getFallbackConfig — preserve tutor-prose language on V2
+    // fallback configs so localization survives a provider failover.
+    conversationLanguage: primary.conversationLanguage,
+  } satisfies Pick<ModelConfig, 'responseFormat' | 'conversationLanguage'>;
   const isFree = llmTier === 'flash';
 
   const sonnet = (): ModelConfig => ({
@@ -1211,6 +1218,11 @@ export async function routeAndCall(
       capability,
     ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
+    // [BUG-895] Thread the learner's tutor-prose language onto the provider
+    // config so an adapter that must synthesize a fallback reply (e.g. Cerebras
+    // localizing a bare model refusal — see providers/refusal-envelope.ts) can
+    // emit it in the right language instead of defaulting to English.
+    conversationLanguage: _options?.conversationLanguage,
   };
   const provider = providers.get(config.provider);
   if (!provider) {
@@ -1629,6 +1641,10 @@ export async function routeAndStream(
       capability,
     ),
     ...(options?.responseFormat ? { responseFormat: 'json' as const } : {}),
+    // [BUG-895] See routeAndCall — thread tutor-prose language to the provider
+    // so a streamed bare refusal is localized (Cerebras is the streaming hot
+    // path), not surfaced as the English fallback.
+    conversationLanguage: options?.conversationLanguage,
   };
   const provider = providers.get(config.provider);
   if (!provider) {

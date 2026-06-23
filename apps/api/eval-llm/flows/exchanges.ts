@@ -274,6 +274,11 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       sessionType: 'learning',
       verificationType: 'standard',
       exchangeCount: 1,
+      // Production "ask anything" freeform = learning + no topic +
+      // effectiveMode 'freeform' (session-exchange.ts). Setting it here makes
+      // the snapshot render the ASK ANYTHING guidance branch instead of the
+      // generic LEARNING cycle, matching what the app actually sends.
+      effectiveMode: 'freeform',
     },
     freeform: true,
     appliesTo: () => true,

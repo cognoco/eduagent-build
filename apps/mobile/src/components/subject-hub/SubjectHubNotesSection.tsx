@@ -63,6 +63,7 @@ export function SubjectHubNotesSection({
   const isEmpty = notes.length === 0;
   // Only offer adding a note when something can actually persist it.
   const canAddNote = canStudy && !!onAddNote;
+  const hasDraftText = draft.trim().length > 0;
 
   const submitDraft = () => {
     if (!onAddNote) return;
@@ -137,8 +138,12 @@ export function SubjectHubNotesSection({
               testID="subject-hub-notes-empty-add"
               accessibilityRole="button"
               accessibilityLabel={t('subjectHub.notes.addNote')}
+              accessibilityState={{ disabled: !hasDraftText }}
+              disabled={!hasDraftText}
               onPress={submitDraft}
-              className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-5"
+              className={`mt-3 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-5 ${
+                hasDraftText ? '' : 'opacity-50'
+              }`}
             >
               <Text className="text-body-sm font-semibold text-text-primary">
                 {t('subjectHub.notes.addNote')}

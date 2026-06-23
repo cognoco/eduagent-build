@@ -10,9 +10,9 @@ import { QUIZ_CONFIG } from '../../apps/api/src/services/quiz/config';
 import {
   _resetCircuits,
   CircuitOpenError,
-  createMockProvider,
   registerProvider,
 } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
 import {
   buildIntegrationEnv,

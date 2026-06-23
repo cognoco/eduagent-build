@@ -18,7 +18,7 @@ jest.mock(
 );
 
 const mockFindOrCreateAccount = jest.fn();
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -31,7 +31,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockFindOwnerProfile = jest.fn();
 const mockGetProfile = jest.fn();
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -43,19 +43,16 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetCoachingCardForProfile = jest.fn();
-jest.mock(
-  '../services/coaching-cards' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/coaching-cards',
-    ) as typeof import('../services/coaching-cards');
-    return {
-      ...actual,
-      getCoachingCardForProfile: (...args: unknown[]) =>
-        mockGetCoachingCardForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/coaching-cards', () => {
+  const actual = jest.requireActual(
+    '../services/coaching-cards',
+  ) as typeof import('../services/coaching-cards');
+  return {
+    ...actual,
+    getCoachingCardForProfile: (...args: unknown[]) =>
+      mockGetCoachingCardForProfile(...args),
+  };
+});
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';

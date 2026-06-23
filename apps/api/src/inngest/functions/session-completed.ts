@@ -734,7 +734,10 @@ export const sessionCompleted = inngest.createFunction(
           async () => {
             const db = getStepDatabase();
             const subject = await db.query.subjects.findFirst({
-              where: eq(subjects.id, subjectId),
+              where: and(
+                eq(subjects.id, subjectId),
+                eq(subjects.profileId, profileId),
+              ),
             });
             if (
               !subject ||

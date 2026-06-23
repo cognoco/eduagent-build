@@ -61,28 +61,15 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, ...mockInngestTransport.module };
 });
 
-// Mock drizzle-orm + database
-jest.mock(
-  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
-  () => ({
-    and: jest.fn(),
-    eq: jest.fn(),
-    inArray: jest.fn(),
-    isNull: jest.fn(),
-    ne: jest.fn(),
-  }),
-);
-
-jest.mock(
-  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
-  () => ({
-    curriculumBooks: {},
-    curriculumTopics: {},
-    curricula: {},
-    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
-    subjects: { status: 'subjects.status' },
-  }),
-);
+// [BUG-900] No `jest.mock('drizzle-orm')` / `jest.mock('@eduagent/database')`.
+// The real drizzle operators and the real schema objects are used so the
+// query builder composes the genuine SQL AST (a column-name typo or a dropped
+// where-clause would surface here, not be papered over by hand-rolled stubs).
+// The actual WHERE/join *filtering* — and the wrong-user scoping guard — is
+// proven against a live DB in review-due-send.integration.test.ts, since only
+// Postgres can evaluate the parent-chain join. These unit tests stub the step
+// database (getStepDatabase) to a controlled fake `db` so the non-DB branch
+// logic (liveness, dedup, send) is exercised in isolation.
 
 import { reviewDueSend } from './review-due-send';
 
@@ -104,6 +91,13 @@ describe('reviewDueSend', () => {
   const mockSelectResult: unknown[] = [];
   const mockDb = {
     query: {
+      // v2 liveness (isPersonLive) reads person.findFirst; legacy reads
+      // profiles.findFirst. Provide both so the test is correct under either
+      // dispatch (the loaded test env sets IDENTITY_V2_ENABLED, so the v2
+      // path runs and would otherwise crash on a missing person query).
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
@@ -124,6 +118,7 @@ describe('reviewDueSend', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue(
       'You have 2 topics to review.',
@@ -187,6 +182,9 @@ describe('reviewDueSend', () => {
     });
 
     it('[WI-86] skips stale send events for archived profiles', async () => {
+      // v2 path: isPersonLive reads person.findFirst; legacy reads
+      // profiles.findFirst. Null both so the archived branch is hit either way.
+      mockDb.query.person.findFirst.mockResolvedValueOnce(null);
       mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
 
       const { result } = await executeHandler({
@@ -241,6 +239,9 @@ describe('reviewDueSend', () => {
 describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   const mockDb = {
     query: {
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
@@ -261,6 +262,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
@@ -328,6 +330,9 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
 describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB failure — fail closed', () => {
   const mockDb = {
     query: {
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
@@ -346,6 +351,7 @@ describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB fa
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });

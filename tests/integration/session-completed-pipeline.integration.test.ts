@@ -39,10 +39,8 @@ import {
   retentionCards,
   sessionSummaries,
 } from '@eduagent/database';
-import {
-  registerProvider,
-  createMockProvider,
-} from '../../apps/api/src/services/llm';
+import { registerProvider } from '../../apps/api/src/services/llm';
+import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';

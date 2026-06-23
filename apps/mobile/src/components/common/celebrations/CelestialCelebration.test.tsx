@@ -31,10 +31,21 @@ jest.mock('react-native-reanimated', () => {
     useAnimatedProps: () => ({}),
     useSharedValue: (v: unknown) => ({ value: v }),
     useReducedMotion: () => mockReduceMotion(),
-    withTiming: (v: unknown) => v,
+    withTiming: (
+      v: unknown,
+      _opts?: unknown,
+      cb?: (finished: boolean) => void,
+    ) => {
+      // Simulate the animation completing synchronously so tests can assert
+      // on the withTiming callback (e.g., the runOnJS(onComplete) call that
+      // fires after the fade-out). This models the external Reanimated
+      // runtime's behaviour of calling the callback with finished=true.
+      cb?.(true);
+      return v;
+    },
     withSpring: (v: unknown) => v,
     withRepeat: (v: unknown) => v,
-    withSequence: (v: unknown) => v,
+    withSequence: (...args: unknown[]) => args[0],
     withDelay: (_d: number, v: unknown) => v,
     cancelAnimation: () => undefined,
     runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
@@ -98,7 +109,7 @@ describe('CelestialCelebration', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onComplete synchronously when animations are enabled', () => {
+  it('calls onComplete via the animated path when withTiming callback fires', () => {
     mockReduceMotion.mockReturnValue(false);
 
     const onComplete = jest.fn();
@@ -111,10 +122,11 @@ describe('CelestialCelebration', () => {
       />,
     );
 
-    // In the test mock, withSequence/withTiming are pass-through, so the
-    // animation completes instantly through the mock. The runOnJS mock
-    // also calls the function directly. So onComplete may still be called.
-    // The key difference is the reduced-motion path calls it unconditionally.
+    // The animated path wires: withTiming(..., callback) → callback(finished=true)
+    // → runOnJS(onComplete)(). The local mock fires withTiming callbacks
+    // synchronously with finished=true, and runOnJS is identity, so onComplete
+    // is called exactly once when the second withTiming (the fade-out) completes.
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   it('sets pointerEvents to none to avoid blocking touches', () => {

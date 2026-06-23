@@ -37,7 +37,8 @@
     "goBackAction": "Volver",
     "tryAgainAction": "Intentar de nuevo",
     "dismiss": "Descartar",
-    "pleaseTryAgain": "Inténtalo de nuevo."
+    "pleaseTryAgain": "Inténtalo de nuevo.",
+    "mentorImageAlt": "Tu mentor"
   },
   "quota": {
     "parent": {
@@ -203,7 +204,15 @@
       "verifyButton": "Verificar",
       "resendCode": "Reenviar código",
       "useDifferentEmail": "Usar otro correo",
-      "backToSignIn": "Volver a inicio de sesión"
+      "backToSignIn": "Volver a inicio de sesión",
+      "tryAnotherMethod": "Prueba otro método",
+      "continueWithGoogle": "Continuar con Google",
+      "continueWithApple": "Continuar con Apple",
+      "continueWithOpenAI": "Continuar con OpenAI",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "passwordPlaceholder": "Crea una contraseña",
+      "signUpButton": "Registrarse",
+      "signInButton": "Iniciar sesión"
     },
     "forgotPassword": {
       "title": "¿Has olvidado la contraseña?",
@@ -4003,7 +4012,11 @@
       "done": "Hecho",
       "mastered": "Dominado"
     },
-    "linkLabel": "Abrir centro de asignaturas"
+    "linkLabel": "Abrir centro de asignaturas",
+    "empty": {
+      "title": "Aún no hay nada que estudiar aquí",
+      "message": "Esta asignatura aún no tiene temas. Inténtalo de nuevo en un momento o vuelve a tus asignaturas."
+    }
   },
   "journal": {
     "title": "Diario",
@@ -4128,6 +4141,8 @@
       "empty": "Añade un estudiante para ver sus asignaturas aquí.",
       "openPerson": "Abrir asignaturas de {{name}}",
       "personHint": "Abre la vista estructural de la asignatura.",
+      "personEmptyTitle": "Aún no hay asignaturas",
+      "personEmptyMessage": "Este estudiante aún no tiene una estructura de asignaturas visible.",
       "structuralOnly": "Solo la estructura de asignatura, capítulo y tema.",
       "bookCount": "{{count}} libro",
       "bookCount_other": "{{count}} libros",

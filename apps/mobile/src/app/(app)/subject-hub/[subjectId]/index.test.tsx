@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -246,5 +247,93 @@ describe('SubjectHubRoute', () => {
       (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
         originalV2;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-942 — loading branch was a spinner-forever / dead-end. The loading state
+// must time out to a retry/back affordance, and a hub that settles with no
+// usable data must surface a recoverable empty state (not blank or stuck).
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — settled with no usable data', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    // The subject exists, but it has no books → no generated topics → the hub
+    // settles with a non-null-but-empty payload. This is the case the old
+    // `(isLoading || !data)` branch could never represent.
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+  });
+
+  it('shows a recoverable empty state with retry and back', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-empty');
+    });
+    screen.getByTestId('subject-hub-empty-retry');
+    screen.getByTestId('subject-hub-empty-back');
+    // The settled-empty state must not silently render the hub surface.
+    expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+  });
+
+  it('goes back from the empty state', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-empty-back');
+    });
+    fireEvent.press(screen.getByTestId('subject-hub-empty-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+});
+
+describe('SubjectHubRoute — loading timeout escape', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('escapes the spinner to a retry/back affordance when the hub query stalls', async () => {
+    // Route /books to a never-settling promise so the hub stays loading
+    // forever. Capture the resolver so it is never called.
+    let _capturedBooksResolver!: (r: Response) => void;
+    const neverSettlingBooks = new Promise<Response>((resolve) => {
+      _capturedBooksResolver = resolve;
+    });
+    mockFetch.setRoute(
+      `/subjects/${SUBJECT_ID}/books`,
+      () => neverSettlingBooks,
+    );
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    // Pre-timeout: spinner is shown, no escape hatch yet.
+    expect(screen.queryByTestId('subject-hub-retry')).toBeNull();
+
+    // Advance past the TimeoutLoader budget (default 15s) → escape appears.
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+    await Promise.resolve();
+
+    screen.getByTestId('subject-hub-retry');
+    screen.getByTestId('subject-hub-back');
+
+    // Reference the captured resolver to satisfy TypeScript (never called).
+    void _capturedBooksResolver;
   });
 });

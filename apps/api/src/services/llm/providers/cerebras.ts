@@ -6,6 +6,7 @@ import {
   type ChatStreamResult,
   type ModelConfig,
 } from '../types';
+import type { ConversationLanguage } from '@eduagent/schemas';
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
@@ -32,10 +33,15 @@ const logger = createLogger();
 //     names the exact Cerebras model (`gpt-oss-120b`).
 //   - chat() normalizes a bare model refusal ({"type":"refusal"} / a
 //     top-level `refusal` string) into a valid safe envelope via
-//     normalizeModelRefusal (~1% of refusals on gpt-oss). The streaming path
-//     does NOT — like every other streaming provider, a mid-stream refusal
-//     surfaces to the downstream envelope-parse fallback (buffering the whole
-//     stream to rewrite it would defeat streaming).
+//     normalizeModelRefusal (~1% of refusals on gpt-oss). chatStream() does the
+//     same WITHOUT defeating streaming for normal replies: it holds back only
+//     the opening bytes until the first top-level JSON key is known (BUG-895).
+//     A valid envelope opens `{"reply": …` → the sniffer releases immediately
+//     and the rest streams token-by-token. A bare refusal opens `{"type": …` /
+//     `{"refusal": …` → the sniffer buffers to stream end and emits the
+//     localized safe envelope (by config.conversationLanguage) instead of
+//     leaking {"type":"refusal"} to the downstream parse fallback (which would
+//     surface the English DEFAULT_FALLBACK_TEXT).
 // ---------------------------------------------------------------------------
 
 const CEREBRAS_BASE_URL = 'https://api.cerebras.ai/v1/chat/completions';
@@ -101,6 +107,96 @@ function buildBody(
 
 function isContentFilterFinishReason(reason: string | undefined): boolean {
   return reason === 'content_filter';
+}
+
+// Bytes needed to read the first top-level key + delimiter, e.g. `{"reply":`,
+// `{"type":`, `{"refusal":`. 16 covers the longest with whitespace slack; a
+// non-refusal stream is released after at most this many buffered chars, so
+// normal replies stream with negligible head-of-line delay.
+const REFUSAL_SNIFF_MAX_CHARS = 24;
+
+/**
+ * Streaming refusal sniffer (BUG-895). Holds back leading content only until
+ * the first top-level JSON key is unambiguous:
+ *   - looks like a bare refusal (`{"type"…` / `{"refusal"…` with no usable
+ *     `reply`) → keep buffering to stream end; `finish()` rewrites the whole
+ *     buffer via normalizeModelRefusal.
+ *   - anything else (valid `{"reply"…` envelope, prose, etc.) → release the
+ *     buffer and pass every subsequent chunk straight through.
+ */
+function createRefusalSniffer(language: ConversationLanguage) {
+  let decided = false;
+  let buffering = true; // hold back until we decide
+  let buffer = '';
+
+  function looksLikeRefusalOpener(text: string): boolean {
+    // Match the opening of {"type":"refusal" or {"refusal": with optional
+    // whitespace, before the full object has arrived. A valid envelope opens
+    // with a "reply" key and never matches.
+    return /^\s*\{\s*"(type|refusal)"\s*:/.test(text);
+  }
+
+  function hasReplyOpener(text: string): boolean {
+    return /^\s*\{\s*"reply"\s*:/.test(text);
+  }
+
+  return {
+    /** Feed a chunk; returns text to yield now (possibly empty). */
+    push(chunk: string): string {
+      if (!buffering) return chunk;
+      buffer += chunk;
+      if (!decided) {
+        // Only JSON objects can be a refusal/envelope. As soon as the first
+        // non-whitespace char is known and is NOT `{`, this is plain content
+        // (the refusal shapes are objects) — release with no granularity loss.
+        const firstNonWs = buffer.trimStart();
+        if (firstNonWs.length > 0 && !firstNonWs.startsWith('{')) {
+          decided = true;
+          buffering = false;
+          const out = buffer;
+          buffer = '';
+          return out;
+        }
+        // A valid envelope opens `{"reply": …` — release immediately and stream
+        // the rest token-by-token.
+        if (hasReplyOpener(buffer)) {
+          decided = true;
+          buffering = false;
+          const out = buffer;
+          buffer = '';
+          return out;
+        }
+        // A bare refusal opens `{"type": …` / `{"refusal": …` — keep buffering
+        // to the end so finish() can rewrite the whole object.
+        if (looksLikeRefusalOpener(buffer)) {
+          decided = true;
+          return '';
+        }
+        if (buffer.length < REFUSAL_SNIFF_MAX_CHARS) {
+          return ''; // first key not yet unambiguous — wait for more
+        }
+        // Enough bytes, still ambiguous (e.g. `{` then unexpected key) → treat
+        // as normal content rather than risk holding back a real reply.
+        decided = true;
+        buffering = false;
+        const out = buffer;
+        buffer = '';
+        return out;
+      }
+      // Decided to be a refusal: keep accumulating, emit nothing yet.
+      return '';
+    },
+    /** Drain at stream end; returns the final text to yield (possibly empty). */
+    finish(): string {
+      if (!buffering) return '';
+      buffering = false;
+      const pending = buffer;
+      buffer = '';
+      if (pending.length === 0) return '';
+      const normalized = normalizeModelRefusal(pending, language);
+      return normalized ?? pending;
+    },
+  };
 }
 
 function createCerebrasContentFilterError(): SafetyFilterError {
@@ -176,6 +272,12 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
 
       async function* generate(): AsyncIterable<string> {
         let rawFinishReason: string | undefined;
+        // BUG-895 — holds back leading bytes only until a bare refusal can be
+        // distinguished from a normal envelope, then rewrites a refusal into a
+        // localized safe envelope. Normal replies pass straight through.
+        const sniffer = createRefusalSniffer(
+          config.conversationLanguage ?? 'en',
+        );
         try {
           const res = await fetch(CEREBRAS_BASE_URL, {
             method: 'POST',
@@ -234,7 +336,10 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                 try {
                   const chunk = JSON.parse(jsonStr) as CerebrasResponse;
                   const text = processChunk(chunk);
-                  if (text) yield text;
+                  if (text) {
+                    const out = sniffer.push(text);
+                    if (out) yield out;
+                  }
                 } catch (err) {
                   if (err instanceof SafetyFilterError) {
                     throw err;
@@ -260,7 +365,10 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                   try {
                     const chunk = JSON.parse(jsonStr) as CerebrasResponse;
                     const text = processChunk(chunk);
-                    if (text) yield text;
+                    if (text) {
+                      const out = sniffer.push(text);
+                      if (out) yield out;
+                    }
                   } catch (err) {
                     if (err instanceof SafetyFilterError) {
                       throw err;
@@ -278,6 +386,12 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                 }
               }
             }
+
+            // Drain the sniffer: if the whole stream was a bare refusal it was
+            // held back and is rewritten here into the localized safe envelope;
+            // otherwise this is a no-op (content already streamed through).
+            const tail = sniffer.finish();
+            if (tail) yield tail;
           } finally {
             reader.releaseLock();
           }

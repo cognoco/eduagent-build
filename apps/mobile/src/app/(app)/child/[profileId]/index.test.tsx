@@ -487,6 +487,47 @@ describe('ChildDetailScreen — profile overview', () => {
     cleanup();
   });
 
+  it('[WI-947] renders a loading state instead of naming the child common.loading while child data loads', () => {
+    const delayed = <T,>(value: T): Promise<T> =>
+      new Promise((resolve) => {
+        setTimeout(() => resolve(value), 50);
+      });
+
+    mockFetch.setRoute('/dashboard/children/child-001', (url: string) => {
+      if (url.includes('/sessions')) {
+        return delayed({ sessions: [] });
+      }
+      return delayed({ child: defaultChildDetail });
+    });
+    mockFetch.setRoute('/dashboard', () =>
+      delayed({ children: [], pendingNotices: [], demoMode: false }),
+    );
+    mockFetch.setRoute('/dashboard/demo', () =>
+      delayed({ children: [], pendingNotices: [], demoMode: true }),
+    );
+    mockFetch.setRoute('/consent/child-001/status', () =>
+      delayed(consentedStatus),
+    );
+
+    const namelessLinkedChildProfile = {
+      ...linkedChildProfile,
+      displayName: undefined as unknown as string,
+    };
+
+    const { result, cleanup } = renderScreen(<ChildDetailScreen />, {
+      profile: guardianProfile,
+      profiles: [guardianProfile, namelessLinkedChildProfile],
+      installGlobalFetch: false,
+      routedFetch: mockFetch,
+    });
+
+    result.getByTestId('child-profile-loading');
+    expect(result.queryByTestId('child-detail-scroll')).toBeNull();
+    expect(result.queryByText('common.loading')).toBeNull();
+
+    cleanup();
+  });
+
   it('links to the child mentor memory management screen', async () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
 

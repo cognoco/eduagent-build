@@ -5,6 +5,7 @@ import {
   languageCodeSchema,
   pedagogyModeSchema,
 } from './language.ts';
+import { sessionTypeSchema } from './session-enums.ts';
 
 // Enums
 
@@ -905,7 +906,7 @@ export const subjectSessionSchema = z.object({
   bookId: z.string().uuid().nullable(),
   bookTitle: z.string().nullable(),
   chapter: z.string().nullable(),
-  sessionType: z.string(),
+  sessionType: sessionTypeSchema,
   durationSeconds: z.number().int().nullable(),
   createdAt: isoDateField,
 });

@@ -39,6 +39,14 @@ type TestEnv = {
     TEST_SEED_SECRET?: string;
     SEED_PASSWORD?: string;
     /**
+     * Neon connection string. Used by the destructive `/__test/reset` route as a
+     * SECOND, independent guard (see isProductionDatabaseUrl): the single
+     * ENVIRONMENT+secret check would re-open reset against the production DB if
+     * Doppler ever mislabelled ENVIRONMENT (e.g. 'staging' in prod). The DB host
+     * is an independent signal that a single env mislabel cannot forge.
+     */
+    DATABASE_URL?: string;
+    /**
      * [BUG-725 / SEC-9] Opt-in flag for /__test/llm-ping. Defaults to disabled
      * even when TEST_SEED_SECRET is configured, so an exposed seed secret
      * cannot be used to burn LLM tokens. Set to 'true' explicitly when you
@@ -48,6 +56,43 @@ type TestEnv = {
   };
   Variables: { db: Database };
 };
+
+/**
+ * [BUG-902] Production-database host markers. The destructive `/__test/reset`
+ * endpoint is otherwise protected only by the single ENVIRONMENT+secret check
+ * in the `/__test/*` middleware. A Doppler mislabel (ENVIRONMENT='staging' in
+ * the production Worker) would defeat that one check and let `/reset` seed/wipe
+ * the production database. The DB host is an independent signal: refuse reset
+ * whenever the connection string points at a known production Neon endpoint,
+ * regardless of what ENVIRONMENT claims.
+ *
+ * A denylist (not an allowlist) is used deliberately: an allowlist of non-prod
+ * hosts would break every time Neon rotates a dev/staging endpoint, whereas the
+ * production endpoint marker is long-lived and the one host we must never wipe.
+ * The marker is the Neon project-id slug (stable across branch/compute rotation)
+ * for the production database — see the verified env→DB map (prd =
+ * `ep-holy-leaf`). Keep this in lockstep with the production DATABASE_URL.
+ */
+const PRODUCTION_DATABASE_HOST_MARKERS: readonly string[] = ['ep-holy-leaf'];
+
+/**
+ * Returns true when the given connection string points at a known production
+ * database host. Case-insensitive substring match against
+ * PRODUCTION_DATABASE_HOST_MARKERS. An undefined/empty URL returns false (the
+ * primary ENVIRONMENT+secret guard still applies); this guard only adds a
+ * second, independent refusal when the host is positively identified as prod.
+ *
+ * Exported for testing.
+ */
+export function isProductionDatabaseUrl(
+  databaseUrl: string | undefined,
+): boolean {
+  if (!databaseUrl) return false;
+  const lower = databaseUrl.toLowerCase();
+  return PRODUCTION_DATABASE_HOST_MARKERS.some((marker) =>
+    lower.includes(marker.toLowerCase()),
+  );
+}
 
 const seedInputSchema = z.object({
   scenario: z.enum(VALID_SCENARIOS as [SeedScenario, ...SeedScenario[]]),
@@ -152,6 +197,23 @@ testSeedRoutes.post(
 );
 
 testSeedRoutes.post('/__test/reset', async (c) => {
+  // [BUG-902] Second, independent guard for the destructive reset. The
+  // `/__test/*` middleware already rejects production via ENVIRONMENT+secret,
+  // but a single Doppler mislabel (ENVIRONMENT='staging' in prod) would defeat
+  // that one check. Refuse the wipe whenever the connection string points at a
+  // known production DB host, regardless of what ENVIRONMENT claims — so no
+  // single env mislabel can re-open reset against production data.
+  if (isProductionDatabaseUrl(c.env.DATABASE_URL)) {
+    return c.json(
+      {
+        code: ERROR_CODES.FORBIDDEN,
+        message:
+          'Refusing /__test/reset: DATABASE_URL points at a production database host',
+      },
+      403,
+    );
+  }
+
   const db = c.get('db');
   const seedEnv: SeedEnv = {
     CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,

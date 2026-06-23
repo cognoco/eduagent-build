@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, within } from '@testing-library/react-native';
 import QuizRoundDetailScreen from './[roundId]';
 import type { CompletedRoundDetailResponse } from '@eduagent/schemas';
 
@@ -265,6 +265,98 @@ describe('QuizRoundDetailScreen — hint reveal', () => {
       // prompt fallback.
       screen.getByText('Guess Who');
     });
+  });
+});
+
+describe('QuizRoundDetailScreen — result lookup with non-index-aligned results', () => {
+  beforeEach(() => {
+    mockUseRoundDetail.mockReset();
+  });
+
+  /**
+   * Regression guard for the O(n²) → useMemo Map refactor.
+   *
+   * The server is free to return results in any order (e.g. wrong answers
+   * first, or sparse). A naive index-based lookup (`results[i]`) would read
+   * the wrong result for each question. The component must use
+   * `result.questionIndex` as the join key — exactly as the original find()
+   * did. This test proves the Map lookup uses the same key.
+   *
+   * Setup: 3 questions whose results arrive in REVERSE order
+   * (questionIndex 2, 1, 0), so results[0] corresponds to question index 2,
+   * etc. A naive `results[i]` would show "Wrong / Wrong / Correct" instead of
+   * the correct "Correct / Correct / Wrong".
+   */
+  it('matches each question to its own result when results are not in index order', () => {
+    const data: CompletedRoundDetailResponse = {
+      id: '00000000-0000-4000-8000-000000000290',
+      activityType: 'capitals',
+      activityLabel: 'Capitals',
+      theme: 'Geography',
+      status: 'completed',
+      score: 2,
+      total: 3,
+      xpEarned: 20,
+      celebrationTier: 'nice',
+      questions: [
+        {
+          type: 'capitals',
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Nice', 'Bordeaux'],
+          funFact: 'Paris is the City of Light.',
+          isLibraryItem: false,
+          correctAnswer: 'Paris',
+        },
+        {
+          type: 'capitals',
+          country: 'Germany',
+          options: ['Berlin', 'Munich', 'Hamburg', 'Cologne'],
+          funFact: 'Berlin was reunified in 1990.',
+          isLibraryItem: false,
+          correctAnswer: 'Berlin',
+        },
+        {
+          type: 'capitals',
+          country: 'Japan',
+          options: ['Tokyo', 'Osaka', 'Kyoto', 'Nagoya'],
+          funFact: 'Tokyo is the largest metropolitan area in the world.',
+          isLibraryItem: false,
+          correctAnswer: 'Tokyo',
+        },
+      ],
+      // Results arrive in REVERSE order — index 2 first, then 1, then 0.
+      results: [
+        { questionIndex: 2, correct: false, correctAnswer: 'Tokyo', answerGiven: 'Osaka' },
+        { questionIndex: 1, correct: true, correctAnswer: 'Berlin', answerGiven: 'Berlin' },
+        { questionIndex: 0, correct: true, correctAnswer: 'Paris', answerGiven: 'Paris' },
+      ],
+    };
+
+    mockUseRoundDetail.mockReturnValue({
+      data,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<QuizRoundDetailScreen />);
+
+    // Q0 card: France (array position 0) → result for questionIndex 0 → correct=true,
+    // answerGiven='Paris'. A naive results[i] would give questionIndex 2 (Osaka, wrong).
+    const q0Card = screen.getByTestId('round-detail-question-0');
+    within(q0Card).getByText('Your answer: Paris');   // proves result matched qi=0
+    within(q0Card).getByText('Correct');              // proves correct=true
+
+    // Q1 card: Germany → questionIndex 1 → correct=true, answerGiven='Berlin'.
+    const q1Card = screen.getByTestId('round-detail-question-1');
+    within(q1Card).getByText('Your answer: Berlin');
+    within(q1Card).getByText('Correct');
+
+    // Q2 card: Japan → questionIndex 2 → correct=false, answerGiven='Osaka'.
+    // A naive results[i] would give questionIndex 0 (Paris, correct) → 'Correct'.
+    const q2Card = screen.getByTestId('round-detail-question-2');
+    within(q2Card).getByText('Your answer: Osaka');
+    within(q2Card).getByText('Wrong');
   });
 });
 

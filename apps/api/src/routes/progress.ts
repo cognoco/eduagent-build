@@ -13,6 +13,7 @@ import {
   continueSuggestionResponseSchema,
   childSessionsQuerySchema,
   childSessionsPageResponseSchema,
+  learningResumeScopeSchema,
   childReportsResponseSchema,
   weeklyReportsResponseSchema,
   childReportDetailResponseSchema,
@@ -214,19 +215,21 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   })
 
   // Get unified "continue learning" target for Home/Library/Progress.
-  .get('/progress/resume-target', async (c) => {
-    const { db, profileId } = withProfile(c);
-    const subjectId = c.req.query('subjectId');
-    const bookId = c.req.query('bookId');
-    const topicId = c.req.query('topicId');
+  .get(
+    '/progress/resume-target',
+    zValidator('query', learningResumeScopeSchema),
+    async (c) => {
+      const { db, profileId } = withProfile(c);
+      const { subjectId, bookId, topicId } = c.req.valid('query');
 
-    const target = await getLearningResumeTarget(db, profileId, {
-      ...(subjectId ? { subjectId } : {}),
-      ...(bookId ? { bookId } : {}),
-      ...(topicId ? { topicId } : {}),
-    });
-    return c.json(resumeTargetResponseSchema.parse({ target }));
-  })
+      const target = await getLearningResumeTarget(db, profileId, {
+        ...(subjectId ? { subjectId } : {}),
+        ...(bookId ? { bookId } : {}),
+        ...(topicId ? { topicId } : {}),
+      });
+      return c.json(resumeTargetResponseSchema.parse({ target }));
+    },
+  )
 
   // Get "continue where I left off" suggestion
   .get('/progress/continue', async (c) => {

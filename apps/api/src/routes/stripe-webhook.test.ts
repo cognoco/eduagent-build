@@ -9,7 +9,7 @@ jest.mock(
   }),
 );
 
-jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/stripe', () => {
   const actual = jest.requireActual(
     '../services/stripe',
   ) as typeof import('../services/stripe');
@@ -19,7 +19,7 @@ jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/kv', () => {
   const actual = jest.requireActual(
     '../services/kv',
   ) as typeof import('../services/kv');
@@ -29,7 +29,7 @@ jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');
@@ -45,40 +45,37 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/subscription' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/subscription',
-    ) as typeof import('../services/subscription');
-    return {
-      ...actual,
-      getTierConfig: jest.fn((tier: string) =>
-        tier === 'free'
-          ? {
-              monthlyQuota: 100,
-              dailyLimit: 10,
-              maxProfiles: 1,
-              priceMonthly: 0,
-              priceYearly: 0,
-              topUpPrice: 0,
-              topUpAmount: 0,
-            }
-          : {
-              monthlyQuota: 500,
-              dailyLimit: null,
-              maxProfiles: 1,
-              priceMonthly: 18.99,
-              priceYearly: 168,
-              topUpPrice: 10,
-              topUpAmount: 500,
-            },
-      ),
-    };
-  },
-);
+jest.mock('../services/subscription', () => {
+  const actual = jest.requireActual(
+    '../services/subscription',
+  ) as typeof import('../services/subscription');
+  return {
+    ...actual,
+    getTierConfig: jest.fn((tier: string) =>
+      tier === 'free'
+        ? {
+            monthlyQuota: 100,
+            dailyLimit: 10,
+            maxProfiles: 1,
+            priceMonthly: 0,
+            priceYearly: 0,
+            topUpPrice: 0,
+            topUpAmount: 0,
+          }
+        : {
+            monthlyQuota: 500,
+            dailyLimit: null,
+            maxProfiles: 1,
+            priceMonthly: 18.99,
+            priceYearly: 168,
+            topUpPrice: 10,
+            topUpAmount: 500,
+          },
+    ),
+  };
+});
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -90,7 +87,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');

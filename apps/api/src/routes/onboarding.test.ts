@@ -58,7 +58,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -74,7 +74,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -100,23 +100,20 @@ const mockUpdateConversationLanguage = jest.fn();
 const mockUpdatePronouns = jest.fn();
 const mockUpdateInterestsContext = jest.fn();
 
-jest.mock(
-  '../services/onboarding' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/onboarding',
-    ) as typeof import('../services/onboarding');
-    return {
-      ...actual,
-      // Preserve the error class so instanceof checks work in the route handler
-      updateConversationLanguage: (...args: unknown[]) =>
-        mockUpdateConversationLanguage(...args),
-      updatePronouns: (...args: unknown[]) => mockUpdatePronouns(...args),
-      updateInterestsContext: (...args: unknown[]) =>
-        mockUpdateInterestsContext(...args),
-    };
-  },
-);
+jest.mock('../services/onboarding', () => {
+  const actual = jest.requireActual(
+    '../services/onboarding',
+  ) as typeof import('../services/onboarding');
+  return {
+    ...actual,
+    // Preserve the error class so instanceof checks work in the route handler
+    updateConversationLanguage: (...args: unknown[]) =>
+      mockUpdateConversationLanguage(...args),
+    updatePronouns: (...args: unknown[]) => mockUpdatePronouns(...args),
+    updateInterestsContext: (...args: unknown[]) =>
+      mockUpdateInterestsContext(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Inngest framework boundary mock (required by index.ts import chain)
@@ -127,7 +124,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -185,6 +182,19 @@ describe('onboarding routes', () => {
     });
     mockFindConsentState.mockResolvedValue(undefined);
   });
+
+  function mockAutoResolvedOwnerProfile() {
+    const { findOwnerProfile } = jest.requireMock('../services/profile');
+    findOwnerProfile.mockResolvedValueOnce({
+      id: 'test-profile-id',
+      birthYear: 1990,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      isOwner: true,
+    });
+  }
 
   // ---- PATCH /v1/onboarding/language (self) --------------------------------
 
@@ -935,6 +945,115 @@ describe('onboarding routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('[BREAK][Issue 901] auto-resolved owner identity is not owner authority', () => {
+    const validInterests = [{ label: 'Math', context: 'school' as const }];
+
+    it('returns 403 on self language when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/language',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child language when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/language`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ conversationLanguage: 'nb' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on self pronouns when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/pronouns',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ pronouns: 'they/them' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child pronouns when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/pronouns`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ pronouns: 'they/them' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on self interests when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        '/v1/onboarding/interests/context',
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ interests: validInterests }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateInterestsContext).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 on child interests when owner identity was auto-resolved', async () => {
+      mockAutoResolvedOwnerProfile();
+
+      const res = await app.request(
+        `/v1/onboarding/${CHILD_PROFILE_ID}/interests/context`,
+        {
+          method: 'PATCH',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ interests: validInterests }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockUpdateInterestsContext).not.toHaveBeenCalled();
     });
   });
 });

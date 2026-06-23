@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateField } from './common.ts';
 import { childCapNotificationKindSchema } from './notifications.ts';
+import { subscriptionStatusSchema, subscriptionTierSchema } from './billing.ts';
 
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
@@ -134,6 +135,53 @@ export const billingProfileQuotaExhaustedEventSchema = z.object({
 });
 export type BillingProfileQuotaExhaustedEvent = z.infer<
   typeof billingProfileQuotaExhaustedEventSchema
+>;
+
+// ---------------------------------------------------------------------------
+// [BUG-783 / BUG-449] RevenueCat SUBSCRIBER_ALIAS merge event
+//
+// Dispatched by the RevenueCat webhook handler (legacy + v2) when a
+// SUBSCRIBER_ALIAS arrives and the `transferred_from` identity still held an
+// active subscription — the revenue-loss scenario. The webhook downgrades the
+// from-side row synchronously (BUG-833) and dispatches this event so the
+// billing-alias-merge worker reconciles the surviving (transferred_to)
+// identity using the PRE-DOWNGRADE snapshot captured here. The snapshot is
+// authoritative: by worker-run time the from-side row has already been forced
+// to free/expired, so the worker cannot re-read the original entitlement.
+//
+// Reconciliation is "best of both, user-favorable, never refund":
+//   - subscription: keep the more valuable tier (free<plus<family<pro),
+//     tiebreak by latest currentPeriodEnd; never downgrade the survivor.
+//   - top-up credits: target ends with MAX(from, to) remaining, not the sum
+//     (summing invites abuse via deliberate re-aliasing).
+// ---------------------------------------------------------------------------
+export const billingAliasReceivedEventSchema = z.object({
+  /** RevenueCat event id — the idempotency key for the merge. */
+  eventId: z.string().min(1),
+  /** Clerk user id the entitlement was transferred FROM (downgraded side). */
+  fromAppUserId: z.string().min(1),
+  /** Clerk user id the entitlement was transferred TO (surviving side). */
+  toAppUserId: z.string().min(1),
+  /** Internal account id of the from-side (resolved at dispatch time). */
+  fromAccountId: z.string().min(1),
+  /** Subscription id of the from-side (pre-downgrade). */
+  fromSubscriptionId: z.string().min(1),
+  /**
+   * Pre-downgrade snapshot of the from-side entitlement. Captured before the
+   * synchronous BUG-833 downgrade so the worker can reconcile the survivor.
+   */
+  fromSnapshot: z.object({
+    tier: subscriptionTierSchema,
+    status: subscriptionStatusSchema,
+    currentPeriodEnd: isoDateField.nullable(),
+    trialEndsAt: isoDateField.nullable(),
+    /** Remaining (unexpired) top-up credits on the from-side at alias time. */
+    topUpRemaining: z.number().int().nonnegative(),
+  }),
+  timestamp: isoDateField,
+});
+export type BillingAliasReceivedEvent = z.infer<
+  typeof billingAliasReceivedEventSchema
 >;
 
 // ---------------------------------------------------------------------------

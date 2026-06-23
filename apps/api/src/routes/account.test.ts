@@ -13,7 +13,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -26,7 +26,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -75,7 +75,7 @@ const mockUpdateAccountEmailFromClerk = jest.fn().mockResolvedValue({
   updatedAt: new Date().toISOString(),
 });
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -109,7 +109,7 @@ const OWNER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
 // const here would throw "Cannot access before initialization". The two must
 // stay in sync — enforced implicitly: the success-path tests fail
 // (getProfile/findOwnerProfile returns null → 403) if the literals diverge.
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -137,7 +137,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/deletion', () => {
   const actual = jest.requireActual(
     '../services/deletion',
   ) as typeof import('../services/deletion');
@@ -159,7 +159,7 @@ jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/export' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/export', () => {
   const actual = jest.requireActual(
     '../services/export',
   ) as typeof import('../services/export');

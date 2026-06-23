@@ -90,11 +90,7 @@ describe('CelebrationAnimation', () => {
       <CelebrationAnimation onComplete={onComplete} testID="test-burst" />,
     );
 
-    // In the mock, withDelay + withTiming pass values through and runOnJS
-    // calls the function synchronously. The key behavioral difference is that
-    // the reduced-motion path sets final values immediately AND calls
-    // onComplete unconditionally, while the animated path delegates to the
-    // animation completion callback (which the mock may or may not trigger).
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it('applies custom size to the container', () => {

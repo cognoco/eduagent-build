@@ -19,7 +19,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -54,7 +54,7 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit-level route test — no DB available; createDatabaseModuleMock provides controlled familyLinks stub for IDOR assertions
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -74,7 +74,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 // a verified profileId on the account. We return a profile owned by the
 // account regardless of which id is sent so the middleware accepts the
 // header and writes it to the context.
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -154,50 +154,43 @@ const mockUnsuppressInference = jest.fn();
 const mockBuildHumanReadableMemoryExport = jest.fn();
 const mockUpdateAccommodationMode = jest.fn();
 
-jest.mock(
-  '../services/learner-profile' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/learner-profile',
-    ) as typeof import('../services/learner-profile');
-    return {
-      ...actual,
-      getOrCreateLearningProfile: (...args: unknown[]) =>
-        mockGetOrCreateLearningProfile(...args),
-      deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
-      deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
-      toggleMemoryCollection: (...args: unknown[]) =>
-        mockToggleMemoryCollection(...args),
-      toggleMemoryInjection: (...args: unknown[]) =>
-        mockToggleMemoryInjection(...args),
-      grantMemoryConsent: (...args: unknown[]) =>
-        mockGrantMemoryConsent(...args),
-      unsuppressInference: (...args: unknown[]) =>
-        mockUnsuppressInference(...args),
-      buildHumanReadableMemoryExport: (...args: unknown[]) =>
-        mockBuildHumanReadableMemoryExport(...args),
-      updateAccommodationMode: (...args: unknown[]) =>
-        mockUpdateAccommodationMode(...args),
-    };
-  },
-);
+jest.mock('../services/learner-profile', () => {
+  const actual = jest.requireActual(
+    '../services/learner-profile',
+  ) as typeof import('../services/learner-profile');
+  return {
+    ...actual,
+    getOrCreateLearningProfile: (...args: unknown[]) =>
+      mockGetOrCreateLearningProfile(...args),
+    deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
+    deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
+    toggleMemoryCollection: (...args: unknown[]) =>
+      mockToggleMemoryCollection(...args),
+    toggleMemoryInjection: (...args: unknown[]) =>
+      mockToggleMemoryInjection(...args),
+    grantMemoryConsent: (...args: unknown[]) => mockGrantMemoryConsent(...args),
+    unsuppressInference: (...args: unknown[]) =>
+      mockUnsuppressInference(...args),
+    buildHumanReadableMemoryExport: (...args: unknown[]) =>
+      mockBuildHumanReadableMemoryExport(...args),
+    updateAccommodationMode: (...args: unknown[]) =>
+      mockUpdateAccommodationMode(...args),
+  };
+});
 
-jest.mock(
-  '../services/learner-input' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/learner-input',
-    ) as typeof import('../services/learner-input');
-    return {
-      ...actual,
-      parseLearnerInput: jest.fn().mockResolvedValue({
-        success: true,
-        message: 'Got it!',
-        fieldsUpdated: ['interests'],
-      }),
-    };
-  },
-);
+jest.mock('../services/learner-input', () => {
+  const actual = jest.requireActual(
+    '../services/learner-input',
+  ) as typeof import('../services/learner-input');
+  return {
+    ...actual,
+    parseLearnerInput: jest.fn().mockResolvedValue({
+      success: true,
+      message: 'Got it!',
+      fieldsUpdated: ['interests'],
+    }),
+  };
+});
 
 import { app } from '../index';
 import { Hono } from 'hono';
@@ -748,7 +741,12 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockDeleteAllMemory).toHaveBeenCalled();
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
 
     it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
@@ -763,7 +761,13 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        'granted',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
   });
 
@@ -919,7 +923,12 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockDeleteAllMemory).toHaveBeenCalled();
+      expect(mockDeleteAllMemory).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
 
     it('POST /learner-profile/consent returns 200 for adult non-owner profile', async () => {
@@ -934,7 +943,13 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockGrantMemoryConsent).toHaveBeenCalled();
+      expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
+        expect.anything(),
+        ADULT_NON_OWNER_PROFILE_ID,
+        'test-account-id',
+        'granted',
+        { identityV2Enabled: false, callerPersonId: undefined },
+      );
     });
   });
 

@@ -948,3 +948,51 @@ describe('buildSystemPrompt — CRITICAL THINKING block', () => {
     expect(prompt).not.toContain('CRITICAL THINKING:');
   });
 });
+
+describe('buildSystemPrompt — ASK ANYTHING (freeform) guidance', () => {
+  it('uses freeform guidance and drops the lead-the-teaching cycle for topicless freeform sessions', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        effectiveMode: 'freeform',
+        topicTitle: undefined,
+        topicDescription: undefined,
+      }),
+    );
+
+    expect(prompt).toContain('Session type: ASK ANYTHING (freeform)');
+    // The learner drives — the generic LEARNING "you lead" cycle must not apply.
+    expect(prompt).not.toContain('Session type: LEARNING');
+    expect(prompt).not.toContain('explain → verify → next concept');
+    // Clarify ambiguous scope with ONE question first (the user's chosen option a).
+    expect(prompt).toMatch(/ask ONE short clarifying question first/i);
+    expect(prompt).toMatch(/follow their lead/i);
+  });
+
+  it('keeps the normal LEARNING cycle for topic-driven learning sessions', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        topicTitle: 'Photosynthesis',
+        topicDescription: 'How plants turn sunlight into energy.',
+      }),
+    );
+
+    expect(prompt).toContain('Session type: LEARNING');
+    expect(prompt).not.toContain('Session type: ASK ANYTHING (freeform)');
+  });
+
+  it('does not apply freeform guidance when a topic is loaded even if effectiveMode is freeform', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'learning',
+        effectiveMode: 'freeform',
+        topicTitle: 'Photosynthesis',
+        topicDescription: 'How plants turn sunlight into energy.',
+      }),
+    );
+
+    expect(prompt).not.toContain('Session type: ASK ANYTHING (freeform)');
+    expect(prompt).toContain('Session type: LEARNING');
+  });
+});

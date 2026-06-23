@@ -38,6 +38,8 @@ const CLERK_USER_ID = 'integration-family-bridge-user';
 // so they must thread the identity-v2 flag the route layer would otherwise set.
 // Flag-ON the parent-access guard reads `guardianship`; flag-OFF `family_links`.
 const SERVICE_OPTS = { identityV2Enabled: isIdentityV2Enabled() };
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function seedFamily() {
   const db = createIntegrationDb();
@@ -308,9 +310,13 @@ describe('family bridge integration', () => {
       descriptionRefreshed: false,
       topicState: 'unstarted',
     });
-    expect(result.createdIds.topicId).toBeDefined();
-    expect(result.createdIds.subjectId).toBeDefined();
-    expect(result.createdIds.bookId).toBeDefined();
+    expect(result.createdIds.topicId).toEqual(
+      expect.stringMatching(UUID_REGEX),
+    );
+    expect(result.createdIds.subjectId).toEqual(
+      expect.stringMatching(UUID_REGEX),
+    );
+    expect(result.createdIds.bookId).toEqual(expect.stringMatching(UUID_REGEX));
 
     const adultTopic = await findAdultTopic(
       fixture.db,

@@ -20,7 +20,7 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -50,7 +50,7 @@ jest.mock(
 // Mock account + session services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -71,7 +71,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 // Mock profile service — middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -97,18 +97,15 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 // [WI-586 flip-safety] identity-v2 helpers — stub the person-based age-bracket
 // reader so the evaluate-depth flag-split (v2 person vs legacy profiles) can be
 // asserted without a real DB.
-jest.mock(
-  '../services/identity-v2/helpers' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/identity-v2/helpers',
-    ) as typeof import('../services/identity-v2/helpers');
-    return {
-      ...actual,
-      getPersonAgeBracket: jest.fn().mockResolvedValue('teen'),
-    };
-  },
-);
+jest.mock('../services/identity-v2/helpers', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/helpers',
+  ) as typeof import('../services/identity-v2/helpers');
+  return {
+    ...actual,
+    getPersonAgeBracket: jest.fn().mockResolvedValue('teen'),
+  };
+});
 
 // [WI-586 flip-safety] Under IDENTITY_V2_ENABLED the account middleware resolves
 // identity via resolveIdentityV2; stub it so flag-ON route tests authenticate
@@ -204,7 +201,7 @@ const mockRefundQuotaOrEscalate = jest.fn(
       : { refunded: false },
 );
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');
@@ -266,45 +263,42 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
 // the same shapes so a metered route (evaluate-depth) authorises under flag-ON
 // without an unmocked DB. The v2 twins themselves are covered by the billing-v2
 // integration suites.
-jest.mock(
-  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/billing/billing-v2',
-    ) as typeof import('../services/billing/billing-v2');
-    return {
-      ...actual,
-      ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
-      getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
-        subscription: mockSubscription,
-        effectiveAccessTier: 'plus',
-        billingAccess: 'current',
-      }),
-      getQuotaPoolV2: jest.fn().mockResolvedValue({
-        id: 'qp-1',
-        subscriptionId: 'sub-1',
-        monthlyLimit: 500,
-        usedThisMonth: 10,
-        dailyLimit: null,
-        usedToday: 0,
-        cycleResetAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }),
-      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
-        id: 'pqu-1',
-        subscriptionId: 'sub-1',
-        profileId: 'test-profile-id',
-        role: 'owner',
-        monthlyLimit: 700,
-        usedThisMonth: 10,
-        dailyLimit: null,
-        usedToday: 0,
-        cycleResetAt: new Date().toISOString(),
-      }),
-    };
-  },
-);
+jest.mock('../services/billing/billing-v2', () => {
+  const actual = jest.requireActual(
+    '../services/billing/billing-v2',
+  ) as typeof import('../services/billing/billing-v2');
+  return {
+    ...actual,
+    ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
+    getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
+      subscription: mockSubscription,
+      effectiveAccessTier: 'plus',
+      billingAccess: 'current',
+    }),
+    getQuotaPoolV2: jest.fn().mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 500,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+      id: 'pqu-1',
+      subscriptionId: 'sub-1',
+      profileId: 'test-profile-id',
+      role: 'owner',
+      monthlyLimit: 700,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+    }),
+  };
+});
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -344,7 +338,7 @@ jest.mock(
   },
 );
 
-jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/session', () => {
   // Use real error classes so instanceof checks in route handlers match production behavior.
   const actual = jest.requireActual(
     '../services/session',
@@ -581,37 +575,31 @@ const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   ],
 });
 
-jest.mock(
-  '../services/interleaved' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/interleaved',
-    ) as typeof import('../services/interleaved');
-    return {
-      ...actual,
-      // overrides
-      // Preserve the real error class so route-layer instanceof checks work.
-      startInterleavedSession: (...args: unknown[]) =>
-        mockStartInterleavedSession(...args),
-    };
-  },
-);
+jest.mock('../services/interleaved', () => {
+  const actual = jest.requireActual(
+    '../services/interleaved',
+  ) as typeof import('../services/interleaved');
+  return {
+    ...actual,
+    // overrides
+    // Preserve the real error class so route-layer instanceof checks work.
+    startInterleavedSession: (...args: unknown[]) =>
+      mockStartInterleavedSession(...args),
+  };
+});
 
-jest.mock(
-  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/recall-bridge',
-    ) as typeof import('../services/recall-bridge');
-    return {
-      ...actual,
-      // overrides
-      generateRecallBridge: jest.fn().mockResolvedValue({
-        bridge: 'mock bridge',
-      }),
-    };
-  },
-);
+jest.mock('../services/recall-bridge', () => {
+  const actual = jest.requireActual(
+    '../services/recall-bridge',
+  ) as typeof import('../services/recall-bridge');
+  return {
+    ...actual,
+    // overrides
+    generateRecallBridge: jest.fn().mockResolvedValue({
+      bridge: 'mock bridge',
+    }),
+  };
+});
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -619,7 +607,7 @@ jest.mock('inngest/hono', () => ({
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

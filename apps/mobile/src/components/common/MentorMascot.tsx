@@ -9,6 +9,7 @@ import Svg, {
   LinearGradient,
   Stop,
 } from 'react-native-svg';
+import { useTranslation } from 'react-i18next';
 import {
   MASCOT_COLORS,
   MASCOT_HERO,
@@ -38,6 +39,7 @@ export function MentorMascot({
   pose = 'hero',
   testID,
 }: MentorMascotProps): React.JSX.Element {
+  const { t } = useTranslation();
   const g = pose === 'hero' ? MASCOT_HERO : MASCOT_BADGE;
   const height = Math.round((size * g.height) / g.width);
   const gradId = `mascot-body-${pose}`;
@@ -48,7 +50,7 @@ export function MentorMascot({
       height={height}
       viewBox={g.viewBox}
       testID={testID}
-      accessibilityLabel="Your mentor"
+      accessibilityLabel={t('common.mentorImageAlt')}
       accessibilityRole="image"
     >
       <Defs>

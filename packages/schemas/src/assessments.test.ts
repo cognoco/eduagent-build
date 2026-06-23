@@ -8,6 +8,7 @@ import {
   retentionCardSchema,
   relearnTopicSchema,
   verificationTypeSchema,
+  teachingPreferenceResponseDataSchema,
 } from './assessments.js';
 
 const TEST_UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -320,5 +321,92 @@ describe('relearnTopicSchema', () => {
         ]),
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// teachingPreferenceResponseDataSchema [WI-979]
+// `method` / `analogyDomain` were bare z.string(); tightened to the canonical
+// teachingMethodSchema / analogyDomainSchema (the same enums the write path and
+// the DB pgEnum columns enforce). nullable/optional modifiers preserved.
+// ---------------------------------------------------------------------------
+
+describe('teachingPreferenceResponseDataSchema', () => {
+  const SUBJECT_UUID = '660e8400-e29b-41d4-a716-446655440000';
+
+  it('accepts every canonical teachingMethod enum value', () => {
+    for (const method of [
+      'visual_diagrams',
+      'step_by_step',
+      'real_world_examples',
+      'practice_problems',
+    ] as const) {
+      const data = {
+        subjectId: SUBJECT_UUID,
+        method,
+        analogyDomain: null,
+        nativeLanguage: null,
+      };
+      expect(teachingPreferenceResponseDataSchema.parse(data)).toEqual(data);
+    }
+  });
+
+  it('accepts every canonical analogyDomain enum value', () => {
+    for (const analogyDomain of [
+      'cooking',
+      'sports',
+      'building',
+      'music',
+      'nature',
+      'gaming',
+    ] as const) {
+      const data = {
+        subjectId: SUBJECT_UUID,
+        method: 'step_by_step',
+        analogyDomain,
+        nativeLanguage: null,
+      };
+      expect(teachingPreferenceResponseDataSchema.parse(data)).toEqual(data);
+    }
+  });
+
+  it('still allows analogyDomain to be null and omitted (nullable + optional preserved)', () => {
+    expect(
+      teachingPreferenceResponseDataSchema.parse({
+        subjectId: SUBJECT_UUID,
+        method: 'step_by_step',
+        analogyDomain: null,
+        nativeLanguage: null,
+      }).analogyDomain,
+    ).toBeNull();
+
+    const omitted = teachingPreferenceResponseDataSchema.parse({
+      subjectId: SUBJECT_UUID,
+      method: 'step_by_step',
+      nativeLanguage: null,
+    });
+    expect(omitted.analogyDomain).toBeUndefined();
+  });
+
+  it('rejects an out-of-enum method', () => {
+    expect(
+      teachingPreferenceResponseDataSchema.safeParse({
+        subjectId: SUBJECT_UUID,
+        method: 'not_a_real_method',
+        analogyDomain: null,
+        nativeLanguage: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an out-of-enum analogyDomain', () => {
+    expect(
+      teachingPreferenceResponseDataSchema.safeParse({
+        subjectId: SUBJECT_UUID,
+        method: 'step_by_step',
+        analogyDomain: 'astrology',
+        nativeLanguage: null,
+      }).success,
+    ).toBe(false);
   });
 });

@@ -21,11 +21,13 @@ export type {
 // Subscription CRUD, Stripe linking, free provisioning, quota pool read/write
 // ---------------------------------------------------------------------------
 
+export type { StripeCustomerCreator } from './billing/subscription-core';
 export {
   getSubscriptionByAccountId,
   createSubscription,
   updateSubscriptionFromWebhook,
   linkStripeCustomer,
+  getOrCreateStripeCustomer,
   getSubscriptionByStripeCustomerId,
   getQuotaPool,
   resetMonthlyQuota,
@@ -43,7 +45,11 @@ export {
 // surface — which would form an import cycle with this facade via
 // billing/metering → billing/billing-v2/*. Mirrors metering.ts's by-path v2
 // imports. The full v2 API stays available from ./billing/billing-v2.
-export { ensureFreeSubscriptionV2 } from './billing/billing-v2/subscription-core-v2';
+// [BUG-827] getOrCreateStripeCustomerV2 re-exported by-path alongside it.
+export {
+  ensureFreeSubscriptionV2,
+  getOrCreateStripeCustomerV2,
+} from './billing/billing-v2/subscription-core-v2';
 
 // ---------------------------------------------------------------------------
 // Trial expiry, quota cron helpers

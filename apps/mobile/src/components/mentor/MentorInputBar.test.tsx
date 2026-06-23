@@ -22,7 +22,7 @@ describe('MentorInputBar', () => {
     expect(onOpenHomework).toHaveBeenCalledTimes(1);
   });
 
-  it('submits typed text and transcribes string-only voice input', () => {
+  it('submits typed text without treating mic press as a transcript', () => {
     const onSubmitText = jest.fn();
     const onTranscript = jest.fn();
     const { getByTestId } = render(
@@ -39,8 +39,7 @@ describe('MentorInputBar', () => {
     fireEvent.press(getByTestId('mentor-bar-mic'));
 
     expect(onSubmitText).toHaveBeenCalledWith('show topic');
-    expect(onTranscript).toHaveBeenCalledWith('show topic');
-    expect(typeof onTranscript.mock.calls[0]?.[0]).toBe('string');
+    expect(onTranscript).not.toHaveBeenCalled();
   });
 
   it('keeps deterministic submit and non-LLM affordances live when unavailable', () => {
@@ -70,6 +69,6 @@ describe('MentorInputBar', () => {
     expect(onSubmitText).toHaveBeenCalledWith('continue session-1');
     expect(onOpenCamera).toHaveBeenCalledTimes(1);
     expect(onOpenHomework).toHaveBeenCalledTimes(1);
-    expect(onTranscript).toHaveBeenCalledWith('continue session-1');
+    expect(onTranscript).not.toHaveBeenCalled();
   });
 });

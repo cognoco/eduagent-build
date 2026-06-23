@@ -1108,6 +1108,31 @@ describe('subjectSessionSchema', () => {
     });
     expect(typeof parsed.createdAt).toBe('string');
   });
+
+  // [WI-979] sessionType was bare z.string(); tightened to the canonical
+  // sessionTypeSchema enum — the same values the DB session_type pgEnum
+  // and the producer (getSubjectSessions) emit.
+  it('accepts every canonical sessionType enum value', () => {
+    for (const sessionType of [
+      'learning',
+      'homework',
+      'interleaved',
+    ] as const) {
+      expect(
+        subjectSessionSchema.parse({ ...validSubjectSession, sessionType })
+          .sessionType,
+      ).toBe(sessionType);
+    }
+  });
+
+  it('rejects an out-of-enum sessionType', () => {
+    expect(
+      subjectSessionSchema.safeParse({
+        ...validSubjectSession,
+        sessionType: 'review',
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('getSubjectSessionsResponseSchema', () => {

@@ -164,4 +164,26 @@ describe('NudgeBanner', () => {
 
     screen.getByTestId('nudge-unread-dismiss');
   });
+
+  it('[WI-946] keeps mark-all-read failures recoverable instead of silently closing', () => {
+    mockUnreadNudgesData = [NUDGE_A];
+    mockActiveProfileConsentStatus = null;
+    mockMarkAllRead.mockImplementation(
+      (_variables?: void, options?: { onError?: (error: Error) => void }) => {
+        options?.onError?.(new Error('server unavailable'));
+      },
+    );
+
+    renderNudgeBanner();
+
+    fireEvent.press(screen.getByTestId('nudge-banner'));
+    fireEvent.press(screen.getByTestId('nudge-unread-dismiss'));
+
+    screen.getByTestId('nudge-unread-dismiss');
+    screen.getByText('Something unexpected happened. Please try again.');
+
+    fireEvent.press(screen.getByTestId('nudge-unread-dismiss'));
+
+    expect(mockMarkAllRead).toHaveBeenCalledTimes(2);
+  });
 });

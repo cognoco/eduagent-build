@@ -37,7 +37,8 @@
     "goBackAction": "Wróć",
     "tryAgainAction": "Spróbuj ponownie",
     "dismiss": "Odrzuć",
-    "pleaseTryAgain": "Spróbuj ponownie."
+    "pleaseTryAgain": "Spróbuj ponownie.",
+    "mentorImageAlt": "Twój mentor"
   },
   "quota": {
     "parent": {
@@ -203,7 +204,15 @@
       "verifyButton": "Weryfikuj",
       "resendCode": "Wyślij kod ponownie",
       "useDifferentEmail": "Użyj innego e-maila",
-      "backToSignIn": "Wróć do logowania"
+      "backToSignIn": "Wróć do logowania",
+      "tryAnotherMethod": "Wypróbuj inną metodę",
+      "continueWithGoogle": "Kontynuuj z Google",
+      "continueWithApple": "Kontynuuj z Apple",
+      "continueWithOpenAI": "Kontynuuj z OpenAI",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Utwórz hasło",
+      "signUpButton": "Zarejestruj się",
+      "signInButton": "Zaloguj się"
     },
     "forgotPassword": {
       "title": "Nie pamiętasz hasła?",
@@ -4161,7 +4170,11 @@
       "done": "Gotowe",
       "mastered": "Opanowane"
     },
-    "linkLabel": "Otwórz centrum tematyczne"
+    "linkLabel": "Otwórz centrum tematyczne",
+    "empty": {
+      "title": "Jeszcze nic tu nie ma do nauki",
+      "message": "Ten przedmiot nie ma jeszcze żadnych tematów. Spróbuj ponownie za chwilę lub wróć do swoich przedmiotów."
+    }
   },
   "journal": {
     "title": "Dziennik",
@@ -4286,6 +4299,8 @@
       "empty": "Dodaj ucznia, aby zobaczyć tutaj jego przedmioty.",
       "openPerson": "Zobacz przedmioty {{name}}",
       "personHint": "Otwórz strukturalny widok przedmiotów.",
+      "personEmptyTitle": "Nie ma jeszcze przedmiotów",
+      "personEmptyMessage": "Ten uczeń nie ma jeszcze widocznej struktury przedmiotów.",
       "structuralOnly": "Tylko struktura przedmiotów, rozdziałów i tematów.",
       "bookCount": "{{count}} książka",
       "bookCount_few": "{{count}} książki",

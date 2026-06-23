@@ -37,7 +37,8 @@
     "goBackAction": "Gå tilbake",
     "tryAgainAction": "Prøv igjen",
     "dismiss": "Avvis",
-    "pleaseTryAgain": "Prøv igjen."
+    "pleaseTryAgain": "Prøv igjen.",
+    "mentorImageAlt": "Mentoren din"
   },
   "quota": {
     "parent": {
@@ -203,7 +204,15 @@
       "verifyButton": "Bekreft",
       "resendCode": "Send kode på nytt",
       "useDifferentEmail": "Bruk en annen e-post",
-      "backToSignIn": "Tilbake til innlogging"
+      "backToSignIn": "Tilbake til innlogging",
+      "tryAnotherMethod": "Prøv en annen metode",
+      "continueWithGoogle": "Fortsett med Google",
+      "continueWithApple": "Fortsett med Apple",
+      "continueWithOpenAI": "Fortsett med OpenAI",
+      "emailPlaceholder": "du@eksempel.com",
+      "passwordPlaceholder": "Lag et passord",
+      "signUpButton": "Registrer deg",
+      "signInButton": "Logg inn"
     },
     "forgotPassword": {
       "title": "Glemt passord?",
@@ -4003,7 +4012,11 @@
       "done": "Ferdig",
       "mastered": "Mestret"
     },
-    "linkLabel": "Åpne fag-hub"
+    "linkLabel": "Åpne fag-hub",
+    "empty": {
+      "title": "Ingenting å studere her ennå",
+      "message": "Dette faget har ingen emner ennå. Prøv igjen om et øyeblikk, eller gå tilbake til fagene dine."
+    }
   },
   "journal": {
     "title": "Journal",
@@ -4128,6 +4141,8 @@
       "empty": "Legg til en elev for å se fagene deres her.",
       "openPerson": "Åpne {{name}}s fag",
       "personHint": "Åpne den strukturelle fagoversikten.",
+      "personEmptyTitle": "Ingen fag ennå",
+      "personEmptyMessage": "Denne eleven har ingen synlig fagstruktur ennå.",
       "structuralOnly": "Kun struktur for fag, kapittel og emne.",
       "bookCount": "{{count}} bok",
       "bookCount_other": "{{count}} bøker",

@@ -70,25 +70,15 @@ const ALLOWED_UNREGISTERED_PREFIXES: string[] = [
  * app/filing.retry_completed — an event with a real `step.waitForEvent`
  * consumer the scanner cannot see because it only harvests
  * inngest.createFunction triggers). See the dispatch sites for per-event
- * rationale.
+ * rationale. The 15th and final entry (app/billing.alias_received) gained a
+ * real handler in BUG-783 — the set is now empty.
  *
- * The 1 entry that remains is NOT acceptable steady state — it is tracked
- * pending, annotated below with WHY no handler exists yet and what the
- * eventual handler should do:
- *
- *   - app/billing.alias_received — dispatched from
- *     services/billing/revenuecat-webhook-handler.ts when a RevenueCat
- *     SUBSCRIBER_ALIAS arrives and the transferred_from identity still has an
- *     active subscription (revenue-loss scenario). It is already escalated via
- *     captureException(severity:'high'), so alerting is NOT silent. The MISSING
- *     piece is an automated *remediation* handler that merges/transfers the two
- *     subscriptions. That requires a product decision (which sub wins, refund
- *     handling, proration) + a migration worker, so it is genuinely out of
- *     scope for this triage. Left pending until the subscription-merge workflow
- *     is specced. Do NOT orphan-allow it — its pending state is the signal that
- *     a handler is still owed.
+ * [BUG-783] app/billing.alias_received is no longer pending — the
+ * billing-alias-merge worker (apps/api/src/inngest/functions/billing-alias-merge.ts,
+ * registered in inngest/index.ts) now consumes it and reconciles the surviving
+ * identity. The set is therefore empty; ANY new orphan event name fails CI.
  */
-const KNOWN_PENDING_ORPHANS = new Set<string>(['app/billing.alias_received']);
+const KNOWN_PENDING_ORPHANS = new Set<string>([]);
 
 function shouldScanFile(absPath: string): boolean {
   const rel = path.relative(REPO_ROOT, absPath).replace(/\\/g, '/');

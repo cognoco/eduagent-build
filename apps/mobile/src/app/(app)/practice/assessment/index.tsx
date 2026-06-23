@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -162,6 +162,16 @@ export default function AssessmentScreen() {
   const [lastError, setLastError] = useState<unknown | null>(null);
   const [lastUserText, setLastUserText] = useState<string | null>(null);
 
+  // [PERF-879] Holds the cleanup fn of the latest animateResponse interval so
+  // we can cancel it on unmount — otherwise the interval keeps ticking
+  // setMessages/setIsStreaming after the screen is gone (leak +
+  // state-update-after-unmount warning).
+  const cleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    const ref = cleanupRef;
+    return () => ref.current?.();
+  }, []);
+
   useEffect(() => {
     const assessment = activeAssessment.data;
     if (!assessment || assessmentId || terminalResult || isStreaming) return;
@@ -209,7 +219,7 @@ export default function AssessmentScreen() {
       ]);
 
       if (isFirstLearnerTurn && isAssessmentReadinessReply(text)) {
-        animateResponse(
+        cleanupRef.current = animateResponse(
           buildAssessmentFirstQuestion({
             t,
             topicTitle: scopedTopicTitle,
@@ -253,27 +263,36 @@ export default function AssessmentScreen() {
           : null;
         const terminalStatus = result.status !== 'in_progress';
 
-        animateResponse(feedback, setMessages, setIsStreaming, () => {
-          if (nextActionPrompt) {
-            animateResponse(nextActionPrompt, setMessages, setIsStreaming);
-            return;
-          }
-          if (terminalStatus) {
-            setTerminalResult(result);
-          }
-          if (result.status === 'passed') {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `assessment-done-${Date.now()}`,
-                role: 'assistant',
-                content: t('assessment.passedMessage', {
-                  mastery: Math.round(evaluation.masteryScore * 100),
-                }),
-              },
-            ]);
-          }
-        });
+        cleanupRef.current = animateResponse(
+          feedback,
+          setMessages,
+          setIsStreaming,
+          () => {
+            if (nextActionPrompt) {
+              cleanupRef.current = animateResponse(
+                nextActionPrompt,
+                setMessages,
+                setIsStreaming,
+              );
+              return;
+            }
+            if (terminalStatus) {
+              setTerminalResult(result);
+            }
+            if (result.status === 'passed') {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `assessment-done-${Date.now()}`,
+                  role: 'assistant',
+                  content: t('assessment.passedMessage', {
+                    mastery: Math.round(evaluation.masteryScore * 100),
+                  }),
+                },
+              ]);
+            }
+          },
+        );
       } catch (err: unknown) {
         // [UX-DE-H4] Do NOT inject server error text into the chat thread —
         // the AI did not "say" this. Surface the error only in the footer

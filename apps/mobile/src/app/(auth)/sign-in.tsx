@@ -1551,7 +1551,7 @@ export default function SignInScreen() {
                     className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
                     testID="try-mentomate-cta"
                     accessibilityRole="button"
-                    accessibilityLabel="Try MentoMate"
+                    accessibilityLabel={t('auth.signIn.tryMentomate')}
                   >
                     <Text className="text-body font-semibold text-primary">
                       {t('auth.signIn.tryMentomate')}

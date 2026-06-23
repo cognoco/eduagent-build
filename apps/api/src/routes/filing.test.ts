@@ -45,7 +45,7 @@ jest.mock(
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -65,7 +65,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -96,7 +96,7 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
 // Mock filing services — stubs so route handler does not hit real DB/LLM
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/filing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/filing', () => {
   const actual = jest.requireActual(
     '../services/filing',
   ) as typeof import('../services/filing');
@@ -127,25 +127,22 @@ jest.mock('../services/filing' /* gc1-allow: pattern-a conversion */, () => {
 // Mock suggestion services
 // ---------------------------------------------------------------------------
 
-jest.mock(
-  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/suggestions',
-    ) as typeof import('../services/suggestions');
-    return {
-      ...actual,
-      markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
-      markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
+jest.mock('../services/suggestions', () => {
+  const actual = jest.requireActual(
+    '../services/suggestions',
+  ) as typeof import('../services/suggestions');
+  return {
+    ...actual,
+    markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
+    markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock session services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/session', () => {
   const actual = jest.requireActual(
     '../services/session',
   ) as typeof import('../services/session');
@@ -168,7 +165,7 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -182,7 +179,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 // Mock Inngest client
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -206,7 +203,7 @@ jest.mock('inngest/hono', () => ({
 
 // Billing mock — required by metering middleware now that
 // POST /v1/filing is metered [WI-154 / WI-77 allowlist sweep].
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');

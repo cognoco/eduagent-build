@@ -264,10 +264,13 @@ describe('useSpeechRecognition', () => {
         ),
       );
 
-      // Start listening — this will await the slow module
-      const startPromise = act(async () => {
-        void result.current.startListening();
+      // Start listening — this will await the slow module.
+      let startPromise!: Promise<void>;
+      await act(async () => {
+        startPromise = result.current.startListening();
+        await Promise.resolve();
       });
+      expect(result.current.status).toBe('requesting_permission');
 
       // Unmount while the module is still loading
       unmount();
@@ -281,11 +284,12 @@ describe('useSpeechRecognition', () => {
           addListener: mockAddListener,
         });
       });
-
       await startPromise;
 
-      // No crash — the hook guards state updates with mountedRef
-      // We just verify the test completes without errors
+      expect(mockStart).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('requesting_permission');
+      expect(result.current.transcript).toBe('');
+      expect(result.current.error).toBeNull();
     });
 
     it('does not update transcript after unmount when result event fires', async () => {
@@ -305,20 +309,27 @@ describe('useSpeechRecognition', () => {
       await act(async () => {
         await result.current.startListening();
       });
+      const resultListener = listeners.result;
+      expect(resultListener).toEqual(expect.any(Function));
+      expect(result.current.transcript).toBe('');
+      expect(result.current.error).toBeNull();
 
       // Unmount component
       unmount();
 
-      // Fire a result event after unmount — should not throw
-      act(() => {
-        listeners.result?.({
-          results: [{ transcript: 'late transcript' }],
-        });
+      const getLateResults = jest.fn(() => [{ transcript: 'late transcript' }]);
+      const lateResultEvent = {};
+      Object.defineProperty(lateResultEvent, 'results', {
+        get: getLateResults,
       });
 
-      // Transcript should NOT have been updated (mountedRef is false)
-      // The hook's last known state before unmount had empty transcript
-      // (startListening clears it). No crash = success.
+      // Fire the captured listener after unmount — mountedRef should return
+      // before the event payload is even read.
+      resultListener!(lateResultEvent);
+
+      expect(getLateResults).not.toHaveBeenCalled();
+      expect(result.current.transcript).toBe('');
+      expect(result.current.error).toBeNull();
     });
 
     it('does not update error state after unmount when error event fires', async () => {
@@ -333,15 +344,22 @@ describe('useSpeechRecognition', () => {
         useSpeechRecognition(mockLoadSpeechModule),
       );
       await flushEffects();
+      const errorListener = listeners.error;
+      expect(errorListener).toEqual(expect.any(Function));
 
       unmount();
 
-      // Fire an error event after unmount — should not throw
-      act(() => {
-        listeners.error?.({ message: 'Late error' });
+      const getLateMessage = jest.fn(() => 'Late error');
+      const lateErrorEvent = {};
+      Object.defineProperty(lateErrorEvent, 'message', {
+        get: getLateMessage,
       });
 
-      // No crash = success. mountedRef guards the state update.
+      // Fire the captured listener after unmount — mountedRef should return
+      // before the event payload is even read.
+      errorListener!(lateErrorEvent);
+
+      expect(getLateMessage).not.toHaveBeenCalled();
     });
   });
 

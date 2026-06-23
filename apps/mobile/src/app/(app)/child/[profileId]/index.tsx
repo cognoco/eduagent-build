@@ -849,8 +849,12 @@ export default function ChildDetailScreen(): React.ReactElement {
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
     (option) => option.mode === (learnerProfile?.accommodationMode ?? 'none'),
   );
-  const childName =
-    child?.displayName ?? ownedProfile?.displayName ?? t('common.loading');
+  const resolvedChildName =
+    child?.displayName ?? ownedProfile?.displayName ?? null;
+  const isChildIdentityLoading =
+    resolvedChildName == null &&
+    (isProfileLoading || isLoading || dashboardQuery.isLoading);
+  const childName = resolvedChildName ?? t('parentView.index.yourChild');
   const progressNudgeAction = useMemo(
     () =>
       buildProgressNudgeAction({
@@ -952,6 +956,21 @@ export default function ChildDetailScreen(): React.ReactElement {
             {t('common.back')}
           </Text>
         </Pressable>
+      </View>
+    );
+  }
+
+  if (isChildIdentityLoading) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+        testID="child-profile-loading"
+      >
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
       </View>
     );
   }

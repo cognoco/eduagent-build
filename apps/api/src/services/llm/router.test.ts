@@ -10,8 +10,11 @@ import {
   OPENAI_ADVANCED_MODEL,
   OPENAI_ADVANCED_MODEL_MIN_RUNG,
   _setOpenAIAdvancedModelForTesting,
+  setLlmRoutingV2Enabled,
 } from './router';
 import { createMockProvider } from './providers/mock';
+import { createCerebrasProvider } from './providers/cerebras';
+import { parseEnvelope } from './envelope';
 import { getTextContent, makeChatStreamResult } from './types';
 import type {
   LLMProvider,
@@ -1731,6 +1734,89 @@ describe('LLM Router', () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+  });
+
+  // [BUG-895] conversationLanguage must reach the Cerebras provider through the
+  // router so a streamed bare model refusal becomes a LOCALIZED safe envelope,
+  // not the English DEFAULT_FALLBACK_TEXT. This drives the REAL Cerebras
+  // streaming adapter through routeAndStream (V2 routing → cerebras), stubbing
+  // only the external fetch() boundary — proving both the router-side threading
+  // and the provider-side stream normalization end to end.
+  describe('[BUG-895] streamed refusal localization through the router', () => {
+    const realFetch = global.fetch;
+
+    function refusalSse(): ReadableStream<Uint8Array> {
+      const encoder = new TextEncoder();
+      const text =
+        [
+          'data: {"choices":[{"delta":{"content":"{\\"type\\":"}}]}',
+          'data: {"choices":[{"delta":{"content":"\\"refusal\\"}"}}]}',
+          'data: [DONE]',
+        ].join('\n') + '\n';
+      return new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(text));
+          controller.close();
+        },
+      });
+    }
+
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createCerebrasProvider('test-key'));
+      setLlmRoutingV2Enabled(true);
+      (global as unknown as { fetch: typeof fetch }).fetch = jest
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, body: refusalSse() });
+    });
+
+    afterEach(() => {
+      setLlmRoutingV2Enabled(false);
+      (global as unknown as { fetch: typeof fetch }).fetch = realFetch;
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('threads conversationLanguage so a streamed refusal yields the Polish decline, not the English fallback', async () => {
+      const plResult = await routeAndStream(
+        [{ role: 'user', content: 'something disallowed' }],
+        1,
+        { flow: 'exchange.session', conversationLanguage: 'pl' },
+      );
+      expect(plResult.provider).toBe('cerebras');
+
+      let plStreamed = '';
+      for await (const chunk of plResult.stream) plStreamed += chunk;
+
+      // The provider must have rewritten the bare refusal into a parseable
+      // envelope rather than leaking {"type":"refusal"} to the fallback.
+      const plParsed = parseEnvelope(plStreamed);
+      expect(plParsed.ok).toBe(true);
+      if (!plParsed.ok) throw new Error('expected a parseable envelope');
+
+      // And the decline must be the Polish one — which only happens if
+      // conversationLanguage was threaded onto the provider config. Compare
+      // against the English decline produced by the same refusal.
+      (global as unknown as { fetch: typeof fetch }).fetch = jest
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, body: refusalSse() });
+      _resetCircuits();
+      const enResult = await routeAndStream(
+        [{ role: 'user', content: 'something disallowed' }],
+        1,
+        { flow: 'exchange.session', conversationLanguage: 'en' },
+      );
+      let enStreamed = '';
+      for await (const chunk of enResult.stream) enStreamed += chunk;
+      const enParsed = parseEnvelope(enStreamed);
+      if (!enParsed.ok)
+        throw new Error('expected a parseable English envelope');
+
+      expect(plParsed.envelope.reply).not.toBe(enParsed.envelope.reply);
+      expect(plParsed.envelope.reply.length).toBeGreaterThan(0);
     });
   });
 });

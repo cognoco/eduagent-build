@@ -30,7 +30,7 @@ jest.mock(
 // Account + profile service mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -46,7 +46,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -76,7 +76,7 @@ const mockGetLearningResumeTarget = jest.fn();
 const mockGetActiveSessionForTopic = jest.fn();
 const mockResolveTopicSubject = jest.fn();
 
-jest.mock('../services/progress' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/progress', () => {
   const actual = jest.requireActual(
     '../services/progress',
   ) as typeof import('../services/progress');
@@ -102,19 +102,16 @@ jest.mock('../services/progress' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockListProfileSessions = jest.fn();
 
-jest.mock(
-  '../services/session/session-crud' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/session/session-crud',
-    ) as typeof import('../services/session/session-crud');
-    return {
-      ...actual,
-      listProfileSessions: (...args: unknown[]) =>
-        mockListProfileSessions(...args),
-    };
-  },
-);
+jest.mock('../services/session/session-crud', () => {
+  const actual = jest.requireActual(
+    '../services/session/session-crud',
+  ) as typeof import('../services/session/session-crud');
+  return {
+    ...actual,
+    listProfileSessions: (...args: unknown[]) =>
+      mockListProfileSessions(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Monthly / weekly report service mocks
@@ -127,41 +124,35 @@ const mockListWeeklyReports = jest.fn();
 const mockGetWeeklyReport = jest.fn();
 const mockMarkWeeklyReportViewedForProfile = jest.fn();
 
-jest.mock(
-  '../services/monthly-report' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/monthly-report',
-    ) as typeof import('../services/monthly-report');
-    return {
-      ...actual,
-      listMonthlyReportsForProfile: (...args: unknown[]) =>
-        mockListMonthlyReports(...args),
-      getMonthlyReportForProfile: (...args: unknown[]) =>
-        mockGetMonthlyReport(...args),
-      markMonthlyReportViewedForProfile: (...args: unknown[]) =>
-        mockMarkMonthlyReportViewedForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/monthly-report', () => {
+  const actual = jest.requireActual(
+    '../services/monthly-report',
+  ) as typeof import('../services/monthly-report');
+  return {
+    ...actual,
+    listMonthlyReportsForProfile: (...args: unknown[]) =>
+      mockListMonthlyReports(...args),
+    getMonthlyReportForProfile: (...args: unknown[]) =>
+      mockGetMonthlyReport(...args),
+    markMonthlyReportViewedForProfile: (...args: unknown[]) =>
+      mockMarkMonthlyReportViewedForProfile(...args),
+  };
+});
 
-jest.mock(
-  '../services/weekly-report' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/weekly-report',
-    ) as typeof import('../services/weekly-report');
-    return {
-      ...actual,
-      listWeeklyReportsForProfile: (...args: unknown[]) =>
-        mockListWeeklyReports(...args),
-      getWeeklyReportForProfile: (...args: unknown[]) =>
-        mockGetWeeklyReport(...args),
-      markWeeklyReportViewedForProfile: (...args: unknown[]) =>
-        mockMarkWeeklyReportViewedForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/weekly-report', () => {
+  const actual = jest.requireActual(
+    '../services/weekly-report',
+  ) as typeof import('../services/weekly-report');
+  return {
+    ...actual,
+    listWeeklyReportsForProfile: (...args: unknown[]) =>
+      mockListWeeklyReports(...args),
+    getWeeklyReportForProfile: (...args: unknown[]) =>
+      mockGetWeeklyReport(...args),
+    markWeeklyReportViewedForProfile: (...args: unknown[]) =>
+      mockMarkWeeklyReportViewedForProfile(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Overdue + retention mocks
@@ -170,33 +161,27 @@ jest.mock(
 const mockGetOverdueTopicsGrouped = jest.fn();
 const mockGetProfileOverdueCount = jest.fn();
 
-jest.mock(
-  '../services/overdue-topics' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/overdue-topics',
-    ) as typeof import('../services/overdue-topics');
-    return {
-      ...actual,
-      getOverdueTopicsGrouped: (...args: unknown[]) =>
-        mockGetOverdueTopicsGrouped(...args),
-    };
-  },
-);
+jest.mock('../services/overdue-topics', () => {
+  const actual = jest.requireActual(
+    '../services/overdue-topics',
+  ) as typeof import('../services/overdue-topics');
+  return {
+    ...actual,
+    getOverdueTopicsGrouped: (...args: unknown[]) =>
+      mockGetOverdueTopicsGrouped(...args),
+  };
+});
 
-jest.mock(
-  '../services/retention-data' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/retention-data',
-    ) as typeof import('../services/retention-data');
-    return {
-      ...actual,
-      getProfileOverdueCount: (...args: unknown[]) =>
-        mockGetProfileOverdueCount(...args),
-    };
-  },
-);
+jest.mock('../services/retention-data', () => {
+  const actual = jest.requireActual(
+    '../services/retention-data',
+  ) as typeof import('../services/retention-data');
+  return {
+    ...actual,
+    getProfileOverdueCount: (...args: unknown[]) =>
+      mockGetProfileOverdueCount(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Inngest framework boundary mock (required by index.ts import chain)
@@ -961,6 +946,69 @@ describe('progress routes', () => {
       // The route does: resumeTargetResponseSchema.parse({ target })
       // where target = null — null is valid per the schema (target is nullable).
       expect(res.status).toBe(200);
+    });
+
+    it('returns 200 when all scope params are omitted (baseline)', async () => {
+      mockGetLearningResumeTarget.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/progress/resume-target',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetLearningResumeTarget).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 400 for invalid subjectId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?subjectId=not-a-uuid',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid bookId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?bookId=123',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid topicId (not a UUID)', async () => {
+      const res = await app.request(
+        '/v1/progress/resume-target?topicId=abc',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+      expect(res.status).toBe(400);
+      expect(mockGetLearningResumeTarget).not.toHaveBeenCalled();
+    });
+
+    it('passes validated scope params through to the service', async () => {
+      mockGetLearningResumeTarget.mockResolvedValueOnce(null);
+      const subjectId = '550e8400-e29b-41d4-a716-446655440010';
+      const bookId = '550e8400-e29b-41d4-a716-446655440011';
+      const topicId = '550e8400-e29b-41d4-a716-446655440012';
+
+      const res = await app.request(
+        `/v1/progress/resume-target?subjectId=${subjectId}&bookId=${bookId}&topicId=${topicId}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetLearningResumeTarget).toHaveBeenCalledTimes(1);
+      const [, profileIdArg, scopeArg] =
+        mockGetLearningResumeTarget.mock.calls[0];
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(scopeArg).toMatchObject({ subjectId, bookId, topicId });
     });
 
     it('returns 401 without auth', async () => {

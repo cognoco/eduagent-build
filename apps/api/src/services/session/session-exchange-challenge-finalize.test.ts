@@ -108,6 +108,10 @@ interface FakeDbState {
   // error / constraint violation on the post-claim mastery or deepening write.
   failNextMasteryInsert?: boolean;
   failNextDeepeningInsert?: boolean;
+  // When true, findOwnedCurriculumTopic returns no row — models a topic that is
+  // NOT owned by this profile (cross-profile / wrong-subject finalize attempt).
+  // The active mastery/deepening writes must reject before touching either table.
+  topicNotOwned?: boolean;
 }
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000001';
@@ -162,23 +166,28 @@ function makeFakeDb(state: FakeDbState): Database {
     from: () => ownedTopicSelect,
     innerJoin: () => ownedTopicSelect,
     where: () => ownedTopicSelect,
-    limit: async () => [
-      {
-        topicId: TOPIC_ID,
-        topicTitle: 'T',
-        topicDescription: null,
-        topicChapter: null,
-        topicEstimatedMinutes: null,
-        bookId: 'book-1',
-        bookTitle: 'B',
-        curriculumId: 'cur-1',
-        subjectId: SUBJECT_ID,
-        topicSource: 'manual',
-        subjectName: 'S',
-        subjectPedagogyMode: null,
-        subjectLanguageCode: null,
-      },
-    ],
+    // A non-owned topic surfaces as zero rows from the ownership-scoped join —
+    // exactly how findOwnedCurriculumTopic signals "not owned by this profile".
+    limit: async () =>
+      state.topicNotOwned
+        ? []
+        : [
+            {
+              topicId: TOPIC_ID,
+              topicTitle: 'T',
+              topicDescription: null,
+              topicChapter: null,
+              topicEstimatedMinutes: null,
+              bookId: 'book-1',
+              bookTitle: 'B',
+              curriculumId: 'cur-1',
+              subjectId: SUBJECT_ID,
+              topicSource: 'manual',
+              subjectName: 'S',
+              subjectPedagogyMode: null,
+              subjectLanguageCode: null,
+            },
+          ],
   };
 
   // The session-metadata claim/persist transaction:
@@ -395,6 +404,74 @@ describe('finalizeChallengeRoundIfReady — idempotent under concurrent/retry fi
     expect(state.deepeningRows).toHaveLength(1);
     // And no mastery write on the partial path.
     expect(state.masteryInserts).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ownership scoping: the ACTIVE mastery/deepening write path is the only
+// challenge-round persistence implementation reachable from production (the
+// parallel `challenge-round/persistence.ts` helpers were dead code, imported
+// only by their own test, and were removed). Its ownership check goes through
+// `findOwnedCurriculumTopic` (curriculum_topics → curriculum_books/curricula →
+// subjects, gated on subjects.profileId). When the topic is NOT owned by the
+// finalizing profile the join yields no row, and finalize MUST refuse to write
+// — no `assessments` mastery row and no `needs_deepening_topics` row may be
+// inserted for a topic the profile does not own. This locks that contract onto
+// the surviving path so a future refactor can't silently drop the scope check.
+// ---------------------------------------------------------------------------
+
+describe('finalizeChallengeRoundIfReady — rejects writes for a topic not owned by the profile', () => {
+  it('does NOT write a mastery row when the topic is not owned (solid round)', async () => {
+    const challengeRound = draftingState(SOLID_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      topicNotOwned: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow(/not owned/i);
+
+    // The ownership gate fired before any write — no mastery row leaked.
+    expect(state.masteryInserts).toHaveLength(0);
+  });
+
+  it('does NOT write a needs_deepening_topics row when the topic is not owned (partial round)', async () => {
+    const challengeRound = draftingState(PARTIAL_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+      topicNotOwned: true,
+    };
+    const db = makeFakeDb(state);
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow(/not owned/i);
+
+    // The ownership gate fired before any write — no deepening row leaked.
+    expect(state.deepeningInsertCount).toBe(0);
+    expect(state.deepeningRows).toHaveLength(0);
   });
 });
 

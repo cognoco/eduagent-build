@@ -10,7 +10,7 @@ const mockRouteAndCall = jest.fn();
 const mockRouteAndStream = jest.fn();
 const mockGetRegisteredProviders = jest.fn().mockReturnValue([]);
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/llm', () => {
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');
@@ -22,7 +22,7 @@ jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/test-seed' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/test-seed', () => {
   const actual = jest.requireActual(
     '../services/test-seed',
   ) as typeof import('../services/test-seed');

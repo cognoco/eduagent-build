@@ -25,9 +25,17 @@
 // byte-identical.
 // ---------------------------------------------------------------------------
 
-import type { Database } from '@eduagent/database';
+import {
+  type Database,
+  findSubscriptionByStripeIdV2__unscoped,
+  lockSubscriptionByOrganizationId__unscoped,
+} from '@eduagent/database';
+import type { SubscriptionTier } from '@eduagent/schemas';
 import type Stripe from 'stripe';
-import type { WebhookSubscriptionUpdate } from '../types';
+import type {
+  AppliedSubscriptionRow,
+  WebhookSubscriptionUpdate,
+} from '../types';
 import { getTierConfig } from '../../subscription';
 import {
   verifySubscriptionTier,
@@ -51,6 +59,8 @@ import {
   getSubscriptionByStripeCustomerIdV2,
 } from './subscription-core-v2';
 import { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
+import { emitTopUpCreditsReattributedMetric } from '../tier';
+import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 
 const logger = createLogger();
 
@@ -87,6 +97,47 @@ function escalateSubscriptionNotFound(
         ...extra,
       },
     },
+  );
+}
+
+/**
+ * Lock-and-read the previous tier of a v2 subscription keyed by Stripe ID,
+ * inside an open transaction. The lock is on the new organization-keyed
+ * subscription row, so tier-change detection and top-up re-attribution serialize
+ * against concurrent webhooks for the same subscription.
+ */
+async function lockPreviousTierByStripeIdV2(
+  txDb: Database,
+  stripeSubscriptionId: string,
+): Promise<SubscriptionTier | undefined> {
+  // safe-caller: Stripe webhook — keyed by external Stripe ID, authenticated by event signature.
+  const existing = await findSubscriptionByStripeIdV2__unscoped(
+    txDb,
+    stripeSubscriptionId,
+  );
+  if (!existing) return undefined;
+
+  // safe-caller: org id resolved from the verified Stripe subscription row above.
+  const locked = await lockSubscriptionByOrganizationId__unscoped(
+    txDb,
+    existing.organizationId,
+  );
+  return (locked?.planTier ?? existing.planTier) as SubscriptionTier;
+}
+
+async function reattributeStripeTierChangeV2(
+  txDb: Database,
+  result: AppliedSubscriptionRow,
+  previousTier: SubscriptionTier | undefined,
+  newTier: SubscriptionTier,
+): Promise<number> {
+  if (!previousTier || previousTier === newTier) return 0;
+  return reattributeTopUpCreditsOnModelChangeV2(
+    txDb,
+    result.id,
+    result.accountId,
+    previousTier,
+    newTier,
   );
 }
 
@@ -209,8 +260,18 @@ export async function handleSubscriptionEventV2(
 
   // [CR-2026-05-19-M3] Outer transaction: subscription update + quota pool limit
   // commit atomically. The v2 core's M11 fence transaction nests as a savepoint.
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  let appliedNewTier: SubscriptionTier | undefined;
+  const reattributionNow = new Date();
+
   const updated = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    previousTier = await lockPreviousTierByStripeIdV2(
+      txDb,
+      stripeSubscription.id,
+    );
 
     const result = await updateSubscriptionFromWebhookV2(
       txDb,
@@ -227,6 +288,13 @@ export async function handleSubscriptionEventV2(
           freeTier.monthlyQuota,
           freeTier.dailyLimit,
         );
+        appliedNewTier = 'free';
+        reattributedCount = await reattributeStripeTierChangeV2(
+          txDb,
+          result,
+          previousTier,
+          'free',
+        );
       } else if (effectiveTier) {
         const tierConfig = getTierConfig(effectiveTier);
         await updateQuotaPoolLimitV2(
@@ -235,11 +303,29 @@ export async function handleSubscriptionEventV2(
           tierConfig.monthlyQuota,
           tierConfig.dailyLimit,
         );
+        appliedNewTier = effectiveTier;
+        reattributedCount = await reattributeStripeTierChangeV2(
+          txDb,
+          result,
+          previousTier,
+          effectiveTier,
+        );
       }
     }
 
     return result;
   });
+
+  if (reattributedCount > 0 && updated && previousTier && appliedNewTier) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: updated.id,
+      accountId: updated.accountId,
+      previousTier,
+      newTier: appliedNewTier,
+      reattributedCount,
+      occurredAt: reattributionNow,
+    });
+  }
 
   if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCacheV2(
@@ -275,8 +361,17 @@ export async function handleSubscriptionDeletedV2(
     stripeEventId,
   };
 
+  let reattributedCount = 0;
+  let previousTier: SubscriptionTier | undefined;
+  const reattributionNow = new Date();
+
   const updated = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
+
+    previousTier = await lockPreviousTierByStripeIdV2(
+      txDb,
+      stripeSubscription.id,
+    );
 
     const result = await updateSubscriptionFromWebhookV2(
       txDb,
@@ -292,10 +387,27 @@ export async function handleSubscriptionDeletedV2(
         freeTier.monthlyQuota,
         freeTier.dailyLimit,
       );
+      reattributedCount = await reattributeStripeTierChangeV2(
+        txDb,
+        result,
+        previousTier,
+        'free',
+      );
     }
 
     return result;
   });
+
+  if (reattributedCount > 0 && updated && previousTier) {
+    await emitTopUpCreditsReattributedMetric({
+      subscriptionId: updated.id,
+      accountId: updated.accountId,
+      previousTier,
+      newTier: 'free',
+      reattributedCount,
+      occurredAt: reattributionNow,
+    });
+  }
 
   if (shouldRefreshStripeKv(updated, stripeEventId)) {
     await safeRefreshKvCacheV2(

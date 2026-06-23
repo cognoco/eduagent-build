@@ -554,55 +554,298 @@ describe('reviewVocabulary', () => {
 // upsertExtractedVocabulary
 // ---------------------------------------------------------------------------
 
-describe('upsertExtractedVocabulary', () => {
-  it('creates vocabulary items for each extracted item', async () => {
-    const createdRow1 = mockVocabRow({ id: 'v1', term: 'hola' });
-    const createdRow2 = mockVocabRow({ id: 'v2', term: 'adiós' });
+/**
+ * Builds a mock db suitable for upsertExtractedVocabulary tests.
+ *
+ * The batch implementation does ONE db.insert call that receives all rows in
+ * values([...]) and returns all rows from .returning(). Milestone ownership
+ * checks use db.select().from().innerJoin().where().limit(1).
+ *
+ * For SM-2 reviews (quality items), the mock wires up:
+ *   db.query.vocabulary.findFirst  → the vocab row by id
+ *   db.transaction                 → passes through to the same db object
+ *   db.query.vocabularyRetentionCards.findFirst → the retention card
+ *   db.select().from().where().for('update') → locked retention card read
+ *   db.update (first call per review) → retention card update
+ *   db.update (second call per review) → vocab mastered update
+ */
+function createBatchUpsertDb(
+  batchRows: ReturnType<typeof mockVocabRow>[],
+  opts: {
+    milestoneOwnedResult?: unknown[];
+    reviewVocabRows?: ReturnType<typeof mockVocabRow>[];
+    retentionCardRow?: ReturnType<typeof mockRetentionCardRow> | null;
+  } = {},
+): Database {
+  const {
+    milestoneOwnedResult = [{ id: 'milestone-1' }],
+    reviewVocabRows = batchRows,
+    retentionCardRow = mockRetentionCardRow(),
+  } = opts;
 
-    // We need to chain multiple inserts; mock insert to return different rows each time
-    const insertValues = jest.fn();
-    insertValues
-      .mockReturnValueOnce({
-        onConflictDoUpdate: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([createdRow1]),
-        }),
-      })
-      .mockReturnValueOnce({
-        onConflictDoUpdate: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([createdRow2]),
-        }),
-      });
+  // (termNormalized is available on rows for order-restoration in the implementation)
 
-    const db = {
-      query: {
-        subjects: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue({ id: SUBJECT_ID, profileId: PROFILE_ID }),
-        },
-        vocabulary: {
-          findFirst: jest.fn().mockResolvedValue(undefined),
-        },
-        vocabularyRetentionCards: {
-          findFirst: jest.fn().mockResolvedValue(undefined),
-        },
+  // We track update call count to alternate between retention-card update and
+  // vocab-mastered update within each reviewVocabulary call.
+  let updateCallCount = 0;
+
+  const db: Database = {
+    query: {
+      subjects: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: SUBJECT_ID, profileId: PROFILE_ID }),
       },
-      insert: jest.fn().mockReturnValue({ values: insertValues }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
+      vocabulary: {
+        findFirst: jest.fn().mockImplementation(({ where: _w } = {}) => {
+          // reviewVocabulary calls findFirst to get the vocab row by id.
+          // Return the first reviewVocabRows entry by default — sufficient for
+          // single-review tests; for multi-review tests the spy returns all.
+          return Promise.resolve(reviewVocabRows[0] ?? null);
+        }),
+      },
+      vocabularyRetentionCards: {
+        findFirst: jest.fn().mockResolvedValue(retentionCardRow),
+      },
+    },
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnValue({
+          // SELECT ... FOR UPDATE used inside reviewVocabulary's transaction
+          for: jest
+            .fn()
+            .mockResolvedValue(retentionCardRow ? [retentionCardRow] : []),
+          orderBy: jest.fn().mockResolvedValue([]),
+        }),
+        innerJoin: jest.fn().mockReturnValue({
+          // verifyMilestoneOwnership: select().from().innerJoin().where().limit(1)
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue(milestoneOwnedResult),
+          }),
+        }),
+        leftJoin: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
             orderBy: jest.fn().mockResolvedValue([]),
           }),
         }),
       }),
-      update: jest.fn().mockReturnValue({
+    }),
+    // Batch insert: .values([...]).onConflictDoUpdate({...}).returning() → all rows
+    insert: jest.fn().mockReturnValue({
+      values: jest.fn().mockReturnValue({
+        onConflictDoUpdate: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(batchRows),
+        }),
+        // ensure / onConflictDoNothing path used inside reviewVocabulary
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
+        returning: jest.fn().mockResolvedValue(batchRows),
+      }),
+    }),
+    update: jest.fn().mockImplementation(() => {
+      // Alternate: odd calls = retention card update, even calls = vocab update
+      updateCallCount++;
+      const isRetentionCard = updateCallCount % 2 === 1;
+      const returnRow = isRetentionCard
+        ? retentionCardRow
+          ? [retentionCardRow]
+          : []
+        : reviewVocabRows[0]
+          ? [reviewVocabRows[0]]
+          : [];
+      return {
         set: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([]),
+            returning: jest.fn().mockResolvedValue(returnRow),
           }),
         }),
+      };
+    }),
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(db),
+      ),
+    delete: jest.fn().mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([]),
       }),
-    } as unknown as Database;
+    }),
+  } as unknown as Database;
+
+  return db;
+}
+
+describe('upsertExtractedVocabulary', () => {
+  // ----- batch-insert efficiency tests (these FAIL on the serial impl) -------
+
+  it('issues a single db.insert for a multi-item batch (not one per item)', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+      mockVocabRow({ id: 'v2', term: 'adios', termNormalized: 'adios' }),
+      mockVocabRow({ id: 'v3', term: 'gracias', termNormalized: 'gracias' }),
+    ];
+    const db = createBatchUpsertDb(rows);
+
+    await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+      { term: 'hola', translation: 'hello', type: 'word' },
+      { term: 'adios', translation: 'goodbye', type: 'word' },
+      { term: 'gracias', translation: 'thanks', type: 'word' },
+    ]);
+
+    // batch: ONE insert call for all three items, not three separate calls
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks subject ownership once regardless of item count', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+      mockVocabRow({ id: 'v2', term: 'adios', termNormalized: 'adios' }),
+    ];
+    const db = createBatchUpsertDb(rows);
+
+    await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+      { term: 'hola', translation: 'hello', type: 'word' },
+      { term: 'adios', translation: 'goodbye', type: 'word' },
+    ]);
+
+    // subject check once, not N times
+    expect(db.query.subjects.findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves return order matching input order', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+      mockVocabRow({ id: 'v2', term: 'adios', termNormalized: 'adios' }),
+      mockVocabRow({ id: 'v3', term: 'gracias', termNormalized: 'gracias' }),
+    ];
+    // Simulate DB returning rows in REVERSE order (as if conflict reorder)
+    const dbWithReversedRows = createBatchUpsertDb(rows);
+    // Override the returning mock to return in reverse
+    const reversedRows = [...rows].reverse();
+    (
+      (db: Database) => {
+        const insertMock = db.insert as jest.Mock;
+        insertMock.mockReturnValue({
+          values: jest.fn().mockReturnValue({
+            onConflictDoUpdate: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue(reversedRows),
+            }),
+            onConflictDoNothing: jest.fn().mockReturnValue({
+              returning: jest.fn().mockResolvedValue([]),
+            }),
+            returning: jest.fn().mockResolvedValue(reversedRows),
+          }),
+        });
+      }
+    )(dbWithReversedRows);
+
+    const result = await upsertExtractedVocabulary(
+      dbWithReversedRows,
+      PROFILE_ID,
+      SUBJECT_ID,
+      [
+        { term: 'hola', translation: 'hello', type: 'word' },
+        { term: 'adios', translation: 'goodbye', type: 'word' },
+        { term: 'gracias', translation: 'thanks', type: 'word' },
+      ],
+    );
+
+    // output must be in INPUT order, not DB return order
+    expect(result[0]!.id).toBe('v1');
+    expect(result[1]!.id).toBe('v2');
+    expect(result[2]!.id).toBe('v3');
+  });
+
+  // ----- ownership / scoping correctness ------------------------------------
+
+  it('still scopes inserts to profileId (ownership preserved in batch values)', async () => {
+    const rows = [
+      mockVocabRow({
+        id: 'v1',
+        term: 'hola',
+        termNormalized: 'hola',
+        profileId: PROFILE_ID,
+      }),
+    ];
+    const db = createBatchUpsertDb(rows);
+
+    const result = await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+      { term: 'hola', translation: 'hello', type: 'word' },
+    ]);
+
+    expect(result[0]!.profileId).toBe(PROFILE_ID);
+    // Verify values() was called with the profileId in the payload
+    const valuesFn = (db.insert as jest.Mock).mock.results[0]?.value?.values as
+      | jest.Mock
+      | undefined;
+    const insertedValues = valuesFn?.mock.calls[0]?.[0] as
+      | Array<{ profileId: string }>
+      | undefined;
+    expect(insertedValues?.[0]?.profileId).toBe(PROFILE_ID);
+  });
+
+  it('throws on subject not found and never calls db.insert', async () => {
+    const db = createMockDb({ subjectFindFirst: null });
+
+    await expect(
+      upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+        { term: 'hola', translation: 'hello', type: 'word' },
+      ]),
+    ).rejects.toThrow('Subject not found');
+
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  // ----- SM-2 retention side effects ----------------------------------------
+
+  it('applies reviewVocabulary SM-2 update for each item that has a quality', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+      mockVocabRow({ id: 'v2', term: 'adios', termNormalized: 'adios' }),
+    ];
+    const db = createBatchUpsertDb(rows, {
+      reviewVocabRows: rows,
+      retentionCardRow: mockRetentionCardRow({ vocabularyId: 'v1' }),
+    });
+
+    // Only the first item has a quality — only one SM-2 review should happen
+    await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+      { term: 'hola', translation: 'hello', type: 'word', quality: 4 },
+      { term: 'adios', translation: 'goodbye', type: 'word' },
+    ]);
+
+    // transaction called once — one review, not zero and not two
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call transaction when no items have quality', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+    ];
+    const db = createBatchUpsertDb(rows);
+
+    await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
+      { term: 'hola', translation: 'hello', type: 'word' },
+    ]);
+
+    // No quality → no SM-2 transaction
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  // ----- unchanged behaviours ------------------------------------------------
+
+  it('creates vocabulary items for each extracted item (existing test)', async () => {
+    const rows = [
+      mockVocabRow({ id: 'v1', term: 'hola', termNormalized: 'hola' }),
+      mockVocabRow({
+        id: 'v2',
+        term: 'adiós',
+        termNormalized: 'adios',
+      }),
+    ];
+    const db = createBatchUpsertDb(rows);
 
     const result = await upsertExtractedVocabulary(db, PROFILE_ID, SUBJECT_ID, [
       { term: 'hola', translation: 'hello', type: 'word' },
@@ -625,6 +868,9 @@ describe('upsertExtractedVocabulary', () => {
     );
 
     expect(result).toEqual([]);
+    // no DB calls at all for empty list
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.query.subjects.findFirst).not.toHaveBeenCalled();
   });
 });
 

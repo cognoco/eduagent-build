@@ -37,7 +37,8 @@
     "goBackAction": "Voltar",
     "tryAgainAction": "Tentar novamente",
     "dismiss": "Dispensar",
-    "pleaseTryAgain": "Tente novamente."
+    "pleaseTryAgain": "Tente novamente.",
+    "mentorImageAlt": "Seu mentor"
   },
   "quota": {
     "parent": {
@@ -203,7 +204,15 @@
       "verifyButton": "Verificar",
       "resendCode": "Reenviar código",
       "useDifferentEmail": "Usar um e-mail diferente",
-      "backToSignIn": "Voltar ao início de sessão"
+      "backToSignIn": "Voltar ao início de sessão",
+      "tryAnotherMethod": "Tentar outro método",
+      "continueWithGoogle": "Continuar com o Google",
+      "continueWithApple": "Continuar com a Apple",
+      "continueWithOpenAI": "Continuar com a OpenAI",
+      "emailPlaceholder": "voce@exemplo.com",
+      "passwordPlaceholder": "Crie uma senha",
+      "signUpButton": "Cadastrar-se",
+      "signInButton": "Entrar"
     },
     "forgotPassword": {
       "title": "Esqueceu a senha?",
@@ -4003,7 +4012,11 @@
       "done": "Concluído",
       "mastered": "Dominado"
     },
-    "linkLabel": "Abrir centro de matérias"
+    "linkLabel": "Abrir centro de matérias",
+    "empty": {
+      "title": "Nada para estudar aqui ainda",
+      "message": "Esta matéria ainda não tem tópicos. Tente novamente em instantes ou volte para as suas matérias."
+    }
   },
   "journal": {
     "title": "Diário",
@@ -4128,6 +4141,8 @@
       "empty": "Adicione um aluno para ver as suas disciplinas aqui.",
       "openPerson": "Abrir disciplinas de {{name}}",
       "personHint": "Abrir a vista estrutural da disciplina.",
+      "personEmptyTitle": "Ainda não há disciplinas",
+      "personEmptyMessage": "Este aluno ainda não tem uma estrutura de disciplinas visível.",
       "structuralOnly": "Apenas estrutura de disciplina, capítulo e tópico.",
       "bookCount": "{{count}} livro",
       "bookCount_other": "{{count}} livros",

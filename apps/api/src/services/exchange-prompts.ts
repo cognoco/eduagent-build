@@ -166,6 +166,22 @@ export function getSessionTypeGuidance(
   );
 }
 
+// "Ask anything" (freeform) sessions have no loaded topic and no lesson plan —
+// the learner is driving. This intentionally REPLACES the generic LEARNING
+// guidance (which tells the mentor to lead an explain → verify → next-concept
+// cycle): in freeform the learner sets the agenda, so the mentor answers what
+// was actually asked and then hands control back instead of steering onto
+// adjacent material. Used only when effectiveMode === 'freeform' and no topic.
+export function getFreeformGuidance(): string {
+  return (
+    'Session type: ASK ANYTHING (freeform)\n' +
+    'The learner opened an open-ended question with no loaded topic. They are driving this conversation — follow their lead. Do NOT impose a lesson plan or run a fixed explain → verify → next-concept cycle here.\n' +
+    'If the question has more than one reasonable reading (e.g. "why is water unique" could mean chemically or biologically), ask ONE short clarifying question first and wait for their answer before launching into a full explanation. Do not silently pick a reading and teach a direction they did not ask about.\n' +
+    'Once the scope is clear, answer that question directly and concisely. For ordinary general-knowledge questions, answer from well-established knowledge that passes the 0.88 confidence gate — you do not need the learner to supply a source. Only ask for a source on source-specific, precise/ranking, or high-stakes questions.\n' +
+    'After answering, hand control back: briefly offer to go deeper or ask what they want to explore next, rather than redirecting them onto adjacent material you chose. Keep any check-question light and optional — a single "want me to go deeper on any of this?" is enough. Do not interrogate.'
+  );
+}
+
 export function getWorkedExampleGuidance(
   level: 'full' | 'fading' | 'problem_first',
 ): string {
@@ -837,6 +853,16 @@ export function buildSystemPrompt(
         'Balance input, output, explicit language study, and fluency work within the session.',
       ].join('\n'),
     );
+  } else if (
+    context.sessionType === 'learning' &&
+    context.effectiveMode === 'freeform' &&
+    !safeTopicTitle
+  ) {
+    // "Ask anything" — learner-driven, no lesson plan. Matches the production
+    // freeform shape (learning + no topic + effectiveMode 'freeform', see
+    // session-exchange.ts). Replaces the generic LEARNING guidance so the
+    // mentor follows the learner instead of steering.
+    sections.push(getFreeformGuidance());
   } else {
     sections.push(
       getSessionTypeGuidance(

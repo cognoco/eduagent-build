@@ -2,7 +2,7 @@
 // Resend Webhook Route — Tests [BUG-29]
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');
@@ -15,7 +15,7 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockLoggerWarn = jest.fn();
-jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/logger', () => {
   const actual = jest.requireActual(
     '../services/logger',
   ) as typeof import('../services/logger');

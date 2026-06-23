@@ -29,6 +29,7 @@ import {
   type RevenueCatEvent,
 } from '../revenuecat-webhook-handler';
 import { purchaseTopUpCreditsV2 } from './top-up-v2';
+import { getTopUpCreditsRemaining } from '../top-up';
 import { getTierConfig } from '../../subscription';
 import { captureException, captureMessage } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -483,6 +484,26 @@ export async function handleSubscriberAliasV2(
       const fromSub = await getSubscriptionByAccountIdV2(db, fromAccountId);
       if (!fromSub) continue;
 
+      // [BUG-783 / WI-1057] Pre-downgrade snapshot for the alias-merge worker.
+      // The BUG-833 downgrade below force-resets the from-side to free/expired,
+      // so the worker reconciles the survivor from THIS snapshot — it can no
+      // longer re-read the original tier/credits. With identity-v2 cut over
+      // (IDENTITY_V2_ENABLED='true' in stg+prd), the worker routes to
+      // mergeAliasedSubscriptionV2 against the `subscription` table. `top_up_credits`
+      // is a shared, non-forked satellite keyed by subscription id, so the same
+      // getTopUpCreditsRemaining reader reads the v2 from-side correctly — mirror
+      // the legacy handler exactly so the credit-migration half actually fires
+      // (the prior `topUpRemaining: 0` floor silently dropped carried credits on
+      // the now-live v2 path).
+      const fromTopUpRemaining = await getTopUpCreditsRemaining(db, fromSub.id);
+      const fromSnapshot = {
+        tier: fromSub.tier,
+        status: fromSub.status,
+        currentPeriodEnd: fromSub.currentPeriodEnd,
+        trialEndsAt: fromSub.trialEndsAt,
+        topUpRemaining: fromTopUpRemaining,
+      };
+
       const nowIso = new Date().toISOString();
       const freeConfig = getTierConfig('free');
       const downgraded =
@@ -513,14 +534,14 @@ export async function handleSubscriberAliasV2(
         );
       }
 
-      captureException(
-        new Error(
-          'SUBSCRIBER_ALIAS: transferred_from has active subscription — merge not implemented',
-        ),
+      // [BUG-783] Handled by the billing-alias-merge worker — informational
+      // breadcrumb, no longer the high-severity "merge not implemented" alert.
+      captureMessage(
+        '[revenuecat] SUBSCRIBER_ALIAS: transferred_from had an active subscription — dispatching alias merge',
         {
+          level: 'info',
           extra: {
-            tag: 'revenuecat.alias.unhandled',
-            severity: 'high',
+            tag: 'revenuecat.alias.merge_dispatched',
             eventId: event.id,
             fromAppUserId: fromUserId,
             toAppUserId: event.app_user_id,
@@ -541,6 +562,7 @@ export async function handleSubscriberAliasV2(
               toAppUserId: event.app_user_id,
               fromAccountId,
               fromSubscriptionId: fromSub.id,
+              fromSnapshot,
               timestamp: new Date().toISOString(),
             },
           }),

@@ -52,6 +52,12 @@ const ALLOWLIST = new Set([
   ['apps', 'mobile', 'src', 'app', 'dev-only', 'seed-preview-state.tsx'].join(
     sep,
   ),
+  // LLM test-support module (BUG-900): re-exports the LLM test helpers
+  // (incl. `_setOpenAIAdvancedModelForTesting`) so tests import from one place
+  // instead of the production `services/llm` barrel. Only `*.test.ts` files
+  // import it — no production code does — so it is tree-shaken out of the
+  // shipped Worker; it is test scaffolding, not a runtime call site.
+  ['apps', 'api', 'src', 'services', 'llm', 'test-utils.ts'].join(sep),
 ]);
 
 function isAllowed(relPath: string): boolean {

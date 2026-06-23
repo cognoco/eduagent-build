@@ -53,7 +53,8 @@
     "goBackAction": "Go back",
     "tryAgainAction": "Try again",
     "dismiss": "Dismiss",
-    "pleaseTryAgain": "Please try again."
+    "pleaseTryAgain": "Please try again.",
+    "mentorImageAlt": "Your mentor"
   },
   "quota": {
     "parent": {
@@ -225,7 +226,15 @@
       "verifyButton": "Verify",
       "resendCode": "Resend code",
       "useDifferentEmail": "Use a different email",
-      "backToSignIn": "Back to sign in"
+      "backToSignIn": "Back to sign in",
+      "tryAnotherMethod": "Try another method",
+      "continueWithGoogle": "Continue with Google",
+      "continueWithApple": "Continue with Apple",
+      "continueWithOpenAI": "Continue with OpenAI",
+      "emailPlaceholder": "you@example.com",
+      "passwordPlaceholder": "Create a password",
+      "signUpButton": "Sign up",
+      "signInButton": "Sign in"
     },
     "forgotPassword": {
       "title": "Forgot password?",
@@ -3054,6 +3063,10 @@
       "loadTitle": "Could not load this subject",
       "loadMessage": "Try again, or go back to your subjects."
     },
+    "empty": {
+      "title": "Nothing to study here yet",
+      "message": "This subject has no topics yet. Try again in a moment, or go back to your subjects."
+    },
     "progress": {
       "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
       "reviewsDue": "{{count}} reviews due",
@@ -3882,6 +3895,8 @@
       "empty": "Add a learner to see their subjects here.",
       "openPerson": "Open {{name}}'s subjects",
       "personHint": "Open the structural subject view.",
+      "personEmptyTitle": "No subjects yet",
+      "personEmptyMessage": "This learner does not have any visible subject structure yet.",
       "structuralOnly": "Subject, chapter and topic structure only.",
       "bookCount": "{{count}} book",
       "bookCount_other": "{{count}} books",

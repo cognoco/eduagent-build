@@ -97,6 +97,7 @@ export function RemediationCard({
       <Pressable
         onPress={cooldownActive ? undefined : onReviewRetest}
         disabled={cooldownActive}
+        accessibilityState={{ disabled: cooldownActive }}
         className="py-3 items-center"
         testID="review-retest-button"
         accessibilityLabel={t('progress.remediation.secondaryCtaA11y')}

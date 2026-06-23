@@ -9,6 +9,7 @@ import { useProfile } from '../../lib/profile';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { useDurationLabel } from '../../hooks/use-time-format';
+import { FAMILY_HOME_PATH, goBackOrReplace } from '../../lib/navigation';
 
 type ReportingComponentProps = {
   profileId: string;
@@ -62,7 +63,10 @@ export function RecentSessionsList({
         label: t('common.goHome'),
         onPress: () => router.push('/(app)/home'),
       }
-    : emptyAction;
+    : {
+        label: t('common.goHome'),
+        onPress: () => goBackOrReplace(router, FAMILY_HOME_PATH),
+      };
 
   return (
     <View className="mt-6" testID="recent-sessions-list">

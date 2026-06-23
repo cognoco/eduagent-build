@@ -45,12 +45,15 @@ import {
   findSubscriptionByStripeIdV2__unscoped,
   findSubscriptionByStripeCustomerIdV2__unscoped,
   findQuotaPool__unscoped,
+  lockSubscriptionByOrganizationId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import type { StripeCustomerCreator } from '../subscription-core';
 import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
 import { safeSend } from '../../safe-non-core';
+import { buildStripeCustomerCreateKey } from '../../dedupe-key';
 import { computeTrialEndDate } from '../../trial';
 import { inngest } from '../../../inngest/client';
 import { findOwnerPersonId } from '../../identity-v2/helpers';
@@ -61,7 +64,7 @@ import {
   type QuotaPoolRow,
   type WebhookSubscriptionUpdate,
 } from '../types';
-import { mapSubscriptionV2Row } from './types-v2';
+import { mapSubscriptionV2Row, parseSubscriptionV2Status } from './types-v2';
 import { reconcileQuotaStateForSubscriptionV2 } from './quota-reconcile-v2';
 
 const logger = createLogger();
@@ -220,7 +223,7 @@ export async function createSubscriptionV2(
       subscriptionId: subRow.id,
       organizationId,
       tier,
-      status: subRow.status as SubscriptionStatus,
+      status: parseSubscriptionV2Status(subRow.status),
       stripeCustomerId: options?.stripeCustomerId ?? null,
       stripeSubscriptionId: options?.stripeSubscriptionId ?? null,
       trialEndsAt: subRow.trialEndsAt ?? null,
@@ -318,12 +321,8 @@ export async function updateSubscriptionFromWebhookV2(
       setValues.planTier = updates.tier;
     }
     if (updates.status !== undefined && updates.status !== existing.status) {
-      if (
-        !isValidTransition(
-          existing.status as SubscriptionStatus,
-          updates.status,
-        )
-      ) {
+      const existingStatus = parseSubscriptionV2Status(existing.status);
+      if (!isValidTransition(existingStatus, updates.status)) {
         // [BUG-447] Throw so callers do NOT proceed to updateQuotaPoolLimit.
         const transitionErr = new Error(
           `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
@@ -450,6 +449,62 @@ export async function linkStripeCustomerV2(
   if (!updated)
     throw new Error('Stripe customer link update did not return a row');
   return mapSubscriptionV2Row(updated);
+}
+
+// ---------------------------------------------------------------------------
+// getOrCreateStripeCustomerV2
+// ---------------------------------------------------------------------------
+
+/**
+ * [BUG-827] v2 twin of getOrCreateStripeCustomer. Same TOCTOU fix (row lock +
+ * re-check + idempotency-keyed create), against the organization-keyed
+ * `subscription` table. See the legacy doc comment in subscription-core.ts for
+ * the full rationale. Reachable only under IDENTITY_V2_ENABLED.
+ */
+export async function getOrCreateStripeCustomerV2(
+  db: Database,
+  organizationId: string,
+  stripe: StripeCustomerCreator,
+  params: { email: string },
+): Promise<string> {
+  return db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    // safe-caller: billing route — organizationId === account.id resolved from
+    // the authenticated owner account under the cutover flag.
+    const locked = await lockSubscriptionByOrganizationId__unscoped(
+      txDb,
+      organizationId,
+    );
+    if (!locked) {
+      throw new Error(
+        'getOrCreateStripeCustomerV2: no subscription row for organization',
+      );
+    }
+
+    if (locked.stripeCustomerId) {
+      return locked.stripeCustomerId;
+    }
+
+    const idempotencyKey = buildStripeCustomerCreateKey(organizationId);
+    const customer = await stripe.customers.create(
+      {
+        email: params.email,
+        metadata: { accountId: organizationId },
+      },
+      { idempotencyKey },
+    );
+
+    const [updated] = await tx
+      .update(subscriptionTable)
+      .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+      .where(eq(subscriptionTable.id, locked.id))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Stripe customer link update did not return a row');
+    }
+    return customer.id;
+  });
 }
 
 // ---------------------------------------------------------------------------
