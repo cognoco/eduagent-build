@@ -1,4 +1,6 @@
 // @inngest-admin: parent-chain (profiles updated with explicit childProfileId + archivedAt guard)
+import { NonRetriableError } from 'inngest';
+import { z } from 'zod';
 import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { sql } from 'drizzle-orm';
@@ -30,6 +32,15 @@ import {
 } from '../../services/notices';
 import { captureException } from '../../services/sentry';
 
+// [WI-973] Schema for the app/consent.revoked event payload.
+// Both childProfileId and revokedAt are required — a missing revokedAt
+// would allow the generation guard to vacuously authorize cascade deletion.
+const consentRevokedEventSchema = z.object({
+  childProfileId: z.string().min(1),
+  parentProfileId: z.string().min(1),
+  revokedAt: z.string().min(1),
+});
+
 /**
  * Scheduled consent revocation — 7-day grace period then cascade delete.
  *
@@ -55,7 +66,15 @@ export const consentRevocation = inngest.createFunction(
   },
   { event: 'app/consent.revoked' },
   async ({ event, step }) => {
-    const { childProfileId, parentProfileId, revokedAt } = event.data;
+    // [WI-973] Validate the event payload before touching any DB state.
+    // NonRetriableError prevents Inngest from re-queuing malformed events.
+    const parsed = consentRevokedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `consent-revocation: invalid event payload — ${parsed.error.message}`,
+      );
+    }
+    const { childProfileId, parentProfileId, revokedAt } = parsed.data;
     const revokedAtDate =
       typeof revokedAt === 'string' ? new Date(revokedAt) : undefined;
     const revocationRespondedAt =

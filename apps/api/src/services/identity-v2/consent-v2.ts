@@ -975,7 +975,9 @@ export async function isConsentRevocationGenerationCurrentV2(
     'gdpr_parental_consent',
   );
   if (!current?.withdrawnAt) return false;
-  if (!revokedAt) return true;
+  // [WI-973] A missing revokedAt means we cannot confirm the generation;
+  // return false so the cascade-delete guard does not pass vacuously.
+  if (!revokedAt) return false;
   return current.withdrawnAt.getTime() === revokedAt.getTime();
 }
 
