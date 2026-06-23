@@ -10,6 +10,14 @@ import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const col = (name: string) => ({ name });
 
+// ---------------------------------------------------------------------------
+// Valid UUID + date constants (snapshotRefreshEventSchema validates profileId
+// as UUID and day as YYYY-MM-DD — non-UUID profileId strings will throw).
+// ---------------------------------------------------------------------------
+const PROFILE_ID = 'dddddddd-0000-4000-8000-000000000001';
+const PROFILE_ID_MISSING = 'dddddddd-0000-4000-8000-000000000002';
+const SNAPSHOT_DAY = '2026-04-19';
+
 const mockSnapshotDb = createTransactionalMockDb({
   query: {
     profiles: {
@@ -309,18 +317,21 @@ describe('dailySnapshotRefresh', () => {
       metrics: {},
     });
 
-    const { result } = await executeRefreshSteps({ profileId: 'profile-001' });
+    const { result } = await executeRefreshSteps({
+      profileId: PROFILE_ID,
+      day: SNAPSHOT_DAY,
+    });
 
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
-      'profile-001',
+      PROFILE_ID,
       // [CUT-B1] the refresh now carries the identity-cutover flag (false in
       // the flag-off legacy path the test exercises).
       { identityV2Enabled: false },
     );
     expect(result).toEqual({
       status: 'completed',
-      profileId: 'profile-001',
+      profileId: PROFILE_ID,
       snapshotDate: '2026-04-19',
       milestones: 2,
     });
@@ -337,7 +348,8 @@ describe('dailySnapshotRefresh', () => {
       });
 
       const { result } = await executeRefreshSteps({
-        profileId: 'profile-001',
+        profileId: PROFILE_ID,
+        day: SNAPSHOT_DAY,
       });
 
       // Liveness was checked on the person table, not profiles.
@@ -345,7 +357,7 @@ describe('dailySnapshotRefresh', () => {
       // The refresh carries the v2 flag.
       expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
         mockSnapshotDb,
-        'profile-001',
+        PROFILE_ID,
         { identityV2Enabled: true },
       );
       expect((result as { status: string }).status).toBe('completed');
@@ -358,7 +370,8 @@ describe('dailySnapshotRefresh', () => {
     mockSnapshotDb.query.profiles.findFirst.mockResolvedValue(null);
 
     const { result } = await executeRefreshSteps({
-      profileId: 'profile-missing',
+      profileId: PROFILE_ID_MISSING,
+      day: SNAPSHOT_DAY,
     });
 
     expect(mockRefreshProgressSnapshot).not.toHaveBeenCalled();
@@ -373,11 +386,11 @@ describe('dailySnapshotRefresh', () => {
     mockRefreshProgressSnapshot.mockRejectedValue(error);
 
     await expect(
-      executeRefreshSteps({ profileId: 'profile-001' }),
+      executeRefreshSteps({ profileId: PROFILE_ID, day: SNAPSHOT_DAY }),
     ).rejects.toThrow('Snapshot computation failed');
 
     expect(mockCaptureException).toHaveBeenCalledWith(error, {
-      profileId: 'profile-001',
+      profileId: PROFILE_ID,
     });
   });
 
@@ -386,13 +399,14 @@ describe('dailySnapshotRefresh', () => {
     mockSnapshotDb.query.profiles.findFirst.mockRejectedValue(error);
 
     await expect(
-      executeRefreshSteps({ profileId: 'profile-001' }),
+      executeRefreshSteps({ profileId: PROFILE_ID, day: SNAPSHOT_DAY }),
     ).rejects.toThrow('DB connection error');
   });
 
   it('runs refresh logic inside a named step', async () => {
     const { runner } = await executeRefreshSteps({
-      profileId: 'profile-001',
+      profileId: PROFILE_ID,
+      day: SNAPSHOT_DAY,
     });
 
     expect(runner.runNames()).toContain('refresh-snapshot');
@@ -405,7 +419,10 @@ describe('dailySnapshotRefresh', () => {
       metrics: {},
     });
 
-    const { result } = await executeRefreshSteps({ profileId: 'profile-001' });
+    const { result } = await executeRefreshSteps({
+      profileId: PROFILE_ID,
+      day: SNAPSHOT_DAY,
+    });
 
     expect(result).toEqual(
       expect.objectContaining({ status: 'completed', milestones: 0 }),
