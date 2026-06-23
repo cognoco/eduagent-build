@@ -151,7 +151,8 @@
       "axios": ">=1.16.0",
       "undici@^6": "6.27.0",
       "undici@^7": "7.28.0",
-      "@babel/plugin-transform-modules-systemjs": ">=7.29.4 <8"
+      "@babel/plugin-transform-modules-systemjs": ">=7.29.4 <8",
+      "@opentelemetry/auto-instrumentations-node": ">=0.75.0"
     },
     "patchedDependencies": {
       "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
