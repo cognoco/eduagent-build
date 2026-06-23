@@ -133,8 +133,9 @@ describe('NowCardStack', () => {
     expect(getByTestId('now-card-slot-module-0')).toBeTruthy();
   });
 
-  it('slot wrapper Views expose no debug accessibilityLabel to screen readers', () => {
-    const { queryByLabelText } = render(
+  it('[WI-1020] outer stack has list role, slot Views have listitem role, empty-state Pressable does not', () => {
+    // Non-empty feed: renders the stack with list/listitem roles
+    const { getByTestId } = render(
       <NowCardStack
         feed={feed([
           card('unfinished_session', 'topic-1'),
@@ -147,8 +148,27 @@ describe('NowCardStack', () => {
       />,
     );
 
-    expect(queryByLabelText('anchor')).toBeNull();
-    expect(queryByLabelText('module')).toBeNull();
+    expect(getByTestId('now-card-stack').props.accessibilityRole).toBe('list');
+    // Slot Views are structural wrappers; React Native has no 'listitem' role.
+    // Screen readers treat children of a 'list' container as list items implicitly.
+    expect(getByTestId('now-card-slot-anchor')).toBeTruthy();
+    expect(getByTestId('now-card-slot-module-0')).toBeTruthy();
+  });
+
+  it('[WI-1020] empty-state Pressable does not receive list role', () => {
+    const { getByTestId } = render(
+      <NowCardStack
+        feed={feed([])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('now-empty-card').props.accessibilityRole).toBe(
+      'button',
+    );
   });
 
   it('threads anchor arc state and completion events into actionable cards', () => {
