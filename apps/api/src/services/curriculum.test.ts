@@ -358,6 +358,35 @@ describe('generateCurriculum', () => {
     }
   });
 
+  it('rejects malformed LLM topic objects before persistence', async () => {
+    registerProvider(
+      providerReturning(
+        JSON.stringify([
+          {
+            title: 'Unsafe Topic',
+            description: 'Looks plausible',
+            estimatedMinutes: '30',
+          },
+        ]),
+      ),
+    );
+
+    let thrown: unknown;
+    try {
+      await generateCurriculum(defaultInput);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toBe(
+      'Failed to parse curriculum from LLM response',
+    );
+    expect((thrown as { issues?: unknown }).issues).toBeUndefined();
+
+    registerProvider(createCurriculumMockProvider());
+  });
+
   it('throws when LLM response contains no JSON array', async () => {
     // Temporarily register a provider that returns non-JSON
     const badProvider: LLMProvider = {
