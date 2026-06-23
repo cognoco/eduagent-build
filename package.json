@@ -140,7 +140,8 @@
       "@tanstack/query-core": "5.100.11",
       "@types/node@^12": "^22.0.0",
       "handlebars": ">=4.7.9",
-      "vitest": "3.2.6"
+      "vitest": "3.2.6",
+      "tar": ">=7.5.16"
     },
     "patchedDependencies": {
       "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
