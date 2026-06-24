@@ -15,6 +15,7 @@ import {
   lt,
   or,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -1264,7 +1265,7 @@ export async function closeStaleSessions(
   let cursor: StaleSessionCursor | null = null;
 
   for (;;) {
-    const cursorFilter = cursor
+    const cursorFilter: SQL<unknown> | undefined = cursor
       ? or(
           gt(learningSessions.lastActivityAt, cursor.lastActivityAt),
           and(
@@ -1274,15 +1275,19 @@ export async function closeStaleSessions(
         )
       : undefined;
 
-    const page = await db.query.learningSessions.findMany({
-      where: and(
-        eq(learningSessions.status, 'active'),
-        lt(learningSessions.lastActivityAt, cutoff),
-        cursorFilter,
-      ),
-      orderBy: [asc(learningSessions.lastActivityAt), asc(learningSessions.id)],
-      limit: pageSize,
-    });
+    const page: (typeof learningSessions.$inferSelect)[] =
+      await db.query.learningSessions.findMany({
+        where: and(
+          eq(learningSessions.status, 'active'),
+          lt(learningSessions.lastActivityAt, cutoff),
+          cursorFilter,
+        ),
+        orderBy: [
+          asc(learningSessions.lastActivityAt),
+          asc(learningSessions.id),
+        ],
+        limit: pageSize,
+      });
 
     for (const staleSession of page) {
       // Per-session error isolation: a single throwing close must not abort
@@ -1333,7 +1338,7 @@ export async function closeStaleSessions(
     // Advance cursor to last row. If the page was smaller than the limit,
     // we have exhausted all stale sessions.
     if (page.length < pageSize) break;
-    const last = page[page.length - 1]!;
+    const last: typeof learningSessions.$inferSelect = page[page.length - 1]!;
     cursor = { lastActivityAt: last.lastActivityAt, lastId: last.id };
   }
 
