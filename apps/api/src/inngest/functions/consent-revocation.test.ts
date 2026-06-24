@@ -859,6 +859,151 @@ describe('memoized step-state PII break test [F-088]', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [WI-997] onFailure dead-letter handler — GDPR cascade-delete terminal failure
+//
+// Red → green: remove the onFailure key from the createFunction config and the
+// first test fails (opts.onFailure is undefined); remove the captureMessage
+// call and the second test fails; remove the safeSend call and the third fails.
+//
+// onFailure runs OUTSIDE the original Sentry async scope — captureMessage
+// (not captureException) is used so the message scopes cleanly without a live
+// Sentry scope. safeSend (not bare inngest.send) is used because a failure of
+// the dead-letter dispatch must not surface as a second crash (non-core).
+// ---------------------------------------------------------------------------
+
+import * as sentry from '../../services/sentry';
+import * as safeNonCore from '../../services/safe-non-core';
+
+describe('[WI-997] onFailure dead-letter handler', () => {
+  type OnFailureArgs = {
+    event: { data: { event?: { data?: unknown }; run_id?: string } };
+    error: unknown;
+  };
+
+  function getOnFailure() {
+    return (consentRevocation as any).opts.onFailure as
+      | ((args: OnFailureArgs) => Promise<void>)
+      | undefined;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it('[BREAK] declares an onFailure handler', () => {
+    expect(typeof getOnFailure()).toBe('function');
+  });
+
+  it('[BREAK] calls captureMessage(level=error) with childProfileId/parentProfileId on terminal failure', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
+
+    const onFailure = getOnFailure()!;
+    await onFailure({
+      event: {
+        data: {
+          event: {
+            data: {
+              childProfileId: 'child-revoke-001',
+              parentProfileId: 'parent-revoke-001',
+            },
+          },
+          run_id: 'run-revoke-abc',
+        },
+      },
+      error: new Error('DB connection lost'),
+    });
+
+    expect(captureSpy).toHaveBeenCalledTimes(1);
+    expect(captureSpy).toHaveBeenCalledWith(
+      expect.stringContaining('child-revoke-001'),
+      expect.objectContaining({
+        level: 'error',
+        extra: expect.objectContaining({
+          surface: 'consent-revocation.terminal_failure',
+          childProfileId: 'child-revoke-001',
+          parentProfileId: 'parent-revoke-001',
+          runId: 'run-revoke-abc',
+        }),
+      }),
+    );
+  });
+
+  it('[BREAK] calls safeSend with app/consent.revocation.failed event on terminal failure', async () => {
+    jest.spyOn(sentry, 'captureMessage').mockImplementation(() => undefined);
+    const safeSendSpy = jest
+      .spyOn(safeNonCore, 'safeSend')
+      .mockResolvedValue(undefined);
+
+    const onFailure = getOnFailure()!;
+    await onFailure({
+      event: {
+        data: {
+          event: {
+            data: {
+              childProfileId: 'child-revoke-001',
+              parentProfileId: 'parent-revoke-001',
+            },
+          },
+          run_id: 'run-revoke-abc',
+        },
+      },
+      error: new Error('DB connection lost'),
+    });
+
+    expect(safeSendSpy).toHaveBeenCalledTimes(1);
+    // First arg is a thunk (() => inngest.send(...)) — invoke it so we can
+    // inspect the event name it would dispatch.
+    const [sendThunk, surface, context] = safeSendSpy.mock.calls[0]!;
+    expect(surface).toBe('consent-revocation.terminal_failure');
+    expect(context).toMatchObject({
+      childProfileId: 'child-revoke-001',
+      parentProfileId: 'parent-revoke-001',
+    });
+    // Invoke the thunk to confirm it tries to send the right event name.
+    // mockInngestSend is already wired to the inngest.send stub in this file.
+    await expect(sendThunk()).resolves.not.toThrow();
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/consent.revocation.failed',
+        data: expect.objectContaining({
+          childProfileId: 'child-revoke-001',
+          parentProfileId: 'parent-revoke-001',
+          error: 'DB connection lost',
+        }),
+      }),
+    );
+  });
+
+  it('tolerates missing original event payload (null childProfileId/parentProfileId)', async () => {
+    const captureSpy = jest
+      .spyOn(sentry, 'captureMessage')
+      .mockImplementation(() => undefined);
+    jest.spyOn(safeNonCore, 'safeSend').mockResolvedValue(undefined);
+
+    const onFailure = getOnFailure()!;
+    // No event.data.event — simulates an Inngest onFailure with no original payload
+    await expect(
+      onFailure({ event: { data: {} }, error: 'string-rejection' }),
+    ).resolves.not.toThrow();
+
+    expect(captureSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unknown'),
+      expect.objectContaining({
+        level: 'error',
+        extra: expect.objectContaining({
+          childProfileId: null,
+          parentProfileId: null,
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [WI-973] Regression: malformed app/consent.revoked events must throw
 // NonRetriableError and must NOT reach the deletion path.
 // ---------------------------------------------------------------------------
