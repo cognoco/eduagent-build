@@ -35,6 +35,7 @@ export * from './observers';
 
 // Subscription & Billing (Epic 5)
 export * from './billing';
+export * from './revenuecat';
 
 // Filing (Conversation-First Flow)
 export * from './filing';
