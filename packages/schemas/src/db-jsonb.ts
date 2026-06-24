@@ -33,6 +33,12 @@ import {
   type ExtractedInterviewSignals,
 } from './sessions';
 import { coachingCardSchema, pendingCelebrationSchema } from './progress';
+import {
+  strengthEntrySchema,
+  focusAreaEntrySchema,
+  type StrengthEntry,
+  type FocusAreaEntry,
+} from './learning-profiles';
 
 // ---------------------------------------------------------------------------
 // [BUG-220] coaching_card_cache.card_data
@@ -189,4 +195,75 @@ export function parseAssessmentExchangeHistory(
 ): AssessmentExchangeHistory {
   const parsed = assessmentExchangeHistorySchema.safeParse(raw);
   return parsed.success ? parsed.data : [];
+}
+
+// ---------------------------------------------------------------------------
+// [WI-986] learning_profiles.strengths / learning_profiles.struggles — JSONB
+// ---------------------------------------------------------------------------
+// These columns are typed as `unknown` by Drizzle. Three service sites
+// previously cast or minimally filtered them without per-element Zod
+// validation, allowing a malformed element (missing .topics, wrong
+// .confidence type) to silently corrupt curated-memory / projection output.
+//
+// Pattern mirrors interestsArraySchema: parse the full array, drop + log
+// invalid elements so DB drift is observable but never silent.
+// ---------------------------------------------------------------------------
+
+export { strengthEntrySchema, focusAreaEntrySchema };
+export type { StrengthEntry, FocusAreaEntry };
+
+/**
+ * Per-element-validated array for learning_profiles.strengths JSONB.
+ * Uses z.array with per-element safeParse drop semantics (see parseStrengthArray).
+ */
+export const strengthArraySchema = z.array(strengthEntrySchema);
+export type StrengthArray = StrengthEntry[];
+
+/**
+ * Per-element-validated array for learning_profiles.struggles JSONB.
+ * Uses z.array with per-element safeParse drop semantics (see parseFocusAreaArray).
+ */
+export const focusAreaArraySchema = z.array(focusAreaEntrySchema);
+export type FocusAreaArray = FocusAreaEntry[];
+
+/**
+ * Parse learning_profiles.strengths JSONB. Invalid elements are dropped and
+ * logged so DB drift is observable. Returns [] on non-array input.
+ */
+export function parseStrengthArray(raw: unknown): StrengthEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const result: StrengthEntry[] = [];
+  for (const item of raw) {
+    const parsed = strengthEntrySchema.safeParse(item);
+    if (parsed.success) {
+      result.push(parsed.data);
+    } else {
+      console.warn(
+        '[db-jsonb] Dropped invalid strengthEntry:',
+        parsed.error.issues,
+      );
+    }
+  }
+  return result;
+}
+
+/**
+ * Parse learning_profiles.struggles JSONB. Invalid elements are dropped and
+ * logged so DB drift is observable. Returns [] on non-array input.
+ */
+export function parseFocusAreaArray(raw: unknown): FocusAreaEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const result: FocusAreaEntry[] = [];
+  for (const item of raw) {
+    const parsed = focusAreaEntrySchema.safeParse(item);
+    if (parsed.success) {
+      result.push(parsed.data);
+    } else {
+      console.warn(
+        '[db-jsonb] Dropped invalid focusAreaEntry:',
+        parsed.error.issues,
+      );
+    }
+  }
+  return result;
 }
