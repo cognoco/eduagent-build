@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~88 screens, 420 test suites, ~4474 tests
-- API: 46 route groups, 329 test suites, ~7019 tests, 59 Inngest functions
-- Cross-package integration tests: 55 suites in `tests/integration/`, ~290 cases
+- Mobile: ~88 screens, 443 test suites, ~4,757 tests
+- API: 48 route groups, 329 test suites, ~7,380 tests, 65 Inngest functions
+- Cross-package integration tests: 56 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-06-18. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-06-24. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## How to Work
 
