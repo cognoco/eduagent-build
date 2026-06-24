@@ -100,7 +100,7 @@ export function NowCardStack({
   }
 
   return (
-    <View testID="now-card-stack" className="gap-3">
+    <View testID="now-card-stack" accessibilityRole="list" className="gap-3">
       {anchor ? (
         <View testID="now-card-slot-anchor">
           {renderCard(
