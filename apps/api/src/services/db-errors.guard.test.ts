@@ -31,7 +31,9 @@ if (!fs.existsSync(path.join(REPO_ROOT, 'apps/api'))) {
 }
 
 // The one file allowed to name the SQLSTATE literal — the canonical helper.
-const SANCTIONED_BASENAMES = new Set(['db-errors.ts']);
+// Matched on the full repo-relative path (not basename) so a future
+// `db-errors.ts` in any other directory cannot silently inherit the exemption.
+const SANCTIONED_PATHS = new Set(['apps/api/src/services/db-errors.ts']);
 
 // Matches the SQLSTATE as a quoted string literal ('23505' / "23505"). Bare
 // occurrences in comments (e.g. "the 23505 catch") are intentionally NOT
@@ -45,7 +47,7 @@ function shouldScanFile(absPath: string): boolean {
   if (rel.endsWith('.test.ts')) return false;
   if (rel.endsWith('.integration.test.ts')) return false;
   if (rel.endsWith('.guard.test.ts')) return false;
-  if (SANCTIONED_BASENAMES.has(path.basename(absPath))) return false;
+  if (SANCTIONED_PATHS.has(rel)) return false;
   return true;
 }
 
