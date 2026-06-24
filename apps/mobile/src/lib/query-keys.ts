@@ -2,7 +2,9 @@
  * Typed query-key registry.
  *
  * Rules:
- * - Every key array is byte-identical to the inline literal it replaces.
+ * - Factory tests define the exact array shape. Replacements preserve existing
+ *   shapes unless a scoped factory intentionally moves the active scope id to
+ *   the final segment.
  * - All factory functions return `readonly unknown[]` via `as const`.
  * - Parameters use `string | undefined` to match how hooks pass
  *   `activeProfile?.id` — React Query disables queries via `enabled:` when
@@ -425,6 +427,80 @@ export const queryKeys = {
   resumeNudge: {
     root: (profileId: string | undefined) =>
       ['resume-nudge', profileId] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // subscription / usage domains
+  // ------------------------------------------------------------------
+  subscription: (profileId: string | undefined) =>
+    ['subscription', profileId] as const,
+
+  usage: (profileId: string | undefined) => ['usage', profileId] as const,
+
+  subscriptionFamily: (profileId: string | undefined) =>
+    ['subscription-family', profileId] as const,
+
+  subscriptionStatus: (profileId: string | undefined) =>
+    ['subscription-status', profileId] as const,
+
+  // ------------------------------------------------------------------
+  // RevenueCat domain
+  // ------------------------------------------------------------------
+  revenuecat: {
+    customerInfo: (userId: string | undefined) =>
+      ['revenuecat', 'customerInfo', userId] as const,
+
+    offerings: (userId: string | undefined) =>
+      ['revenuecat', 'offerings', userId] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // profiles domain
+  // ------------------------------------------------------------------
+  profiles: {
+    list: (userId: string | undefined) => ['profiles', userId] as const,
+
+    active: (profileId: string | undefined) => ['profile', profileId] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // settings domain
+  // ------------------------------------------------------------------
+  settings: {
+    notifications: (profileId: string | undefined) =>
+      ['settings', 'notifications', profileId] as const,
+
+    celebrationLevel: (profileId: string | undefined) =>
+      ['settings', 'celebration-level', profileId] as const,
+
+    childCelebrationLevel: (
+      childProfileId: string | undefined,
+      profileId: string | undefined,
+    ) => ['settings', 'celebration-level', childProfileId, profileId] as const,
+
+    withdrawalArchive: (profileId: string | undefined) =>
+      ['settings', 'withdrawal-archive', profileId] as const,
+
+    familyPoolBreakdownSharing: (profileId: string | undefined) =>
+      ['settings', 'family-pool-breakdown-sharing', profileId] as const,
+
+    analogyDomain: (
+      subjectId: string | undefined,
+      profileId: string | undefined,
+    ) => ['settings', 'analogy-domain', subjectId, profileId] as const,
+
+    nativeLanguage: (
+      subjectId: string | undefined,
+      profileId: string | undefined,
+    ) => ['settings', 'native-language', subjectId, profileId] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // onboarding invalidation domains
+  // ------------------------------------------------------------------
+  onboarding: {
+    learnerProfile: (profileId: string | undefined) =>
+      ['learner-profile', profileId] as const,
   },
 
   // ------------------------------------------------------------------

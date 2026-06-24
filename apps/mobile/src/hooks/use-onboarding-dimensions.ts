@@ -10,6 +10,7 @@ import {
   useQueryClient,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import type {
   ConversationLanguage,
   InterestEntry,
@@ -18,6 +19,7 @@ import type {
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 interface UpdateLanguageInput {
   childProfileId?: string;
@@ -49,6 +51,7 @@ export function useUpdateConversationLanguage(): UseMutationResult<
 > {
   const client = useApiClient();
   const qc = useQueryClient();
+  const { userId } = useAuth();
   const { activeProfile } = useProfile();
 
   return useMutation({
@@ -68,10 +71,12 @@ export function useUpdateConversationLanguage(): UseMutationResult<
       // The tutor-language change takes effect at the next session (per spec
       // non-goal: no mid-session swap). Invalidate the profiles list so any
       // UI chip or Settings row re-renders.
-      await qc.invalidateQueries({ queryKey: ['profiles'] });
+      await qc.invalidateQueries({
+        queryKey: queryKeys.profiles.list(userId),
+      });
       if (activeProfile) {
         await qc.invalidateQueries({
-          queryKey: ['profile', activeProfile.id],
+          queryKey: queryKeys.profiles.active(activeProfile.id),
         });
       }
     },
@@ -92,6 +97,7 @@ export function useUpdatePronouns(): UseMutationResult<
 > {
   const client = useApiClient();
   const qc = useQueryClient();
+  const { userId } = useAuth();
   const { activeProfile } = useProfile();
 
   return useMutation({
@@ -108,10 +114,12 @@ export function useUpdatePronouns(): UseMutationResult<
       return (await res.json()) as { success: boolean };
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['profiles'] });
+      await qc.invalidateQueries({
+        queryKey: queryKeys.profiles.list(userId),
+      });
       if (activeProfile) {
         await qc.invalidateQueries({
-          queryKey: ['profile', activeProfile.id],
+          queryKey: queryKeys.profiles.active(activeProfile.id),
         });
       }
     },
@@ -152,7 +160,7 @@ export function useUpdateInterestsContext(): UseMutationResult<
     onSuccess: async (_, vars) => {
       const targetId = vars.childProfileId ?? activeProfile?.id;
       await qc.invalidateQueries({
-        queryKey: ['learner-profile', targetId],
+        queryKey: queryKeys.onboarding.learnerProfile(targetId),
       });
     },
   });

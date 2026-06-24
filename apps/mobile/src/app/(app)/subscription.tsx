@@ -24,6 +24,7 @@ import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
+import { queryKeys } from '../../lib/query-keys';
 
 import { TimeoutLoader } from '../../components/common';
 import {
@@ -250,7 +251,7 @@ function SubscriptionContent(): React.ReactElement | null {
     const restoreOutcome = await poll.run({
       fetchProbe: () =>
         queryClient.fetchQuery<{ tier: string }>({
-          queryKey: ['subscription', activeProfile?.id],
+          queryKey: queryKeys.subscription(activeProfile?.id),
           staleTime: 0,
           queryFn: async () => {
             const res = await client.subscription.$get({});
@@ -359,7 +360,7 @@ function SubscriptionContent(): React.ReactElement | null {
       const purchaseOutcome = await poll.run({
         fetchProbe: () =>
           queryClient.fetchQuery<{ tier: string }>({
-            queryKey: ['subscription', activeProfile?.id],
+            queryKey: queryKeys.subscription(activeProfile?.id),
             staleTime: 0,
             queryFn: async () => {
               const res = await client.subscription.$get({});
@@ -521,7 +522,7 @@ function SubscriptionContent(): React.ReactElement | null {
     const topUpOutcome = await poll.run({
       fetchProbe: () =>
         queryClient.fetchQuery<{ topUpCreditsRemaining: number }>({
-          queryKey: ['usage', activeProfile?.id],
+          queryKey: queryKeys.usage(activeProfile?.id),
           staleTime: 0,
           queryFn: () => fetchUsageData(client),
         }),
