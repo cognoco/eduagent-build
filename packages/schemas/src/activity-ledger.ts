@@ -27,6 +27,56 @@ export const ledgerTemplateKeySchema = z.enum([
 ]);
 export type LedgerTemplateKey = z.infer<typeof ledgerTemplateKeySchema>;
 
+// Typed params per ledger kind — routing-relevant UUID fields are validated;
+// non-routing display fields (topicTitle, subjectName, etc.) pass through.
+export const ledgerKindParamsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('session_filed'),
+    sessionId: z.string().uuid().optional(),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('topic_mastered'),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('retention_due'),
+    subjectId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('needs_deepening_added'),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('recap_ready'),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('snapshot_ready'),
+    subjectId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('milestone_reached'),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+  }),
+  z.object({
+    kind: z.literal('reward_receipt'),
+    subjectId: z.string().uuid().optional(),
+  }),
+]);
+export type LedgerKindParams = z.infer<typeof ledgerKindParamsSchema>;
+
+// open-record: raw DB params column; use ledgerKindParamsSchema when kind is known
 export const ledgerParamsSchema = z.record(z.string(), z.unknown());
 
 export function parseLedgerParams(raw: unknown): Record<string, unknown> {
