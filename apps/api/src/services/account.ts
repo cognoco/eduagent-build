@@ -7,6 +7,7 @@ import { createHash } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { accounts, type Database } from '@eduagent/database';
 import { createSubscription, getSubscriptionByAccountId } from './billing';
+import { isUniqueViolation } from './db-errors';
 import {
   invalidateVerifiedClerkEmailCache,
   resolveVerifiedClerkEmail,
@@ -110,15 +111,6 @@ function hashEmail(email: string): string {
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '23505'
-  );
 }
 
 /**

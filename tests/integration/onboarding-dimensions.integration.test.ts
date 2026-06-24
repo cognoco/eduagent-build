@@ -28,6 +28,7 @@ import {
 } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
+import { unwrapDbError } from '../../apps/api/src/services/db-errors';
 
 const TEST_ENV = buildIntegrationEnv();
 
@@ -497,12 +498,25 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     );
 
     const db = createIntegrationDb();
-    await expect(
+    // drizzle >=0.44 wraps the driver error in a DrizzleQueryError whose message
+    // is "Failed query: …"; the Postgres CHECK constraint name lives on the
+    // unwrapped driver error, not the wrapper. Unwrap before asserting (same
+    // helper the production 23505 handlers use).
+    const rejection = await Promise.resolve(
       db
         .update(profiles)
         .set({ pronouns: 'a'.repeat(33) })
         .where(eq(profiles.id, profileId)),
-    ).rejects.toThrow(/profiles_pronouns_length_check/);
+    ).then(
+      () => {
+        throw new Error(
+          'expected pronouns CHECK to reject a 33-char write, but the UPDATE succeeded',
+        );
+      },
+      (error: unknown) => error,
+    );
+    const driverError = unwrapDbError(rejection) as { message?: string };
+    expect(driverError.message ?? '').toMatch(/profiles_pronouns_length_check/);
 
     // Sanity: 32 chars exactly is allowed.
     await db

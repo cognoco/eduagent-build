@@ -22,6 +22,8 @@ import { accounts, profiles, createDatabase } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
+import { unwrapDbError } from './db-errors';
+
 // ---------------------------------------------------------------------------
 // DB setup
 // ---------------------------------------------------------------------------
@@ -194,7 +196,11 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
     // the CHECK constraint is the only thing standing between us and the row.
     // gen_random_uuid() supplies the PK so the NOT NULL constraint on id is
     // satisfied before the CHECK is evaluated.
-    await expect(
+    // drizzle >=0.44 wraps the driver error in a DrizzleQueryError whose message
+    // is "Failed query: …"; the Postgres "violates check constraint …" text lives
+    // on the unwrapped driver error. Unwrap before asserting (same helper the
+    // production 23505 handlers use).
+    const rejection = await Promise.resolve(
       db.execute(
         sql`
           INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner, conversation_language)
@@ -208,6 +214,15 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
           )
         `,
       ),
-    ).rejects.toThrow(/check constraint/i);
+    ).then(
+      () => {
+        throw new Error(
+          'expected conversation_language CHECK to reject "xx", but the INSERT succeeded',
+        );
+      },
+      (error: unknown) => error,
+    );
+    const driverError = unwrapDbError(rejection) as { message?: string };
+    expect(driverError.message ?? '').toMatch(/check constraint/i);
   });
 });

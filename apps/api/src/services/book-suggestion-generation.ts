@@ -13,6 +13,7 @@ import {
 } from '@eduagent/schemas';
 
 import { getLanguageByCode } from '../data/languages';
+import { isUniqueViolation } from './db-errors';
 import { routeAndCall, extractFirstJsonObject, type ChatMessage } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
 import { areEquivalentBookTitles } from './curriculum';
@@ -583,10 +584,4 @@ function getLanguageDisplayName(languageCode: string): string | null {
   const firstName = language?.names[0];
   if (!firstName) return null;
   return firstName.replace(/^./, (char) => char.toUpperCase());
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const code = (error as { code?: unknown }).code;
-  return code === '23505';
 }
