@@ -1,4 +1,6 @@
 // @inngest-admin: parent-chain (consentStates.profileId enforced in WHERE)
+import { NonRetriableError } from 'inngest';
+import { z } from 'zod';
 import { inngest } from '../client';
 import {
   getStepDatabase,
@@ -25,16 +27,26 @@ import { deleteProfileIfNoConsent } from '../../services/deletion';
 import { deletePersonIfNoConsentV2 } from '../../services/identity-v2/deletion-v2';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
+// [WI-973] Schema for the app/consent.requested event payload.
+const consentRequestedEventSchema = z.object({
+  profileId: z.string().min(1),
+  requestedAt: z.string().min(1),
+});
+
 export const consentReminder = inngest.createFunction(
   { id: 'consent-reminder', name: 'Send consent reminder' },
   { event: 'app/consent.requested' },
   async ({ event, step }) => {
-    const { profileId } = event.data;
-    const requestedAt =
-      typeof event.data.requestedAt === 'string'
-        ? event.data.requestedAt
-        : null;
-    const requestedAtDate = requestedAt ? new Date(requestedAt) : null;
+    // [WI-973] Validate the event payload before entering the reminder
+    // workflow. NonRetriableError prevents retry loops on malformed events.
+    const parsed = consentRequestedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `consent-reminder: invalid event payload — ${parsed.error.message}`,
+      );
+    }
+    const { profileId, requestedAt } = parsed.data;
+    const requestedAtDate = new Date(requestedAt);
     const requestedAtUpperBound =
       requestedAtDate != null && !Number.isNaN(requestedAtDate.getTime())
         ? new Date(requestedAtDate.getTime() + 1)

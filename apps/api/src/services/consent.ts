@@ -1041,7 +1041,9 @@ export async function isConsentRevocationGenerationCurrent(
     desc(consentStates.requestedAt),
   );
   if (row?.status !== 'WITHDRAWN') return false;
-  if (!revokedAt) return true;
+  // [WI-973] A missing revokedAt means we cannot confirm the generation;
+  // return false so the cascade-delete guard does not pass vacuously.
+  if (!revokedAt) return false;
 
   const currentRespondedAt = row.respondedAt?.getTime();
   const eventRespondedAt = revokedAt.getTime();
