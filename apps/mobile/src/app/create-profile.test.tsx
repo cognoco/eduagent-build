@@ -326,6 +326,45 @@ describe('CreateProfileScreen', () => {
     }
   });
 
+  it('[WI-1019] web birthdate input placeholder resolves through the i18n key, not a hardcoded literal', () => {
+    // Override the key to a SENTINEL on the real i18next instance so the test
+    // distinguishes t('…birthDatePlaceholder') from a hardcoded "YYYY-MM-DD"
+    // literal. Reverting the source back to the literal makes this FAIL — a
+    // real red-green guard. (i18next.addResource is the test-harness API, not
+    // an internal jest.mock.)
+    const i18nModule = require('i18next');
+    const i18next = i18nModule.default ?? i18nModule;
+    const KEY = 'onboarding.createProfile.birthDatePlaceholder';
+    const SENTINEL = '__BIRTHDATE_PH__';
+    const original = i18next.getResource('en', 'translation', KEY) as
+      | string
+      | undefined;
+    i18next.addResource('en', 'translation', KEY, SENTINEL);
+
+    const RN = require('react-native');
+    const originalOs = Object.getOwnPropertyDescriptor(RN.Platform, 'OS');
+
+    Object.defineProperty(RN.Platform, 'OS', {
+      configurable: true,
+      get: () => 'web',
+    });
+
+    try {
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      const input = screen.getByTestId('create-profile-birthdate-input');
+      expect(input.props.placeholder).toBe(SENTINEL);
+    } finally {
+      if (originalOs) {
+        Object.defineProperty(RN.Platform, 'OS', originalOs);
+      }
+      // Restore the real catalog value so other tests are unaffected.
+      if (original !== undefined) {
+        i18next.addResource('en', 'translation', KEY, original);
+      }
+    }
+  });
+
   it('calls POST and navigates back on successful submit (adult, no consent needed)', async () => {
     const newProfile = {
       id: 'new-id',
