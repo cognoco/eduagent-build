@@ -57,8 +57,10 @@ export type AskGateTimeoutEvent = z.infer<typeof askGateTimeoutEventSchema>;
 // ---------------------------------------------------------------------------
 
 export const emailBouncedEventSchema = z.object({
-  type: z.enum(['email.bounced', 'email.complained']).optional(),
-  to: z.string().optional(),
+  // [WI-989] `type` and `to` are required — a bounce/complaint event without these
+  // fields cannot be meaningfully processed and should be rejected at the schema boundary.
+  type: z.enum(['email.bounced', 'email.complained']),
+  to: z.string(),
   emailId: z.string().nullable().optional(),
   timestamp: z.string().optional(),
 });
