@@ -63,6 +63,9 @@ export * from './quiz-utils';
 export * from './llm-envelope';
 export * from './llm-summary';
 
+// Suitability-judge verdict contract (MMT-ADR-0016 §2)
+export * from './judge';
+
 // Database JSONB parsers (BUG-220 / BUG-222 / BUG-225) — runtime validation
 // helpers for jsonb columns that drizzle types as `unknown` or via `$type<…>`.
 export * from './db-jsonb';
