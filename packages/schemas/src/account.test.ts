@@ -161,6 +161,8 @@ describe('account schemas', () => {
     it('accepts subjects/subscriptions/quotaPools arrays', () => {
       // [WI-978] subscriptions now uses the tightened dataExportSubscriptionRowSchema;
       // the payload must match the real schema (not an arbitrary record).
+      // Nullable fields must be explicitly null (not undefined) — DB nullable
+      // columns return null, not undefined.
       const result = dataExportSchema.safeParse({
         account: { email: 'user@example.com', createdAt: ISO },
         profiles: [],
@@ -170,8 +172,19 @@ describe('account schemas', () => {
           {
             id: UUID,
             accountId: UUID,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
             tier: 'free',
             status: 'active',
+            trialEndsAt: null,
+            currentPeriodStart: null,
+            currentPeriodEnd: null,
+            cancelledAt: null,
+            lastStripeEventTimestamp: null,
+            lastStripeEventId: null,
+            revenuecatOriginalAppUserId: null,
+            lastRevenuecatEventId: null,
+            lastRevenuecatEventTimestampMs: null,
             createdAt: ISO,
             updatedAt: ISO,
           },
@@ -191,11 +204,24 @@ describe('account schemas', () => {
     });
 
     it('[WI-978] tightened subscription schema accepts a valid minimal row', () => {
+      // Nullable fields must be explicitly null (DB nullable columns return null,
+      // not undefined; .nullable() rejects undefined).
       const result = dataExportSubscriptionRowSchema.safeParse({
         id: UUID,
         accountId: UUID,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
         tier: 'free',
         status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        lastStripeEventTimestamp: null,
+        lastStripeEventId: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
         createdAt: ISO,
         updatedAt: ISO,
       });
@@ -211,12 +237,19 @@ describe('account schemas', () => {
     });
 
     it('[WI-978] tightened assessment schema accepts a valid minimal row', () => {
+      // Nullable fields must be explicitly null (DB nullable columns return null,
+      // not undefined; .nullable() rejects undefined). verificationDepth and
+      // exchangeHistory have .default() so they can be omitted (defaults apply).
       const result = dataExportAssessmentRowSchema.safeParse({
         id: UUID,
         profileId: UUID,
         subjectId: UUID,
         topicId: UUID,
+        sessionId: null,
         status: 'passed',
+        masteryScore: null,
+        masteryChallengeVerifiedAt: null,
+        qualityRating: null,
         createdAt: ISO,
         updatedAt: ISO,
       });
