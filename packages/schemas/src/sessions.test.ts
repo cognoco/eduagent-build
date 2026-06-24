@@ -784,6 +784,25 @@ describe('sessionAnalyticsEventSchema', () => {
       false,
     );
   });
+
+  // [WI-982] Guard: sessionAnalyticsEventTypeSchema (the enum) must stay in
+  // sync with sessionAnalyticsEventSchema (the discriminated union). A developer
+  // adding a new eventType to the union but forgetting the enum (or vice-versa)
+  // creates an invisible API/client mismatch — enum callers accept a value the
+  // API rejects (400). This test makes the drift test-time-visible.
+  it('[WI-982] sessionAnalyticsEventTypeSchema enum values match sessionAnalyticsEventSchema discriminated union branches', () => {
+    // Zod v4 classic: ZodDiscriminatedUnion extends ZodUnion which has .options;
+    // ZodObject has .shape; ZodLiteral has .value (legacy single-value accessor).
+    const unionValues = new Set(
+      (
+        sessionAnalyticsEventSchema.options as Array<{
+          shape: { eventType: { value: string } };
+        }>
+      ).map((branch) => branch.shape.eventType.value),
+    );
+    const enumValues = new Set(sessionAnalyticsEventTypeSchema.options);
+    expect(unionValues).toEqual(enumValues);
+  });
 });
 
 // ---------------------------------------------------------------------------
