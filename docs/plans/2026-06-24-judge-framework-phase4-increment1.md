@@ -78,7 +78,8 @@ the learner's exchange). Pre-display gating is a later increment.
 | `apps/api/src/services/policy-engine/judge-suitability.ts` | `runSuitabilityJudge(input): Promise<JudgeVerdict \| null>` — build prompt, route Haiku (flow `judge.suitability`, vendor-independent), parse verdict, fail-open. |
 | `apps/api/src/services/policy-engine/judge-suitability-prompt.ts` | `buildSuitabilityJudgePrompt(input)` — model-agnostic rubric (categories + over-blocking-is-failure framing), data-minimized inputs only. |
 | `apps/api/src/services/policy-engine/judge-profile.ts` | `resolveSuitabilityProfile(ageBracket)` → `{ sampling }` (coverage only; gating mode deferred to phase 5 — see Step 2); `shouldJudge(ageBracket, rng)` → boolean. |
-| `apps/api/src/inngest/functions/judge-suitability.ts` | Inngest fn on `app/judge.suitability_requested` → `runSuitabilityJudge` → emit `judge.verdict` structured metric (scores/flags only). Mirror `ask-silent-classify.ts`. |
+| `apps/api/src/inngest/functions/judge-suitability.ts` | Inngest fn on `app/judge.suitability_requested` (opaque session_events ids only) → rehydrate reply + preceding learner message from `session_events` scoped by profileId **inside one step closure** → `runSuitabilityJudge` → emit `judge.verdict` / `judge.degraded` structured **logger** metric (overall + flags only — no text, no rationale). Mirror `review-calibration-grade.ts` (bare `handleSuitabilityJudge` + `createFunction` wrapper). |
+| `apps/api/src/services/policy-engine/judge-dispatch.ts` | `resolveSuitabilityJudgeDispatch(input)` → `SuitabilityJudgeRequestedEvent \| null` — pure gating + payload shaping (flag, persisted-reply ref, tutor identity, `computeAgeBracket` + `shouldJudge`); `rng`/`timestamp` injected. |
 | co-located `*.test.ts` for each of the above | TDD tests. |
 
 ### Modified files
@@ -86,8 +87,9 @@ the learner's exchange). Pre-display gating is a later increment.
 |---|---|
 | `apps/api/src/config.ts` | Add `JUDGE_FRAMEWORK_ENABLED: z.enum(['true','false']).default('false')` + `isJudgeFrameworkEnabled()` helper (mirror `isLlmRoutingV2Enabled` / the `IDENTITY_V2` `=== 'true'` guard at config.ts:154/176). |
 | `apps/api/src/services/policy-engine/judge.ts` | Keep `resolveJudgeConfig`; `judge-suitability.ts` consumes its `vendorConstraint` to assert vendor-independence (no behavior change to the scaffold's exports). |
-| `apps/api/src/services/session/session-exchange.ts` (and/or `exchanges.ts`) | After the reply is finalized (non-streaming: post-`processExchange` pre-return ~`:3088–3200`; streaming: `onComplete` path), call `dispatchSuitabilityJudge(...)` behind the flag. Mirror `emitCrisisRedirectEvent` (`exchanges.ts:77`). |
-| Inngest event registry (the `EventSchemas` in `apps/api/src/inngest/client.ts`) | Type `app/judge.suitability_requested` (payload: reply, precedingLearnerMessage, ageBracket, profileId, sessionId, flow, tutorVendor, tutorModel, conversationLanguage). |
+| `apps/api/src/services/session/session-exchange.ts` | Add exported `maybeDispatchSuitabilityJudge(input)` wrapper (injects `Math.random()`/clock → `resolveSuitabilityJudgeDispatch` → `safeSend`); add `judgeFrameworkEnabled?: boolean` option to `processMessage` + `streamMessage`; call the wrapper at both reply-persisted sites (after `maybeDispatchReviewCalibration`). Dispatch-seam test `session-exchange-judge-dispatch.test.ts`. |
+| `apps/api/src/routes/sessions.ts` + `apps/api/src/index.ts` | Read `isJudgeFrameworkEnabled(c.env.JUDGE_FRAMEWORK_ENABLED)`, thread `judgeFrameworkEnabled` at the four `processMessage`/`streamMessage` call sites (mirror `challengeRoundRuntimeEnabled`); declare the `JUDGE_FRAMEWORK_ENABLED?: string` binding on both env types. |
+| `packages/schemas/src/inngest-events.ts` | Add `suitabilityJudgeRequestedEventSchema` (+ type) for `app/judge.suitability_requested`. **PII-safe payload — opaque refs only**: `profileId`, `sessionId`, `replyEventId`, nullable `precedingLearnerMessageEventId` (both session_events row ids), `ageBracket`, `tutorVendor`, `tutorModel`, `flow`, optional `conversationLanguage`, `timestamp`. No raw reply/learner text (mirrors `reviewCalibrationRequestedEventSchema`, WI-620). The client (`inngest/client.ts`) has no central `EventSchemas` map — events are string-named and parsed by the handler via this schema. |
 | Inngest functions registry (serve array) | Register `judgeSuitability`. Satisfies `orphan-dispatcher.guard` + `orphan-handler.guard` (this event has BOTH a dispatch and a handler — no `orphan-allow` needed). |
 
 ## Mocks (GC1/GC6 compliant)
@@ -183,22 +185,69 @@ external-boundary pattern; `/* gc1-allow: pattern-a conversion */`).
 - GREEN: minimal implementation — `buildSuitabilityJudgePrompt` → `routeAndCall` →
   `extractFirstJsonObject` → `JSON.parse` → `judgeVerdictSchema.safeParse`.
 
-**Step 5 — Inngest handler** (`functions/judge-suitability.ts`) — mock `routeAndCall`
-- RED: invoking the handler with a `app/judge.suitability_requested` event runs
-  `runSuitabilityJudge` and emits a `judge.verdict` metric carrying scores/flags +
-  `{profileId, ageBracket, flow, tutorModel, conversationLanguage}` — and
-  **asserts the reply/learner text is NOT in the emitted metric** (data-min).
-  Verdict `null` (degraded) → emits `judge.degraded`, no `judge.verdict`.
-- GREEN: minimal handler mirroring `ask-silent-classify.ts`.
+**Step 5 — Inngest handler** (`functions/judge-suitability.ts`)
+- **PII egress (the load-bearing reason this is an integration test, not a unit
+  test):** the event carries opaque `session_events` row ids, never text. The
+  handler rehydrates the reply + the preceding learner message from the DB
+  (scoped by `profileId`) and runs the judge **inside one `step.run` closure**, so
+  the raw text stays a local variable and only the non-PII verdict projection
+  (`overall` + `flags`) ever crosses the Inngest step boundary into its
+  third-party state store. Mirrors `review-calibration-grade.ts`'s
+  `rehydrate-and-grade` single-closure pattern (WI-620).
+- **Test = integration** (`tests/integration/judge-suitability.integration.test.ts`,
+  real stg DB; LLM mocked at the provider registry — the blessed external
+  boundary). Seed a profile + subject + `learning_session` + two `session_events`
+  rows (one `ai_response` reply, one `user_message` preceding); build the event
+  with those row ids; register an `anthropic` provider returning a verdict JSON
+  (the judge routes vendor-independent of a `gemini` tutor → `anthropic`); invoke
+  the bare `handleSuitabilityJudge`.
+- RED:
+  - the handler rehydrates from `session_events` and returns the parsed verdict
+    projection `{ judged: true, overall, flags }` (NOT the raw text);
+  - **`JSON.stringify(result)` contains neither the reply text nor the learner
+    message text** (data-min) — and carries no `rationale`;
+  - a missing/non-matching `replyEventId` → `{ skipped: 'reply_not_found' }` (no judge call);
+  - judge returns `null` (provider throws / non-JSON) → `{ degraded: true }`, no verdict projection;
+  - invalid event payload (`safeParse` fail) → `{ skipped: 'invalid_payload' }`, no DB read.
+- GREEN: minimal handler — `safeParse` → rehydrate-and-judge in one `step.run`
+  closure → `logger.info('[judge-suitability] verdict', { metric: 'judge.verdict',
+  overall, flags, profileId, ageBracket, flow, tutorModel, conversationLanguage })`
+  (or `logger.warn(… 'judge.degraded' …)`) → return the non-PII projection.
+  Register `suitabilityJudge` in `inngest/index.ts` (export + `functions[]`).
+  Emitting the metric as a **logger line** (not a new Inngest event) keeps the
+  only new event — `app/judge.suitability_requested` — covered by its Step-6
+  dispatcher + this handler, so no orphan-event guard escape is needed.
 
-**Step 6 — dispatch gating** (`dispatchSuitabilityJudge` in session-exchange/exchanges)
-  — mock the Inngest `send`
-- RED: flag-off → no send (even for under-18). flag-on + under-18 → exactly one
-  send; payload carries reply + preceding message only. flag-on + adult + rng
-  above sample → no send; adult + rng below sample → send. Dispatch uses
-  `safeSend` (a send failure does not throw into the exchange — break-test:
-  send rejects, exchange result still returns).
-- GREEN: minimal gated dispatch behind `isJudgeFrameworkEnabled()`.
+**Step 6 — dispatch gating** — DONE. Split into a pure resolver + a thin wrapper
+so the gating decision is deterministically unit-testable (no DB / clock / RNG in
+the decision):
+- **Pure resolver** `resolveSuitabilityJudgeDispatch(input)` in
+  `services/policy-engine/judge-dispatch.ts` (co-located `judge-dispatch.test.ts`,
+  11 cases, RED→GREEN). Returns the `SuitabilityJudgeRequestedEvent` or `null`.
+  Gating: flag off → null; no `replyEventId` (reply not persisted → no PII-safe
+  ref) → null; missing tutor vendor/model → null; otherwise `computeAgeBracket`
+  (unknown age → conservative `'child'`) feeds `shouldJudge(ageBracket, rng)`
+  (under-18 = full coverage, adult sampled). `rng` + `timestamp` are injected.
+- **Wrapper** `maybeDispatchSuitabilityJudge(input)` in `session-exchange.ts`
+  injects `Math.random()` + `new Date().toISOString()`, then dispatches the
+  resolver's event via `safeSend` (calibration telemetry — a send failure is
+  captured in Sentry, never thrown into the exchange). Dispatch-seam test
+  `session-exchange-judge-dispatch.test.ts` (6 cases): flag-off→0 send,
+  under-18→1 send, adult sampling in/out, opaque-ids-only payload, safeSend
+  no-throw (spies the real `inngest.send` — external boundary).
+- **Wiring:** `judgeFrameworkEnabled?: boolean` option added to `processMessage`
+  + `streamMessage`; the wrapper is called at both reply-persisted sites (after
+  `maybeDispatchReviewCalibration`, inside `if (persisted.persistedUserMessage)`)
+  mapping `replyEventId=persisted.aiEventId`,
+  `precedingLearnerMessageEventId=persisted.userMessageEventId`,
+  `tutorVendor=result.provider`, `tutorModel=result.model`,
+  `birthYear/conversationLanguage` from `context`, `flow=context.effectiveMode`.
+  `routes/sessions.ts` reads `isJudgeFrameworkEnabled(c.env.JUDGE_FRAMEWORK_ENABLED)`
+  and threads it at all four `processMessage`/`streamMessage` call sites
+  (mirroring `challengeRoundRuntimeEnabled`); the binding is declared on both env
+  types (`index.ts`, `routes/sessions.ts`).
+- Flag default `false` → zero behaviour change, proven by the 96 existing
+  session-exchange unit tests staying green.
 
 ## Verification gates (before "done")
 

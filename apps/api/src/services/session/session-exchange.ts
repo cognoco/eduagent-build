@@ -111,6 +111,7 @@ import {
   loadPriorSessionMeta,
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
+import { resolveSuitabilityJudgeDispatch } from '../policy-engine/judge-dispatch';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
 import {
   recordPracticeActivityEvent,
@@ -1289,6 +1290,52 @@ export async function maybeDispatchReviewCalibration(
       profileId,
       sessionId: session.id,
       topicId: session.topicId,
+    },
+  );
+}
+
+/**
+ * Post-display suitability-judge dispatch (MMT-ADR-0016 §3/§7 phase 4).
+ *
+ * Fires AFTER the tutor reply is persisted so the event references the opaque
+ * `replyEventId` (session_events row id) instead of carrying the reply text
+ * across the Inngest trust boundary. The gating + payload shape is the pure
+ * {@link resolveSuitabilityJudgeDispatch}; this wrapper only injects the random
+ * draw + clock and dispatches via `safeSend` (calibration telemetry — a
+ * dispatch failure is captured in Sentry but never breaks the user's exchange).
+ *
+ * Default-off behind `JUDGE_FRAMEWORK_ENABLED`: when `enabled` is false the
+ * resolver returns null and nothing is sent (zero behaviour change).
+ */
+export async function maybeDispatchSuitabilityJudge(input: {
+  enabled: boolean;
+  profileId: string;
+  sessionId: string;
+  replyEventId: string | undefined;
+  precedingLearnerMessageEventId: string | undefined;
+  birthYear: number | null | undefined;
+  tutorVendor: string | undefined;
+  tutorModel: string | undefined;
+  flow: string;
+  conversationLanguage?: ConversationLanguage;
+}): Promise<void> {
+  const event = resolveSuitabilityJudgeDispatch({
+    ...input,
+    rng: Math.random(),
+    timestamp: new Date().toISOString(),
+  });
+  if (!event) return;
+
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/judge.suitability_requested',
+        data: event,
+      }),
+    'judge.suitability',
+    {
+      profileId: input.profileId,
+      sessionId: input.sessionId,
     },
   );
 }
@@ -2995,6 +3042,7 @@ export async function processMessage(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     identityV2Enabled?: boolean;
+    judgeFrameworkEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -3187,6 +3235,21 @@ export async function processMessage(
       context.topicTitle,
       persisted.userMessageEventId,
     );
+    // [MMT-ADR-0016 §7 phase 4] Post-display suitability judge — references the
+    // opaque reply row id, never the reply text. Default-off behind
+    // JUDGE_FRAMEWORK_ENABLED; no-op when the flag is off or not sampled.
+    await maybeDispatchSuitabilityJudge({
+      enabled: options?.judgeFrameworkEnabled === true,
+      profileId,
+      sessionId: session.id,
+      replyEventId: persisted.aiEventId,
+      precedingLearnerMessageEventId: persisted.userMessageEventId,
+      birthYear: context.birthYear,
+      tutorVendor: result.provider,
+      tutorModel: result.model,
+      flow: context.effectiveMode ?? 'exchange',
+      conversationLanguage: context.conversationLanguage,
+    });
   }
 
   // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
@@ -3241,6 +3304,7 @@ export async function streamMessage(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     identityV2Enabled?: boolean;
+    judgeFrameworkEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -3531,6 +3595,20 @@ export async function streamMessage(
           context.topicTitle,
           persisted.userMessageEventId,
         );
+        // [MMT-ADR-0016 §7 phase 4] Post-display suitability judge — opaque
+        // reply row id only; default-off behind JUDGE_FRAMEWORK_ENABLED.
+        await maybeDispatchSuitabilityJudge({
+          enabled: options?.judgeFrameworkEnabled === true,
+          profileId,
+          sessionId: session.id,
+          replyEventId: persisted.aiEventId,
+          precedingLearnerMessageEventId: persisted.userMessageEventId,
+          birthYear: context.birthYear,
+          tutorVendor: result.provider,
+          tutorModel: result.model,
+          flow: context.effectiveMode ?? 'exchange',
+          conversationLanguage: context.conversationLanguage,
+        });
       }
 
       // [#419] Apply the server-side hard cap for interview / onboarding flows,

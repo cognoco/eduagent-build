@@ -87,6 +87,7 @@ import {
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
+import { suitabilityJudge } from './functions/judge-suitability';
 import { topicProbeExtract } from './functions/topic-probe-extract';
 import { streakRecord } from './functions/streak-record';
 import { progressSummaryGeneration } from './functions/progress-summary';
@@ -181,6 +182,7 @@ export {
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
+  suitabilityJudge,
   topicProbeExtract,
   streakRecord,
   progressSummaryGeneration,
@@ -269,6 +271,7 @@ export const functions = [
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
+  suitabilityJudge,
   topicProbeExtract,
   streakRecord,
   progressSummaryGeneration,

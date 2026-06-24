@@ -622,6 +622,7 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    JUDGE_FRAMEWORK_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
