@@ -115,7 +115,7 @@ export function RecentSessionsList({
             }}
             className="bg-surface rounded-card p-4 mt-3"
             accessibilityLabel={t('parentView.index.viewSessionFrom', {
-              date: formatSessionDate(session.startedAt, i18n.language),
+              date: formatSessionDate(session.startedAt, i18n?.language),
             })}
             accessibilityRole="button"
             testID={`session-card-${session.sessionId}`}
@@ -123,11 +123,11 @@ export function RecentSessionsList({
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-body font-medium text-text-primary">
                 {session.homeworkSummary?.displayTitle ??
-                  formatSessionDate(session.startedAt, i18n.language)}
+                  formatSessionDate(session.startedAt, i18n?.language)}
               </Text>
               <Text className="text-caption text-text-secondary">
                 {session.homeworkSummary
-                  ? formatSessionDate(session.startedAt, i18n.language)
+                  ? formatSessionDate(session.startedAt, i18n?.language)
                   : session.sessionType}
               </Text>
             </View>

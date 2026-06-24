@@ -361,14 +361,14 @@ export default function TopicDetailScreen() {
               }
               className="bg-surface rounded-card p-4 mt-2"
               accessibilityLabel={t('parentView.topic.viewSessionFrom', {
-                date: formatSessionDate(session.startedAt, i18n.language),
+                date: formatSessionDate(session.startedAt, i18n?.language),
               })}
               accessibilityRole="button"
               testID={`session-card-${session.sessionId}`}
             >
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-body font-medium text-text-primary">
-                  {formatSessionDate(session.startedAt, i18n.language)}
+                  {formatSessionDate(session.startedAt, i18n?.language)}
                 </Text>
                 <Text className="text-caption text-text-secondary">
                   {session.sessionType}

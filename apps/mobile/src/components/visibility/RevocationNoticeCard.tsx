@@ -19,7 +19,7 @@ export function RevocationNoticeCard({
       </Text>
       <Text className="mt-2 text-body text-text-secondary">
         {t('visibility.revocation.message', {
-          graceEndsAt: formatShortDate(notice.graceEndsAt, i18n.language),
+          graceEndsAt: formatShortDate(notice.graceEndsAt, i18n?.language),
         })}
       </Text>
     </View>

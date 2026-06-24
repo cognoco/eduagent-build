@@ -76,12 +76,12 @@ export function LatestReportCard({
             onPress={onOpen}
             accessibilityRole="button"
             accessibilityLabel={t('progress.latestReport.openWithDate', {
-              date: formatReportDate(latestReport, i18n.language),
+              date: formatReportDate(latestReport, i18n?.language),
             })}
             testID="progress-latest-report-card"
           >
             <Text className="text-body-sm text-text-secondary">
-              {formatReportDate(latestReport, i18n.language)}
+              {formatReportDate(latestReport, i18n?.language)}
             </Text>
             <Text className="text-h2 font-bold text-text-primary mt-2">
               {latestReport.report.headlineStat.value}{' '}

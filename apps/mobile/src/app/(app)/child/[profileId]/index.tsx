@@ -849,7 +849,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt, t);
-  const joinedLabel = formatJoinedDate(ownedProfile?.createdAt, i18n.language);
+  const joinedLabel = formatJoinedDate(ownedProfile?.createdAt, i18n?.language);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
     (option) => option.mode === (learnerProfile?.accommodationMode ?? 'none'),
   );

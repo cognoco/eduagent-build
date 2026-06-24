@@ -699,7 +699,7 @@ export default function CreateProfileScreen() {
               style={birthDate ? undefined : { color: colors.muted }}
             >
               {birthDate
-                ? formatDateForDisplay(birthDate, i18n.language)
+                ? formatDateForDisplay(birthDate, i18n?.language)
                 : isAddingChild
                   ? t('createProfile.selectChildDob')
                   : t('createProfile.selectDob')}

@@ -788,7 +788,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   {t('subscription.trial.endsAt', {
                     date: formatShortDate(
                       subscription.trialEndsAt,
-                      i18n.language,
+                      i18n?.language,
                       {
                         year: 'numeric',
                         month: 'long',
@@ -841,7 +841,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   ? t('subscription.accessUntil', {
                       date: formatShortDate(
                         subscription.currentPeriodEnd,
-                        i18n.language,
+                        i18n?.language,
                         {
                           year: 'numeric',
                           month: 'long',
@@ -852,7 +852,7 @@ function SubscriptionContent(): React.ReactElement | null {
                   : t('subscription.renewsOn', {
                       date: formatShortDate(
                         subscription.currentPeriodEnd,
-                        i18n.language,
+                        i18n?.language,
                         {
                           year: 'numeric',
                           month: 'long',
@@ -920,7 +920,7 @@ function SubscriptionContent(): React.ReactElement | null {
                 {t('subscription.endingBody', {
                   date: formatShortDate(
                     subscription.currentPeriodEnd,
-                    i18n.language,
+                    i18n?.language,
                     {
                       year: 'numeric',
                       month: 'long',

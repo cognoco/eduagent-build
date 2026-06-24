@@ -205,7 +205,7 @@ export function ReportsList({
         onPressMonthly={onPressMonthly}
         onPressWeekly={onPressWeekly}
         t={t}
-        locale={i18n.language}
+        locale={i18n?.language}
       />
     ),
     [
@@ -214,7 +214,7 @@ export function ReportsList({
       onPressMonthly,
       onPressWeekly,
       t,
-      i18n.language,
+      i18n?.language,
     ],
   );
 

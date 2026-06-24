@@ -269,7 +269,7 @@ function ArchiveCard({
   const meta = [
     item.topicTitle,
     item.typeLabel,
-    formatInlineDate(item.date, i18n.language),
+    formatInlineDate(item.date, i18n?.language),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -377,8 +377,8 @@ export default function MyNotesListScreen(): React.ReactElement {
   }, [bookmarksQuery.data, kind, notesQuery.data, sessionsQuery.data, t]);
 
   const items = useMemo(
-    () => rawItems.filter((item) => matchesQuery(item, query, i18n.language)),
-    [query, rawItems, i18n.language],
+    () => rawItems.filter((item) => matchesQuery(item, query, i18n?.language)),
+    [query, rawItems, i18n?.language],
   );
   const rows = useMemo(
     () => groupItems(items, groupMode, relativeDate),

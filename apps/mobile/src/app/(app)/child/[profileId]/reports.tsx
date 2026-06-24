@@ -93,7 +93,7 @@ function ReportsHeaderSummary({
           {formatReportWeek(
             latestReport.reportWeek,
             t('guardian.latestWeekFallback'),
-            i18n.language,
+            i18n?.language,
           )}
         </Text>
         {showNewBadge ? (
@@ -376,7 +376,7 @@ export default function ChildReportsScreen(): React.ReactElement {
         {(() => {
           const { date, timeContext } = getNextReportInfo(
             new Date(),
-            i18n.language,
+            i18n?.language,
           );
           return (
             <Text

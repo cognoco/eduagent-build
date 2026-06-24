@@ -347,8 +347,8 @@ export default function SubjectTopicsScreen() {
                   className="bg-surface rounded-card p-4 mt-3"
                   accessibilityRole="button"
                   accessibilityLabel={t('parentView.subjects.viewSessionFrom', {
-                    date: formatSessionDate(session.startedAt, i18n.language),
-                    defaultValue: `View session from ${formatSessionDate(session.startedAt, i18n.language)}`,
+                    date: formatSessionDate(session.startedAt, i18n?.language),
+                    defaultValue: `View session from ${formatSessionDate(session.startedAt, i18n?.language)}`,
                   })}
                   testID={`subject-session-card-${session.sessionId}`}
                 >
@@ -357,10 +357,10 @@ export default function SubjectTopicsScreen() {
                       <Text className="text-body font-semibold text-text-primary">
                         {session.topicTitle ??
                           session.displayTitle ??
-                          formatSessionDate(session.startedAt, i18n.language)}
+                          formatSessionDate(session.startedAt, i18n?.language)}
                       </Text>
                       <Text className="text-caption text-text-secondary mt-1">
-                        {formatSessionDate(session.startedAt, i18n.language)}
+                        {formatSessionDate(session.startedAt, i18n?.language)}
                         {duration ? ` - ${duration}` : ''}
                       </Text>
                       {session.highlight ? (

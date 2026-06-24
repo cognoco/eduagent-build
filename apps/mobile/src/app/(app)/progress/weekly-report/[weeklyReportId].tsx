@@ -100,7 +100,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
                 ? formatWeeklyReportRange(
                     report.reportData.weekStart,
                     t('parentView.weeklyReport.weeklyReport'),
-                    i18n.language,
+                    i18n?.language,
                   )
                 : t('parentView.weeklyReport.weeklyReport')}
             </Text>
