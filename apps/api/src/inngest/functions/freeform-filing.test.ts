@@ -2,6 +2,7 @@
 // Freeform Filing Retry — Tests [F-5]
 // ---------------------------------------------------------------------------
 
+import { ZodError } from 'zod';
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
 const col = (name: string) => ({ name });
@@ -199,6 +200,23 @@ function createEventData(
 // ---------------------------------------------------------------------------
 
 describe('freeformFilingRetry', () => {
+  // -------------------------------------------------------------------------
+  // [WI-996] Regression: schema parse must reject invalid payloads immediately
+  // -------------------------------------------------------------------------
+
+  it('[WI-996] throws ZodError synchronously when profileId is not a UUID', async () => {
+    // With the `as` cast, an invalid profileId would pass through silently.
+    // With filingRetryEventSchema.parse(), it must throw a ZodError at the
+    // function boundary before any step.run() is called.
+    await expect(
+      executeSteps({
+        profileId: 'not-uuid',
+        sessionId: testSessionId,
+        sessionMode: 'freeform',
+      }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     // Re-establish the default session row after clearAllMocks wipes implementations.

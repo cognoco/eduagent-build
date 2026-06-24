@@ -103,6 +103,17 @@ describe('filing lifecycle Inngest event schemas', () => {
     ).toThrow();
   });
 
+  it('[WI-996] filingRetryEventSchema defaults sessionMode to freeform when omitted (backward-compat for in-flight events)', () => {
+    // Old dispatches before WI-996 did not include sessionMode; without
+    // .default('freeform') they would throw ZodError on every retry and be
+    // permanently dead-lettered.
+    const parsed = filingRetryEventSchema.parse({
+      profileId: validUuid,
+      sessionId: validUuid,
+    });
+    expect(parsed.sessionMode).toBe('freeform');
+  });
+
   it('accepts retry, retry-completed, and resolved payloads', () => {
     expect(() =>
       filingRetryEventSchema.parse({
