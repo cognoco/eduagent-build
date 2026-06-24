@@ -71,8 +71,8 @@ export function CelestialCelebration({
     <Animated.View
       style={[styles.container, animatedStyle, { pointerEvents: 'none' }]}
       testID={testID}
-      accessibilityRole="image"
-      accessibilityLabel="Celebration animation"
+      accessibilityElementsHidden={true}
+      importantForAccessibility="no-hide-descendants"
     >
       <Svg width={180} height={180} viewBox="0 0 180 180">
         <Circle cx="90" cy="90" r="26" fill={color} opacity="0.12" />
