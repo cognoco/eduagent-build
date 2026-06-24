@@ -51,7 +51,11 @@ export type ContextualQuickChipId = Exclude<
   'switch_topic' | 'park' | 'wrong_subject'
 >;
 
-export type MessageFeedbackState = 'helpful' | 'not_helpful' | 'incorrect';
+// [WI-982] Re-export from shared schema contract so mobile and API share a
+// single source of truth. Before this change both defined the union locally;
+// the API's strict z.discriminatedUnion now validates .value against
+// messageFeedbackStateSchema, so any drift would produce silent 400s.
+export type { MessageFeedbackState } from '@eduagent/schemas';
 
 export interface PendingSubjectResolution {
   originalText: string;
