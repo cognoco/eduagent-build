@@ -10,6 +10,7 @@ import {
   accountDeletionResponseSchema,
   accountDeletionStatusResponseSchema,
   cancelDeletionResponseSchema,
+  dataExportAssessmentRowSchema,
   dataExportConsentSchema,
   dataExportRowSchema,
   dataExportSchema,
@@ -117,12 +118,14 @@ describe('account schemas', () => {
   });
 
   describe('[BUG-206] dataExportRowSchema centralisation', () => {
-    it('per-table aliases all reference the canonical row schema', () => {
-      // Today they share the same instance; a future PR may tighten any of
-      // them independently. This assertion documents the current ratchet
-      // state — change it when an alias is genuinely narrowed.
+    it('deferred per-table aliases still reference the canonical row schema', () => {
+      // Only non-tightened (deferred) aliases stay as dataExportRowSchema.
+      // [WI-978] subscriptions + assessments have been tightened to real z.object
+      // schemas — they are intentionally NOT toBe(dataExportRowSchema) any more.
       expect(dataExportSubjectRowSchema).toBe(dataExportRowSchema);
-      expect(dataExportSubscriptionRowSchema).toBe(dataExportRowSchema);
+      // Verify the tightened schemas are distinct (not the stub):
+      expect(dataExportSubscriptionRowSchema).not.toBe(dataExportRowSchema);
+      expect(dataExportAssessmentRowSchema).not.toBe(dataExportRowSchema);
     });
 
     it('dataExportRowSchema accepts an arbitrary object row', () => {
@@ -156,14 +159,99 @@ describe('account schemas', () => {
     });
 
     it('accepts subjects/subscriptions/quotaPools arrays', () => {
+      // [WI-978] subscriptions now uses the tightened dataExportSubscriptionRowSchema;
+      // the payload must match the real schema (not an arbitrary record).
+      // Nullable fields must be explicitly null (not undefined) — DB nullable
+      // columns return null, not undefined.
       const result = dataExportSchema.safeParse({
         account: { email: 'user@example.com', createdAt: ISO },
         profiles: [],
         consentStates: [],
         subjects: [{ id: UUID, name: 'Math' }],
-        subscriptions: [{ tier: 'free' }],
+        subscriptions: [
+          {
+            id: UUID,
+            accountId: UUID,
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+            tier: 'free',
+            status: 'active',
+            trialEndsAt: null,
+            currentPeriodStart: null,
+            currentPeriodEnd: null,
+            cancelledAt: null,
+            lastStripeEventTimestamp: null,
+            lastStripeEventId: null,
+            revenuecatOriginalAppUserId: null,
+            lastRevenuecatEventId: null,
+            lastRevenuecatEventTimestampMs: null,
+            createdAt: ISO,
+            updatedAt: ISO,
+          },
+        ],
         quotaPools: [{ pool: 'free' }],
         exportedAt: ISO,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('[WI-978] tightened subscription schema rejects partial/arbitrary rows', () => {
+      // A bare { tier: 'free' } that the old z.record stub accepted must now fail.
+      const result = dataExportSubscriptionRowSchema.safeParse({
+        tier: 'free',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-978] tightened subscription schema accepts a valid minimal row', () => {
+      // Nullable fields must be explicitly null (DB nullable columns return null,
+      // not undefined; .nullable() rejects undefined).
+      const result = dataExportSubscriptionRowSchema.safeParse({
+        id: UUID,
+        accountId: UUID,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        tier: 'free',
+        status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        lastStripeEventTimestamp: null,
+        lastStripeEventId: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
+        createdAt: ISO,
+        updatedAt: ISO,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('[WI-978] tightened assessment schema rejects partial rows', () => {
+      // A bare { profileId: UUID } that the old z.record accepted must now fail.
+      const result = dataExportAssessmentRowSchema.safeParse({
+        profileId: UUID,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('[WI-978] tightened assessment schema accepts a valid minimal row', () => {
+      // Nullable fields must be explicitly null (DB nullable columns return null,
+      // not undefined; .nullable() rejects undefined). verificationDepth and
+      // exchangeHistory have .default() so they can be omitted (defaults apply).
+      const result = dataExportAssessmentRowSchema.safeParse({
+        id: UUID,
+        profileId: UUID,
+        subjectId: UUID,
+        topicId: UUID,
+        sessionId: null,
+        status: 'passed',
+        masteryScore: null,
+        masteryChallengeVerifiedAt: null,
+        qualityRating: null,
+        createdAt: ISO,
+        updatedAt: ISO,
       });
       expect(result.success).toBe(true);
     });
