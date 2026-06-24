@@ -6,6 +6,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { NotFoundError } from '@eduagent/schemas';
+import { z } from 'zod';
 import type {
   ConversationLanguage,
   HomeworkProblem,
@@ -42,6 +43,24 @@ Rules:
 - "independentProblemCount" means they mostly checked or completed it independently.
 - Never mention private or sensitive details.
 - If skill names are uncertain, use broader academic phrases like "fractions" or "linear equations".`;
+
+// [WI-993] Lenient object schema for the homework-summary LLM response.
+// Replaces an ad-hoc `JSON.parse(...) as Partial<HomeworkSummary>` cast. The
+// schema ONLY validates that the parsed JSON is an object (not a string,
+// array, null, etc.) — every field is `unknown` so a single wrong-typed field
+// never fails the whole parse. The original per-field graceful-degradation
+// semantics are then preserved verbatim by the `typeof` guards in the merge
+// below: each valid field is kept (any finite `problemCount`, including
+// negatives), each missing/invalid one falls back. This keeps a good summary
+// even if one numeric field is off, rather than dropping the whole object.
+const homeworkSummaryLenientSchema = z.object({
+  problemCount: z.unknown(),
+  practicedSkills: z.unknown(),
+  independentProblemCount: z.unknown(),
+  guidedProblemCount: z.unknown(),
+  summary: z.unknown(),
+  displayTitle: z.unknown(),
+});
 
 function getSessionMetadata(metadata: unknown): SessionMetadata {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
@@ -98,7 +117,15 @@ export function parseHomeworkSummaryResponse(
       return fallback;
     }
 
-    const parsed = JSON.parse(jsonStr) as Partial<HomeworkSummary>;
+    const parseResult = homeworkSummaryLenientSchema.safeParse(
+      JSON.parse(jsonStr),
+    );
+    if (!parseResult.success) {
+      return fallback;
+    }
+    const parsed = parseResult.data;
+    // Per-field graceful degradation: keep each valid field, substitute the
+    // fallback only for missing/invalid ones (preserves the original behavior).
     return {
       problemCount:
         typeof parsed.problemCount === 'number'

@@ -217,11 +217,34 @@ export async function previewCurriculumTopic(
       return fallbackTopicPreview(subjectName, trimmedTitle);
     }
 
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    // [WI-993] Replace `JSON.parse(jsonStr) as Record<string, unknown>` with a
+    // lenient Zod parse: the schema only enforces that the JSON is an object
+    // with well-typed (optional) fields. The original defaulting + clamping
+    // semantics are PRESERVED below — a partial / out-of-range response still
+    // produces the same defaulted/clamped preview it did before; only a
+    // genuinely non-object response hits the fallback at this step.
+    const curriculumTopicPreviewLlmSchema = z.object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      estimatedMinutes: z.number().optional(),
+    });
+    const parseResult = curriculumTopicPreviewLlmSchema.safeParse(
+      JSON.parse(jsonStr),
+    );
+    if (!parseResult.success) {
+      logger.warn('curriculum.preview_topic.invalid_shape', {
+        subjectName: sanitizeXmlValue(subjectName, 120),
+        rawTitle: sanitizeXmlValue(trimmedTitle, 120),
+        zodError: parseResult.error.flatten(),
+      });
+      return fallbackTopicPreview(subjectName, trimmedTitle);
+    }
+
+    const parsed = parseResult.data;
     const preview = {
-      title: String(parsed.title ?? trimmedTitle).trim(),
-      description: String(parsed.description ?? '').trim(),
-      estimatedMinutes: Number(parsed.estimatedMinutes ?? 30),
+      title: (parsed.title ?? trimmedTitle).trim(),
+      description: (parsed.description ?? '').trim(),
+      estimatedMinutes: parsed.estimatedMinutes ?? 30,
     };
 
     if (
