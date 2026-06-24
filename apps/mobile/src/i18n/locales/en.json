@@ -337,6 +337,7 @@
     },
     "parent": {
       "greeting": "Hey {{displayName}}",
+      "greetingNoName": "Hey there!",
       "accountLink": "Open account",
       "tonight": {
         "promptWithTopic": "What felt clearer in {{topic}} this week?",

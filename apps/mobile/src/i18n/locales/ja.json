@@ -401,7 +401,8 @@
         "accessibilityLabel": "家族に学習者を追加する"
       },
       "childProfileLabel": "{{name}}のプロフィール",
-      "greetingFallbackName": "こんにちは"
+      "greetingFallbackName": "こんにちは",
+      "greetingNoName": "こんにちは！"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",

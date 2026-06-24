@@ -407,7 +407,8 @@
         "accessibilityLabel": "Dodaj ucznia do swojej rodziny"
       },
       "childProfileLabel": "Profil {{name}}",
-      "greetingFallbackName": "Cześć"
+      "greetingFallbackName": "Cześć",
+      "greetingNoName": "Cześć!"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
