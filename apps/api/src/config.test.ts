@@ -611,6 +611,7 @@ describe('validateProductionBindings', () => {
     API_ORIGIN: 'https://api.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
+    SUPPORT_EMAIL: 'support@mentomate.com',
     CONSENT_POLICY_VERSION: '2026-05-31',
     EMPTY_REPLY_GUARD_ENABLED: 'true',
     RETENTION_PURGE_ENABLED: 'false',

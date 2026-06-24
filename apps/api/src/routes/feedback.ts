@@ -28,8 +28,6 @@ type FeedbackRouteEnv = {
   };
 };
 
-const DEFAULT_SUPPORT_EMAIL = 'support@mentomate.com';
-
 // SEC-03: In-memory sliding-window rate limit for feedback submissions.
 // 5 submissions per hour per user. Resets on worker restart — acceptable
 // for a low-volume endpoint; avoids adding a DB/KV dependency.
@@ -70,7 +68,9 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
     const body = c.req.valid('json');
     const profileId = c.get('profileId') ?? 'unknown';
     const env = c.env ?? {};
-    const supportTo = env.SUPPORT_EMAIL ?? DEFAULT_SUPPORT_EMAIL;
+    // SUPPORT_EMAIL is validated by envSchema (config.ts) with a default; fall
+    // back to the schema default inline in case the binding is absent in tests.
+    const supportTo = env.SUPPORT_EMAIL ?? 'support@mentomate.com';
 
     const categoryLabel =
       body.category === 'bug'

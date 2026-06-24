@@ -42,6 +42,7 @@ const envSchema = z.object({
   // Resend webhook signing secret (whsec_... format from Resend dashboard)
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().default('noreply@mentomate.com'),
+  SUPPORT_EMAIL: z.string().email().default('support@mentomate.com'),
 
   // [Bug #872] Parental consent policy version. Stored alongside each
   // consent_states row so we can answer "which policy version did the parent
