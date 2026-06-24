@@ -28,15 +28,30 @@ const providerErrorSchema = z.object({
 const chatChoiceSchema = z.object({
   message: z
     .object({
-      content: z.string().nullable().optional(),
+      // Vendors may return null for content (e.g. tool-use turns); callers
+      // gate on !content already, so coerce null → undefined to keep the
+      // inferred type as string | undefined and avoid TS2345 at call sites.
+      content: z
+        .string()
+        .nullable()
+        .optional()
+        .transform((v) => v ?? undefined),
     })
     .optional(),
   delta: z
     .object({
-      content: z.string().nullable().optional(),
+      content: z
+        .string()
+        .nullable()
+        .optional()
+        .transform((v) => v ?? undefined),
     })
     .optional(),
-  finish_reason: z.string().nullable().optional(),
+  finish_reason: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => v ?? undefined),
 });
 
 // ---------------------------------------------------------------------------
