@@ -79,10 +79,17 @@ function getServerDate(): string {
  * Validates that the client-supplied localDate is within ±1 day of server UTC.
  * Returns null if the date is acceptable, or an error message string if not.
  */
-function validateLocalDate(localDate: string): string | null {
+// [WI-921] Exported for unit testing. Internal to this module at runtime.
+export function validateLocalDate(localDate: string): string | null {
   const serverDate = getServerDate();
   const serverDateMs = new Date(serverDate).getTime();
   const clientDateMs = new Date(localDate).getTime();
+  // [WI-921] NaN guard: new Date('invalid').getTime() returns NaN; NaN is never
+  // > 1 so without this check an unparseable localDate would silently pass
+  // validation and propagate as NaN into DB or arithmetic downstream.
+  if (isNaN(clientDateMs)) {
+    return `localDate "${localDate}" is not a valid date string.`;
+  }
   const diffDays =
     Math.abs(serverDateMs - clientDateMs) / (24 * 60 * 60 * 1000);
   if (diffDays > 1) {

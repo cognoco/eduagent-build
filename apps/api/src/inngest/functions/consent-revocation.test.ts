@@ -169,6 +169,10 @@ async function executeRevocation(
   eventData: {
     childProfileId: string;
     parentProfileId: string;
+    // [WI-973] revokedAt is now required by the schema. Tests that previously
+    // omitted it were exercising the old vacuous-pass path (the bug). All tests
+    // that represent "a legitimate revocation event" must supply a revokedAt.
+    // Tests that intentionally omit it are in the WI-973 regression suite.
     revokedAt?: string;
   },
   stepOptions?: InngestStepRunnerOptions,
@@ -237,6 +241,7 @@ describe('consentRevocation', () => {
     const { runner } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(runner.sleepCalls).toEqual(
@@ -251,6 +256,7 @@ describe('consentRevocation', () => {
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
@@ -276,6 +282,7 @@ describe('consentRevocation', () => {
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
@@ -290,6 +297,7 @@ describe('consentRevocation', () => {
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
@@ -322,6 +330,7 @@ describe('consentRevocation', () => {
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
@@ -356,6 +365,7 @@ describe('consentRevocation', () => {
       const { result, runner } = await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-001',
+        revokedAt: '2026-01-15T00:00:00.000Z',
       });
 
       expect(result).toEqual({
@@ -429,14 +439,15 @@ describe('consentRevocation', () => {
     const { result } = await executeRevocation({
       childProfileId: 'child-boundary',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(result).toEqual({
       status: 'deleted',
       childProfileId: 'child-boundary',
     });
-    // [F-093] real DELETE SQL carries the account guard; revokedAt absent in
-    // this test path so the generation predicate (responded_at) must be absent.
+    // [F-093] real DELETE SQL carries the account guard. revokedAt is now
+    // required by the schema (WI-973), so responded_at appears in the SQL.
     const deleteSql = findProfileDeleteSql();
     expect(deleteSql).toBeDefined();
     expect(deleteSql).toContain('child-boundary');
@@ -444,7 +455,7 @@ describe('consentRevocation', () => {
       'account_id = (select account_id from profiles where id =',
     );
     expect(deleteSql).toContain('parent-001');
-    expect(deleteSql).not.toContain('responded_at');
+    expect(deleteSql).toContain('responded_at');
   });
 
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
@@ -458,6 +469,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-dup',
         parentProfileId: 'parent-001',
+        revokedAt: '2026-01-15T00:00:00.000Z',
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
@@ -484,6 +496,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-dup',
+        revokedAt: '2026-01-15T00:00:00.000Z',
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
@@ -510,6 +523,7 @@ describe('consentRevocation', () => {
       const { result } = await executeRevocation({
         childProfileId: 'child-dup',
         parentProfileId: 'parent-dup',
+        revokedAt: '2026-01-15T00:00:00.000Z',
       });
 
       // Function still completes through the pipeline (deletion still runs).
@@ -539,6 +553,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-001',
+        revokedAt: '2026-01-15T00:00:00.000Z',
       });
 
       expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
@@ -562,6 +577,7 @@ describe('archive path — auto preference, age 14', () => {
     const { result, runner } = await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(result).toEqual({ status: 'archived', childProfileId: 'child-014' });
@@ -599,6 +615,7 @@ describe('archive path — auto preference, age 14', () => {
     await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'coparent-profile-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(mockRecordPendingNotice).toHaveBeenCalledWith(
@@ -621,6 +638,7 @@ describe('archive path — auto preference, age 14', () => {
     await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
@@ -691,6 +709,7 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
       childProfileId: 'child-001',
       // Event sender is the co-parent, NOT the account owner.
       parentProfileId: 'coparent-profile-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     expect(mockRecordPendingNotice).toHaveBeenCalledWith(
@@ -716,6 +735,7 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'coparent-profile-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
     });
 
     // Exactly one call: inside `choose-final-action`, before any mutation.
@@ -769,7 +789,11 @@ describe('memoized step-state PII break test [F-088]', () => {
     ).fn;
     const result = await handler({
       event: {
-        data: { childProfileId: 'child-001', parentProfileId: 'parent-001' },
+        data: {
+          childProfileId: 'child-001',
+          parentProfileId: 'parent-001',
+          revokedAt: '2026-01-15T00:00:00.000Z',
+        },
         name: 'app/consent.revoked',
       },
       step: recordingStep,
@@ -831,5 +855,48 @@ describe('memoized step-state PII break test [F-088]', () => {
         body: expect.stringContaining('Liam'),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-973] Regression: malformed app/consent.revoked events must throw
+// NonRetriableError and must NOT reach the deletion path.
+// ---------------------------------------------------------------------------
+
+import { NonRetriableError } from 'inngest';
+
+describe('[WI-973] malformed consent.revoked payload — NonRetriableError guard', () => {
+  it('throws NonRetriableError when revokedAt is omitted, and does NOT call deleteProfileIfConsentWithdrawn', async () => {
+    await expect(
+      executeRevocation({
+        childProfileId: 'child-001',
+        parentProfileId: 'parent-001',
+        // revokedAt intentionally omitted — this is the malformed case
+      }),
+    ).rejects.toThrow(NonRetriableError);
+
+    // Deletion must NOT have been reached.
+    expect(findProfileDeleteSql()).toBeUndefined();
+  });
+
+  it('throws NonRetriableError when childProfileId is absent', async () => {
+    const runner = createInngestStepRunner();
+    const handler = (
+      consentRevocation as unknown as { fn: (ctx: unknown) => Promise<unknown> }
+    ).fn;
+    await expect(
+      handler({
+        event: {
+          data: {
+            parentProfileId: 'parent-001',
+            revokedAt: '2026-01-10T10:00:00.000Z',
+          },
+          name: 'app/consent.revoked',
+        },
+        step: runner.step,
+      }),
+    ).rejects.toThrow(NonRetriableError);
+
+    expect(findProfileDeleteSql()).toBeUndefined();
   });
 });

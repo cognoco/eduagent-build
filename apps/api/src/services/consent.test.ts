@@ -871,7 +871,10 @@ describe('getConsentStatus', () => {
 });
 
 describe('isConsentRevocationGenerationCurrent', () => {
-  it('returns true when latest GDPR state is withdrawn and revokedAt is omitted', async () => {
+  it('[WI-973] returns false when revokedAt is omitted — prevents vacuous cascade-delete authorization', async () => {
+    // Before WI-973 fix this returned true (the bug): a missing revokedAt could
+    // not confirm the generation, so returning true vacuously authorised
+    // cascade child-profile deletion on malformed/replayed events.
     const db = createMockDb({
       findFirstResult: mockConsentRow({
         status: 'WITHDRAWN',
@@ -884,7 +887,7 @@ describe('isConsentRevocationGenerationCurrent', () => {
         db,
         '550e8400-e29b-41d4-a716-446655440000',
       ),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
   });
 
   it('returns true when the current GDPR withdrawal has the same respondedAt as the event generation', async () => {

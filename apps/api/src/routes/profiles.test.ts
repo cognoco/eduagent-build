@@ -36,12 +36,14 @@ jest.mock('../services/identity-v2/profile-v2', () => {
     ...actual,
     listProfilesV2: jest.fn(),
     getOwnerProfileV2: jest.fn(),
+    getPersonScope: jest.fn(),
   };
 });
 
 // GC1 Pattern A: requireActual + targeted override (real orchestrator covered by
 // child-profile-v2.integration.test.ts; route tests only stub createChildProfileV2).
 jest.mock('../services/identity-v2/child-profile-v2', () => {
+  // gc1-allow: unit-route isolation; real orchestrator covered by child-profile-v2.integration.test.ts
   const actual = jest.requireActual(
     '../services/identity-v2/child-profile-v2',
   ) as typeof import('../services/identity-v2/child-profile-v2');
@@ -55,6 +57,7 @@ jest.mock('../services/identity-v2/child-profile-v2', () => {
 // by identity-graph integration tests; route tests only observe whether the
 // pre-graph branch reaches createIdentityGraph).
 jest.mock('../services/identity-v2/identity-graph', () => {
+  // gc1-allow: unit-route isolation; real graph bootstrap covered by identity-graph integration tests
   const actual = jest.requireActual(
     '../services/identity-v2/identity-graph',
   ) as typeof import('../services/identity-v2/identity-graph');
@@ -105,7 +108,7 @@ const PROFILE_ID_B = 'a0000000-0000-4000-a000-000000000011';
 import type { ProfileMeta } from '../middleware/profile-scope';
 
 type TestEnv = {
-  Bindings: { DATABASE_URL: string };
+  Bindings: { DATABASE_URL: string; OWNER_ELEVATION_GATE_ENABLED?: string };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -120,10 +123,19 @@ function makeApp(overrides?: {
   isOwner?: boolean;
   profileMeta?: ProfileMeta | null;
   profileId?: string;
+  user?: AuthUser & { factorVerificationAge?: [number, number] };
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
     c.set('db', {} as Database);
+    c.set(
+      'user',
+      overrides?.user ?? {
+        userId: 'user_test',
+        email: 'test@example.com',
+        emailVerified: true,
+      },
+    );
     c.set('account', {
       id: overrides?.accountId ?? ACCOUNT_ID,
       clerkUserId: 'user_test',
@@ -1296,7 +1308,10 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
 
 describe('POST /v1/profiles/switch', () => {
   it('returns 200 on successful switch', async () => {
-    switchProfileMock.mockResolvedValue({ profileId: PROFILE_ID_A });
+    switchProfileMock.mockResolvedValue({
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    });
 
     const res = await makeApp().request('/v1/profiles/switch', {
       method: 'POST',
@@ -1344,6 +1359,210 @@ describe('POST /v1/profiles/switch', () => {
 
     expect(res.status).toBe(400);
     expect(switchProfileMock).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK][WI-301] returns 403 OWNER_ELEVATION_REQUIRED when a non-owner switches to owner with stale fva', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_B,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+        factorVerificationAge: [120, -1],
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_A }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: 'OWNER_ELEVATION_REQUIRED',
+    });
+  });
+
+  it('[WI-301] returns 200 when a non-owner switches to owner with fresh fva', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_B,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+        factorVerificationAge: [1, -1],
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_A }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profileId: PROFILE_ID_A });
+  });
+
+  it('[WI-301] allows an explicit owner to switch to the owner profile without fresh fva', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_A,
+      profileMeta: {
+        isOwner: true,
+        birthYear: 1990,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'owner_user',
+        email: 'owner@example.com',
+        factorVerificationAge: [120, -1],
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_A }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profileId: PROFILE_ID_A });
+  });
+
+  it('[WI-301] allows a non-owner to switch to another non-owner without fva', async () => {
+    const childSwitchResult = {
+      profileId: PROFILE_ID_B,
+      isOwner: false,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(childSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_A,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_B }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profileId: PROFILE_ID_B });
+  });
+
+  it('[WI-301] fails closed when a non-owner switches to owner without fva', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_B,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_A }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      code: 'OWNER_ELEVATION_REQUIRED',
+    });
+  });
+
+  it('[WI-301] bypasses owner elevation when OWNER_ELEVATION_GATE_ENABLED is false', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      isOwner: true,
+    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
+    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_B,
+      profileMeta: {
+        isOwner: false,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+        factorVerificationAge: [120, -1],
+      },
+    }).request(
+      '/v1/profiles/switch',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: PROFILE_ID_A }),
+      },
+      { OWNER_ELEVATION_GATE_ENABLED: 'false' },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ profileId: PROFILE_ID_A });
   });
 });
 

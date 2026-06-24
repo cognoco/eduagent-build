@@ -1286,6 +1286,142 @@ describe('session routes', () => {
       const body = (await res.json()) as { code: string };
       expect(body.code).toBe('NOT_FOUND');
     });
+
+    // [WI-982] discriminated-union metadata guard — the metadata field must only
+    // contain the known keys per eventType (strict objects); unexpected keys are
+    // rejected before the DB write. The payloads below are the REAL shapes the
+    // mobile client sends (apps/mobile/src/components/session/use-session-actions.ts):
+    //   quick_action  → { chip, sourceMessageId? }
+    //   user_feedback → { value, eventId }
+    it('[WI-982] accepts quick_action with chip only (real client payload)', async () => {
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(recordSessionEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('[WI-982] accepts quick_action with chip + sourceMessageId (real client payload)', async () => {
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            content: 'too_easy',
+            metadata: { chip: 'too_easy', sourceMessageId: 'msg-123' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(recordSessionEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('[WI-982] accepts user_feedback with value + eventId (real client payload)', async () => {
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'user_feedback',
+            content: 'not_helpful',
+            metadata: { value: 'not_helpful', eventId: 'evt-456' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(recordSessionEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('[WI-982] returns 400 when user_feedback metadata.value is not a MessageFeedbackState', async () => {
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'user_feedback',
+            // 'maybe' is not in messageFeedbackStateSchema
+            metadata: { value: 'maybe', eventId: 'evt-456' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(recordSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('[WI-982] returns 400 when metadata contains an unexpected key', async () => {
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            // 'unknownKey' is not in the strict quick_action metadata shape;
+            // a prototype-pollution attempt (an arbitrary extra key) lands here too.
+            metadata: { chip: 'too_easy', unknownKey: 'x' },
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(recordSessionEvent).not.toHaveBeenCalled();
+    });
+
+    it('[WI-982] returns 400 when event body contains an unexpected top-level key', async () => {
+      // Regression guard: outer z.object().strict() rejects injected top-level fields.
+      // Without outer .strict(), Zod silently strips them — this test would pass a 200
+      // if the outer strict guard were removed.
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            metadata: { chip: 'too_easy' },
+            injectedTopLevel: 'inject',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(recordSessionEvent).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------

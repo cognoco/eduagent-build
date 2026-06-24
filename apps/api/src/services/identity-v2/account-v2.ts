@@ -29,16 +29,8 @@ import {
   resolveVerifiedClerkEmail,
 } from '../clerk-user';
 import { notifyAccountSecurityEvent } from '../account';
+import { isUniqueViolation } from '../db-errors';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '23505'
-  );
-}
 
 /**
  * v2 twin of `updateAccountEmailFromClerk` — updates `login.email` for the

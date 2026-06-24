@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, lookupJWKByKid, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
-import { captureException, addBreadcrumb } from '../services/sentry';
+import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -27,6 +27,9 @@ const clerkJWTClaimsSchema = z.object({
   sub: z.string().min(1),
   email: z.string().optional(),
   email_verified: z.boolean().optional(),
+  // Clerk factor-verification-age claim: minutes since primary/secondary
+  // factor verification. -1 means that factor was not applicable.
+  fva: z.tuple([z.number(), z.number()]).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -38,6 +41,7 @@ export interface AuthUser {
   email?: string;
   /** True only when Clerk's email_verified claim is explicitly true in the JWT. */
   emailVerified?: boolean;
+  factorVerificationAge?: [number, number];
 }
 
 export type AuthEnv = {
@@ -107,7 +111,12 @@ async function verifyClerkJWT(
   token: string,
   jwksUrl: string | undefined,
   audience: string | undefined,
-): Promise<{ sub: string; email?: string; emailVerified: boolean }> {
+): Promise<{
+  sub: string;
+  email?: string;
+  emailVerified: boolean;
+  factorVerificationAge?: [number, number];
+}> {
   if (!jwksUrl) {
     throw new Error('CLERK_JWKS_URL is not configured');
   }
@@ -165,6 +174,9 @@ async function verifyClerkJWT(
     sub: claims.data.sub,
     email: claims.data.email,
     emailVerified: claims.data.email_verified === true,
+    ...(claims.data.fva !== undefined
+      ? { factorVerificationAge: claims.data.fva }
+      : {}),
   };
 }
 
@@ -200,6 +212,9 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       userId: result.sub,
       email: result.email,
       emailVerified: result.emailVerified,
+      ...(result.factorVerificationAge !== undefined
+        ? { factorVerificationAge: result.factorVerificationAge }
+        : {}),
     });
     return next();
   } catch (err) {
@@ -243,11 +258,11 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       // / bury real signal. `captureException` is reserved for infra.
       const errorName = err instanceof Error ? err.name : 'Unknown';
       logger.warn('JWT validation failed', {
+        event: 'jwt.validation_failed',
         error: message,
         errorName,
         path: c.req.path,
       });
-      addBreadcrumb('JWT validation failed', 'auth');
     }
 
     return c.json(

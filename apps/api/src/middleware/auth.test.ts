@@ -89,7 +89,11 @@ function createTestApp() {
   // Protected route
   app.get('/me', (c) => {
     const user = c.get('user');
-    return c.json({ userId: user.userId, email: user.email });
+    return c.json({
+      userId: user.userId,
+      email: user.email,
+      factorVerificationAge: user.factorVerificationAge,
+    });
   });
 
   return app;
@@ -352,12 +356,15 @@ describe('authMiddleware', () => {
       // Must not flood Sentry exception alerts on every expired token —
       // captureException is reserved for infra failures.
       expect(sentryMock.captureException).not.toHaveBeenCalled();
-      // Breadcrumb still attached for context if a later exception fires.
-      expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+      // [WI-1009] addBreadcrumb is dead code on this path (drops unless an
+      // enclosing exception fires, which it does not here). Removed.
+      expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
       // The queryable signal — alertable on 24h volume via log aggregation.
+      // event field is required for log-aggregation queries.
       expect(loggerMock.warn).toHaveBeenCalledWith(
         'JWT validation failed',
         expect.objectContaining({
+          event: 'jwt.validation_failed',
           error: 'Invalid JWT: expired',
           errorName: 'Error',
           path: '/v1/me',
@@ -495,6 +502,47 @@ describe('authMiddleware', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.userId).toBe('user_f021_test');
+    });
+
+    it('[WI-301] parses Clerk fva from JWT claims', async () => {
+      jwtMock.verifyJWT.mockResolvedValueOnce({
+        sub: 'user_fva_test',
+        email: 'claims@test.com',
+        email_verified: true,
+        fva: [2, -1],
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer valid.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.factorVerificationAge).toEqual([2, -1]);
+    });
+
+    it('[WI-301] leaves factorVerificationAge undefined when fva is absent', async () => {
+      jwtMock.verifyJWT.mockResolvedValueOnce({
+        sub: 'user_no_fva_test',
+        email: 'claims@test.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      });
+
+      const app = createTestApp();
+      const res = await app.request(
+        '/v1/me',
+        { headers: { Authorization: 'Bearer valid.jwt.token' } },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.factorVerificationAge).toBeUndefined();
     });
   });
 

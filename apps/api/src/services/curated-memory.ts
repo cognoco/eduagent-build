@@ -8,9 +8,8 @@ import type {
   CuratedMemoryView,
   MemoryCategory,
   MemoryCategoryKey,
-  StrengthEntry,
-  FocusAreaEntry,
 } from '@eduagent/schemas';
+import { parseStrengthArray, parseFocusAreaArray } from '@eduagent/schemas';
 import {
   hasMemoryFactsMarker,
   readMemorySnapshotFromFacts,
@@ -77,7 +76,8 @@ function serializeLearningStyle(
 // ---------------------------------------------------------------------------
 
 function buildStrengthItems(strengths: unknown[]): CuratedMemoryItem[] {
-  return (strengths as StrengthEntry[]).map((entry) => ({
+  // [WI-986] Per-element validation: invalid entries are dropped (not propagated).
+  return parseStrengthArray(strengths).map((entry) => ({
     category: 'strengths' as const,
     value: entry.subject,
     statement: `Strong in ${entry.subject}: ${entry.topics.join(', ')}`,
@@ -86,7 +86,8 @@ function buildStrengthItems(strengths: unknown[]): CuratedMemoryItem[] {
 }
 
 function buildStruggleItems(struggles: unknown[]): CuratedMemoryItem[] {
-  return (struggles as FocusAreaEntry[]).map((entry) => ({
+  // [WI-986] Per-element validation: invalid entries are dropped (not propagated).
+  return parseFocusAreaArray(struggles).map((entry) => ({
     category: 'struggles' as const,
     value: entry.topic,
     statement: entry.subject

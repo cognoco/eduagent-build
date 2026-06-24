@@ -43,6 +43,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { ConflictError, BadRequestError } from '../../errors';
+import { uniqueViolationConstraint } from '../db-errors';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 import { safeSend } from '../safe-non-core';
@@ -137,20 +138,6 @@ function toDateString(dt: Date): string {
 /** One-way SHA-256 of an email, safe for logs/Sentry (mirrors account.ts). */
 function hashEmail(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
-}
-
-/** Postgres 23505 unique-violation discriminator. */
-function uniqueViolationConstraint(error: unknown): string | null {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === '23505'
-  ) {
-    const constraint = (error as { constraint?: unknown }).constraint;
-    return typeof constraint === 'string' ? constraint : '';
-  }
-  return null;
 }
 
 /** True iff `public.<table>` exists. Used only for pre-repoint legacy FK anchors. */

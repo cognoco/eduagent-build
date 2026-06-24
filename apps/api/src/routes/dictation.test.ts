@@ -498,6 +498,30 @@ describe('POST /v1/dictation/result', () => {
     expect(body.code).toBe('VALIDATION_ERROR');
   });
 
+  // [WI-921] NaN guard: new Date('invalid').getTime() returns NaN; without the
+  // guard, NaN is not > 1 so the validation silently passes and the invalid
+  // date propagates into DB writes.
+  it('[WI-921] returns 400 when localDate is an invalid date string', async () => {
+    const res = await app.request(
+      '/v1/dictation/result',
+      {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: JSON.stringify({
+          completionKey: COMPLETION_KEY,
+          localDate: 'not-a-date',
+          sentenceCount: 5,
+          mode: 'homework',
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe('VALIDATION_ERROR');
+  });
+
   it('returns 400 when mode is invalid', async () => {
     const res = await app.request(
       '/v1/dictation/result',
@@ -1064,7 +1088,32 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
 // F-047 regression: struggle fetch failure logging in dictation review
 // ---------------------------------------------------------------------------
 
+import { validateLocalDate } from './dictation';
 import * as sentryModule from '../services/sentry';
+
+// ---------------------------------------------------------------------------
+// [WI-921] validateLocalDate unit tests — NaN guard
+// ---------------------------------------------------------------------------
+
+describe('[WI-921] validateLocalDate — NaN guard', () => {
+  it('returns an error message for an invalid date string (NaN guard)', () => {
+    // Without the NaN guard: new Date('not-a-date').getTime() = NaN;
+    // Math.abs(serverDateMs - NaN) = NaN; NaN > 1 = false → null returned (no error).
+    // With the guard: rejected before the arithmetic.
+    const result = validateLocalDate('not-a-date');
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/not a valid date/i);
+  });
+
+  it('returns null for a valid date within 1 day of now', () => {
+    const result = validateLocalDate(new Date().toISOString().slice(0, 10));
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F-047 regression: struggle fetch failure logging in dictation review
+// ---------------------------------------------------------------------------
 
 describe('POST /v1/dictation/review — struggle fetch failure logging (errors-api F-047)', () => {
   it('logs warn + captureException when getLearningProfile DB call throws', async () => {

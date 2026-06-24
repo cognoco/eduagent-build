@@ -333,6 +333,10 @@ describe('Integration: POST /v1/profiles/switch', () => {
         headers: buildAuthHeaders({
           sub: PROFILE_USER.userId,
           email: PROFILE_USER.email,
+          // [WI-301] Switching into the owner profile now requires fresh
+          // primary-factor reverification (Clerk fva). Prove it with a recent
+          // fva so this happy-path switch returns 200 (fresh < 10 min cap).
+          fva: [1, -1],
         }),
         body: JSON.stringify({ profileId: created.id }),
       },

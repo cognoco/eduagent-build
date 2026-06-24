@@ -16,10 +16,14 @@ export type FilingTimedOutEvent = z.infer<typeof filingTimedOutEventSchema>;
 // event payloads in its third-party event store, so a minor's transcript
 // must never ride in the event. The consumer (freeform-filing) rehydrates
 // the transcript from the DB by sessionId, scoped by profileId.
+// [WI-996] sessionMode defaults to 'freeform' so any in-flight events
+// dispatched before sessionMode was added to the payload are not
+// dead-lettered on retry: old events omit the field and would throw a
+// ZodError without the default.
 export const filingRetryEventSchema = z.object({
   profileId: z.string().uuid(),
   sessionId: z.string().uuid(),
-  sessionMode: z.enum(['freeform', 'homework']),
+  sessionMode: z.enum(['freeform', 'homework']).default('freeform'),
 });
 export type FilingRetryEvent = z.infer<typeof filingRetryEventSchema>;
 
@@ -451,3 +455,23 @@ export const summaryReconciliationScannedEventSchema = z.object({
 export type SummaryReconciliationScannedEvent = z.infer<
   typeof summaryReconciliationScannedEventSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Cron fan-out event schemas — [WI-985] typed event data for parse-at-boundary
+// ---------------------------------------------------------------------------
+
+/** Fan-out payload fired by monthlyReportCron → monthlyReportGenerate. */
+export const monthlyReportGenerateEventSchema = z.object({
+  parentId: z.string().uuid(),
+  childId: z.string().uuid(),
+});
+export type MonthlyReportGenerateEvent = z.infer<
+  typeof monthlyReportGenerateEventSchema
+>;
+
+/** Fan-out payload fired by dailySnapshotCron → dailySnapshotRefresh. */
+export const snapshotRefreshEventSchema = z.object({
+  profileId: z.string().uuid(),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+export type SnapshotRefreshEvent = z.infer<typeof snapshotRefreshEventSchema>;

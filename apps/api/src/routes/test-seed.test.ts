@@ -54,6 +54,92 @@ async function callPing(env: Record<string, string | undefined>) {
   return res;
 }
 
+// ---------------------------------------------------------------------------
+// [WI-983] /__test/reset body validation — zValidator replaces manual `as` casts
+// ---------------------------------------------------------------------------
+
+async function callReset(
+  body: unknown,
+  env: Record<string, string | undefined> = {
+    ENVIRONMENT: 'development',
+    TEST_SEED_SECRET: 'dev-secret',
+  },
+) {
+  const req = new Request('http://test.local/__test/reset', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // dev secret is validated by the /__test/* middleware
+      'X-Test-Secret': env['TEST_SEED_SECRET'] ?? '',
+    },
+    body: JSON.stringify(body),
+  });
+  return testSeedRoutes.request(req, undefined, env);
+}
+
+// Import the mock so we can verify it's not called on bad input
+const { resetDatabase } = jest.requireMock('../services/test-seed') as {
+  resetDatabase: jest.Mock;
+};
+
+describe('[WI-983] POST /__test/reset — Zod body validation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default: resetDatabase succeeds and returns the expected shape
+    (resetDatabase as jest.Mock).mockResolvedValue({
+      deletedCount: 0,
+      clerkUsersDeleted: 0,
+    });
+  });
+
+  it('returns 400 when verifiedSeedClerkUserIds contains a non-string element', async () => {
+    const res = await callReset({ verifiedSeedClerkUserIds: [42] });
+    expect(res.status).toBe(400);
+    expect(resetDatabase).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 and calls resetDatabase when verifiedSeedClerkUserIds is a valid string array', async () => {
+    const res = await callReset({ verifiedSeedClerkUserIds: ['user_abc'] });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toBe('Database reset complete');
+    expect(resetDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  // [WI-983] Regression: the CI seed-cleanup callers POST /__test/reset with NO
+  // body and NO Content-Type (`.github/workflows/e2e-web.yml:222-225` and
+  // `e2e-web-cleanup.yml:67-70` — `curl -X POST -H X-Test-Secret …`, no `-d`).
+  // The pre-WI-983 handler tolerated this and proceeded with
+  // verifiedSeedClerkUserIds = undefined. This test locks that contract: when no
+  // Content-Type is present, Hono's json validator skips body parsing and passes
+  // `{}` to the schema (all fields optional → success), so a bodyless reset still
+  // returns 200. (Verified: hono/validator only calls c.req.json() when a JSON
+  // Content-Type is set, so an absent body never 400s.)
+  it('returns 200 for a bodyless POST (no body, no Content-Type) and proceeds with undefined IDs', async () => {
+    const req = new Request('http://test.local/__test/reset', {
+      method: 'POST',
+      headers: {
+        // No Content-Type and no body — mirrors the CI curl invocation.
+        'X-Test-Secret': 'dev-secret',
+      },
+    });
+    const res = await testSeedRoutes.request(req, undefined, {
+      ENVIRONMENT: 'development',
+      TEST_SEED_SECRET: 'dev-secret',
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { message: string };
+    expect(body.message).toBe('Database reset complete');
+    expect(resetDatabase).toHaveBeenCalledTimes(1);
+    // No body → verifiedSeedClerkUserIds is undefined in the resetDatabase opts.
+    const opts = (resetDatabase as jest.Mock).mock.calls[0]?.[2] as {
+      verifiedSeedClerkUserIds?: unknown;
+    };
+    expect(opts.verifiedSeedClerkUserIds).toBeUndefined();
+  });
+});
+
 describe('[BUG-725 / SEC-9] /__test/llm-ping environment guard', () => {
   beforeEach(() => {
     jest.clearAllMocks();

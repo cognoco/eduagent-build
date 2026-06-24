@@ -47,7 +47,13 @@ describe('buildCuratedMemoryView', () => {
   it('groups struggles with subject context', () => {
     const profile = makeLearningProfile({
       struggles: [
-        { topic: 'fractions', subject: 'Math', severity: 'moderate' },
+        {
+          topic: 'fractions',
+          subject: 'Math',
+          lastSeen: '2026-05-19T00:00:00.000Z',
+          attempts: 2,
+          confidence: 'low',
+        },
       ],
     });
     const result = buildCuratedMemoryView(profile);
@@ -60,12 +66,19 @@ describe('buildCuratedMemoryView', () => {
       category: 'struggles',
       value: 'fractions',
       statement: 'Struggles with fractions (Math)',
+      confidence: 'low',
     });
   });
 
   it('groups strengths by subject', () => {
     const profile = makeLearningProfile({
-      strengths: [{ subject: 'Science', topics: ['photosynthesis', 'cells'] }],
+      strengths: [
+        {
+          subject: 'Science',
+          topics: ['photosynthesis', 'cells'],
+          confidence: 'high',
+        },
+      ],
     });
     const result = buildCuratedMemoryView(profile);
 
@@ -77,6 +90,7 @@ describe('buildCuratedMemoryView', () => {
       category: 'strengths',
       value: 'Science',
       statement: 'Strong in Science: photosynthesis, cells',
+      confidence: 'high',
     });
   });
 
@@ -135,5 +149,25 @@ describe('buildCuratedMemoryView', () => {
       injectionEnabled: true,
       accommodationMode: 'short-burst',
     });
+  });
+
+  it('[WI-986] drops a malformed strength entry (missing .topics and .confidence) without throwing', () => {
+    // A DB row with { subject: 'Math' } is missing required fields .topics and
+    // .confidence. Without Zod validation this would either corrupt output or
+    // throw a TypeError at entry.topics.join(). With per-element safeParse it
+    // must be silently dropped and no error thrown.
+    const profile = makeLearningProfile({
+      strengths: [{ subject: 'Math' }],
+    });
+
+    let result: ReturnType<typeof buildCuratedMemoryView> | undefined;
+    expect(() => {
+      result = buildCuratedMemoryView(profile);
+    }).not.toThrow();
+
+    // The invalid entry must be dropped; the category must not appear.
+    expect(
+      result!.categories.find((c: MemoryCategory) => c.label === 'Strengths'),
+    ).toBeUndefined();
   });
 });

@@ -163,6 +163,7 @@ describe('emailBouncedEventSchema', () => {
   it('accepts null emailId (nullable field)', () => {
     const result = emailBouncedEventSchema.safeParse({
       type: 'email.bounced',
+      to: 'u***@example.com',
       emailId: null,
     });
     expect(result.success).toBe(true);
@@ -171,8 +172,18 @@ describe('emailBouncedEventSchema', () => {
     }
   });
 
-  it('accepts an empty object (all fields are optional)', () => {
+  // [WI-989] `type` and `to` are now required — {} must be rejected.
+  it('rejects an empty object (type and to are required)', () => {
     const result = emailBouncedEventSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  // [WI-989] Valid minimal payload — only required fields present.
+  it('accepts a minimal valid payload with type and to', () => {
+    const result = emailBouncedEventSchema.safeParse({
+      type: 'email.bounced',
+      to: 'u***@example.com',
+    });
     expect(result.success).toBe(true);
   });
 

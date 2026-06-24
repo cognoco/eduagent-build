@@ -100,9 +100,9 @@ export function NowCardStack({
   }
 
   return (
-    <View testID="now-card-stack" className="gap-3">
+    <View testID="now-card-stack" accessibilityRole="list" className="gap-3">
       {anchor ? (
-        <View testID="now-card-slot-anchor" accessibilityLabel="anchor">
+        <View testID="now-card-slot-anchor">
           {renderCard(
             anchor,
             'anchor',
@@ -117,7 +117,6 @@ export function NowCardStack({
         <View
           key={getNowCardDismissKey(card)}
           testID={`now-card-slot-module-${index}`}
-          accessibilityLabel="module"
         >
           {renderCard(
             card,

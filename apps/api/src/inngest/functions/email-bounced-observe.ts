@@ -69,8 +69,8 @@ export const emailBouncedObserve = inngest.createFunction(
         : 'email.bounced.received';
 
     logger.warn(logMessage, {
-      type: data.type ?? null,
-      to: data.to ?? null,
+      type: data.type,
+      to: data.to,
       emailId: data.emailId ?? null,
       eventTimestamp: data.timestamp ?? null,
       receivedAt: new Date().toISOString(),
@@ -78,7 +78,7 @@ export const emailBouncedObserve = inngest.createFunction(
 
     return {
       status: 'logged' as const,
-      type: data.type ?? null,
+      type: data.type,
       emailId: data.emailId ?? null,
     };
   },

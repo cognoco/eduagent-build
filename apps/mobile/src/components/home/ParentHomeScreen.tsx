@@ -890,7 +890,9 @@ export function ParentHomeScreen({
           </Pressable>
         </View>
         <Text className="text-h2 font-bold text-text-primary leading-tight">
-          {t('home.parent.greeting', { displayName: firstName })}
+          {firstName
+            ? t('home.parent.greeting', { displayName: firstName })
+            : t('home.parent.greetingNoName')}
         </Text>
         <Text
           className="text-body-sm text-text-secondary mt-0.5"

@@ -7,7 +7,10 @@ import {
   curriculumTopics,
   learningSessions,
 } from '@eduagent/database';
-import { filingRetryCompletedEventSchema } from '@eduagent/schemas';
+import {
+  filingRetryCompletedEventSchema,
+  filingRetryEventSchema,
+} from '@eduagent/schemas';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -36,12 +39,12 @@ async function runFreeformFiling({
   // transcript is always rehydrated from the DB inside the retry-filing
   // step below (scoped by profileId). Legacy in-flight events may still
   // carry a `sessionTranscript` key; it is deliberately ignored.
-  const { profileId, sessionId, sessionMode } = event.data as {
-    profileId: string;
-    sessionId: string;
-    sessionMode?: 'freeform' | 'homework';
-  };
-  const effectiveSessionMode = sessionMode ?? 'freeform';
+  // [WI-996] Replace `as` cast with schema parse — invalid payloads now throw
+  // ZodError at the function boundary rather than silently propagating.
+  const { profileId, sessionId, sessionMode } = filingRetryEventSchema.parse(
+    event.data,
+  );
+  const effectiveSessionMode = sessionMode;
 
   const sessionSnapshot = await step.run('check-already-filed', async () => {
     const db = getStepDatabase();

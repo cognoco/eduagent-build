@@ -280,6 +280,21 @@ describe('ParentHomeScreen', () => {
     result.getByText('Hey Alex');
   });
 
+  it('[PARENT-01] uses companion greeting key when displayName is empty string', () => {
+    const { result } = mount([PARENT], {}, makeProfile({ displayName: '' }));
+    const element = result.getByText('Hey there!');
+    expect(element).toBeTruthy();
+    // Must NOT render a dangling "Hey " with no name
+    expect(result.queryByText(/^Hey $/)).toBeNull();
+  });
+
+  it('[PARENT-01] uses companion greeting key when displayName is whitespace only', () => {
+    const { result } = mount([PARENT], {}, makeProfile({ displayName: '   ' }));
+    const element = result.getByText('Hey there!');
+    expect(element).toBeTruthy();
+    expect(result.queryByText(/^Hey $/)).toBeNull();
+  });
+
   it('[PARENT-01][PARENT-02] renders one command card per linked child with actions inside it', async () => {
     const { result } = mount([PARENT, CHILD_A, CHILD_B]);
     await waitForParentTransitionNotice(result);

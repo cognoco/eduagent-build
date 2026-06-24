@@ -401,7 +401,8 @@
         "accessibilityLabel": "Adicionar um aluno à sua família"
       },
       "childProfileLabel": "Perfil de {{name}}",
-      "greetingFallbackName": "Olá"
+      "greetingFallbackName": "Olá",
+      "greetingNoName": "Olá!"
     },
     "goToProgress": "Go to Progress",
     "goToProgressLabel": "Go to Progress",
@@ -2410,7 +2411,8 @@
       "birthDateAccessLabel": "Data de nascimento",
       "selectChildBirthDateLabel": "Selecione a data de nascimento da criança",
       "selectBirthDateLabel": "Selecione a data de nascimento",
-      "addChildButton": "Adicionar criança"
+      "addChildButton": "Adicionar criança",
+      "birthDatePlaceholder": "AAAA-MM-DD"
     },
     "profiles": {
       "roleParent": "Pai/Mãe",

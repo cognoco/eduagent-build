@@ -49,6 +49,7 @@ const mockCaptureException = jest.fn();
 const mockSetTag = jest.fn();
 
 jest.mock('@sentry/cloudflare', () => ({
+  // gc1-allow: @sentry/cloudflare is an external observability SDK — no real Sentry transport is available in the test environment; the Cloudflare-specific withSentry/withScope wrappers require a live DSN and worker context to initialise
   withScope: (
     fn: (scope: {
       setUser: jest.Mock;

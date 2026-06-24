@@ -240,7 +240,23 @@ describe('generateExport', () => {
     const eventRow = { id: 'evt-1', profileId: 'p1' };
     const summaryRow = { id: 'sum-1', profileId: 'p1' };
     const cardRow = { id: 'card-1', profileId: 'p1' };
-    const assessmentRow = { id: 'asmnt-1', profileId: 'p1' };
+    // [WI-978] Assessment row must match the tightened dataExportAssessmentRowSchema.
+    const now = new Date('2025-05-01T00:00:00.000Z').toISOString();
+    const assessmentRow = {
+      id: 'a0000000-0000-4000-8000-000000000001',
+      profileId: 'a0000000-0000-4000-8000-000000000002',
+      subjectId: 'a0000000-0000-4000-8000-000000000003',
+      topicId: 'a0000000-0000-4000-8000-000000000004',
+      sessionId: null,
+      verificationDepth: 'recall',
+      status: 'passed',
+      masteryScore: null,
+      masteryChallengeVerifiedAt: null,
+      qualityRating: null,
+      exchangeHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    };
     const xpRow = { id: 'xp-1', profileId: 'p1' };
     const streakRow = { id: 'str-1', profileId: 'p1' };
     const notifRow = { id: 'notif-1', profileId: 'p1' };
@@ -545,13 +561,28 @@ describe('generateExport', () => {
       // always queried regardless of profileIds — ideal for a Date-serialisation
       // schema-parse test that doesn't depend on profileSchema.
       const date = new Date('2025-05-01T00:00:00.000Z');
+      // [WI-978] Row must match the tightened dataExportSubscriptionRowSchema:
+      // real column names (`tier`/`status`) and valid UUIDs for id/accountId.
+      const subUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f701';
+      const acctUuid = 'a1b2c3d4-e5f6-4789-a012-b3c4d5e6f702';
       const subscriptionRow = {
-        id: 'sub-1',
-        accountId: 'account-1',
-        plan: 'plus',
+        id: subUuid,
+        accountId: acctUuid,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        tier: 'plus',
+        status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        lastStripeEventTimestamp: null,
+        lastStripeEventId: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
         createdAt: date,
         updatedAt: date,
-        expiresAt: date,
       };
       const db = createMockDb({
         profiles: [],

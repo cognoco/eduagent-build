@@ -523,6 +523,8 @@ The `(app)/` group contains all authenticated screens. View differences between 
 
 **ProfileProvider/useProfile Lifecycle:** `ProfileProvider` in `apps/mobile/src/lib/profile.ts` loads the active profile on mount via TanStack Query, provides it via React Context, and exposes `switchProfile()`. Root `_layout.tsx` wraps the app with this provider. `useProfile()` is the access point for all profile-dependent UI.
 
+**Owner-context elevation:** A non-owner to owner profile switch requires fresh primary-factor reverification (`fva`), enforced server-side in `POST /v1/profiles/switch` and flag-guarded by `OWNER_ELEVATION_GATE_ENABLED`; see MMT-ADR-0025.
+
 ### Infrastructure & Deployment
 
 **Primary deployment:**

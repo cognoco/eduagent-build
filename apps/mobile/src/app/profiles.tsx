@@ -12,11 +12,12 @@ import {
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useReverification } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import {
   useProfile,
   isGuardianProfile,
+  type SwitchProfileResult,
   type SwitchProfileOptions,
 } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
@@ -29,6 +30,35 @@ import {
 import { useUpdateProfileName } from '../hooks/use-profiles';
 import { platformAlert } from '../lib/platform-alert';
 import { formatApiError } from '../lib/format-api-error';
+
+const OWNER_ELEVATION_REQUIRED = 'OWNER_ELEVATION_REQUIRED';
+const OWNER_ELEVATION_REVERIFICATION_HINT = {
+  clerk_error: {
+    type: 'forbidden',
+    reason: 'reverification-error',
+    metadata: {
+      reverification: {
+        level: 'first_factor',
+        afterMinutes: 10,
+      },
+    },
+  },
+} as const;
+
+function isOwnerElevationRequiredResult(
+  result: SwitchProfileResult | undefined,
+): boolean {
+  return result?.errorCode === OWNER_ELEVATION_REQUIRED;
+}
+
+function hasOwnerElevationErrorCode(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const candidate = err as { apiCode?: unknown; code?: unknown };
+  return (
+    candidate.apiCode === OWNER_ELEVATION_REQUIRED ||
+    candidate.code === OWNER_ELEVATION_REQUIRED
+  );
+}
 
 export default function ProfilesScreen() {
   const insets = useSafeAreaInsets();
@@ -103,20 +133,22 @@ export default function ProfilesScreen() {
 
   // UX-DE-L13: timeout on profile switch
   //
-  // [BUG-133] The client-side `profiles[]` array used by this screen (and by
-  // handleProfileTap below) is a UX hint only. The authoritative ownership
-  // check lives server-side in `POST /v1/profiles/switch` (see
-  // `lib/profile.ts#switchProfile`), which rejects any profileId not linked
-  // to the signed-in account. If a tampered client passed an unrelated
-  // profileId here, switchProfile would return `{success:false}` and the
-  // alert path below would surface the typed server error. We therefore do
-  // NOT add a redundant client-side ownership guard — doing so would be
-  // false reassurance about security and would mask a real server-side
-  // regression behind a green client check.
+  // [BUG-133 / WI-301] The client-side `profiles[]` array used by this screen
+  // (and by handleProfileTap below) is a UX hint only. The authoritative
+  // ownership and owner-elevation check lives server-side in
+  // `POST /v1/profiles/switch` (see `lib/profile.ts#switchProfile` and
+  // MMT-ADR-0025). The non-owner->owner tap branch below drives Clerk
+  // reverification for UX, but the server fva check remains the security gate.
+  // The same route still rejects any profileId not linked to the account; a
+  // tampered client gets `{success:false}` and the alert path surfaces the
+  // typed server error.
   const handleSwitch = async (
     profileId: string,
     options?: SwitchProfileOptions,
-  ) => {
+    behavior?: { returnOwnerElevationHint?: boolean },
+  ): Promise<
+    SwitchProfileResult | typeof OWNER_ELEVATION_REVERIFICATION_HINT | void
+  > => {
     if (isSwitching || switchInFlightRef.current) return;
     switchInFlightRef.current = true;
     setIsSwitching(true);
@@ -149,6 +181,12 @@ export default function ProfilesScreen() {
         return;
       }
       if (result?.success === false) {
+        if (
+          behavior?.returnOwnerElevationHint &&
+          isOwnerElevationRequiredResult(result)
+        ) {
+          return OWNER_ELEVATION_REVERIFICATION_HINT;
+        }
         platformAlert(
           t('profiles.switchErrorTitle'),
           result.error ?? t('common.pleaseTryAgain'),
@@ -165,6 +203,7 @@ export default function ProfilesScreen() {
           t('profiles.switchPersistenceWarning'),
         );
       }
+      return result;
     } catch (err) {
       // [BUG-822] switchProfile may throw (network failure, Clerk error, etc.)
       // instead of returning {success:false}. Surface the typed server reason
@@ -174,6 +213,12 @@ export default function ProfilesScreen() {
       // [CR-2026-05-21-107] Same guard as the success path — if the 20s
       // alert already fired, do not stack a second error dialog over it.
       if (timedOut) return;
+      if (
+        behavior?.returnOwnerElevationHint &&
+        hasOwnerElevationErrorCode(err)
+      ) {
+        return OWNER_ELEVATION_REVERIFICATION_HINT;
+      }
       platformAlert(t('profiles.switchErrorTitle'), formatApiError(err));
     } finally {
       clearTimeout(timeoutId);
@@ -181,6 +226,10 @@ export default function ProfilesScreen() {
       setIsSwitching(false);
     }
   };
+
+  const reverifiedOwnerSwitch = useReverification((profileId: string) =>
+    handleSwitch(profileId, undefined, { returnOwnerElevationHint: true }),
+  );
 
   const handleProfileTap = (profile: (typeof profiles)[number]) => {
     if (activeProfile?.isOwner && !profile.isOwner) {
@@ -199,6 +248,11 @@ export default function ProfilesScreen() {
         router.dismiss();
       }
       router.push(childProfileHref(profile.id, 'settings'));
+      return;
+    }
+
+    if (activeProfile && !activeProfile.isOwner && profile.isOwner) {
+      void reverifiedOwnerSwitch(profile.id);
       return;
     }
 

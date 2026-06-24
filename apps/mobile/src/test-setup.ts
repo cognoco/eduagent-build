@@ -194,6 +194,7 @@ jest.mock('@clerk/clerk-expo', () => ({
       fullName: 'Alex Test',
     },
   }),
+  useReverification: jest.fn((fn: (...args: unknown[]) => unknown) => fn),
   useSignIn: jest.fn().mockReturnValue({
     isLoaded: true,
     signIn: {

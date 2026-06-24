@@ -25,6 +25,7 @@ import { learningSessions, person, profiles } from '@eduagent/database';
 import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
+import { snapshotRefreshEventSchema } from '@eduagent/schemas';
 import { captureException } from '../../services/sentry';
 
 export const dailySnapshotCron = inngest.createFunction(
@@ -124,7 +125,9 @@ export const dailySnapshotRefresh = inngest.createFunction(
   },
   { event: 'app/progress.snapshot.refresh' },
   async ({ event, step }) => {
-    const { profileId } = event.data;
+    // [WI-985] Parse at the Inngest function boundary — throws ZodError on
+    // malformed data so Inngest retries rather than silently passing undefined.
+    const { profileId } = snapshotRefreshEventSchema.parse(event.data);
 
     return step.run('refresh-snapshot', async () => {
       // [J-11] Do NOT catch-and-return-failed here. Returning { status: 'failed' }

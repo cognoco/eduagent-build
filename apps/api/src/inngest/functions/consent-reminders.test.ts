@@ -93,6 +93,7 @@ jest.mock(
   },
 );
 
+import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { consentReminder } from './consent-reminders';
 
@@ -462,21 +463,30 @@ describe('consentReminder', () => {
     expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
   });
 
-  it('[WI-84 DS-021] skips legacy reminder events without requestedAt because they cannot prove freshness', async () => {
-    await executeHandler(
-      ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
-      {
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        parentEmail: 'parent@example.com',
-        consentType: 'GDPR',
-        requestedAt: '2026-05-01T00:00:00.000Z',
-      },
-      {
-        profileId: 'profile-1',
-        consentType: 'GDPR',
-      },
-    );
+  it('[WI-84 DS-021] [WI-973] rejects legacy reminder events without requestedAt with NonRetriableError — they cannot prove freshness and must not retry', async () => {
+    // Before WI-973: missing requestedAt silently skipped all actions (safe
+    // but allowed malformed events to proceed through the function body).
+    // After WI-973: the Zod guard at function entry throws NonRetriableError
+    // so the event is dead-lettered immediately and never retried. No email
+    // and no delete are ever reached — same safety property, stronger contract.
+    await expect(
+      executeHandler(
+        ['PENDING', 'PENDING', 'PENDING', 'PENDING'],
+        {
+          status: 'PARENTAL_CONSENT_REQUESTED',
+          parentEmail: 'parent@example.com',
+          consentType: 'GDPR',
+          requestedAt: '2026-05-01T00:00:00.000Z',
+        },
+        {
+          profileId: 'profile-1',
+          consentType: 'GDPR',
+          // requestedAt intentionally omitted — this is the malformed/legacy case
+        },
+      ),
+    ).rejects.toThrow(NonRetriableError);
 
+    // Neither side-effect is ever reached.
     expect(mockSendEmail).not.toHaveBeenCalled();
     expect(mockDeleteProfileIfNoConsent).not.toHaveBeenCalled();
   });
