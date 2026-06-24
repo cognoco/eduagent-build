@@ -706,26 +706,6 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             };
           }
 
-          // [BUG-699-FOLLOWUP] 24h dedup gate, scoped to the push only — the
-          // weeklyReports insert above is idempotent via onConflictDoNothing,
-          // so a duplicate `app/weekly-progress-push.generate` event leaves the
-          // report row intact but must NOT re-push the parent. Cron cadence
-          // (weekly) makes the read-then-write race window irrelevant; promote
-          // to a unique index on notificationLog if duplicates ever surface.
-          const recentCount = await getRecentNotificationCount(
-            db,
-            parentId,
-            'weekly_progress',
-            24,
-          );
-          if (recentCount > 0) {
-            return {
-              status: 'throttled' as const,
-              reason: 'dedup_24h',
-              parentId,
-            };
-          }
-
           const prefs = await db.query.notificationPreferences.findFirst({
             where: eq(notificationPreferences.profileId, parentId),
             columns: {
@@ -832,6 +812,24 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             }
             if (childSummaries.length === 0) {
               return { sent: false, reason: 'no_activity' as const };
+            }
+            // [WI-998][BUG-699-FOLLOWUP] Dedup gate moved here from prepare step
+            // so the read and the logNotification write (called inside
+            // sendPushNotification) are in the same Inngest step. The old split
+            // design left a race: a step retry on 'send-weekly-progress-push'
+            // re-ran the full step body, re-checked dedup from prepare's memoized
+            // state (always 0 there), and re-sent the push. Moving the read inside
+            // this step means: retry → re-read → count > 0 (logNotification from
+            // the first attempt committed) → skip → no duplicate push.
+            // Email path already follows this pattern (BUG-842 fix).
+            const recentPushCount = await getRecentNotificationCount(
+              db,
+              parentId,
+              'weekly_progress',
+              24,
+            );
+            if (recentPushCount > 0) {
+              return { sent: false, reason: 'dedup_24h' as const };
             }
             return sendPushNotification(db, {
               profileId: parentId,
