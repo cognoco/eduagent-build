@@ -4,10 +4,16 @@ date: 2026-06-06
 profile: code
 spec: docs/specs/2026-06-06-llm-routing-and-judge-architecture.md
 adr: docs/adr/MMT-ADR-0016-safety-and-judge-architecture.md
-status: draft
+status: archived
 ---
 
 # Gemini-Exit Interactive Routing Build — Implementation Spec
+
+> **ARCHIVED 2026-06-23.** The build it specs has **shipped** behind
+> `LLM_ROUTING_V2_ENABLED` (Cerebras/Mistral adapters, GPT-5-mini plumbing,
+> fail-closed fallback ban). Operative reference is now the guiding doc
+> [`docs/registers/llm-models/master.md`](../../registers/llm-models/master.md).
+> Kept for the file-by-file implementation rationale.
 
 **Goal:** Implement the full §1.5 interactive routing matrix and make the fallback path **never** resolve to an under-18-banned vendor (Gemini/Vertex). Concretely: **all tiers (free incl.), teaching rungs 1–3, text → gpt-oss-120b @ Cerebras `high`** (the universal default); each tier's **secondary** — used when the business-rule layer routes away from Cerebras (EU-residency required *or* Cerebras unavailable) **and** for vision — is **free → Mistral Small 4** (EU), **paid → GPT-5 mini @ low**; deep-reasoning rungs 4–5 → **gpt-5.4 @ medium** for **Plus / Pro / AI-Upgrade-entitled only** — the **Family tier has NO access to gpt-5.4** (owner ruling 2026-06-07), Family's rungs 4–5 stay on **gpt-oss-120b @ Cerebras `high`**. Sonnet 4.6 stays the rung-4–5 fallback. The age/residency/plan business-rule layer that selects primary-vs-secondary is **not built in this spec** — here `getModelConfig` pins gpt-oss as the all-tier primary and wires each tier's secondary as the **fallback** target (T12); the residency-driven *primary* substitution is a later rule-table phase. (Adult-only Gemini eligibility is an open legal ruling — see routing-spec §10.1; until ruled, Gemini/Vertex stays unconditionally banned here.)
 

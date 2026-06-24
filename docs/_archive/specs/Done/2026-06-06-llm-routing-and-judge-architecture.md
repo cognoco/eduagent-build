@@ -1,7 +1,14 @@
 # LLM Routing Rule Table & Judge Architecture
 
+> **ARCHIVED 2026-06-23.** Superseded as the operative reference by the guiding
+> doc [`docs/registers/llm-models/master.md`](../../registers/llm-models/master.md)
+> (which model where & why) + [`MMT-ADR-0016`](../../adr/MMT-ADR-0016-safety-and-judge-architecture.md)
+> (the *why*). Kept for the design rationale — the rule-table schema (§1), judge
+> framework (§2), and gating-mode design (§3) — not yet implemented. Do **not**
+> route from this doc's §1.5 table; route from `master.md`.
+
 **Date:** 2026-06-06
-**Status:** Draft — design ratified in owner conversation 2026-06-05/06/07; implementation not started
+**Status:** Archived (design reference) — design ratified in owner conversation 2026-06-05/06/07; implementation not started
 **Depends on:** `docs/meetings/2026-06-05-llm-model-selection-research-memo.md` (§6 eval results, §7 open model ruling)
 **Related:** `docs/specs/2026-04-07-epic-17-voice-first-design.md` (voice — forward invariants only here)
 
