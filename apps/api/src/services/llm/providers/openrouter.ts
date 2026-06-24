@@ -16,8 +16,8 @@ import { toOpenAIContent } from './openai';
 //
 // Purpose: one adapter to A/B candidate models (Mistral Small 4, gpt-oss-120b,
 // US-hosted DeepSeek, …) in the eval harness (`pnpm eval:llm --live`) without
-// writing a per-vendor integration for each candidate. See
-// docs/meetings/2026-06-05-llm-model-selection-research-memo.md §4.
+// writing a per-vendor integration for each candidate. See the model register
+// docs/registers/llm-models/master.md (and its vetting/ trail) for the vetted set.
 //
 // NOT registered in production middleware (middleware/llm.ts) by design:
 // OpenRouter is a US broker — adding it to the production path for minors'
