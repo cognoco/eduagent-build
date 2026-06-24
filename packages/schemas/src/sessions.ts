@@ -420,13 +420,52 @@ export type SessionAnalyticsEventType = z.infer<
   typeof sessionAnalyticsEventTypeSchema
 >;
 
-export const sessionAnalyticsEventSchema = z
-  .object({
-    eventType: sessionAnalyticsEventTypeSchema,
-    content: z.string().max(1000).optional(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-  })
-  .strict();
+// [WI-982] Mirrors the mobile `MessageFeedbackState` union
+// (apps/mobile/src/components/session/session-types.ts). Defined here because
+// @eduagent/schemas is the shared API contract and must not import from mobile;
+// the mobile call site passes one of these values as `metadata.value`.
+export const messageFeedbackStateSchema = z.enum([
+  'helpful',
+  'not_helpful',
+  'incorrect',
+]);
+export type MessageFeedbackState = z.infer<typeof messageFeedbackStateSchema>;
+
+// [WI-982] Discriminated union replaces the open `z.record` passthrough so that
+// only expected metadata keys reach the DB — closes prototype-pollution and
+// arbitrary-key injection via the analytics-event endpoint. Each branch's
+// metadata shape mirrors the real client payload in
+// apps/mobile/src/components/session/use-session-actions.ts:
+//   quick_action  → { chip, sourceMessageId? }   (lines ~508-514)
+//   user_feedback → { value, eventId }            (lines ~566-573)
+export const sessionAnalyticsEventSchema = z.discriminatedUnion('eventType', [
+  z
+    .object({
+      eventType: z.literal('quick_action'),
+      content: z.string().max(1000).optional(),
+      metadata: z
+        .object({
+          chip: z.string(),
+          sourceMessageId: z.string().optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      eventType: z.literal('user_feedback'),
+      content: z.string().max(1000).optional(),
+      metadata: z
+        .object({
+          value: messageFeedbackStateSchema,
+          eventId: z.string(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+]);
 export type SessionAnalyticsEventInput = z.infer<
   typeof sessionAnalyticsEventSchema
 >;
