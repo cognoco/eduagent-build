@@ -42,6 +42,7 @@ import {
 } from '../../hooks/use-revenuecat';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
+import { formatShortDate } from '../../lib/format-datetime';
 import {
   getTiersToCompare,
   getTierLabel,
@@ -98,7 +99,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
   const client = useApiClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const queryClient = useQueryClient();
 
@@ -785,8 +786,9 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="trial-banner-ends-at"
                 >
                   {t('subscription.trial.endsAt', {
-                    date: new Date(subscription.trialEndsAt).toLocaleDateString(
-                      undefined,
+                    date: formatShortDate(
+                      subscription.trialEndsAt,
+                      i18n.language,
                       {
                         year: 'numeric',
                         month: 'long',
@@ -837,22 +839,26 @@ function SubscriptionContent(): React.ReactElement | null {
               <Text className="text-caption text-text-secondary mt-1">
                 {cancelAtPeriodEnd
                   ? t('subscription.accessUntil', {
-                      date: new Date(
+                      date: formatShortDate(
                         subscription.currentPeriodEnd,
-                      ).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      }),
+                        i18n.language,
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        },
+                      ),
                     })
                   : t('subscription.renewsOn', {
-                      date: new Date(
+                      date: formatShortDate(
                         subscription.currentPeriodEnd,
-                      ).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      }),
+                        i18n.language,
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        },
+                      ),
                     })}
               </Text>
             )}
@@ -912,13 +918,15 @@ function SubscriptionContent(): React.ReactElement | null {
               </Text>
               <Text className="text-caption text-text-secondary mt-0.5">
                 {t('subscription.endingBody', {
-                  date: new Date(
+                  date: formatShortDate(
                     subscription.currentPeriodEnd,
-                  ).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  }),
+                    i18n.language,
+                    {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    },
+                  ),
                 })}
               </Text>
             </View>

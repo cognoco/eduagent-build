@@ -1,13 +1,14 @@
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { RevocationNotice } from '@eduagent/schemas';
+import { formatShortDate } from '../../lib/format-datetime';
 
 export function RevocationNoticeCard({
   notice,
 }: {
   notice: RevocationNotice;
 }): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <View
       testID="visibility-revocation-notice"
@@ -18,7 +19,7 @@ export function RevocationNoticeCard({
       </Text>
       <Text className="mt-2 text-body text-text-secondary">
         {t('visibility.revocation.message', {
-          graceEndsAt: new Date(notice.graceEndsAt).toLocaleDateString(),
+          graceEndsAt: formatShortDate(notice.graceEndsAt, i18n.language),
         })}
       </Text>
     </View>

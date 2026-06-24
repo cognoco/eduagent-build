@@ -20,7 +20,7 @@ export function LatestReportCard({
   onOpen: () => void;
   onRetry: () => void;
 }): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const metrics =
     latestReport?.kind === 'weekly'
       ? latestReport.report.thisWeek
@@ -76,12 +76,12 @@ export function LatestReportCard({
             onPress={onOpen}
             accessibilityRole="button"
             accessibilityLabel={t('progress.latestReport.openWithDate', {
-              date: formatReportDate(latestReport),
+              date: formatReportDate(latestReport, i18n.language),
             })}
             testID="progress-latest-report-card"
           >
             <Text className="text-body-sm text-text-secondary">
-              {formatReportDate(latestReport)}
+              {formatReportDate(latestReport, i18n.language)}
             </Text>
             <Text className="text-h2 font-bold text-text-primary mt-2">
               {latestReport.report.headlineStat.value}{' '}

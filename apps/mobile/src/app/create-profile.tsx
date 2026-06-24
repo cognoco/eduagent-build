@@ -37,6 +37,7 @@ import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useUpdateProfileAppContext } from '../hooks/use-profiles';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
+import { formatShortDate } from '../lib/format-datetime';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
 import { formatApiError } from '../lib/format-api-error';
@@ -57,8 +58,8 @@ const MIN_DATE = new Date(
   MAX_DATE.getDate(),
 );
 
-function formatDateForDisplay(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+function formatDateForDisplay(date: Date, locale: string | undefined): string {
+  return formatShortDate(date, locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -698,7 +699,7 @@ export default function CreateProfileScreen() {
               style={birthDate ? undefined : { color: colors.muted }}
             >
               {birthDate
-                ? formatDateForDisplay(birthDate)
+                ? formatDateForDisplay(birthDate, i18n.language)
                 : isAddingChild
                   ? t('createProfile.selectChildDob')
                   : t('createProfile.selectDob')}

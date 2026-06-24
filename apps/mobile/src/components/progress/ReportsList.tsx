@@ -6,6 +6,7 @@ import type {
   MonthlyReportSummary,
   WeeklyReportSummary,
 } from '@eduagent/schemas';
+import { formatShortDate } from '../../lib/format-datetime';
 
 export interface ReportsListProps {
   monthlyReports: MonthlyReportSummary[];
@@ -41,10 +42,11 @@ type ReportListItem =
 
 function formatDateOnly(
   isoDate: string,
+  locale: string | undefined,
   options: Intl.DateTimeFormatOptions,
 ): string {
   const dateOnly = /^\d{4}-\d{2}$/.test(isoDate) ? `${isoDate}-01` : isoDate;
-  return new Date(`${dateOnly}T00:00:00Z`).toLocaleDateString(undefined, {
+  return formatShortDate(`${dateOnly}T00:00:00Z`, locale, {
     ...options,
     timeZone: 'UTC',
   });
@@ -68,6 +70,7 @@ function ReportRow({
   onPressMonthly,
   onPressWeekly,
   t,
+  locale,
 }: {
   item: ReportListItem;
   showNewBadge: boolean;
@@ -75,17 +78,19 @@ function ReportRow({
   onPressMonthly: (id: string) => void;
   onPressWeekly: (id: string) => void;
   t: TFunction;
+  locale: string | undefined;
 }): React.ReactElement {
   const title =
     item.kind === 'weekly'
       ? `${t('parentView.reports.weekOf')} ${formatDateOnly(
           item.report.reportWeek,
+          locale,
           {
             month: 'short',
             day: 'numeric',
           },
         )}`
-      : formatDateOnly(item.report.reportMonth, {
+      : formatDateOnly(item.report.reportMonth, locale, {
           month: 'long',
           year: 'numeric',
         });
@@ -162,7 +167,7 @@ export function ReportsList({
   newReportId,
   scrollEnabled = true,
 }: ReportsListProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const allItems: ReportListItem[] = useMemo(
     () =>
@@ -200,9 +205,17 @@ export function ReportsList({
         onPressMonthly={onPressMonthly}
         onPressWeekly={onPressWeekly}
         t={t}
+        locale={i18n.language}
       />
     ),
-    [showNewBadge, newReportId, onPressMonthly, onPressWeekly, t],
+    [
+      showNewBadge,
+      newReportId,
+      onPressMonthly,
+      onPressWeekly,
+      t,
+      i18n.language,
+    ],
   );
 
   if (isEmpty) {

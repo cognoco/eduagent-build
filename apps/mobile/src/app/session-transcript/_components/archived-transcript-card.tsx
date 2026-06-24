@@ -2,6 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { ArchivedTranscriptResponse } from '@eduagent/schemas';
+import { formatShortDate } from '../../../lib/format-datetime';
 import { useThemeColors } from '../../../lib/theme';
 
 interface Props extends Omit<ArchivedTranscriptResponse, 'archived'> {
@@ -19,7 +20,7 @@ export function ArchivedTranscriptCard({
   const colors = useThemeColors();
   const hasTopics = summary.topicsCovered.length > 0;
   const canContinueTopic = summary.topicId != null;
-  const archivedDate = new Date(archivedAt).toLocaleDateString(i18n.language, {
+  const archivedDate = formatShortDate(archivedAt, i18n.language, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',

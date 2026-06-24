@@ -17,6 +17,7 @@ import { goBackOrReplace } from '../../../../../lib/navigation';
 import { isNewLearner } from '../../../../../lib/progressive-disclosure';
 import { useDurationLabel } from '../../../../../hooks/use-time-format';
 import { getDurationParts } from '../../../../../lib/format-relative-date';
+import { formatShortDate } from '../../../../../lib/format-datetime';
 
 function getCompletionLabel(status: string, t: Translate): string {
   switch (status) {
@@ -45,10 +46,10 @@ function TopicSkeleton(): React.ReactNode {
   );
 }
 
-function formatSessionDate(iso: string): string {
+function formatSessionDate(iso: string, locale: string | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(undefined, {
+  return formatShortDate(date, locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -57,7 +58,7 @@ function formatSessionDate(iso: string): string {
 }
 
 export default function SubjectTopicsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -346,8 +347,8 @@ export default function SubjectTopicsScreen() {
                   className="bg-surface rounded-card p-4 mt-3"
                   accessibilityRole="button"
                   accessibilityLabel={t('parentView.subjects.viewSessionFrom', {
-                    date: formatSessionDate(session.startedAt),
-                    defaultValue: `View session from ${formatSessionDate(session.startedAt)}`,
+                    date: formatSessionDate(session.startedAt, i18n.language),
+                    defaultValue: `View session from ${formatSessionDate(session.startedAt, i18n.language)}`,
                   })}
                   testID={`subject-session-card-${session.sessionId}`}
                 >
@@ -356,10 +357,10 @@ export default function SubjectTopicsScreen() {
                       <Text className="text-body font-semibold text-text-primary">
                         {session.topicTitle ??
                           session.displayTitle ??
-                          formatSessionDate(session.startedAt)}
+                          formatSessionDate(session.startedAt, i18n.language)}
                       </Text>
                       <Text className="text-caption text-text-secondary mt-1">
-                        {formatSessionDate(session.startedAt)}
+                        {formatSessionDate(session.startedAt, i18n.language)}
                         {duration ? ` - ${duration}` : ''}
                       </Text>
                       {session.highlight ? (

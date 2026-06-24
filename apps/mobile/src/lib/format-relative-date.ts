@@ -51,7 +51,7 @@ export type RelativeDatePart =
   | { unit: 'days'; value: number } // 2–6
   | { unit: 'lastWeek' } // 7–13 days
   | { unit: 'weeks'; value: number } // 14–29 days → 2–4
-  | { unit: 'date'; iso: string }; // ≥30 days → caller renders toLocaleDateString
+  | { unit: 'date'; iso: string }; // >=30 days -> caller renders a formatted date
 
 // Midnight-normalize both dates, then diff whole calendar days. This is the
 // more-correct calendar-day diff: the raw-ms Math.floor that several screens

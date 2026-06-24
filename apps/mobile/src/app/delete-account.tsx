@@ -20,6 +20,7 @@ import {
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
+import { formatShortDate } from '../lib/format-datetime';
 import { platformAlert } from '../lib/platform-alert';
 import { signOutWithCleanup } from '../lib/sign-out';
 import { useHasLinkedChildren, useProfile } from '../lib/profile';
@@ -34,7 +35,7 @@ export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { signOut, userId } = useAuth();
   const queryClient = useQueryClient();
   const { profiles, activeProfile, isLoading: isProfileLoading } = useProfile();
@@ -142,7 +143,7 @@ export default function DeleteAccountScreen() {
     !statusLoadFailed;
 
   const formattedDate = gracePeriodEnds
-    ? new Date(gracePeriodEnds).toLocaleDateString(undefined, {
+    ? formatShortDate(gracePeriodEnds, i18n.language, {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

@@ -9,6 +9,7 @@ import {
   goBackOrReplace,
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
+import { formatShortDate } from '../../../../../lib/format-datetime';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
 import {
@@ -28,17 +29,21 @@ import { NudgeActionSheet } from '../../../../../components/nudge/NudgeActionShe
  * weekStart is an ISO date string (YYYY-MM-DD) representing the first day of
  * the report week. The end day is +6 days (inclusive 7-day window).
  */
-function formatWeeklyReportRange(weekStart: string, fallback: string): string {
+function formatWeeklyReportRange(
+  weekStart: string,
+  fallback: string,
+  locale: string | undefined,
+): string {
   const start = new Date(`${weekStart}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
-  const startLabel = start.toLocaleDateString(undefined, {
+  const startLabel = formatShortDate(start, locale, {
     month: 'short',
     day: 'numeric',
     timeZone: 'UTC',
   });
-  const endLabel = end.toLocaleDateString(undefined, {
+  const endLabel = formatShortDate(end, locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -74,7 +79,7 @@ function isEmptyWeeklyReport(reportData: {
 }
 
 export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId, weeklyReportId } = useLocalSearchParams<{
@@ -150,6 +155,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 ? formatWeeklyReportRange(
                     report.reportData.weekStart,
                     t('parentView.weeklyReport.weeklyReport'),
+                    i18n.language,
                   )
                 : t('parentView.weeklyReport.weeklyReport')}
             </Text>

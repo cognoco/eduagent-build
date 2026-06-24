@@ -25,6 +25,7 @@ import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { useThemeColors } from '../../../../../lib/theme';
 import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
 import { useDurationLabel } from '../../../../../hooks/use-time-format';
+import { formatShortDate } from '../../../../../lib/format-datetime';
 let Clipboard: typeof import('expo-clipboard') | null = null;
 try {
   Clipboard = require('expo-clipboard');
@@ -33,8 +34,7 @@ try {
 }
 
 function formatDate(iso: string, locale: string | undefined): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(locale, {
+  return formatShortDate(iso, locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
