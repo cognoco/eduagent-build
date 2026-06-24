@@ -17,6 +17,7 @@ import type { Database } from '@eduagent/database';
 
 import * as sentryModule from '../sentry';
 import * as settingsService from '../settings';
+import * as subscriptionCore from './subscription-core';
 import {
   downgradeAllFamilyProfiles,
   getUsageBreakdownForProfile,
@@ -389,5 +390,212 @@ describe('subscription-not-found escalation', () => {
         }),
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-960] downgradeAllFamilyProfiles — parallel provisioning + bounded query
+//
+// Problem: the original implementation awaited db.update(profile) and then
+// ensureFreeSubscription sequentially per non-owner profile — N*2 serial
+// round-trips for a family with N non-owner members. The unbounded findMany
+// also had no limit guard.
+//
+// Fix:
+//   1. Adds `limit: DOWNGRADE_PROFILE_QUERY_LIMIT` (100) to the profiles query.
+//   2. Collects all non-owner profiles to downgrade, then fans out with
+//      Promise.all: each profile's update + provision pair runs as an
+//      independent async task, so all updates fire before any provision
+//      completes (parallel execution).
+//
+// Red-green evidence:
+//   GREEN (fix): callOrder = ['update-a', 'update-b', 'provision-a',
+//     'provision-b'] — both updates fire before either provision resolves.
+//   RED (revert to serial loop): callOrder = ['update-a', 'provision-a',
+//     'update-b', 'provision-b'] — provision-a blocks update-b.
+// ---------------------------------------------------------------------------
+
+describe('[WI-960] downgradeAllFamilyProfiles — parallel provisioning + bounded query', () => {
+  let ensureFreeSpy: jest.SpiedFunction<
+    typeof subscriptionCore.ensureFreeSubscription
+  >;
+  let updateQuotaSpy: jest.SpiedFunction<
+    typeof subscriptionCore.updateQuotaPoolLimit
+  >;
+
+  // Execution-order tracker. The profile updates are synchronous (resolved
+  // immediately), whereas ensureFreeSubscription for profile-a is deferred by
+  // one microtask tick. With parallel execution both updates fire before either
+  // provision resolves; with serial execution provision-a would block update-b.
+  const callOrder: string[] = [];
+
+  const SUBSCRIPTION_ID = 'sub-family-960';
+  const ACCOUNT_ID = 'account-family-960';
+  const PROFILE_OWNER = 'profile-owner';
+  const PROFILE_NON_OWNER_A = 'profile-non-owner-a';
+  const PROFILE_NON_OWNER_B = 'profile-non-owner-b';
+  const NEW_ACCOUNT_A = 'new-account-a';
+  const NEW_ACCOUNT_B = 'new-account-b';
+
+  function buildFakeDb(): Database {
+    // profile update mock: records call synchronously, returns a resolved value.
+    const profileUpdateMock = jest
+      .fn()
+      .mockImplementation((_updateArg: unknown) => ({
+        set: jest.fn().mockImplementation((setArg: { accountId?: string }) => ({
+          where: jest.fn().mockImplementation(() => {
+            const newAccountId = setArg.accountId;
+            // Identify which profile is being updated by the new account id.
+            if (newAccountId === NEW_ACCOUNT_A) {
+              callOrder.push('update-a');
+            } else if (newAccountId === NEW_ACCOUNT_B) {
+              callOrder.push('update-b');
+            } else {
+              // owner subscription tier downgrade
+              callOrder.push('update-owner-sub');
+            }
+            return Promise.resolve([]);
+          }),
+        })),
+      }));
+
+    const db = {
+      query: {
+        profiles: {
+          findMany: jest.fn().mockResolvedValue([
+            { id: PROFILE_OWNER, isOwner: true, accountId: ACCOUNT_ID },
+            { id: PROFILE_NON_OWNER_A, isOwner: false, accountId: ACCOUNT_ID },
+            { id: PROFILE_NON_OWNER_B, isOwner: false, accountId: ACCOUNT_ID },
+          ]),
+        },
+      },
+      update: profileUpdateMock,
+    } as unknown as Database;
+
+    return db;
+  }
+
+  beforeEach(() => {
+    callOrder.length = 0;
+    jest.clearAllMocks();
+
+    // mockFindSubscriptionById is declared at the top of this test file and
+    // patches findSubscriptionById__unscoped via the @eduagent/database mock.
+    mockFindSubscriptionById.mockResolvedValue({
+      id: SUBSCRIPTION_ID,
+      accountId: ACCOUNT_ID,
+    });
+
+    // Spy on ensureFreeSubscription:
+    //   - for NEW_ACCOUNT_A: deferred one microtask tick, records 'provision-a'
+    //   - for NEW_ACCOUNT_B: resolves synchronously, records 'provision-b'
+    // This guarantees that with PARALLEL execution both updates fire before
+    // either provision records its entry, whereas SERIAL execution would record
+    // provision-a between update-a and update-b.
+    ensureFreeSpy = jest
+      .spyOn(subscriptionCore, 'ensureFreeSubscription')
+      .mockImplementation(async (_db, accountId) => {
+        if (accountId === NEW_ACCOUNT_A) {
+          // Defer to next microtask so concurrent update-b can fire first.
+          await new Promise<void>((resolve) => resolve());
+          callOrder.push('provision-a');
+        } else {
+          callOrder.push('provision-b');
+        }
+        return { id: `sub-${accountId}` } as ReturnType<
+          typeof subscriptionCore.ensureFreeSubscription
+        > extends Promise<infer T>
+          ? T
+          : never;
+      });
+
+    updateQuotaSpy = jest
+      .spyOn(subscriptionCore, 'updateQuotaPoolLimit')
+      .mockResolvedValue(undefined as never);
+  });
+
+  afterEach(() => {
+    ensureFreeSpy.mockRestore();
+    updateQuotaSpy.mockRestore();
+  });
+
+  it('returns all non-owner profile ids and performs parallel update + provision', async () => {
+    const db = buildFakeDb();
+    const profileToAccountMap = new Map([
+      [PROFILE_NON_OWNER_A, NEW_ACCOUNT_A],
+      [PROFILE_NON_OWNER_B, NEW_ACCOUNT_B],
+    ]);
+
+    const downgraded = await downgradeAllFamilyProfiles(
+      db,
+      SUBSCRIPTION_ID,
+      profileToAccountMap,
+    );
+
+    // All non-owner profiles are in the returned downgraded list.
+    expect(downgraded.sort()).toEqual(
+      [PROFILE_NON_OWNER_A, PROFILE_NON_OWNER_B].sort(),
+    );
+
+    // ensureFreeSubscription called once per non-owner profile.
+    expect(ensureFreeSpy).toHaveBeenCalledTimes(2);
+    expect(ensureFreeSpy).toHaveBeenCalledWith(db, NEW_ACCOUNT_A);
+    expect(ensureFreeSpy).toHaveBeenCalledWith(db, NEW_ACCOUNT_B);
+
+    // updateQuotaPoolLimit called once for the owner subscription.
+    expect(updateQuotaSpy).toHaveBeenCalledTimes(1);
+    expect(updateQuotaSpy).toHaveBeenCalledWith(
+      db,
+      SUBSCRIPTION_ID,
+      expect.any(Number),
+      expect.any(Number),
+    );
+  });
+
+  it('fan-out is parallel: both profile updates fire before any provision completes', async () => {
+    // THE KEY GUARD: with the old serial loop, provision-a would block
+    // update-b, producing ['update-a', 'provision-a', 'update-b', ...].
+    // With Promise.all both updates fire before any provision resolves:
+    // ['update-a', 'update-b', 'provision-a', 'provision-b'].
+    const db = buildFakeDb();
+    const profileToAccountMap = new Map([
+      [PROFILE_NON_OWNER_A, NEW_ACCOUNT_A],
+      [PROFILE_NON_OWNER_B, NEW_ACCOUNT_B],
+    ]);
+
+    await downgradeAllFamilyProfiles(db, SUBSCRIPTION_ID, profileToAccountMap);
+
+    const updateAIdx = callOrder.indexOf('update-a');
+    const updateBIdx = callOrder.indexOf('update-b');
+    const provisionAIdx = callOrder.indexOf('provision-a');
+    const provisionBIdx = callOrder.indexOf('provision-b');
+
+    // Both updates must have been recorded.
+    expect(updateAIdx).toBeGreaterThanOrEqual(0);
+    expect(updateBIdx).toBeGreaterThanOrEqual(0);
+    expect(provisionAIdx).toBeGreaterThanOrEqual(0);
+    expect(provisionBIdx).toBeGreaterThanOrEqual(0);
+
+    // With parallel execution update-b fires BEFORE provision-a resolves
+    // (since provision-a is deferred by one microtask tick).
+    // Restoring the serial loop would cause provision-a to land between
+    // update-a and update-b, making this assertion fail.
+    expect(updateBIdx).toBeLessThan(provisionAIdx);
+  });
+
+  it('skips profiles not in the profileToAccountMap without error', async () => {
+    const db = buildFakeDb();
+    // Only profile-a is in the map; profile-b is absent.
+    const profileToAccountMap = new Map([[PROFILE_NON_OWNER_A, NEW_ACCOUNT_A]]);
+
+    const downgraded = await downgradeAllFamilyProfiles(
+      db,
+      SUBSCRIPTION_ID,
+      profileToAccountMap,
+    );
+
+    expect(downgraded).toEqual([PROFILE_NON_OWNER_A]);
+    expect(ensureFreeSpy).toHaveBeenCalledTimes(1);
+    expect(ensureFreeSpy).toHaveBeenCalledWith(db, NEW_ACCOUNT_A);
   });
 });
