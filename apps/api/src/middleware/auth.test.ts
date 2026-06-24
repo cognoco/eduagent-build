@@ -356,12 +356,15 @@ describe('authMiddleware', () => {
       // Must not flood Sentry exception alerts on every expired token —
       // captureException is reserved for infra failures.
       expect(sentryMock.captureException).not.toHaveBeenCalled();
-      // Breadcrumb still attached for context if a later exception fires.
-      expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+      // [WI-1009] addBreadcrumb is dead code on this path (drops unless an
+      // enclosing exception fires, which it does not here). Removed.
+      expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
       // The queryable signal — alertable on 24h volume via log aggregation.
+      // event field is required for log-aggregation queries.
       expect(loggerMock.warn).toHaveBeenCalledWith(
         'JWT validation failed',
         expect.objectContaining({
+          event: 'jwt.validation_failed',
           error: 'Invalid JWT: expired',
           errorName: 'Error',
           path: '/v1/me',

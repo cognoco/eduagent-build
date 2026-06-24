@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, lookupJWKByKid, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
-import { captureException, addBreadcrumb } from '../services/sentry';
+import { captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -258,11 +258,11 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       // / bury real signal. `captureException` is reserved for infra.
       const errorName = err instanceof Error ? err.name : 'Unknown';
       logger.warn('JWT validation failed', {
+        event: 'jwt.validation_failed',
         error: message,
         errorName,
         path: c.req.path,
       });
-      addBreadcrumb('JWT validation failed', 'auth');
     }
 
     return c.json(
