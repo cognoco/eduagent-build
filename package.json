@@ -146,7 +146,8 @@
       "minimatch@9": "9.0.9",
       "minimatch@10": "10.2.5",
       "tar": ">=7.5.16",
-      "node-forge": ">=1.4.0"
+      "node-forge": ">=1.4.0",
+      "@grpc/grpc-js": ">=1.14.4"
     },
     "patchedDependencies": {
       "react-native-css-interop@0.2.1": "patches/react-native-css-interop@0.2.1.patch"
