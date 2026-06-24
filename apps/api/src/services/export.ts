@@ -32,13 +32,11 @@ import {
   mentorActivityLedger,
   type Database,
 } from '@eduagent/database';
-import type {
-  DataExport,
-  ConsentStatus,
-  Profile,
-  DataExportAssessmentRow,
-  DataExportSubscriptionRow,
+import {
+  dataExportAssessmentRowSchema,
+  dataExportSubscriptionRowSchema,
 } from '@eduagent/schemas';
+import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
 
 /**
@@ -507,8 +505,8 @@ export async function generateExport(
     }),
     sessionSummaries: sessionSummaryRows.map(serializeDates),
     retentionCards: retentionCardRows.map(serializeDates),
-    assessments: assessmentRows.map(
-      (row) => serializeDates(row) as DataExportAssessmentRow,
+    assessments: assessmentRows.map((row) =>
+      dataExportAssessmentRowSchema.parse(serializeDates(row)),
     ),
     xpLedger: xpLedgerRows.map(serializeDates),
     streaks: streakRows.map(serializeDates),
@@ -526,8 +524,8 @@ export async function generateExport(
         content: projectSessionEmbeddingContent(serialized['content']),
       };
     }),
-    subscriptions: subscriptionRows.map(
-      (row) => serializeDates(row) as DataExportSubscriptionRow,
+    subscriptions: subscriptionRows.map((row) =>
+      dataExportSubscriptionRowSchema.parse(serializeDates(row)),
     ),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),
