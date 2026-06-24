@@ -240,7 +240,23 @@ describe('generateExport', () => {
     const eventRow = { id: 'evt-1', profileId: 'p1' };
     const summaryRow = { id: 'sum-1', profileId: 'p1' };
     const cardRow = { id: 'card-1', profileId: 'p1' };
-    const assessmentRow = { id: 'asmnt-1', profileId: 'p1' };
+    // [WI-978] Assessment row must match the tightened dataExportAssessmentRowSchema.
+    const now = new Date('2025-05-01T00:00:00.000Z').toISOString();
+    const assessmentRow = {
+      id: 'a0000000-0000-4000-8000-000000000001',
+      profileId: 'a0000000-0000-4000-8000-000000000002',
+      subjectId: 'a0000000-0000-4000-8000-000000000003',
+      topicId: 'a0000000-0000-4000-8000-000000000004',
+      sessionId: null,
+      verificationDepth: 'recall',
+      status: 'passed',
+      masteryScore: null,
+      masteryChallengeVerifiedAt: null,
+      qualityRating: null,
+      exchangeHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    };
     const xpRow = { id: 'xp-1', profileId: 'p1' };
     const streakRow = { id: 'str-1', profileId: 'p1' };
     const notifRow = { id: 'notif-1', profileId: 'p1' };
@@ -552,8 +568,19 @@ describe('generateExport', () => {
       const subscriptionRow = {
         id: subUuid,
         accountId: acctUuid,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
         tier: 'plus',
         status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        cancelledAt: null,
+        lastStripeEventTimestamp: null,
+        lastStripeEventId: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
         createdAt: date,
         updatedAt: date,
       };
