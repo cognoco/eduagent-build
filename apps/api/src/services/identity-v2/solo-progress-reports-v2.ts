@@ -93,29 +93,39 @@ export async function listEligibleSelfReportPersonIdsV2(
 
   // Exclude linked children: a person who is the CHARGE of any active
   // guardianship edge is a linked child, not a self-managed owner.
-  const selfManaged: typeof owners = [];
-  for (const o of owners) {
-    const guardians = await getGuardianPersonIds(db, o.personId);
-    if (guardians.length === 0) selfManaged.push(o);
-  }
+  // [WI-961] The per-owner guardianship lookups are independent — fan out in
+  // parallel instead of awaiting each serially. Filtering after the fan-out
+  // preserves the original semantics (self-managed = zero guardians) exactly.
+  const guardianChecks = await Promise.all(
+    owners.map(async (o) => ({
+      o,
+      guardians: await getGuardianPersonIds(db, o.personId),
+    })),
+  );
+  const selfManaged = guardianChecks
+    .filter(({ guardians }) => guardians.length === 0)
+    .map(({ o }) => o);
   if (selfManaged.length === 0) return [];
 
   // GDPR consent: allowed when the GDPR status is null (no row) or CONSENTED
   // (basis-explicit — a basis-blind read would be the BUG-466/465 bug).
-  const result: string[] = [];
-  for (const o of selfManaged) {
-    const status = await resolveConsentStatus(
-      db,
-      o.personId,
-      o.organizationId,
-      DEFAULT_CONSENT_PURPOSE,
-      'gdpr_parental_consent',
-    );
-    if (status == null || status === 'CONSENTED') {
-      result.push(o.personId);
-    }
-  }
-  return result;
+  // [WI-961] The per-owner consent-status reads are independent — fan out in
+  // parallel. The post-filter preserves the original semantics exactly.
+  const consentChecks = await Promise.all(
+    selfManaged.map(async (o) => ({
+      personId: o.personId,
+      status: await resolveConsentStatus(
+        db,
+        o.personId,
+        o.organizationId,
+        DEFAULT_CONSENT_PURPOSE,
+        'gdpr_parental_consent',
+      ),
+    })),
+  );
+  return consentChecks
+    .filter(({ status }) => status == null || status === 'CONSENTED')
+    .map(({ personId }) => personId);
 }
 
 /**
