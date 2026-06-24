@@ -439,28 +439,32 @@ export type MessageFeedbackState = z.infer<typeof messageFeedbackStateSchema>;
 //   quick_action  → { chip, sourceMessageId? }   (lines ~508-514)
 //   user_feedback → { value, eventId }            (lines ~566-573)
 export const sessionAnalyticsEventSchema = z.discriminatedUnion('eventType', [
-  z.object({
-    eventType: z.literal('quick_action'),
-    content: z.string().max(1000).optional(),
-    metadata: z
-      .object({
-        chip: z.string(),
-        sourceMessageId: z.string().optional(),
-      })
-      .strict()
-      .optional(),
-  }),
-  z.object({
-    eventType: z.literal('user_feedback'),
-    content: z.string().max(1000).optional(),
-    metadata: z
-      .object({
-        value: messageFeedbackStateSchema,
-        eventId: z.string(),
-      })
-      .strict()
-      .optional(),
-  }),
+  z
+    .object({
+      eventType: z.literal('quick_action'),
+      content: z.string().max(1000).optional(),
+      metadata: z
+        .object({
+          chip: z.string(),
+          sourceMessageId: z.string().optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      eventType: z.literal('user_feedback'),
+      content: z.string().max(1000).optional(),
+      metadata: z
+        .object({
+          value: messageFeedbackStateSchema,
+          eventId: z.string(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
 ]);
 export type SessionAnalyticsEventInput = z.infer<
   typeof sessionAnalyticsEventSchema

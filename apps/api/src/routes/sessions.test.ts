@@ -1398,6 +1398,30 @@ describe('session routes', () => {
       expect(res.status).toBe(400);
       expect(recordSessionEvent).not.toHaveBeenCalled();
     });
+
+    it('[WI-982] returns 400 when event body contains an unexpected top-level key', async () => {
+      // Regression guard: outer z.object().strict() rejects injected top-level fields.
+      // Without outer .strict(), Zod silently strips them — this test would pass a 200
+      // if the outer strict guard were removed.
+      (recordSessionEvent as jest.Mock).mockClear();
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/events`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            eventType: 'quick_action',
+            metadata: { chip: 'too_easy' },
+            injectedTopLevel: 'inject',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(recordSessionEvent).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
