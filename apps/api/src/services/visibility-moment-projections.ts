@@ -5,7 +5,11 @@ import {
   type Database,
   type NewSupportVisibilityNotice,
 } from '@eduagent/database';
-import type { RenderAudience, VisibilityMoment } from '@eduagent/schemas';
+import {
+  visibilityMomentPayloadSchema,
+  type RenderAudience,
+  type VisibilityMoment,
+} from '@eduagent/schemas';
 
 export async function createVisibilityNotice(
   db: Database,
@@ -56,9 +60,6 @@ function mapNotice(
     targetPersonId: row.targetPersonId,
     createdAt: row.createdAt.toISOString(),
     acknowledgedAt: row.acknowledgedAt?.toISOString() ?? null,
-    payload:
-      row.payload && typeof row.payload === 'object'
-        ? (row.payload as Record<string, unknown>)
-        : {},
+    payload: visibilityMomentPayloadSchema.parse(row.payload),
   };
 }
