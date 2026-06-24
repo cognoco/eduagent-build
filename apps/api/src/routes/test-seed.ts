@@ -99,6 +99,18 @@ const seedInputSchema = z.object({
   email: z.string().email().default('test-e2e@example.com'),
 });
 
+// [WI-983] Local schema for /__test/reset — test-infrastructure only, not in @eduagent/schemas.
+// The whole body is optional. This preserves the pre-WI-983 contract for the CI seed-cleanup
+// callers (`.github/workflows/e2e-web.yml:222-225`, `e2e-web-cleanup.yml:67-70`), which POST
+// with NO body and NO Content-Type: Hono's json validator only calls c.req.json() when a JSON
+// Content-Type is present, so an absent body is passed to the schema as `{}` → parses cleanly
+// to `verifiedSeedClerkUserIds = undefined`, exactly as the old handler behaved. A present body
+// is still strictly validated (a non-string array element → 400). See the bodyless-POST
+// regression test in test-seed.test.ts.
+const resetBodySchema = z.object({
+  verifiedSeedClerkUserIds: z.array(z.string()).optional(),
+});
+
 export const testSeedRoutes = new Hono<TestEnv>();
 
 // ---------------------------------------------------------------------------
@@ -196,60 +208,56 @@ testSeedRoutes.post(
   },
 );
 
-testSeedRoutes.post('/__test/reset', async (c) => {
-  // [BUG-902] Second, independent guard for the destructive reset. The
-  // `/__test/*` middleware already rejects production via ENVIRONMENT+secret,
-  // but a single Doppler mislabel (ENVIRONMENT='staging' in prod) would defeat
-  // that one check. Refuse the wipe whenever the connection string points at a
-  // known production DB host, regardless of what ENVIRONMENT claims — so no
-  // single env mislabel can re-open reset against production data.
-  if (isProductionDatabaseUrl(c.env.DATABASE_URL)) {
-    return c.json(
-      {
-        code: ERROR_CODES.FORBIDDEN,
-        message:
-          'Refusing /__test/reset: DATABASE_URL points at a production database host',
-      },
-      403,
-    );
-  }
-
-  const db = c.get('db');
-  const seedEnv: SeedEnv = {
-    CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
-    SEED_PASSWORD: c.env.SEED_PASSWORD,
-  };
-  const prefix = c.req.query('prefix')?.trim() || undefined;
-
-  // Optional body param: `verifiedSeedClerkUserIds` lets callers (e.g.,
-  // scripts/clean-clerk-test-users.mjs) pre-delete Clerk users locally and
-  // have the server only handle DB cleanup. Avoids the CF Worker
-  // 50-subrequest limit on bulk cleanup (~49 users × 2 calls > 50).
-  let verifiedSeedClerkUserIds: string[] | undefined;
-  const contentType = c.req.header('content-type') ?? '';
-  if (contentType.includes('application/json')) {
-    const body = (await c.req.json().catch(() => ({}))) as {
-      verifiedSeedClerkUserIds?: unknown;
-      clerkUserIds?: unknown;
-    };
-    if (
-      Array.isArray(body.verifiedSeedClerkUserIds) &&
-      body.verifiedSeedClerkUserIds.every((id) => typeof id === 'string')
-    ) {
-      verifiedSeedClerkUserIds = body.verifiedSeedClerkUserIds as string[];
+testSeedRoutes.post(
+  '/__test/reset',
+  // [WI-983] Validate the optional reset body — replaces the old manual `as` casts
+  // and Array.isArray/typeof checks with a proper Zod parse at the route boundary.
+  // Unlike `zValidator('json', …)` (which calls c.req.json() and 400s on an absent
+  // or empty body), this custom validator tolerates a bodyless POST by defaulting to
+  // `{}` — preserving the pre-WI-983 contract relied on by the CI seed-cleanup curls,
+  // while still rejecting a present-but-malformed body via resetBodySchema.
+  zValidator('json', resetBodySchema),
+  async (c) => {
+    // [BUG-902] Second, independent guard for the destructive reset. The
+    // `/__test/*` middleware already rejects production via ENVIRONMENT+secret,
+    // but a single Doppler mislabel (ENVIRONMENT='staging' in prod) would defeat
+    // that one check. Refuse the wipe whenever the connection string points at a
+    // known production DB host, regardless of what ENVIRONMENT claims — so no
+    // single env mislabel can re-open reset against production data.
+    if (isProductionDatabaseUrl(c.env.DATABASE_URL)) {
+      return c.json(
+        {
+          code: ERROR_CODES.FORBIDDEN,
+          message:
+            'Refusing /__test/reset: DATABASE_URL points at a production database host',
+        },
+        403,
+      );
     }
-  }
 
-  const { deletedCount, clerkUsersDeleted } = await resetDatabase(db, seedEnv, {
-    prefix,
-    verifiedSeedClerkUserIds,
-  });
-  return c.json({
-    message: 'Database reset complete',
-    deletedCount,
-    clerkUsersDeleted,
-  });
-});
+    const db = c.get('db');
+    const seedEnv: SeedEnv = {
+      CLERK_SECRET_KEY: c.env.CLERK_SECRET_KEY,
+      SEED_PASSWORD: c.env.SEED_PASSWORD,
+    };
+    const prefix = c.req.query('prefix')?.trim() || undefined;
+    const { verifiedSeedClerkUserIds } = c.req.valid('json');
+
+    const { deletedCount, clerkUsersDeleted } = await resetDatabase(
+      db,
+      seedEnv,
+      {
+        prefix,
+        verifiedSeedClerkUserIds,
+      },
+    );
+    return c.json({
+      message: 'Database reset complete',
+      deletedCount,
+      clerkUsersDeleted,
+    });
+  },
+);
 
 testSeedRoutes.get('/__test/scenarios', (c) => {
   return c.json({ scenarios: VALID_SCENARIOS });
