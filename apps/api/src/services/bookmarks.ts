@@ -8,16 +8,8 @@ import {
 } from '@eduagent/database';
 import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
+import { isUniqueViolation } from './db-errors';
 import { projectAiResponseContent } from './llm/project-response';
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: string }).code === '23505'
-  );
-}
 
 function mapBookmarkRow(row: {
   id: string;
