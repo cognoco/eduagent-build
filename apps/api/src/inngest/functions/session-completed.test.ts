@@ -7,6 +7,7 @@ import {
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { NonRetriableError } from 'inngest';
 
 const col = (name: string) => ({ name });
 // Joinable terminal: supports both direct .where()/.limit() (no joins)
@@ -3174,5 +3175,51 @@ describe('memoized step-state PII break test [F-089]', () => {
       ]),
     );
     expect(JSON.stringify(result)).not.toContain('long division');
+  });
+
+  // [WI-972] Regression: malformed event payload must throw NonRetriableError
+  // and must NOT write to assessments or update streaks.
+  //
+  // Before the fix: event.data.qualityRating coerced via `as number | undefined`
+  // — a string value silently passed the check in completionQualityRating and
+  // could corrupt SM-2 scheduling. event.data.exchangeCount coerced similarly
+  // — a null value would cause streak-credit to silently skip.
+  //
+  // After the fix: sessionCompletedEventSchema.safeParse rejects both shapes
+  // immediately and throws NonRetriableError before any destructuring or DB
+  // write occurs.
+  //
+  // Red-green: this test FAILS without the safeParse guard (handler returns
+  // a result object rather than throwing) and PASSES with the guard in place.
+  it('[WI-972] throws NonRetriableError for malformed payload (qualityRating=string, exchangeCount=null)', async () => {
+    const handler = (sessionCompleted as any).fn;
+
+    await expect(
+      handler({
+        event: {
+          name: 'app/session.completed',
+          data: {
+            profileId: PROFILE_ID,
+            sessionId: SESSION_ID,
+            topicId: TOPIC_ID,
+            subjectId: SUBJECT_ID,
+            summaryStatus: 'pending',
+            sessionType: 'learning',
+            // qualityRating as string — highest-risk variant per AC: silently
+            // corrupts SM-2 if coerced via `as number | undefined`
+            qualityRating: 'bad',
+            // exchangeCount as null — causes streak credit to silently skip
+            exchangeCount: null,
+            timestamp: '2026-02-17T10:00:00.000Z',
+          },
+        },
+        step: {
+          run: jest.fn(),
+          sendEvent: jest.fn(),
+          sleep: jest.fn(),
+          waitForEvent: jest.fn(),
+        },
+      }),
+    ).rejects.toThrow(NonRetriableError);
   });
 });
