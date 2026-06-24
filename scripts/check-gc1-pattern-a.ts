@@ -24,6 +24,7 @@
 // Exit codes: 0 clean, 1 violations.
 
 import { spawnSync } from 'node:child_process';
+import * as ts from 'typescript';
 
 export type Violation = {
   file: string;
@@ -94,7 +95,110 @@ export function isPatternA(
   return false;
 }
 
-export type StagedMockSite = { line: number; content: string };
+export type StagedMockSite = {
+  line: number;
+  content: string;
+  specifier?: string;
+};
+
+function collectAddedNewFileLines(unifiedDiff: string): Set<number> {
+  const addedLines = new Set<number>();
+  const lines = unifiedDiff.split('\n');
+  let cur = 0;
+  let inHunk = false;
+
+  for (const ln of lines) {
+    if (ln.startsWith('+++') || ln.startsWith('---')) continue;
+    const hunk = ln.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      cur = parseInt(hunk[1], 10);
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) continue;
+    if (ln.startsWith('+')) {
+      addedLines.add(cur);
+      cur++;
+    } else if (ln.startsWith('-')) {
+      // deletion — does not consume a new-file line
+    } else {
+      // context line — only present at unified > 0
+      cur++;
+    }
+  }
+
+  return addedLines;
+}
+
+function getLineNumber(sourceFile: ts.SourceFile, position: number): number {
+  return sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+}
+
+function getJestMockName(call: ts.CallExpression): 'mock' | 'doMock' | null {
+  const expression = call.expression;
+  if (!ts.isPropertyAccessExpression(expression)) return null;
+  if (!ts.isIdentifier(expression.expression)) return null;
+  if (expression.expression.text !== 'jest') return null;
+  if (expression.name.text !== 'mock' && expression.name.text !== 'doMock') {
+    return null;
+  }
+  return expression.name.text;
+}
+
+function getStringLiteralText(node: ts.Expression): string | null {
+  if (ts.isStringLiteral(node)) return node.text;
+  if (node.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral) {
+    return (node as ts.NoSubstitutionTemplateLiteral).text;
+  }
+  return null;
+}
+
+function findAddedMockCallsFromSource(
+  unifiedDiff: string,
+  stagedSrc: string,
+  file: string,
+): StagedMockSite[] {
+  const addedLines = collectAddedNewFileLines(unifiedDiff);
+  if (addedLines.size === 0) return [];
+
+  const sourceFile = ts.createSourceFile(
+    file,
+    stagedSrc,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const sites: StagedMockSite[] = [];
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && getJestMockName(node)) {
+      const start = node.getStart(sourceFile);
+      const line = getLineNumber(sourceFile, start);
+      if (addedLines.has(line)) {
+        const firstArg = node.arguments[0];
+        const specifier = firstArg ? getStringLiteralText(firstArg) : null;
+        if (specifier?.startsWith('./') || specifier?.startsWith('../')) {
+          let end = firstArg ? firstArg.getEnd() : node.getEnd();
+          // Preserve the existing same-line escape hatch:
+          // `jest.mock('./foo', () => ({})); // gc1-allow: reason`.
+          if (getLineNumber(sourceFile, node.getEnd()) === line) {
+            const lineEnd = stagedSrc.indexOf('\n', node.getEnd());
+            end = lineEnd === -1 ? stagedSrc.length : lineEnd;
+          }
+          sites.push({
+            line,
+            content: stagedSrc.slice(start, end),
+            specifier,
+          });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return sites;
+}
 
 // Parse a `git diff --cached --unified=0` patch (already filtered to one file)
 // and return new-file line numbers of any added `jest.mock('./...')` lines.
@@ -105,7 +209,15 @@ export type StagedMockSite = { line: number; content: string };
 //                './foo',        ← specifier found by look-ahead
 //                () => ({})
 //              );
-export function findAddedMockLines(unifiedDiff: string): StagedMockSite[] {
+export function findAddedMockLines(
+  unifiedDiff: string,
+  stagedSrc?: string,
+  file = 'staged.test.ts',
+): StagedMockSite[] {
+  if (stagedSrc !== undefined) {
+    return findAddedMockCallsFromSource(unifiedDiff, stagedSrc, file);
+  }
+
   const lines = unifiedDiff.split('\n');
   const sites: StagedMockSite[] = [];
   let cur = 0;
@@ -187,13 +299,13 @@ export function checkFile(
   unifiedDiff: string,
   stagedSrc: string,
 ): Violation[] {
-  const sites = findAddedMockLines(unifiedDiff);
+  const sites = findAddedMockLines(unifiedDiff, stagedSrc, file);
   if (sites.length === 0) return [];
   const lines = stagedSrc.split('\n');
   const violations: Violation[] = [];
-  for (const { line, content } of sites) {
+  for (const { line, content, specifier } of sites) {
     if (GC1_ALLOW.test(content)) continue;
-    const spec = extractSpecifier(content);
+    const spec = specifier ?? extractSpecifier(content);
     if (!spec) {
       violations.push({ file, line, content, reason: 'invalid-mock' });
       continue;
