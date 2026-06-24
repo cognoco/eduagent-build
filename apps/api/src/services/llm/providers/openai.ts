@@ -12,6 +12,10 @@ import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
+import {
+  openAIResponseSchema,
+  type OpenAIResponseParsed,
+} from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -49,17 +53,6 @@ interface OpenAIRequest {
   // sent when the caller sets config.reasoningEffort; non-reasoning models
   // (gpt-4o*) never receive it. Previously this field was silently dropped.
   reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
-}
-
-interface OpenAIChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
-  finish_reason?: string;
-}
-
-interface OpenAIResponse {
-  choices?: OpenAIChoice[];
-  error?: { message: string; type: string; code?: string };
 }
 
 export function toOpenAIContent(
@@ -164,7 +157,14 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
         );
       }
 
-      const data = (await res.json()) as OpenAIResponse;
+      const raw = await res.json();
+      const parsed = openAIResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        throw createProviderApiError('OpenAI API', {
+          type: 'invalid_response_shape',
+        });
+      }
+      const data = parsed.data;
 
       if (data.error) {
         // [FCR-2026-05-23-L11.F11] Keep only the structured type/code tokens for
@@ -237,7 +237,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           const decoder = new TextDecoder();
           let buffer = '';
 
-          function processChunk(chunk: OpenAIResponse): string | undefined {
+          function processChunk(
+            chunk: OpenAIResponseParsed,
+          ): string | undefined {
             const finish = chunk.choices?.[0]?.finish_reason;
             if (finish) rawFinishReason = finish;
             if (isContentFilterFinishReason(finish)) {
@@ -263,8 +265,18 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                 if (!jsonStr || jsonStr === '[DONE]') continue;
 
                 try {
-                  const chunk = JSON.parse(jsonStr) as OpenAIResponse;
-                  const text = processChunk(chunk);
+                  const rawChunk = JSON.parse(jsonStr);
+                  const chunkParsed = openAIResponseSchema.safeParse(rawChunk);
+                  if (!chunkParsed.success) {
+                    logger.warn('[llm:openai] malformed SSE chunk discarded', {
+                      event: 'openai.sse.malformed',
+                      site: 'stream_loop',
+                      chunk: jsonStr.slice(0, 200),
+                      error: chunkParsed.error.message,
+                    });
+                    continue;
+                  }
+                  const text = processChunk(chunkParsed.data);
                   if (text) yield text;
                 } catch (err) {
                   if (err instanceof SafetyFilterError) {
@@ -294,9 +306,23 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
                 const jsonStr = trimmed.slice(6);
                 if (jsonStr && jsonStr !== '[DONE]') {
                   try {
-                    const chunk = JSON.parse(jsonStr) as OpenAIResponse;
-                    const text = processChunk(chunk);
-                    if (text) yield text;
+                    const rawChunk = JSON.parse(jsonStr);
+                    const chunkParsed =
+                      openAIResponseSchema.safeParse(rawChunk);
+                    if (!chunkParsed.success) {
+                      logger.warn(
+                        '[llm:openai] malformed SSE chunk discarded',
+                        {
+                          event: 'openai.sse.malformed',
+                          site: 'flush_buffer',
+                          chunk: jsonStr.slice(0, 200),
+                          error: chunkParsed.error.message,
+                        },
+                      );
+                    } else {
+                      const text = processChunk(chunkParsed.data);
+                      if (text) yield text;
+                    }
                   } catch (err) {
                     if (err instanceof SafetyFilterError) {
                       throw err;

@@ -13,6 +13,10 @@ import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
 import { toOpenAIContent } from './openai';
 import { normalizeModelRefusal } from './refusal-envelope';
+import {
+  cerebrasResponseSchema,
+  type CerebrasResponseParsed,
+} from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -65,17 +69,6 @@ interface CerebrasRequest {
   response_format?: { type: 'json_object' };
   // Top-level, OpenAI-style — only sent when the caller sets reasoningEffort.
   reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
-}
-
-interface CerebrasChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
-  finish_reason?: string;
-}
-
-interface CerebrasResponse {
-  choices?: CerebrasChoice[];
-  error?: { message: string; type: string; code?: string };
 }
 
 function toCerebrasMessages(messages: ChatMessage[]): CerebrasMessage[] {
@@ -232,7 +225,14 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
         );
       }
 
-      const data = (await res.json()) as CerebrasResponse;
+      const raw = await res.json();
+      const parsed = cerebrasResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        throw createProviderApiError('Cerebras API', {
+          type: 'invalid_response_shape',
+        });
+      }
+      const data = parsed.data;
 
       if (data.error) {
         // Keep only the structured type/code tokens — the vendor message can
@@ -308,7 +308,9 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
           const decoder = new TextDecoder();
           let buffer = '';
 
-          function processChunk(chunk: CerebrasResponse): string | undefined {
+          function processChunk(
+            chunk: CerebrasResponseParsed,
+          ): string | undefined {
             const finish = chunk.choices?.[0]?.finish_reason;
             if (finish) rawFinishReason = finish;
             if (isContentFilterFinishReason(finish)) {
@@ -334,8 +336,22 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                 if (!jsonStr || jsonStr === '[DONE]') continue;
 
                 try {
-                  const chunk = JSON.parse(jsonStr) as CerebrasResponse;
-                  const text = processChunk(chunk);
+                  const rawChunk = JSON.parse(jsonStr);
+                  const chunkParsed =
+                    cerebrasResponseSchema.safeParse(rawChunk);
+                  if (!chunkParsed.success) {
+                    logger.warn(
+                      '[llm:cerebras] malformed SSE chunk discarded',
+                      {
+                        event: 'cerebras.sse.malformed',
+                        site: 'stream_loop',
+                        chunk: jsonStr.slice(0, 200),
+                        error: chunkParsed.error.message,
+                      },
+                    );
+                    continue;
+                  }
+                  const text = processChunk(chunkParsed.data);
                   if (text) {
                     const out = sniffer.push(text);
                     if (out) yield out;
@@ -363,11 +379,25 @@ export function createCerebrasProvider(apiKey: string): LLMProvider {
                 const jsonStr = trimmed.slice(6);
                 if (jsonStr && jsonStr !== '[DONE]') {
                   try {
-                    const chunk = JSON.parse(jsonStr) as CerebrasResponse;
-                    const text = processChunk(chunk);
-                    if (text) {
-                      const out = sniffer.push(text);
-                      if (out) yield out;
+                    const rawChunk = JSON.parse(jsonStr);
+                    const chunkParsed =
+                      cerebrasResponseSchema.safeParse(rawChunk);
+                    if (!chunkParsed.success) {
+                      logger.warn(
+                        '[llm:cerebras] malformed SSE chunk discarded',
+                        {
+                          event: 'cerebras.sse.malformed',
+                          site: 'flush_buffer',
+                          chunk: jsonStr.slice(0, 200),
+                          error: chunkParsed.error.message,
+                        },
+                      );
+                    } else {
+                      const text = processChunk(chunkParsed.data);
+                      if (text) {
+                        const out = sniffer.push(text);
+                        if (out) yield out;
+                      }
                     }
                   } catch (err) {
                     if (err instanceof SafetyFilterError) {
