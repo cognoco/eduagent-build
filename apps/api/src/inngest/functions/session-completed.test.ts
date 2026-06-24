@@ -152,6 +152,9 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
 const SESSION_ID = '00000000-0000-4000-8000-000000000002';
 const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000004';
+const INTERLEAVED_TOPIC_A = '00000000-0000-4000-8000-000000000031';
+const INTERLEAVED_TOPIC_B = '00000000-0000-4000-8000-000000000032';
+const INTERLEAVED_TOPIC_C = '00000000-0000-4000-8000-000000000033';
 
 // Separate UUIDs used in the BUG-852 wait-for-filing timeout tests so
 // assertions on those specific values remain distinct from the defaults above.
@@ -790,6 +793,18 @@ describe('sessionCompleted', () => {
     expect(mockStep.waitForEvent).not.toHaveBeenCalled();
   });
 
+  it('[WI-696] safe-skips malformed app/session.completed payloads before steps run', async () => {
+    const { result, mockStep } = (await executeSteps(
+      createEventData({ mode: 'not-a-session-mode' }),
+    )) as any;
+
+    expect(result).toEqual(
+      expect.objectContaining({ skipped: true, reason: 'invalid_payload' }),
+    );
+    expect(mockStep.run).not.toHaveBeenCalled();
+    expect(mockStep.waitForEvent).not.toHaveBeenCalled();
+  });
+
   // [BUG-852] When step.waitForEvent('wait-for-filing') returns null (60s
   // timeout fired), we previously proceeded silently with stale topic
   // placement — invisible in production observability. The fix escalates
@@ -1017,7 +1032,11 @@ describe('sessionCompleted', () => {
     it('loops over interleavedTopicIds when present (FR92)', async () => {
       await executeSteps(
         createEventData({
-          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          interleavedTopicIds: [
+            INTERLEAVED_TOPIC_A,
+            INTERLEAVED_TOPIC_B,
+            INTERLEAVED_TOPIC_C,
+          ],
           qualityRating: 4,
         }),
       );
@@ -1026,21 +1045,21 @@ describe('sessionCompleted', () => {
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-a',
+        INTERLEAVED_TOPIC_A,
         4,
         '2026-02-17T10:00:00.000Z',
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-b',
+        INTERLEAVED_TOPIC_B,
         4,
         '2026-02-17T10:00:00.000Z',
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-c',
+        INTERLEAVED_TOPIC_C,
         4,
         '2026-02-17T10:00:00.000Z',
       );
@@ -1050,7 +1069,7 @@ describe('sessionCompleted', () => {
       await executeSteps(
         createEventData({
           topicId: TOPIC_ID,
-          interleavedTopicIds: ['topic-a', 'topic-b'],
+          interleavedTopicIds: [INTERLEAVED_TOPIC_A, INTERLEAVED_TOPIC_B],
           qualityRating: 4,
         }),
       );
@@ -1167,7 +1186,11 @@ describe('sessionCompleted', () => {
     it('loops over interleavedTopicIds when present (FR92)', async () => {
       await executeSteps(
         createEventData({
-          interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
+          interleavedTopicIds: [
+            INTERLEAVED_TOPIC_A,
+            INTERLEAVED_TOPIC_B,
+            INTERLEAVED_TOPIC_C,
+          ],
           qualityRating: 5,
         }),
       );
@@ -1176,19 +1199,19 @@ describe('sessionCompleted', () => {
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-a',
+        INTERLEAVED_TOPIC_A,
         5,
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-b',
+        INTERLEAVED_TOPIC_B,
         5,
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        'topic-c',
+        INTERLEAVED_TOPIC_C,
         5,
       );
     });
@@ -1253,28 +1276,28 @@ describe('sessionCompleted', () => {
       resetDatabaseUrl();
     });
 
-    it('skips when subjectId is not provided', async () => {
-      const { result } = (await executeSteps(
+    it('[WI-696] safe-skips when required subjectId is null', async () => {
+      const { result, mockStep } = (await executeSteps(
         createEventData({ subjectId: null }),
       )) as any;
 
-      const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention',
+      expect(result).toEqual(
+        expect.objectContaining({ skipped: true, reason: 'invalid_payload' }),
       );
-      expect(outcome.status).toBe('skipped');
+      expect(mockStep.run).not.toHaveBeenCalled();
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
       expect(mockUpsertExtractedVocabulary).not.toHaveBeenCalled();
     });
 
-    it('skips when subjectId is undefined', async () => {
-      const { result } = (await executeSteps(
+    it('[WI-696] safe-skips when required subjectId is undefined', async () => {
+      const { result, mockStep } = (await executeSteps(
         createEventData({ subjectId: undefined }),
       )) as any;
 
-      const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention',
+      expect(result).toEqual(
+        expect.objectContaining({ skipped: true, reason: 'invalid_payload' }),
       );
-      expect(outcome.status).toBe('skipped');
+      expect(mockStep.run).not.toHaveBeenCalled();
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
     });
 
@@ -1639,10 +1662,11 @@ describe('sessionCompleted', () => {
 
     it('uses current date when no timestamp provided', async () => {
       const today = new Date().toISOString().slice(0, 10);
-      await executeSteps(
+      const { result } = (await executeSteps(
         createEventData({ timestamp: undefined, qualityRating: 4 }),
-      );
+      )) as any;
 
+      expect(result).toEqual(expect.objectContaining({ status: 'completed' }));
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
@@ -2194,24 +2218,17 @@ describe('sessionCompleted', () => {
       expect(outcome.status).toBe('skipped');
     });
 
-    it('skips and warns for unknown verificationType (C-05)', async () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const { result } = (await executeSteps(
+    it('[WI-696] safe-skips unknown verificationType at the event boundary', async () => {
+      const { result, mockStep } = (await executeSteps(
         createEventData({ verificationType: 'unknown_future_type' }),
       )) as any;
 
-      const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion',
+      expect(result).toEqual(
+        expect.objectContaining({ skipped: true, reason: 'invalid_payload' }),
       );
-      expect(outcome.status).toBe('skipped');
+      expect(mockStep.run).not.toHaveBeenCalled();
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
       expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown verificationType'),
-      );
-
-      consoleSpy.mockRestore();
     });
 
     it('skips silently when verificationType is null (C-05)', async () => {

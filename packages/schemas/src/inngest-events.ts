@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import { verificationTypeSchema } from './assessments.ts';
 import { isoDateField } from './common.ts';
 import { childCapNotificationKindSchema } from './notifications.ts';
 import { subscriptionStatusSchema, subscriptionTierSchema } from './billing.ts';
+import { sessionTypeSchema } from './session-enums.ts';
+import { escalationRungSchema, summaryStatusSchema } from './sessions.ts';
 
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
@@ -42,6 +45,36 @@ export const sessionAutoFileRequestedEventSchema = z.object({
 export type SessionAutoFileRequestedEvent = z.infer<
   typeof sessionAutoFileRequestedEventSchema
 >;
+
+export const sessionCompletedModeSchema = z.enum([
+  'freeform',
+  'learning',
+  'homework',
+  'review',
+  'practice',
+  'relearn',
+  'gap_fill',
+  'recitation',
+]);
+export type SessionCompletedMode = z.infer<typeof sessionCompletedModeSchema>;
+
+export const sessionCompletedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  topicId: z.string().uuid().nullable().optional(),
+  subjectId: z.string().uuid(),
+  sessionType: sessionTypeSchema,
+  mode: sessionCompletedModeSchema.optional(),
+  verificationType: verificationTypeSchema.nullable().optional(),
+  interleavedTopicIds: z.array(z.string().uuid()).optional(),
+  escalationRungs: z.array(escalationRungSchema).optional(),
+  exchangeCount: z.number().int().nonnegative().optional(),
+  summaryStatus: summaryStatusSchema,
+  qualityRating: z.number().optional(),
+  timestamp: isoDateField.optional(),
+  reason: z.string().optional(),
+});
+export type SessionCompletedEvent = z.infer<typeof sessionCompletedEventSchema>;
 
 // PII egress: No `message` / `supportTo` / `metaLines` fields: Inngest
 // persists event payloads in its third-party event store, so the user's

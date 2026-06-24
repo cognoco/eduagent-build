@@ -2,6 +2,8 @@ import type { Database } from '@eduagent/database';
 import {
   getSessionEffectiveMode,
   sessionAutoFileRequestedEventSchema,
+  sessionCompletedEventSchema,
+  sessionCompletedModeSchema,
 } from '@eduagent/schemas';
 
 import { FILING_CONFIG } from '../../config/filing';
@@ -96,6 +98,25 @@ export async function dispatchSessionCompletedEvent(
   );
 
   try {
+    const parsedMode = sessionCompletedModeSchema.safeParse(completion.mode);
+    const eventData = sessionCompletedEventSchema.parse({
+      profileId,
+      sessionId: completion.sessionId,
+      topicId: completion.topicId,
+      subjectId: completion.subjectId,
+      sessionType: completion.sessionType,
+      ...(parsedMode.success ? { mode: parsedMode.data } : {}),
+      verificationType: completion.verificationType,
+      interleavedTopicIds: completion.interleavedTopicIds,
+      escalationRungs: completion.escalationRungs,
+      exchangeCount: completion.exchangeCount,
+      summaryStatus: options.summaryStatus,
+      ...(options.qualityRating != null
+        ? { qualityRating: options.qualityRating }
+        : {}),
+      timestamp: new Date().toISOString(),
+    });
+
     // core-send: pipeline integrity — silent drop breaks dashboard/streaks/memory
     // Inngest event-key dedup. Three routes can reach this dispatch
     // without idempotency middleware: POST /sessions/:id/close, /summary,
@@ -111,23 +132,7 @@ export async function dispatchSessionCompletedEvent(
     await inngest.send({
       id: `session-completed-${completion.sessionId}-${options.summaryStatus}`,
       name: 'app/session.completed',
-      data: {
-        profileId,
-        sessionId: completion.sessionId,
-        topicId: completion.topicId,
-        subjectId: completion.subjectId,
-        sessionType: completion.sessionType,
-        ...(completion.mode ? { mode: completion.mode } : {}),
-        verificationType: completion.verificationType,
-        interleavedTopicIds: completion.interleavedTopicIds,
-        escalationRungs: completion.escalationRungs,
-        exchangeCount: completion.exchangeCount,
-        summaryStatus: options.summaryStatus,
-        ...(options.qualityRating != null
-          ? { qualityRating: options.qualityRating }
-          : {}),
-        timestamp: new Date().toISOString(),
-      },
+      data: eventData,
     });
   } catch (err) {
     // Capture context BEFORE rethrowing so Sentry has the session/profile

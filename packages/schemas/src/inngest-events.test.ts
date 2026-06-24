@@ -4,6 +4,8 @@ import {
   filingRetryCompletedEventSchema,
   filingRetryEventSchema,
   sessionAutoFileRequestedEventSchema,
+  sessionCompletedEventSchema,
+  sessionCompletedModeSchema,
   filingTimedOutEventSchema,
   orphanPersistFailedEventSchema,
   sessionSummaryFailedEventSchema,
@@ -196,6 +198,58 @@ describe('sessionAutoFileRequestedEventSchema', () => {
         reason: 'retry',
       }),
     ).toThrow();
+  });
+});
+
+describe('sessionCompletedEventSchema', () => {
+  const basePayload = {
+    profileId: validUuid,
+    sessionId: validUuid,
+    topicId: validUuid,
+    subjectId: validUuid,
+    sessionType: 'learning',
+    verificationType: 'teach_back',
+    exchangeCount: 3,
+    summaryStatus: 'accepted',
+    timestamp: '2026-06-24T10:00:00.000Z',
+  };
+
+  it('[WI-696] accepts the recitation completion mode without requiring a topic', () => {
+    const parsed = sessionCompletedEventSchema.parse({
+      ...basePayload,
+      topicId: null,
+      mode: 'recitation',
+      interleavedTopicIds: [validUuid],
+      escalationRungs: [1, 3],
+      qualityRating: 4,
+    });
+
+    expect(parsed.mode).toBe('recitation');
+    expect(parsed.topicId).toBeNull();
+  });
+
+  it('[WI-696] rejects malformed session-completed payload fields', () => {
+    const result = sessionCompletedEventSchema.safeParse({
+      ...basePayload,
+      mode: 'not-a-session-mode',
+      exchangeCount: '3',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.path.join('.'))).toEqual(
+        expect.arrayContaining(['mode', 'exchangeCount']),
+      );
+    }
+  });
+
+  it('[WI-696] exposes a mode enum that includes recitation', () => {
+    expect(sessionCompletedModeSchema.safeParse('recitation').success).toBe(
+      true,
+    );
+    expect(
+      sessionCompletedModeSchema.safeParse('not-a-session-mode').success,
+    ).toBe(false);
   });
 });
 

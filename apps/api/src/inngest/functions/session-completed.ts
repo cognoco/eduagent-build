@@ -65,7 +65,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   cefrLevelSchema,
   computeAgeBracket,
-  verificationTypeSchema,
+  sessionCompletedEventSchema,
 } from '@eduagent/schemas';
 import {
   analyzeSessionTranscript,
@@ -391,6 +391,23 @@ export const sessionCompleted = inngest.createFunction(
   },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
+    const parsedEvent = sessionCompletedEventSchema.safeParse(event.data);
+    if (!parsedEvent.success) {
+      const issues = parsedEvent.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
+      logger.warn('[session-completed] invalid payload — skipping retries', {
+        issues,
+      });
+      return {
+        skipped: true as const,
+        reason: 'invalid_payload' as const,
+        issues,
+      };
+    }
+
+    const data = parsedEvent.data;
     const {
       profileId,
       sessionId,
@@ -399,17 +416,17 @@ export const sessionCompleted = inngest.createFunction(
       timestamp,
       verificationType,
       sessionType,
-    } = event.data;
+    } = data;
     // topicId must be `let` so it can be backfilled after the waitForEvent
     // re-read (F-6: filing may complete just before the 60s timeout fires).
-    let topicId = event.data.topicId as string | null | undefined;
+    let topicId = data.topicId;
 
     // AD6: Wait for filing to complete before progressing, so that the
     // progress snapshot captures topic placement from the filing step.
     // Freeform sessions (no topicId) and homework sessions trigger filing
     // as a separate async step; we give it up to 60 s to land.
     const isAbandoned = summaryStatus === 'auto_closed';
-    const eventMode = event.data.mode as string | undefined;
+    const eventMode = data.mode;
     const shouldWaitForFiling =
       (sessionType === 'homework' || !topicId) &&
       !isAbandoned &&
@@ -460,7 +477,7 @@ export const sessionCompleted = inngest.createFunction(
     // F-6: Filing may have backfilled topicId even if the event didn't arrive
     // in time (network delay, retry succeeded). Re-read the session row so
     // downstream steps use the correct topicId and exchangeCount.
-    let exchangeCount = event.data.exchangeCount as number | undefined;
+    let exchangeCount = data.exchangeCount;
     if (!topicId || exchangeCount == null) {
       const freshSession = await step.run('re-read-session', async () => {
         const db = getStepDatabase();
@@ -532,11 +549,8 @@ export const sessionCompleted = inngest.createFunction(
 
     // FR92: Determine which topics need retention updates
     // Interleaved sessions update all practiced topics; others update the single topicId
-    const rawInterleaved = event.data.interleavedTopicIds;
-    const retentionTopicIds: string[] = Array.isArray(rawInterleaved)
-      ? (rawInterleaved as unknown[]).filter(
-          (id): id is string => typeof id === 'string',
-        )
+    const retentionTopicIds: string[] = data.interleavedTopicIds?.length
+      ? data.interleavedTopicIds
       : topicId
         ? [topicId]
         : [];
@@ -547,49 +561,16 @@ export const sessionCompleted = inngest.createFunction(
     const verificationCompletionOutcome = await step.run(
       'process-verification-completion',
       async () => {
-        // C-05: validate verificationType at runtime using Zod schema
-        // from @eduagent/schemas. If the value is invalid or a new type is
-        // added without a handler, we log a warning rather than silently
-        // skipping.
-        const parsed = verificationTypeSchema.safeParse(verificationType);
-        if (!parsed.success) {
-          if (verificationType != null) {
-            // [logging sweep] structured logger so PII fields land as JSON context
-            logger.warn('[session-completed] Unknown verificationType', {
-              verificationType: String(verificationType),
-              profileId,
-            });
-            // [SWEEP-SILENT-RECOVERY] Capture for queryable failure rate —
-            // an unknown verificationType arriving here is a contract drift
-            // signal (new type added without a handler). Without Sentry we
-            // can't quantify how often this fires and where it originates.
-            sentry.captureException(
-              new Error(
-                `session-completed: unknown verificationType ${String(
-                  verificationType,
-                )}`,
-              ),
-              {
-                profileId,
-                extra: {
-                  sessionId,
-                  verificationType: String(verificationType),
-                },
-              },
-            );
-          }
+        if (
+          verificationType == null ||
+          (verificationType !== 'evaluate' && verificationType !== 'teach_back')
+        ) {
           return {
             step: 'process-verification-completion',
             status: 'skipped' as const,
           };
         }
-        const vType = parsed.data;
-        if (vType !== 'evaluate' && vType !== 'teach_back') {
-          return {
-            step: 'process-verification-completion',
-            status: 'skipped' as const,
-          };
-        }
+        const vType = verificationType;
         if (!topicId) {
           return {
             step: 'process-verification-completion',
@@ -621,8 +602,7 @@ export const sessionCompleted = inngest.createFunction(
       typeof verificationCompletionOutcome.qualityRating === 'number'
         ? verificationCompletionOutcome.qualityRating
         : undefined;
-    const completionQualityRating =
-      derivedQualityRating ?? (event.data.qualityRating as number | undefined);
+    const completionQualityRating = derivedQualityRating ?? data.qualityRating;
 
     // Only explicit quality signals advance SM-2. A user-ended, skipped, or
     // crash-recovered session with a couple of exchanges is activity, but not
@@ -648,7 +628,7 @@ export const sessionCompleted = inngest.createFunction(
     // break the D-01 guard used by update-retention.
     outcomes.push(
       await step.run('relearn-retention-reset', async () => {
-        const sessionMode = event.data.mode as string | undefined;
+        const sessionMode = data.mode;
         if (
           sessionMode !== 'relearn' ||
           (exchangeCount ?? 0) <= 0 ||
@@ -1685,10 +1665,10 @@ export const sessionCompleted = inngest.createFunction(
       // (services/learner-profile.ts:1451). The dedup pass already mirrors
       // every event into DedupPassReport counters, so the per-event log is the
       // observability surface, not a control signal.
-      for (const event of dedupResult.events) {
+      for (const dedupEvent of dedupResult.events) {
         logger.info('[memory_facts] dedup outcome', {
-          event: event.name,
-          ...event.data,
+          event: dedupEvent.name,
+          ...dedupEvent.data,
         });
       }
     }
@@ -1738,7 +1718,7 @@ export const sessionCompleted = inngest.createFunction(
       // (exchangeCount > 0) should count toward the streak, UNLESS it
       // was an unattended close (e.g. silence_timeout from the stale-
       // cleanup cron where no learning occurred).
-      const reason = event.data.reason as string | undefined;
+      const reason = data.reason;
       const isUnattended =
         reason != null &&
         (UNATTENDED_REASONS as readonly string[]).includes(reason);
@@ -2048,12 +2028,8 @@ export const sessionCompleted = inngest.createFunction(
         runIsolated('queue-celebrations', profileId, async () => {
           const db = getStepDatabase();
           const quality = completionQualityRating;
-          const currentTopicId = topicId as string | null | undefined;
-          // C-05: Zod runtime validation for verification type
-          const vParsed = verificationTypeSchema.safeParse(verificationType);
-          const currentVerification = vParsed.success
-            ? vParsed.data
-            : undefined;
+          const currentTopicId = topicId;
+          const currentVerification = verificationType ?? undefined;
 
           if (currentVerification === 'evaluate' && (quality ?? 0) >= 4) {
             await queueCelebration(
