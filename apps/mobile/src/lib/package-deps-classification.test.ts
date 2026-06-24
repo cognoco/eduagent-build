@@ -138,7 +138,12 @@ describe('workspace protobufjs dependency security floor [WI-1029]', () => {
 
     for (const [key, snapshot] of Object.entries(snapshots)) {
       if (key.startsWith('@opentelemetry/otlp-transformer@')) {
-        expect(snapshot.dependencies?.protobufjs).toBe('8.6.4');
+        // Newer versions of @opentelemetry/otlp-transformer (>=0.219.0) removed
+        // protobufjs as a direct dependency. Only assert the floor for snapshots
+        // that still include it.
+        if (snapshot.dependencies?.protobufjs !== undefined) {
+          expect(snapshot.dependencies?.protobufjs).toBe('8.6.4');
+        }
       }
 
       if (key.startsWith('@grpc/proto-loader@')) {
