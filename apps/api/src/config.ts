@@ -193,6 +193,17 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+/**
+ * True when running inside Jest / a Node.js test runner (NODE_ENV=test).
+ * Use this instead of raw `process.env['NODE_ENV']` in API code — it
+ * centralises the single place where process.env is read for test detection
+ * and satisfies the G4 typed-config rule for callers (config.ts itself is
+ * exempt from G4 by eslint.config.mjs).
+ */
+export function isNodeTestEnv(): boolean {
+  return process.env['NODE_ENV'] === 'test';
+}
+
 export function isMemoryFactsReadEnabled(value: string | undefined): boolean {
   return value === 'true';
 }

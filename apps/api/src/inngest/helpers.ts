@@ -4,6 +4,7 @@ import {
   createDatabase,
   type Database,
 } from '@eduagent/database';
+import { isNodeTestEnv } from '../config';
 import { captureException } from '../services/sentry';
 
 const stepDatabaseScope = new AsyncLocalStorage<Set<Database>>();
@@ -95,7 +96,7 @@ function getEnvBinding<K extends keyof EnvBindings>(
  * middleware and rely on process.env / hardcoded defaults.
  */
 function warnMissingBinding(bindingKey: keyof EnvBindings): void {
-  if (process.env['NODE_ENV'] === 'test') return;
+  if (isNodeTestEnv()) return;
   captureException(
     new Error(
       `Inngest env binding absent: ${String(bindingKey)} — middleware may not be wired or AsyncLocalStorage context lost`,

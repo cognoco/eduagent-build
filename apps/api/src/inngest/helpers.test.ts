@@ -172,6 +172,7 @@ describe('Inngest helpers', () => {
     let originalNodeEnv: string | undefined;
 
     beforeEach(() => {
+      mockCaptureException.mockClear();
       originalNodeEnv = process.env['NODE_ENV'];
       process.env['NODE_ENV'] = 'production';
       // Ensure no process.env fallbacks are present
