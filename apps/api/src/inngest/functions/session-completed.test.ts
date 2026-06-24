@@ -1873,6 +1873,31 @@ describe('sessionCompleted', () => {
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
     });
 
+    it('[WI-1061] retries transient billing setup before any quota decrement', async () => {
+      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
+      const transientBillingError = new Error('temporary billing read failure');
+      const identityV2 = process.env['IDENTITY_V2_ENABLED'] === 'true';
+      if (identityV2) {
+        mockEnsureFreeSubscriptionV2.mockRejectedValueOnce(
+          transientBillingError,
+        );
+      } else {
+        mockEnsureFreeSubscription.mockRejectedValueOnce(transientBillingError);
+      }
+
+      await expect(
+        executeSteps(createEventData({ sessionType: 'homework' })),
+      ).rejects.toThrow('temporary billing read failure');
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
+
+      await executeSteps(createEventData({ sessionType: 'homework' }));
+
+      expect(mockDecrementQuota).toHaveBeenCalledTimes(1);
+      expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledTimes(1);
+      expect(mockSafeRefundQuota).not.toHaveBeenCalled();
+    });
+
     it('[BREAK] skips LLM and emits structured event when quota exhausted', async () => {
       (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       mockDecrementQuota.mockResolvedValueOnce({
