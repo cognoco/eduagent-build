@@ -429,3 +429,17 @@ describe('dailySnapshotRefresh', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-985] dailySnapshotRefresh — Zod boundary parse regression test
+// ---------------------------------------------------------------------------
+
+describe('[WI-985] dailySnapshotRefresh — event.data parse guard', () => {
+  it('throws ZodError when profileId is not a UUID', async () => {
+    // snapshotRefreshEventSchema.parse() runs before any step.run, so an
+    // invalid profileId throws immediately and Inngest retries the function.
+    await expect(
+      executeRefreshSteps({ profileId: 'not-a-uuid', day: '2026-04-19' }),
+    ).rejects.toThrow(/invalid_string|uuid/i);
+  });
+});
