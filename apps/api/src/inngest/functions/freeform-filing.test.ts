@@ -2,6 +2,7 @@
 // Freeform Filing Retry — Tests [F-5]
 // ---------------------------------------------------------------------------
 
+import { ZodError } from 'zod';
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
 const col = (name: string) => ({ name });
@@ -207,7 +208,6 @@ describe('freeformFilingRetry', () => {
     // With the `as` cast, an invalid profileId would pass through silently.
     // With filingRetryEventSchema.parse(), it must throw a ZodError at the
     // function boundary before any step.run() is called.
-    const { ZodError } = await import('zod');
     await expect(
       executeSteps({
         profileId: 'not-uuid',
