@@ -13,9 +13,13 @@
 // regressed and the handler proceeded to resolveAccountIdV2 / the grant path,
 // the call would throw. Asserting it resolves without throwing proves the guard
 // short-circuited before touching the DB.
+//
+// [WI-1010] Additional mocks for handleBillingIssueV2 inngest.send escalation
+// test. These modules are external boundaries or pattern-a conversions.
 // ---------------------------------------------------------------------------
 
 const mockCaptureMessage = jest.fn();
+const mockCaptureException = jest.fn();
 jest.mock(
   '../../sentry' /* gc1-allow: external boundary (Sentry SDK wrapper) */,
   () => {
@@ -25,7 +29,73 @@ jest.mock(
     return {
       ...actual,
       captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
-      captureException: jest.fn(),
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
+
+// [WI-1010] Inngest client — external Inngest framework boundary.
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../../../inngest/client' /* gc1-allow: external Inngest framework boundary */,
+  () => ({
+    inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
+  }),
+);
+
+// [WI-1010] identity-v2 resolve — DB-backed; pattern-a conversion.
+// Note: resolveAccountIdV2 is defined inline in revenuecat-webhook-handler-v2.ts
+// and calls resolveIdentityV2 from this module. Mocking resolveIdentityV2 is
+// the correct seam.
+const mockResolveIdentityV2 = jest.fn().mockResolvedValue({
+  organizationId: 'account-v2-test',
+});
+jest.mock(
+  '../../identity-v2/identity-resolve' /* gc1-allow: pattern-a conversion — DB-backed; only resolveIdentityV2 is needed */,
+  () => {
+    const actual = jest.requireActual(
+      '../../identity-v2/identity-resolve',
+    ) as typeof import('../../identity-v2/identity-resolve');
+    return {
+      ...actual,
+      resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
+    };
+  },
+);
+
+// [WI-1010] revenuecat-v2 — DB-backed; pattern-a conversion.
+const mockUpdateSubscriptionFromRevenuecatWebhookV2 = jest
+  .fn()
+  .mockResolvedValue({
+    id: 'sub-v2-test',
+    accountId: 'account-v2-test',
+    webhookApplied: true,
+    lastRevenuecatEventId: 'evt_billing_issue_1',
+  });
+jest.mock(
+  './revenuecat-v2' /* gc1-allow: pattern-a conversion — DB-backed; only updateSubscriptionFromRevenuecatWebhookV2 is needed */,
+  () => {
+    const actual = jest.requireActual(
+      './revenuecat-v2',
+    ) as typeof import('./revenuecat-v2');
+    return {
+      ...actual,
+      updateSubscriptionFromRevenuecatWebhookV2: (...args: unknown[]) =>
+        mockUpdateSubscriptionFromRevenuecatWebhookV2(...args),
+    };
+  },
+);
+
+// [WI-1010] safe-refresh-kv-cache-v2 — KV+DB-backed; pattern-a conversion.
+jest.mock(
+  './safe-refresh-kv-cache-v2' /* gc1-allow: pattern-a conversion — KV+DB-backed; no-op in unit tests */,
+  () => {
+    const actual = jest.requireActual(
+      './safe-refresh-kv-cache-v2',
+    ) as typeof import('./safe-refresh-kv-cache-v2');
+    return {
+      ...actual,
+      safeRefreshKvCacheV2: jest.fn().mockResolvedValue(undefined),
     };
   },
 );
@@ -35,6 +105,7 @@ import {
   handleRenewalV2,
   handleProductChangeV2,
   handleNonRenewingPurchaseV2,
+  handleBillingIssueV2,
 } from './revenuecat-webhook-handler-v2';
 import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
 
@@ -174,5 +245,97 @@ describe('[Issue 836] v2 family-share entitlement block', () => {
     ).rejects.toThrow('DB accessed');
 
     expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// [WI-1010] handleBillingIssueV2 inngest.send failure escalation via safeSend.
+//
+// The caller (routes/revenuecat-webhook.ts) wraps each handler in a try/catch
+// that 200-acks RevenueCat regardless of outcome (retry-storm prevention).
+// Before the fix: the app/payment.failed dispatch was a bare inngest.send; if
+// it threw, the error propagated to the route's blanket catch, was logged, and
+// the webhook acked 200 — a silent drop of the billing-observability event.
+//
+// After the fix: the dispatch is routed through the repo's safeSend() helper
+// (apps/api/src/services/safe-non-core.ts), the sanctioned path for non-core
+// observability dispatches. safeSend captures a send failure/stall via the
+// Sentry boundary (captureException, kind 'non-core-send') and never throws, so
+// the function resolves and the 200-ack is preserved while the drop is visible.
+//
+// The REAL safeSend runs here — it is internal code (GC1: never mocked). It
+// imports captureException from ./sentry, which resolves to the SAME module the
+// '../../sentry' mock below replaces, so the mock observes safeSend's escalation.
+//
+// Red → green: replace the safeSend() call with a bare `await inngest.send(...)`
+// and the first test fails (the rejection propagates past the function, so the
+// `.resolves` assertion rejects) and the escalation test fails (captureException
+// is never reached). Restoring safeSend makes both green.
+describe('[WI-1010] handleBillingIssueV2 inngest.send failure escalation', () => {
+  const billingIssueEvent: RevenueCatEvent = {
+    id: 'evt_billing_issue_1',
+    type: 'BILLING_ISSUE',
+    app_user_id: 'clerk_user_billing_1',
+    product_id: 'com.eduagent.plus.monthly',
+    period_type: 'NORMAL',
+    purchased_at_ms: 1700000000000,
+    expiration_at_ms: 1702592000000,
+    event_timestamp_ms: 1700000000000,
+  };
+
+  // A no-op db — handleBillingIssueV2 DB operations are all mocked.
+  const noopDb = {} as never;
+
+  beforeEach(() => {
+    // Ensure inngest.send succeeds by default; tests override as needed.
+    mockInngestSend.mockResolvedValue(undefined);
+    mockResolveIdentityV2.mockResolvedValue({
+      organizationId: 'account-v2-test',
+    });
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue({
+      id: 'sub-v2-test',
+      accountId: 'account-v2-test',
+      webhookApplied: true,
+      lastRevenuecatEventId: 'evt_billing_issue_1',
+    });
+  });
+
+  it('[BREAK] resolves (does not throw) when inngest.send throws — 200-ack preserved', async () => {
+    // safeSend never throws on a rejected dispatch, so the handler resolves and
+    // the route's normal success path (200-ack) is preserved.
+    mockInngestSend.mockRejectedValue(new Error('Inngest unavailable'));
+
+    await expect(
+      handleBillingIssueV2(noopDb, undefined, billingIssueEvent),
+    ).resolves.toBeUndefined();
+  });
+
+  it('[BREAK] escalates to Sentry via safeSend (captureException, kind non-core-send) when inngest.send throws', async () => {
+    const sendError = new Error('Inngest unavailable');
+    mockInngestSend.mockRejectedValue(sendError);
+
+    await handleBillingIssueV2(noopDb, undefined, billingIssueEvent);
+
+    // safeSend captures the rejection through the Sentry boundary. The context
+    // we pass (surface, eventId, accountId) plus safeSend's own kind tag appear
+    // in the extra payload.
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      sendError,
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'revenuecat-webhook-handler-v2.handleBillingIssueV2',
+          kind: 'non-core-send',
+          eventId: 'evt_billing_issue_1',
+          accountId: 'account-v2-test',
+        }),
+      }),
+    );
+  });
+
+  it('does NOT escalate to Sentry when inngest.send succeeds (control)', async () => {
+    // Happy path: inngest.send succeeds, safeSend resolves silently.
+    await handleBillingIssueV2(noopDb, undefined, billingIssueEvent);
+
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });

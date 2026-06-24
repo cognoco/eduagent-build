@@ -445,17 +445,27 @@ export async function handleBillingIssueV2(
   if (!updated) return;
 
   if (shouldDispatchBillingIssue) {
-    // core-send: payment-failed alert — billing observability cannot be silent.
-    await inngest.send({
-      id: `revenuecat-payment-failed:${event.id}`,
-      name: 'app/payment.failed',
-      data: {
-        subscriptionId: updated.id,
-        accountId: updated.accountId,
-        source: 'revenuecat',
-        timestamp: new Date().toISOString(),
-      },
-    });
+    // [WI-1010] Non-core observability dispatch routed through safeSend: it
+    // escalates a send failure/stall to Sentry and never throws, so the webhook
+    // keeps its 200-ack (RevenueCat retry-storm prevention) while a dropped
+    // payment-failed event is still made visible. (Previously a bare inngest.send
+    // whose rejection was swallowed by the caller's blanket 200-ack — a silent
+    // drop.)
+    await safeSend(
+      () =>
+        inngest.send({
+          id: `revenuecat-payment-failed:${event.id}`,
+          name: 'app/payment.failed',
+          data: {
+            subscriptionId: updated.id,
+            accountId: updated.accountId,
+            source: 'revenuecat',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'revenuecat-webhook-handler-v2.handleBillingIssueV2',
+      { eventId: event.id, accountId: updated.accountId },
+    );
   }
 }
 
