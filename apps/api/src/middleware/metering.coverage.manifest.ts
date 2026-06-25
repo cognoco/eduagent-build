@@ -86,6 +86,12 @@ export const LLM_CALL_SITE_EXEMPT: readonly string[] = [
   'apps/api/src/services/homework-summary.ts',
   'apps/api/src/services/memory/dedup-llm.ts',
   'apps/api/src/services/monthly-report.ts',
+  // Post-display suitability judge (MMT-ADR-0016 §7 phase 4). `runSuitabilityJudge`
+  // is invoked only from the Inngest function judge-suitability.ts — a background
+  // calibration call, never HTTP-reachable. It must NOT consume the learner's
+  // quota (it is a system call, not a user-initiated feature), so it is exempt
+  // from the HTTP metering middleware by design.
+  'apps/api/src/services/policy-engine/judge-suitability.ts',
   'apps/api/src/services/session-highlights.ts',
   'apps/api/src/services/session-llm-summary.ts',
   'apps/api/src/services/session-recap.ts',

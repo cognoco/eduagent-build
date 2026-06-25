@@ -102,7 +102,7 @@ function buildUserPrompt(input: SuitabilityJudgeInput): string {
 
 /**
  * Build the vendor-independent suitability-judge prompt as a system+user
- * ChatMessage pair, ready for `routeAndCall(messages, …)`.
+ * ChatMessage pair, ready to pass to the LLM router.
  */
 export function buildSuitabilityJudgePrompt(
   input: SuitabilityJudgeInput,
