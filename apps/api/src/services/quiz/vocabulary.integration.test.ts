@@ -204,7 +204,12 @@ beforeEach(async () => {
   llmProviderCalls.length = 0;
   _clearProviders();
   _resetCircuits();
-  registerProvider(createVocabularyProvider());
+  // [WI-1052] The seeded learner is under-18, now routed off Gemini to an
+  // approved provider. Register the vocab mock under both the legacy Gemini id
+  // and the approved id so the under-18 quiz-generation call selects it.
+  const vocabularyProvider = createVocabularyProvider();
+  registerProvider(vocabularyProvider);
+  registerProvider({ ...vocabularyProvider, id: 'cerebras' });
   await cleanupTestAccounts();
 });
 
