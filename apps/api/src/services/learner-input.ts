@@ -120,6 +120,10 @@ async function parseLearnerInputToAnalysis(
     const result = await routeAndCall(messages, 1, {});
     // [BUG-480] Replace greedy regex with brace-depth walker so prose
     // containing "{...}" mid-paragraph doesn't corrupt the extraction.
+    // [WI-1073 deferred] Two-stage captureException with distinct Sentry site
+    // labels (parseLearnerInputToAnalysis.jsonParse / .safeParse) — these
+    // security-required labels (F-074/WI-579) cannot be preserved with the
+    // seam's single logger.warn contract. See also WI-1073 completion summary.
     const jsonStr = extractFirstJsonObject(result.response);
     if (!jsonStr) {
       return fallbackAnalysis(text, source);

@@ -116,6 +116,10 @@ export async function extractSignalsFromExchangeHistory(
     llmTier: options?.llmTier,
   });
 
+  // [WI-1073 deferred] Two-stage captureException (no_json / invalid_json)
+  // with bespoke per-stage Sentry context; WI-993 already moved this site to
+  // safeParse. Remaining gap: Sentry captures cannot be preserved with the
+  // seam's logger.warn-only contract.
   const jsonStr = extractFirstJsonObject(result.response);
   if (!jsonStr) {
     captureException(

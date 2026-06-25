@@ -348,6 +348,9 @@ export async function fileToLibrary(
   // instead of ad-hoc fence stripping. Log structured failures so filing
   // regressions surface in telemetry instead of bubbling up as opaque
   // SyntaxError stacks.
+  // [WI-1073 deferred] Three-stage captureException (no_json / invalid_json /
+  // schema_violation) with per-stage Sentry context; throws on each failure.
+  // Migrate once the seam supports optional Sentry captures and typed throws.
   const jsonStr = extractFirstJsonObject(llmResult.response);
   if (!jsonStr) {
     const err = new Error('filing: no JSON object found in LLM response');

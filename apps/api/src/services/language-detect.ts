@@ -59,6 +59,9 @@ export async function detectLanguageSubject(
     const result = await routeAndCall(messages, 1);
     // [PROMPT-INJECT-110] Depth-aware extractor; strips markdown fences and
     // doesn't grab past the JSON when the LLM appends prose.
+    // [WI-1073 deferred] No Zod schema — uses a type cast and manual property
+    // inspection; outer try/catch captures parse errors to Sentry. Migrate by
+    // adding a schema here and lifting the Sentry capture out of the outer catch.
     const jsonStr = extractFirstJsonObject(result.response);
     if (!jsonStr) {
       return entryToDetection(hint);
