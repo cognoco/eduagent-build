@@ -915,8 +915,14 @@ export function createScopedRepository(db: Database, profileId: string) {
        * between this SELECT and the subsequent completion UPDATE — that
        * in-flight attempt is then overwritten by the stale snapshot. The
        * status='active' guard prevents double-completion but not lost writes.
-       * Caller must be inside a transaction (otherwise `FOR UPDATE` is a
-       * no-op release-on-statement-end). Returns null when no row matches.
+       *
+       * **Invariant [WI-350]:** must be called as the FIRST operation inside
+       * `db.transaction()`. `.for('update')` is a no-op outside a transaction
+       * (lock releases immediately on statement end), so calling this outside
+       * a transaction silently removes all concurrency protection. Future
+       * quiz-like multi-write flows that skip this lock reintroduce the race.
+       *
+       * Returns null when no row matches.
        */
       async findByIdForUpdate(roundId: string) {
         const rows = await db
