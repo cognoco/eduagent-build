@@ -295,7 +295,10 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
         }),
       ]),
     );
-    expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
+    // [WI-1052] The seeded learner is under-18 (birthYear 2014), now routed off
+    // Gemini to the approved Cerebras provider — so the model is the Cerebras
+    // default, not gemini-2.5-flash (the old value encoded the under-18 leak).
+    expect(llmProviderCalls[0]!.config.model).toBe('gpt-oss-120b');
     const [systemPrompt] = llmProviderCalls[0]!.messages as Array<{
       role: string;
       content: string;
