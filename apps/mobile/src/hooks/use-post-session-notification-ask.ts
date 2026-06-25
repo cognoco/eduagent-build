@@ -13,9 +13,9 @@ import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from '../lib/secure-storage';
-import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import { platformAlert } from '../lib/platform-alert';
 import { Sentry } from '../lib/sentry';
+import { notificationFirstAskKey } from '../lib/secure-store-keys';
 
 const PRIMER_DELAY_MS = 1500;
 
@@ -49,9 +49,7 @@ export function usePostSessionNotificationAsk(
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     void (async () => {
-      const key = sanitizeSecureStoreKey(
-        `notificationFirstAskShown_${profileId}`,
-      );
+      const key = notificationFirstAskKey(profileId);
 
       try {
         const seen = await SecureStore.getItemAsync(key);

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import * as SecureStore from '../lib/secure-storage';
 import { Sentry } from '../lib/sentry';
 import type { DictationPace } from '@eduagent/schemas';
+import {
+  dictationPaceKey,
+  dictationPunctuationKey,
+} from '../lib/secure-store-keys';
 
 // [escalation] SecureStore writes here are best-effort, but per project
 // AGENTS.md "console.warn alone is never sufficient" for fallback paths.
@@ -17,8 +21,8 @@ function reportSecureStoreFailure(
   });
 }
 
-const getPaceKey = (profileId: string) => `dictation-pace-${profileId}`;
-const getPunctKey = (profileId: string) => `dictation-punctuation-${profileId}`;
+const getPaceKey = dictationPaceKey;
+const getPunctKey = dictationPunctuationKey;
 
 export interface DictationPreferences {
   pace: DictationPace;
