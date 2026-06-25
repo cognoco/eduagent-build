@@ -1011,6 +1011,74 @@ describe('useDictationPlayback', () => {
     );
   });
 
+  // AC variant: "previous while paused" — the learner pauses mid-sentence then
+  // taps the previous-sentence button. The hook must clear the pause, stop TTS,
+  // move currentIndex back by one, and immediately start speaking that sentence
+  // from its first chunk (not wait for a resume).
+  it('[WI-903] previous() while paused moves to the previous sentence and starts speaking it', async () => {
+    // Do NOT auto-complete speech — we want to observe speaking state without
+    // the cascade of onDone timers firing during the assertion phase.
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    // Advance past countdown (3500 ms + margin)
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    // Now speaking sentence 0; complete it to trigger the sentence-boundary pause
+    act(() => {
+      capturedOnDone?.();
+    });
+    // Advance past the slow sentence pause (5500 ms) to start sentence 1
+    act(() => {
+      jest.advanceTimersByTime(5500);
+    });
+
+    // Confirm we are on sentence 1 and speaking
+    expect(result.current.currentIndex).toBe(1);
+    expect(result.current.state).toBe('speaking');
+
+    // Pause while on sentence 1
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.state).toBe('paused');
+
+    // Isolate the previous() call from earlier speak/stop history
+    mockSpeak.mockClear();
+    mockStop.mockClear();
+
+    // Act: call previous() while paused
+    act(() => {
+      result.current.previous();
+    });
+
+    // previous() must:
+    // 1. Stop TTS (clears the paused audio)
+    expect(mockStop).toHaveBeenCalled();
+    // 2. Move back to sentence 0
+    expect(result.current.currentIndex).toBe(0);
+    // 3. Start speaking sentence 0 from its first chunk — state is 'speaking', not 'paused'
+    expect(result.current.state).toBe('speaking');
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // [WI-904] Lengthen the pauses between chunks/sentences so the default
   // ('normal') pace gives learners enough time to write. Articulation rate is
