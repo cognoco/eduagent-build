@@ -44,7 +44,6 @@ import type {
 } from '@eduagent/schemas';
 
 import { findAccountByClerkId } from '../account';
-import { getTierConfig } from '../subscription';
 import { captureMessage } from '../sentry';
 import { createLogger } from '../logger';
 import { claimWebhookId } from '../webhook-idempotency';
@@ -54,6 +53,7 @@ import {
   getTopUpCreditsRemaining,
   purchaseTopUpCredits,
 } from '../billing';
+import { extractTierQuota } from './billing-shared';
 import type { SubscriptionRow } from './types';
 
 const logger = createLogger();
@@ -258,7 +258,6 @@ export async function mergeAliasedSubscription(
     //     id so its internal dedup keys off the alias merge, not the original
     //     purchase event.
     if (decision.upgradeSurvivor) {
-      const tierConfig = getTierConfig(decision.survivorTier);
       await updateSubscriptionAndQuotaFromRevenuecatWebhook(
         txDb,
         survivor.accountId,
@@ -269,10 +268,7 @@ export async function mergeAliasedSubscription(
           currentPeriodEnd: decision.survivorPeriodEnd,
           trialEndsAt: decision.survivorTrialEndsAt,
         },
-        {
-          monthlyQuota: tierConfig.monthlyQuota,
-          dailyLimit: tierConfig.dailyLimit,
-        },
+        extractTierQuota(decision.survivorTier),
       );
       changed = true;
     }
