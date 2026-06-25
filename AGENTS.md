@@ -349,6 +349,7 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 - Dev schema iteration can use `drizzle-kit push`.
 - Staging and production must use committed migration SQL plus `drizzle-kit migrate`.
 - Never run `drizzle-kit push` against staging or production.
+- Applied migrations are immutable. CI fails any PR that Modifies, Deletes, or Renames an existing `apps/api/drizzle/NNNN_*.sql` (the `Migration immutability guard (BUG-886)` step in `ci.yml` → `scripts/check-migration-immutability.ts`) — editing an applied migration re-runs its DDL on the next `drizzle-kit migrate` and drifts the schema (the 2026-05 staging-ledger-drift root cause). Write a NEW forward migration instead; a genuinely exceptional change (e.g. a branch-sync renumber) is allowlisted with a reason in `scripts/migration-immutability-allowlist.json`.
 - A worker deploy does not migrate Neon. Apply the target migration before shipping code that reads new columns.
 - Keep staging and production database credentials separate in CI. Never let staging deploys point at production data.
 - Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying whether rollback is possible, what data is lost, and the recovery procedure. If rollback is impossible, say so explicitly.

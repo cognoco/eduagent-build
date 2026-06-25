@@ -225,6 +225,19 @@ jobs:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: pnpm exec tsx scripts/check-gc1-pattern-a.ts
 
+      # Migration-immutability ratchet (BUG-886): applied migrations are
+      # immutable — editing one re-runs its destructive DDL on the next
+      # `drizzle-kit migrate` and drifts the schema (the 2026-05 staging ledger
+      # drift root cause). Git-diff vs the base branch, so an edit can't be
+      # laundered by regenerating a manifest in the same PR; only Modified /
+      # Deleted / Renamed existing migration .sql fail — adding a new migration
+      # is always fine. Same diff-vs-base shape as the GC1 step above.
+      - name: Migration immutability guard (BUG-886)
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: pnpm exec tsx scripts/check-migration-immutability.ts
+
       - name: GitHub workflow supply-chain check
         run: pnpm run check:github-workflow-security
 
