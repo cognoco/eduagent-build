@@ -1257,10 +1257,14 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockCompleteRoundMutate).toHaveBeenCalled();
     });
-    expect(mockSentryCapture).toHaveBeenCalledWith({
-      code: 'INTERNAL_ERROR',
-      message: 'server-shape',
-    });
+    // [#887] The raw server envelope is still forwarded to Sentry as the first
+    // arg; the second arg now carries the per-action fingerprint tags.
+    expect(mockSentryCapture).toHaveBeenCalledWith(
+      { code: 'INTERNAL_ERROR', message: 'server-shape' },
+      expect.objectContaining({
+        tags: { component: 'quiz/play', action: 'complete_round' },
+      }),
+    );
   });
 
   it('[BUG-806] completeRound onError forwards Error message via formatApiError', async () => {
@@ -1275,8 +1279,13 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockCompleteRoundMutate).toHaveBeenCalled();
     });
+    // [#887] The Error is still forwarded as the first arg; the second arg now
+    // carries the per-action fingerprint tags.
     expect(mockSentryCapture).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Round save failed: 500' }),
+      expect.objectContaining({
+        tags: { component: 'quiz/play', action: 'complete_round' },
+      }),
     );
   });
 

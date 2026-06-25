@@ -30,7 +30,10 @@ interface SubjectFixture {
   books: BookFixture[];
 }
 
-function makeLibraryBooksResponse(subjects: SubjectFixture[]) {
+function makeLibraryBooksResponse(
+  subjects: SubjectFixture[],
+  nextCursor: string | null = null,
+) {
   return new Response(
     JSON.stringify({
       subjects: subjects.map((s) => ({
@@ -48,6 +51,7 @@ function makeLibraryBooksResponse(subjects: SubjectFixture[]) {
           updatedAt: '2026-01-01T00:00:00.000Z',
         })),
       })),
+      nextCursor,
     }),
     { status: 200 },
   );
@@ -281,13 +285,233 @@ describe('useAllBooks', () => {
       wrapper: createWrapper(),
     });
 
+    // useInfiniteQuery stores pages[] — first page is pages[0]
     await waitFor(() => {
       const cached = queryClient.getQueryData([
         'library',
         'books',
         'test-profile-id',
-      ]) as { subjects: Array<{ books: Array<{ id: string }> }> } | undefined;
-      expect(cached?.subjects[0]?.books[0]?.id).toBe('b1');
+      ]) as
+        | {
+            pages: Array<{ subjects: Array<{ books: Array<{ id: string }> }> }>;
+          }
+        | undefined;
+      expect(cached?.pages[0]?.subjects[0]?.books[0]?.id).toBe('b1');
     });
+  });
+
+  // ---- [WI-966] Multi-page / cursor pagination ----
+
+  it('[WI-966] flattens books across multiple pages', async () => {
+    const CURSOR_PAGE2 = '550e8400-e29b-41d4-a716-446655440099';
+    // Page 1: one subject, one built book; nextCursor points to page 2
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        CURSOR_PAGE2,
+      ),
+    );
+    // Page 2: second subject, one built book; nextCursor=null (last page)
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's2',
+            subjectName: 'Science',
+            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+          },
+        ],
+        null,
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    // The hook auto-drains both pages (no manual fetchNextPage needed); the
+    // explicit fetchNextPage() API remains exposed and is a safe no-op once
+    // drained. Both pages must flatten into books[].
+    await waitFor(() => {
+      expect(result.current.books.length).toBe(2);
+    });
+
+    // Calling the exposed fetchNextPage after exhaustion is a harmless no-op.
+    result.current.fetchNextPage();
+
+    expect(result.current.hasNextPage).toBe(false);
+    const ids = result.current.books.map((b: EnrichedBook) => b.book.id);
+    expect(ids).toContain('b1');
+    expect(ids).toContain('b2');
+  });
+
+  it('[WI-966] auto-drains all pages so page-2 books appear WITHOUT a manual fetchNextPage', async () => {
+    // This is the behaviour-preservation guard: library.tsx consumes the full
+    // flattened book list and never calls fetchNextPage. A profile with >1
+    // page of subjects must still surface every book, exactly like the
+    // pre-pagination one-shot fetch.
+    const CURSOR_PAGE2 = '550e8400-e29b-41d4-a716-446655440099';
+    const CURSOR_PAGE3 = '550e8400-e29b-41d4-a716-446655440100';
+    // Page 1 → nextCursor page 2
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        CURSOR_PAGE2,
+      ),
+    );
+    // Page 2 → nextCursor page 3
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's2',
+            subjectName: 'Science',
+            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+          },
+        ],
+        CURSOR_PAGE3,
+      ),
+    );
+    // Page 3 → last page (nextCursor=null)
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's3',
+            subjectName: 'History',
+            books: [{ id: 'b3', title: 'Rome', topicsGenerated: true }],
+          },
+        ],
+        null,
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    // No manual fetchNextPage(): the hook should drain all 3 pages on its own.
+    await waitFor(() => {
+      expect(result.current.books.length).toBe(3);
+    });
+
+    expect(result.current.hasNextPage).toBe(false);
+    const ids = result.current.books.map((b: EnrichedBook) => b.book.id);
+    expect(ids).toContain('b1'); // page 1
+    expect(ids).toContain('b2'); // page 2 — the regression the rework fixes
+    expect(ids).toContain('b3'); // page 3
+    // All three pages were actually requested from the server.
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('[WI-966] exposes hasNextPage=false on last page', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        null, // nextCursor=null → last page
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.books.length).toBe(1);
+  });
+
+  // ---- [WI-966] isFullyLoaded ----
+
+  it('[WI-966] isFullyLoaded is true only once all pages have drained (single page)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        null, // last page — no drain needed
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      // Single page — isFullyLoaded and isSuccess converge immediately.
+      expect(result.current.isFullyLoaded).toBe(true);
+    });
+
+    expect(result.current.isSuccess).toBe(true);
+    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.isFetchingNextPage).toBe(false);
+  });
+
+  it('[WI-966] isFullyLoaded is true after the auto-drain of a multi-page response finishes', async () => {
+    const CURSOR_PAGE2 = '550e8400-e29b-41d4-a716-446655440099';
+    // Page 1 returns a cursor; page 2 is the last.
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        CURSOR_PAGE2,
+      ),
+    );
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's2',
+            subjectName: 'Science',
+            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+          },
+        ],
+        null, // last page
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    // isFullyLoaded must only become true once ALL pages are loaded.
+    await waitFor(() => {
+      expect(result.current.isFullyLoaded).toBe(true);
+    });
+
+    // Both books visible — drain completed.
+    expect(result.current.books).toHaveLength(2);
+    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.isFetchingNextPage).toBe(false);
   });
 });

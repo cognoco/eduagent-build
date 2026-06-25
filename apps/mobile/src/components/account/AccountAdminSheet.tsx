@@ -131,7 +131,7 @@ export function AccountAdminSheet(): React.ReactElement {
                 router.push({
                   pathname: '/create-profile',
                   params: { for: 'child' },
-                } as never)
+                } as Href)
               }
               testID="account-admin-add-child"
             />

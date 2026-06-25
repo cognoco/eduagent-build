@@ -4,6 +4,7 @@ import {
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
   isManagedTierActive,
+  isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionBindings,
@@ -870,5 +871,30 @@ describe('isProfileInDedupRollout', () => {
     }
     expect(inRollout / count).toBeGreaterThan(0.25);
     expect(inRollout / count).toBeLessThan(0.35);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1051] isMaintenanceProductionEnabled unit tests
+// ---------------------------------------------------------------------------
+// The helper is intentionally fail-closed: ONLY the literal string 'true' opts
+// in; 'false', '1', 'yes', and undefined all return false. These tests verify
+// the semantics directly (independent of the route-level integration tests in
+// [BUG-875] above).
+describe('isMaintenanceProductionEnabled [WI-1051]', () => {
+  it("returns true for the exact string 'true'", () => {
+    expect(isMaintenanceProductionEnabled('true')).toBe(true);
+  });
+
+  it("returns false for the string 'false'", () => {
+    expect(isMaintenanceProductionEnabled('false')).toBe(false);
+  });
+
+  it('returns false for undefined (no flag set)', () => {
+    expect(isMaintenanceProductionEnabled(undefined)).toBe(false);
+  });
+
+  it("returns false for '1' (JS-truthy string, not the required literal)", () => {
+    expect(isMaintenanceProductionEnabled('1')).toBe(false);
   });
 });

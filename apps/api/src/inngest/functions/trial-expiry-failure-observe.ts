@@ -16,6 +16,7 @@
 
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureMessage } from '../../services/sentry';
 
 const logger = createLogger();
 
@@ -39,6 +40,26 @@ export const trialExpiryFailureObserve = inngest.createFunction(
       reason: data.reason ?? 'unknown',
       eventTimestamp: data.timestamp ?? null,
       receivedAt: new Date().toISOString(),
+    });
+
+    // [#887] Billing failures must escalate to Sentry, not just the log
+    // stream — "silent recovery without escalation is banned in billing"
+    // (AGENTS.md). captureMessage (not captureException) because the upstream
+    // Error was already consumed at the throw site; this handler receives only
+    // the structured failure event, so an independently-queryable message with
+    // the failure context is the right signal for on-call alerting.
+    captureMessage('billing.trial_expiry_failed', {
+      level: 'error',
+      tags: {
+        surface: 'billing',
+        event: 'trial_expiry_failed',
+        step: data.step ?? 'unknown',
+      },
+      extra: {
+        trialId: data.trialId ?? 'unknown',
+        reason: data.reason ?? 'unknown',
+        eventTimestamp: data.timestamp ?? null,
+      },
     });
 
     return {

@@ -14,6 +14,7 @@ import { createMiddleware } from 'hono/factory';
 import { validateEnv, validateProductionBindings } from '../config';
 import type { Env, ProductionBindings } from '../config';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 
 const logger = createLogger();
 
@@ -77,6 +78,13 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
               ? err.message
               : 'Environment validation failed';
           logger.error('[env-validation]', { message });
+          // [#887] A misconfigured Worker 500s every request; logger.error
+          // alone never reaches Sentry (the logger does not forward), so
+          // on-call has no alert. Capture so the config failure is visible.
+          captureException(err, {
+            tags: { surface: 'env-validation', phase: 'zod-parse' },
+            extra: { message },
+          });
           // [BUG-486] Do NOT update _validatedEnvHash on failure — next
           // request with the same env will retry validation.
           return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
@@ -94,6 +102,12 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
           logger.error('[env-validation] binding gate failed', {
             event: 'env-validation.binding_gate_failed',
             missing: bindingResult.missing,
+          });
+          // [#887] Same as the zod path: a production binding gate that 500s
+          // all traffic must escalate to Sentry, not just the log stream.
+          captureException(new Error(message), {
+            tags: { surface: 'env-validation', phase: 'binding-gate' },
+            extra: { missing: bindingResult.missing },
           });
           // [BUG-486] Do NOT update _validatedEnvHash — binding failures are
           // retried on the next request (binding may become available).

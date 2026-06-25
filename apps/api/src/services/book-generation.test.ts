@@ -158,6 +158,28 @@ describe('book-generation', () => {
       }
     });
 
+    it('does not route to Gemini for under-18 learners (MMT-ADR-0016 §10.1)', async () => {
+      // Regression test: under-18 learners must never be routed to Gemini.
+      // Without the fix, callBookGenerationJson passes providerPolicy: 'gemini_only'
+      // unconditionally; with the fix it is omitted for learnerAge < 18.
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'broad',
+            books: generatedBooksFixture(),
+          }),
+        ),
+      );
+
+      await detectSubjectType('Biology', 15);
+
+      expect(mockRouteAndCall).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ providerPolicy: 'gemini_only' }),
+      );
+    });
+
     it('includes age-register guidance in the subject structure prompt', async () => {
       mockRouteAndCall.mockResolvedValueOnce(
         llmRouteResult(
@@ -247,9 +269,14 @@ describe('book-generation', () => {
         3,
         expect.objectContaining({
           flow: 'book.generation',
-          providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),
+      );
+      // learnerAge=11 (under-18): must NOT route to Gemini (MMT-ADR-0016 §10.1)
+      expect(mockRouteAndCall).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ providerPolicy: 'gemini_only' }),
       );
     });
 
@@ -287,9 +314,14 @@ describe('book-generation', () => {
         3,
         expect.objectContaining({
           flow: 'book.generation',
-          providerPolicy: 'gemini_only',
           responseFormat: 'json',
         }),
+      );
+      // learnerAge=11 (under-18): must NOT route to Gemini (MMT-ADR-0016 §10.1)
+      expect(mockRouteAndCall).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ providerPolicy: 'gemini_only' }),
       );
     });
 
