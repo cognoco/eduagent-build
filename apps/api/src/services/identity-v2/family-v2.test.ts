@@ -1,37 +1,9 @@
-// ---------------------------------------------------------------------------
-// [WI-959] getFirstActiveChildNameV2 — single bounded person query
-//
-// Problem: the original implementation called getChargePersonIds to get all
-// charge ids, then issued one serial db.query.person.findFirst per charge id
-// until it found a non-archived child — N round-trips in the worst case.
-//
-// Fix: after obtaining the charge ids, issue a single db.query.person.findFirst
-// with inArray(person.id, charges) AND isNull(person.archivedAt) — one bounded
-// query regardless of how many charges the guardian holds.
-//
-// Red-green evidence:
-//   GREEN (fix applied):  db.query.person.findFirst is called exactly once even
-//     when there are multiple charges (two archived + one active), and returns
-//     the first active child's display name.
-//   RED   (fix reverted to serial): db.query.person.findFirst would be called N
-//     times (once per charge) — the mock would be called 3 times (two returning
-//     null/archived, one returning the active child), making the
-//     "called exactly once" assertion fail.
-// ---------------------------------------------------------------------------
+// [WI-959] Red-green guard: person.findFirst must be called once (inArray), not N times (serial loop).
 
 import type { Database } from '@eduagent/database';
 import { getFirstActiveChildNameV2 } from './family-v2';
 
-// ---------------------------------------------------------------------------
-// Fake DB builder
-// ---------------------------------------------------------------------------
-
-/**
- * Collect all string values that appear as leaves in any Drizzle AST object.
- * Used to detect which charge ids are referenced by the `where` clause — this
- * lets the mock behave correctly for both the OLD code (eq(person.id, singleId))
- * and the NEW code (inArray(person.id, [id1, id2, ...])).
- */
+// Collect string leaves from a Drizzle AST node — detects ids in eq() and inArray() WHERE clauses.
 function collectStrings(node: unknown, seen = new Set<unknown>()): string[] {
   if (node == null || typeof node !== 'object' || seen.has(node)) return [];
   seen.add(node);
@@ -50,34 +22,15 @@ function collectStrings(node: unknown, seen = new Set<unknown>()): string[] {
   return strs;
 }
 
-/**
- * Builds a hand-rolled fake Database that drives the REAL
- * getFirstActiveChildNameV2 (+ real getChargePersonIds internally). The DB
- * is a true external boundary; we substitute it with a fake rather than
- * mocking internal modules (GC1 rule).
- *
- * The fake exposes two surfaces:
- *  - `guardianship.findMany` — returns the configured charge ids (active edges).
- *  - `person.findFirst` — the call we are counting and asserting.
- *
- * The `person.findFirst` mock simulates the DB predicate by:
- *  - Collecting all string values from `args.where` (the Drizzle AST).
- *  - Finding the first person whose id appears in those strings AND whose
- *    archivedAt is null. This correctly handles both `eq(person.id, singleId)`
- *    (OLD code) and `inArray(person.id, [...ids])` (NEW code).
- */
+// Fake Database: guardianship.findMany returns chargeIds; person.findFirst simulates the WHERE predicate.
 function makeDb(options: {
   chargeIds: string[];
-  /** Map of personId → { displayName, archivedAt }; persons NOT in the map are absent. */
   persons: Map<string, { displayName: string; archivedAt: Date | null }>;
 }) {
   const personFindFirstMock = jest
     .fn()
     .mockImplementation(async (args?: { where?: unknown }) => {
-      // Collect all string values from the WHERE AST to find referenced ids.
       const referencedIds = new Set(collectStrings(args?.where));
-      // Return the first person whose id is in the WHERE AST and is not archived.
-      // This correctly simulates both the old single-id eq() and the new inArray().
       for (const [personId, p] of options.persons) {
         if (referencedIds.has(personId) && p.archivedAt === null) {
           return { displayName: p.displayName };
@@ -103,10 +56,6 @@ function makeDb(options: {
 
   return { db, personFindFirstMock };
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('[WI-959] getFirstActiveChildNameV2 — single bounded person query', () => {
   beforeEach(() => {
