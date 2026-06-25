@@ -848,7 +848,20 @@ export type ExplainTopicResponse = z.infer<typeof explainTopicResponseSchema>;
 
 // --- Book route response schemas ---
 
-/** GET /library/books — all books grouped by subject */
+/** GET /library/books — books grouped by subject with optional cursor pagination.
+ *
+ * [WI-966] Added `nextCursor` and `limit` support so callers can page through
+ * subjects instead of receiving every subject+book in one response. When
+ * `nextCursor` is null the caller has received all subjects.
+ */
+export const getAllProfileBooksQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  cursor: z.string().uuid().optional(),
+});
+export type GetAllProfileBooksQuery = z.infer<
+  typeof getAllProfileBooksQuerySchema
+>;
+
 export const getAllProfileBooksResponseSchema = z.object({
   subjects: z.array(
     z.object({
@@ -857,6 +870,9 @@ export const getAllProfileBooksResponseSchema = z.object({
       books: z.array(curriculumBookSchema),
     }),
   ),
+  /** Opaque cursor (subjectId of the last item in this page).
+   * `null` means this is the last page. */
+  nextCursor: z.string().uuid().nullable(),
 });
 export type GetAllProfileBooksResponse = z.infer<
   typeof getAllProfileBooksResponseSchema

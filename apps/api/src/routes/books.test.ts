@@ -154,7 +154,9 @@ jest.mock('../services/curriculum', () => {
   return {
     ...actual,
     getBooks: jest.fn().mockResolvedValue([]),
-    getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
+    getAllProfileBooks: jest
+      .fn()
+      .mockResolvedValue({ subjects: [], nextCursor: null }),
     getBookWithTopics: jest.fn().mockResolvedValue(null),
     persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
     claimBookForGeneration: jest.fn().mockResolvedValue(null),
@@ -485,6 +487,7 @@ describe('book routes', () => {
             books: [mockBook as never],
           },
         ],
+        nextCursor: null,
       });
 
       const res = await app.request(
@@ -498,11 +501,80 @@ describe('book routes', () => {
       expect(body.subjects).toHaveLength(1);
       expect(body.subjects[0].subjectId).toBe(SUBJECT_ID);
       expect(body.subjects[0].books).toHaveLength(1);
+      expect(body.nextCursor).toBeNull();
       expect(mockGetAllProfileBooks).toHaveBeenCalledTimes(1);
       // Second arg must be the profile ID — proves the route passes scope.
       expect((mockGetAllProfileBooks as jest.Mock).mock.calls[0]?.[1]).toBe(
         'test-profile-id',
       );
+    });
+
+    // ---- [WI-966] Pagination: limit + cursor query params ----
+
+    it('[WI-966] forwards limit and cursor query params to getAllProfileBooks', async () => {
+      const CURSOR_ID = '550e8400-e29b-41d4-a716-446655440099';
+      mockGetAllProfileBooks.mockResolvedValueOnce({
+        subjects: [],
+        nextCursor: null,
+      });
+
+      const res = await app.request(
+        `/v1/library/books?limit=10&cursor=${CURSOR_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockGetAllProfileBooks).toHaveBeenCalledTimes(1);
+      const call = (mockGetAllProfileBooks as jest.Mock).mock.calls[0];
+      // Third arg is the options object with limit + cursor
+      expect(call?.[2]).toEqual({ limit: 10, cursor: CURSOR_ID });
+    });
+
+    it('[WI-966] returns nextCursor when more pages exist', async () => {
+      const NEXT_CURSOR = '550e8400-e29b-41d4-a716-446655440099';
+      mockGetAllProfileBooks.mockResolvedValueOnce({
+        subjects: [
+          {
+            subjectId: SUBJECT_ID,
+            subjectName: 'History',
+            books: [mockBook as never],
+          },
+        ],
+        nextCursor: NEXT_CURSOR,
+      });
+
+      const res = await app.request(
+        '/v1/library/books?limit=1',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.nextCursor).toBe(NEXT_CURSOR);
+    });
+
+    it('[WI-966] returns 400 for invalid limit (exceeds max of 50)', async () => {
+      const res = await app.request(
+        '/v1/library/books?limit=51',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetAllProfileBooks).not.toHaveBeenCalled();
+    });
+
+    it('[WI-966] returns 400 for non-UUID cursor', async () => {
+      const res = await app.request(
+        '/v1/library/books?cursor=not-a-uuid',
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockGetAllProfileBooks).not.toHaveBeenCalled();
     });
 
     it('returns 400 when authenticated but missing X-Profile-Id header', async () => {
