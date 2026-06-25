@@ -4,7 +4,7 @@ export type SupportedSSOStrategy =
   | `oauth_custom_${string}`;
 
 export function getOpenAISSOStrategy(): `oauth_custom_${string}` | null {
-  const key = process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY?.trim();
+  const key = process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG?.trim();
   if (!key) return null;
   return `oauth_custom_${key}`;
 }
