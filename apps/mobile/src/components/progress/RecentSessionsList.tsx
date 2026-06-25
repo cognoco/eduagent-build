@@ -46,8 +46,8 @@ export function RecentSessionsList({
         label: t('parentView.index.startSession', {
           defaultValue: 'Start a session',
         }),
-        // [WI-1067] Push ancestor first so router.back() from session returns
-        // to the child profile view rather than falling through to Home tab.
+        // [WI-1067] Push the family home screen first so router.back() from session returns
+        // to home rather than falling through to the active tab's first route. Mirrors pushLearningResumeTarget.
         onPress: () => {
           router.push('/(app)/home' as Href);
           router.push('/(app)/session' as Href);
