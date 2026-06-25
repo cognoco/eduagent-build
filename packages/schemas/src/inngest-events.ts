@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isoDateField } from './common.ts';
 import { childCapNotificationKindSchema } from './notifications.ts';
 import { subscriptionStatusSchema, subscriptionTierSchema } from './billing.ts';
+import { conversationLanguageSchema } from './profiles.ts';
 
 export const filingTimedOutEventSchema = z.object({
   sessionId: z.string().uuid(),
@@ -249,6 +250,43 @@ export const topicProbeRequestedEventSchema = z.object({
 });
 export type TopicProbeRequestedEvent = z.infer<
   typeof topicProbeRequestedEventSchema
+>;
+
+// PII egress: No raw `reply` / `precedingLearnerMessage` text. Inngest persists
+// event payloads in its third-party event store, so the tutor reply under review
+// and the learner's preceding message must never ride in the event. The payload
+// carries opaque `session_events` row references — `replyEventId` (the
+// ai_response row) and the nullable `precedingLearnerMessageEventId` (the
+// immediately-preceding user_message row, null when the reply opens the
+// exchange). The consumer (judge-suitability) rehydrates both texts from the DB,
+// scoped by profileId, inside ONE step closure and returns only the non-PII
+// verdict projection. (MMT-ADR-0016 §2 data minimization — same
+// reference-and-rehydrate class as WI-620's review-calibration site.)
+export const suitabilityJudgeRequestedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  /** session_events row id of the tutor reply under review (eventType ai_response). */
+  replyEventId: z.string().uuid(),
+  /**
+   * session_events row id of the immediately-preceding learner message, or null
+   * when the reply opens the exchange. The data-minimization cap (§2): at most
+   * one preceding turn.
+   */
+  precedingLearnerMessageEventId: z.string().uuid().nullable(),
+  /** Coarse age band — frames age-appropriateness without a birth year. */
+  ageBracket: z.enum(['child', 'adolescent', 'adult']),
+  /** Tutor model vendor — the judge must not share it (§2 vendor-independence). */
+  tutorVendor: z.string().min(1),
+  /** Tutor model id — recorded on the verdict metric for per-model calibration. */
+  tutorModel: z.string().min(1),
+  /** Exchange flow label — recorded on the verdict metric. */
+  flow: z.string().min(1),
+  /** Optional tutor-prose language hint so the judge reads the exchange correctly. */
+  conversationLanguage: conversationLanguageSchema.optional(),
+  timestamp: isoDateField,
+});
+export type SuitabilityJudgeRequestedEvent = z.infer<
+  typeof suitabilityJudgeRequestedEventSchema
 >;
 
 export const streakRecordEventSchema = z.object({

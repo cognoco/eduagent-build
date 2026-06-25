@@ -154,6 +154,15 @@ const envSchema = z.object({
   // the build spec; this flag only controls the code path.
   LLM_ROUTING_V2_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Suitability-judge framework (MMT-ADR-0016 §7 phase 4). Default-OFF: while
+  // 'false', the exchange path dispatches NO post-display judge — zero behavior
+  // change. Flipped to 'true' in STAGING first to calibrate flag rates from the
+  // judge.verdict / judge.degraded metrics before any phase-5 pre-display
+  // gating. Production stays off until the vendor/DPA gates in
+  // docs/registers/llm-models/master.md clear. The judge is post-display and
+  // fail-open, so the flag only controls whether the calibration dispatch fires.
+  JUDGE_FRAMEWORK_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -270,6 +279,17 @@ export function isChallengeRoundRuntimeEnabled(
  * never accidentally cuts over. See the gpt-oss-cerebras-build spec.
  */
 export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Suitability-judge framework gate (MMT-ADR-0016 §7 phase 4). Read at the
+ * exchange route boundary and threaded into processMessage/streamMessage as
+ * `options.judgeFrameworkEnabled`; gates the post-display judge dispatch.
+ * Default-closed: undefined / anything other than 'true' fires NO dispatch, so
+ * a missing binding never accidentally turns the judge on.
+ */
+export function isJudgeFrameworkEnabled(value: string | undefined): boolean {
   return value === 'true';
 }
 
