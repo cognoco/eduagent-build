@@ -52,6 +52,7 @@ import {
 import { useSubjects } from '../../../hooks/use-subjects';
 import {
   pushChildReport,
+  pushChildReports,
   pushChildWeeklyReport,
   pushLearningResumeTarget,
 } from '../../../lib/navigation';
@@ -618,13 +619,16 @@ export default function ProgressScreen(): React.ReactElement {
                     {t('progress.previousReports.title')}
                   </Text>
                   <Pressable
-                    onPress={() =>
-                      router.push(
-                        isViewingSelf
-                          ? ('/(app)/progress/reports' as Href)
-                          : (`/(app)/child/${selectedProfileId}/reports` as Href),
-                      )
-                    }
+                    onPress={() => {
+                      if (isViewingSelf) {
+                        router.push('/(app)/progress/reports' as Href);
+                      } else if (selectedProfileId) {
+                        // [WI-1067] Use the navigation helper to push the full
+                        // ancestor chain (child index first, then reports) so
+                        // router.back() from the reports screen returns correctly.
+                        pushChildReports(router, selectedProfileId);
+                      }
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={t('progress.previousReports.viewAll')}
                     testID="progress-reports-link"
@@ -647,13 +651,14 @@ export default function ProgressScreen(): React.ReactElement {
             {selectedProfileId && !hasAnyReports ? (
               <Pressable
                 testID="progress-view-all-reports"
-                onPress={() =>
-                  router.push(
-                    isViewingSelf
-                      ? ('/(app)/progress/reports' as Href)
-                      : (`/(app)/child/${selectedProfileId}/reports` as Href),
-                  )
-                }
+                onPress={() => {
+                  if (isViewingSelf) {
+                    router.push('/(app)/progress/reports' as Href);
+                  } else {
+                    // [WI-1067] Push ancestor chain so router.back() returns correctly.
+                    pushChildReports(router, selectedProfileId);
+                  }
+                }}
                 className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('progress.guardian.viewAllReports')}

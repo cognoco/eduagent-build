@@ -427,8 +427,15 @@ describe('ParentHomeScreen', () => {
 
     fireEvent.press(result.getByTestId('parent-home-weekly-report-child-a'));
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a/reports');
+    // [WI-1067] pushChildReports pushes the ancestor chain: child profile index
+    // first, then the reports leaf — so router.back() from reports returns to
+    // the child profile screen rather than falling through to the Home tab.
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/child/child-a');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/child/[profileId]/reports',
+      params: { profileId: 'child-a' },
+    });
   });
 
   it('keeps parent learning out of the family summary when there is no parent activity', () => {
