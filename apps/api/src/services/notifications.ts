@@ -94,7 +94,16 @@ export async function sendPushNotification(
   options?: {
     skipRateLimitLog?: boolean;
     skipDailyCap?: boolean;
-    respectPushPreference?: boolean;
+    /**
+     * [WI-369] Push-preference check is ON by default. Set to true only for
+     * transactional / regulatory notices that MUST always deliver (GDPR consent
+     * notices, billing/trial-expiry), or when the caller has already verified
+     * pushEnabled before calling (e.g. the struggle-notification path, which
+     * checks before reserving the dedup slot so push-disabled parents do not
+     * consume their slot). Reminders/nudges must NOT set this — they respect the
+     * recipient's master push preference.
+     */
+    bypassPreferenceCheck?: boolean;
   },
 ): Promise<NotificationResult> {
   // 1. Get push token
@@ -108,11 +117,13 @@ export async function sendPushNotification(
     return { sent: false, reason: 'invalid_token' };
   }
 
-  // [WI-226] When the caller opts in, honor the recipient's master push
-  // preference. The central helper previously checked only token + cap, so
-  // direct callers could deliver to profiles that disabled push.
+  // [WI-226 / WI-369] Honor the recipient's master push preference unless the
+  // caller opts out (bypassPreferenceCheck=true) for a transactional/regulatory
+  // notice or because it already verified pushEnabled. Previously this check was
+  // opt-in (respectPushPreference); it is now enforced by default so callers
+  // cannot accidentally bypass user consent by omitting the flag.
   if (
-    options?.respectPushPreference &&
+    !options?.bypassPreferenceCheck &&
     !(await isPushEnabled(db, payload.profileId))
   ) {
     return { sent: false, reason: 'push_disabled' };
@@ -447,16 +458,13 @@ export async function notifyParentToSubscribe(
   }
 
   // 4. Send push notification to parent
-  await sendPushNotification(
-    db,
-    {
-      profileId: parentProfileId,
-      title: `${childName} wants to keep learning!`,
-      body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
-      type: 'subscribe_request',
-    },
-    { respectPushPreference: true },
-  );
+  // [WI-369] No options needed — push preference is enforced by default.
+  await sendPushNotification(db, {
+    profileId: parentProfileId,
+    title: `${childName} wants to keep learning!`,
+    body: `${childName} has been making great progress. Subscribe to continue their learning journey.`,
+    type: 'subscribe_request',
+  });
 
   // 5. Send email to parent (via consent state parentEmail / v2 guardianEmail)
   let parentEmail: string | undefined;
@@ -645,8 +653,8 @@ export async function sendStruggleNotification(
     // [BUG-856] Slot already reserved by checkAndLogRateLimitInternal above
     // for the same (parentProfileId, type) bucket — skip the push log so we
     // do not record two rows for the same notification.
-    // pushEnabled was already enforced above (before slot reservation), so we
-    // intentionally do NOT pass respectPushPreference here.
-    { skipRateLimitLog: true },
+    // [WI-369] pushEnabled was already verified above (before slot reservation)
+    // so we skip the default check here to avoid double-querying the DB.
+    { skipRateLimitLog: true, bypassPreferenceCheck: true },
   );
 }

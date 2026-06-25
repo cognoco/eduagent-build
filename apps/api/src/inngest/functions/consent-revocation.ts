@@ -197,12 +197,18 @@ export const consentRevocation = inngest.createFunction(
       }
 
       const childName = (await childDisplayName(db)) ?? 'Your child';
-      await sendPushNotification(db, {
-        profileId: parentProfileId,
-        title: 'Account closing tomorrow',
-        body: `${childName}'s account closes tomorrow. You can still reverse.`,
-        type: 'consent_warning',
-      });
+      await sendPushNotification(
+        db,
+        {
+          profileId: parentProfileId,
+          title: 'Account closing tomorrow',
+          body: `${childName}'s account closes tomorrow. You can still reverse.`,
+          type: 'consent_warning',
+        },
+        // [WI-369] GDPR regulatory notice — must always deliver regardless of
+        // the recipient's push preference.
+        { bypassPreferenceCheck: true },
+      );
       return { sent: true };
     });
 
@@ -352,12 +358,18 @@ export const consentRevocation = inngest.createFunction(
         }
         // Rehydrated in-step: the archived profile row still exists.
         const childName = (await childDisplayName(db)) ?? 'Your child';
-        await sendPushNotification(db, {
-          profileId: parentProfileId,
-          title: 'Account archived',
-          body: `${childName}'s account is archived for 30 days, then deleted.`,
-          type: 'consent_archived',
-        });
+        await sendPushNotification(
+          db,
+          {
+            profileId: parentProfileId,
+            title: 'Account archived',
+            body: `${childName}'s account is archived for 30 days, then deleted.`,
+            type: 'consent_archived',
+          },
+          // [WI-369] GDPR regulatory notice — must always deliver regardless of
+          // the recipient's push preference.
+          { bypassPreferenceCheck: true },
+        );
         return { sent: true };
       });
 
@@ -398,12 +410,18 @@ export const consentRevocation = inngest.createFunction(
       if (recentCount > 0) {
         return { sent: false, reason: 'dedup_24h' };
       }
-      await sendPushNotification(db, {
-        profileId: childProfileId,
-        title: 'Account deletion',
-        body: 'Your account is being deleted as your parent withdrew consent.',
-        type: 'consent_expired',
-      });
+      await sendPushNotification(
+        db,
+        {
+          profileId: childProfileId,
+          title: 'Account deletion',
+          body: 'Your account is being deleted as your parent withdrew consent.',
+          type: 'consent_expired',
+        },
+        // [WI-369] GDPR regulatory notice — must always deliver regardless of
+        // the recipient's push preference.
+        { bypassPreferenceCheck: true },
+      );
       return { sent: true };
     });
 
@@ -504,12 +522,18 @@ export const consentRevocation = inngest.createFunction(
             deleteNoticeId,
           )) ?? 'Your child')
         : 'Your child';
-      await sendPushNotification(db, {
-        profileId: parentProfileId,
-        title: 'Data deleted',
-        body: `${childName}'s account has been permanently deleted as requested.`,
-        type: 'consent_expired',
-      });
+      await sendPushNotification(
+        db,
+        {
+          profileId: parentProfileId,
+          title: 'Data deleted',
+          body: `${childName}'s account has been permanently deleted as requested.`,
+          type: 'consent_expired',
+        },
+        // [WI-369] GDPR regulatory notice — must always deliver regardless of
+        // the recipient's push preference.
+        { bypassPreferenceCheck: true },
+      );
       return { sent: true };
     });
 

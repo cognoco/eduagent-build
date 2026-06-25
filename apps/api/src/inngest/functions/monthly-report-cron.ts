@@ -642,16 +642,13 @@ export const monthlyReportGenerate = inngest.createFunction(
       // observability see the actual delivery outcome (no_push_token,
       // push_disabled, daily_cap_exceeded, etc.) instead of a hardcoded
       // {sent:true, reason:undefined}. Matches weekly-progress-push pattern.
-      return sendPushNotification(
-        db,
-        {
-          profileId: parentId,
-          title: `${childDisplayName}'s monthly report is ready`,
-          body: 'Open the app to see what they learned this month.',
-          type: 'monthly_report',
-        },
-        { respectPushPreference: true },
-      );
+      // [WI-369] No options needed — push preference is enforced by default.
+      return sendPushNotification(db, {
+        profileId: parentId,
+        title: `${childDisplayName}'s monthly report is ready`,
+        body: 'Open the app to see what they learned this month.',
+        type: 'monthly_report',
+      });
     });
 
     // [CR-2026-05-21-022] Step 3: Send email in a separate step. If this step

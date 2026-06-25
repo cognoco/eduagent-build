@@ -166,12 +166,18 @@ export async function sendTrialNotificationToAccountOwner(
   // notificationLog row inside the same transaction that gated us. If the
   // push itself fails, we accept the unsent-but-logged state — a duplicate
   // push (user-visible) is worse than an unsent one (recoverable).
-  return sendPushNotification(db, {
-    profileId: ownerProfileId,
-    title: payload.title,
-    body: payload.body,
-    type: payload.type,
-  });
+  return sendPushNotification(
+    db,
+    {
+      profileId: ownerProfileId,
+      title: payload.title,
+      body: payload.body,
+      type: payload.type,
+    },
+    // [WI-369] Transactional billing notice (trial expiry) — must always
+    // deliver regardless of the recipient's push preference.
+    { bypassPreferenceCheck: true },
+  );
 }
 
 export const trialExpiry = inngest.createFunction(

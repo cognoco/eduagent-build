@@ -7,7 +7,8 @@
 // fn override so every other export stays real.
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm' /* gc1-allow: pattern-a conversion (LLM boundary) */, () => {
+// gc1-allow: LLM boundary — routeAndCall cannot be exercised without a provider registration (pattern-a conversion)
+jest.mock('../llm', () => {
   const actual = jest.requireActual('../llm') as typeof import('../llm');
   return {
     ...actual,

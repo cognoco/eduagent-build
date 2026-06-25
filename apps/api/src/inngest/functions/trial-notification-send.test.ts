@@ -159,6 +159,8 @@ describe('trialNotificationSend', () => {
         body: '3 days left of your trial',
         type: 'trial_expiry',
       }),
+      // [WI-369] Transactional billing notice — must bypass push preference.
+      { bypassPreferenceCheck: true },
     );
     expect(result).toEqual({
       status: 'sent',
@@ -184,6 +186,8 @@ describe('trialNotificationSend', () => {
         body: 'giving you 15/day for 2 more weeks',
         type: 'trial_expiry',
       }),
+      // [WI-369] Transactional billing notice — must bypass push preference.
+      { bypassPreferenceCheck: true },
     );
     expect(result.status).toBe('sent');
     expect(result.step).toBe('send-soft-landing');
