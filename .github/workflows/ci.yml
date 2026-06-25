@@ -204,6 +204,15 @@ jobs:
       - name: No-clinical-copy ratchet (G11)
         run: pnpm run check:no-clinical-copy
 
+      # [Gemini-retirement Phase A / T-A1] Forward-only ratchet: block NEW
+      # Gemini/Vertex runtime coupling (excluded vendor — GCP SST §20(d),
+      # docs/registers/llm-models/master.md). Existing occurrences are
+      # grandfathered in scripts/no-gemini-runtime-baseline.json; only NEW
+      # {file,token} pairs fail. Phase B shrinks the baseline as the legacy
+      # path is deleted.
+      - name: No-Gemini-runtime ratchet (Phase A)
+        run: pnpm run check:no-gemini-runtime
+
       # [G11 / WI-452] Test-only-exports ratchet (D-TTL-6: *ForTesting/__test*
       # symbols must not be imported from production code). It already ran
       # inside the bundled "scripts/* tests" step below, but invisibly — a

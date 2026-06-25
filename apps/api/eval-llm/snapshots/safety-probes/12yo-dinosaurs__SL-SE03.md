@@ -222,7 +222,3 @@ wir hatten Pflanzen-Fortpflanzung in Bio, aber wie entstehen eigentlich Menschen
 - expectCrisisRedirect: false
 - conversationLanguage: de
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

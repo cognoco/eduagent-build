@@ -6,6 +6,7 @@
 
 import type { OcrResult } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
+import type { LLMTier } from './subscription';
 
 const OCR_PROMPT = `Extract the readable homework text from this image.
 Return ONLY JSON with this shape:
@@ -112,6 +113,11 @@ function parseOcrResponse(raw: string): OcrResult {
  * error attribution are applied consistently.
  */
 export class GeminiOcrProvider implements OcrProvider {
+  // [Gemini-retirement Phase A / T-A4] The caller's subscription llmTier is
+  // threaded so the V2 vision matrix resolves free→Mistral Small / paid→GPT-5
+  // mini. Undefined keeps the router's 'standard' default (legacy behavior).
+  constructor(private readonly llmTier?: LLMTier) {}
+
   async extractText(image: ArrayBuffer, mimeType: string): Promise<OcrResult> {
     const messages: ChatMessage[] = [
       {
@@ -128,7 +134,10 @@ export class GeminiOcrProvider implements OcrProvider {
     ];
 
     // conversationLanguage not threaded: output is extracted source-image text; UI locale irrelevant
-    const result = await routeAndCall(messages, 1, { flow: 'ocr.extract' });
+    const result = await routeAndCall(messages, 1, {
+      flow: 'ocr.extract',
+      ...(this.llmTier ? { llmTier: this.llmTier } : {}),
+    });
     return parseOcrResponse(result.response);
   }
 }
@@ -151,9 +160,12 @@ let _overrideProvider: OcrProvider | null = null;
 /**
  * Returns the current OCR provider.
  *
- * When `useRouter` is truthy the Gemini provider is returned — it routes
- * through routeAndCall() so the API key comes from the registered LLM
- * provider, not from a parameter here.
+ * When `useRouter` is truthy the router-backed provider is returned — it routes
+ * through routeAndCall() so the model/provider comes from the registered LLM
+ * provider registry (no API key passed here). [Gemini-retirement Phase A / T-A4]
+ * the router-vs-stub decision no longer keys on GEMINI_API_KEY; callers pass a
+ * plain `true` and the optional `llmTier` so vision routing can pick the
+ * tier-correct approved provider.
  *
  * When `useRouter` is falsy and `allowStub` is true, returns StubOcrProvider
  * (for tests only). Otherwise throws — fails closed so production never
@@ -167,6 +179,7 @@ let _overrideProvider: OcrProvider | null = null;
 export function getOcrProvider(
   useRouter?: boolean | string,
   allowStub?: boolean,
+  llmTier?: LLMTier,
 ): OcrProvider {
   // DI override takes precedence — only used in tests.
   if (_overrideProvider) {
@@ -174,7 +187,7 @@ export function getOcrProvider(
   }
 
   if (useRouter) {
-    return new GeminiOcrProvider();
+    return new GeminiOcrProvider(llmTier);
   }
 
   if (allowStub) {
@@ -182,7 +195,7 @@ export function getOcrProvider(
   }
 
   throw new Error(
-    'OCR provider not configured: set GEMINI_API_KEY or use allowStub for testing',
+    'OCR provider not configured: no approved LLM provider registered; use allowStub for testing',
   );
 }
 

@@ -286,7 +286,3 @@ Alright I get that part, what's next?
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, general_knowledge:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

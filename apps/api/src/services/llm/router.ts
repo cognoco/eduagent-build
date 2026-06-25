@@ -551,6 +551,49 @@ function getModelConfigV2Matrix(
   };
 }
 
+/**
+ * [Gemini-retirement Phase A / T-A5] First registered approved text provider
+ * for the legacy path when Gemini is absent. NEVER returns Gemini/Vertex.
+ * Prefers the V2 universal default (Cerebras) when registered, then the legacy
+ * paid providers. Used only by the no-Gemini-registered degradation branches —
+ * it does not change selection when a Gemini provider IS registered.
+ */
+function approvedTextFallbackConfig(
+  rung: EscalationRung,
+  llmTier: LLMTier,
+): ModelConfig {
+  if (providers.has('cerebras')) {
+    return {
+      provider: 'cerebras',
+      model: CEREBRAS_DEFAULT_MODEL,
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+      reasoningEffort: 'high',
+    };
+  }
+  if (llmTier === 'premium' && providers.has('anthropic')) {
+    return {
+      provider: 'anthropic',
+      model: ANTHROPIC_SONNET_MODEL,
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+  if (providers.has('openai')) {
+    const isLight = llmTier === 'flash' || rung <= 2;
+    return {
+      provider: 'openai',
+      model: isLight ? 'gpt-4o-mini' : 'gpt-4o',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+  // No approved text provider is registered. Returning an unservable config
+  // here would only defer the failure to routeAndCall's opaque "No provider
+  // registered for: <x>" throw — surface the misconfiguration directly instead
+  // (mirrors the Gemini guard above; never silently degrade).
+  throw new Error(
+    'approvedTextFallbackConfig: no approved text provider registered (cerebras/anthropic/openai all absent); cannot route legacy request after Gemini removal',
+  );
+}
+
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
@@ -566,12 +609,19 @@ function getModelConfig(
   }
 
   if (providerPolicy === 'gemini_only') {
-    const isLight = llmTier === 'flash' || rung <= 2;
-    return {
-      provider: 'gemini',
-      model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
-      maxTokens: MIN_REPLY_MAX_TOKENS,
-    };
+    // [Gemini-retirement Phase A / T-A5] Only pin Gemini when it is actually
+    // registered. If the Gemini key has been removed (pre-cutover), degrade to
+    // an approved provider instead of returning an unservable Gemini config that
+    // makes routeAndCall throw "No provider registered for: gemini".
+    if (providers.has('gemini')) {
+      const isLight = llmTier === 'flash' || rung <= 2;
+      return {
+        provider: 'gemini',
+        model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+        maxTokens: MIN_REPLY_MAX_TOKENS,
+      };
+    }
+    return approvedTextFallbackConfig(rung, llmTier);
   }
 
   const preferredConfig = preferredProvider

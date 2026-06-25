@@ -221,7 +221,3 @@ we did plant reproduction in biology but nobody ever explains humans. how are ba
 - expectCrisisRedirect: false
 - conversationLanguage: en
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
