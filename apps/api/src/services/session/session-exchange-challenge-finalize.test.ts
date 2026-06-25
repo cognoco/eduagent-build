@@ -190,11 +190,88 @@ function makeFakeDb(state: FakeDbState): Database {
           ],
   };
 
+  // Shared write/read handlers — used by BOTH the top-level db and the tx
+  // handed to db.transaction(). [WI-1060] persistChallengeRoundReviewTargets now
+  // routes its needsDeepeningTopics read + update/insert loop through `tx`, so
+  // the tx must expose the same insert/update/query surface as the top-level db.
+  const insertHandler = (_table: unknown) => ({
+    values: async (vals: Record<string, unknown>) => {
+      // Distinguish assessments vs needs_deepening_topics by the columns.
+      if ('masteryChallengeVerifiedAt' in vals) {
+        if (state.failNextMasteryInsert) {
+          state.failNextMasteryInsert = false;
+          throw new Error('transient mastery insert failure');
+        }
+        state.masteryInserts.push(vals);
+      } else if ('source' in vals && vals.source === 'challenge_round') {
+        if (state.failNextDeepeningInsert) {
+          state.failNextDeepeningInsert = false;
+          throw new Error('transient deepening insert failure');
+        }
+        state.deepeningInsertCount += 1;
+        state.deepeningRows.push({
+          id: `ndt-${state.deepeningRows.length + 1}`,
+          profileId: vals.profileId as string,
+          subjectId: vals.subjectId as string,
+          topicId: vals.topicId as string,
+          status: (vals.status as string) ?? 'pending_review',
+          source: 'challenge_round',
+          concept: (vals.concept as string) ?? null,
+          misconception: (vals.misconception as string) ?? null,
+          correction: (vals.correction as string) ?? null,
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        });
+      }
+      return undefined;
+    },
+  });
+
+  // update() serves two call shapes:
+  //   - session-metadata persist: .set({metadata}).where().returning() → [row]
+  //   - needsDeepeningTopics update: .set({...}).where() awaited directly
+  const updateHandler = () => ({
+    set: (vals: { metadata?: Record<string, unknown> }) => {
+      const whereResult = {
+        returning: async () => {
+          if (vals.metadata) {
+            state.sessionMetadata = vals.metadata;
+          }
+          return [fullSessionRow(state.sessionMetadata)];
+        },
+        // Awaited-directly form (needsDeepeningTopics update has no .returning()).
+        then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+          Promise.resolve(undefined).then(resolve, reject),
+      };
+      return { where: () => whereResult };
+    },
+  });
+
+  const queryHandler = {
+    needsDeepeningTopics: {
+      findMany: async () =>
+        state.deepeningRows.filter(
+          (r) =>
+            r.subjectId === SUBJECT_ID &&
+            r.topicId === TOPIC_ID &&
+            r.source === 'challenge_round' &&
+            (r.status === 'active' || r.status === 'pending_review'),
+        ),
+    },
+    // [BUG-483] createScopedRepository(...).sessionEvents.findMany routes here.
+    // The opaque WHERE is built by the real scoped repo; we return the seeded
+    // rows and let the REAL validateEvaluationEventIds do its id→content
+    // mapping + strict-missing rejection in JS.
+    sessionEvents: {
+      findMany: async () => state.sessionEventRows ?? [],
+    },
+  };
+
   // The session-metadata claim/persist transaction:
   //   tx.select({metadata}).from(learningSessions).where().for('update').limit(1)
   //   then tx.update(learningSessions).set().where().returning()
-  // We serialize on the in-memory metadata: reads see the latest persisted
-  // state, writes replace it. This models the FOR UPDATE row lock.
+  // [WI-1060] also serves persistChallengeRoundReviewTargets's read+write loop,
+  // so the tx exposes insert + query + the scoped-repo read surface too.
   function makeTx() {
     return {
       select: () => ({
@@ -209,18 +286,9 @@ function makeFakeDb(state: FakeDbState): Database {
           }),
         }),
       }),
-      update: () => ({
-        set: (vals: { metadata?: Record<string, unknown> }) => ({
-          where: () => ({
-            returning: async () => {
-              if (vals.metadata) {
-                state.sessionMetadata = vals.metadata;
-              }
-              return [fullSessionRow(state.sessionMetadata)];
-            },
-          }),
-        }),
-      }),
+      update: updateHandler,
+      insert: insertHandler,
+      query: queryHandler,
     };
   }
 
@@ -231,64 +299,11 @@ function makeFakeDb(state: FakeDbState): Database {
     // findOwnedCurriculumTopic entry point.
     select: () => ownedTopicSelect,
 
-    insert: (_table: unknown) => ({
-      values: async (vals: Record<string, unknown>) => {
-        // Distinguish assessments vs needs_deepening_topics by the columns.
-        if ('masteryChallengeVerifiedAt' in vals) {
-          if (state.failNextMasteryInsert) {
-            state.failNextMasteryInsert = false;
-            throw new Error('transient mastery insert failure');
-          }
-          state.masteryInserts.push(vals);
-        } else if ('source' in vals && vals.source === 'challenge_round') {
-          if (state.failNextDeepeningInsert) {
-            state.failNextDeepeningInsert = false;
-            throw new Error('transient deepening insert failure');
-          }
-          state.deepeningInsertCount += 1;
-          state.deepeningRows.push({
-            id: `ndt-${state.deepeningRows.length + 1}`,
-            profileId: vals.profileId as string,
-            subjectId: vals.subjectId as string,
-            topicId: vals.topicId as string,
-            status: (vals.status as string) ?? 'pending_review',
-            source: 'challenge_round',
-            concept: (vals.concept as string) ?? null,
-            misconception: (vals.misconception as string) ?? null,
-            correction: (vals.correction as string) ?? null,
-            updatedAt: new Date(),
-            createdAt: new Date(),
-          });
-        }
-        return undefined;
-      },
-    }),
+    insert: insertHandler,
 
-    update: () => ({
-      set: () => ({
-        where: async () => undefined,
-      }),
-    }),
+    update: updateHandler,
 
-    query: {
-      needsDeepeningTopics: {
-        findMany: async () =>
-          state.deepeningRows.filter(
-            (r) =>
-              r.subjectId === SUBJECT_ID &&
-              r.topicId === TOPIC_ID &&
-              r.source === 'challenge_round' &&
-              (r.status === 'active' || r.status === 'pending_review'),
-          ),
-      },
-      // [BUG-483] createScopedRepository(...).sessionEvents.findMany routes here.
-      // The opaque WHERE is built by the real scoped repo; we return the seeded
-      // rows and let the REAL validateEvaluationEventIds do its id→content
-      // mapping + strict-missing rejection in JS.
-      sessionEvents: {
-        findMany: async () => state.sessionEventRows ?? [],
-      },
-    },
+    query: queryHandler,
   };
 
   return db as unknown as Database;

@@ -253,33 +253,50 @@ export async function executeDeletion(
   //
   // If 0 rows are deleted the account either never had a pending deletion,
   // was cancelled during the grace period, or was already removed.
-  const result = await db
-    .delete(accounts)
-    .where(
-      and(
-        eq(accounts.id, accountId),
-        isNotNull(accounts.deletionScheduledAt),
-        or(
-          isNull(accounts.deletionCancelledAt),
-          lte(accounts.deletionCancelledAt, accounts.deletionScheduledAt),
+  // [WI-1060] Wrap the account delete + the byok_waitlist erasure in one
+  // transaction. These are two separate deletes that must both land for GDPR
+  // Art 17 erasure to be complete. Without the transaction, a crash after the
+  // account delete but before the byok delete orphans the waitlist email
+  // forever: on Inngest retry the account is already gone (result.length === 0),
+  // so the byok branch is skipped and the email never gets erased. Atomic:
+  // either both deletes commit or the account delete rolls back and the retry
+  // re-runs the whole erasure.
+  const result = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const deleted = await txDb
+      .delete(accounts)
+      .where(
+        and(
+          eq(accounts.id, accountId),
+          isNotNull(accounts.deletionScheduledAt),
+          or(
+            isNull(accounts.deletionCancelledAt),
+            lte(accounts.deletionCancelledAt, accounts.deletionScheduledAt),
+          ),
         ),
-      ),
-    )
-    .returning({ id: accounts.id, email: accounts.email });
+      )
+      .returning({ id: accounts.id, email: accounts.email });
+
+    if (deleted.length > 0) {
+      // [R3] byok_waitlist is an email-only table with NO foreign key back to
+      // accounts (packages/database/src/schema/billing.ts), so the account
+      // cascade above never reaches it and the waitlist email would survive
+      // erasure — a GDPR Art 17 gap (audit 2026-06-07, R3). Erase the row
+      // matching the just-deleted account's email, captured from the DELETE ...
+      // RETURNING above so there is no separate read of a now-gone row.
+      // Idempotent: a no-op if the owner never joined the BYOK waitlist or
+      // joined with a different email. Scoped to full account deletion only —
+      // the waitlist email belongs to the account owner, not a child profile, so
+      // the consent-withdrawal/profile-deletion path correctly does not touch it.
+      const deletedEmail = deleted[0]!.email;
+      await txDb
+        .delete(byokWaitlist)
+        .where(eq(byokWaitlist.email, deletedEmail));
+    }
+    return deleted;
+  });
 
   if (result.length > 0) {
-    // [R3] byok_waitlist is an email-only table with NO foreign key back to
-    // accounts (packages/database/src/schema/billing.ts), so the account
-    // cascade above never reaches it and the waitlist email would survive
-    // erasure — a GDPR Art 17 gap (audit 2026-06-07, R3). Erase the row
-    // matching the just-deleted account's email, captured atomically from the
-    // DELETE ... RETURNING above so there is no separate read of a now-gone
-    // row. Idempotent: a no-op if the owner never joined the BYOK waitlist or
-    // joined with a different email. Scoped to full account deletion only —
-    // the waitlist email belongs to the account owner, not a child profile, so
-    // the consent-withdrawal/profile-deletion path correctly does not touch it.
-    const deletedEmail = result[0]!.email;
-    await db.delete(byokWaitlist).where(eq(byokWaitlist.email, deletedEmail));
     return 'deleted';
   }
 

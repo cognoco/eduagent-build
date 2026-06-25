@@ -56,55 +56,62 @@ export async function initiateLink(
     throw new BadRequestError('A supporter cannot support themself.');
   }
 
+  // [WI-1060] Wrap all three writes in a transaction so a mid-sequence crash
+  // cannot leave an orphaned supportership row without its visibility contract
+  // or audit trail.
   const now = input.now ?? new Date();
-  const edgeRows = await db
-    .insert(supportership)
-    .values({
-      supporterPersonId: input.supporterPersonId,
-      supporteePersonId: input.supporteePersonId,
-      grantedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-  const edge = edgeRows[0];
-  if (!edge) throw new Error('Supportership insert returned no row');
+  return await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
 
-  const contractRows = await db
-    .insert(supportVisibilityContracts)
-    .values({
+    const edgeRows = await tx
+      .insert(supportership)
+      .values({
+        supporterPersonId: input.supporterPersonId,
+        supporteePersonId: input.supporteePersonId,
+        grantedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const edge = edgeRows[0];
+    if (!edge) throw new Error('Supportership insert returned no row');
+
+    const contractRows = await tx
+      .insert(supportVisibilityContracts)
+      .values({
+        supportershipId: edge.id,
+        supporterPersonId: input.supporterPersonId,
+        supporteePersonId: input.supporteePersonId,
+        relation: input.relation,
+        status: input.managedTier ? 'accepted' : 'pending',
+        contractVersion: input.contractVersion ?? 1,
+        reportableKinds: REPORTABLE_KINDS,
+        artifactWall: true,
+        renderEquivalence: true,
+        safetyException: true,
+        supporterAcceptedAt: input.managedTier ? now : null,
+        supporteeAcceptedAt: input.managedTier ? now : null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const contract = contractRows[0];
+    if (!contract) throw new Error('Visibility contract insert returned no row');
+
+    await writeVisibilityAuditEvent(txDb, {
       supportershipId: edge.id,
-      supporterPersonId: input.supporterPersonId,
-      supporteePersonId: input.supporteePersonId,
-      relation: input.relation,
-      status: input.managedTier ? 'accepted' : 'pending',
-      contractVersion: input.contractVersion ?? 1,
-      reportableKinds: REPORTABLE_KINDS,
-      artifactWall: true,
-      renderEquivalence: true,
-      safetyException: true,
-      supporterAcceptedAt: input.managedTier ? now : null,
-      supporteeAcceptedAt: input.managedTier ? now : null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-  const contract = contractRows[0];
-  if (!contract) throw new Error('Visibility contract insert returned no row');
+      contractId: contract.id,
+      actorPersonId: input.supporterPersonId,
+      eventType: 'contract_initiated',
+      payload: {
+        relation: input.relation,
+        managedTier: input.managedTier,
+        reportableKinds: REPORTABLE_KINDS,
+      },
+    });
 
-  await writeVisibilityAuditEvent(db, {
-    supportershipId: edge.id,
-    contractId: contract.id,
-    actorPersonId: input.supporterPersonId,
-    eventType: 'contract_initiated',
-    payload: {
-      relation: input.relation,
-      managedTier: input.managedTier,
-      reportableKinds: REPORTABLE_KINDS,
-    },
+    return mapContract(contract);
   });
-
-  return mapContract(contract);
 }
 
 export async function acceptLink(
@@ -137,28 +144,35 @@ export async function acceptLink(
   const status =
     supporterAcceptedAt && supporteeAcceptedAt ? 'accepted' : contract.status;
 
-  const rows = await db
-    .update(supportVisibilityContracts)
-    .set({
-      supporterAcceptedAt,
-      supporteeAcceptedAt,
-      status,
-      updatedAt: now,
-    })
-    .where(eq(supportVisibilityContracts.id, contractId))
-    .returning();
-  const updated = rows[0];
-  if (!updated) throw new Error('Visibility contract update returned no row');
+  // [WI-1060] Wrap the contract update + audit insert in a transaction so a
+  // crash between the two writes cannot leave the contract updated but the
+  // audit trail missing.
+  return await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
 
-  await writeVisibilityAuditEvent(db, {
-    supportershipId: updated.supportershipId,
-    contractId: updated.id,
-    actorPersonId: input.actorPersonId,
-    eventType: 'contract_accepted',
-    payload: { audience: input.audience, status },
+    const rows = await tx
+      .update(supportVisibilityContracts)
+      .set({
+        supporterAcceptedAt,
+        supporteeAcceptedAt,
+        status,
+        updatedAt: now,
+      })
+      .where(eq(supportVisibilityContracts.id, contractId))
+      .returning();
+    const updated = rows[0];
+    if (!updated) throw new Error('Visibility contract update returned no row');
+
+    await writeVisibilityAuditEvent(txDb, {
+      supportershipId: updated.supportershipId,
+      contractId: updated.id,
+      actorPersonId: input.actorPersonId,
+      eventType: 'contract_accepted',
+      payload: { audience: input.audience, status },
+    });
+
+    return mapContract(updated);
   });
-
-  return mapContract(updated);
 }
 
 export async function getContractForVisibleLink(

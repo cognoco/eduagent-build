@@ -685,63 +685,76 @@ async function persistChallengeRoundReviewTargets(
   }
 
   const pendingExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const repo = createScopedRepository(db, profileId);
-  const existingRows = await repo.needsDeepeningTopics.findMany(
-    and(
-      eq(needsDeepeningTopics.subjectId, session.subjectId),
-      eq(needsDeepeningTopics.topicId, topicId),
-      eq(needsDeepeningTopics.source, 'challenge_round'),
-      inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
-    ),
-  );
-
-  const existingByConcept = new Map<string, (typeof existingRows)[number]>();
-  for (const row of existingRows.sort(
-    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-  )) {
-    const concept = row.concept;
-    if (concept && !existingByConcept.has(concept)) {
-      existingByConcept.set(concept, row);
-    }
-  }
+  const subjectId = session.subjectId;
   const targetsByConcept = new Map(
     decision.reviewTargets.map((target) => [target.concept, target]),
   );
 
-  for (const target of targetsByConcept.values()) {
-    const existing = existingByConcept.get(target.concept);
-    if (existing) {
-      await db
-        .update(needsDeepeningTopics)
-        .set({
-          misconception: target.misconception,
-          correction: target.correction,
-          ...(existing.status === 'pending_review' ? { pendingExpiresAt } : {}),
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(needsDeepeningTopics.id, existing.id),
-            eq(needsDeepeningTopics.profileId, profileId),
-            eq(needsDeepeningTopics.topicId, topicId),
-          ),
-        );
-      continue;
+  // [WI-1060] Read existing rows + the per-target update/insert loop run in one
+  // transaction. Each review target is a separate update-or-insert; a crash
+  // mid-loop would persist some weak concepts as deepening targets and drop
+  // others, leaving the learner with an inconsistent review set for a single
+  // Challenge Round. Atomic: all review targets land together or none do, and
+  // the existing-rows read shares the loop's snapshot.
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const repo = createScopedRepository(txDb, profileId);
+    const existingRows = await repo.needsDeepeningTopics.findMany(
+      and(
+        eq(needsDeepeningTopics.subjectId, subjectId),
+        eq(needsDeepeningTopics.topicId, topicId),
+        eq(needsDeepeningTopics.source, 'challenge_round'),
+        inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
+      ),
+    );
+
+    const existingByConcept = new Map<string, (typeof existingRows)[number]>();
+    for (const row of existingRows.sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+    )) {
+      const concept = row.concept;
+      if (concept && !existingByConcept.has(concept)) {
+        existingByConcept.set(concept, row);
+      }
     }
 
-    await db.insert(needsDeepeningTopics).values({
-      profileId,
-      subjectId: session.subjectId,
-      topicId,
-      status: 'pending_review',
-      source: 'challenge_round',
-      concept: target.concept,
-      misconception: target.misconception,
-      correction: target.correction,
-      pendingExpiresAt,
-      updatedAt: now,
-    });
-  }
+    for (const target of targetsByConcept.values()) {
+      const existing = existingByConcept.get(target.concept);
+      if (existing) {
+        await txDb
+          .update(needsDeepeningTopics)
+          .set({
+            misconception: target.misconception,
+            correction: target.correction,
+            ...(existing.status === 'pending_review'
+              ? { pendingExpiresAt }
+              : {}),
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(needsDeepeningTopics.id, existing.id),
+              eq(needsDeepeningTopics.profileId, profileId),
+              eq(needsDeepeningTopics.topicId, topicId),
+            ),
+          );
+        continue;
+      }
+
+      await txDb.insert(needsDeepeningTopics).values({
+        profileId,
+        subjectId,
+        topicId,
+        status: 'pending_review',
+        source: 'challenge_round',
+        concept: target.concept,
+        misconception: target.misconception,
+        correction: target.correction,
+        pendingExpiresAt,
+        updatedAt: now,
+      });
+    }
+  });
 }
 
 /**

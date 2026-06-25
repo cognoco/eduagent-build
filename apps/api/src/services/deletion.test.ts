@@ -97,7 +97,7 @@ function createMockDb(
     where: updateWhereMock,
   });
 
-  return {
+  const db = {
     query: {
       accounts: {
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
@@ -111,13 +111,29 @@ function createMockDb(
     }),
     // [Fix Bug #494] executeDeletion now calls .delete().where().returning()
     // and then (when 0 rows) re-reads via query.accounts.findFirst.
+    // [WI-1060] The account delete RETURNING now includes `email` (the byok
+    // erasure inside the transaction reads deleted[0].email). The second
+    // delete (byok_waitlist) reuses the same chainable mock.
     // Default: 1 row returned (happy path — account deleted).
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
-        returning: jest.fn().mockResolvedValue([{ id: 'account-1' }]),
+        returning: jest
+          .fn()
+          .mockResolvedValue([{ id: 'account-1', email: 'owner@example.com' }]),
       }),
     }),
-  } as unknown as Database;
+  } as unknown as Database & { transaction: unknown };
+
+  // [WI-1060] executeDeletion now wraps the account + byok deletes in
+  // db.transaction(); run the callback with the same mock db as the tx so the
+  // existing delete/query stubs resolve unchanged.
+  (db as unknown as { transaction: unknown }).transaction = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(db),
+    );
+
+  return db as unknown as Database;
 }
 
 describe('scheduleDeletion', () => {
@@ -484,6 +500,12 @@ describe('executeDeletion', () => {
           returning: jest.fn().mockResolvedValue([]), // 0 rows
         }),
       }),
+      // [WI-1060] executeDeletion wraps the deletes in db.transaction().
+      transaction: jest
+        .fn()
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db),
+        ),
     } as unknown as Database;
 
     await expect(executeDeletion(db, 'account-1')).resolves.toBe('cancelled');
@@ -513,6 +535,12 @@ describe('executeDeletion', () => {
           returning: jest.fn().mockResolvedValue([]), // 0 rows
         }),
       }),
+      // [WI-1060] executeDeletion wraps the deletes in db.transaction().
+      transaction: jest
+        .fn()
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db),
+        ),
     } as unknown as Database;
 
     await expect(executeDeletion(db, 'account-1')).resolves.toBe(
@@ -551,6 +579,12 @@ describe('executeDeletion', () => {
           returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
         }),
       }),
+      // [WI-1060] executeDeletion wraps the deletes in db.transaction().
+      transaction: jest
+        .fn()
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db),
+        ),
     } as unknown as Database;
 
     const result = await executeDeletion(db, 'account-1');
@@ -592,6 +626,12 @@ describe('executeDeletion', () => {
           returning: jest.fn().mockResolvedValue([]), // 0 rows deleted
         }),
       }),
+      // [WI-1060] executeDeletion wraps the deletes in db.transaction().
+      transaction: jest
+        .fn()
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db),
+        ),
     } as unknown as Database;
 
     const result = await executeDeletion(db, 'account-1');
