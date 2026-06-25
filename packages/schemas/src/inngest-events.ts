@@ -56,7 +56,9 @@ export const feedbackDeliveryFailedEventSchema = z.object({
   // Not always a uuid: the feedback route's profile context can be the
   // literal 'unknown'.
   profileId: z.string().min(1),
-  userId: z.string().min(1),
+  // [WI-1066] Renamed from `userId` to make explicit this is the Clerk user ID
+  // (not a profile ID), disambiguating the two identity namespaces in events.
+  clerkUserId: z.string().min(1),
 });
 export type FeedbackDeliveryFailedEvent = z.infer<
   typeof feedbackDeliveryFailedEventSchema

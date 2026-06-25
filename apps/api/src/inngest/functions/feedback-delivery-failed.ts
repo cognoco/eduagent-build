@@ -68,7 +68,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
-    const { retryId, profileId, userId } = validated.data;
+    const { retryId, profileId, clerkUserId } = validated.data;
 
     return step.run('retry-delivery', async () => {
       const db = getStepDatabase();
@@ -84,7 +84,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           surface: 'feedback-delivery-failed',
           reason: 'retry_row_missing',
           profileId,
-          userId,
+          clerkUserId,
         });
         return { status: 'skipped' as const, reason: 'retry_row_missing' };
       }
@@ -133,7 +133,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             surface: 'feedback-delivery-failed',
             reason: 'missing_event_id',
             profileId,
-            userId,
+            clerkUserId,
             category: queued.category,
           },
         );
@@ -146,7 +146,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               surface: 'feedback-delivery-failed',
               reason: 'missing_event_id',
               profileId,
-              userId,
+              clerkUserId,
               category: queued.category,
             },
           },
