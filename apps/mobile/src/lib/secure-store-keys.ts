@@ -1,16 +1,17 @@
 /**
- * Centralized SecureStore key barrel — WI-1090.
+ * Centralized storage key barrel — WI-1090.
  *
- * This is the single source of truth for all SecureStore key strings used
- * across the mobile app. Every site that calls SecureStore.getItemAsync /
- * setItemAsync / deleteItemAsync must import its key from here instead of
- * defining a local constant.
+ * Single source of truth for all storage key strings in the mobile app.
+ * Primary scope: Expo SecureStore (getItemAsync / setItemAsync /
+ * deleteItemAsync). Also includes keys for sessionStorage (web-only,
+ * auth-expiry.ts) and AsyncStorage (now-feed-cache.ts) that belong here
+ * for centralization even though they use different storage backends.
  *
  * Char-safety rule: all key strings must contain only [a-zA-Z0-9._-].
  * The companion test `secure-store-keys.test.ts` enforces this automatically.
  *
- * Registering a new key here is NOT a substitute for registering it in
- * `sign-out-cleanup.ts`. Both are required — the barrel is the key
+ * Registering a new SecureStore key here is NOT a substitute for registering
+ * it in `sign-out-cleanup.ts`. Both are required — the barrel is the key
  * definition; sign-out-cleanup.ts is the lifecycle declaration.
  */
 
@@ -117,3 +118,35 @@ export const summaryDraftKey = (profileId: string, sessionId: string): string =>
   sanitizeSecureStoreKey(
     `${SUMMARY_DRAFT_KEY_PREFIX}-${profileId}-${sessionId}`,
   );
+
+// ---------------------------------------------------------------------------
+// Web sessionStorage keys — NOT SecureStore (auth-expiry.ts).
+// Used only on web to persist a 5-minute session-expiry/revocation notice
+// across module re-evaluations. Native targets use in-memory state only.
+// ---------------------------------------------------------------------------
+
+/**
+ * Session-expired notice timestamp (web sessionStorage).
+ * Key: `mentomate_session_expired_at`
+ */
+export const AUTH_EXPIRY_EXPIRED_STORAGE_KEY = 'mentomate_session_expired_at';
+
+/**
+ * Session-revoked notice timestamp (web sessionStorage).
+ * Key: `mentomate_session_revoked_at`
+ */
+export const AUTH_EXPIRY_REVOKED_STORAGE_KEY = 'mentomate_session_revoked_at';
+
+// ---------------------------------------------------------------------------
+// AsyncStorage key prefixes — NOT SecureStore (now-feed-cache.ts).
+// ---------------------------------------------------------------------------
+
+/**
+ * Now-feed cache key prefix (AsyncStorage).
+ * Full key: `now-feed-cache::<profileId>` (double-colon separator is
+ * intentional for AsyncStorage namespacing — colon is AsyncStorage-safe
+ * but NOT SecureStore-safe; keep the double-colon construction in the
+ * consumer, not in this constant).
+ * Key prefix: `now-feed-cache`
+ */
+export const NOW_FEED_CACHE_KEY_PREFIX = 'now-feed-cache';

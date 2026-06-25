@@ -11,8 +11,11 @@
 // (vs. a client-side token expiry). Both notices share the same five-minute
 // window and the same peek/consume/clear lifecycle.
 
-const EXPIRED_STORAGE_KEY = 'mentomate_session_expired_at';
-const REVOKED_STORAGE_KEY = 'mentomate_session_revoked_at';
+import {
+  AUTH_EXPIRY_EXPIRED_STORAGE_KEY as EXPIRED_STORAGE_KEY,
+  AUTH_EXPIRY_REVOKED_STORAGE_KEY as REVOKED_STORAGE_KEY,
+} from './secure-store-keys';
+
 const EXPIRY_NOTICE_WINDOW_MS = 5 * 60_000;
 
 let _sessionExpiredAt: number | null = null;
@@ -135,6 +138,7 @@ export function clearSessionRevokedNotice(): void {
 // test harness that needs to seed the marker before the app boots) can
 // reference them without duplicating string literals. Exporting from a
 // single module keeps the production code and the test fixtures aligned.
+// Key strings are defined in `secure-store-keys.ts` (WI-1090).
 export const AUTH_EXPIRY_STORAGE_KEYS = {
   expired: EXPIRED_STORAGE_KEY,
   revoked: REVOKED_STORAGE_KEY,
