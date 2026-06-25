@@ -1,6 +1,9 @@
 // [BUG-498] Format raw minutes into a readable string.
 // e.g. 45 → "45 min", 130 → "2h 10m", 240 → "4h"
 export function formatMinutes(min: number): string {
+  // [#899] Clamp NaN / negative input to a 0-floor the way formatTimer does.
+  // An unguarded bad duration otherwise renders "-5 min" or "NaNh".
+  if (!Number.isFinite(min) || min <= 0) return '0 min';
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
   const m = min % 60;

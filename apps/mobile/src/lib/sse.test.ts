@@ -454,6 +454,41 @@ describe('streamSSEViaXHR', () => {
     expect(collected).toEqual([]);
   });
 
+  // [#899] Tighter than BUG-632: the error lands *mid-drain* — after the
+  // consumer has already pulled one buffered chunk — so the entry guard has
+  // passed and only the in-drain re-check can discard the remaining stale
+  // chunks (c2/c3) instead of yielding them.
+  it('[#899] discards still-buffered events when the stream errors mid-drain', async () => {
+    const xhr = installFakeXhr();
+
+    const { events } = streamSSEViaXHR('https://example.test/stream', {
+      method: 'POST',
+    });
+
+    // Three chunks buffered before the consumer pulls anything.
+    xhr._emitProgress('data: {"type":"chunk","content":"c1"}\n\n');
+    xhr._emitProgress('data: {"type":"chunk","content":"c2"}\n\n');
+    xhr._emitProgress('data: {"type":"chunk","content":"c3"}\n\n');
+
+    // Pull only the first chunk — the generator suspends mid-drain with c2/c3
+    // still queued.
+    const first = await events.next();
+    expect(first.value).toEqual({ type: 'chunk', content: 'c1' });
+
+    // The stream errors while c2/c3 are still buffered.
+    xhr._emitError(500, 'internal server error');
+
+    // The next pull must THROW (discarding c2/c3), not yield the stale c2.
+    let caught: unknown = null;
+    try {
+      await events.next();
+    } catch (err) {
+      caught = err;
+    }
+    expect((caught as Error | null)?.name).toBe('UpstreamError');
+    expect((caught as { status?: number } | null)?.status).toBe(500);
+  });
+
   it('[BUG-958] treats app-level done frame as terminal without waiting for XHR loadend', async () => {
     const xhr = installFakeXhr();
     const { events } = streamSSEViaXHR('https://example.test/stream', {

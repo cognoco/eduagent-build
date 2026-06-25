@@ -22,6 +22,7 @@ import {
   TimeoutError,
   UpstreamError,
   classifyFetchRejection,
+  classifyPaymentRequired,
 } from './api-errors';
 import { ForbiddenError, ConflictError } from './api-errors';
 import { createTimeoutSignal } from './query-timeout';
@@ -219,6 +220,65 @@ describe('UpstreamError', () => {
   it('defaults status to 500', () => {
     const err = new UpstreamError('boom', 'UPSTREAM_ERROR');
     expect(err.status).toBe(500);
+  });
+});
+
+// [#899] Shared 402 classifier — previously re-implemented in both api-client.ts
+// and sse.ts. Both surfaces now route through this single helper.
+describe('classifyPaymentRequired', () => {
+  it('returns QuotaExceededError for a structured quota body', () => {
+    const err = classifyPaymentRequired({
+      parsed: {
+        code: 'QUOTA_EXCEEDED',
+        message: 'Out of quota',
+        details: QUOTA_DETAILS,
+      },
+      defaultCode: 'PAYMENT_REQUIRED',
+    });
+    expect(err).toBeInstanceOf(QuotaExceededError);
+    expect((err as QuotaExceededError).message).toBe('Out of quota');
+    expect((err as QuotaExceededError).details).toEqual(QUOTA_DETAILS);
+  });
+
+  it('returns UpstreamError(402) for a non-quota 402 body', () => {
+    const err = classifyPaymentRequired({
+      parsed: { message: 'nope' },
+      message: 'Card declined',
+      defaultCode: 'PAYMENT_REQUIRED',
+    });
+    expect(err).toBeInstanceOf(UpstreamError);
+    expect((err as UpstreamError).status).toBe(402);
+    expect((err as UpstreamError).code).toBe('PAYMENT_REQUIRED');
+    expect((err as UpstreamError).message).toBe('Card declined');
+  });
+
+  it('honors an explicit server code over the default', () => {
+    const err = classifyPaymentRequired({
+      parsed: {},
+      code: 'UPSTREAM_ERROR',
+      defaultCode: 'PAYMENT_REQUIRED',
+    }) as UpstreamError;
+    expect(err.code).toBe('UPSTREAM_ERROR');
+  });
+
+  it('falls back to fallbackText then a literal default for the message', () => {
+    expect(
+      (
+        classifyPaymentRequired({
+          parsed: {},
+          fallbackText: 'raw body',
+          defaultCode: 'X',
+        }) as UpstreamError
+      ).message,
+    ).toBe('raw body');
+    expect(
+      (
+        classifyPaymentRequired({
+          parsed: {},
+          defaultCode: 'X',
+        }) as UpstreamError
+      ).message,
+    ).toBe('Payment required');
   });
 });
 

@@ -9,7 +9,6 @@
  * is erased at compile time, so zero API code enters the mobile bundle.
  */
 import type { AppType } from '@eduagent/api';
-import { quotaExceededSchema } from '@eduagent/schemas';
 import { hc } from 'hono/client';
 import { useMemo, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-expo';
@@ -23,11 +22,11 @@ import { getApiUrl } from './api';
 import {
   BadRequestError,
   classifyFetchRejection,
+  classifyPaymentRequired,
   ConflictError,
   ConsentRequiredError,
   ForbiddenError,
   NotFoundError,
-  QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
   UnauthorizedError,
@@ -37,6 +36,7 @@ import { i18next } from '../i18n';
 
 export {
   BadRequestError,
+  classifyPaymentRequired,
   ConflictError,
   ConsentRequiredError,
   ForbiddenError,
@@ -328,20 +328,16 @@ export function useApiClient(): ApiClient {
         }
 
         if (res.status === 402) {
-          const quotaExceeded = quotaExceededSchema.safeParse(parsed);
-          if (quotaExceeded.success) {
-            throw new QuotaExceededError(
-              quotaExceeded.data.message,
-              quotaExceeded.data.details,
-            );
-          }
-          // [CR-API-402-04] Non-quota 402 — preserve status code so callers
-          // can branch on payment-required without parsing raw HTTP status.
-          throw new UpstreamError(
-            apiMessage ?? (errBody || res.statusText),
-            code ?? 'PAYMENT_REQUIRED',
-            402,
-          );
+          // [#899 / CR-API-402-04] Shared 402 classifier — a structured quota
+          // body becomes QuotaExceededError, otherwise UpstreamError(402) so
+          // callers branch on payment-required without parsing raw HTTP status.
+          throw classifyPaymentRequired({
+            parsed,
+            message: apiMessage,
+            fallbackText: errBody || res.statusText,
+            code,
+            defaultCode: 'PAYMENT_REQUIRED',
+          });
         }
 
         // [EP15-I5] Classify 403 into typed ForbiddenError so screens can
