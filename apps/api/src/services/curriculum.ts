@@ -1190,25 +1190,66 @@ export async function deleteBook(
  * shape callers expect (each book carries its computed status and
  * completedTopicCount). Inactive subjects are included so the Library
  * Books tab can still render archived/paused subjects' books.
+ *
+ * [WI-966] Supports cursor-based pagination over subjects so library mount
+ * no longer requires returning every subject and book in one response.
+ * `cursor` is an opaque subject UUID; `limit` caps the page size (default 20).
+ * `nextCursor` in the response is null when the caller has received all subjects.
  */
 export async function getAllProfileBooks(
   db: Database,
   profileId: string,
+  options?: { limit?: number; cursor?: string },
 ): Promise<{
   subjects: Array<{
     subjectId: string;
     subjectName: string;
     books: CurriculumBook[];
   }>;
+  nextCursor: string | null;
 }> {
+  const pageSize = Math.min(options?.limit ?? 20, 50);
+  const cursor = options?.cursor ?? null;
+
   const repo = createScopedRepository(db, profileId);
-  const profileSubjects = await repo.subjects.findMany();
-  if (profileSubjects.length === 0) {
-    return { subjects: [] };
+  const allProfileSubjects = await repo.subjects.findMany();
+  if (allProfileSubjects.length === 0) {
+    return { subjects: [], nextCursor: null };
   }
+
+  // [WI-966] Apply cursor-based pagination over the subject list.
+  // The cursor is the subjectId of the last subject in the previous page.
+  // Subjects are returned in their natural DB order (consistent between pages).
+  let startIndex = 0;
+  if (cursor !== null) {
+    const cursorIdx = allProfileSubjects.findIndex((s) => s.id === cursor);
+    // If the cursor subject was found, start AFTER it; if not found (deleted
+    // subject), start from the beginning (safe degradation).
+    startIndex = cursorIdx >= 0 ? cursorIdx + 1 : 0;
+  }
+  const pageSubjects = allProfileSubjects.slice(
+    startIndex,
+    startIndex + pageSize,
+  );
+
+  // [WI-966] startIndex >= allProfileSubjects.length when the cursor resolves
+  // to the very last subject (or a concurrent delete pushed it past the end).
+  // Calling inArray(col, []) produces invalid SQL ("WHERE x IN ()"), so bail
+  // out early with the correct empty-page shape.
+  if (pageSubjects.length === 0) {
+    return { subjects: [], nextCursor: null };
+  }
+
+  const hasMore = startIndex + pageSize < allProfileSubjects.length;
+  const nextCursor = hasMore
+    ? (pageSubjects[pageSubjects.length - 1]?.id ?? null)
+    : null;
+
+  // profileSubjects = the subjects on this page only
+  const profileSubjects = pageSubjects;
   const subjectIds = profileSubjects.map((s) => s.id);
 
-  // 1. All books across all subjects in a single query.
+  // 1. Books for this page's subjects in a single query.
   const bookRows = await db.query.curriculumBooks.findMany({
     where: inArray(curriculumBooks.subjectId, subjectIds),
     orderBy: [asc(curriculumBooks.sortOrder), asc(curriculumBooks.createdAt)],
@@ -1221,6 +1262,7 @@ export async function getAllProfileBooks(
         subjectName: s.name,
         books: [],
       })),
+      nextCursor,
     };
   }
 
@@ -1325,6 +1367,7 @@ export async function getAllProfileBooks(
       subjectName: s.name,
       books: booksBySubject.get(s.id) ?? [],
     })),
+    nextCursor,
   };
 }
 

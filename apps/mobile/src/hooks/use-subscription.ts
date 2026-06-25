@@ -5,6 +5,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import type {
   SubscriptionTier,
   SubscriptionStatus,
@@ -23,6 +24,7 @@ import { NotFoundError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Types — prefer imports from @eduagent/schemas; local only for API-specific shapes
@@ -77,7 +79,7 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['subscription', activeProfile?.id],
+    queryKey: queryKeys.subscription(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -98,7 +100,7 @@ export function useUsage(): UseQueryResult<UsageData> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['usage', activeProfile?.id],
+    queryKey: queryKeys.usage(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -118,7 +120,7 @@ export function useFamilySubscription(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['subscription-family', activeProfile?.id],
+    queryKey: queryKeys.subscriptionFamily(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -164,7 +166,7 @@ export function useSubscriptionStatus(options?: {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['subscription-status', activeProfile?.id],
+    queryKey: queryKeys.subscriptionStatus(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -206,6 +208,7 @@ export function useRemoveFamilyProfile(): UseMutationResult<
   string
 > {
   const client = useApiClient();
+  const { userId } = useAuth();
   const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
@@ -222,18 +225,20 @@ export function useRemoveFamilyProfile(): UseMutationResult<
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['profiles'] }),
         queryClient.invalidateQueries({
-          queryKey: ['subscription-family', activeProfile?.id],
+          queryKey: queryKeys.profiles.list(userId),
         }),
         queryClient.invalidateQueries({
-          queryKey: ['subscription', activeProfile?.id],
+          queryKey: queryKeys.subscriptionFamily(activeProfile?.id),
         }),
         queryClient.invalidateQueries({
-          queryKey: ['usage', activeProfile?.id],
+          queryKey: queryKeys.subscription(activeProfile?.id),
         }),
         queryClient.invalidateQueries({
-          queryKey: ['revenuecat', 'customerInfo'],
+          queryKey: queryKeys.usage(activeProfile?.id),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.revenuecat.customerInfo(userId),
         }),
       ]);
     },

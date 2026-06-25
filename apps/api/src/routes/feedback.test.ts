@@ -290,7 +290,7 @@ describe('POST /feedback', () => {
       data: {
         retryId: TEST_RETRY_ID,
         profileId: 'profile-bug767-fail',
-        userId: 'user-bug767-fail',
+        clerkUserId: 'user-bug767-fail',
       },
     });
     expect(insertedRetryRows).toHaveLength(1);
@@ -395,7 +395,7 @@ describe('POST /feedback', () => {
     expect(eventArg.data).toEqual({
       retryId: expect.any(String),
       profileId: 'profile-f090-fail',
-      userId: 'user-f090-fail',
+      clerkUserId: 'user-f090-fail',
     });
     // The free-text and the support address must not appear ANYWHERE in the
     // event payload, under any key.

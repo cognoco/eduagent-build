@@ -474,7 +474,31 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     expect(screen.queryByText('Not quite right?')).toBeNull();
   });
 
-  it('shows dispute button after a wrong answer', async () => {
+  it('shows dispute button after a wrong answer on a non-final question', async () => {
+    // [WI-948] Use a 2-question round so Q1 is non-final and submitRound is
+    // not called — the dispute button must remain visible.
+    mockRound = {
+      id: 'round-dispute-nonfinal',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
     mockCheckAnswer.mockResolvedValueOnce({
       correct: false,
       correctAnswer: 'Bratislava',
@@ -488,6 +512,104 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     });
     expect(screen.queryByTestId('quiz-correct-celebration')).toBeNull();
     screen.getByTestId('quiz-dispute-button');
+  });
+});
+
+// [WI-948] After a wrong answer on the FINAL question submitRound() fires and
+// sets roundSubmittedRef, making handleDispute a silent no-op. The "Not quite
+// right?" affordance must disappear once the round is submitted so the tap
+// does not mislead the learner. Non-final wrong answers must remain disputeable.
+describe('QuizPlayScreen — dispute hidden after final-question submission (WI-948)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCompleteRoundMutate.mockImplementation((_input, opts) => {
+      opts.onSuccess({
+        score: 0,
+        total: 1,
+        xpEarned: 0,
+        celebrationTier: 'none',
+        questionResults: [],
+      });
+    });
+  });
+
+  it('hides dispute button after a wrong answer on the final question (round submitted)', async () => {
+    mockRound = {
+      id: 'round-wi948-final',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Bratislava',
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-1')); // wrong answer
+
+    await waitFor(() => {
+      screen.getByText('Not quite');
+    });
+
+    // Round submitted immediately after final answer — dispute must be hidden
+    await waitFor(() => {
+      expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
+    });
+    expect(screen.queryByText('Not quite right?')).toBeNull();
+    // completeRound must have been called
+    expect(mockCompleteRoundMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows dispute button after a wrong answer on a non-final question', async () => {
+    mockRound = {
+      id: 'round-wi948-nonfinal',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({
+      correct: false,
+      correctAnswer: 'Bratislava',
+    });
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-1')); // wrong answer on Q1 (non-final)
+
+    await waitFor(() => {
+      screen.getByText('Not quite');
+    });
+
+    // Non-final: round NOT submitted, dispute must remain visible
+    screen.getByTestId('quiz-dispute-button');
+    expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
   });
 });
 
@@ -1135,10 +1257,14 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockCompleteRoundMutate).toHaveBeenCalled();
     });
-    expect(mockSentryCapture).toHaveBeenCalledWith({
-      code: 'INTERNAL_ERROR',
-      message: 'server-shape',
-    });
+    // [#887] The raw server envelope is still forwarded to Sentry as the first
+    // arg; the second arg now carries the per-action fingerprint tags.
+    expect(mockSentryCapture).toHaveBeenCalledWith(
+      { code: 'INTERNAL_ERROR', message: 'server-shape' },
+      expect.objectContaining({
+        tags: { component: 'quiz/play', action: 'complete_round' },
+      }),
+    );
   });
 
   it('[BUG-806] completeRound onError forwards Error message via formatApiError', async () => {
@@ -1153,8 +1279,13 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockCompleteRoundMutate).toHaveBeenCalled();
     });
+    // [#887] The Error is still forwarded as the first arg; the second arg now
+    // carries the per-action fingerprint tags.
     expect(mockSentryCapture).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Round save failed: 500' }),
+      expect.objectContaining({
+        tags: { component: 'quiz/play', action: 'complete_round' },
+      }),
     );
   });
 

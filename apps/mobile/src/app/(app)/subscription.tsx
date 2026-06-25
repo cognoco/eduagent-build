@@ -24,6 +24,7 @@ import { useThemeColors } from '../../lib/theme';
 import { useProfile } from '../../lib/profile';
 import { useApiClient } from '../../lib/api-client';
 import { assertOk } from '../../lib/assert-ok';
+import { queryKeys } from '../../lib/query-keys';
 
 import { TimeoutLoader } from '../../components/common';
 import {
@@ -42,6 +43,7 @@ import {
 } from '../../hooks/use-revenuecat';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { track } from '../../lib/analytics';
+import { formatShortDate } from '../../lib/format-datetime';
 import {
   getTiersToCompare,
   getTierLabel,
@@ -98,7 +100,7 @@ function SubscriptionContent(): React.ReactElement | null {
   const { activeProfile, profiles = [] } = useProfile();
   const navigationContract = useNavigationContract();
   const client = useApiClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const queryClient = useQueryClient();
 
@@ -250,7 +252,7 @@ function SubscriptionContent(): React.ReactElement | null {
     const restoreOutcome = await poll.run({
       fetchProbe: () =>
         queryClient.fetchQuery<{ tier: string }>({
-          queryKey: ['subscription', activeProfile?.id],
+          queryKey: queryKeys.subscription(activeProfile?.id),
           staleTime: 0,
           queryFn: async () => {
             const res = await client.subscription.$get({});
@@ -359,7 +361,7 @@ function SubscriptionContent(): React.ReactElement | null {
       const purchaseOutcome = await poll.run({
         fetchProbe: () =>
           queryClient.fetchQuery<{ tier: string }>({
-            queryKey: ['subscription', activeProfile?.id],
+            queryKey: queryKeys.subscription(activeProfile?.id),
             staleTime: 0,
             queryFn: async () => {
               const res = await client.subscription.$get({});
@@ -521,7 +523,7 @@ function SubscriptionContent(): React.ReactElement | null {
     const topUpOutcome = await poll.run({
       fetchProbe: () =>
         queryClient.fetchQuery<{ topUpCreditsRemaining: number }>({
-          queryKey: ['usage', activeProfile?.id],
+          queryKey: queryKeys.usage(activeProfile?.id),
           staleTime: 0,
           queryFn: () => fetchUsageData(client),
         }),
@@ -785,8 +787,9 @@ function SubscriptionContent(): React.ReactElement | null {
                   testID="trial-banner-ends-at"
                 >
                   {t('subscription.trial.endsAt', {
-                    date: new Date(subscription.trialEndsAt).toLocaleDateString(
-                      undefined,
+                    date: formatShortDate(
+                      subscription.trialEndsAt,
+                      i18n?.language,
                       {
                         year: 'numeric',
                         month: 'long',
@@ -837,22 +840,26 @@ function SubscriptionContent(): React.ReactElement | null {
               <Text className="text-caption text-text-secondary mt-1">
                 {cancelAtPeriodEnd
                   ? t('subscription.accessUntil', {
-                      date: new Date(
+                      date: formatShortDate(
                         subscription.currentPeriodEnd,
-                      ).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      }),
+                        i18n?.language,
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        },
+                      ),
                     })
                   : t('subscription.renewsOn', {
-                      date: new Date(
+                      date: formatShortDate(
                         subscription.currentPeriodEnd,
-                      ).toLocaleDateString(undefined, {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      }),
+                        i18n?.language,
+                        {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        },
+                      ),
                     })}
               </Text>
             )}
@@ -912,13 +919,15 @@ function SubscriptionContent(): React.ReactElement | null {
               </Text>
               <Text className="text-caption text-text-secondary mt-0.5">
                 {t('subscription.endingBody', {
-                  date: new Date(
+                  date: formatShortDate(
                     subscription.currentPeriodEnd,
-                  ).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  }),
+                    i18n?.language,
+                    {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    },
+                  ),
                 })}
               </Text>
             </View>

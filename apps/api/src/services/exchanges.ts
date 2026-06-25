@@ -1342,9 +1342,12 @@ function buildTripwireEnvelope(category: CatastrophicCategory): string {
  * caption + extracted text.
  *
  * SCOPE: a regex tripwire cannot read pixels. A purely pixel-based catastrophic
- * image with no extractable text (drawn/photographic) is OUT OF SCOPE here and
- * needs a vision safety classifier (tracked follow-up). This covers the
- * embedded/handwritten/printed-text case the OCR provider can extract.
+ * image with no extractable text (drawn/photographic) is covered by the
+ * Option-A fail-safe below: when OCR yields empty text AND the caption is empty
+ * or very short, we treat the image as unscreened and refuse it. This closes
+ * the worst-case silent-pass gap without a vision safety classifier. A
+ * dedicated pixel-level classifier (Option B) remains a tracked follow-up for
+ * the case where the image accompanies a long benign message.
  *
  * FAIL-SAFE: if OCR errors we must NOT fall through to the conversational
  * model (that would silently defeat the floor). We return `image_unscreened`
@@ -1384,6 +1387,26 @@ async function screenImageForCatastrophicContent(
       session_id: context.sessionId,
       profile_id: context.profileId,
       error: error instanceof Error ? error.message : String(error),
+    });
+    return { kind: 'unscreened' };
+  }
+
+  // Option A fail-safe (WI-1055): when OCR yields no text AND the caption is
+  // absent or very short, we cannot screen the image's pixel content. Treat as
+  // 'unscreened' (refuse) rather than 'clean' (pass through). This closes the
+  // gap where a purely photographic/drawn catastrophic image with a benign or
+  // empty caption would previously reach the LLM unscreened.
+  // Threshold: userMessage ≤10 chars is "effectively no caption" — too short to
+  // constitute a meaningful question about the image's content.
+  const IMAGE_ONLY_CAPTION_THRESHOLD = 10;
+  if (
+    !extractedText.trim() &&
+    userMessage.trim().length <= IMAGE_ONLY_CAPTION_THRESHOLD
+  ) {
+    logger.warn('safety.image_no_text_extracted', {
+      session_id: context.sessionId,
+      profile_id: context.profileId,
+      caption_length: userMessage.trim().length,
     });
     return { kind: 'unscreened' };
   }

@@ -48,7 +48,10 @@ import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
 import { LearnTogetherSheet } from '../family/LearnTogetherSheet';
-import { childProfileHref } from '../../lib/navigation';
+import {
+  childProfileHref,
+  pushChildReports as pushChildReportsNav,
+} from '../../lib/navigation';
 import { useRecaps } from '../../hooks/use-recaps';
 import type { RecapListItem } from '@eduagent/schemas';
 import {
@@ -848,9 +851,12 @@ export function ParentHomeScreen({
     [router],
   );
 
+  // [WI-1067] Use the navigation helper so the ancestor chain is pushed
+  // (child profile index first, then reports list) — a direct push to the
+  // reports screen synthesises a 1-deep stack, breaking router.back().
   const pushChildReports = useCallback(
     (childProfileId: string): void => {
-      router.push(`/(app)/child/${childProfileId}/reports` as Href);
+      pushChildReportsNav(router, childProfileId);
     },
     [router],
   );

@@ -7,6 +7,7 @@ import {
   filingTimedOutEventSchema,
   getSessionEffectiveMode,
   sessionAutoFileRequestedEventSchema,
+  summarizeRawPayload,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
@@ -37,7 +38,30 @@ export const filingTimedOutObserve = inngest.createFunction(
   },
   { event: 'app/session.filing_timed_out' },
   async ({ event, step }) => {
-    const parsed = filingTimedOutEventSchema.parse(event.data);
+    const parsedResult = filingTimedOutEventSchema.safeParse(event.data);
+    if (!parsedResult.success) {
+      captureException(
+        new Error(
+          `filing-timed-out-observe: invalid payload - ${parsedResult.error.message}`,
+        ),
+        {
+          extra: {
+            site: 'filingTimedOutObserve.invalid_payload',
+            issues: parsedResult.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
+      );
+      logger.warn('filing_timed_out_observe.invalid_payload', {
+        issues: parsedResult.error.issues,
+      });
+      return {
+        status: 'invalid_payload' as const,
+        error: parsedResult.error.message,
+      };
+    }
+
+    const parsed = parsedResult.data;
     const { sessionId, profileId } = parsed;
 
     const snapshot = await step.run('capture-diagnostic-snapshot', async () => {

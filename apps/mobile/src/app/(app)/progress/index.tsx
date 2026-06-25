@@ -52,12 +52,13 @@ import {
 import { useSubjects } from '../../../hooks/use-subjects';
 import {
   pushChildReport,
+  pushChildReports,
   pushChildWeeklyReport,
   pushLearningResumeTarget,
 } from '../../../lib/navigation';
-import { copyRegisterFor } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
+import { useApiClient } from '../../../lib/api-client';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
 import { useAppContext } from '../../../lib/app-context';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -66,8 +67,9 @@ import { useTheme } from '../../../lib/theme';
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
+  const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
+  const client = useApiClient();
   const { profileId: rawRequestedProfileId } = useLocalSearchParams<{
     profileId?: string;
   }>();
@@ -438,9 +440,13 @@ export default function ProgressScreen(): React.ReactElement {
 
   const handleEmptyProgressAction = () => {
     if (activeProfile) {
-      track('progress_empty_state_cta_tapped', {
-        profile_id_hash: hashProfileId(activeProfile.id),
-        account_age_bucket: bucketAccountAge(activeProfile.createdAt),
+      const profileId = activeProfile.id;
+      const accountAgeBucket = bucketAccountAge(activeProfile.createdAt);
+      void hashProfileId(profileId, client).then((profileIdHash) => {
+        track('progress_empty_state_cta_tapped', {
+          profile_id_hash: profileIdHash,
+          account_age_bucket: accountAgeBucket,
+        });
       });
     }
 
@@ -613,13 +619,16 @@ export default function ProgressScreen(): React.ReactElement {
                     {t('progress.previousReports.title')}
                   </Text>
                   <Pressable
-                    onPress={() =>
-                      router.push(
-                        isViewingSelf
-                          ? ('/(app)/progress/reports' as Href)
-                          : (`/(app)/child/${selectedProfileId}/reports` as Href),
-                      )
-                    }
+                    onPress={() => {
+                      if (isViewingSelf) {
+                        router.push('/(app)/progress/reports' as Href);
+                      } else if (selectedProfileId) {
+                        // [WI-1067] Use the navigation helper to push the full
+                        // ancestor chain (child index first, then reports) so
+                        // router.back() from the reports screen returns correctly.
+                        pushChildReports(router, selectedProfileId);
+                      }
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={t('progress.previousReports.viewAll')}
                     testID="progress-reports-link"
@@ -642,13 +651,14 @@ export default function ProgressScreen(): React.ReactElement {
             {selectedProfileId && !hasAnyReports ? (
               <Pressable
                 testID="progress-view-all-reports"
-                onPress={() =>
-                  router.push(
-                    isViewingSelf
-                      ? ('/(app)/progress/reports' as Href)
-                      : (`/(app)/child/${selectedProfileId}/reports` as Href),
-                  )
-                }
+                onPress={() => {
+                  if (isViewingSelf) {
+                    router.push('/(app)/progress/reports' as Href);
+                  } else {
+                    // [WI-1067] Push ancestor chain so router.back() returns correctly.
+                    pushChildReports(router, selectedProfileId);
+                  }
+                }}
                 className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('progress.guardian.viewAllReports')}

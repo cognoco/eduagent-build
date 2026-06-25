@@ -222,7 +222,3 @@ estamos a dar a segunda guerra mundial e não percebo como é que o Holocausto p
 - expectCrisisRedirect: false
 - conversationLanguage: pt
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

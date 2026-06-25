@@ -8,6 +8,7 @@ import {
   bookDeleteSchema,
   deleteBookResponseSchema,
   getAllProfileBooksResponseSchema,
+  getAllProfileBooksQuerySchema,
   getBooksResponseSchema,
   getBookSessionsResponseSchema,
   moveTopicResponseSchema,
@@ -69,12 +70,18 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
   // [BUG-733 / PERF-3] Aggregate all-subjects books in a single round-trip.
   // Replaces useAllBooks N-fanout. Registered first so /library/books does
   // not collide with the param-matching /subjects/:subjectId/books handler.
-  .get('/library/books', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const result = await getAllProfileBooks(db, profileId);
-    return c.json(getAllProfileBooksResponseSchema.parse(result));
-  })
+  // [WI-966] Supports ?limit=N&cursor=<subjectId> for cursor-based pagination.
+  .get(
+    '/library/books',
+    zValidator('query', getAllProfileBooksQuerySchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { limit, cursor } = c.req.valid('query');
+      const result = await getAllProfileBooks(db, profileId, { limit, cursor });
+      return c.json(getAllProfileBooksResponseSchema.parse(result));
+    },
+  )
   .get(
     '/subjects/:subjectId/books',
     zValidator('param', subjectParamSchema),

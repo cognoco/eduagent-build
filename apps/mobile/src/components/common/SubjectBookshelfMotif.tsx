@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import type { LearningSubjectTint } from '../../lib/subject-tints';
 import { withOpacity } from '../../lib/color-opacity';
 
 // Hoisted to module scope — geometry/opacity only, no theme or prop dependencies.

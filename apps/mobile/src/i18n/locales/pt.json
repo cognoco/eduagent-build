@@ -454,9 +454,7 @@
     }
   },
   "family": {
-    "orientationCueBody": "O progresso das crianças e a sua própria aprendizagem, tudo num só lugar.",
     "orientationCueDismiss": "Entendido",
-    "orientationCueTitle": "Esta é a sua casa",
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",

@@ -17,6 +17,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Query hooks
@@ -27,7 +28,7 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'notifications', activeProfile?.id],
+    queryKey: queryKeys.settings.notifications(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -51,7 +52,7 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'celebration-level', activeProfile?.id],
+    queryKey: queryKeys.settings.celebrationLevel(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -79,12 +80,10 @@ export function useChildCelebrationLevel(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'settings',
-      'celebration-level',
-      activeProfile?.id,
+    queryKey: queryKeys.settings.childCelebrationLevel(
       childProfileId,
-    ],
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -110,7 +109,7 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'withdrawal-archive', activeProfile?.id],
+    queryKey: queryKeys.settings.withdrawalArchive(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -136,7 +135,7 @@ export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'family-pool-breakdown-sharing', activeProfile?.id],
+    queryKey: queryKeys.settings.familyPoolBreakdownSharing(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -177,7 +176,7 @@ export function useUpdateNotificationSettings(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['settings', 'notifications', activeProfile?.id],
+        queryKey: queryKeys.settings.notifications(activeProfile?.id),
       });
     },
   });
@@ -203,7 +202,7 @@ export function useUpdateCelebrationLevel(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['settings', 'celebration-level', activeProfile?.id],
+        queryKey: queryKeys.settings.celebrationLevel(activeProfile?.id),
       });
     },
   });
@@ -229,12 +228,10 @@ export function useUpdateChildCelebrationLevel(): UseMutationResult<
     },
     onSuccess: (_level, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: [
-          'settings',
-          'celebration-level',
-          activeProfile?.id,
+        queryKey: queryKeys.settings.childCelebrationLevel(
           variables.childProfileId,
-        ],
+          activeProfile?.id,
+        ),
       });
     },
   });
@@ -260,7 +257,7 @@ export function useUpdateWithdrawalArchivePreference(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['settings', 'withdrawal-archive', activeProfile?.id],
+        queryKey: queryKeys.settings.withdrawalArchive(activeProfile?.id),
       });
     },
   });
@@ -286,14 +283,12 @@ export function useUpdateFamilyPoolBreakdownSharing(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: [
-          'settings',
-          'family-pool-breakdown-sharing',
+        queryKey: queryKeys.settings.familyPoolBreakdownSharing(
           activeProfile?.id,
-        ],
+        ),
       });
       void queryClient.invalidateQueries({
-        queryKey: ['usage', activeProfile?.id],
+        queryKey: queryKeys.usage(activeProfile?.id),
       });
     },
   });
@@ -367,7 +362,7 @@ export function useAnalogyDomain(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+    queryKey: queryKeys.settings.analogyDomain(subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -406,7 +401,10 @@ export function useUpdateAnalogyDomain(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['settings', 'analogy-domain', activeProfile?.id, subjectId],
+        queryKey: queryKeys.settings.analogyDomain(
+          subjectId,
+          activeProfile?.id,
+        ),
       });
     },
   });
@@ -419,7 +417,7 @@ export function useNativeLanguage(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['settings', 'native-language', activeProfile?.id, subjectId],
+    queryKey: queryKeys.settings.nativeLanguage(subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -458,7 +456,10 @@ export function useUpdateNativeLanguage(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['settings', 'native-language', activeProfile?.id, subjectId],
+        queryKey: queryKeys.settings.nativeLanguage(
+          subjectId,
+          activeProfile?.id,
+        ),
       });
     },
   });

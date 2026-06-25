@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -59,7 +59,7 @@ export default function MoreScreen() {
         router.push({
           pathname: '/create-profile',
           params: { for: 'child' },
-        } as never);
+        } as Href);
         return;
       }
       // Subscription query still loading and the navigation gate is not ready
@@ -71,7 +71,7 @@ export default function MoreScreen() {
     router.push({
       pathname: '/create-profile',
       params: { for: 'child' },
-    } as never);
+    } as Href);
   }, [subscription, navigationContract.gates.showAddChild, router, t]);
 
   const linkedChildren =

@@ -9,20 +9,28 @@ describe('validateNoteDraft — accepts grounded drafts', () => {
   it('accepts a draft whose vocabulary overlaps strongly with the learner', () => {
     const draft =
       'Photosynthesis takes place in chloroplasts. Light energy converts carbon dioxide and water into glucose. ATP is the cell energy currency.';
-    const r = validateNoteDraft(draft, solidLearnerQuotes);
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
+    const r = validateNoteDraft(draft, solidLearnerQuotes, solidLearnerQuotes);
     expect(r.ok).toBe(true);
     expect(r.overlapRatio).toBeGreaterThan(0.4);
   });
 
   it('accepts a short but meaningful draft (n-gram fallback path)', () => {
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
     expect(
-      validateNoteDraft('ATP stores energy.', ['ATP stores energy.']).ok,
+      validateNoteDraft(
+        'ATP stores energy.',
+        ['ATP stores energy.'],
+        ['ATP stores energy.'],
+      ).ok,
     ).toBe(true);
   });
 
   it('reports overlapRatio above threshold for an accepted draft', () => {
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
     const r = validateNoteDraft(
       'Photosynthesis happens in chloroplasts. ATP is energy currency.',
+      solidLearnerQuotes,
       solidLearnerQuotes,
     );
     expect(r.ok).toBe(true);
@@ -34,19 +42,24 @@ describe('validateNoteDraft — rejects ungrounded drafts (HIGH-1 topic drift)',
   it('rejects a draft that invents new topic content', () => {
     const draft =
       'The Krebs cycle is essential for cellular respiration and produces NADH and FADH2 electron carriers.';
-    const r = validateNoteDraft(draft, solidLearnerQuotes);
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
+    const r = validateNoteDraft(draft, solidLearnerQuotes, solidLearnerQuotes);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe('low_lexical_overlap');
   });
 
   it('rejects an empty draft with reason=empty', () => {
-    const r = validateNoteDraft('', solidLearnerQuotes);
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
+    const r = validateNoteDraft('', solidLearnerQuotes, solidLearnerQuotes);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe('empty');
   });
 
   it('rejects a whitespace-only draft', () => {
-    expect(validateNoteDraft('   \n\t', solidLearnerQuotes).ok).toBe(false);
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
+    expect(
+      validateNoteDraft('   \n\t', solidLearnerQuotes, solidLearnerQuotes).ok,
+    ).toBe(false);
   });
 
   // HIGH-6 boundary: callers must pass only solid quotes. The guard
@@ -60,8 +73,11 @@ describe('validateNoteDraft — rejects ungrounded drafts (HIGH-1 topic drift)',
     ];
     const draft =
       'Photosynthesis happens in the nucleus and ATP means atomic transfer power.';
-    expect(validateNoteDraft(draft, solidLearnerQuotes).ok).toBe(false);
-    expect(validateNoteDraft(draft, wrongIdeas).ok).toBe(true);
+    // test isolation: passes solidLearnerQuotes as verified content (no DB in unit test)
+    expect(
+      validateNoteDraft(draft, solidLearnerQuotes, solidLearnerQuotes).ok,
+    ).toBe(false);
+    expect(validateNoteDraft(draft, wrongIdeas, wrongIdeas).ok).toBe(true);
   });
 });
 
@@ -72,14 +88,20 @@ describe('validateNoteDraft — rejects ungrounded drafts (HIGH-1 topic drift)',
 // draft, making the guard a no-op.  Real learner text ("yeah mitochondria")
 // does NOT overlap sufficiently with the fabricated draft.
 describe('validateNoteDraft — verified event contents guard [BUG-483]', () => {
-  it('PASSES (false safe) when only LLM paraphrase is supplied (demonstrates the pre-fix vulnerability)', () => {
+  it('PASSES (false safe) when LLM paraphrase is passed as verified content (demonstrates the pre-fix vulnerability)', () => {
     // LLM says the learner answered "the powerhouse of the cell is the mitochondria"
     // — but the learner actually just said "yeah mitochondria".
     const llmParaphrase = ['the powerhouse of the cell is the mitochondria'];
     // LLM-drafted note reuses its own paraphrase vocabulary → overlap ≈ 1.0
     const fabricatedDraft =
       'The mitochondria is the powerhouse of the cell. It produces energy for life.';
-    const result = validateNoteDraft(fabricatedDraft, llmParaphrase);
+    // Passing llmParaphrase as BOTH solidLearnerQuotes and verifiedEventContents
+    // demonstrates the attack: when the LLM controls both inputs the guard is a no-op.
+    const result = validateNoteDraft(
+      fabricatedDraft,
+      llmParaphrase,
+      llmParaphrase,
+    );
     // Guard passes because LLM paraphrase + LLM draft share the same vocabulary.
     // This is the vulnerability: the guard does NOT catch value substitution here.
     expect(result.ok).toBe(true);
@@ -126,9 +148,41 @@ describe('validateNoteDraft — verified event contents guard [BUG-483]', () => 
     const draft =
       'Photosynthesis converts light energy into glucose inside chloroplasts.';
     const withEmpty = validateNoteDraft(draft, quotes, []);
-    const withoutArg = validateNoteDraft(draft, quotes);
-    expect(withEmpty.ok).toBe(withoutArg.ok);
-    expect(withEmpty.overlapRatio).toBe(withoutArg.overlapRatio);
+    // Passing quotes as verifiedEventContents is equivalent to fallback (same source data)
+    const withSolidQuotes = validateNoteDraft(draft, quotes, quotes);
+    expect(withEmpty.ok).toBe(withSolidQuotes.ok);
+    expect(withEmpty.overlapRatio).toBe(withSolidQuotes.overlapRatio);
+  });
+
+  // [WI-1056] Regression: solidLearnerQuotes overlap with draft but verifiedEventContents do not.
+  // Before the fix (optional param), passing only solidLearnerQuotes would make this pass.
+  // With verifiedEventContents required and containing non-overlapping content, it must reject.
+  it('[WI-1056] REJECTS when solidLearnerQuotes overlap with draft but verifiedEventContents do not', () => {
+    // The LLM-generated paraphrase ("photosynthesis takes place in chloroplasts…")
+    // overlaps with the draft. The verified event content is sparse ("yeah sunlight").
+    const solidParaphrase = [
+      'Photosynthesis takes place in chloroplasts using light energy to produce glucose.',
+    ];
+    const draft =
+      'Photosynthesis takes place in chloroplasts and produces glucose using light energy.';
+    const verifiedEventContent = ['yeah sunlight'];
+
+    // With solidParaphrase as verifiedEventContents → overlap is high → PASSES
+    const withSolidAsVerified = validateNoteDraft(
+      draft,
+      solidParaphrase,
+      solidParaphrase,
+    );
+    expect(withSolidAsVerified.ok).toBe(true);
+
+    // With sparse real content as verifiedEventContents → overlap is low → REJECTS
+    const withRealContent = validateNoteDraft(
+      draft,
+      solidParaphrase,
+      verifiedEventContent,
+    );
+    expect(withRealContent.ok).toBe(false);
+    expect(withRealContent.reason).toBe('low_lexical_overlap');
   });
 });
 
@@ -136,19 +190,22 @@ describe('validateNoteDraft — Unicode + non-Latin tokenization (MED-10)', () =
   it('accepts accented Latin (Czech) when the draft mirrors the learner', () => {
     const quotes = ['Fotosyntéza probíhá v chloroplastech a vytváří glukózu.'];
     const draft = 'Fotosyntéza probíhá v chloroplastech a vytváří glukózu.';
-    expect(validateNoteDraft(draft, quotes).ok).toBe(true);
+    // test isolation: passes quotes as verified content (no DB in unit test)
+    expect(validateNoteDraft(draft, quotes, quotes).ok).toBe(true);
   });
 
   it('accepts non-spaced script (Japanese) via the character n-gram fallback', () => {
     const quotes = ['光合成は葉緑体で行われます'];
     const draft = '光合成は葉緑体で行われます';
-    expect(validateNoteDraft(draft, quotes).ok).toBe(true);
+    // test isolation: passes quotes as verified content (no DB in unit test)
+    expect(validateNoteDraft(draft, quotes, quotes).ok).toBe(true);
   });
 
   it('rejects a Japanese draft that drifts to an unrelated string', () => {
     const quotes = ['光合成は葉緑体で行われます'];
     const draft = '今日の天気は晴れです';
-    expect(validateNoteDraft(draft, quotes).ok).toBe(false);
+    // test isolation: passes quotes as verified content (no DB in unit test)
+    expect(validateNoteDraft(draft, quotes, quotes).ok).toBe(false);
   });
 });
 

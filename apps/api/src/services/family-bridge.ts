@@ -665,31 +665,43 @@ export async function undoCloneFromChild(
     return { deleted: { topic: false } };
   }
 
-  const [deletedTopic] = await db
-    .delete(curriculumTopics)
-    .where(
-      and(
-        eq(curriculumTopics.id, topic.topicId),
-        sql`NOT EXISTS (
-          SELECT 1
-          FROM ${learningSessions}
-          WHERE ${learningSessions.profileId} = ${adultProfileId}
-            AND ${learningSessions.topicId} = ${topic.topicId}
-        )`,
-      ),
-    )
-    .returning({ id: curriculumTopics.id });
+  // [WI-1060] Wrap the topic delete + ancestor cascade in one transaction.
+  // A crash between the topic delete and cascadeUndoCreatedAncestors would
+  // leave the orphan book + subject this clone created (the exact state the
+  // BUG-863 cascade exists to prevent), now with the topic already gone and no
+  // re-trigger to clean it up. Atomic: either the whole undo lands or none of it.
+  const deletedTopic = await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
+    const [deleted] = await txDb
+      .delete(curriculumTopics)
+      .where(
+        and(
+          eq(curriculumTopics.id, topic.topicId),
+          sql`NOT EXISTS (
+            SELECT 1
+            FROM ${learningSessions}
+            WHERE ${learningSessions.profileId} = ${adultProfileId}
+              AND ${learningSessions.topicId} = ${topic.topicId}
+          )`,
+        ),
+      )
+      .returning({ id: curriculumTopics.id });
+
+    if (deleted) {
+      // [BUG-863] Cascade the undo to ancestors THIS clone created. createdIds
+      // carries bookId/subjectId only when cloneTopicFromChild had to create
+      // them (first clone into a brand-new book/subject). Without this cascade
+      // an immediate undo leaves an orphan book + subject on the parent's
+      // account with no UI affordance to clean up. Delete an ancestor only when
+      // it is (a) present in createdIds (this clone made it), (b) now empty, and
+      // (c) owned by the adult via the parent chain — guarding against deleting
+      // a pre-existing or still-populated ancestor.
+      await cascadeUndoCreatedAncestors(txDb, adultProfileId, createdIds);
+    }
+    return deleted;
+  });
 
   if (deletedTopic) {
-    // [BUG-863] Cascade the undo to ancestors THIS clone created. createdIds
-    // carries bookId/subjectId only when cloneTopicFromChild had to create them
-    // (first clone into a brand-new book/subject). Without this cascade an
-    // immediate undo leaves an orphan book + subject on the parent's account
-    // with no UI affordance to clean up. Delete an ancestor only when it is
-    // (a) present in createdIds (this clone made it), (b) now empty, and
-    // (c) owned by the adult via the parent chain — guarding against deleting
-    // a pre-existing or still-populated ancestor.
-    await cascadeUndoCreatedAncestors(db, adultProfileId, createdIds);
     return { deleted: { topic: true } };
   }
 

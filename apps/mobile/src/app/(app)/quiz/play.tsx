@@ -102,6 +102,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
   const [roundAutoSaveStarted, setRoundAutoSaveStarted] = useState(false);
   const [roundAutoSaved, setRoundAutoSaved] = useState(false);
+  // [WI-948] Mirrors roundSubmittedRef so the dispute affordance can re-render
+  // when the final question is submitted. roundSubmittedRef guards re-entry
+  // (no re-render needed there); roundSubmitted drives the JSX hide.
+  const [roundSubmitted, setRoundSubmitted] = useState(false);
   const [correctCelebrationKey, setCorrectCelebrationKey] = useState<
     number | null
   >(null);
@@ -217,6 +221,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
       setCompleteError(null);
       roundSubmittedRef.current = true;
+      setRoundSubmitted(true);
       if (!navigateOnSuccess) {
         setRoundAutoSaveStarted(true);
       }
@@ -234,13 +239,19 @@ export default function QuizPlayScreen(): React.ReactElement {
           },
           onError: (err) => {
             roundSubmittedRef.current = false;
+            setRoundSubmitted(false);
             setRoundAutoSaveStarted(false);
             // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
             // string, network failure) — `err instanceof Error` returns false for
             // server-typed error envelopes, hiding the actionable reason behind
             // the generic fallback.
             setCompleteError(formatApiError(err));
-            Sentry.captureException(err);
+            // [#887] Tag so this surfaces as its own Sentry fingerprint rather
+            // than collapsing into one generic quiz/play bucket.
+            Sentry.captureException(err, {
+              tags: { component: 'quiz/play', action: 'complete_round' },
+              extra: { roundId },
+            });
           },
         },
       );
@@ -326,7 +337,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         // Surface the failure visibly + capture for triage. Without this, the
         // user thinks their answer was validated when in fact it never was.
         setAnswerCheckFailed(true);
-        Sentry.captureException(err);
+        // [#887] Distinct fingerprint for the Guess-Who answer-check failure.
+        Sentry.captureException(err, {
+          tags: { component: 'quiz/play', action: 'check_guess_who_answer' },
+          extra: { roundId, currentIndex },
+        });
         platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
         return false;
       }
@@ -575,7 +590,11 @@ export default function QuizPlayScreen(): React.ReactElement {
       // the answer wasn't validated, instead of silently flipping the flag.
       correct = false;
       setAnswerCheckFailed(true);
-      Sentry.captureException(err);
+      // [#887] Distinct fingerprint for the per-question advance answer-check.
+      Sentry.captureException(err, {
+        tags: { component: 'quiz/play', action: 'check_answer_advance' },
+        extra: { roundId, questionIndex },
+      });
       platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
     }
 
@@ -1049,7 +1068,12 @@ export default function QuizPlayScreen(): React.ReactElement {
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
                 nothing to dispute on a correct response, and showing the link
                 pollutes triage with noise on clearly-correct answers. */}
-            {answerState === 'wrong' && !disputedIndices.has(currentIndex) ? (
+            {/* [WI-948] Hide after round submission: handleDispute no-ops once
+                roundSubmittedRef is set, so showing the affordance is misleading.
+                roundSubmitted state mirrors the ref to drive this re-render. */}
+            {answerState === 'wrong' &&
+            !disputedIndices.has(currentIndex) &&
+            !roundSubmitted ? (
               <Pressable
                 onPress={handleDispute}
                 className="mt-2 items-center py-1"

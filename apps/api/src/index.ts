@@ -93,6 +93,7 @@ import { challengeRoundRoutes } from './routes/challenge-round';
 import { nowRoutes } from './routes/now';
 import { scopesRoutes } from './routes/scopes';
 import { visibilityRoutes } from './routes/visibility';
+import { analyticsRoutes } from './routes/analytics';
 
 // [Issue-888] Bindings must stay in sync with envSchema in config.ts.
 // All string env vars that envSchema declares must appear here so c.env.X
@@ -152,6 +153,7 @@ type Bindings = {
 
   // Observability
   SENTRY_DSN?: string;
+  ANALYTICS_HASH_KEY?: string;
 
   // Consent policy versioning
   CONSENT_POLICY_VERSION?: string;
@@ -390,6 +392,7 @@ const routes = api
   .route('/', librarySearchRoutes)
   .route('/', scopesRoutes)
   .route('/', visibilityRoutes)
+  .route('/', analyticsRoutes)
   .route('/', nowRoutes)
   .route('/', challengeRoundRoutes);
 

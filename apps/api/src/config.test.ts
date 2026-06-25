@@ -4,6 +4,7 @@ import {
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
   isManagedTierActive,
+  isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
   validateEnv,
   validateProductionBindings,
@@ -111,6 +112,7 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
     expect(missing).toContain('RESEND_WEBHOOK_SECRET');
+    expect(missing).toContain('ANALYTICS_HASH_KEY');
     // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
     expect(missing).not.toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
@@ -119,8 +121,8 @@ describe('validateProductionKeys', () => {
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    // 8 originals + 2 new Inngest keys = 10
-    expect(missing).toHaveLength(10);
+    // 8 originals + 2 Inngest keys + analytics HMAC key = 11
+    expect(missing).toHaveLength(11);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -139,6 +141,7 @@ describe('validateProductionKeys', () => {
       RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -182,7 +185,71 @@ describe('validateProductionKeys', () => {
       'RESEND_API_KEY',
       'RESEND_WEBHOOK_SECRET',
       'REVENUECAT_WEBHOOK_SECRET',
+      'ANALYTICS_HASH_KEY',
     ]);
+  });
+
+  // [Gemini-retirement Phase A / T-A2] The production-required LLM key set must
+  // track the active routing path, not hard-wire Gemini. With the V2 matrix live
+  // (LLM_ROUTING_V2_ENABLED='true') production must boot on the approved
+  // providers (Cerebras/Mistral/OpenAI) with NO GEMINI_API_KEY; with the flag
+  // off the legacy Gemini-default path still requires it.
+  describe('path-aware LLM required keys (LLM_ROUTING_V2_ENABLED)', () => {
+    const PROD_BASE: Env = {
+      ...BASE_ENV,
+      ENVIRONMENT: 'production',
+      CLERK_SECRET_KEY: 'sk_live_xxx',
+      CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api',
+      INNGEST_SIGNING_KEY: 'signkey_prd_xxx',
+      INNGEST_EVENT_KEY: 'evtkey_prd_xxx',
+      VOYAGE_API_KEY: 'voyage-key',
+      RESEND_API_KEY: 're_xxx',
+      RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
+      API_ORIGIN: 'https://api.mentomate.com',
+      REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
+    };
+
+    it('V2 on: passes with Cerebras+Mistral+OpenAI and NO Gemini key', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'true',
+        CEREBRAS_API_KEY: 'cb-key',
+        MISTRAL_API_KEY: 'ml-key',
+        OPENAI_API_KEY: 'oa-key',
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toEqual([]);
+    });
+
+    it('V2 on: requires the approved providers and NOT Gemini', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'true',
+        CEREBRAS_API_KEY: undefined,
+        MISTRAL_API_KEY: undefined,
+        OPENAI_API_KEY: undefined,
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toContain('CEREBRAS_API_KEY');
+      expect(missing).toContain('MISTRAL_API_KEY');
+      expect(missing).toContain('OPENAI_API_KEY');
+      expect(missing).not.toContain('GEMINI_API_KEY');
+    });
+
+    it('legacy (flag off): still requires GEMINI_API_KEY even when approved providers are present', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'false',
+        CEREBRAS_API_KEY: 'cb-key',
+        MISTRAL_API_KEY: 'ml-key',
+        OPENAI_API_KEY: 'oa-key',
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toContain('GEMINI_API_KEY');
+      expect(missing).not.toContain('CEREBRAS_API_KEY');
+    });
   });
 });
 
@@ -262,6 +329,7 @@ describe('validateEnv', () => {
       RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -803,5 +871,30 @@ describe('isProfileInDedupRollout', () => {
     }
     expect(inRollout / count).toBeGreaterThan(0.25);
     expect(inRollout / count).toBeLessThan(0.35);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1051] isMaintenanceProductionEnabled unit tests
+// ---------------------------------------------------------------------------
+// The helper is intentionally fail-closed: ONLY the literal string 'true' opts
+// in; 'false', '1', 'yes', and undefined all return false. These tests verify
+// the semantics directly (independent of the route-level integration tests in
+// [BUG-875] above).
+describe('isMaintenanceProductionEnabled [WI-1051]', () => {
+  it("returns true for the exact string 'true'", () => {
+    expect(isMaintenanceProductionEnabled('true')).toBe(true);
+  });
+
+  it("returns false for the string 'false'", () => {
+    expect(isMaintenanceProductionEnabled('false')).toBe(false);
+  });
+
+  it('returns false for undefined (no flag set)', () => {
+    expect(isMaintenanceProductionEnabled(undefined)).toBe(false);
+  });
+
+  it("returns false for '1' (JS-truthy string, not the required literal)", () => {
+    expect(isMaintenanceProductionEnabled('1')).toBe(false);
   });
 });

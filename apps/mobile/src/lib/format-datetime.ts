@@ -31,3 +31,25 @@ export function formatMediumDateTime(isoValue: string | undefined): string {
     }
   }
 }
+
+export function formatShortDate(
+  isoValue: string | Date | undefined,
+  locale?: string,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  if (!isoValue) return '';
+  const date = isoValue instanceof Date ? isoValue : new Date(isoValue);
+  if (Number.isNaN(date.getTime())) {
+    return typeof isoValue === 'string' ? isoValue : '';
+  }
+  const formatOptions = options ?? { dateStyle: 'medium' };
+  try {
+    return new Intl.DateTimeFormat(locale, formatOptions).format(date);
+  } catch {
+    try {
+      return date.toLocaleDateString(locale, formatOptions);
+    } catch {
+      return date.toISOString();
+    }
+  }
+}

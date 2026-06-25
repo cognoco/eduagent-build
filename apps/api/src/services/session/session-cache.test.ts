@@ -411,6 +411,86 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
     expect(_sessionStaticContextCacheSize()).toBe(2);
   });
+
+  // -------------------------------------------------------------------------
+  // [WI-963] parallel resolution — both contexts available / one context absent
+  //
+  // These tests pin the filtering behaviour that prepareExchangeContext relies on
+  // when resolving getCachedBookLearningHistoryContext and
+  // getCachedHomeworkLibraryContext in parallel via Promise.all.
+  // -------------------------------------------------------------------------
+
+  it('[WI-963] both contexts present: parallel Promise.all resolves both correctly', async () => {
+    mockBuildBookLearningHistoryContext.mockResolvedValue('Book context text');
+    mockBuildHomeworkLibraryContext.mockResolvedValue('Homework context text');
+
+    const session = {
+      subjectId: 'subject-963a',
+      topicId: 'topic-963a',
+    } as never;
+
+    const [bookCtx, hwCtx] = await Promise.all([
+      getCachedBookLearningHistoryContext(
+        {} as never,
+        'prof-963a',
+        'sess-963a',
+        session,
+        'topic-963a',
+        'book-963a',
+      ),
+      getCachedHomeworkLibraryContext(
+        {} as never,
+        'prof-963a',
+        'sess-963a',
+        session,
+      ),
+    ]);
+
+    // Both resolvers returned strings — filter preserves them in order
+    const parts = [bookCtx, hwCtx].filter((part): part is string =>
+      Boolean(part),
+    );
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toBe('Book context text');
+    expect(parts[1]).toBe('Homework context text');
+    expect(parts.join('\n\n')).toBe(
+      'Book context text\n\nHomework context text',
+    );
+  });
+
+  it('[WI-963] one context absent: filter excludes undefined and preserves the present one', async () => {
+    // Homework context absent (returns undefined) — only book context present
+    mockBuildBookLearningHistoryContext.mockResolvedValue('Book context text');
+    mockBuildHomeworkLibraryContext.mockResolvedValue(undefined);
+
+    const session = {
+      subjectId: 'subject-963b',
+      topicId: 'topic-963b',
+    } as never;
+
+    const [bookCtx, hwCtx] = await Promise.all([
+      getCachedBookLearningHistoryContext(
+        {} as never,
+        'prof-963b',
+        'sess-963b',
+        session,
+        'topic-963b',
+        'book-963b',
+      ),
+      getCachedHomeworkLibraryContext(
+        {} as never,
+        'prof-963b',
+        'sess-963b',
+        session,
+      ),
+    ]);
+
+    const parts = [bookCtx, hwCtx].filter((part): part is string =>
+      Boolean(part),
+    );
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toBe('Book context text');
+  });
 });
 
 // ---------------------------------------------------------------------------

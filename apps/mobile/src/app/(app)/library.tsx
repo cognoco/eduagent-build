@@ -273,8 +273,11 @@ function LibraryScreenContent({
   );
 
   const progressInventoryQuery = useLibraryProgressInventory();
+  // Use isFullyLoaded (not isSuccess) so delete-scope counts are only
+  // presented after the auto-drain of all book pages finishes; isSuccess goes
+  // true after the first page settles while pages 2, 3, … are still in flight.
   const isDeleteScopeReady =
-    allBooksQuery.isSuccess && progressInventoryQuery.isSuccess;
+    allBooksQuery.isFullyLoaded && progressInventoryQuery.isSuccess;
   const inventoryBySubjectId = useMemo(
     () =>
       new Map(

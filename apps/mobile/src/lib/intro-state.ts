@@ -40,11 +40,7 @@
 import { setItemAsync } from './secure-storage';
 import { Sentry } from './sentry';
 import { track } from './analytics';
-
-// Dot-delimited so it satisfies the SecureStore key sanitizer
-// (letters, digits, dot, dash, underscore) without going through
-// sanitizeSecureStoreKey at every call.
-const PRE_AUTH_INTRO_KEY = 'preAuthIntroSeen.v1';
+import { PRE_AUTH_INTRO_KEY } from './secure-store-keys';
 
 let inMemoryIntroSeen = false;
 

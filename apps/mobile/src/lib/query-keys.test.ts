@@ -202,4 +202,83 @@ describe('queryKeys non-mode-scoped factories', () => {
       ['topic-1', 'topic-2'],
     ]);
   });
+
+  it('scopes subscription and usage keys by profileId', () => {
+    expect(queryKeys.subscription('prof-abc')).toEqual([
+      'subscription',
+      'prof-abc',
+    ]);
+    expect(queryKeys.usage('prof-abc')).toEqual(['usage', 'prof-abc']);
+    expect(queryKeys.subscriptionFamily('prof-abc')).toEqual([
+      'subscription-family',
+      'prof-abc',
+    ]);
+    expect(queryKeys.subscriptionStatus('prof-abc')).toEqual([
+      'subscription-status',
+      'prof-abc',
+    ]);
+  });
+
+  it('scopes RevenueCat keys by Clerk userId', () => {
+    expect(queryKeys.revenuecat.customerInfo('user-abc')).toEqual([
+      'revenuecat',
+      'customerInfo',
+      'user-abc',
+    ]);
+    expect(queryKeys.revenuecat.offerings('user-abc')).toEqual([
+      'revenuecat',
+      'offerings',
+      'user-abc',
+    ]);
+  });
+
+  it('scopes profile keys by Clerk userId or profileId', () => {
+    expect(queryKeys.profiles.list('user-abc')).toEqual([
+      'profiles',
+      'user-abc',
+    ]);
+    expect(queryKeys.profiles.active('prof-abc')).toEqual([
+      'profile',
+      'prof-abc',
+    ]);
+  });
+
+  it('scopes settings keys by profileId as the final segment', () => {
+    expect(queryKeys.settings.notifications('prof-abc')).toEqual([
+      'settings',
+      'notifications',
+      'prof-abc',
+    ]);
+    expect(queryKeys.settings.celebrationLevel('prof-abc')).toEqual([
+      'settings',
+      'celebration-level',
+      'prof-abc',
+    ]);
+    expect(queryKeys.settings.withdrawalArchive('prof-abc')).toEqual([
+      'settings',
+      'withdrawal-archive',
+      'prof-abc',
+    ]);
+    expect(queryKeys.settings.familyPoolBreakdownSharing('prof-abc')).toEqual([
+      'settings',
+      'family-pool-breakdown-sharing',
+      'prof-abc',
+    ]);
+    expect(
+      queryKeys.settings.childCelebrationLevel('child-abc', 'prof-abc'),
+    ).toEqual(['settings', 'celebration-level', 'child-abc', 'prof-abc']);
+    expect(queryKeys.settings.analogyDomain('subject-abc', 'prof-abc')).toEqual(
+      ['settings', 'analogy-domain', 'subject-abc', 'prof-abc'],
+    );
+    expect(
+      queryKeys.settings.nativeLanguage('subject-abc', 'prof-abc'),
+    ).toEqual(['settings', 'native-language', 'subject-abc', 'prof-abc']);
+  });
+
+  it('scopes onboarding invalidation keys by profileId', () => {
+    expect(queryKeys.onboarding.learnerProfile('prof-abc')).toEqual([
+      'learner-profile',
+      'prof-abc',
+    ]);
+  });
 });

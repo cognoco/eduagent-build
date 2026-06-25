@@ -6,8 +6,10 @@ import { AccordionTopicList } from './AccordionTopicList';
 import { ProgressBar } from './ProgressBar';
 import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 import { formatMinutes } from '../../lib/format-relative-date';
-import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
-import { getSubjectTint } from '../../lib/subject-tints';
+import {
+  getSubjectTint,
+  type LearningSubjectTint,
+} from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import type { Translate } from '../../i18n';
 

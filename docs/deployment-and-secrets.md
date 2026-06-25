@@ -241,6 +241,7 @@ Same pattern as staging:
 - `RESEND_WEBHOOK_SECRET`
 - `API_ORIGIN`
 - `REVENUECAT_WEBHOOK_SECRET`
+- `ANALYTICS_HASH_KEY`
 
 Production also requires the `IDEMPOTENCY_KV` binding unless Doppler `prd`
 explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary prelaunch
@@ -605,6 +606,7 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | **Email** | `RESEND_API_KEY` | Yes |
 | | `RESEND_WEBHOOK_SECRET` | Yes |
 | **API** | `API_ORIGIN` | Yes |
+| | `ANALYTICS_HASH_KEY` | Yes |
 | **Payments** | `REVENUECAT_WEBHOOK_SECRET` | Yes |
 | | `STRIPE_SECRET_KEY` | No (dormant) |
 | | `STRIPE_WEBHOOK_SECRET` | No (dormant) |

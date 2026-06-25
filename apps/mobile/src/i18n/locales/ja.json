@@ -427,9 +427,7 @@
     }
   },
   "family": {
-    "orientationCueBody": "お子さまの進捗とあなた自身の学習を、ひとつの場所で。",
     "orientationCueDismiss": "OK",
-    "orientationCueTitle": "ここがあなたのホームです",
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",

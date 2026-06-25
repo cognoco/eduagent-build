@@ -1,4 +1,4 @@
-import { addBreadcrumb } from './sentry';
+import { addBreadcrumb, captureException } from './sentry';
 
 const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
 const TRANSIENT_DB_RETRY_DELAY_MS = 300;
@@ -74,10 +74,18 @@ export async function withTransientDatabaseRetry<T>(
       return await operation();
     } catch (error) {
       lastError = error;
-      if (
-        attempt === TRANSIENT_DB_RETRY_ATTEMPTS ||
-        !isTransientDatabaseError(error)
-      ) {
+      const retriesExhausted = attempt === TRANSIENT_DB_RETRY_ATTEMPTS;
+      if (retriesExhausted || !isTransientDatabaseError(error)) {
+        if (retriesExhausted && isTransientDatabaseError(error)) {
+          // [#887] Retries exhausted on a still-transient error. The per-retry
+          // breadcrumbs only attach to a later captured event; if the caller
+          // swallows this throw the terminal DB failure is invisible. Capture
+          // it here so the exhausted-retry case always reaches Sentry.
+          captureException(error, {
+            tags: { surface: 'transient-db-retry', operation: label },
+            extra: { attempts: TRANSIENT_DB_RETRY_ATTEMPTS + 1 },
+          });
+        }
         throw error;
       }
 

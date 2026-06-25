@@ -1,9 +1,16 @@
-import { supportershipUnlinkedEventSchema } from '@eduagent/schemas';
+import {
+  supportershipUnlinkedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { SUPPORTERSHIP_GRACE_DAYS } from '../../services/supportership-revocation';
 import { createVisibilityNotice } from '../../services/visibility-moment-projections';
+import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
+
+const logger = createLogger();
 
 export const supportershipRevocation = inngest.createFunction(
   {
@@ -15,7 +22,30 @@ export const supportershipRevocation = inngest.createFunction(
   },
   { event: 'app/supportership.unlinked' },
   async ({ event, step }) => {
-    const parsed = supportershipUnlinkedEventSchema.parse(event.data);
+    const parsedResult = supportershipUnlinkedEventSchema.safeParse(event.data);
+    if (!parsedResult.success) {
+      captureException(
+        new Error(
+          `supportership-revocation: invalid payload - ${parsedResult.error.message}`,
+        ),
+        {
+          extra: {
+            site: 'supportershipRevocation.invalid_payload',
+            issues: parsedResult.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
+      );
+      logger.warn('supportership_revocation.invalid_payload', {
+        issues: parsedResult.error.issues,
+      });
+      return {
+        status: 'invalid_payload' as const,
+        error: parsedResult.error.message,
+      };
+    }
+
+    const parsed = parsedResult.data;
     await step.sleep('grace-window', `${SUPPORTERSHIP_GRACE_DAYS}d`);
 
     await step.run('record-supporter-link-ended-notice', async () => {

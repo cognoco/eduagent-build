@@ -42,6 +42,7 @@ export {
   KNOWN_MARKER_KEYS,
 } from './envelope';
 export { streamEnvelopeReply, teeEnvelopeStream } from './stream-envelope';
+export { parseStructuredLlmOutput } from './parse-structured';
 export type {
   ParseEnvelopeResult,
   ParseEnvelopeSuccess,

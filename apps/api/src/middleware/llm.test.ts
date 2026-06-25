@@ -287,22 +287,44 @@ describe('llmMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('[v2 infra] does NOT register cerebras/mistral when only their keys would gate the deployment', async () => {
-    // The v2 providers are explicitly NOT in the primary-key gate. With ONLY a
-    // cerebras key and no Gemini/OpenAI/Anthropic primary, the middleware still
-    // throws (a flag-off deployment must have a primary), but cerebras is
-    // registered before the gate check runs.
+  it('[T-A3] a Cerebras-only deployment now satisfies the boot gate', async () => {
+    // Gemini-retirement Phase A widened the boot gate to count any admitted
+    // provider. A cerebras key alone is now a valid primary (text), so the
+    // middleware registers it and proceeds — it no longer throws. (Vision still
+    // needs Mistral/OpenAI, but the boot gate's job is "some provider exists".)
     process.env['NODE_ENV'] = 'development';
     const c = createMockContext({
       ENVIRONMENT: 'production',
       CEREBRAS_API_KEY: 'cb-key',
     });
-    const next = jest.fn();
+    const next = jest.fn().mockResolvedValue(undefined);
 
-    await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'At least one LLM API key is required',
-    );
-    expect(next).not.toHaveBeenCalled();
+    await llmMiddleware(c, next);
+
+    expect(registeredProviderIds()).toContain('cerebras');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('[T-A3] boots in production with only Cerebras+Mistral keys (no Gemini/OpenAI/Anthropic)', async () => {
+    // Gemini-retirement Phase A: the boot gate counts any admitted provider, so
+    // a Gemini-free deployment whose text primary is Cerebras and vision is
+    // Mistral boots without throwing. createCerebrasProvider / createMistralProvider
+    // are real (not mocked), so registration produces real provider objects.
+    process.env['NODE_ENV'] = 'development';
+    const c = createMockContext({
+      ENVIRONMENT: 'production',
+      CEREBRAS_API_KEY: 'cb-key',
+      MISTRAL_API_KEY: 'mi-key',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await llmMiddleware(c, next);
+
+    const ids = registeredProviderIds();
+    expect(ids).toContain('cerebras');
+    expect(ids).toContain('mistral');
+    expect(ids).not.toContain('gemini');
+    expect(next).toHaveBeenCalled();
   });
 
   it('[BUG-488 extended] re-registers when CEREBRAS_API_KEY changes (hash includes it)', async () => {

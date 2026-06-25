@@ -121,7 +121,12 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
       registerProvider(createMistralProvider(mistralKey));
     }
 
-    const hasAnyProvider = geminiKey || openaiKey || anthropicKey;
+    // [Gemini-retirement Phase A / T-A3] Count any admitted provider, not just
+    // the legacy primaries. A Gemini-free deployment whose text primary is
+    // Cerebras and vision is Mistral is a valid boot — gating only on
+    // Gemini/OpenAI/Anthropic would reject it despite working providers.
+    const hasAnyProvider =
+      cerebrasKey || mistralKey || openaiKey || anthropicKey || geminiKey;
 
     if (!hasAnyProvider) {
       if (
@@ -138,7 +143,7 @@ export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
       } else {
         const env = c.env?.ENVIRONMENT ?? 'development';
         throw new Error(
-          `At least one LLM API key is required (GEMINI_API_KEY or OPENAI_API_KEY) (environment: ${env})`,
+          `At least one LLM API key is required (CEREBRAS_API_KEY, MISTRAL_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY) (environment: ${env})`,
         );
       }
     }

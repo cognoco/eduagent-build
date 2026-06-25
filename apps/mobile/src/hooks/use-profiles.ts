@@ -9,6 +9,7 @@ import { useApiClient } from '../lib/api-client';
 import type { AppContext, Profile } from '@eduagent/schemas';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 export function useProfiles(): UseQueryResult<Profile[]> {
   const client = useApiClient();
@@ -25,7 +26,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
   // Prefix-based invalidations (`queryKey: ['profiles']`) still match this
   // scoped key because TanStack invalidation is a prefix match by default.
   return useQuery({
-    queryKey: ['profiles', userId],
+    queryKey: queryKeys.profiles.list(userId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -43,6 +44,7 @@ export function useProfiles(): UseQueryResult<Profile[]> {
 
 export function useUpdateProfileName() {
   const client = useApiClient();
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -62,18 +64,21 @@ export function useUpdateProfileName() {
       return data.profile;
     },
     onSuccess: (profile) => {
-      queryClient.setQueriesData<Profile[]>(
-        { queryKey: ['profiles'] },
+      queryClient.setQueryData<Profile[]>(
+        queryKeys.profiles.list(userId),
         (existing) =>
           existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
       );
-      void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.profiles.list(userId),
+      });
     },
   });
 }
 
 export function useUpdateProfileAppContext() {
   const client = useApiClient();
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -99,12 +104,14 @@ export function useUpdateProfileAppContext() {
       return data.profile;
     },
     onSuccess: (profile) => {
-      queryClient.setQueriesData<Profile[]>(
-        { queryKey: ['profiles'] },
+      queryClient.setQueryData<Profile[]>(
+        queryKeys.profiles.list(userId),
         (existing) =>
           existing?.map((entry) => (entry.id === profile.id ? profile : entry)),
       );
-      void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.profiles.list(userId),
+      });
     },
   });
 }
