@@ -6,11 +6,11 @@ import { useProfile } from '../../lib/profile';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { useFeedbackContext } from '../feedback/FeedbackProvider';
+import { earlyAdopterDismissedKey } from '../../lib/secure-store-keys';
 
 const MAX_SESSIONS = 5;
 
-const DISMISSED_KEY = (profileId: string) =>
-  `earlyAdopterDismissed_${profileId}`;
+const DISMISSED_KEY = earlyAdopterDismissedKey;
 
 interface EarlyAdopterCardProps {
   totalSessions: number;

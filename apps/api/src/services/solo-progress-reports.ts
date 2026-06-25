@@ -1,13 +1,16 @@
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import {
   accounts,
-  consentStates,
   familyLinks,
   learningSessions,
   profiles,
   type Database,
 } from '@eduagent/database';
-import { MINIMUM_AGE, calculateAge } from './consent';
+import {
+  MINIMUM_AGE,
+  calculateAge,
+  isGdprProcessingAllowedBatch,
+} from './consent';
 
 type SelfReportWindow = {
   start: Date;
@@ -84,41 +87,17 @@ export async function listEligibleSelfReportProfileIds(
   );
   if (selfManagedProfiles.length === 0) return [];
 
+  // [WI-489] Replaced inline findMany + manual dedup with the shared batch helper.
+  // isGdprProcessingAllowedBatch issues a single query with the BUG-394 desc(id)
+  // tiebreak and returns Map<profileId, boolean> (true = allowed, false = blocked).
   const selfManagedIds = selfManagedProfiles.map((profile) => profile.id);
-  const consentRows = await db.query.consentStates.findMany({
-    where: and(
-      inArray(consentStates.profileId, selfManagedIds),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    columns: {
-      profileId: true,
-      status: true,
-      requestedAt: true,
-    },
-  });
-
-  const latestConsentByProfileId = new Map<
-    string,
-    {
-      status: (typeof consentRows)[number]['status'];
-      requestedAt: Date;
-    }
-  >();
-  for (const row of consentRows) {
-    const previous = latestConsentByProfileId.get(row.profileId);
-    if (!previous || row.requestedAt > previous.requestedAt) {
-      latestConsentByProfileId.set(row.profileId, {
-        status: row.status,
-        requestedAt: row.requestedAt,
-      });
-    }
-  }
+  const allowedByProfile = await isGdprProcessingAllowedBatch(
+    db,
+    selfManagedIds,
+  );
 
   return selfManagedProfiles
-    .filter((profile) => {
-      const latestConsent = latestConsentByProfileId.get(profile.id);
-      return latestConsent == null || latestConsent.status === 'CONSENTED';
-    })
+    .filter((profile) => allowedByProfile.get(profile.id) ?? true)
     .map((profile) => profile.id);
 }
 

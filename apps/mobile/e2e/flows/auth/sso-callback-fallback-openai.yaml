@@ -20,7 +20,7 @@
 # testIDs verified against source:
 #   openai-sso-button    apps/mobile/src/app/(auth)/sign-in.tsx line 1264
 #                        gated by `openAIStrategy` truthy — requires
-#                        EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY baked into APK at
+#                        EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG baked into APK at
 #                        build time (EXPO_PUBLIC_* vars are baked, not runtime)
 #   sso-fallback-back    apps/mobile/src/app/sso-callback.tsx line 48
 #   sign-in-button       apps/mobile/src/app/(auth)/sign-in.tsx line 1293
@@ -47,7 +47,7 @@ tags:
 
 # ── Step 2: Assert openai-sso-button is visible (strict, NOT optional) ──
 # If this assertion fails, rebuild the dev-client APK with
-# EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set — EXPO_PUBLIC_* vars are baked at
+# EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG set — EXPO_PUBLIC_* vars are baked at
 # build time and cannot be injected at runtime. Failing fast here avoids
 # wasting the 25-second fallback timer before getting an actionable error.
 - takeScreenshot: sso-fallback-openai-02-before-sso-tap

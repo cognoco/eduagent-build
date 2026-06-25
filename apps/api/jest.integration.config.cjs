@@ -31,7 +31,7 @@ module.exports = {
   ],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
-    '<rootDir>/apps/api/src/**/*.integration.test.ts',
+    '**/apps/api/src/**/*.integration.test.ts',
   ],
   testPathIgnorePatterns: [
     '<rootDir>/.worktrees/',

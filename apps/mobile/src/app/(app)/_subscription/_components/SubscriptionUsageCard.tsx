@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { UsageMeter } from '../../../../components/common';
 import { TrackedView } from '../../../../components/common/TrackedView';
 import type { UsageData } from '../../../../hooks/use-subscription';
+import { formatShortDate } from '../../../../lib/format-datetime';
 
 export interface SubscriptionUsageCardProps {
   usage: UsageData;
@@ -20,7 +21,7 @@ export function SubscriptionUsageCard({
   canUseOwnerBillingGates,
   breakdownAnalytics,
 }: SubscriptionUsageCardProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <View className="mt-4">
       <TrackedView
@@ -97,7 +98,7 @@ export function SubscriptionUsageCard({
             {t('subscription.usageCard.quotaResets', {
               date:
                 usage.resetsAtLabel ??
-                new Date(usage.cycleResetAt).toLocaleDateString(undefined, {
+                formatShortDate(usage.cycleResetAt, i18n?.language, {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',

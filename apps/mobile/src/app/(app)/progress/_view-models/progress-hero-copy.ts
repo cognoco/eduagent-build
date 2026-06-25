@@ -1,5 +1,6 @@
-import type { CopyRegister } from '../../../../lib/copy-register';
 import type { Translate } from '../../../../i18n';
+
+type CopyRegister = 'adult' | 'child';
 
 export function heroCopy(
   input: {

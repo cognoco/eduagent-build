@@ -3,7 +3,7 @@
 # Validates: on Android, the sign-in screen renders the correct SSO buttons
 # given platform + env. Stricter than sso-buttons.yaml — apple-sso-button MUST
 # NOT appear (Android suite), and openai-sso-button is REQUIRED (the APK must
-# be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set).
+# be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG set).
 #
 # Why a separate flow:
 #   sso-buttons.yaml marks openai-sso-button as `optional: true`, which lets a
@@ -12,7 +12,7 @@
 #   visible, Apple hidden.
 #
 # Pre-req (no wrapper can verify — surfaced via the assertion below):
-#   The dev-client APK must be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set.
+#   The dev-client APK must be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG set.
 #   EXPO_PUBLIC_* env vars are baked into the JS bundle at build time, so a
 #   missing key cannot be remediated at run time. If the openai-sso-button
 #   assertion fails, rebuild the APK with the env var present.
@@ -56,7 +56,7 @@ tags:
     id: "apple-sso-button"
 
 # OpenAI: must be visible when openAIStrategy resolves. If this fails the APK
-# was built without EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY — rebuild and rerun.
+# was built without EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG — rebuild and rerun.
 - scrollUntilVisible:
     element:
       id: "openai-sso-button"

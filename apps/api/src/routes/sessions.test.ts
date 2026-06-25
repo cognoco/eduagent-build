@@ -646,6 +646,7 @@ import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
 import { getProfileAgeBracket } from '../services/profile';
 import { getPersonAgeBracket } from '../services/identity-v2/helpers';
+import { FILING_CONFIG } from '../config/filing';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -1536,7 +1537,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 5,
+        exchangeCount: FILING_CONFIG.minFreeformExchanges,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1572,7 +1573,7 @@ describe('session routes', () => {
       });
     });
 
-    it('does not dispatch close-path auto-file for 4-exchange freeform sessions', async () => {
+    it('does not dispatch close-path auto-file for below-threshold freeform sessions (MIN-1)', async () => {
       useAutoFileProfile();
       (getSession as jest.Mock).mockResolvedValueOnce({
         id: SESSION_ID,
@@ -1583,7 +1584,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 4,
+        exchangeCount: FILING_CONFIG.minFreeformExchanges - 1,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),
@@ -1619,7 +1620,7 @@ describe('session routes', () => {
         verificationType: null,
         status: 'completed',
         escalationRung: 1,
-        exchangeCount: 5,
+        exchangeCount: FILING_CONFIG.minFreeformExchanges,
         startedAt: new Date().toISOString(),
         lastActivityAt: new Date().toISOString(),
         endedAt: new Date().toISOString(),

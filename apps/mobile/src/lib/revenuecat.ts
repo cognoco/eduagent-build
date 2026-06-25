@@ -46,19 +46,13 @@ export function configureRevenueCat(): void {
     if (__DEV__) {
       console.warn(message);
     } else {
-      // Production: use console.error so crash reporters / log aggregators
-      // surface the misconfiguration rather than silently disabling purchases.
-      console.error(message);
-      // [#887] RevenueCat is billing; "silent recovery without escalation is
-      // banned in billing" and console.error alone is not enough. A missing
-      // key means every purchase is broken, so escalate to Sentry as an
-      // independently-queryable event. Guarded because configureRevenueCat
-      // runs at module load, possibly before Sentry has initialised.
-      try {
-        Sentry.captureMessage(message, 'error');
-      } catch {
-        // Sentry not ready yet (early boot) — the console.error above stands.
-      }
+      Sentry.captureException(new Error(message), {
+        tags: {
+          component: 'revenuecat',
+          platform: Platform.OS,
+          reason: 'missing_api_key',
+        },
+      });
     }
     return;
   }

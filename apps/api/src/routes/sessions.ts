@@ -94,6 +94,7 @@ import {
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
   isIdentityV2Enabled,
+  isJudgeFrameworkEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -208,6 +209,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    JUDGE_FRAMEWORK_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
     IDENTITY_V2_ENABLED?: string;
@@ -542,6 +544,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
       );
+      const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
+        c.env.JUDGE_FRAMEWORK_ENABLED,
+      );
 
       try {
         const result = await processMessage(
@@ -559,6 +564,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
@@ -732,6 +738,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
       );
+      const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
+        c.env.JUDGE_FRAMEWORK_ENABLED,
+      );
 
       try {
         const { stream, onComplete } = await streamMessage(
@@ -749,6 +758,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
@@ -819,6 +829,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     memoryFactsReadEnabled,
                     memoryFactsRelevanceEnabled,
                     challengeRoundRuntimeEnabled,
+                    judgeFrameworkEnabled,
                     identityV2Enabled: isIdentityV2Enabled(
                       c.env?.IDENTITY_V2_ENABLED,
                     ),
@@ -1158,6 +1169,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 memoryFactsReadEnabled,
                 memoryFactsRelevanceEnabled,
                 challengeRoundRuntimeEnabled,
+                judgeFrameworkEnabled,
                 identityV2Enabled: isIdentityV2Enabled(
                   c.env?.IDENTITY_V2_ENABLED,
                 ),

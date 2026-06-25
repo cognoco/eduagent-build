@@ -26,6 +26,7 @@ import { useRestoreConsent } from '../../../../hooks/use-restore-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { formatApiError } from '../../../../lib/format-api-error';
+import { formatShortDate } from '../../../../lib/format-datetime';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
@@ -73,11 +74,14 @@ function formatLastSession(
   return t('parentView.index.timeAgo.years', { count: diffYears });
 }
 
-function formatJoinedDate(isoDate: string | null | undefined): string | null {
+function formatJoinedDate(
+  isoDate: string | null | undefined,
+  locale: string | undefined,
+): string | null {
   if (!isoDate) return null;
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, {
+  return formatShortDate(date, locale, {
     month: 'long',
     year: 'numeric',
   });
@@ -793,7 +797,7 @@ function ConsentManagementSection({
 }
 
 export default function ChildDetailScreen(): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profiles, isLoading: isProfileLoading } = useProfile();
@@ -845,7 +849,7 @@ export default function ChildDetailScreen(): React.ReactElement {
   );
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt, t);
-  const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
+  const joinedLabel = formatJoinedDate(ownedProfile?.createdAt, i18n?.language);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
     (option) => option.mode === (learnerProfile?.accommodationMode ?? 'none'),
   );

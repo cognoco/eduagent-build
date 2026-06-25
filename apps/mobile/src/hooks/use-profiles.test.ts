@@ -246,7 +246,9 @@ describe('useUpdateProfileAppContext', () => {
     expect(init.method).toBe('PATCH');
     const body = JSON.parse(init.body as string);
     expect(body.defaultAppContext).toBe('family');
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['profiles', 'user-1'],
+    });
   });
 
   it('retries once on a transient network failure before surfacing error', async () => {

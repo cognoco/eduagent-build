@@ -2,11 +2,13 @@
  * Typed query-key registry.
  *
  * Rules:
- * - Every key array is byte-identical to the inline literal it replaces.
+ * - Factory tests define the exact array shape. Replacements preserve existing
+ *   shapes unless a scoped factory intentionally moves the active scope id to
+ *   the final segment.
  * - All factory functions return `readonly unknown[]` via `as const`.
- * - Parameters use `string | undefined` to match how hooks pass
- *   `activeProfile?.id` — React Query disables queries via `enabled:` when
- *   the profile is absent.
+ * - New scoped factories accept `null | undefined` because some identity
+ *   providers expose unloaded identifiers as null; factories normalize both to
+ *   undefined.
  * - Broad-prefix invalidations (`['progress']`, `['dashboard']`, etc.) in
  *   `_layout.tsx` and `invalidateSessionDerivedQueries` are handled in PR 10
  *   and remain as inline literals for now.
@@ -22,6 +24,9 @@ interface ProgressHistoryQuery {
 }
 
 type ModeSegment = AppMode | null | undefined;
+type QueryScopeId = string | null | undefined;
+
+const scopeId = (id: QueryScopeId): string | undefined => id ?? undefined;
 
 export const queryKeys = {
   // ------------------------------------------------------------------
@@ -425,6 +430,97 @@ export const queryKeys = {
   resumeNudge: {
     root: (profileId: string | undefined) =>
       ['resume-nudge', profileId] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // subscription / usage domains
+  // ------------------------------------------------------------------
+  subscription: (profileId: QueryScopeId) =>
+    ['subscription', scopeId(profileId)] as const,
+
+  usage: (profileId: QueryScopeId) => ['usage', scopeId(profileId)] as const,
+
+  subscriptionFamily: (profileId: QueryScopeId) =>
+    ['subscription-family', scopeId(profileId)] as const,
+
+  subscriptionStatus: (profileId: QueryScopeId) =>
+    ['subscription-status', scopeId(profileId)] as const,
+
+  // ------------------------------------------------------------------
+  // RevenueCat domain
+  // ------------------------------------------------------------------
+  revenuecat: {
+    customerInfo: (userId: QueryScopeId) =>
+      ['revenuecat', 'customerInfo', scopeId(userId)] as const,
+
+    offerings: (userId: QueryScopeId) =>
+      ['revenuecat', 'offerings', scopeId(userId)] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // profiles domain
+  // ------------------------------------------------------------------
+  profiles: {
+    list: (userId: QueryScopeId) => ['profiles', scopeId(userId)] as const,
+
+    active: (profileId: QueryScopeId) =>
+      ['profile', scopeId(profileId)] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // settings domain
+  // ------------------------------------------------------------------
+  settings: {
+    notifications: (profileId: QueryScopeId) =>
+      ['settings', 'notifications', scopeId(profileId)] as const,
+
+    celebrationLevel: (profileId: QueryScopeId) =>
+      ['settings', 'celebration-level', scopeId(profileId)] as const,
+
+    childCelebrationLevel: (
+      childProfileId: QueryScopeId,
+      profileId: QueryScopeId,
+    ) =>
+      [
+        'settings',
+        'celebration-level',
+        scopeId(childProfileId),
+        scopeId(profileId),
+      ] as const,
+
+    withdrawalArchive: (profileId: QueryScopeId) =>
+      ['settings', 'withdrawal-archive', scopeId(profileId)] as const,
+
+    familyPoolBreakdownSharing: (profileId: QueryScopeId) =>
+      [
+        'settings',
+        'family-pool-breakdown-sharing',
+        scopeId(profileId),
+      ] as const,
+
+    analogyDomain: (subjectId: QueryScopeId, profileId: QueryScopeId) =>
+      [
+        'settings',
+        'analogy-domain',
+        scopeId(subjectId),
+        scopeId(profileId),
+      ] as const,
+
+    nativeLanguage: (subjectId: QueryScopeId, profileId: QueryScopeId) =>
+      [
+        'settings',
+        'native-language',
+        scopeId(subjectId),
+        scopeId(profileId),
+      ] as const,
+  },
+
+  // ------------------------------------------------------------------
+  // onboarding invalidation domains
+  // ------------------------------------------------------------------
+  onboarding: {
+    learnerProfile: (profileId: QueryScopeId) =>
+      ['learner-profile', scopeId(profileId)] as const,
   },
 
   // ------------------------------------------------------------------

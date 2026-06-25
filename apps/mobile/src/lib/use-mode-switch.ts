@@ -14,6 +14,7 @@ import {
   type AppModeSwitchCallbacks,
 } from './app-context';
 import { bucketAccountAge, hashProfileId, track } from './analytics';
+import { useApiClient } from './api-client';
 import { FEATURE_FLAGS } from './feature-flags';
 import { MODE_SCOPED_KEYS } from './mode-scoped-keys';
 import { useProfile } from './profile';
@@ -29,6 +30,7 @@ export function useModeSwitch(): {
   const queryClient = useQueryClient();
   const { mode, setMode } = useAppContext();
   const { activeProfile } = useProfile();
+  const client = useApiClient();
   const isSwitchingRef = useRef(false);
   const [isSwitching, setIsSwitching] = useState(false);
   // Holds the requested mode when setMode rejected. UI surfaces this so a
@@ -103,11 +105,15 @@ export function useModeSwitch(): {
               ),
           });
           if (activeProfile && previousMode) {
-            track('mode_switched', {
-              from: previousMode,
-              to: nextMode,
-              profileIdHash: hashProfileId(activeProfile.id),
-              accountAgeBucket: bucketAccountAge(activeProfile.createdAt),
+            const profileId = activeProfile.id;
+            const accountAgeBucket = bucketAccountAge(activeProfile.createdAt);
+            void hashProfileId(profileId, client).then((profileIdHash) => {
+              track('mode_switched', {
+                from: previousMode,
+                to: nextMode,
+                profileIdHash,
+                accountAgeBucket,
+              });
             });
           }
           pendingTimerRef.current = setTimeout(() => {
@@ -121,7 +127,7 @@ export function useModeSwitch(): {
         },
       });
     },
-    [activeProfile, queryClient, router, setMode],
+    [activeProfile, client, queryClient, router, setMode],
   );
 
   return { switchMode, isSwitching, isSwitchingRef, switchError, dismissError };

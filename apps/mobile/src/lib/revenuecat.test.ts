@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import Purchases from 'react-native-purchases';
-import { Sentry } from './sentry';
 import { configureRevenueCat, getRevenueCatApiKey } from './revenuecat';
+import { Sentry } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Mock react-native-purchases
@@ -80,13 +80,16 @@ describe('getRevenueCatApiKey', () => {
 
 describe('configureRevenueCat', () => {
   const originalPlatformOS = Platform.OS;
+  const originalDev = (global as { __DEV__?: boolean }).__DEV__;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (global as { __DEV__?: boolean }).__DEV__ = originalDev;
   });
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
+    (global as { __DEV__?: boolean }).__DEV__ = originalDev;
     delete process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS;
     delete process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
   });
@@ -118,32 +121,21 @@ describe('configureRevenueCat', () => {
     expect(Purchases.setLogLevel).not.toHaveBeenCalled();
   });
 
-  // [#887] RevenueCat is billing; a missing key in a production build means
-  // every purchase is broken. console.error alone is insufficient escalation
-  // (AGENTS.md billing rule), so the missing-key prod path must reach Sentry.
-  //
-  // Red-green proof: remove the Sentry.captureMessage(...) call in
-  // revenuecat.ts and this assertion fails (0 calls).
-  it('[#887] escalates to Sentry when the key is missing in a production (non-dev) build', () => {
+  it('captures missing native API key to Sentry in production', () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    const originalDev = (global as { __DEV__?: boolean }).__DEV__;
     (global as { __DEV__?: boolean }).__DEV__ = false;
-    const errorSpy = jest
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined);
 
-    try {
-      configureRevenueCat();
+    configureRevenueCat();
 
-      expect(Purchases.configure).not.toHaveBeenCalled();
-      expect(Sentry.captureMessage).toHaveBeenCalledWith(
-        expect.stringContaining('API key not configured'),
-        'error',
-      );
-    } finally {
-      (global as { __DEV__?: boolean }).__DEV__ = originalDev;
-      errorSpy.mockRestore();
-    }
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        component: 'revenuecat',
+        platform: 'ios',
+        reason: 'missing_api_key',
+      },
+    });
+    expect(Purchases.configure).not.toHaveBeenCalled();
+    expect(Purchases.setLogLevel).not.toHaveBeenCalled();
   });
 
   it('configures with iOS key and sets DEBUG log level in dev', () => {

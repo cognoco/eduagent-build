@@ -1,13 +1,16 @@
 const mockRunHarnessLlm = jest.fn();
-jest.mock('../runner/llm-client', () => {
-  const actual = jest.requireActual(
-    '../runner/llm-client',
-  ) as typeof import('../runner/llm-client');
-  return {
-    ...actual,
-    runHarnessLlm: (...args: unknown[]) => mockRunHarnessLlm(...args),
-  };
-});
+jest.mock(
+  '../runner/llm-client' /* gc1-allow: eval-harness unit test — runHarnessLlm is the live-LLM boundary being stubbed so flow logic (prompt construction, quality evaluation, scenario enumeration) can be verified without real LLM calls or API keys */,
+  () => {
+    const actual = jest.requireActual(
+      '../runner/llm-client',
+    ) as typeof import('../runner/llm-client');
+    return {
+      ...actual,
+      runHarnessLlm: (...args: unknown[]) => mockRunHarnessLlm(...args),
+    };
+  },
+);
 
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import { parkAndReturnReweaveFlow } from './park-and-return-reweave';

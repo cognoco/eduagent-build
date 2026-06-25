@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ChildSession } from '@eduagent/schemas';
@@ -9,6 +9,7 @@ import { useProfile } from '../../lib/profile';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { useDurationLabel } from '../../hooks/use-time-format';
+import { formatShortDate } from '../../lib/format-datetime';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../lib/navigation';
 
 type ReportingComponentProps = {
@@ -16,9 +17,8 @@ type ReportingComponentProps = {
   sessionsQuery: UseQueryResult<ChildSession[]>;
 };
 
-function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+function formatSessionDate(iso: string, locale: string | undefined): string {
+  return formatShortDate(iso, locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -30,7 +30,7 @@ export function RecentSessionsList({
   profileId,
   sessionsQuery,
 }: ReportingComponentProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const durationLabel = useDurationLabel();
   const router = useRouter();
   const { activeProfile } = useProfile();
@@ -46,7 +46,12 @@ export function RecentSessionsList({
         label: t('parentView.index.startSession', {
           defaultValue: 'Start a session',
         }),
-        onPress: () => router.push('/(app)/session'),
+        // [WI-1067] Push the family home screen first so router.back() from session returns
+        // to home rather than falling through to the active tab's first route. Mirrors pushLearningResumeTarget.
+        onPress: () => {
+          router.push('/(app)/home' as Href);
+          router.push('/(app)/session' as Href);
+        },
       }
     : {
         label: t('parentView.index.goToCurriculum', {
@@ -115,7 +120,7 @@ export function RecentSessionsList({
             }}
             className="bg-surface rounded-card p-4 mt-3"
             accessibilityLabel={t('parentView.index.viewSessionFrom', {
-              date: formatSessionDate(session.startedAt),
+              date: formatSessionDate(session.startedAt, i18n?.language),
             })}
             accessibilityRole="button"
             testID={`session-card-${session.sessionId}`}
@@ -123,11 +128,11 @@ export function RecentSessionsList({
             <View className="flex-row items-center justify-between mb-1">
               <Text className="text-body font-medium text-text-primary">
                 {session.homeworkSummary?.displayTitle ??
-                  formatSessionDate(session.startedAt)}
+                  formatSessionDate(session.startedAt, i18n?.language)}
               </Text>
               <Text className="text-caption text-text-secondary">
                 {session.homeworkSummary
-                  ? formatSessionDate(session.startedAt)
+                  ? formatSessionDate(session.startedAt, i18n?.language)
                   : session.sessionType}
               </Text>
             </View>

@@ -1,4 +1,5 @@
 export { AnalogyDomainPicker } from './AnalogyDomainPicker';
+export { BottomSheet } from './BottomSheet';
 export { BookPageFlipAnimation } from './BookPageFlipAnimation';
 export { BrandCelebration } from './BrandCelebration';
 export { Button } from './Button';

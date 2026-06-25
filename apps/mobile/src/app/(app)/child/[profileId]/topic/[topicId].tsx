@@ -22,6 +22,7 @@ import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
 import { useDurationLabel } from '../../../../../hooks/use-time-format';
 import { getDurationParts } from '../../../../../lib/format-relative-date';
+import { formatShortDate } from '../../../../../lib/format-datetime';
 
 const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   not_started: 'parentView.topic.completionStatus.notStarted',
@@ -31,9 +32,8 @@ const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   stable: 'parentView.topic.completionStatus.stable',
 };
 
-function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+function formatSessionDate(iso: string, locale: string | undefined): string {
+  return formatShortDate(iso, locale, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -52,7 +52,7 @@ function formatTimeOnApp(
 }
 
 export default function TopicDetailScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const durationLabel = useDurationLabel();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -361,14 +361,14 @@ export default function TopicDetailScreen() {
               }
               className="bg-surface rounded-card p-4 mt-2"
               accessibilityLabel={t('parentView.topic.viewSessionFrom', {
-                date: formatSessionDate(session.startedAt),
+                date: formatSessionDate(session.startedAt, i18n?.language),
               })}
               accessibilityRole="button"
               testID={`session-card-${session.sessionId}`}
             >
               <View className="flex-row items-center justify-between mb-1">
                 <Text className="text-body font-medium text-text-primary">
-                  {formatSessionDate(session.startedAt)}
+                  {formatSessionDate(session.startedAt, i18n?.language)}
                 </Text>
                 <Text className="text-caption text-text-secondary">
                   {session.sessionType}

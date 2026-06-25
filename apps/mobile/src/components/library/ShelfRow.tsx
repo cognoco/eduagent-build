@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { SubjectStatus } from '@eduagent/schemas';
 
-import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import type { LearningSubjectTint } from '../../lib/subject-tints';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
 

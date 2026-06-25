@@ -64,6 +64,9 @@ export * from './quiz-utils';
 export * from './llm-envelope';
 export * from './llm-summary';
 
+// Suitability-judge verdict contract (MMT-ADR-0016 §2)
+export * from './judge';
+
 // LLM provider wire-format schemas (OpenAI/Cerebras/Mistral chat-completion shapes)
 export * from './llm-providers';
 

@@ -3,11 +3,10 @@ import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import * as SecureStore from '../../lib/secure-storage';
-import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
-
-export function parentHomeSeenKey(profileId: string): string {
-  return sanitizeSecureStoreKey(`mentomate_parent_home_seen_${profileId}`);
-}
+import { parentHomeSeenKey } from '../../lib/secure-store-keys';
+// [WI-1090] Key definition lives in the barrel; re-exported here for backward
+// compatibility with callers that import directly from this component module.
+export { parentHomeSeenKey } from '../../lib/secure-store-keys';
 
 export function ParentTransitionNotice({
   profileId,

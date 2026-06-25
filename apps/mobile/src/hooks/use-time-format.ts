@@ -3,6 +3,7 @@ import {
   getDurationParts,
   getRelativeDateParts,
 } from '../lib/format-relative-date';
+import { formatShortDate } from '../lib/format-datetime';
 
 // i18n presentation layer over the locale-free parts in
 // lib/format-relative-date.ts. Screens call these hooks instead of
@@ -26,7 +27,7 @@ export function useRelativeDate(): (iso: string) => string {
       case 'date': {
         const d = new Date(part.iso);
         const includeYear = d.getFullYear() !== new Date().getFullYear();
-        return d.toLocaleDateString(i18n?.language || undefined, {
+        return formatShortDate(part.iso, i18n?.language || undefined, {
           month: 'short',
           day: 'numeric',
           ...(includeYear ? { year: 'numeric' } : {}),
