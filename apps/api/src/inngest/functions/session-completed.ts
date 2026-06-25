@@ -1914,106 +1914,103 @@ export const sessionCompleted = inngest.createFunction(
           throw missingOrgErr;
         }
 
-        return runIsolated('extract-homework-summary', profileId, async () => {
-          // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
-          // `subscription` table keyed by organizationId; legacy path reads
-          // `subscriptions` via accountId. decrementQuota / safeRefundQuota
-          // already accept identityV2 to select the v2 ownership cross-check.
-          const subscription = identityV2
-            ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
-            : await ensureFreeSubscription(db, homeworkOrganizationId);
-          const decrementResult = await decrementQuota(
-            db,
-            subscription.id,
-            profileId,
-            identityV2,
-          );
-          if (!decrementResult.success) {
-            // [C7] profile_mismatch is a data-integrity anomaly (the profileId
-            // is not in this subscription's account), NOT a quota event.
-            // Emitting it as 'monthly_exceeded' would fire a spurious "child
-            // hit monthly cap" parent notification. Escalate separately and skip
-            // the quota-exhausted notification path.
-            if (decrementResult.source === 'profile_mismatch') {
-              logger.warn(
-                '[metering] homework-summary: profile_mismatch on decrementQuota — skipping LLM, escalating',
-                {
-                  event: 'metering.homework_summary.profile_mismatch',
-                  subscriptionId: subscription.id,
-                  profileId,
-                },
-              );
-              await safeSend(
-                () =>
-                  inngest.send({
-                    // orphan-allow: data-integrity signal, consumed by ops alerting.
-                    name: 'app/billing.homework_summary.profile_mismatch',
-                    data: {
-                      subscriptionId: subscription.id,
-                      profileId,
-                      occurredAt: new Date().toISOString(),
-                    },
-                  }),
-                'billing.homework_summary.profile_mismatch',
-                { subscriptionId: subscription.id, profileId },
-              );
-              return;
-            }
-
-            // [S7] Quota exhausted — skip the LLM call and emit a structured
-            // event so the silent-recovery ban is satisfied (bare logger.warn
-            // is not enough per AGENTS.md). The metering module emits this for
-            // per-profile tiers; the shared-pool path does not set resetsAt, so
-            // we derive it from the subscription's cycleResetAt here.
-            const quotaPool = await getQuotaPool(db, subscription.id);
-            const resetsAt =
-              decrementResult.resetsAt ??
-              (decrementResult.source === 'daily_exceeded'
-                ? new Date(
-                    Date.UTC(
-                      new Date().getUTCFullYear(),
-                      new Date().getUTCMonth(),
-                      new Date().getUTCDate() + 1,
-                      1,
-                      0,
-                      0,
-                      0,
-                    ),
-                  ).toISOString()
-                : (quotaPool?.cycleResetAt ?? new Date().toISOString()));
+        // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
+        // `subscription` table keyed by organizationId; legacy path reads
+        // `subscriptions` via accountId. decrementQuota / safeRefundQuota
+        // already accept identityV2 to select the v2 ownership cross-check.
+        const subscription = identityV2
+          ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
+          : await ensureFreeSubscription(db, homeworkOrganizationId);
+        const decrementResult = await decrementQuota(
+          db,
+          subscription.id,
+          profileId,
+          identityV2,
+        );
+        if (!decrementResult.success) {
+          // [C7] profile_mismatch is a data-integrity anomaly (the profileId
+          // is not in this subscription's account), NOT a quota event.
+          // Emitting it as 'monthly_exceeded' would fire a spurious "child
+          // hit monthly cap" parent notification. Escalate separately and skip
+          // the quota-exhausted notification path.
+          if (decrementResult.source === 'profile_mismatch') {
+            logger.warn(
+              '[metering] homework-summary: profile_mismatch on decrementQuota — skipping LLM, escalating',
+              {
+                event: 'metering.homework_summary.profile_mismatch',
+                subscriptionId: subscription.id,
+                profileId,
+              },
+            );
             await safeSend(
               () =>
                 inngest.send({
-                  name: 'app/billing.profile_quota.exhausted',
+                  // orphan-allow: data-integrity signal, consumed by ops alerting.
+                  name: 'app/billing.homework_summary.profile_mismatch',
                   data: {
                     subscriptionId: subscription.id,
                     profileId,
-                    kind:
-                      decrementResult.source === 'daily_exceeded'
-                        ? 'daily_exceeded'
-                        : 'monthly_exceeded',
-                    resetsAt,
                     occurredAt: new Date().toISOString(),
-                    source: 'homework_summary',
                   },
                 }),
-              'billing.homework_summary.quota_exhausted',
-              // [S7] Include resetsAt in the observable data so tests (and log
-              // correlators) can assert the value without invoking the closure.
-              { subscriptionId: subscription.id, profileId, resetsAt },
+              'billing.homework_summary.profile_mismatch',
+              { subscriptionId: subscription.id, profileId },
             );
-            logger.warn(
-              '[metering] homework-summary skipped — quota exhausted',
-              {
-                event: 'metering.homework_summary.quota_exhausted',
-                subscriptionId: subscription.id,
-                profileId,
-                source: decrementResult.source,
-              },
-            );
-            return;
+            return { step: 'extract-homework-summary', status: 'ok' as const };
           }
 
+          // [S7] Quota exhausted — skip the LLM call and emit a structured
+          // event so the silent-recovery ban is satisfied (bare logger.warn
+          // is not enough per AGENTS.md). The metering module emits this for
+          // per-profile tiers; the shared-pool path does not set resetsAt, so
+          // we derive it from the subscription's cycleResetAt here.
+          const quotaPool = await getQuotaPool(db, subscription.id);
+          const resetsAt =
+            decrementResult.resetsAt ??
+            (decrementResult.source === 'daily_exceeded'
+              ? new Date(
+                  Date.UTC(
+                    new Date().getUTCFullYear(),
+                    new Date().getUTCMonth(),
+                    new Date().getUTCDate() + 1,
+                    1,
+                    0,
+                    0,
+                    0,
+                  ),
+                ).toISOString()
+              : (quotaPool?.cycleResetAt ?? new Date().toISOString()));
+          await safeSend(
+            () =>
+              inngest.send({
+                name: 'app/billing.profile_quota.exhausted',
+                data: {
+                  subscriptionId: subscription.id,
+                  profileId,
+                  kind:
+                    decrementResult.source === 'daily_exceeded'
+                      ? 'daily_exceeded'
+                      : 'monthly_exceeded',
+                  resetsAt,
+                  occurredAt: new Date().toISOString(),
+                  source: 'homework_summary',
+                },
+              }),
+            'billing.homework_summary.quota_exhausted',
+            // [S7] Include resetsAt in the observable data so tests (and log
+            // correlators) can assert the value without invoking the closure.
+            { subscriptionId: subscription.id, profileId, resetsAt },
+          );
+          logger.warn('[metering] homework-summary skipped — quota exhausted', {
+            event: 'metering.homework_summary.quota_exhausted',
+            subscriptionId: subscription.id,
+            profileId,
+            source: decrementResult.source,
+          });
+          return { step: 'extract-homework-summary', status: 'ok' as const };
+        }
+
+        return runIsolated('extract-homework-summary', profileId, async () => {
           try {
             await extractAndStoreHomeworkSummary(db, profileId, sessionId, {
               // DB returns string | null; parse to union before passing to LLM.
