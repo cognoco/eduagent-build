@@ -180,6 +180,30 @@ describe('book-generation', () => {
       );
     });
 
+    it('does not route to Gemini at the boundary year (computed age 18 may still be 17) (MMT-ADR-0016 §10.1)', async () => {
+      // SF1 fail-closed boundary: learnerAge === 18 corresponds to
+      // birthYear === currentYear - 18 — the learner may not have had their
+      // 18th birthday yet, so they must be treated as a minor. The old
+      // `learnerAge >= 18` gate routed this boundary learner to Gemini; the
+      // fail-closed `> 18` gate (== isUnambiguouslyAdult) must NOT.
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'broad',
+            books: generatedBooksFixture(),
+          }),
+        ),
+      );
+
+      await detectSubjectType('Biology', 18);
+
+      expect(mockRouteAndCall).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ providerPolicy: 'gemini_only' }),
+      );
+    });
+
     it('includes age-register guidance in the subject structure prompt', async () => {
       mockRouteAndCall.mockResolvedValueOnce(
         llmRouteResult(

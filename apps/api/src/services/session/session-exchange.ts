@@ -2302,10 +2302,16 @@ export async function prepareExchangeContext(
     effectiveRung,
     challengeRound,
   );
+  // MMT-ADR-0016 §10.1: Gemini is banned for under-18 users.
+  // isUnambiguouslyAdult is fail-closed: the boundary birth year (currentYear - 18)
+  // is treated as a minor because the learner may not have had their birthday yet.
+  const isAdultLearner =
+    profile.birthYear != null && isUnambiguouslyAdult(profile.birthYear);
   const llmRouting = resolveExchangeLlmRouting({
     subscriptionTier: options?.subscriptionTier,
     requestedLlmTier: options?.llmTier,
     effectiveRung: llmRoutingRung,
+    isAdultLearner,
   });
 
   // 5. Build prior learning context (FR40 — bridge FR)

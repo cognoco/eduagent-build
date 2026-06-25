@@ -52,8 +52,19 @@ export function resolveExchangeLlmRouting(input: {
   subscriptionTier?: SubscriptionTier;
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
+  /**
+   * MMT-ADR-0016 §10.1: Gemini is banned for under-18 users.
+   * Pass `true` only when the learner's birth year is unambiguously adult
+   * (use `isUnambiguouslyAdult(profile.birthYear)` at the call site).
+   * Defaults to `false` — fail-closed for age-gating.
+   */
+  isAdultLearner?: boolean;
 }): ExchangeLlmRouting {
   const isAdvancedRung = input.effectiveRung >= GEMINI_ADVANCED_MODEL_MIN_RUNG;
+  // MMT-ADR-0016 §10.1: Gemini is banned for under-18 users.
+  // Only apply gemini_only when the learner is unambiguously an adult.
+  // Fail-closed: undefined / false → no Gemini routing for this learner.
+  const canUseGeminiOnly = input.isAdultLearner === true;
 
   if (input.subscriptionTier === 'plus') {
     return isAdvancedRung
@@ -63,7 +74,9 @@ export function resolveExchangeLlmRouting(input: {
         }
       : {
           llmTier: 'standard',
-          providerPolicy: 'gemini_only',
+          ...(canUseGeminiOnly
+            ? { providerPolicy: 'gemini_only' as const }
+            : {}),
           routingReason: PLUS_STANDARD_RUNG_ROUTING_REASON,
         };
   }
@@ -76,7 +89,9 @@ export function resolveExchangeLlmRouting(input: {
         }
       : {
           llmTier: 'standard',
-          providerPolicy: 'gemini_only',
+          ...(canUseGeminiOnly
+            ? { providerPolicy: 'gemini_only' as const }
+            : {}),
           routingReason: PREMIUM_ADDON_STANDARD_RUNG_ROUTING_REASON,
         };
   }
@@ -84,7 +99,7 @@ export function resolveExchangeLlmRouting(input: {
   if (input.subscriptionTier === 'family') {
     return {
       llmTier: input.requestedLlmTier,
-      providerPolicy: 'gemini_only',
+      ...(canUseGeminiOnly ? { providerPolicy: 'gemini_only' as const } : {}),
       routingReason: 'family_standard_gemini_only',
     };
   }
