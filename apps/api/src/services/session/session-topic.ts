@@ -4,13 +4,9 @@
 
 import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import { learningSessions, subjects, type Database } from '@eduagent/database';
+import type { TopicSession } from '@eduagent/schemas';
 
-export interface TopicSession {
-  id: string;
-  sessionType: 'learning' | 'homework' | 'interleaved';
-  durationSeconds: number | null;
-  createdAt: string;
-}
+export type { TopicSession };
 
 /**
  * Returns completed or auto-closed sessions for a specific topic, filtered
