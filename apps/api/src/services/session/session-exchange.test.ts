@@ -481,6 +481,26 @@ describe('resolveExchangeLlmRouting', () => {
     expect(result.providerPolicy).not.toBe('gemini_only');
   });
 
+  // SF2: omitted isAdultLearner (undefined) mimics a null/unknown birthYear —
+  // must fail closed to no Gemini routing, exactly like isAdultLearner: false.
+  it('does not apply gemini_only for plus-tier learners when isAdultLearner is omitted (null birthYear) (MMT-ADR-0016 §10.1)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: 'plus',
+      requestedLlmTier: 'standard',
+      effectiveRung: 1,
+    });
+    expect(result.providerPolicy).not.toBe('gemini_only');
+  });
+
+  it('does not apply gemini_only for family-plan standard learners when isAdultLearner is omitted (null birthYear) (MMT-ADR-0016 §10.1)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: 'family',
+      requestedLlmTier: 'standard',
+      effectiveRung: 2,
+    });
+    expect(result.providerPolicy).not.toBe('gemini_only');
+  });
+
   it('returns no explicit tier or policy for unknown subscriptionTier (passthrough)', () => {
     const result = resolveExchangeLlmRouting({
       subscriptionTier: undefined,

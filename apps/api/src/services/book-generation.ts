@@ -18,6 +18,20 @@ type SafeParser<T> = {
 const BOOK_GENERATION_RUNG = 3;
 const BOOK_GENERATION_JSON_ATTEMPTS = 2;
 
+/**
+ * MMT-ADR-0016 §10.1: Gemini is banned for under-18 users. The `learnerAge`
+ * reaching book-generation is a pure year-difference (`currentYear - birthYear`,
+ * missing → 12) produced by `getProfileAge` / `getPersonAge`; birthYear itself
+ * is already collapsed away before these functions are called. The fail-closed
+ * adult test on a year-difference is therefore `> 18` (i.e. ≥ 19), which is
+ * exactly `isUnambiguouslyAdult(birthYear)` (`birthYear < currentYear - 18`):
+ * the ambiguous boundary year (computed age 18, who may still be 17) is treated
+ * as a minor. Centralised here so every callBookGenerationJson call site agrees.
+ */
+function isUnambiguouslyAdultAge(learnerAge: number): boolean {
+  return learnerAge > 18;
+}
+
 export const AGE_STYLE_GUIDANCE = `Audience and naming style:
 - Use the learner age as a curriculum register, not as a gimmick.
 - For ages 18+, use clear adult-learning titles: direct, specific, and calm.
@@ -101,14 +115,15 @@ async function callBookGenerationJson<T>(
   schema: SafeParser<T>,
   labels: { invalidJson: string; unexpectedShape: string },
   conversationLanguage?: ConversationLanguage,
-  learnerAge?: number,
+  isAdultLearner?: boolean,
 ): Promise<T> {
   let firstFailure: Error | undefined;
   let lastFailureMessage = '';
 
   // MMT-ADR-0016 §10.1: Gemini is banned for under-18 users.
-  // Only apply gemini_only on the V1 routing path for adult learners (age >= 18).
-  const isAdultLearner = learnerAge !== undefined && learnerAge >= 18;
+  // Only apply gemini_only on the V1 routing path for adult learners.
+  // Fail-closed: undefined / false → no Gemini routing for this learner.
+  const applyGeminiOnly = isAdultLearner === true;
 
   for (let attempt = 0; attempt < BOOK_GENERATION_JSON_ATTEMPTS; attempt++) {
     const attemptMessages =
@@ -129,7 +144,7 @@ async function callBookGenerationJson<T>(
 
     const result = await routeAndCall(attemptMessages, BOOK_GENERATION_RUNG, {
       flow: 'book.generation',
-      ...(isAdultLearner ? { providerPolicy: 'gemini_only' } : {}),
+      ...(applyGeminiOnly ? { providerPolicy: 'gemini_only' } : {}),
       responseFormat: 'json',
       conversationLanguage,
     });
@@ -186,7 +201,7 @@ export async function detectSubjectType(
       unexpectedShape: 'LLM returned unexpected subject detection structure',
     },
     options?.conversationLanguage,
-    learnerAge,
+    isUnambiguouslyAdultAge(learnerAge),
   );
 }
 
@@ -230,6 +245,6 @@ export async function generateBookTopics(
       unexpectedShape: 'LLM returned unexpected book topic structure',
     },
     options?.conversationLanguage,
-    learnerAge,
+    isUnambiguouslyAdultAge(learnerAge),
   );
 }
