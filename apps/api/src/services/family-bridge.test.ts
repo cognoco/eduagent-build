@@ -184,15 +184,12 @@ function makeUndoDb(opts: UndoMockOptions = {}): {
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
       const pending: string[] = [];
       const tx = { delete: makeDeleteChain(pending) };
-      try {
-        const result = await fn(tx);
-        // Commit: pending deletes become durable.
-        committed.push(...pending);
-        return result;
-      } catch (err) {
-        // Rollback: discard pending deletes (do NOT push to committed).
-        throw err;
-      }
+      const result = await fn(tx);
+      // Commit: pending deletes become durable.
+      // On throw, the exception propagates without pushing to committed —
+      // pending deletes are discarded (rollback semantics).
+      committed.push(...pending);
+      return result;
     },
   } as unknown as Database;
 

@@ -334,8 +334,15 @@ describe('[WI-1060] acceptLink — transaction wrapping', () => {
 // Helper: call db.insert(table).values({}).returning() — used in the RED test
 // ---------------------------------------------------------------------------
 async function mockInsert(db: Database, table: TableRef) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = await (db as any).insert(table).values({}).returning();
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+  const rows = await (
+    db as unknown as {
+      insert: (t: TableRef) => {
+        values: (v: unknown) => { returning: () => Promise<unknown[]> };
+      };
+    }
+  )
+    .insert(table)
+    .values({})
+    .returning();
   return rows[0];
 }
