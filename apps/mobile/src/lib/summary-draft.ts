@@ -1,8 +1,7 @@
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
 import { Sentry } from './sentry';
-
-const KEY_PREFIX = 'summary-draft';
+import { SUMMARY_DRAFT_KEY_PREFIX } from './secure-store-keys';
 // Drafts older than this are treated as stale and discarded on read.
 // A reflection the user never resolved in a week is almost certainly
 // abandoned context; keeping it around risks surfacing stale text as a
@@ -20,7 +19,9 @@ function getDraftKey(profileId: string, sessionId: string): string {
   // [I-5] Sanitize both components — iOS SecureStore keys must only contain
   // [a-zA-Z0-9._-]. Future sessionId formats (base64, timestamp+uuid) may
   // include characters that crash setItemAsync on iOS.
-  return sanitizeSecureStoreKey(`${KEY_PREFIX}-${profileId}-${sessionId}`);
+  return sanitizeSecureStoreKey(
+    `${SUMMARY_DRAFT_KEY_PREFIX}-${profileId}-${sessionId}`,
+  );
 }
 
 function reportDraftFailure(

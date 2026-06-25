@@ -17,6 +17,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as SecureStore from './secure-storage';
 import { sanitizeSecureStoreKey } from './secure-storage';
+import {
+  bookmarkNudgeKey,
+  bookmarkNudgeLegacyKey,
+  earlyAdopterDismissedKey,
+  dictationPaceKey,
+  dictationPunctuationKey,
+  ratingRecallCountKey,
+  ratingLastPromptKey,
+  parentHomeSeenKey,
+  notificationFirstAskKey,
+  guardianNotificationAskKey,
+} from './secure-store-keys';
 
 // Per-profile key constructors. Each takes a profileId and returns the exact
 // SecureStore key. Keep these in sync with the writers — if a writer changes
@@ -30,29 +42,29 @@ import { sanitizeSecureStoreKey } from './secure-storage';
 // introspect; the export is purely for test enforcement.
 export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // EarlyAdopterCard.tsx — DISMISSED_KEY: `earlyAdopterDismissed_${profileId}`
-  (id) => `earlyAdopterDismissed_${id}`,
+  earlyAdopterDismissedKey,
   // BookmarkNudgeTooltip.tsx — getBookmarkNudgeKey writes the dot-separator
   // form post-2026-05-23 (commit 8803082f8). The colon-sanitized form is the
   // legacy variant the writer's getLegacyBookmarkNudgeKey reads as a fallback;
   // we wipe it here too so it doesn't persist forever on devices that
   // dismissed under the old key. [CR-2026-05-21-143]
-  (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown.${id}`),
-  (id) => sanitizeSecureStoreKey(`bookmark-nudge-shown:${id}`),
+  bookmarkNudgeKey,
+  bookmarkNudgeLegacyKey,
   // Raw un-sanitized colon variant: defensive against any pre-sanitization
   // writer that landed before sanitizeSecureStoreKey was introduced. iOS
   // would have rejected this key; Android may have accepted it.
   (id) => `bookmark-nudge-shown:${id}`,
   // use-dictation-preferences.ts — getPaceKey + getPunctKey
-  (id) => `dictation-pace-${id}`,
-  (id) => `dictation-punctuation-${id}`,
+  dictationPaceKey,
+  dictationPunctuationKey,
   // use-rating-prompt.ts — current keys only.
   // Legacy `rating-recall-success-count:${id}` and `rating-last-prompt:${id}`
   // colon-delimited keys removed 2026-05-24 (BUG-724 / FCR-2026-05-23-L14.F10).
   // Codebase is pre-launch (no real devices) and SecureStore guardrail forbids
   // colons in keys; the legacy migration in use-rating-prompt.ts is removed in
   // the same change so there is nothing left to clean up.
-  (id) => `rating-recall-success-count-${id}`,
-  (id) => `rating-last-prompt-${id}`,
+  ratingRecallCountKey,
+  ratingLastPromptKey,
   // session-recovery.ts — getRecoveryKey, sanitized
   (id) => sanitizeSecureStoreKey(`session-recovery-marker-${id}`),
   // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered keys (BUG-723 leak).
@@ -63,9 +75,9 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // Legacy permission setup gate — clear orphaned flag from existing installs.
   (id) => sanitizeSecureStoreKey(`permissionSetupSeen_${id}`),
   // use-post-session-notification-ask.ts — one-shot post-session notification primer flag.
-  (id) => sanitizeSecureStoreKey(`notificationFirstAskShown_${id}`),
+  notificationFirstAskKey,
   // use-guardian-notification-ask.ts — one-shot parent-home notification primer flag.
-  (id) => sanitizeSecureStoreKey(`guardianNotificationAskShown_${id}`),
+  guardianNotificationAskKey,
   // session-types.ts — getInputModeKey, sanitized
   (id) => sanitizeSecureStoreKey(`voice-input-mode-${id}`),
   // [CR-PR129-M6] (app)/_layout.tsx — ACCENT_STORE_PREFIX: accent preset per profile, sanitized.
@@ -73,7 +85,7 @@ export const PER_PROFILE_KEYS: ReadonlyArray<(profileId: string) => string> = [
   // file-scoped in REGISTRY_EXCEPTIONS for its Clerk tokenCache callsite.
   (id) => sanitizeSecureStoreKey(`accentPreset_${id}`),
   // ParentTransitionNotice.tsx — show the parent-home orientation cue once per profile.
-  (id) => sanitizeSecureStoreKey(`mentomate_parent_home_seen_${id}`),
+  parentHomeSeenKey,
   // scope-context.tsx — last active relationship-lens scope per profile.
   (id) => sanitizeSecureStoreKey(`scope.last-active-${id}`),
 ];
@@ -173,15 +185,15 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
   },
   {
     file: 'apps/mobile/src/lib/summary-draft.ts',
-    line: 55,
+    line: 56,
     reason:
-      'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API).',
+      'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API). [Line updated WI-1090: KEY_PREFIX const replaced by barrel import, shifted line by 2]',
   },
   {
     file: 'apps/mobile/src/lib/intro-state.ts',
-    line: 57,
+    line: 53,
     reason:
-      'Pre-auth welcome-intro "seen" flag is device-scoped (single static key, no userId or profileId) — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from the global wipe: a user who signs out and back in on the same device must not re-see the intro. The key contains no user identifier, so cross-account leakage is structurally impossible (the only signal is "this device has been through the welcome cards once"). Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md.',
+      'Pre-auth welcome-intro "seen" flag is device-scoped (single static key, no userId or profileId) — falls outside PER_PROFILE_KEYS. Per GLOBAL_KEYS comment, onboarding flags that legitimately survive sign-out cycles are intentionally excluded from the global wipe: a user who signs out and back in on the same device must not re-see the intro. The key contains no user identifier, so cross-account leakage is structurally impossible (the only signal is "this device has been through the welcome cards once"). Spec: docs/plans/2026-05-27-pre-auth-welcome-flow.md. [Line updated WI-1090: local const replaced by barrel import, shifted line by 4]',
   },
 ];
 

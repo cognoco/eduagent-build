@@ -3,7 +3,6 @@ import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 
 import * as SecureStore from '../lib/secure-storage';
-import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import {
   isGuardianProfile,
   useLinkedChildren,
@@ -12,12 +11,12 @@ import {
 import { platformAlert } from '../lib/platform-alert';
 import { Sentry } from '../lib/sentry';
 import { useNavigationContract } from './use-navigation-contract';
+import { guardianNotificationAskKey } from '../lib/secure-store-keys';
+// [WI-1090] Key definition lives in the barrel; re-exported here for backward
+// compatibility with callers that import directly from this hook module.
+export { guardianNotificationAskKey as getGuardianNotificationAskShownKey } from '../lib/secure-store-keys';
 
 const PRIMER_DELAY_MS = 1500;
-
-export function getGuardianNotificationAskShownKey(profileId: string): string {
-  return sanitizeSecureStoreKey(`guardianNotificationAskShown_${profileId}`);
-}
 
 export function useGuardianNotificationAsk(): void {
   const { t } = useTranslation();
@@ -41,7 +40,7 @@ export function useGuardianNotificationAsk(): void {
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     void (async () => {
-      const key = getGuardianNotificationAskShownKey(profileId);
+      const key = guardianNotificationAskKey(profileId);
 
       try {
         const seen = await SecureStore.getItemAsync(key);
