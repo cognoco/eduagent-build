@@ -207,6 +207,7 @@ describe('validateProductionKeys', () => {
       RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
     };
 
     it('V2 on: passes with Cerebras+Mistral+OpenAI and NO Gemini key', () => {
