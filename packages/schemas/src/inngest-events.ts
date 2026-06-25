@@ -477,7 +477,7 @@ export const snapshotRefreshEventSchema = z.object({
 export type SnapshotRefreshEvent = z.infer<typeof snapshotRefreshEventSchema>;
 
 // ---------------------------------------------------------------------------
-// app/session.completed — trigger event schema [WI-972]
+// app/session.completed — trigger event schema
 //
 // Models BOTH dispatch shapes:
 //   (a) Primary path (session-filing-dispatch.ts) — sends all fields.
@@ -524,7 +524,7 @@ export const sessionCompletedEventSchema = z.object({
   ]),
   /** reason — controls isUnattended flag; must be a string when present. */
   reason: z.string().optional(),
-  // [SC-03] isoDateField — neon-serverless may return raw Date; union handles both.
+  // isoDateField — neon-serverless may return raw Date; union handles both.
   // Optional: auto-closed path sends timestamp but some legacy in-flight events
   // may omit it; consumers fall back to new Date() when absent.
   timestamp: isoDateField.optional(),

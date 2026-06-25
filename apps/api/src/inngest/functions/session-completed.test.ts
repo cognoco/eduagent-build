@@ -3177,7 +3177,7 @@ describe('memoized step-state PII break test [F-089]', () => {
     expect(JSON.stringify(result)).not.toContain('long division');
   });
 
-  // [WI-972] Regression: malformed event payload must throw NonRetriableError
+  // Regression: malformed event payload must throw NonRetriableError
   // and must NOT write to assessments or update streaks.
   //
   // Before the fix: event.data.qualityRating coerced via `as number | undefined`
@@ -3191,7 +3191,7 @@ describe('memoized step-state PII break test [F-089]', () => {
   //
   // Red-green: this test FAILS without the safeParse guard (handler returns
   // a result object rather than throwing) and PASSES with the guard in place.
-  it('[WI-972] throws NonRetriableError for malformed payload (qualityRating=string, exchangeCount=null)', async () => {
+  it('throws NonRetriableError for malformed payload (qualityRating=string, exchangeCount=null)', async () => {
     const handler = (sessionCompleted as any).fn;
 
     await expect(

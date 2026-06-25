@@ -34,7 +34,7 @@ export const progressSummaryGeneration = inngest.createFunction(
   },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
-    // [WI-972] Validate that profileId and sessionId are non-empty strings before
+    // Validate that profileId and sessionId are non-empty strings before
     // any data access. The AC classifies progress-summary as a lower-risk
     // consumer (conservative if-guards protect against most bad values), so we
     // enforce only the minimum gate: profileId and sessionId must be strings.

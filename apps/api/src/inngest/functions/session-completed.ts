@@ -393,7 +393,7 @@ export const sessionCompleted = inngest.createFunction(
   },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
-    // [WI-972] Validate event payload at entry. Malformed payloads (wrong
+    // Validate event payload at entry. Malformed payloads (wrong
     // types for qualityRating, exchangeCount, reason, or missing required
     // ids) would otherwise silently corrupt SM-2 scheduling, streak credit,
     // or isUnattended gating via raw `as` casts. NonRetriableError
