@@ -30,7 +30,8 @@ import {
   getPendingNoticeChildName,
   recordPendingNotice,
 } from '../../services/notices';
-import { captureException } from '../../services/sentry';
+import { captureException, captureMessage } from '../../services/sentry';
+import { safeSend } from '../../services/safe-non-core';
 
 // [WI-973] Schema for the app/consent.revoked event payload.
 // Both childProfileId and revokedAt are required — a missing revokedAt
@@ -63,6 +64,66 @@ export const consentRevocation = inngest.createFunction(
     // concurrency(limit:1) serialises any concurrent runs for the same child.
     idempotency: 'event.data.childProfileId + "-" + event.data.revokedAt',
     concurrency: { key: 'event.data.childProfileId', limit: 1 },
+    // [WI-997] GDPR cascade-delete dead-letter handler.
+    // Inngest calls onFailure once after all retries are exhausted. Without it,
+    // a terminally-failed revocation run (e.g. sustained DB outage after a
+    // partial cascade) produces no queryable signal — ops cannot detect a child
+    // profile that is still alive past the 7-day grace period.
+    // captureMessage (not captureException) is used because onFailure runs
+    // outside the original Sentry async context — captureMessage scopes
+    // cleanly; captureException would require a live scope.
+    // safeSend (not bare inngest.send) because the dead-letter dispatch is
+    // non-core: the original run has already terminally failed; a failure of
+    // this dispatch must not surface as a second crash.
+    onFailure: async ({
+      event,
+      error,
+    }: {
+      event: { data: { event?: { data?: unknown }; run_id?: string } };
+      error: unknown;
+    }) => {
+      const originalData = event.data.event?.data as
+        | { childProfileId?: string; parentProfileId?: string }
+        | undefined;
+      const childProfileId = originalData?.childProfileId ?? null;
+      const parentProfileId = originalData?.parentProfileId ?? null;
+
+      captureMessage(
+        `consent-revocation: all retries exhausted — GDPR cascade delete may not have completed for childProfileId=${childProfileId ?? 'unknown'}`,
+        {
+          level: 'error',
+          extra: {
+            surface: 'consent-revocation.terminal_failure',
+            childProfileId,
+            parentProfileId,
+            runId: event.data.run_id ?? null,
+            errorName: error instanceof Error ? error.name : typeof error,
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+            hint: 'Check if the child profile still exists past the 7-day grace window and complete the deletion manually if so.',
+          },
+        },
+      );
+
+      await safeSend(
+        () =>
+          inngest.send({
+            // orphan-allow: observability-only dead-letter signal (no handler
+            // needed); consumed out-of-band by ops alerting and queryable via
+            // the Inngest dashboard. Paired with the explicit captureMessage
+            // (above) which carries the escalation signal.
+            name: 'app/consent.revocation.failed',
+            data: {
+              childProfileId,
+              parentProfileId,
+              error: error instanceof Error ? error.message : String(error),
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'consent-revocation.terminal_failure',
+        { childProfileId, parentProfileId },
+      );
+    },
   },
   { event: 'app/consent.revoked' },
   async ({ event, step }) => {
