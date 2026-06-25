@@ -594,18 +594,41 @@ function approvedTextFallbackConfig(
   );
 }
 
+/**
+ * [WI-1052] True for learners policy-banned from Google/Gemini by age. Under-18
+ * (`child`, `adolescent`) must never be routed to Gemini — see MMT-ADR-0016
+ * §1.5. The V2 matrix enforces this when LLM_ROUTING_V2_ENABLED is on; this lets
+ * the legacy path (flag off — production today) enforce the same ban.
+ */
+function isUnder18AgeBracket(ageBracket?: AgeBracket): boolean {
+  return ageBracket === 'child' || ageBracket === 'adolescent';
+}
+
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
   preferredProvider?: PreferredLlmProvider,
   providerPolicy: LlmProviderPolicy = 'default',
   capability: LlmCapability = 'text',
+  ageBracket?: AgeBracket,
 ): ModelConfig {
   // V2 cutover: the §1.5 matrix is authoritative for ALL tiers/policies. It is
   // checked before every legacy branch (including gemini_only and
   // preferredProvider) so no flag-on request can resolve to a banned vendor.
   if (routingV2Enabled) {
     return getModelConfigV2(rung, llmTier, capability);
+  }
+
+  // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
+  // §1.5). With V2 off (production today) the legacy branches below otherwise
+  // prefer Gemini for the gemini_only policy, the default path, AND a
+  // preferred-provider 'gemini' hint — each with no age check, leaking minors to
+  // a banned vendor. Gate them all here, before any Gemini selection, routing
+  // minors to an approved non-Gemini provider (fails closed if none registered).
+  // Adults and age-unknown system calls (subject classification, language
+  // detection) fall through and keep existing behavior.
+  if (isUnder18AgeBracket(ageBracket)) {
+    return approvedTextFallbackConfig(rung, llmTier);
   }
 
   if (providerPolicy === 'gemini_only') {
@@ -915,6 +938,7 @@ export function getModelConfigForTest(
     preferredProvider?: PreferredLlmProvider;
     providerPolicy?: LlmProviderPolicy;
     capability?: 'text' | 'vision';
+    ageBracket?: AgeBracket;
   },
 ): ModelConfig {
   return getModelConfig(
@@ -923,6 +947,7 @@ export function getModelConfigForTest(
     opts?.preferredProvider,
     opts?.providerPolicy,
     opts?.capability,
+    opts?.ageBracket,
   );
 }
 
@@ -1266,6 +1291,7 @@ export async function routeAndCall(
       _options?.preferredProvider,
       _options?.providerPolicy,
       capability,
+      _options?.ageBracket,
     ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
     // [BUG-895] Thread the learner's tutor-prose language onto the provider
@@ -1689,6 +1715,7 @@ export async function routeAndStream(
       options?.preferredProvider,
       options?.providerPolicy,
       capability,
+      options?.ageBracket,
     ),
     ...(options?.responseFormat ? { responseFormat: 'json' as const } : {}),
     // [BUG-895] See routeAndCall — thread tutor-prose language to the provider

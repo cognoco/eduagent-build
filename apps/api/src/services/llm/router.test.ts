@@ -1351,8 +1351,10 @@ describe('LLM Router', () => {
 
     it('uses minor framing for adolescent ageBracket', async () => {
       const receivedMessages: ChatMessage[][] = [];
+      // [WI-1052] Under-18 requests are routed away from Gemini to an approved
+      // provider, so the capture-spy must register as one to receive the call.
       const spy: LLMProvider = {
-        id: 'gemini',
+        id: 'cerebras',
         async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
@@ -1379,8 +1381,10 @@ describe('LLM Router', () => {
 
     it('uses minor framing for child ageBracket', async () => {
       const receivedMessages: ChatMessage[][] = [];
+      // [WI-1052] Under-18 requests are routed away from Gemini to an approved
+      // provider, so the capture-spy must register as one to receive the call.
       const spy: LLMProvider = {
-        id: 'gemini',
+        id: 'cerebras',
         async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
@@ -1909,6 +1913,97 @@ describe('LLM Router', () => {
           llmTier: 'standard',
         }),
       ).toThrow(/no approved.*provider registered/i);
+    });
+  });
+
+  // [WI-1052] Under-18 learners are policy-banned from Gemini (MMT-ADR-0016
+  // §1.5). The V2 matrix enforces this when LLM_ROUTING_V2_ENABLED is on; these
+  // tests cover the LEGACY path (flag off — production today) WITH Gemini
+  // registered (GEMINI_API_KEY present, the real prod state). The legacy
+  // gemini_only policy, the default path, AND a preferred-provider 'gemini'
+  // hint all otherwise prefer Gemini with no age check — minors must never
+  // reach it. Adults and age-unknown system calls keep returning Gemini.
+  describe('[WI-1052] legacy path never routes under-18 learners to Gemini even when Gemini is registered', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      // Prod-like: Gemini IS registered, alongside approved providers.
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+      registerProvider(createMockProvider('openai'));
+      registerProvider(createMockProvider('anthropic'));
+    });
+
+    afterAll(() => {
+      // Restore the suite-wide baseline the top-level beforeAll established.
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('child + gemini_only routes to an approved provider, never Gemini', () => {
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+        ageBracket: 'child',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('cerebras');
+    });
+
+    it('adolescent + gemini_only routes to an approved provider, never Gemini', () => {
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+        ageBracket: 'adolescent',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('cerebras');
+    });
+
+    it('child + default policy never returns Gemini (free-tier minor default-path leak)', () => {
+      const cfg = getModelConfigForTest(2, {
+        llmTier: 'flash',
+        ageBracket: 'child',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('cerebras');
+    });
+
+    it('adolescent + preferred-provider gemini hint never returns Gemini', () => {
+      const cfg = getModelConfigForTest(2, {
+        preferredProvider: 'gemini',
+        llmTier: 'flash',
+        ageBracket: 'adolescent',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('cerebras');
+    });
+
+    it('adult + gemini_only STILL returns Gemini (no regression)', () => {
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+        ageBracket: 'adult',
+      });
+
+      expect(cfg.provider).toBe('gemini');
+      expect(cfg.model).toBe('gemini-2.5-pro');
+    });
+
+    it('age-unknown (no ageBracket) + gemini_only STILL returns Gemini (system calls unchanged)', () => {
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+      });
+
+      expect(cfg.provider).toBe('gemini');
     });
   });
 });
