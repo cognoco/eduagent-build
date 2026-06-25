@@ -772,3 +772,276 @@ describe('finalizeChallengeRoundIfReady — note-draft guard uses DB-verified co
     expect(outcome?.draftedNote?.fallbackPrompt).toBeTruthy();
   });
 });
+
+// [WI-1060] Review-targets transaction atomicity.
+//
+// `persistChallengeRoundReviewTargets` wraps its "read existing rows + insert /
+// update per concept" loop in a single db.transaction(). Without the transaction,
+// a throw mid-loop would commit the first concept's deepening row and drop the
+// remaining ones — leaving the learner with an inconsistent, incomplete review
+// set that cannot be recovered because the Challenge Round is already `complete`.
+//
+// RED (remove db.transaction() from persistChallengeRoundReviewTargets): the
+// first concept is inserted directly into `state.deepeningRows`; when the second
+// concept's insert throws, `state.deepeningRows.length === 1` — partial commit.
+// GREEN (with db.transaction()): the first concept goes into a pending buffer;
+// the rollback discards it; `state.deepeningRows.length === 0` after the throw.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rollback-aware fake db for the atomicity red-green test.
+ *
+ * - Transaction #1 (claim): simple pass-through — select + update session meta.
+ * - Transaction #2 (review targets): rollback-aware — deepening inserts go to a
+ *   pending buffer, flushed to committed only on success.
+ * - Transaction #3 (release): simple pass-through — select + update session meta.
+ *
+ * `opts.failOnNthDeepeningInsert`: throw on the Nth call to insert a
+ * `challenge_round` deepening row. Use `2` for the "first succeeds, second
+ * throws" scenario.
+ */
+function makeRollbackAwareFakeDb(
+  state: FakeDbState,
+  opts: { failOnNthDeepeningInsert: number },
+): Database {
+  const committed: DeepeningRow[] = [];
+  let txCount = 0;
+  let totalDeepeningInserts = 0;
+
+  const ownedTopicSelect = {
+    from: () => ownedTopicSelect,
+    innerJoin: () => ownedTopicSelect,
+    where: () => ownedTopicSelect,
+    limit: async () =>
+      state.topicNotOwned
+        ? []
+        : [
+            {
+              topicId: TOPIC_ID,
+              topicTitle: 'T',
+              topicDescription: null,
+              topicChapter: null,
+              topicEstimatedMinutes: null,
+              bookId: 'book-1',
+              bookTitle: 'B',
+              curriculumId: 'cur-1',
+              subjectId: SUBJECT_ID,
+              topicSource: 'manual',
+              subjectName: 'S',
+              subjectPedagogyMode: null,
+              subjectLanguageCode: null,
+            },
+          ],
+  };
+
+  // Returns an insert handler that writes to `buf` (pending buffer inside tx)
+  // or directly to `committed` when `buf` is null (outside tx / simple tx path).
+  const makeInsertHandler =
+    (buf: DeepeningRow[] | null) => (_table: unknown) => ({
+      values: async (vals: Record<string, unknown>) => {
+        if ('source' in vals && vals.source === 'challenge_round') {
+          totalDeepeningInserts++;
+          if (totalDeepeningInserts === opts.failOnNthDeepeningInsert) {
+            throw new Error('transient deepening insert failure');
+          }
+          const row: DeepeningRow = {
+            id: `ndt-${committed.length + (buf?.length ?? 0) + 1}`,
+            profileId: vals.profileId as string,
+            subjectId: vals.subjectId as string,
+            topicId: vals.topicId as string,
+            status: (vals.status as string) ?? 'pending_review',
+            source: 'challenge_round',
+            concept: (vals.concept as string) ?? null,
+            misconception: (vals.misconception as string) ?? null,
+            correction: (vals.correction as string) ?? null,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          };
+          if (buf !== null) {
+            buf.push(row);
+          } else {
+            committed.push(row);
+            state.deepeningRows = [...committed];
+            state.deepeningInsertCount = committed.length;
+          }
+        } else if ('masteryChallengeVerifiedAt' in vals) {
+          state.masteryInserts.push(vals);
+        }
+        return undefined;
+      },
+    });
+
+  const makeUpdateHandler = () => () => ({
+    set: (vals: { metadata?: Record<string, unknown> }) => {
+      const whereResult = {
+        returning: async () => {
+          if (vals.metadata) state.sessionMetadata = vals.metadata;
+          return [fullSessionRow(state.sessionMetadata)];
+        },
+        then: (resolve: (v: unknown) => void, reject: (e: unknown) => void) =>
+          Promise.resolve(undefined).then(resolve, reject),
+      };
+      return { where: () => whereResult };
+    },
+  });
+
+  const makeQueryHandler = () => ({
+    needsDeepeningTopics: {
+      findMany: async () =>
+        committed.filter(
+          (r) =>
+            r.subjectId === SUBJECT_ID &&
+            r.topicId === TOPIC_ID &&
+            r.source === 'challenge_round' &&
+            (r.status === 'active' || r.status === 'pending_review'),
+        ),
+    },
+    sessionEvents: {
+      findMany: async () => state.sessionEventRows ?? [],
+    },
+  });
+
+  const makeSelectHandler = () => () => ({
+    from: () => ({
+      where: () => ({
+        for: () => ({
+          limit: async () => [{ metadata: state.sessionMetadata }],
+        }),
+        limit: async () => [{ metadata: state.sessionMetadata }],
+      }),
+    }),
+  });
+
+  const db = {
+    transaction: async (fn: (tx: unknown) => unknown) => {
+      txCount++;
+
+      if (txCount !== 2) {
+        // Claim (#1) and release (#3): simple pass-through.
+        const tx = {
+          select: makeSelectHandler(),
+          update: makeUpdateHandler(),
+          insert: makeInsertHandler(null),
+          query: makeQueryHandler(),
+        };
+        return fn(tx);
+      }
+
+      // Review-targets (#2): rollback-aware deepening inserts.
+      const pending: DeepeningRow[] = [];
+      const tx = {
+        select: makeSelectHandler(),
+        update: makeUpdateHandler(),
+        insert: makeInsertHandler(pending),
+        query: {
+          // Reads from committed (no pre-existing rows in this test).
+          needsDeepeningTopics: {
+            findMany: async () => [] as DeepeningRow[],
+          },
+          sessionEvents: {
+            findMany: async () => [] as typeof state.sessionEventRows,
+          },
+        },
+      };
+      // If fn throws, pending is never flushed to committed — that IS the
+      // rollback. The exception propagates naturally (no catch needed).
+      const result = await fn(tx);
+      // Transaction committed: flush pending to committed.
+      committed.push(...pending);
+      state.deepeningRows = [...committed];
+      state.deepeningInsertCount = committed.length;
+      return result;
+    },
+
+    select: () => ownedTopicSelect,
+    insert: makeInsertHandler(null),
+    update: makeUpdateHandler(),
+    query: makeQueryHandler(),
+  };
+
+  return db as unknown as Database;
+}
+
+describe('finalizeChallengeRoundIfReady — review-targets transaction atomicity [WI-1060]', () => {
+  beforeEach(() => {
+    mockCaptureException.mockClear();
+    mockInngestSend.mockClear();
+  });
+
+  it('[WI-1060] rolls back all deepening inserts when the second concept throws (atomicity)', async () => {
+    // Two partial concepts. First insert succeeds (pending); second throws.
+    // Without the db.transaction() wrapping in persistChallengeRoundReviewTargets
+    // the first concept row commits to state.deepeningRows before the second
+    // throws — an incomplete review set the learner can never see corrected
+    // because the round is already `complete`.
+    // With the transaction both inserts roll back; the claim is released to
+    // `drafting` and the full round can be retried.
+    //
+    // RED (remove db.transaction() from persistChallengeRoundReviewTargets):
+    //   state.deepeningRows.length === 1 after the second throw.
+    // GREEN (with db.transaction()):
+    //   state.deepeningRows.length === 0 (rollback discarded the first insert).
+    const TWO_PARTIAL_EVALS: ChallengeRoundEvaluationItem[] = [
+      {
+        concept: 'photosynthesis',
+        result: 'partial',
+        evidence: 'Vague on light-energy conversion step.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote: 'Plants make food somehow.',
+        correction:
+          'Light energy is converted to chemical energy in chloroplasts.',
+      },
+      {
+        concept: 'chlorophyll',
+        result: 'partial',
+        evidence: 'Missed the pigment role.',
+        answerEventId: ANSWER_EVENT_ID,
+        learnerQuote: 'The green stuff.',
+        correction: 'Chlorophyll absorbs light energy for photosynthesis.',
+      },
+    ];
+
+    const challengeRound = draftingState(TWO_PARTIAL_EVALS);
+    const state: FakeDbState = {
+      sessionMetadata: { challengeRound },
+      masteryInserts: [],
+      deepeningRows: [],
+      deepeningInsertCount: 0,
+    };
+    // failOnNthDeepeningInsert: 2 → first insert goes to pending, second throws.
+    const db = makeRollbackAwareFakeDb(state, { failOnNthDeepeningInsert: 2 });
+    const session = makeSession(state.sessionMetadata);
+
+    await expect(
+      finalizeChallengeRoundIfReady(
+        db,
+        PROFILE_ID,
+        session,
+        challengeRound,
+        null,
+      ),
+    ).rejects.toThrow('transient deepening insert failure');
+
+    // GREEN: transaction rolled back — no deepening rows committed.
+    expect(state.deepeningRows).toHaveLength(0);
+
+    // Claim released: session is back to 'drafting' so a retry can re-run.
+    expect(persistedChallengeState(state)?.state).toBe('drafting');
+
+    // Escalation fired (AGENTS.md: "Silent recovery without escalation is banned
+    // in … state-machine flows").
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'transient deepening insert failure',
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          surface: 'challenge-round.finalize.terminal-write-failed',
+        }),
+      }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/challenge-round.finalize.failed' }),
+    );
+  });
+});

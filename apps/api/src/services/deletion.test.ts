@@ -503,9 +503,7 @@ describe('executeDeletion', () => {
       // [WI-1060] executeDeletion wraps the deletes in db.transaction().
       transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db),
-        ),
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db)),
     } as unknown as Database;
 
     await expect(executeDeletion(db, 'account-1')).resolves.toBe('cancelled');
@@ -538,9 +536,7 @@ describe('executeDeletion', () => {
       // [WI-1060] executeDeletion wraps the deletes in db.transaction().
       transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db),
-        ),
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db)),
     } as unknown as Database;
 
     await expect(executeDeletion(db, 'account-1')).resolves.toBe(
@@ -582,9 +578,7 @@ describe('executeDeletion', () => {
       // [WI-1060] executeDeletion wraps the deletes in db.transaction().
       transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db),
-        ),
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db)),
     } as unknown as Database;
 
     const result = await executeDeletion(db, 'account-1');
@@ -629,9 +623,7 @@ describe('executeDeletion', () => {
       // [WI-1060] executeDeletion wraps the deletes in db.transaction().
       transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-          fn(db),
-        ),
+        .mockImplementation((fn: (tx: unknown) => Promise<unknown>) => fn(db)),
     } as unknown as Database;
 
     const result = await executeDeletion(db, 'account-1');
@@ -639,6 +631,95 @@ describe('executeDeletion', () => {
     expect(result).toBe('cancelled');
     // Sentry must NOT fire for the expected cancel path.
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  // [WI-1060] Red-green atomicity proof for the account-delete + byok-erase tx.
+  //
+  // Without the db.transaction() wrapping, the first delete (accounts) commits
+  // before the second delete (byok_waitlist) throws — a GDPR Art 17 gap: on
+  // Inngest retry the account row is gone so the byok branch is skipped and the
+  // waitlist email is orphaned forever.
+  // With the transaction both deletes roll back; the retry re-runs the complete
+  // erasure atomically.
+  //
+  // RED (remove db.transaction() from executeDeletion): committed.accountDeleted
+  // becomes true when the byok throw fires — account was deleted but email
+  // survives.
+  // GREEN (with db.transaction()): committed.accountDeleted remains false after
+  // the throw — the rollback prevented the partial commit.
+  it('[WI-1060] rolls back the account delete when the byok erase throws (atomicity)', async () => {
+    const committed = { accountDeleted: false };
+
+    // Returns a jest.fn() that chains .where() and:
+    //   - first call (myIdx===1): .where() returns { returning: () => [{...}] }
+    //   - second call (myIdx===2): .where() throws synchronously so that
+    //     `await txDb.delete(byokWaitlist).where(...)` rejects inside the tx.
+    const makeDeleteChain = (
+      onFirstReturning: () => Array<{ id: string; email: string }>,
+    ) => {
+      let callIdx = 0;
+      return jest.fn().mockImplementation(() => {
+        callIdx++;
+        const myIdx = callIdx;
+        return {
+          where: jest.fn().mockImplementation(() => {
+            if (myIdx === 1) {
+              return {
+                returning: jest
+                  .fn()
+                  .mockImplementation(async () => onFirstReturning()),
+              };
+            }
+            throw new Error('byok erase failed');
+          }),
+        };
+      });
+    };
+
+    const db = {
+      // Outer db.delete: writes directly to committed — models the no-tx RED
+      // scenario. Not invoked in the GREEN path since executeDeletion uses
+      // db.transaction() and the production code never falls back to db.delete().
+      delete: makeDeleteChain(() => {
+        committed.accountDeleted = true;
+        return [{ id: 'account-1', email: 'owner@example.com' }];
+      }),
+
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+          let pendingDeleted = false;
+
+          const txDb = {
+            delete: makeDeleteChain(() => {
+              pendingDeleted = true;
+              return [{ id: 'account-1', email: 'owner@example.com' }];
+            }),
+          };
+
+          // If fn throws, committed.accountDeleted is never written (stays
+          // false) — that IS the rollback. No catch needed.
+          const result = await fn(txDb);
+          // Transaction committed: flush pending state.
+          committed.accountDeleted = pendingDeleted;
+          return result;
+        }),
+
+      query: {
+        accounts: {
+          // Not reached — the transaction throws before the post-tx row check.
+          findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }),
+        },
+      },
+    } as unknown as Database;
+
+    // executeDeletion must propagate the byok error.
+    await expect(executeDeletion(db, 'account-1')).rejects.toThrow(
+      'byok erase failed',
+    );
+
+    // The account delete was rolled back — GDPR Art 17 erasure will be retried.
+    expect(committed.accountDeleted).toBe(false);
   });
 });
 
