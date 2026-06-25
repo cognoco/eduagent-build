@@ -156,10 +156,6 @@ const EAS_JSON_DENYLIST = [
   'EXPO_PUBLIC_SENTRY_DSN',
   'EXPO_PUBLIC_REVENUECAT_API_KEY_IOS',
   'EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID',
-  // [CFG-SEC-1] Analytics HMAC key is a secret — baking it into committed
-  // eas.json would expose it in plaintext in git history. EAS Build injects
-  // it from EAS Environment Variables at build time (set via 'eas env:create').
-  'EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1',
 ];
 
 /**
