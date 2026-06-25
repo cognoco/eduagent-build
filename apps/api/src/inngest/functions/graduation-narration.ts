@@ -1,8 +1,15 @@
-import { personGraduatedEventSchema } from '@eduagent/schemas';
+import {
+  personGraduatedEventSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { restampGraduationContracts } from '../../services/graduation-narration';
+import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
+
+const logger = createLogger();
 
 export const graduationNarration = inngest.createFunction(
   {
@@ -14,7 +21,30 @@ export const graduationNarration = inngest.createFunction(
   },
   { event: 'app/person.graduated' },
   async ({ event, step }) => {
-    const parsed = personGraduatedEventSchema.parse(event.data);
+    const parsedResult = personGraduatedEventSchema.safeParse(event.data);
+    if (!parsedResult.success) {
+      captureException(
+        new Error(
+          `graduation-narration: invalid payload - ${parsedResult.error.message}`,
+        ),
+        {
+          extra: {
+            site: 'graduationNarration.invalid_payload',
+            issues: parsedResult.error.issues,
+            rawData: summarizeRawPayload(event.data),
+          },
+        },
+      );
+      logger.warn('graduation_narration.invalid_payload', {
+        issues: parsedResult.error.issues,
+      });
+      return {
+        status: 'invalid_payload' as const,
+        error: parsedResult.error.message,
+      };
+    }
+
+    const parsed = parsedResult.data;
     const result = await step.run('restamp-visibility-contracts', async () => {
       const db = getStepDatabase();
       return restampGraduationContracts(db, {
