@@ -957,27 +957,18 @@ describe('[WI-650] persistChallengeRoundState — typed NotFoundError for missin
 // the LLM never emits the signal. resolveReadyToFinish is the single source
 // of truth for the interview-close decision. These tests pin the contract:
 //
-//   1. The LLM signal alone is honored (LLM-driven close before the cap).
-//   2. The hard cap fires even when the LLM never emits the signal —
+//   1. The hard cap fires even when the LLM never emits the signal —
 //      WITHOUT this branch the interview can run unbounded up to
 //      MAX_EXCHANGES_PER_SESSION (50), which is the bug we are fixing.
-//   3. Non-interview sessions never trigger the cap — they are bounded by
+//   2. Non-interview sessions never trigger the cap — they are bounded by
 //      MAX_EXCHANGES_PER_SESSION instead.
+//
+// Note: the LLM-driven early-close path (llmReadyToFinish) was removed
+// because `ready_to_finish` is absent from every exchange prompt template, so
+// the LLM never emits it. The hard cap is the sole termination mechanism.
 
 describe('resolveReadyToFinish', () => {
   const onboardingMeta = { onboardingFastPath: { extractedSignals: {} } };
-
-  it('[BUG-92] returns true when the LLM signalled ready_to_finish (before cap)', () => {
-    // LLM says we are done at exchange 2 — close immediately, do not wait
-    // for the cap. This is the LLM-driven close path.
-    expect(
-      resolveReadyToFinish({
-        llmReadyToFinish: true,
-        exchangeCount: 2,
-        sessionMetadata: onboardingMeta,
-      }),
-    ).toBe(true);
-  });
 
   it('[BUG-92] returns true when the hard cap is reached even if the LLM never emits the signal', () => {
     // LLM never emits — we are at the cap. WITHOUT this branch the
@@ -986,7 +977,6 @@ describe('resolveReadyToFinish', () => {
     // server-side safety net mandated by the envelope contract.
     expect(
       resolveReadyToFinish({
-        llmReadyToFinish: false,
         exchangeCount: MAX_INTERVIEW_EXCHANGES,
         sessionMetadata: onboardingMeta,
       }),
@@ -996,7 +986,6 @@ describe('resolveReadyToFinish', () => {
   it('[BUG-92] returns false below the cap when the LLM has not signalled', () => {
     expect(
       resolveReadyToFinish({
-        llmReadyToFinish: false,
         exchangeCount: MAX_INTERVIEW_EXCHANGES - 1,
         sessionMetadata: onboardingMeta,
       }),
@@ -1010,7 +999,6 @@ describe('resolveReadyToFinish', () => {
     // learning session at exchange 4.
     expect(
       resolveReadyToFinish({
-        llmReadyToFinish: false,
         exchangeCount: MAX_INTERVIEW_EXCHANGES + 10,
         sessionMetadata: { effectiveMode: 'learning' },
       }),
@@ -1020,7 +1008,6 @@ describe('resolveReadyToFinish', () => {
   it('[BUG-92] returns false when session metadata is null', () => {
     expect(
       resolveReadyToFinish({
-        llmReadyToFinish: false,
         exchangeCount: MAX_INTERVIEW_EXCHANGES + 1,
         sessionMetadata: null,
       }),
@@ -1032,26 +1019,12 @@ describe('resolveReadyToFinish', () => {
     // fast-path shape. Treat as non-interview.
     expect(
       resolveReadyToFinish({
-        llmReadyToFinish: false,
         exchangeCount: MAX_INTERVIEW_EXCHANGES,
         sessionMetadata: {
           onboardingFastPath: ['not-an-object'],
         },
       }),
     ).toBe(false);
-  });
-
-  it('[BUG-92] LLM signal wins even on a non-interview session', () => {
-    // The LLM-emitted signal is honored regardless of flow — if the model
-    // explicitly says it is done, we close. The cap is the safety net,
-    // not a veto.
-    expect(
-      resolveReadyToFinish({
-        llmReadyToFinish: true,
-        exchangeCount: 1,
-        sessionMetadata: { effectiveMode: 'learning' },
-      }),
-    ).toBe(true);
   });
 });
 

@@ -166,6 +166,90 @@ describe('processEvaluateCompletion', () => {
     );
   });
 
+  it('[EVIDENCE-GATE] does not advance rung when challenge_passed=true but flaw_identified is absent', async () => {
+    // LLM emitted challenge_passed=true without flaw_identified evidence.
+    // Server gate: rung stays at currentRung; SM-2 quality update still proceeds.
+    const assessment = {
+      challengePassed: true,
+      flawIdentified: undefined, // no evidence provided
+      quality: 4,
+    };
+    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(4);
+
+    const db = createMockDb({
+      selectResults: [
+        [
+          {
+            id: 'event-1',
+            content: '{"challengePassed": true, "quality": 4}',
+            createdAt: new Date(),
+          },
+        ],
+        [
+          {
+            id: 'card-1',
+            topicId,
+            profileId,
+            evaluateDifficultyRung: 2,
+          },
+        ],
+      ],
+    });
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    // Retention card must still be updated (SM-2 quality applied), but rung
+    // must NOT advance (stays at 2 — evidence-gated pass without rung promotion).
+    expect(db.update).toHaveBeenCalled();
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluateDifficultyRung: 2, // held — no flaw_identified evidence
+      }),
+    );
+  });
+
+  it('[EVIDENCE-GATE] does not advance rung when flaw_identified is an empty string', async () => {
+    // Empty string is not valid evidence — same gate as absent field.
+    const assessment = {
+      challengePassed: true,
+      flawIdentified: '   ', // whitespace only — not evidence
+      quality: 3,
+    };
+    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(3);
+
+    const db = createMockDb({
+      selectResults: [
+        [
+          {
+            id: 'event-1',
+            content: '{"challengePassed": true}',
+            createdAt: new Date(),
+          },
+        ],
+        [
+          {
+            id: 'card-1',
+            topicId,
+            profileId,
+            evaluateDifficultyRung: 3,
+          },
+        ],
+      ],
+    });
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluateDifficultyRung: 3, // held — whitespace-only flaw_identified
+      }),
+    );
+  });
+
   it('handles failure with lower difficulty action', async () => {
     const assessment = {
       challengePassed: false,
@@ -370,7 +454,10 @@ describe('processEvaluateCompletion', () => {
     );
   });
 
-  it('defaults evaluateDifficultyRung to 1 when null on card', async () => {
+  it('defaults evaluateDifficultyRung to 1 when null on card (no evidence — rung held)', async () => {
+    // Card has no rung set (null → defaults to 1). Assessment is a pass but
+    // carries no flaw_identified evidence → the evidence gate holds the rung
+    // at the default (1). SM-2 quality update still proceeds.
     const assessment = {
       challengePassed: true,
       quality: 5,
@@ -400,7 +487,49 @@ describe('processEvaluateCompletion', () => {
 
     await processEvaluateCompletion(db, profileId, sessionId, topicId);
 
-    // Default rung 1, on success advances to 2
+    // Rung stays at 1 — no flaw_identified evidence blocks advancement.
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluateDifficultyRung: 1,
+      }),
+    );
+  });
+
+  it('defaults evaluateDifficultyRung to 1 when null on card (with evidence — rung advances to 2)', async () => {
+    // Same null-rung scenario but this time flaw_identified is present →
+    // the evidence gate passes and the rung advances from default (1) to 2.
+    const assessment = {
+      challengePassed: true,
+      flawIdentified: 'applied wrong formula',
+      quality: 5,
+    };
+    (parseEvaluateAssessment as jest.Mock).mockReturnValue(assessment);
+    (mapEvaluateQualityToSm2 as jest.Mock).mockReturnValue(5);
+
+    const db = createMockDb({
+      selectResults: [
+        [
+          {
+            id: 'event-1',
+            content: '{"challengePassed": true, "quality": 5}',
+            createdAt: new Date(),
+          },
+        ],
+        [
+          {
+            id: 'card-1',
+            topicId,
+            profileId,
+            evaluateDifficultyRung: null,
+          },
+        ],
+      ],
+    });
+
+    await processEvaluateCompletion(db, profileId, sessionId, topicId);
+
+    // Rung advances from 1 (default) to 2 — evidence present.
     const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -609,6 +738,8 @@ describe('processTeachBackCompletion', () => {
   });
 
   it('stores structured assessment in event on success', async () => {
+    // accuracy=3, raw mapTeachBackRubricToSm2 returns 4.
+    // Server-side accuracy floor: sm2Quality = min(4, 3) = 3.
     const assessment = {
       completeness: 4,
       accuracy: 3,
@@ -634,7 +765,8 @@ describe('processTeachBackCompletion', () => {
 
     await processTeachBackCompletion(db, profileId, sessionId);
 
-    // Should update the event with structured assessment
+    // Should update the event with structured assessment.
+    // sm2Quality is capped at accuracy (3), not the raw weighted result (4).
     expect(db.update).toHaveBeenCalled();
     const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
@@ -644,7 +776,73 @@ describe('processTeachBackCompletion', () => {
           completeness: 4,
           accuracy: 3,
           clarity: 5,
-          sm2Quality: 4,
+          sm2Quality: 3, // capped at accuracy (3) from raw 4 — accuracy floor gate
+        }),
+      }),
+    );
+  });
+
+  it('[ACCURACY-FLOOR] caps sm2Quality at accuracy when weighted result exceeds it', async () => {
+    // Confirms the accuracy floor gate: high completeness/clarity with lower
+    // accuracy must not inflate the persisted sm2Quality beyond accuracy.
+    const assessment = {
+      completeness: 5,
+      accuracy: 2,
+      clarity: 5,
+      overallQuality: 4,
+      weakestArea: 'accuracy' as const,
+      gapIdentified: 'major factual error on momentum',
+    };
+    (parseTeachBackAssessment as jest.Mock).mockReturnValue(assessment);
+    // Weighted: 2*0.5 + 5*0.3 + 5*0.2 = 1 + 1.5 + 1 = 3.5 → 4
+    (mapTeachBackRubricToSm2 as jest.Mock).mockReturnValue(4);
+
+    const db = createMockDb({
+      selectResults: [
+        [{ id: 'event-1', content: 'response', createdAt: new Date() }],
+      ],
+    });
+
+    await processTeachBackCompletion(db, profileId, sessionId);
+
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        structuredAssessment: expect.objectContaining({
+          sm2Quality: 2, // floored at accuracy=2, not the raw 4
+        }),
+      }),
+    );
+  });
+
+  it('[ACCURACY-FLOOR] does not cap when accuracy is >= weighted quality', async () => {
+    // When accuracy is already the binding constraint (or equal to quality),
+    // the cap has no effect and the result equals the weighted average.
+    const assessment = {
+      completeness: 3,
+      accuracy: 5,
+      clarity: 4,
+      overallQuality: 4,
+      weakestArea: 'completeness' as const,
+      gapIdentified: null,
+    };
+    (parseTeachBackAssessment as jest.Mock).mockReturnValue(assessment);
+    // Weighted: 5*0.5 + 3*0.3 + 4*0.2 = 2.5 + 0.9 + 0.8 = 4.2 → 4
+    (mapTeachBackRubricToSm2 as jest.Mock).mockReturnValue(4);
+
+    const db = createMockDb({
+      selectResults: [
+        [{ id: 'event-1', content: 'response', createdAt: new Date() }],
+      ],
+    });
+
+    await processTeachBackCompletion(db, profileId, sessionId);
+
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
+    expect(setFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        structuredAssessment: expect.objectContaining({
+          sm2Quality: 4, // min(4, 5) = 4 — no cap applied
         }),
       }),
     );

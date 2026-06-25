@@ -42,7 +42,7 @@ Rules:
 - "guidedProblemCount" means the learner needed substantive help.
 - "independentProblemCount" means they mostly checked or completed it independently.
 - Never mention private or sensitive details.
-- If skill names are uncertain, use broader academic phrases like "fractions" or "linear equations".`;
+- If skill names are uncertain, list them as "unspecified" rather than guessing a broader academic category — do not invent a label.`;
 
 // [WI-993] Lenient object schema for the homework-summary LLM response.
 // Replaces an ad-hoc `JSON.parse(...) as Partial<HomeworkSummary>` cast. The

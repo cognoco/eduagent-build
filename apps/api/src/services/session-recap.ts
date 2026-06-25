@@ -18,6 +18,95 @@ const logger = createLogger();
 
 /** Upper bound on candidate topics fetched when resolving the "next topic". */
 const MAX_NEXT_TOPIC_CANDIDATES = 50;
+
+// ---------------------------------------------------------------------------
+// Lexical-overlap guard — mirrors the pattern in challenge-round/note-draft.ts
+// but uses a more lenient threshold: session recaps paraphrase the transcript
+// rather than quoting it directly, so a lower floor is appropriate.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimum ratio of recap tokens that must appear in the session transcript.
+ * Lower than the note-draft threshold (0.4) because recaps are summaries
+ * that naturally use synonyms and re-ordering rather than direct quotes.
+ * Catches "topic drift" hallucinations (LLM wrote about space when the
+ * session was about algebra) while accepting legitimate paraphrase.
+ */
+const MIN_LEXICAL_OVERLAP_SESSION_RECAP = 0.15;
+
+const RECAP_STOPWORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'is',
+  'are',
+  'and',
+  'or',
+  'of',
+  'to',
+  'in',
+  'on',
+  'for',
+  'with',
+  'as',
+  'by',
+  'at',
+  'it',
+  'its',
+  'this',
+  'that',
+  'be',
+  'was',
+  'were',
+  'has',
+  'have',
+  'had',
+  'do',
+  'does',
+  'did',
+  'i',
+  'you',
+  'they',
+  'we',
+  'he',
+  'she',
+  'student',
+  'mentor',
+  'your',
+  'our',
+]);
+
+function recapWordTokens(text: string): Set<string> {
+  return new Set(
+    text
+      .normalize('NFKC')
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !RECAP_STOPWORDS.has(t)),
+  );
+}
+
+/**
+ * Returns the fraction of recap word-tokens that also appear in the
+ * transcript (Jaccard-like coverage from the recap side).
+ *
+ * An empty recap (no content tokens) is conservatively treated as
+ * fully grounded (ratio 1) so a zero-length string never trips the guard.
+ */
+export function sessionRecapLexicalOverlap(
+  recapText: string,
+  transcriptText: string,
+): number {
+  const recapTokens = recapWordTokens(recapText);
+  if (recapTokens.size === 0) return 1;
+  const transcriptTokens = recapWordTokens(transcriptText);
+  let overlap = 0;
+  for (const tok of recapTokens) {
+    if (transcriptTokens.has(tok)) overlap += 1;
+  }
+  return overlap / recapTokens.size;
+}
 /** Max freeform keyword matches we'll consider; >1 collapses to null intentionally. */
 const MAX_FREEFORM_MATCHES = 3;
 
@@ -431,6 +520,30 @@ export async function generateLearnerRecap(
   }
 
   const { closingLine, takeaways, nextTopicReason } = validated.data;
+
+  // Lexical-overlap guard: verify that the generated recap is grounded in the
+  // actual transcript rather than hallucinating off-topic content.
+  // The recap is the permanent per-session record AND feeds the next session's
+  // prompt context, so a hallucinated recap propagates forward — this guard
+  // is the last defence before the content is persisted.
+  const recapText = `${closingLine} ${takeaways.join(' ')}`;
+  const overlapRatio = sessionRecapLexicalOverlap(recapText, transcriptText);
+  if (overlapRatio < MIN_LEXICAL_OVERLAP_SESSION_RECAP) {
+    logger.warn('llm.recap.low_lexical_overlap', {
+      sessionId: input.sessionId,
+      overlapRatio,
+      threshold: MIN_LEXICAL_OVERLAP_SESSION_RECAP,
+    });
+    // Return a deterministic factual fallback: the session happened, but we
+    // cannot trust the LLM's vocabulary-drifted output. nextTopic is kept
+    // because it is resolved from trusted DB data, not from LLM text.
+    return {
+      closingLine: 'You completed a learning session.',
+      learnerRecap: '- You worked through this topic with your mentor.',
+      nextTopicId: nextTopic?.id ?? null,
+      nextTopicReason: null,
+    };
+  }
 
   if (!input.topicId && !nextTopic) {
     nextTopic = await matchFreeformTopic(repo, input.subjectId, takeaways);

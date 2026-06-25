@@ -184,6 +184,20 @@ export async function generateReportHighlights(
   nextSteps: string[];
   comparison: string | null;
 }> {
+  // Zero-activity guard: when no new sessions were recorded this month there
+  // is no evidence for the LLM to ground its highlights in. Calling the LLM
+  // anyway causes it to fabricate "specific highlights" from nothing.
+  // The existing `fallback` only fires on LLM ERROR — this guard closes the
+  // gap where the fallback never fires because the call succeeds but the
+  // output is hallucinated. Return a factual no-activity message instead.
+  if (reportData.thisMonth.totalSessions === 0) {
+    return {
+      highlights: ['No learning sessions recorded this month.'],
+      nextSteps: [],
+      comparison: null,
+    };
+  }
+
   const messages: ChatMessage[] = [
     {
       role: 'system',

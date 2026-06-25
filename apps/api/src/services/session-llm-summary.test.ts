@@ -184,6 +184,43 @@ describe('generateLlmSummary', () => {
     mockCaptureException.mockReset();
   });
 
+  // [SHORT-SESSION] A 2-3 turn session may not have enough content for a
+  // meaningful narrative. The model must be allowed to return an empty string
+  // rather than being forced to pad (old min(40) caused fabrication).
+  it('[SHORT-SESSION] accepts an empty narrative from a thin session without triggering a repair', async () => {
+    const db = createMockDb([
+      { eventType: 'user_message', content: 'Hi' },
+      {
+        eventType: 'ai_response',
+        content: 'Hello, what would you like to learn?',
+      },
+    ]);
+
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        narrative: '',
+        topicsCovered: [],
+        sessionState: 'auto-closed',
+        reEntryRecommendation:
+          'Start with a concrete topic and ask the learner to describe what they want to explore.',
+      }),
+    });
+
+    const result = await generateLlmSummary(db, {
+      sessionId: 'session-short',
+      profileId: 'profile-1',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        narrative: '',
+        sessionState: 'auto-closed',
+      }),
+    );
+    // No repair should be triggered — empty narrative is now valid.
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+  });
+
   it('repairs one invalid response and returns the corrected summary', async () => {
     const db = createMockDb([
       { eventType: 'user_message', content: 'Can we do algebra?' },

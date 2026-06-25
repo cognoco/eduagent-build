@@ -6,6 +6,8 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Database } from '@eduagent/database';
 import * as sentry from './sentry';
 import { routeAndCall } from './llm';
@@ -761,6 +763,30 @@ describe('buildHomeworkSummaryUserPrompt [WI-215 / DS-126]', () => {
     });
     expect(prompt).toContain('<problem_count>3</problem_count>');
     expect(prompt).toMatch(/<problem index="0" mode="help_me">safe<\/problem>/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [LOW] HOMEWORK_SUMMARY_SYSTEM_PROMPT — uncertain-skill rule tightened
+//
+// Old rule: "use broader academic phrases like 'fractions' or 'linear equations'"
+// → licensed mislabeling: the model guessed a category rather than abstaining.
+// New rule: abstain with "unspecified" when uncertain rather than inventing a label.
+// ---------------------------------------------------------------------------
+
+describe('HOMEWORK_SUMMARY_SYSTEM_PROMPT — uncertain-skill abstention rule', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, 'homework-summary.ts'),
+    'utf8',
+  );
+
+  it('does NOT tell the model to use broader academic phrases when uncertain', () => {
+    expect(source).not.toContain('use broader academic phrases');
+  });
+
+  it('tells the model to use "unspecified" rather than guessing a category', () => {
+    expect(source).toContain('unspecified');
+    expect(source).toContain('do not invent a label');
   });
 });
 

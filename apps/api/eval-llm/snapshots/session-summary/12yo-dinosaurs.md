@@ -47,7 +47,7 @@ Return exactly one JSON object with this shape:
 }
 
 Rules:
-- `narrative` must be 40-1500 characters, self-contained, and mention at least one topic from `topicsCovered` by name.
+- `narrative` must be at most 1500 characters. For sessions with enough content, be self-contained and mention at least one topic from `topicsCovered` by name. For very short sessions (2-3 turns), set `narrative` to an empty string rather than padding with invented details.
 - At least one `topicsCovered` item must exactly match a phrase that appears in `narrative`; the provided topic title is usually the safest anchor.
 - `topicsCovered` must contain 1-20 concrete topic anchors from the transcript.
 - `sessionState` should be `completed` when the learner reached a clear stopping point, `paused-mid-topic` when the conversation stopped while a topic was still in progress, and `auto-closed` when the session was ended by the system (timeout, silence, or hard caps) rather than by an explicit close.
