@@ -27,6 +27,7 @@ import { apiError } from '../errors';
 import { getRevenuecatWebhookHandlers } from '../services/billing/billing-v2/dispatch';
 import { captureException, captureMessage } from '../services/sentry';
 import { createLogger } from '../services/logger';
+import { revenuecatAuthFailureEscalator } from '../services/webhooks/signature-failure-escalator';
 
 const logger = createLogger();
 
@@ -101,6 +102,7 @@ export const revenuecatWebhookRoute = new Hono<{
   // Validate Authorization Bearer header
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
+    revenuecatAuthFailureEscalator.record();
     return apiError(
       c,
       401,
@@ -117,6 +119,14 @@ export const revenuecatWebhookRoute = new Hono<{
     logger.error(
       '[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured — webhook rejected',
     );
+    // [WI-1064] Escalate misconfiguration immediately — a missing secret means
+    // every incoming webhook is rejected; this is a deploy/config error that
+    // must page, not a single failure. captureMessage (not escalator) because
+    // every occurrence is a distinct definitive config failure, not a rate event.
+    captureMessage('RevenueCat REVENUECAT_WEBHOOK_SECRET is not configured', {
+      level: 'error',
+      extra: { context: 'revenuecat.webhook.missing_secret' },
+    });
     return apiError(
       c,
       401,
@@ -126,6 +136,7 @@ export const revenuecatWebhookRoute = new Hono<{
   }
 
   if (!(await constantTimeCompare(token, webhookSecret))) {
+    revenuecatAuthFailureEscalator.record();
     return apiError(
       c,
       401,
