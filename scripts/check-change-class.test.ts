@@ -121,6 +121,40 @@ describe('check-change-class.sh', () => {
     expect(output).toContain('pnpm exec tsc --build');
   });
 
+  it('executes the Husky typecheck gate in --run mode for TypeScript changes', () => {
+    writeFileSync(
+      join(repo, 'src', 'unclassified.ts'),
+      'export const a = 3;\n',
+    );
+
+    const binDir = join(repo, 'bin');
+    mkdirSync(binDir, { recursive: true });
+    const pnpmLog = join(repo, 'pnpm-calls.log');
+    const fakePnpm = join(binDir, 'pnpm');
+    writeFileSync(
+      fakePnpm,
+      [
+        '#!/usr/bin/env sh',
+        'printf "%s\\n" "$*" >> "$PNPM_LOG"',
+        'exit 0',
+        '',
+      ].join('\n'),
+    );
+    chmodSync(fakePnpm, 0o755);
+
+    const output = runChangeClass(repo, ['--branch', '--run'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${toBashPath(binDir)}:${process.env.PATH ?? ''}`,
+        PNPM_LOG: toBashPath(pnpmLog),
+      },
+    });
+
+    expect(output).toContain('Results: 1 passed, 0 failed');
+    expect(readFileSync(pnpmLog, 'utf8')).toContain('exec tsc --build');
+  });
+
   // ── --github-output router mode (WI-452) ──────────────────────────────
   // The flags emitted here gate slow CI suites (ci.yml integration tests,
   // api-quality-gate eval steps). A regression that silently emits =false
