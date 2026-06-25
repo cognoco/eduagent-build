@@ -19,6 +19,7 @@ import {
   familyRemoveResponseSchema,
   byokWaitlistResponseSchema,
 } from '@eduagent/schemas';
+import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
@@ -85,6 +86,18 @@ import { requireAccount } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 
 const logger = createLogger();
+
+// [WI-994] Local schema for the Stripe cancel response. The Stripe SDK v20
+// does not expose `current_period_end` at subscription level in its TypeScript
+// types (deprecated field present in real API responses). Instead of
+// `as unknown as { current_period_end?: number }`, we parse the raw response
+// through this schema so the numeric type is validated at runtime.
+const stripeCancelResponseSchema = z.object({
+  current_period_end: z.number().optional(),
+  items: z.object({
+    data: z.array(z.object({ current_period_end: z.number().optional() })),
+  }),
+});
 
 type BillingRouteEnv = {
   Bindings: {
@@ -362,13 +375,15 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     // BUG-51 (re-apply 1C.8): Read subscription-level current_period_end first,
     // with item-level as fallback. The subscription-level field is reliably
-    // present on cancel responses even in Stripe SDK v20.
-    const raw = updated as unknown as { current_period_end?: number };
-    const subscriptionLevelEnd =
-      typeof raw.current_period_end === 'number'
-        ? raw.current_period_end
-        : undefined;
-    const itemLevelEnd = updated.items.data[0]?.current_period_end;
+    // present on cancel responses even in Stripe SDK v20 but stripped from
+    // SDK types (deprecated); stripeCancelResponseSchema validates it at runtime.
+    const parsedCancel = stripeCancelResponseSchema.safeParse(updated);
+    const subscriptionLevelEnd = parsedCancel.success
+      ? parsedCancel.data.current_period_end
+      : undefined;
+    const itemLevelEnd = parsedCancel.success
+      ? parsedCancel.data.items.data[0]?.current_period_end
+      : updated.items.data[0]?.current_period_end;
     const periodEndTs = subscriptionLevelEnd ?? itemLevelEnd;
     if (!periodEndTs) {
       // [logging sweep] structured logger so PII fields land as JSON context
