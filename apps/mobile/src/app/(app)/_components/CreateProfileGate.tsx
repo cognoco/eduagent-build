@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,7 +45,7 @@ export function CreateProfileGate(): React.ReactElement {
   const handleGetStarted = React.useCallback(() => {
     if (isPushingRef.current) return;
     isPushingRef.current = true;
-    router.push('/create-profile');
+    router.push('/create-profile' as Href);
     // Reset after navigation settles to allow re-entry if user backs out
     setTimeout(() => {
       isPushingRef.current = false;

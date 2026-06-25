@@ -6,7 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -210,7 +210,7 @@ export function ProfileBasicsStep({
                   onPress: () => {
                     onExitWizard();
                     void clearPreviewState();
-                    router.push('/(app)/subscription');
+                    router.push('/(app)/subscription' as Href);
                   },
                 },
               ],

@@ -1413,7 +1413,7 @@ export default function CameraScreen(): React.ReactNode {
                 </Pressable>
               ))}
             <Pressable
-              onPress={() => router.push('/create-subject')}
+              onPress={() => router.push('/create-subject' as Href)}
               className="bg-surface rounded-button py-3 px-4 mb-2 min-h-[48px] justify-center"
               accessibilityLabel={t('homework.createNewSubjectLabel')}
               accessibilityRole="button"
@@ -1610,7 +1610,7 @@ export default function CameraScreen(): React.ReactNode {
                         </Text>
                         <Pressable
                           testID="manual-subject-picker-create"
-                          onPress={() => router.push('/create-subject')}
+                          onPress={() => router.push('/create-subject' as Href)}
                           className="bg-primary rounded-button py-3 px-4 min-h-[48px] items-center justify-center"
                           accessibilityLabel={t(
                             'homework.createNewSubjectLabel',

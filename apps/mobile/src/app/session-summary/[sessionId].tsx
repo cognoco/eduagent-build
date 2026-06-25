@@ -813,7 +813,7 @@ export default function SessionSummaryScreen() {
       return;
     }
 
-    router.push('/(app)/mentor-memory');
+    router.push('/(app)/mentor-memory' as Href);
   };
 
   // [BUG-805] Suppress the duration takeaway until we have a verified non-zero

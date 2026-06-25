@@ -150,7 +150,7 @@ export function AccordionTopicList({
           <Pressable
             onPress={(event) => {
               event?.stopPropagation?.();
-              router.push('/(app)/library');
+              router.push('/(app)/library' as Href);
             }}
             accessibilityRole="button"
             accessibilityLabel={t('progress.accordion.a11yBrowseLibrary')}

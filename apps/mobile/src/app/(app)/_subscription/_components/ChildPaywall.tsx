@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { ChildCapNotifyParentInput } from '@eduagent/schemas';
 
@@ -300,7 +300,7 @@ export function ChildPaywall({
         )}
 
         <Pressable
-          onPress={() => router.push('/(app)/library')}
+          onPress={() => router.push('/(app)/library' as Href)}
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="browse-library-button"
           accessibilityRole="button"
@@ -314,7 +314,7 @@ export function ChildPaywall({
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/(app)/progress')}
+          onPress={() => router.push('/(app)/progress' as Href)}
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full mb-2"
           testID="see-progress-button"
           accessibilityRole="button"
@@ -328,7 +328,7 @@ export function ChildPaywall({
         </Pressable>
 
         <Pressable
-          onPress={() => router.push('/(app)/home')}
+          onPress={() => router.push('/(app)/home' as Href)}
           className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
           testID="go-home-button"
           accessibilityRole="button"
