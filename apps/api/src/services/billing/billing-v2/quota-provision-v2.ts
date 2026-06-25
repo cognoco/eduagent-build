@@ -29,49 +29,14 @@ import type { SubscriptionTier } from '@eduagent/schemas';
 import { getTierConfig } from '../../subscription';
 import { safeSend } from '../../safe-non-core';
 import { inngest } from '../../../inngest/client';
-import type {
-  ProfileQuotaRole,
-  ProfileQuotaUsageSnapshot,
-} from '../quota-provision';
+import {
+  getProfileQuotaLimits,
+  mapProfileQuotaUsageRow,
+  nextMonthlyReset,
+  type ProfileQuotaRole,
+  type ProfileQuotaUsageSnapshot,
+} from '../billing-shared';
 import { getEffectiveAccessForSubscriptionV2 } from './access-v2';
-
-function nextMonthlyReset(now: Date): Date {
-  const cycleResetAt = new Date(now);
-  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
-  return cycleResetAt;
-}
-
-function getProfileQuotaLimits(
-  tier: SubscriptionTier,
-  role: ProfileQuotaRole,
-): { monthlyLimit: number; dailyLimit: number | null } | null {
-  const config = getTierConfig(tier);
-  if (config.quotaModel !== 'per-profile') return null;
-
-  const monthlyLimit =
-    role === 'owner' ? config.ownerMonthlyQuota : config.childMonthlyQuota;
-  const dailyLimit =
-    role === 'owner' ? config.ownerDailyQuota : config.childDailyQuota;
-
-  if (monthlyLimit === null) return null;
-  return { monthlyLimit, dailyLimit };
-}
-
-function mapProfileQuotaUsageRow(
-  row: typeof profileQuotaUsage.$inferSelect,
-): ProfileQuotaUsageSnapshot {
-  return {
-    id: row.id,
-    subscriptionId: row.subscriptionId,
-    profileId: row.profileId,
-    role: row.role,
-    monthlyLimit: row.monthlyLimit,
-    usedThisMonth: row.usedThisMonth,
-    dailyLimit: row.dailyLimit,
-    usedToday: row.usedToday,
-    cycleResetAt: row.cycleResetAt.toISOString(),
-  };
-}
 
 /**
  * v2: resolve a profile's quota role (owner/child) for a subscription. Joins
