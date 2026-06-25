@@ -84,6 +84,9 @@ export async function prepareHomework(
     conversationLanguage: options?.conversationLanguage,
   });
 
+  // [WI-1073 deferred] Two-stage captureException (no_json / parse+schema)
+  // with bespoke requestPath Sentry context; throws UpstreamLlmError.
+  // Migrate once the seam supports optional Sentry captures and typed error throws.
   const jsonStr = extractFirstJsonObject(result.response);
   if (!jsonStr) {
     const err = new UpstreamLlmError(

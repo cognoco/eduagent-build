@@ -2045,6 +2045,10 @@ function envelopeToParsedExchange(
   };
 }
 
+// [WI-1073 deferred] parseHandledMarker uses bespoke manual field extraction
+// (reading specific keys from a loose Record) with no Zod schema — the seam
+// requires a schema for validation. Migrate once the payload is modelled as
+// a schema (likely as part of envelope.ts consolidation).
 // Pulls handled-marker values out of a bare-marker payload (no `reply`).
 // Only reads HANDLED_MARKER_KEYS so an unexpected key never sneaks through.
 function parseHandledMarker(response: string): ParsedExchangeEnvelope {
@@ -2092,6 +2096,8 @@ function parseHandledMarker(response: string): ParsedExchangeEnvelope {
   return base;
 }
 
+// [WI-1073 deferred] extractKnownMarkerKey uses KNOWN_MARKER_KEYS membership
+// checks and manual object inspection — no Zod schema. Seam requires a schema.
 // Returns the first matching known-marker key, or null if not marker-shaped.
 // Shares KNOWN_MARKER_KEYS with isRecognizedMarker so the two views of
 // "what counts as a marker" never drift.

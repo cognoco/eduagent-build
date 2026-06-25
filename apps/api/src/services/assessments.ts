@@ -490,6 +490,10 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
   // the greedy /\{[\s\S]*\}/ regex — the regex grabs everything between the
   // first `{` and the LAST `}`, which fails when the LLM emits prose containing
   // braces around the real envelope or wraps the JSON in markdown fences.
+  // [WI-1073 deferred] Two-stage captureException (no_json / invalid_json /
+  // missing_questions) with bespoke per-stage Sentry context; final check uses
+  // manual field inspection, not a Zod schema. Migrate once the seam supports
+  // structured error reporting that preserves per-stage Sentry labels.
   const jsonStr = extractFirstJsonObject(response);
   if (jsonStr) {
     try {

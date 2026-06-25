@@ -215,6 +215,11 @@ export async function generateDictation(
     conversationLanguage: ctx.conversationLanguage,
   });
 
+  // [WI-1073 deferred] Uses extractJsonObject (a throwing wrapper from
+  // quiz/generate-round.ts, not extractFirstJsonObject directly); two-stage
+  // captureException (no_json / parse+schema) with bespoke requestPath context;
+  // throws UpstreamLlmError. Migrate once the seam supports optional Sentry
+  // captures and typed error throws.
   let jsonStr: string;
   try {
     jsonStr = extractJsonObject(result.response);

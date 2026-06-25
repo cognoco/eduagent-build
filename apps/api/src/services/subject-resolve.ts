@@ -96,6 +96,10 @@ export async function resolveSubjectName(
   // conversationLanguage not threaded: output is a fixed taxonomy slug
   const result = await routeAndCall(messages, 1);
 
+  // [WI-1073 deferred] captureException in outer catch would be lost with the
+  // seam's logger.warn-only contract. WI-993 already moved this site to safeParse;
+  // remaining gap is Sentry capture preservation. Migrate once seam supports
+  // optional caller-supplied Sentry captures.
   try {
     // [BUG-461] brace-depth walker replaces greedy regex
     const jsonStr = extractFirstJsonObject(result.response);

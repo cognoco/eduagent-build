@@ -527,6 +527,11 @@ Generate the suggestions now.`;
   ];
 }
 
+// [WI-1073 deferred] Bespoke JSON repair step (repairBookSuggestionJson) tries
+// to fix malformed LLM output before re-parsing. The parseStructuredLlmOutput
+// seam does not support an intermediate repair pass. Migrate once the seam
+// accepts an optional repair hook, or once the LLM output is reliable enough
+// that repair is no longer needed.
 export function extractBookSuggestionJson(response: string): unknown {
   // [BUG-461] Replace greedy /\{[\s\S]*\}/ with brace-depth walker so prose
   // between two JSON blocks or markdown fences no longer produces an ill-formed

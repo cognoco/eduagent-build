@@ -101,6 +101,11 @@ Also generate lightweight visual connections between related topics.
 Return ONLY valid JSON:
 {"topics":[{"title":"...","description":"...","chapter":"...","sortOrder":1,"estimatedMinutes":30}],"connections":[{"topicA":"Topic Title 1","topicB":"Topic Title 2"}]}`;
 
+// [WI-1073 deferred] extractJson returns `unknown`; schema validation happens
+// at each call site via SafeParser<T> (see callBookGenerationJson). The seam
+// contract (T | null with schema at extraction time) does not match this
+// two-step architecture. Migrate when book-generation is restructured to pass
+// the schema at extraction time.
 function extractJson(response: string): unknown {
   const jsonObject = extractFirstJsonObject(response);
   if (!jsonObject) {
