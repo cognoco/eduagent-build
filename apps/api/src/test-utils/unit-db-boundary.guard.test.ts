@@ -14,6 +14,10 @@ const SKIPPED_DIRS = new Set([
   'out-tsc',
 ]);
 
+// Covers the two sanctioned DB-acquisition entry points in @eduagent/test-utils;
+// the list is closed — extend it here when a new DB helper (e.g. a future
+// resolveDatabase()) is added. Block-comment bypass (/* createDatabase() */) is
+// out of scope: codeLine() only strips single-line // and * comments.
 const DIRECT_DB_SETUP_PATTERNS = [
   { label: 'loadDatabaseEnv', pattern: /\bloadDatabaseEnv\s*\(/ },
   { label: 'createDatabase', pattern: /\bcreateDatabase\s*\(/ },
