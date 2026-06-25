@@ -57,6 +57,11 @@ export function useAllBooks(): {
   isError: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  /** True once all pages have loaded (no pending auto-drain). Gate any UI that
+   *  must show a complete book list (e.g. delete-scope counts) on this flag,
+   *  not `isLoading`, because `isLoading` goes false after the first page
+   *  settles while auto-drain of pages 2, 3, … is still in flight. */
+  isFullyLoaded: boolean;
   fetchNextPage: () => void;
   refetch: () => void;
 } {
@@ -149,6 +154,8 @@ export function useAllBooks(): {
     isError: libraryBooksQuery.isError,
     hasNextPage,
     isFetchingNextPage,
+    isFullyLoaded:
+      libraryBooksQuery.isSuccess && !hasNextPage && !isFetchingNextPage,
     fetchNextPage: (): void => {
       void fetchNextPage();
     },

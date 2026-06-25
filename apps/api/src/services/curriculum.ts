@@ -1231,6 +1231,15 @@ export async function getAllProfileBooks(
     startIndex,
     startIndex + pageSize,
   );
+
+  // [WI-966] startIndex >= allProfileSubjects.length when the cursor resolves
+  // to the very last subject (or a concurrent delete pushed it past the end).
+  // Calling inArray(col, []) produces invalid SQL ("WHERE x IN ()"), so bail
+  // out early with the correct empty-page shape.
+  if (pageSubjects.length === 0) {
+    return { subjects: [], nextCursor: null };
+  }
+
   const hasMore = startIndex + pageSize < allProfileSubjects.length;
   const nextCursor = hasMore
     ? (pageSubjects[pageSubjects.length - 1]?.id ?? null)

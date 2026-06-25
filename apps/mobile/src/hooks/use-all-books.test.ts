@@ -441,4 +441,77 @@ describe('useAllBooks', () => {
     expect(result.current.hasNextPage).toBe(false);
     expect(result.current.books.length).toBe(1);
   });
+
+  // ---- [WI-966] isFullyLoaded ----
+
+  it('[WI-966] isFullyLoaded is true only once all pages have drained (single page)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        null, // last page — no drain needed
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      // Single page — isFullyLoaded and isSuccess converge immediately.
+      expect(result.current.isFullyLoaded).toBe(true);
+    });
+
+    expect(result.current.isSuccess).toBe(true);
+    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.isFetchingNextPage).toBe(false);
+  });
+
+  it('[WI-966] isFullyLoaded is true after the auto-drain of a multi-page response finishes', async () => {
+    const CURSOR_PAGE2 = '550e8400-e29b-41d4-a716-446655440099';
+    // Page 1 returns a cursor; page 2 is the last.
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        CURSOR_PAGE2,
+      ),
+    );
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's2',
+            subjectName: 'Science',
+            books: [{ id: 'b2', title: 'Physics', topicsGenerated: true }],
+          },
+        ],
+        null, // last page
+      ),
+    );
+
+    const { result } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    // isFullyLoaded must only become true once ALL pages are loaded.
+    await waitFor(() => {
+      expect(result.current.isFullyLoaded).toBe(true);
+    });
+
+    // Both books visible — drain completed.
+    expect(result.current.books).toHaveLength(2);
+    expect(result.current.hasNextPage).toBe(false);
+    expect(result.current.isFetchingNextPage).toBe(false);
+  });
 });

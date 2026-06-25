@@ -11,6 +11,7 @@ import {
   generateCurriculum,
   getCurriculum,
   getBooks,
+  getAllProfileBooks,
   skipTopic,
   unskipTopic,
   challengeCurriculum,
@@ -3575,5 +3576,98 @@ describe('persistNarrowTopics orphan strip', () => {
     const insertedTopics = (db.insert as jest.Mock).mock.results[0]!.value
       .values.mock.calls[0]![0] as Array<{ title: string }>;
     expect(insertedTopics).toHaveLength(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAllProfileBooks — empty-page guard [WI-966]
+// ---------------------------------------------------------------------------
+
+describe('[WI-966] getAllProfileBooks — empty-page guard', () => {
+  // Minimal mock DB that returns a list of subjects from repo.subjects.findMany
+  // (which internally calls db.query.subjects.findMany) and never gets called
+  // for books when the cursor-derived page slice is empty.
+  // Returns both the db mock and captured spies for assertion.
+  function mockDbForAllProfileBooks(
+    subjects: Array<{ id: string; name: string }>,
+  ): {
+    db: Database;
+    booksFindMany: jest.Mock;
+  } {
+    const booksFindMany = jest.fn().mockResolvedValue([]);
+    const db = {
+      query: {
+        subjects: {
+          // repo.subjects.findMany() calls db.query.subjects.findMany({where: eq(profileId)})
+          findMany: jest.fn().mockResolvedValue(subjects),
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        curriculumBooks: {
+          findMany: booksFindMany,
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(undefined),
+        },
+        curriculumTopics: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        assessments: { findMany: jest.fn().mockResolvedValue([]) },
+        retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
+        sessionSummaries: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      select: jest.fn(() => ({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      })),
+    } as unknown as Database;
+    return { db, booksFindMany };
+  }
+
+  it('[WI-966] returns { subjects: [], nextCursor: null } when cursor resolves past the last subject', async () => {
+    // Two subjects; cursor = last subject's id → startIndex becomes 2 →
+    // pageSubjects.length === 0 → early return before any DB book/topic query.
+    const subjects = [
+      { id: 'sub-1', name: 'Math' },
+      { id: 'sub-2', name: 'Science' },
+    ];
+    const { db, booksFindMany } = mockDbForAllProfileBooks(subjects);
+
+    const result = await getAllProfileBooks(db, PROFILE_ID, {
+      limit: 20,
+      cursor: 'sub-2', // last subject → next startIndex = 2 = length
+    });
+
+    expect(result).toEqual({ subjects: [], nextCursor: null });
+    // No book or topic queries should have been issued.
+    expect(booksFindMany).not.toHaveBeenCalled();
+  });
+
+  it('[WI-966] returns { subjects: [], nextCursor: null } when no subjects exist', async () => {
+    const { db } = mockDbForAllProfileBooks([]);
+
+    const result = await getAllProfileBooks(db, PROFILE_ID);
+
+    expect(result).toEqual({ subjects: [], nextCursor: null });
+  });
+
+  it('[WI-966] returns the first page normally when cursor is absent', async () => {
+    const subjects = [
+      { id: 'sub-1', name: 'Math' },
+      { id: 'sub-2', name: 'Science' },
+    ];
+    const { db } = mockDbForAllProfileBooks(subjects);
+
+    const result = await getAllProfileBooks(db, PROFILE_ID, { limit: 20 });
+
+    // Both subjects should appear on the page; no nextCursor.
+    expect(result.nextCursor).toBeNull();
+    expect(result.subjects).toHaveLength(2);
+    expect(result.subjects[0]!.subjectId).toBe('sub-1');
+    expect(result.subjects[1]!.subjectId).toBe('sub-2');
   });
 });
