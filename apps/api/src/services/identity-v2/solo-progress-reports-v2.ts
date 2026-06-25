@@ -91,31 +91,53 @@ export async function listEligibleSelfReportPersonIdsV2(
     .filter((o) => currentAge(o.birthYear) >= MINIMUM_AGE);
   if (owners.length === 0) return [];
 
+  // [WI-961] Bounded fan-out: run mapper in parallel batches of BATCH_SIZE so
+  // a large reporting cohort cannot exhaust DB pool concurrency in one burst.
+  const BATCH_SIZE = 25;
+  async function mapInBatches<T, R>(
+    items: readonly T[],
+    mapper: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += BATCH_SIZE) {
+      results.push(
+        ...(await Promise.all(items.slice(i, i + BATCH_SIZE).map(mapper))),
+      );
+    }
+    return results;
+  }
+
   // Exclude linked children: a person who is the CHARGE of any active
   // guardianship edge is a linked child, not a self-managed owner.
-  const selfManaged: typeof owners = [];
-  for (const o of owners) {
-    const guardians = await getGuardianPersonIds(db, o.personId);
-    if (guardians.length === 0) selfManaged.push(o);
-  }
+  // The per-owner guardianship lookups are independent — fan out in parallel
+  // batches. Filtering after the fan-out preserves the original semantics
+  // (self-managed = zero guardians) exactly.
+  const guardianChecks = await mapInBatches(owners, async (o) => ({
+    o,
+    guardians: await getGuardianPersonIds(db, o.personId),
+  }));
+  const selfManaged = guardianChecks
+    .filter(({ guardians }) => guardians.length === 0)
+    .map(({ o }) => o);
   if (selfManaged.length === 0) return [];
 
   // GDPR consent: allowed when the GDPR status is null (no row) or CONSENTED
   // (basis-explicit — a basis-blind read would be the BUG-466/465 bug).
-  const result: string[] = [];
-  for (const o of selfManaged) {
-    const status = await resolveConsentStatus(
+  // The per-owner consent-status reads are independent — fan out in parallel
+  // batches. The post-filter preserves the original semantics exactly.
+  const consentChecks = await mapInBatches(selfManaged, async (o) => ({
+    personId: o.personId,
+    status: await resolveConsentStatus(
       db,
       o.personId,
       o.organizationId,
       DEFAULT_CONSENT_PURPOSE,
       'gdpr_parental_consent',
-    );
-    if (status == null || status === 'CONSENTED') {
-      result.push(o.personId);
-    }
-  }
-  return result;
+    ),
+  }));
+  return consentChecks
+    .filter(({ status }) => status == null || status === 'CONSENTED')
+    .map(({ personId }) => personId);
 }
 
 /**
