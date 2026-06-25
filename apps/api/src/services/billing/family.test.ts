@@ -598,4 +598,47 @@ describe('[WI-960] downgradeAllFamilyProfiles — parallel provisioning + bounde
     expect(ensureFreeSpy).toHaveBeenCalledTimes(1);
     expect(ensureFreeSpy).toHaveBeenCalledWith(db, NEW_ACCOUNT_A);
   });
+
+  it('[WI-960] Promise.all fails fast: rejection propagates AND the sibling profile update still ran (partial side-effects)', async () => {
+    // Failure-mode coverage for the changed error semantics: the old serial
+    // loop propagated failures in profile order; the new Promise.all fans out
+    // and fails fast. This documents that under a provision failure the
+    // function (a) re-throws and (b) leaves partial side-effects committed —
+    // the sibling profile's account move has already run. Recovery is a retry,
+    // which is safe because the profile update and ensureFreeSubscription are
+    // both idempotent.
+    const db = buildFakeDb();
+    const profileToAccountMap = new Map([
+      [PROFILE_NON_OWNER_A, NEW_ACCOUNT_A],
+      [PROFILE_NON_OWNER_B, NEW_ACCOUNT_B],
+    ]);
+
+    const provisionError = new Error('ensureFreeSubscription failed for B');
+    // Profile-A succeeds; profile-B's provision rejects. Both updates fire
+    // synchronously (fan-out) before either provision resolves, so update-a is
+    // committed even though the batch ultimately rejects.
+    ensureFreeSpy.mockImplementation(async (_db, accountId) => {
+      if (accountId === NEW_ACCOUNT_B) {
+        throw provisionError;
+      }
+      callOrder.push('provision-a');
+      return { id: `sub-${accountId}` } as ReturnType<
+        typeof subscriptionCore.ensureFreeSubscription
+      > extends Promise<infer T>
+        ? T
+        : never;
+    });
+
+    // (a) The rejection propagates out of downgradeAllFamilyProfiles.
+    await expect(
+      downgradeAllFamilyProfiles(db, SUBSCRIPTION_ID, profileToAccountMap),
+    ).rejects.toThrow(provisionError);
+
+    // (b) Profile-A's account move still ran — partial side-effects are real.
+    expect(callOrder).toContain('update-a');
+    // The owner subscription downgrade runs only AFTER the parallel batch
+    // resolves, so a fail-fast batch must short-circuit before it.
+    expect(callOrder).not.toContain('update-owner-sub');
+    expect(updateQuotaSpy).not.toHaveBeenCalled();
+  });
 });
