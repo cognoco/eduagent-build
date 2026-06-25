@@ -173,6 +173,17 @@ export const resendSignatureFailureEscalator = createSignatureFailureEscalator(
 );
 
 /**
+ * RevenueCat webhook auth-failure escalator.
+ * Use `revenuecatAuthFailureEscalator.record()` in the RevenueCat webhook auth rejection
+ * branches (missing header, token mismatch) to detect sustained misconfiguration.
+ * Missing-secret failures use captureMessage directly (single-event, not rate-limited).
+ */
+export const revenuecatAuthFailureEscalator = createSignatureFailureEscalator(
+  'revenuecat.webhook.sustained_auth_failure',
+  'RevenueCat webhook auth failure rate exceeded threshold',
+);
+
+/**
  * Convenience shorthand for `stripeSignatureFailureEscalator.record()`.
  * Used in stripe-webhook.ts for brevity; prefer the named escalator when
  * adding new call sites so the source is unambiguous.
