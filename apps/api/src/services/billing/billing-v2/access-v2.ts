@@ -11,30 +11,23 @@
 // stays byte-identical.
 // ---------------------------------------------------------------------------
 
-import {
-  type Database,
-  findSubscriptionById__unscoped,
-} from '@eduagent/database';
+import { type Database } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 import { subscription as subscriptionTable } from '@eduagent/database';
 import type { BillingAccess, SubscriptionTier } from '@eduagent/schemas';
 
 import { resolveEffectiveAccessTier } from '../../subscription';
-import {
-  parseSubscriptionV2PlanTier,
-  parseSubscriptionV2Status,
-} from './types-v2';
+import type { SubscriptionRow } from '../types';
+import { mapSubscriptionV2Row } from './types-v2';
 
 export interface EffectiveSubscriptionAccessV2 {
   /**
-   * The raw new-table subscription row. Typed off the legacy unscoped helper's
-   * return so the access shape stays interchangeable at the call sites that only
-   * read tier/status/period (the fields both tables share by name except the two
-   * mapped below, which the caller does not consume from this struct).
+   * The subscription row mapped to the legacy SubscriptionRow shape (accountId,
+   * tier, status, currentPeriodStart/End as ISO strings). Using the canonical
+   * SubscriptionRow type ensures TypeScript verifies field presence at compile
+   * time — no escape casts needed.
    */
-  subscription: NonNullable<
-    Awaited<ReturnType<typeof findSubscriptionById__unscoped>>
-  >;
+  subscription: SubscriptionRow;
   effectiveAccessTier: SubscriptionTier;
   billingAccess: BillingAccess;
 }
@@ -56,31 +49,19 @@ export async function getEffectiveAccessForSubscriptionV2(
   });
   if (!row) return null;
 
-  const tier = parseSubscriptionV2PlanTier(row.planTier);
-  const status = parseSubscriptionV2Status(row.status);
+  // mapSubscriptionV2Row validates planTier/status through the schema contract
+  // and returns a fully-typed SubscriptionRow — no escape cast required.
+  const subscription = mapSubscriptionV2Row(row);
 
   const access = resolveEffectiveAccessTier(
     {
-      tier,
-      status,
-      trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
-      currentPeriodEnd: row.periodEndAt?.toISOString() ?? null,
+      tier: subscription.tier,
+      status: subscription.status,
+      trialEndsAt: subscription.trialEndsAt,
+      currentPeriodEnd: subscription.currentPeriodEnd,
     },
     now,
   );
 
-  // Re-shape the new-table row into the legacy subscription struct the caller
-  // expects (tier/status/period field names), preserving the id and the
-  // store-correlation columns. Only the fields downstream actually reads are
-  // surfaced under their legacy names.
-  const legacyShaped = {
-    ...row,
-    accountId: row.organizationId,
-    tier,
-    status,
-    currentPeriodStart: row.periodStartAt,
-    currentPeriodEnd: row.periodEndAt,
-  } as unknown as EffectiveSubscriptionAccessV2['subscription'];
-
-  return { subscription: legacyShaped, ...access };
+  return { subscription, ...access };
 }
