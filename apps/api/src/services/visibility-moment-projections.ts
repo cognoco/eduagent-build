@@ -5,7 +5,13 @@ import {
   type Database,
   type NewSupportVisibilityNotice,
 } from '@eduagent/database';
-import type { RenderAudience, VisibilityMoment } from '@eduagent/schemas';
+import {
+  visibilityMomentPayloadSchema,
+  type RenderAudience,
+  type VisibilityMoment,
+} from '@eduagent/schemas';
+
+import { captureException } from './sentry';
 
 export async function createVisibilityNotice(
   db: Database,
@@ -19,7 +25,13 @@ export async function createVisibilityNotice(
     .returning();
   const row = rows[0];
   if (!row) throw new Error('Visibility notice insert returned no row');
-  return mapNotice(row);
+  const moment = mapNotice(row);
+  if (!moment) {
+    throw new Error(
+      `Visibility notice payload failed validation after insert (id=${row.id})`,
+    );
+  }
+  return moment;
 }
 
 export async function deriveVisibilityMoments(
@@ -42,12 +54,24 @@ export async function deriveVisibilityMoments(
     .orderBy(desc(supportVisibilityNotices.createdAt))
     .limit(input.limit ?? 20);
 
-  return rows.map(mapNotice);
+  // Skip rows whose payload no longer matches the schema rather than failing
+  // the whole read: one malformed historical row must not 500 every notice.
+  return rows
+    .map(mapNotice)
+    .filter((moment): moment is VisibilityMoment => moment !== null);
 }
 
 function mapNotice(
   row: typeof supportVisibilityNotices.$inferSelect,
-): VisibilityMoment {
+): VisibilityMoment | null {
+  const parsed = visibilityMomentPayloadSchema.safeParse(row.payload);
+  if (!parsed.success) {
+    captureException(parsed.error, {
+      tags: { surface: 'visibility.payload_parse' },
+      extra: { noticeId: row.id, noticeType: row.noticeType },
+    });
+    return null;
+  }
   return {
     id: row.id,
     type: row.noticeType as VisibilityMoment['type'],
@@ -56,9 +80,6 @@ function mapNotice(
     targetPersonId: row.targetPersonId,
     createdAt: row.createdAt.toISOString(),
     acknowledgedAt: row.acknowledgedAt?.toISOString() ?? null,
-    payload:
-      row.payload && typeof row.payload === 'object'
-        ? (row.payload as Record<string, unknown>)
-        : {},
+    payload: parsed.data,
   };
 }

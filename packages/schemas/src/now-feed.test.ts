@@ -1,5 +1,6 @@
 import {
   nowCardKindSchema,
+  nowCardParamsSchema,
   nowCardSchema,
   nowDeepLinkRouteSchema,
   nowDeepLinkSchema,
@@ -111,5 +112,35 @@ describe('now feed schemas', () => {
 
   it('accepts a well-formed now card', () => {
     expect(nowCardSchema.parse(card('ok'))).toEqual(card('ok'));
+  });
+
+  describe('[WI-992] nowCardParamsSchema — routing UUID field validation', () => {
+    const VALID_UUID = '00000000-0000-4000-8000-000000000001';
+
+    it('rejects params when a known routing UUID field has a non-uuid value', () => {
+      expect(
+        nowCardParamsSchema.safeParse({ sessionId: 'not-uuid' }).success,
+      ).toBe(false);
+    });
+
+    it('accepts params with a valid UUID sessionId', () => {
+      expect(
+        nowCardParamsSchema.safeParse({ sessionId: VALID_UUID }).success,
+      ).toBe(true);
+    });
+
+    it('accepts params with non-routing display fields (topicTitle, subjectName)', () => {
+      expect(
+        nowCardParamsSchema.safeParse({
+          subjectId: VALID_UUID,
+          topicTitle: 'Some Topic',
+          subjectName: 'Mathematics',
+        }).success,
+      ).toBe(true);
+    });
+
+    it('accepts empty params (cards with no deep-link routing IDs)', () => {
+      expect(nowCardParamsSchema.safeParse({}).success).toBe(true);
+    });
   });
 });
