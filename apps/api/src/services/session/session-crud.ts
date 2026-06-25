@@ -89,6 +89,35 @@ function hasMinimumFreeformLibraryFilingExchanges(session: {
   return (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges;
 }
 
+/**
+ * Canonical predicate for "this freeform session should be auto-filed into the
+ * library when it closes." Lives here (not in session-filing-dispatch) so both
+ * the HTTP-close dispatch path AND the stale-cleanup cron path can share ONE
+ * definition without a circular import — session-filing-dispatch re-exports it.
+ *
+ * A session qualifies when it is a freeform session that has never been filed
+ * (no topic, no filedAt, no in-flight/failed filing claim) and has reached the
+ * minimum exchange count. Status is intentionally NOT checked: both a
+ * user-closed ('completed') and an abandoned ('auto_closed') session are
+ * eligible — `claimSessionForAutoFiling` likewise filters only on the
+ * topic/filedAt/filingStatus null-state, never on status.
+ */
+export function isClosePathAutoFileEligible(session: {
+  metadata?: unknown;
+  topicId?: string | null;
+  filedAt?: string | Date | null;
+  filingStatus?: string | null;
+  exchangeCount?: number | null;
+}): boolean {
+  return (
+    getSessionEffectiveMode(session) === 'freeform' &&
+    session.topicId == null &&
+    session.filedAt == null &&
+    session.filingStatus == null &&
+    hasMinimumFreeformLibraryFilingExchanges(session)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Error classes
 // ---------------------------------------------------------------------------
@@ -1214,6 +1243,9 @@ export interface StaleSessionCloseResult {
     | 'auto_closed';
   interleavedTopicIds?: string[];
   escalationRungs?: number[];
+  // Whether this just-closed session should be dispatched for freeform
+  // library auto-filing by the stale-cleanup cron (see closeStaleSessions).
+  autoFileEligible: boolean;
 }
 
 export interface StaleSessionCloseFailure {
@@ -1312,6 +1344,13 @@ export async function closeStaleSessions(
         results.push({
           profileId: staleSession.profileId,
           ...result,
+          // Computed from the pre-close row: closeSession does not touch
+          // topicId/filedAt/filingStatus/exchangeCount/metadata, so the
+          // freeform-filing eligibility of the just-closed session is identical
+          // to that of the row we read. The cron uses this to dispatch the
+          // freeform auto-file (mirroring the HTTP close route) so abandoned
+          // freeform sessions still land in the library.
+          autoFileEligible: isClosePathAutoFileEligible(staleSession),
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

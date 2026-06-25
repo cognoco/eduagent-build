@@ -64,6 +64,38 @@ export const sessionStaleCleanup = inngest.createFunction(
       );
     }
 
+    // [Defect-2b] Mirror the HTTP close route for abandoned freeform sessions.
+    // closeStaleSessions only performs the DB close; the route (routes/sessions.ts)
+    // SEPARATELY dispatches the freeform library auto-file. Without this mirror a
+    // stale freeform session is auto_closed but never filed and never appears in
+    // the learner's library (the manual filing-stranded-backfill job is the
+    // recovery for exactly this gap). closeStaleSessions flags eligible sessions
+    // (freeform, unfiled, >= minFreeformExchanges) so we don't re-read here.
+    //
+    // [BUG-696 / J-7] step.sendEvent (memoized), never bare inngest.send. A
+    // stable per-session event id makes cron retries idempotent at ingestion;
+    // dispatchId mirrors the route's 'initial' so the auto-file function dedupes
+    // a cron dispatch against any route dispatch for the same session.
+    const autoFileSessions = closedSessions.sessions.filter(
+      (session) => session.autoFileEligible,
+    );
+    if (autoFileSessions.length > 0) {
+      await step.sendEvent(
+        'dispatch-freeform-auto-file',
+        autoFileSessions.map((session) => ({
+          id: `auto-file-${session.sessionId}-initial`,
+          name: 'app/session.auto_file_requested' as const,
+          data: {
+            profileId: session.profileId,
+            sessionId: session.sessionId,
+            requestedAt: new Date().toISOString(),
+            reason: 'freeform_session_closed' as const,
+            dispatchId: 'initial',
+          },
+        })),
+      );
+    }
+
     // [CRIT-2] Abandon quiz rounds that have been active for too long.
     // Prefetched rounds the user never completed stay 'active' forever and
     // are quota-charged. Mark them 'abandoned' so they don't accumulate.
