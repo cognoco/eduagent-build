@@ -86,6 +86,7 @@ function createClosedSession(
     summaryStatus: string;
     interleavedTopicIds: string[];
     escalationRungs: number[];
+    autoFileEligible: boolean;
   }> = {},
 ) {
   return {
@@ -99,6 +100,7 @@ function createClosedSession(
     summaryStatus: overrides.summaryStatus ?? 'auto_closed',
     interleavedTopicIds: overrides.interleavedTopicIds,
     escalationRungs: overrides.escalationRungs,
+    autoFileEligible: overrides.autoFileEligible ?? false,
   };
 }
 
@@ -428,5 +430,73 @@ describe('session-stale-cleanup Inngest function', () => {
 
     expect(mockInngestTransport.sentEvents).toHaveLength(0);
     expect(sendEventCalls).toHaveLength(1);
+  });
+
+  // [Defect-2b] BREAK TEST — an abandoned freeform session that crossed the
+  // exchange threshold must be dispatched for library auto-filing, mirroring the
+  // HTTP close route. Before the fix the cron only emitted session.completed and
+  // the session was auto_closed-but-never-filed (invisible in the library). If
+  // the auto-file dispatch is removed, this fails.
+  it('[Defect-2b] dispatches freeform auto-file for eligible auto-closed sessions', async () => {
+    const eligible = createClosedSession({
+      sessionId: 'freeform-1',
+      profileId: 'profile-9',
+      topicId: null,
+      autoFileEligible: true,
+    });
+    const ineligible = createClosedSession({
+      sessionId: 'homework-1',
+      autoFileEligible: false,
+    });
+    mockCloseStaleSessions.mockResolvedValue(
+      staleBatch([eligible, ineligible]),
+    );
+
+    const { sendEventCalls } = await executeHandler();
+
+    const autoFileCall = sendEventCalls.find(
+      (call) => call.name === 'dispatch-freeform-auto-file',
+    );
+    expect(autoFileCall).toBeDefined();
+
+    const events = autoFileCall!.payload as Array<{
+      id: string;
+      name: string;
+      data: Record<string, unknown>;
+    }>;
+    // Only the eligible freeform session is dispatched; the ineligible one is not.
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
+      expect.objectContaining({
+        // Stable per-session id so cron retries dedupe at ingestion and a cron
+        // dispatch dedupes against a route dispatch for the same session.
+        id: 'auto-file-freeform-1-initial',
+        name: 'app/session.auto_file_requested',
+        data: expect.objectContaining({
+          profileId: 'profile-9',
+          sessionId: 'freeform-1',
+          reason: 'freeform_session_closed',
+          dispatchId: 'initial',
+        }),
+      }),
+    );
+  });
+
+  it('[Defect-2b] dispatches no auto-file when no closed session is freeform-eligible', async () => {
+    // Default fixtures are autoFileEligible:false (e.g. homework / already-filed).
+    const session = createClosedSession({ autoFileEligible: false });
+    mockCloseStaleSessions.mockResolvedValue(staleBatch([session]));
+
+    const { sendEventCalls } = await executeHandler();
+
+    expect(
+      sendEventCalls.find(
+        (call) => call.name === 'dispatch-freeform-auto-file',
+      ),
+    ).toBeUndefined();
+    // The session.completed dispatch still fires.
+    expect(
+      sendEventCalls.find((call) => call.name === 'dispatch-session-completed'),
+    ).toBeDefined();
   });
 });

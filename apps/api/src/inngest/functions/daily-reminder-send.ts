@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
+import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { profiles } from '@eduagent/database';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -26,10 +27,10 @@ export const dailyReminderSend = inngest.createFunction(
     // [BUG-253] Bound parallelism on the fan-out receiver. The cron upstream
     // can fan out hundreds-to-thousands of daily-reminder events in a single
     // burst; each handler hits Neon for the notification-log dedup read and
-    // again for the push-notification send. limit=50 caps Neon connection
-    // pressure and matches the transcript-purge / daily-snapshot-refresh
-    // pattern.
-    concurrency: { limit: 50 },
+    // again for the push-notification send. Intended 50 to cap Neon connection
+    // pressure; capped to the Inngest plan limit (a lower cap only tightens Neon
+    // pressure further). Raise after a plan upgrade — see INNGEST_PLAN_CONCURRENCY_CAP.
+    concurrency: { limit: INNGEST_PLAN_CONCURRENCY_CAP },
   },
   { event: 'app/daily-reminder.send' },
   async ({ event, step }) => {

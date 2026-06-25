@@ -839,6 +839,74 @@ describe('generateMonthlyReportData — metadata passthrough', () => {
 });
 
 // ---------------------------------------------------------------------------
+// generateReportHighlights — zero-session guard (fabrication-when-no-evidence)
+// ---------------------------------------------------------------------------
+
+describe('generateReportHighlights — zero-session guard', () => {
+  // reportData with 0 new sessions this month (delta = 0)
+  const noActivityReportData: MonthlyReportData = {
+    childName: 'Alice',
+    month: 'April 2026',
+    thisMonth: {
+      totalSessions: 0,
+      totalActiveMinutes: 0,
+      topicsMastered: 0,
+      topicsExplored: 0,
+      vocabularyTotal: 10, // cumulative vocab may be > 0, but no new sessions
+      streakBest: 0,
+    },
+    lastMonth: null,
+    highlights: [],
+    nextSteps: [],
+    subjects: [],
+    headlineStat: {
+      label: 'Topics mastered',
+      value: 0,
+      comparison: 'in a first month',
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('does NOT call the LLM when totalSessions delta is 0', async () => {
+    const result = await generateReportHighlights(noActivityReportData);
+
+    // The guard must short-circuit before the LLM call.
+    expect(mockRouteAndCall).not.toHaveBeenCalled();
+    // Returns a factual no-activity message rather than fabricated highlights.
+    expect(result.highlights).toHaveLength(1);
+    expect(result.highlights[0]).toMatch(/no.*session/i);
+    expect(result.nextSteps).toEqual([]);
+    expect(result.comparison).toBeNull();
+  });
+
+  it('still calls the LLM when totalSessions delta is greater than 0', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response: JSON.stringify({
+        highlights: ['Great work!'],
+        nextSteps: [],
+        equivalent: null,
+      }),
+      provider: 'mock',
+      model: 'mock-model',
+      latencyMs: 10,
+      stopReason: 'stop' as const,
+    });
+
+    const activeReportData: MonthlyReportData = {
+      ...noActivityReportData,
+      thisMonth: { ...noActivityReportData.thisMonth, totalSessions: 3 },
+    };
+
+    await generateReportHighlights(activeReportData);
+
+    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // generateReportHighlights — LLM success path
 // ---------------------------------------------------------------------------
 

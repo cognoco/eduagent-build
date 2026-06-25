@@ -1,33 +1,22 @@
 import type { Database } from '@eduagent/database';
-import {
-  getSessionEffectiveMode,
-  sessionAutoFileRequestedEventSchema,
-} from '@eduagent/schemas';
+import { sessionAutoFileRequestedEventSchema } from '@eduagent/schemas';
 
-import { FILING_CONFIG } from '../../config/filing';
 import { inngest } from '../../inngest/client';
 import { createLogger } from '../logger';
 import { safeSend } from '../safe-non-core';
 import { captureException } from '../sentry';
-import { getSession, getSessionCompletionContext } from './session-crud';
+import {
+  getSession,
+  getSessionCompletionContext,
+  isClosePathAutoFileEligible,
+} from './session-crud';
 
 const logger = createLogger();
 
-export function isClosePathAutoFileEligible(session: {
-  metadata?: unknown;
-  topicId?: string | null;
-  filedAt?: string | Date | null;
-  filingStatus?: string | null;
-  exchangeCount?: number;
-}): boolean {
-  return (
-    getSessionEffectiveMode(session) === 'freeform' &&
-    session.topicId == null &&
-    session.filedAt == null &&
-    session.filingStatus == null &&
-    (session.exchangeCount ?? 0) >= FILING_CONFIG.minFreeformExchanges
-  );
-}
+// Canonical definition moved to session-crud so the stale-cleanup cron can
+// share it without a circular import. Re-exported here for back-compat with
+// existing importers (services/session barrel, tests).
+export { isClosePathAutoFileEligible } from './session-crud';
 
 export async function dispatchClosePathAutoFileIfEligible(
   db: Database,

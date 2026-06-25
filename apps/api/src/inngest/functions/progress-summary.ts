@@ -28,7 +28,11 @@ export const progressSummaryGeneration = inngest.createFunction(
     name: 'Generate child progress summary after session',
     retries: 2,
     debounce: {
-      key: 'progress-summary-{{ event.data.profileId }}',
+      // Debounce per profile. Inngest debounce keys are CEL expressions, not
+      // mustache templates — a `{{ ... }}` here fails CEL compilation and blocks
+      // the ENTIRE app sync (all functions), not just this one. The key is
+      // already function-scoped, so no prefix is needed.
+      key: 'event.data.profileId',
       period: '5m',
     },
   },

@@ -3272,7 +3272,6 @@ export async function processMessage(
   // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
   // onboarding flows. See `resolveReadyToFinish` JSDoc for the contract.
   const readyToFinish = resolveReadyToFinish({
-    llmReadyToFinish: result.readyToFinish,
     exchangeCount: persisted.exchangeCount,
     sessionMetadata: session.metadata as Record<string, unknown> | null,
   });
@@ -3633,7 +3632,6 @@ export async function streamMessage(
       // streaming interview session could run all the way to
       // MAX_EXCHANGES_PER_SESSION (50) when the LLM never emits the signal.
       const readyToFinish = resolveReadyToFinish({
-        llmReadyToFinish: parsed.readyToFinish,
         exchangeCount: persisted.exchangeCount,
         sessionMetadata: session.metadata as Record<string, unknown> | null,
       });

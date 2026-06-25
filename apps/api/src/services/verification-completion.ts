@@ -140,8 +140,21 @@ export async function processEvaluateCompletion(
       newRung = 1 as const;
     }
   } else {
-    // On success, advance difficulty rung (cap at 4)
-    newRung = Math.min(4, currentRung + 1) as 1 | 2 | 3 | 4;
+    // On success, advance difficulty rung (cap at 4) — BUT only when the LLM
+    // supplied a non-empty flaw_identified string as evidence. A bare
+    // challenge_passed=true without that description is a weakly-supported pass:
+    // the SM-2 quality update proceeds normally (no penalty for the learner)
+    // but the difficulty rung does not advance. This mirrors the Challenge-Round
+    // mastery policy: the server never trusts a bare LLM boolean without
+    // structured evidence. If flaw_identified is missing, newRung stays at
+    // currentRung (i.e. no rung advancement for an unsupported pass).
+    if (
+      typeof assessment.flawIdentified === 'string' &&
+      assessment.flawIdentified.trim().length > 0
+    ) {
+      newRung = Math.min(4, currentRung + 1) as 1 | 2 | 3 | 4;
+    }
+    // else: keep newRung = currentRung — pass is noted but not promoted
   }
 
   // Update the retention card with new difficulty rung
@@ -228,8 +241,16 @@ export async function processTeachBackCompletion(
 
   if (!assessment || !assessmentEvent) return undefined; // No parseable assessment found
 
-  // Map rubric to SM-2 quality
-  const sm2Quality = mapTeachBackRubricToSm2(assessment);
+  // Map rubric to SM-2 quality, then apply the accuracy-floor gate.
+  // SERVER-SIDE EVIDENCE FLOOR: the overall SM-2 quality is capped at the
+  // accuracy score (the 50%-weighted primary dimension). This prevents an LLM
+  // that returns inflated completeness/clarity scores from pushing the total
+  // beyond what factual correctness supports. A teach-back where accuracy is
+  // low should never produce a high SM-2 quality. Analogous to the EVALUATE
+  // rung-advance gate: the server imposes a conservative ceiling on
+  // self-reported LLM numbers rather than trusting them unconditionally.
+  const rawSm2Quality = mapTeachBackRubricToSm2(assessment);
+  const sm2Quality = Math.min(rawSm2Quality, assessment.accuracy);
 
   // Store structured assessment in the event that produced it (not blindly events[0])
   await db

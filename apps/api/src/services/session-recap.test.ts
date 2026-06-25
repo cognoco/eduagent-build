@@ -1,9 +1,21 @@
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
+
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Database } from '@eduagent/database';
+import { routeAndCall } from './llm';
 import {
   buildRecapPrompt,
   buildRecapTranscriptText,
+  generateLearnerRecap,
   getAgeVoiceTierLabel,
+  sessionRecapLexicalOverlap,
 } from './session-recap';
 
 describe('getAgeVoiceTierLabel', () => {
@@ -183,6 +195,174 @@ describe('buildRecapTranscriptText', () => {
     expect(text).toContain('Mentor: hi');
     expect(text).not.toContain('"signals"');
     expect(text).not.toContain('"ui_hints"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sessionRecapLexicalOverlap — unit tests for the overlap helper
+// ---------------------------------------------------------------------------
+
+describe('sessionRecapLexicalOverlap', () => {
+  it('returns 1 when the recap is empty (no content tokens)', () => {
+    expect(
+      sessionRecapLexicalOverlap('', 'Some transcript text about algebra'),
+    ).toBe(1);
+  });
+
+  it('returns high overlap when the recap paraphrases the transcript vocabulary', () => {
+    const transcript =
+      'Student: What is algebra? Mentor: Algebra uses variables like x to solve equations.';
+    const recap =
+      'You explored algebraic equations using variables. You practiced solving for x.';
+    expect(sessionRecapLexicalOverlap(recap, transcript)).toBeGreaterThan(0.15);
+  });
+
+  it('returns low overlap when the recap is entirely off-topic', () => {
+    const transcript =
+      'Student: What is algebra? Mentor: Algebra uses variables like x to solve equations.';
+    const recap =
+      'You investigated stellar formation and explored cosmic nebulae in distant galaxies.';
+    expect(sessionRecapLexicalOverlap(recap, transcript)).toBeLessThan(0.15);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateLearnerRecap — lexical-overlap guard integration
+// ---------------------------------------------------------------------------
+
+describe('generateLearnerRecap — lexical-overlap guard', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // Math transcript — 6 turns (3 pairs) so exchangeCount=3 and transcriptTurns=6 >= 4.
+  // Includes a minimal db.select chain so matchFreeformTopic can run to completion
+  // (it returns null when no matches / keyword ambiguity, which is fine here).
+  function createMathTranscriptDb(): Database {
+    // Stub the innerJoin chain that matchFreeformTopic uses via
+    // repo.curriculumTopics.findMatchingInSubject → db.select().from().innerJoin()...
+    // findMatchingInSubject chains 3 innerJoins + where + limit, so we build
+    // a self-referential stub that returns itself for every builder call.
+    // Return empty matches so matchFreeformTopic returns null (matches.length !== 1).
+    const limit = jest.fn().mockResolvedValue([]);
+    const chainStub: Record<string, unknown> = { limit };
+    const selfReturn = () => chainStub;
+    chainStub['from'] = selfReturn;
+    chainStub['innerJoin'] = selfReturn;
+    chainStub['where'] = selfReturn;
+    const select = jest.fn().mockReturnValue(chainStub);
+
+    return {
+      query: {
+        sessionEvents: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              eventType: 'user_message',
+              content: 'What is algebra and how do variables work?',
+            },
+            {
+              eventType: 'ai_response',
+              content:
+                'Algebra uses variables like x to represent unknown numbers in equations.',
+            },
+            {
+              eventType: 'user_message',
+              content:
+                'Can you show me how to solve for x in a simple equation?',
+            },
+            {
+              eventType: 'ai_response',
+              content:
+                'Sure: if x plus five equals ten, then x equals five. Subtract five from both sides.',
+            },
+            {
+              eventType: 'user_message',
+              content:
+                'I understand now. The variables make equations easier to solve.',
+            },
+            {
+              eventType: 'ai_response',
+              content:
+                'Exactly. You connected variables to equation solving — that is the core of algebra.',
+            },
+          ]),
+        },
+      },
+      select,
+    } as unknown as Database;
+  }
+
+  it('returns the deterministic fallback when the LLM recap is off-transcript (lexical overlap too low)', async () => {
+    const db = createMathTranscriptDb();
+
+    // LLM hallucinates a space-exploration recap for a math session.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        closingLine:
+          'You investigated stellar formation and explored cosmic nebulae in distant galaxies today.',
+        takeaways: [
+          'You examined interstellar radiation patterns and their cosmic origins.',
+          'You connected galactic drift to supernovae formation cycles.',
+        ],
+        nextTopicReason: null,
+      }),
+      provider: 'mock',
+      model: 'mock-model',
+      latencyMs: 0,
+      stopReason: 'stop' as const,
+    });
+
+    const result = await generateLearnerRecap(db, {
+      sessionId: 'session-overlap-test',
+      profileId: 'profile-1',
+      topicId: null,
+      subjectId: 'subject-1',
+      exchangeCount: 3,
+      birthYear: 2010,
+    });
+
+    // Guard fires — must return the deterministic fallback, not the hallucinated text.
+    expect(result).not.toBeNull();
+    expect(result!.closingLine).toBe('You completed a learning session.');
+    expect(result!.learnerRecap).toContain('worked through this topic');
+    // The off-topic hallucinated lines must not appear.
+    expect(result!.closingLine).not.toContain('nebulae');
+    expect(result!.closingLine).not.toContain('stellar');
+    expect(result!.learnerRecap).not.toContain('galactic');
+  });
+
+  it('returns the LLM recap when it has sufficient transcript overlap', async () => {
+    const db = createMathTranscriptDb();
+
+    // LLM returns a genuinely on-topic recap about algebra/variables/equations.
+    (routeAndCall as jest.Mock).mockResolvedValueOnce({
+      response: JSON.stringify({
+        closingLine:
+          'You practiced solving equations by substituting variables and balancing both sides.',
+        takeaways: [
+          'You connected variables to solving equations by subtracting from both sides.',
+          'You asked how algebra uses unknowns to represent numbers in equations.',
+        ],
+        nextTopicReason: null,
+      }),
+      provider: 'mock',
+      model: 'mock-model',
+      latencyMs: 0,
+      stopReason: 'stop' as const,
+    });
+
+    const result = await generateLearnerRecap(db, {
+      sessionId: 'session-valid-test',
+      profileId: 'profile-1',
+      topicId: null,
+      subjectId: 'subject-1',
+      exchangeCount: 3,
+      birthYear: 2010,
+    });
+
+    // Guard must NOT fire — the LLM recap is grounded in the transcript.
+    expect(result).not.toBeNull();
+    expect(result!.closingLine).toContain('equations');
   });
 });
 

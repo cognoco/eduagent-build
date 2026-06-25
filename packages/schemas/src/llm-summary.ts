@@ -3,7 +3,12 @@ import { isoDateField } from './common.ts';
 import { sessionTranscriptSchema } from './sessions';
 
 const llmSummaryBaseSchema = z.object({
-  narrative: z.string().min(40).max(1500),
+  // [SHORT-SESSION] No minimum length: very short sessions (2-3 turns) may not
+  // have enough content for a meaningful narrative. Forcing a 40-char floor
+  // caused the model to pad/fabricate rather than be concise. An empty string
+  // is valid — the refine below exempts empty narratives from the topic-anchor
+  // requirement so they do not fail validation.
+  narrative: z.string().max(1500),
   topicsCovered: z.array(z.string().min(2).max(120)).max(20),
   sessionState: z.enum(['completed', 'paused-mid-topic', 'auto-closed']),
   reEntryRecommendation: z.string().min(20).max(400),
@@ -29,12 +34,17 @@ const narrativeMentionsTopic = (value: {
   narrative: string;
   topicsCovered: string[];
   sessionState: string;
-}): boolean =>
-  value.topicsCovered.length === 0
+}): boolean => {
+  // [SHORT-SESSION] An empty narrative is valid regardless of topicsCovered or
+  // sessionState — a 2-3 turn session may have nothing meaningful to say in
+  // prose form, and an empty string is more honest than forced padding.
+  if (value.narrative.length === 0) return true;
+  return value.topicsCovered.length === 0
     ? value.sessionState === 'auto-closed'
     : value.topicsCovered.some((topic) =>
         topicMatchesNarrative(value.narrative, topic),
       );
+};
 
 const narrativeMentionsTopicOptions = {
   message:

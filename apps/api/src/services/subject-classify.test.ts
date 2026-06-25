@@ -207,15 +207,19 @@ describe('classifySubject', () => {
       expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
     });
 
-    // A generous but low-confidence match (< 0.8) must still prompt for
-    // confirmation rather than committing the wrong subject silently.
-    it('asks for confirmation when the only match is below the confidence threshold', async () => {
+    // [BREAK] The core "water is not Statistics" defect. Even if the LLM
+    // force-fits the only enrolled subject at low confidence, the relatedness
+    // floor (MIN_CANDIDATE_CONFIDENCE) must DROP it so it is never surfaced as a
+    // pick or a nonsensical "is this Statistics?" question. The learner gets the
+    // suggested new subject instead. This is the defense-in-depth backstop for
+    // the prompt's "no match is correct" rule.
+    it('[BREAK] floors out an unrelated forced match instead of surfacing it', async () => {
       mockListSubjects.mockResolvedValueOnce([
         makeSubject('sub-001', 'Statistics'),
       ]);
       llmResponse({
-        matches: [{ subjectName: 'Statistics', confidence: 0.5 }],
-        suggestedSubjectName: null,
+        matches: [{ subjectName: 'Statistics', confidence: 0.4 }],
+        suggestedSubjectName: 'Science',
       });
 
       const result = await classifySubject(
@@ -224,10 +228,69 @@ describe('classifySubject', () => {
         'why is water so unique',
       );
 
+      // The 0.4 Statistics match is below the floor → dropped entirely.
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      // The learner is offered a genuinely fitting new subject, never asked
+      // whether water is Statistics.
+      expect(result.suggestedSubjectName).toBe('Science');
+    });
+
+    // A genuinely-related single match that lands in the soft-confirm band
+    // (>= floor but < auto-pick) is KEPT as a candidate and surfaced for a
+    // one-tap confirmation rather than committed silently.
+    it('keeps a genuine single match below the auto-pick bar and asks to confirm', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'History'),
+      ]);
+      llmResponse({
+        matches: [{ subjectName: 'History', confidence: 0.65 }],
+        suggestedSubjectName: null,
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'tell me about the Roman Empire',
+      );
+
       expect(result.candidates).toHaveLength(1);
-      expect(result.candidates[0]!.confidence).toBe(0.5);
+      expect(result.candidates[0]!.confidence).toBe(0.65);
       expect(result.needsConfirmation).toBe(true);
     });
+  });
+
+  // Auto-pick boundary: a single genuine candidate is committed silently only at
+  // or above AUTO_PICK_CONFIDENCE (0.88, ruled 2026-06-25). Just below the bar
+  // it must surface for confirmation.
+  describe('auto-pick confidence boundary (0.88)', () => {
+    it.each([
+      [0.92, false],
+      [0.88, false],
+      [0.87, true],
+      [0.7, true],
+    ])(
+      'single Mathematics match at %p -> needsConfirmation=%p',
+      async (confidence, expectedNeedsConfirmation) => {
+        mockListSubjects.mockResolvedValueOnce([
+          makeSubject('sub-001', 'Mathematics'),
+          makeSubject('sub-002', 'Physics'),
+        ]);
+        llmResponse({
+          matches: [{ subjectName: 'Mathematics', confidence }],
+          suggestedSubjectName: null,
+        });
+
+        const result = await classifySubject(
+          FAKE_DB,
+          PROFILE_ID,
+          'solve 2x + 5 = 15',
+        );
+
+        expect(result.candidates).toHaveLength(1);
+        expect(result.needsConfirmation).toBe(expectedNeedsConfirmation);
+      },
+    );
   });
 
   it('returns high-confidence match from LLM with needsConfirmation=false', async () => {
@@ -514,7 +577,7 @@ describe('classifySubject', () => {
     llmResponse({
       matches: [
         { subjectName: 'Chemistry', confidence: 0.9 },
-        { subjectName: 'Mathematics', confidence: 0.85 },
+        { subjectName: 'Mathematics', confidence: 0.92 },
       ],
       suggestedSubjectName: null,
     });
@@ -525,13 +588,14 @@ describe('classifySubject', () => {
       'balance this equation',
     );
 
-    // Chemistry is not enrolled, so only Mathematics should appear
+    // Chemistry is not enrolled, so only Mathematics should appear (>= 0.88
+    // auto-pick bar, so still no confirmation needed).
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]!.subjectName).toBe('Mathematics');
     expect(result.needsConfirmation).toBe(false);
   });
 
-  it('clamps confidence values to 0-1 range', async () => {
+  it('clamps confidence values to 0-1 range, then floors out sub-threshold matches', async () => {
     mockListSubjects.mockResolvedValueOnce([
       makeSubject('sub-001', 'Mathematics'),
       makeSubject('sub-002', 'Physics'),
@@ -547,8 +611,12 @@ describe('classifySubject', () => {
 
     const result = await classifySubject(FAKE_DB, PROFILE_ID, 'some text');
 
+    // Mathematics 1.5 clamps to 1 and survives the relatedness floor; Physics
+    // -0.3 clamps to 0 and is dropped by the floor (< MIN_CANDIDATE_CONFIDENCE),
+    // so it never reaches the UI as a phantom candidate.
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]!.subjectName).toBe('Mathematics');
     expect(result.candidates[0]!.confidence).toBe(1);
-    expect(result.candidates[1]!.confidence).toBe(0);
   });
 
   // BUG-233: Cultural topics should not be rejected — they must either match
@@ -713,6 +781,26 @@ describe('classifySubject', () => {
       const systemMessage = mockRouteAndCall.mock.calls[0]?.[0]?.[0];
       expect(systemMessage?.content).toContain('cross-disciplinary');
       expect(systemMessage?.content).toContain('Cultural topics');
+    });
+
+    // [BREAK] Regression guard for the water=Statistics defect. The prompt must
+    // NOT instruct the model to prefer a forced match over an empty result, and
+    // MUST tell it that returning no match is a correct answer. If the
+    // force-match line ever returns, this fails.
+    it('[BREAK] prompt forbids force-matching and allows no-match', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'Statistics'),
+      ]);
+      llmResponse({ matches: [], suggestedSubjectName: 'Science' });
+
+      await classifySubject(FAKE_DB, PROFILE_ID, 'why is water so unique');
+
+      const systemMessage = mockRouteAndCall.mock.calls[0]?.[0]?.[0];
+      const content =
+        typeof systemMessage?.content === 'string' ? systemMessage.content : '';
+      expect(content).not.toContain('over returning no matches');
+      expect(content).not.toContain('even moderate relevance');
+      expect(content).toContain('Returning no match is a correct');
     });
   });
 });

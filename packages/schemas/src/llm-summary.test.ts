@@ -19,10 +19,25 @@ describe('llmSummarySchema', () => {
     expect(llmSummarySchema.safeParse(valid).success).toBe(true);
   });
 
-  it('rejects short narrative content', () => {
+  // [SHORT-SESSION] The old min(40) floor caused padding/fabrication on
+  // thin sessions. A short but on-topic narrative is now valid; the refine
+  // still rejects narratives that omit every topic anchor (tested below).
+  it('accepts a short on-topic narrative (no minimum length floor)', () => {
     expect(
-      llmSummarySchema.safeParse({ ...valid, narrative: 'too short' }).success,
-    ).toBe(false);
+      llmSummarySchema.safeParse({ ...valid, narrative: 'long division' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('accepts an empty narrative (short session with no meaningful prose)', () => {
+    expect(
+      llmSummarySchema.safeParse({
+        ...valid,
+        narrative: '',
+        topicsCovered: [],
+        sessionState: 'auto-closed' as const,
+      }).success,
+    ).toBe(true);
   });
 
   it('rejects narratives longer than 1500 chars', () => {

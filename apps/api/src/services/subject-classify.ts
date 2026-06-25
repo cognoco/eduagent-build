@@ -19,6 +19,23 @@ import { createLogger } from './logger';
 
 const logger = createLogger();
 
+// A candidate below this confidence is treated as "not genuinely related" and
+// dropped before it can ever be surfaced — neither auto-assigned nor offered as
+// a confirmation/disambiguation question. This is the defense-in-depth backstop
+// for the prompt's "no match is correct" rule: even if the LLM force-fits an
+// unrelated enrolled subject at low confidence (e.g. water -> Statistics 0.4 on
+// a Statistics-only account), it is discarded here so the UI never auto-files it
+// and never asks the nonsensical "is this <unrelated subject>?" question. The
+// learner gets a new-subject suggestion instead.
+export const MIN_CANDIDATE_CONFIDENCE = 0.5;
+
+// A single genuinely-related candidate at or above this confidence is
+// auto-assigned with no confirmation step. Below it (but still above the
+// relatedness floor) the UI soft-confirms via the override chip or asks which
+// subject. Raised from 0.8 per product ruling 2026-06-25 ("at least 88%, else
+// ask the user").
+export const AUTO_PICK_CONFIDENCE = 0.88;
+
 const CLASSIFY_SYSTEM_PROMPT = `You are a subject classifier for a tutoring platform.
 
 Given a piece of text (homework problem, question, or conversation) and a list of the student's enrolled subjects, determine which subject(s) the text belongs to.
@@ -32,12 +49,13 @@ Return ONLY a JSON object with this structure:
 }
 
 Rules:
-- confidence should be 0.0-1.0 where 1.0 = certain match
-- If the text clearly matches one subject, return that with high confidence (>= 0.8)
+- confidence should be 0.0-1.0 where 1.0 = certain match. Confidence reflects how strong the GENUINE relationship is between the text and the subject — never how much you want to find a match.
+- If the text clearly matches one subject, return that with high confidence (>= 0.85)
 - If the text could match multiple subjects, return all with their respective confidences
-- If the text doesn't match any enrolled subject, return empty matches AND ALWAYS suggest a subject name in "suggestedSubjectName" — never leave it null when matches is empty
+- If the text does NOT genuinely relate to any enrolled subject, return empty matches. Returning no match is a correct, expected answer — do NOT force-fit the text to an unrelated enrolled subject just to avoid an empty list. Example: a question about water on an account whose only enrolled subject is "Statistics" has NO match — return empty matches, never "Statistics".
+- Whenever matches is empty you MUST suggest a fitting new subject name in "suggestedSubjectName" (e.g. water -> "Science", Easter -> "Religious Studies") — never leave it null when matches is empty.
 - Match against the EXACT subject names provided — don't invent new ones for matches
-- Be VERY generous with matching — think broadly about what relates to each subject:
+- Match generously WHEN THERE IS GENUINE TOPICAL RELATEDNESS — think broadly about what truly relates to each subject:
   - Cultural topics (Easter, Christmas, Ramadan, Diwali, Thanksgiving) relate to History, Religious Studies, Social Studies, Cultural Studies
   - Current events relate to Social Studies, Geography, Politics, Civics
   - Animals, plants, weather relate to Biology, Science, Nature Studies, Geography
@@ -46,7 +64,7 @@ Rules:
   - Sports relate to Physical Education, Biology (biomechanics), Physics (motion)
   - Cooking, nutrition relate to Chemistry, Biology, Home Economics
   - "solve 2x + 5 = 15" matches "Algebra", "Math", "Mathematics" etc.
-- When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
+- This generosity applies ONLY to genuine cross-disciplinary overlap. It is NOT a licence to attach unrelated text to whatever subject happens to be enrolled. When the choice is between a weak forced match and no match, choose no match and suggest a new subject.
 `;
 
 function inferSuggestedSubjectName(text: string): string | null {
@@ -102,6 +120,84 @@ function sanitizeLlmInput(text: string, maxLength = 500): string {
     .join('')
     .slice(0, maxLength);
   return escapeXml(stripped);
+}
+
+// Pure prompt builder for the multi-subject relevance check. Extracted so the
+// eval-llm harness (flows/subject-classify.ts) can exercise the EXACT production
+// prompt against the real LLM without a DB, mirroring the topic-intent-matcher
+// pattern (buildTopicIntentMatcherMessages). Input sanitization lives here so
+// the eval covers it too.
+export function buildSubjectClassifyMessages(
+  subjects: ReadonlyArray<{ name: string }>,
+  text: string,
+): ChatMessage[] {
+  // [PROMPT-INJECT-8] subjects.name is learner-owned text stored in DB —
+  // sanitize each entry before joining so a crafted subject name cannot
+  // inject newlines or directives into the enrolled-subject list.
+  const subjectList = subjects
+    .map((s) => `- ${sanitizeXmlValue(s.name, 200)}`)
+    .join('\n');
+  const sanitizedText = sanitizeLlmInput(text);
+  return [
+    { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `Student's enrolled subjects:\n${subjectList}\n\nText to classify:\n${sanitizedText}`,
+    },
+  ];
+}
+
+// Pure decision logic over the LLM's parsed response: applies the relatedness
+// floor (MIN_CANDIDATE_CONFIDENCE) and auto-pick bar (AUTO_PICK_CONFIDENCE) to
+// the raw matches. Extracted so production (classifySubject) and the live-eval
+// harness derive the final decision through the SAME code path — the eval can
+// never drift from the thresholds/logic it is meant to guard. This is the
+// server-side backstop for the prompt's "no match is correct" rule: an
+// unrelated forced match (water -> Statistics 0.4) is dropped here and never
+// surfaced as a pick or a disambiguation question.
+export function deriveSubjectClassifyResult(
+  parsed: {
+    matches: ReadonlyArray<{ subjectName: string; confidence?: number }>;
+    suggestedSubjectName?: string | null;
+  },
+  subjects: ReadonlyArray<{ id: string; name: string }>,
+  text: string,
+): SubjectClassifyResult {
+  const candidates = parsed.matches
+    .map((m) => {
+      const subject = subjects.find(
+        (s) => s.name.toLowerCase() === m.subjectName.toLowerCase(),
+      );
+      if (!subject) return null;
+      return {
+        subjectId: subject.id,
+        subjectName: subject.name,
+        confidence: Math.min(1, Math.max(0, Number(m.confidence) || 0)),
+      };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null)
+    .filter((c) => c.confidence >= MIN_CANDIDATE_CONFIDENCE)
+    .sort((a, b) => b.confidence - a.confidence);
+
+  const topCandidate = candidates[0];
+  // A single genuine candidate at/above AUTO_PICK_CONFIDENCE is used silently;
+  // a weaker (but still genuinely related) single candidate or 2+ candidates
+  // are surfaced for soft-confirm / "which one?" instead.
+  const needsConfirmation =
+    !topCandidate ||
+    topCandidate.confidence < AUTO_PICK_CONFIDENCE ||
+    candidates.length > 1;
+
+  return {
+    candidates,
+    needsConfirmation,
+    suggestedSubjectName:
+      typeof parsed.suggestedSubjectName === 'string'
+        ? parsed.suggestedSubjectName
+        : topCandidate
+          ? null
+          : (inferSuggestedSubjectName(text) ?? null),
+  };
 }
 
 export async function classifySubject(
@@ -175,22 +271,7 @@ export async function classifySubject(
   // silently filed under the wrong subject. The shared path respects the
   // confidence threshold and surfaces a confirmation / suggestion instead.
 
-  // [PROMPT-INJECT-8] subjects.name is learner-owned text stored in DB —
-  // sanitize each entry before joining so a crafted subject name cannot
-  // inject newlines or directives into the enrolled-subject list.
-  const subjectList = subjects
-    .map((s) => `- ${sanitizeXmlValue(s.name, 200)}`)
-    .join('\n');
-
-  const sanitizedText = sanitizeLlmInput(text);
-
-  const messages: ChatMessage[] = [
-    { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
-    {
-      role: 'user',
-      content: `Student's enrolled subjects:\n${subjectList}\n\nText to classify:\n${sanitizedText}`,
-    },
-  ];
+  const messages = buildSubjectClassifyMessages(subjects, text);
 
   try {
     // conversationLanguage not threaded: output is a fixed taxonomy slug
@@ -218,39 +299,7 @@ export async function classifySubject(
       };
     }
 
-    const parsed = parseResult.data;
-    const matches = parsed.matches;
-
-    // Map LLM matches to candidates with subjectIds
-    const candidates = matches
-      .map((m) => {
-        const subject = subjects.find(
-          (s) => s.name.toLowerCase() === m.subjectName.toLowerCase(),
-        );
-        if (!subject) return null;
-        return {
-          subjectId: subject.id,
-          subjectName: subject.name,
-          confidence: Math.min(1, Math.max(0, Number(m.confidence) || 0)),
-        };
-      })
-      .filter((c): c is NonNullable<typeof c> => c !== null)
-      .sort((a, b) => b.confidence - a.confidence);
-
-    const topCandidate = candidates[0];
-    const needsConfirmation =
-      !topCandidate || topCandidate.confidence < 0.8 || candidates.length > 1;
-
-    return {
-      candidates,
-      needsConfirmation,
-      suggestedSubjectName:
-        typeof parsed.suggestedSubjectName === 'string'
-          ? parsed.suggestedSubjectName
-          : topCandidate
-            ? null
-            : (inferSuggestedSubjectName(text) ?? null),
-    };
+    return deriveSubjectClassifyResult(parseResult.data, subjects, text);
   } catch (err) {
     // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. An empty-candidates
     // response looks identical to a genuine no-match, so we need Sentry to
