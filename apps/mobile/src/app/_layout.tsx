@@ -25,6 +25,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
 import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
 import {
+  MutationCache,
   QueryCache,
   QueryClient,
   QueryClientProvider,
@@ -100,6 +101,22 @@ const queryClient = new QueryClient({
       // isError, but ensures no failure goes unnoticed.
       Sentry.captureException(error, {
         tags: { queryKey: getSentryQueryKeyTag(query.queryKey) },
+      });
+    },
+  }),
+  // [#887] TanStack Query v5 does NOT route mutation errors through
+  // QueryCache.onError, so without a MutationCache.onError every failed
+  // mutation that a screen forgets to surface goes unreported. Mirror the
+  // query path: same Sentry-noise filter, tagged with the mutationKey.
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (!shouldReportQueryErrorToSentry(error)) {
+        return;
+      }
+      Sentry.captureException(error, {
+        tags: {
+          mutationKey: getSentryQueryKeyTag(mutation.options.mutationKey),
+        },
       });
     },
   }),
