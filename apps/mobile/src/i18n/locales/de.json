@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "{{count}} weitere Optionen"
     },
-    "empty": {
-      "title": "Gerade ist nichts zu tun",
-      "cta": "Weitere Lernoptionen durchsuchen"
-    },
     "bar": {
       "unavailable": "Der Tutor ist kurz offline. Du kannst trotzdem schreiben.",
       "cameraLabel": "Kamera",
       "placeholder": "Frage, füge ein oder beschreibe, was du lernen willst.",
       "micLabel": "Mikro",
-      "homeworkChip": "Hausaufgaben"
+      "homeworkChip": "Hausaufgaben",
+      "title": "Frag alles"
     },
     "onTrack": {
       "label": "Auf Kurs",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "Nutze die Kamera, um das Problem zu erfassen, oder tippe es hier ein.",
       "firstSessionTeach": "Ich merke mir, was du hier schreibst, damit der nächste Schritt näher bei dir beginnt."
     },
-    "title": "Mentor",
-    "subtitle": "Ein paar nützliche nächste Schritte und ein Ort, an dem du alles fragen oder festhalten kannst.",
     "fallback": {
       "cached": "Zuletzt gespeicherter Feed wird angezeigt, während wir neu verbinden.",
       "continue": "Mach da weiter, wo du aufgehört hast"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "Hilf mir, das zu lösen",
       "checkMyAnswer": "Überprüfe meine Antwort"
     },
-    "homeworkPrompt": "Hast du heute Hausaufgaben? Mach ein Foto und wir gehen sie zusammen durch."
+    "homeworkPrompt": "Hast du heute Hausaufgaben? Mach ein Foto und wir gehen sie zusammen durch.",
+    "headline": "Hol dir Hilfe bei allem"
   },
   "subjectsBrowse": {
     "title": "Fächer",

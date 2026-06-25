@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "{{count}} flere alternativer"
     },
-    "empty": {
-      "title": "Ingenting trenger deg akkurat nå",
-      "cta": "Utforsk flere læringsalternativer"
-    },
     "bar": {
       "unavailable": "Veilederen er frakoblet et øyeblikk. Du kan fortsatt skrive.",
       "cameraLabel": "Kamera",
       "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
       "micLabel": "Mikrofon",
-      "homeworkChip": "Lekser"
+      "homeworkChip": "Lekser",
+      "title": "Spør om hva som helst"
     },
     "onTrack": {
       "label": "I rute",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her.",
       "firstSessionTeach": "Jeg husker det du skriver her, slik at neste steg starter nærmere deg."
     },
-    "title": "Mentor",
-    "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",
     "fallback": {
       "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt.",
       "continue": "Fortsett der du slapp"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "Hjelp meg å løse denne",
       "checkMyAnswer": "Sjekk svaret mitt"
     },
-    "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen."
+    "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen.",
+    "headline": "Få hjelp med hva som helst"
   },
   "subjectsBrowse": {
     "title": "Emner",

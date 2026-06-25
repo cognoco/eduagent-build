@@ -3,6 +3,19 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { MentorInputBar } from './MentorInputBar';
 
 describe('MentorInputBar', () => {
+  it('renders the "Ask anything" box title', () => {
+    const { getByText } = render(
+      <MentorInputBar
+        onSubmitText={jest.fn()}
+        onOpenCamera={jest.fn()}
+        onOpenHomework={jest.fn()}
+        onTranscript={jest.fn()}
+      />,
+    );
+
+    expect(getByText('Ask anything')).toBeTruthy();
+  });
+
   it('fires camera and homework callbacks', () => {
     const onOpenCamera = jest.fn();
     const onOpenHomework = jest.fn();

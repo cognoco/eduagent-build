@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 import type { NowCard, NowDeepLink, NowResponse } from '@eduagent/schemas';
@@ -272,19 +280,20 @@ function LearnerMentorScreen(): React.ReactElement {
   }
 
   return (
-    <View className="flex-1 bg-background" testID="mentor-screen">
-      <View className="flex-1 px-5 py-4">
-        <View className="mb-4 flex-row items-center justify-between gap-3">
-          <View className="flex-1">
-            <Text className="text-h2 font-bold text-text-primary">
-              {t('mentorHome.title')}
-            </Text>
-            <Text className="mt-1 text-body-sm text-text-secondary">
-              {t('mentorHome.subtitle')}
-            </Text>
-          </View>
-          <OnTrackBadge reviewsDue={reviewsDue} />
-        </View>
+    <KeyboardAvoidingView
+      testID="mentor-screen"
+      className="flex-1 bg-background"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 16 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text className="mb-4 text-h2 font-bold text-text-primary">
+          {t('mentorHome.headline')}
+        </Text>
 
         <View className="gap-3">
           {showHomeworkPrompt ? (
@@ -299,7 +308,15 @@ function LearnerMentorScreen(): React.ReactElement {
               </Text>
             </Pressable>
           ) : null}
+
+          {/* On-track status moved out of the page header into a compact,
+              right-aligned chip directly above the feed. */}
+          <View className="flex-row justify-end">
+            <OnTrackBadge reviewsDue={reviewsDue} />
+          </View>
+
           {renderedFeed}
+
           {completionCelebration ? (
             <MentorCelebration
               eventId={completionCelebration.eventId}
@@ -309,6 +326,17 @@ function LearnerMentorScreen(): React.ReactElement {
             />
           ) : null}
           {rewardReceipt ? <RewardReceiptCard receipt={rewardReceipt} /> : null}
+
+          {/* Ask box moved up from a bottom-pinned bar into the scroll area so
+              the keyboard no longer covers it while typing. */}
+          <MentorInputBar
+            unavailable={nowFeed.isError && !feed}
+            onSubmitText={handleSubmitText}
+            onOpenCamera={() => pushMentorHomeworkCamera(router)}
+            onOpenHomework={() => pushMentorHomeworkCamera(router)}
+            onTranscript={handleSubmitText}
+          />
+
           {showLightPractice || (feed?.cards.length ?? 0) <= 1 ? (
             <LightPracticeAffordance
               reason="thin_feed"
@@ -322,15 +350,8 @@ function LearnerMentorScreen(): React.ReactElement {
             />
           ) : null}
         </View>
-      </View>
-      <MentorInputBar
-        unavailable={nowFeed.isError && !feed}
-        onSubmitText={handleSubmitText}
-        onOpenCamera={() => pushMentorHomeworkCamera(router)}
-        onOpenHomework={() => pushMentorHomeworkCamera(router)}
-        onTranscript={handleSubmitText}
-      />
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

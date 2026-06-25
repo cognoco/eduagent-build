@@ -144,16 +144,34 @@ describe('MentorScreen', () => {
     };
   });
 
-  it('renders the feed stack, on-track badge, and pinned input affordances', () => {
+  it('renders the feed stack, on-track badge, and inline ask affordances', () => {
     render(<MentorScreen />);
 
     screen.getByTestId('mentor-screen');
     screen.getByTestId('now-card-stack');
     screen.getByTestId('mentor-on-track-badge');
+    // Ask box is now inline in the scroll area (moved up from a bottom bar).
     screen.getByTestId('mentor-input-bar');
     screen.getByTestId('mentor-bar-camera');
     screen.getByTestId('mentor-bar-homework-chip');
     screen.getByTestId('mentor-bar-mic');
+  });
+
+  it('shows the ask box and light practice instead of a dead-end on an empty feed', () => {
+    // Real first state (a subject exists) but the now-feed is empty: the old
+    // build showed a "Nothing needs you / Browse" card whose tap did nothing.
+    mockSubjectsCount = 1;
+    mockNowFeed = {
+      ...mockNowFeed,
+      data: feed([]),
+    };
+
+    render(<MentorScreen />);
+
+    expect(screen.queryByTestId('now-empty-card')).toBeNull();
+    expect(screen.queryByTestId('now-card-stack')).toBeNull();
+    screen.getByTestId('mentor-input-bar');
+    screen.getByTestId('mentor-light-practice');
   });
 
   it('renders the Support hub Mentor variant without loading the Me feed', () => {

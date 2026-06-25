@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "{{count}} mais opções"
     },
-    "empty": {
-      "title": "Nada precisa de você agora",
-      "cta": "Procurar mais opções de aprendizado"
-    },
     "bar": {
       "unavailable": "O tutor está offline por um momento. Você ainda pode digitar.",
       "cameraLabel": "Câmera",
       "placeholder": "Pergunte, cole ou descreva o que você quer aprender.",
       "micLabel": "Microfone",
-      "homeworkChip": "Dever de casa"
+      "homeworkChip": "Dever de casa",
+      "title": "Pergunte qualquer coisa"
     },
     "onTrack": {
       "label": "Em dia",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "Use a câmera para capturar o problema ou digite-o aqui.",
       "firstSessionTeach": "Vou lembrar o que você escrever aqui para que o próximo passo comece mais perto de você."
     },
-    "title": "Mentor",
-    "subtitle": "Alguns próximos passos úteis, além de um lugar para perguntar ou anotar qualquer coisa.",
     "fallback": {
       "cached": "Mostrando o último feed salvo enquanto nos reconectamos.",
       "continue": "Continue de onde parou"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "Me ajude a resolver",
       "checkMyAnswer": "Verificar minha resposta"
     },
-    "homeworkPrompt": "Tem trabalho de casa para hoje? Tire uma foto e vamos resolvê-lo juntos."
+    "homeworkPrompt": "Tem trabalho de casa para hoje? Tire uma foto e vamos resolvê-lo juntos.",
+    "headline": "Peça ajuda com qualquer coisa"
   },
   "subjectsBrowse": {
     "title": "Matérias",

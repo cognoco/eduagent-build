@@ -81,22 +81,12 @@ export function NowCardStack({
   const anchor = cards[0];
   const modules = cards.slice(1, 3);
 
+  // When there is nothing actionable and no overflow, render nothing. The
+  // screen's always-present Ask box + "Prefer something light?" affordance keep
+  // it from being a dead-end — the previous "Browse more learning options" card
+  // called onShowOverflow with overflowCount === 0, so its tap did nothing.
   if (!anchor && feed.overflowCount === 0) {
-    return (
-      <Pressable
-        testID="now-empty-card"
-        accessibilityRole="button"
-        onPress={onShowOverflow}
-        className="rounded-2xl border border-border bg-surface p-4"
-      >
-        <Text className="font-bold text-text-primary">
-          {t('mentorHome.empty.title')}
-        </Text>
-        <Text className="mt-2 text-sm text-primary">
-          {t('mentorHome.empty.cta')}
-        </Text>
-      </Pressable>
-    );
+    return null;
   }
 
   return (

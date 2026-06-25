@@ -4029,16 +4029,13 @@
     "overflow": {
       "more": "Jeszcze {{count}} opcji"
     },
-    "empty": {
-      "title": "Nic nie wymaga teraz Twojej uwagi",
-      "cta": "Przeglądaj więcej opcji nauki"
-    },
     "bar": {
       "unavailable": "Tutor jest chwilowo niedostępny. Nadal możesz pisać.",
       "cameraLabel": "Aparat",
       "placeholder": "Zapytaj, wklej lub opisz, czego chcesz się nauczyć.",
       "micLabel": "Mikrofon",
-      "homeworkChip": "Praca domowa"
+      "homeworkChip": "Praca domowa",
+      "title": "Pytaj o wszystko"
     },
     "onTrack": {
       "label": "Na bieżąco",
@@ -4081,8 +4078,6 @@
       "homeworkReply": "Użyj aparatu, aby sfotografować zadanie, lub wpisz je tutaj.",
       "firstSessionTeach": "Zapamiętam to, co tu napiszesz, żeby następny krok zaczął się bliżej ciebie."
     },
-    "title": "Mentor",
-    "subtitle": "Kilka przydatnych kroków i jedno miejsce na pytania i notatki.",
     "fallback": {
       "cached": "Wyświetlanie ostatniego zapisanego kanału podczas ponownego łączenia.",
       "continue": "Kontynuuj od ostatniego miejsca"
@@ -4097,7 +4092,8 @@
       "helpMeSolve": "Pomóż mi to rozwiązać",
       "checkMyAnswer": "Sprawdź moją odpowiedź"
     },
-    "homeworkPrompt": "Masz dziś zadanie domowe? Zrób zdjęcie, a rozwiążemy je razem."
+    "homeworkPrompt": "Masz dziś zadanie domowe? Zrób zdjęcie, a rozwiążemy je razem.",
+    "headline": "Uzyskaj pomoc w każdej sprawie"
   },
   "subjectsBrowse": {
     "title": "Przedmioty",

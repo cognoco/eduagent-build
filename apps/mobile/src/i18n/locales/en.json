@@ -2912,8 +2912,7 @@
     "moreLabel": "More"
   },
   "mentorHome": {
-    "title": "Mentor",
-    "subtitle": "A few useful next steps, plus one place to ask or capture anything.",
+    "headline": "Get help with anything",
     "homeworkPrompt": "Got homework tonight? Snap a photo and we'll work through it together.",
     "fallback": {
       "cached": "Showing the last saved feed while we reconnect.",
@@ -2982,11 +2981,8 @@
     "overflow": {
       "more": "{{count}} more options"
     },
-    "empty": {
-      "title": "Nothing needs you right now",
-      "cta": "Browse more learning options"
-    },
     "bar": {
+      "title": "Ask anything",
       "unavailable": "The mentor is offline for a moment. You can still type.",
       "cameraLabel": "Camera",
       "placeholder": "Ask, paste, or describe what you want to learn.",
