@@ -21,7 +21,10 @@ function createTestApp(options?: {
 }): Hono<AnalyticsTestEnv> {
   const app = new Hono<AnalyticsTestEnv>();
   app.use('*', async (c, next) => {
-    c.set('profileId', options?.profileId ?? PROFILE_ID);
+    c.set(
+      'profileId',
+      options && 'profileId' in options ? options.profileId : PROFILE_ID,
+    );
     c.env = {
       ANALYTICS_HASH_KEY:
         options && 'analyticsHashKey' in options
@@ -60,6 +63,18 @@ describe('POST /analytics/hash-profile-id', () => {
     });
 
     expect(res.status).toBe(403);
+  });
+
+  it('rejects an unauthenticated request when no profile is resolved', async () => {
+    const app = createTestApp({ profileId: undefined });
+
+    const res = await app.request('/analytics/hash-profile-id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID }),
+    });
+
+    expect(res.status).toBe(400);
   });
 
   it('fails closed when the server-side ANALYTICS_HASH_KEY is not configured', async () => {
