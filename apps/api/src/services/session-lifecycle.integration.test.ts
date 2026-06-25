@@ -115,6 +115,10 @@ beforeAll(async () => {
   // Register mock LLM provider — the ONLY mocked external boundary
   unregisterProvider('gemini');
   registerProvider(createMockProvider('gemini'));
+  // [WI-1052] The seeded learners are under-18, now routed off Gemini to an
+  // approved provider; register one so exchanges resolve a servable config.
+  unregisterProvider('cerebras');
+  registerProvider(createMockProvider('cerebras'));
 });
 
 afterAll(async () => {
@@ -131,6 +135,7 @@ afterAll(async () => {
   // Reset in-process caches to avoid cross-test pollution
   resetSessionStaticContextCache();
   unregisterProvider('gemini');
+  unregisterProvider('cerebras'); // [WI-1052]
 });
 
 beforeEach(() => {

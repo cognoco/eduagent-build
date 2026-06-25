@@ -33,6 +33,18 @@ import type { OcrResult } from '@eduagent/schemas';
 
 beforeAll(() => {
   registerProvider(createMockProvider('gemini'));
+  // [WI-1052] The default baseContext learner is 14 (under-18), now routed OFF
+  // Gemini to an approved provider. Register one so exchange tests resolve a
+  // servable config; adult-profile tests still route to the Gemini mock above.
+  registerProvider(createMockProvider('cerebras'));
+});
+
+// [WI-1052] Restore the two-provider baseline after every test so a test that
+// registers a custom provider under either id (e.g. the inline 'cerebras'
+// response/throwing mocks) cannot leak into a later test's routing.
+afterEach(() => {
+  registerProvider(createMockProvider('gemini'));
+  registerProvider(createMockProvider('cerebras'));
 });
 
 const currentYear = new Date().getFullYear();
@@ -62,7 +74,7 @@ const baseContext: ExchangeContext = {
 
 describe('processExchange — safety tripwire wiring', () => {
   const throwingProvider: LLMProvider = {
-    id: 'gemini',
+    id: 'cerebras',
     async chat() {
       throw new Error('LLM must not be called when the safety tripwire fires');
     },
@@ -105,7 +117,7 @@ describe('processExchange — safety tripwire wiring', () => {
   it('does NOT trip on a legitimate curriculum question (LLM is used)', async () => {
     let called = false;
     const countingProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat() {
         called = true;
         return {
@@ -152,7 +164,7 @@ describe('processExchange — safety tripwire wiring', () => {
 
 describe('processExchange/streamExchange — image/vision safety tripwire (Issue 894)', () => {
   const throwingProvider: LLMProvider = {
-    id: 'gemini',
+    id: 'cerebras',
     async chat() {
       throw new Error(
         'conversational LLM must not be called when an image trips the safety floor',
@@ -226,7 +238,7 @@ describe('processExchange/streamExchange — image/vision safety tripwire (Issue
   it('does NOT trip on a benign image (OCR yields ordinary homework text → LLM is used)', async () => {
     let called = false;
     const countingProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat() {
         called = true;
         return {
@@ -1190,7 +1202,7 @@ describe('processExchange', () => {
   it('detects understanding check in response', async () => {
     // Register a provider that includes an understanding check phrase
     const checkProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return {
           content: 'Great work! Does that make sense so far?',
@@ -1220,7 +1232,7 @@ describe('processExchange', () => {
 
   it('forces learning signals off for app-help turns', async () => {
     const appHelpProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return {
           content: JSON.stringify({
@@ -1267,7 +1279,7 @@ describe('processExchange', () => {
   it('injects the app-help map only for app-help messages', async () => {
     const systemPrompts: string[] = [];
     const capturingProvider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(messages: ChatMessage[], _config: ModelConfig) {
         systemPrompts.push(String(messages[0]?.content ?? ''));
         return {
@@ -1306,7 +1318,7 @@ describe('processExchange', () => {
 
   it('answers ordinary freeform facts from 0.88+ general knowledge', async () => {
     const provider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return {
           content: JSON.stringify({
@@ -1372,11 +1384,11 @@ describe('streamExchange', () => {
     // Shape: must be async-iterable, not just truthy.
     expect(typeof result.stream[Symbol.asyncIterator]).toBe('function');
 
-    // Provider/model: the mock provider is registered as 'gemini' in the
-    // beforeAll above, so we know the routed value rather than only asserting
-    // the type. Catches the bug where the result is returned with stale or
-    // missing routing metadata.
-    expect(result.provider).toBe('gemini');
+    // Provider/model: baseContext is a 14yo (under-18), now routed OFF Gemini to
+    // the approved 'cerebras' mock registered in the beforeAll above ([WI-1052]),
+    // so we know the routed value rather than only asserting the type. Catches
+    // the bug where the result is returned with stale or missing routing metadata.
+    expect(result.provider).toBe('cerebras');
     expect(typeof result.model).toBe('string');
     expect(result.model.length).toBeGreaterThan(0);
 
@@ -1438,7 +1450,7 @@ describe('streamExchange', () => {
     // the bug — single-chunk responses do not exercise the boundary code).
     const chunkSize = 13;
     const provider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return { content: envelopeJson, stopReason: 'stop' as StopReason };
       },
@@ -1496,7 +1508,7 @@ describe('streamExchange', () => {
 describe('processExchange — readyToFinish surfacing', () => {
   it('[BUG-92] propagates signals.ready_to_finish from envelope to result', async () => {
     const provider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return {
           content: JSON.stringify({
@@ -1537,7 +1549,7 @@ describe('processExchange — readyToFinish surfacing', () => {
 
   it('[BUG-92] app-help turns force readyToFinish=false even if the model emits true', async () => {
     const provider: LLMProvider = {
-      id: 'gemini',
+      id: 'cerebras',
       async chat(_messages: ChatMessage[], _config: ModelConfig) {
         return {
           content: JSON.stringify({
@@ -3017,7 +3029,7 @@ describe('source provenance audit', () => {
       const unsupportedClaim =
         'The quadratic formula was first written down in 1545 by Cardano in his book Ars Magna.';
       const provider: LLMProvider = {
-        id: 'gemini',
+        id: 'cerebras',
         // Plain prose (not a valid envelope, no private_sources) — the model
         // returns usable text on the parse-recovery path the bug targets.
         async chat(_messages: ChatMessage[], _config: ModelConfig) {
@@ -3066,7 +3078,7 @@ describe('source provenance audit', () => {
       });
       const chunkSize = 11;
       const provider: LLMProvider = {
-        id: 'gemini',
+        id: 'cerebras',
         async chat(_messages: ChatMessage[], _config: ModelConfig) {
           return { content: envelopeJson, stopReason: 'stop' as StopReason };
         },
