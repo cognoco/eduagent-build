@@ -577,12 +577,21 @@ function approvedTextFallbackConfig(
       maxTokens: MIN_REPLY_MAX_TOKENS,
     };
   }
-  const isLight = llmTier === 'flash' || rung <= 2;
-  return {
-    provider: 'openai',
-    model: isLight ? 'gpt-4o-mini' : 'gpt-4o',
-    maxTokens: MIN_REPLY_MAX_TOKENS,
-  };
+  if (providers.has('openai')) {
+    const isLight = llmTier === 'flash' || rung <= 2;
+    return {
+      provider: 'openai',
+      model: isLight ? 'gpt-4o-mini' : 'gpt-4o',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+  // No approved text provider is registered. Returning an unservable config
+  // here would only defer the failure to routeAndCall's opaque "No provider
+  // registered for: <x>" throw — surface the misconfiguration directly instead
+  // (mirrors the Gemini guard above; never silently degrade).
+  throw new Error(
+    'approvedTextFallbackConfig: no approved text provider registered (cerebras/anthropic/openai all absent); cannot route legacy request after Gemini removal',
+  );
 }
 
 function getModelConfig(

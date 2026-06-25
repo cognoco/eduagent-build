@@ -1891,5 +1891,24 @@ describe('LLM Router', () => {
       });
       expect(preferred.provider).not.toBe('gemini');
     });
+
+    // [review SHOULD-FIX] The fallback must not hand back an unservable
+    // { provider: 'openai' } config when OpenAI is itself unregistered — that
+    // just defers the failure to routeAndCall's opaque "No provider registered
+    // for: openai" throw. On the Phase A transition path (Gemini key removed,
+    // V2 still off, only Mistral registered in dev/staging) no approved legacy
+    // text provider exists, so the fallback must surface the misconfiguration.
+    it('gemini_only policy throws a clear error when no approved provider is registered (no unservable openai config)', () => {
+      // Mistral is not a legacy text provider — none of cerebras/anthropic/openai
+      // and no gemini are registered.
+      registerProvider(createMockProvider('mistral'));
+
+      expect(() =>
+        getModelConfigForTest(4, {
+          providerPolicy: 'gemini_only',
+          llmTier: 'standard',
+        }),
+      ).toThrow(/no approved.*provider registered/i);
+    });
   });
 });
