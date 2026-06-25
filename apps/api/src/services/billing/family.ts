@@ -29,6 +29,12 @@ import { captureException } from '../sentry';
 
 const logger = createLogger();
 
+// [WI-960] Defensive upper bound for the per-account profile findMany in
+// downgradeAllFamilyProfiles. Family size is practically limited by tier
+// maxProfiles (≤6), but an explicit limit prevents unbounded scans in case of
+// data anomalies (e.g. orphaned rows from a migration bug).
+const DOWNGRADE_PROFILE_QUERY_LIMIT = 100;
+
 export type { FamilyMember } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -624,36 +630,44 @@ export async function downgradeAllFamilyProfiles(
     return [];
   }
 
+  // [WI-960] Bound the query; family size is ≤ tier maxProfiles (≤6) in
+  // normal operation. The explicit limit is a defensive guard against data
+  // anomalies (orphaned rows from a migration bug, etc.).
   const allProfiles = await db.query.profiles.findMany({
     where: eq(profiles.accountId, sub.accountId),
+    limit: DOWNGRADE_PROFILE_QUERY_LIMIT,
   });
 
-  const downgraded: string[] = [];
+  // [WI-960] Collect non-owner profiles that need downgrading, then fan out
+  // all profile-account updates and free-subscription provisions in parallel
+  // instead of awaiting each pair serially. The update and provision for a
+  // single profile are still sequential (provision depends on the new
+  // accountId existing, but ensureFreeSubscription is idempotent so the
+  // ordering is safe even under concurrent calls). Profiles without a
+  // mapping entry are silently skipped, preserving legacy behaviour.
+  const toDowngrade = allProfiles.flatMap((p) => {
+    const newAccountId = profileToAccountMap.get(p.id);
+    if (p.isOwner || !newAccountId) return [];
+    return [{ id: p.id, newAccountId }];
+  });
 
-  for (const profile of allProfiles) {
-    if (profile.isOwner) {
-      continue;
-    }
+  await Promise.all(
+    toDowngrade.map(async ({ id, newAccountId }) => {
+      // Move profile to its new account.
+      await db
+        .update(profiles)
+        .set({
+          accountId: newAccountId,
+          updatedAt: new Date(),
+        })
+        .where(eq(profiles.id, id));
 
-    const newAccountId = profileToAccountMap.get(profile.id);
-    if (!newAccountId) {
-      continue;
-    }
+      // Provision a free-tier subscription for the new account.
+      await ensureFreeSubscription(db, newAccountId);
+    }),
+  );
 
-    // Move to new account
-    await db
-      .update(profiles)
-      .set({
-        accountId: newAccountId,
-        updatedAt: new Date(),
-      })
-      .where(eq(profiles.id, profile.id));
-
-    // Provision free-tier subscription for new account
-    await ensureFreeSubscription(db, newAccountId);
-
-    downgraded.push(profile.id);
-  }
+  const downgraded = toDowngrade.map(({ id }) => id);
 
   // Downgrade the owner's subscription to free tier
   const freeTier = getTierConfig('free');
