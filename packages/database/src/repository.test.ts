@@ -856,11 +856,7 @@ describe('quizRounds.findByIdForUpdate', () => {
 
   it('returns the first row when a matching round exists', async () => {
     const roundId = 'round-1';
-    const mockRow = {
-      id: roundId,
-      profileId: TEST_PROFILE_ID,
-      status: 'active',
-    };
+    const mockRow = { id: roundId, profileId: TEST_PROFILE_ID, status: 'active' };
     const { db } = makeSelectChain([mockRow]);
     const repo = createScopedRepository(db, TEST_PROFILE_ID);
 

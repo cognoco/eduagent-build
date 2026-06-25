@@ -6,11 +6,7 @@ import {
   profiles,
   type Database,
 } from '@eduagent/database';
-import {
-  MINIMUM_AGE,
-  calculateAge,
-  isGdprProcessingAllowedBatch,
-} from './consent';
+import { MINIMUM_AGE, calculateAge, isGdprProcessingAllowedBatch } from './consent';
 
 type SelfReportWindow = {
   start: Date;
@@ -91,10 +87,7 @@ export async function listEligibleSelfReportProfileIds(
   // isGdprProcessingAllowedBatch issues a single query with the BUG-394 desc(id)
   // tiebreak and returns Map<profileId, boolean> (true = allowed, false = blocked).
   const selfManagedIds = selfManagedProfiles.map((profile) => profile.id);
-  const allowedByProfile = await isGdprProcessingAllowedBatch(
-    db,
-    selfManagedIds,
-  );
+  const allowedByProfile = await isGdprProcessingAllowedBatch(db, selfManagedIds);
 
   return selfManagedProfiles
     .filter((profile) => allowedByProfile.get(profile.id) ?? true)

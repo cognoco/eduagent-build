@@ -1793,7 +1793,9 @@ describe('getLatestGdprConsentByProfile', () => {
 
   it('preserves the real respondedAt for a CONSENTED profile (not nulled)', async () => {
     const consentedAt = new Date('2025-03-01T08:00:00.000Z');
-    const db = makeBatchDb([makeBatchRow('p1', 'CONSENTED', NOW, consentedAt)]);
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'CONSENTED', NOW, consentedAt),
+    ]);
     const result = await getLatestGdprConsentByProfile(db, ['p1']);
     expect(result.get('p1')).toEqual({
       status: 'CONSENTED',
@@ -1803,7 +1805,9 @@ describe('getLatestGdprConsentByProfile', () => {
 
   it('preserves the real respondedAt for a WITHDRAWN profile (grace-period countdown)', async () => {
     const withdrawnAt = new Date('2025-06-10T12:00:00.000Z');
-    const db = makeBatchDb([makeBatchRow('p1', 'WITHDRAWN', NOW, withdrawnAt)]);
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'WITHDRAWN', NOW, withdrawnAt),
+    ]);
     const result = await getLatestGdprConsentByProfile(db, ['p1']);
     expect(result.get('p1')).toEqual({
       status: 'WITHDRAWN',
@@ -1814,10 +1818,7 @@ describe('getLatestGdprConsentByProfile', () => {
   it('normalises an undefined respondedAt to null', async () => {
     const db = makeBatchDb([makeBatchRow('p1', 'CONSENTED', NOW, null)]);
     const result = await getLatestGdprConsentByProfile(db, ['p1']);
-    expect(result.get('p1')).toEqual({
-      status: 'CONSENTED',
-      respondedAt: null,
-    });
+    expect(result.get('p1')).toEqual({ status: 'CONSENTED', respondedAt: null });
   });
 
   it('keeps only the latest (first) row per profileId — mirrors BUG-394 ordering', async () => {
@@ -1901,12 +1902,7 @@ describe('isGdprProcessingAllowedBatch', () => {
       makeBatchRow('p2', 'WITHDRAWN'),
       makeBatchRow('p4', 'PENDING'),
     ]);
-    const result = await isGdprProcessingAllowedBatch(db, [
-      'p1',
-      'p2',
-      'p3',
-      'p4',
-    ]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1', 'p2', 'p3', 'p4']);
     expect(result.get('p1')).toBe(true);
     expect(result.get('p2')).toBe(false);
     expect(result.get('p3')).toBe(true);
@@ -1916,16 +1912,8 @@ describe('isGdprProcessingAllowedBatch', () => {
   it('uses first-row-wins dedup (latest row per profileId, mirroring BUG-394 ordering)', async () => {
     // Simulate two rows for the same profile: findMany already ordered by
     // desc(requestedAt), desc(id) — helper must keep only the first row.
-    const older = makeBatchRow(
-      'p1',
-      'CONSENTED',
-      new Date('2025-01-01T00:00:00Z'),
-    );
-    const newer = makeBatchRow(
-      'p1',
-      'WITHDRAWN',
-      new Date('2025-06-01T00:00:00Z'),
-    );
+    const older = makeBatchRow('p1', 'CONSENTED', new Date('2025-01-01T00:00:00Z'));
+    const newer = makeBatchRow('p1', 'WITHDRAWN', new Date('2025-06-01T00:00:00Z'));
     // findMany returns them ordered newest-first (as the real DB would).
     const db = makeBatchDb([newer, older]);
     const result = await isGdprProcessingAllowedBatch(db, ['p1']);
