@@ -30,7 +30,6 @@ import {
   classifyApiError,
   formatApiError,
 } from '../../../../lib/format-api-error';
-import { copyRegisterFor } from '../../../../lib/copy-register';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 
 function StatCard({
@@ -55,7 +54,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const navigationContract = useNavigationContract();
   const canWrite = !navigationContract.isParentProxy;
   const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
+  const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { subjectId, returnTo } = useLocalSearchParams<{

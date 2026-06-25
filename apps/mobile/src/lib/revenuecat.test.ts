@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Purchases from 'react-native-purchases';
 import { configureRevenueCat, getRevenueCatApiKey } from './revenuecat';
+import { Sentry } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Mock react-native-purchases
@@ -79,13 +80,16 @@ describe('getRevenueCatApiKey', () => {
 
 describe('configureRevenueCat', () => {
   const originalPlatformOS = Platform.OS;
+  const originalDev = (global as { __DEV__?: boolean }).__DEV__;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (global as { __DEV__?: boolean }).__DEV__ = originalDev;
   });
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: originalPlatformOS });
+    (global as { __DEV__?: boolean }).__DEV__ = originalDev;
     delete process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS;
     delete process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
   });
@@ -113,6 +117,23 @@ describe('configureRevenueCat', () => {
 
     configureRevenueCat();
 
+    expect(Purchases.configure).not.toHaveBeenCalled();
+    expect(Purchases.setLogLevel).not.toHaveBeenCalled();
+  });
+
+  it('captures missing native API key to Sentry in production', () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios' });
+    (global as { __DEV__?: boolean }).__DEV__ = false;
+
+    configureRevenueCat();
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        component: 'revenuecat',
+        platform: 'ios',
+        reason: 'missing_api_key',
+      },
+    });
     expect(Purchases.configure).not.toHaveBeenCalled();
     expect(Purchases.setLogLevel).not.toHaveBeenCalled();
   });

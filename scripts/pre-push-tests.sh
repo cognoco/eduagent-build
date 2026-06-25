@@ -10,6 +10,12 @@
 #   2. jest --findRelatedTests per project on the delta
 #   3. Change-class-specific fast checks (eval:llm, check:i18n)
 #
+# Database secrets: this pre-push hook intentionally does not wrap commands in
+# Doppler. It ignores *.integration.test.* files; any local command that needs
+# a real DATABASE_URL must be invoked by the caller with DATABASE_URL already in
+# env, `doppler run -- ...`, or the @eduagent/test-utils resolver
+# (DOPPLER_CLI override, PATH lookup, then platform install-path candidates).
+#
 # What pre-commit already covers (not duplicated here):
 #   - Per-file lint (ESLint + Prettier via lint-staged)
 #   - GC1 ratchet, eval snapshot guard, i18n staleness guard
