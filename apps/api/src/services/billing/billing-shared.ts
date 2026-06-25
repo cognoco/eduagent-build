@@ -13,11 +13,11 @@
 // ---------------------------------------------------------------------------
 
 import type { profileQuotaUsage } from '@eduagent/database';
-import type { SubscriptionTier } from '@eduagent/schemas';
+import type { ProfileQuotaRole, SubscriptionTier } from '@eduagent/schemas';
 
 import { getTierConfig } from '../subscription';
 
-export type ProfileQuotaRole = 'owner' | 'child';
+export type { ProfileQuotaRole } from '@eduagent/schemas';
 
 export interface ProfileQuotaUsageSnapshot {
   id: string;
