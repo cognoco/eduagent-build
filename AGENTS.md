@@ -344,11 +344,15 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 - **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
 
+- **`@clerk/clerk-js` ships `@coinbase/wallet-sdk` + `@solana/*` into `node_modules`, but they never reach the device bundle** — clerk-js `dist` is PRE-BUNDLED (no `require()` of those packages), so Metro never traverses them; install-footprint only, zero device-bundle impact (verified WI-1040). Not removable via pnpm config: they are real `dependencies` of clerk-js, not missing optional peers, so `pnpm.peerDependencyRules.ignoreMissing` does not apply. An upstream issue against `@clerk/clerk-expo` for a no-web3 entrypoint is the only real mitigation; do not attempt to strip them locally.
+- **The global unscoped `@tanstack/query-core` pin in root `package.json` `pnpm.overrides` is load-bearing**, not hygiene debt — it dedupes query-core to one version across `@clerk/shared` (declares `5.87.4`) and the `@tanstack/*` consumers (react-query, query-async-storage-persister, query-persist-client-core). Scoping it to the react-query edge (`@tanstack/react-query>@tanstack/query-core`) regresses to 3 separate query-core versions in the tree (verified WI-1043). Keep it global, and bump its version **in lockstep** whenever `@tanstack/react-query` is bumped.
+
 ## Schema And Deploy Safety
 
 - Dev schema iteration can use `drizzle-kit push`.
 - Staging and production must use committed migration SQL plus `drizzle-kit migrate`.
 - Never run `drizzle-kit push` against staging or production.
+- Applied migrations are immutable. CI fails any PR that Modifies, Deletes, or Renames an existing `apps/api/drizzle/NNNN_*.sql` (the `Migration immutability guard (BUG-886)` step in `ci.yml` → `scripts/check-migration-immutability.ts`) — editing an applied migration re-runs its DDL on the next `drizzle-kit migrate` and drifts the schema (the 2026-05 staging-ledger-drift root cause). Write a NEW forward migration instead; a genuinely exceptional change (e.g. a branch-sync renumber) is allowlisted with a reason in `scripts/migration-immutability-allowlist.json`.
 - A worker deploy does not migrate Neon. Apply the target migration before shipping code that reads new columns.
 - Keep staging and production database credentials separate in CI. Never let staging deploys point at production data.
 - Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying whether rollback is possible, what data is lost, and the recovery procedure. If rollback is impossible, say so explicitly.

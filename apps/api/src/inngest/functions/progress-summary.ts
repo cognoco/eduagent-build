@@ -20,6 +20,7 @@ import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
 import { getGuardianPersonIds } from '../../services/identity-v2/guardianship';
 import { captureException } from '../../services/sentry';
+import { NonRetriableError } from 'inngest';
 
 export const progressSummaryGeneration = inngest.createFunction(
   {
@@ -33,6 +34,23 @@ export const progressSummaryGeneration = inngest.createFunction(
   },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
+    // Validate that profileId and sessionId are non-empty strings before
+    // any data access. The AC classifies progress-summary as a lower-risk
+    // consumer (conservative if-guards protect against most bad values), so we
+    // enforce only the minimum gate: profileId and sessionId must be strings.
+    // Full schema validation lives in session-completed.ts (the primary consumer).
+    // Using NonRetriableError here prevents retry loops on structurally invalid
+    // events (e.g. missing ids) — the existing if-guard below handles falsy values
+    // via a soft skip, which is the correct fallback for in-flight legacy events.
+    if (
+      typeof event.data.profileId !== 'string' ||
+      typeof event.data.sessionId !== 'string'
+    ) {
+      throw new NonRetriableError(
+        '[progress-summary] Invalid event payload: profileId and sessionId must be strings',
+      );
+    }
+
     const profileId = event.data.profileId;
     const sessionId = event.data.sessionId;
     if (!profileId || !sessionId) {

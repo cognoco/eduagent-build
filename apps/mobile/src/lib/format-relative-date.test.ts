@@ -167,4 +167,11 @@ describe('formatRelativeDate / formatMinutes', () => {
     expect(formatMinutes(130)).toBe('2h 10m');
     expect(formatMinutes(240)).toBe('4h');
   });
+
+  it('[#899] formatMinutes clamps negative / NaN input to "0 min"', () => {
+    expect(formatMinutes(-5)).toBe('0 min');
+    expect(formatMinutes(NaN)).toBe('0 min');
+    expect(formatMinutes(0)).toBe('0 min');
+    expect(formatMinutes(Infinity)).toBe('0 min');
+  });
 });

@@ -721,6 +721,12 @@ export const subjectResponseSchema = z.object({
 });
 export type SubjectResponse = z.infer<typeof subjectResponseSchema>;
 
+// GET /subjects — query param schema
+export const subjectListQuerySchema = z.object({
+  includeInactive: z.enum(['true', 'false']).optional(),
+});
+export type SubjectListQuery = z.infer<typeof subjectListQuerySchema>;
+
 export const subjectListResponseSchema = z.object({
   subjects: z.array(subjectSchema),
 });

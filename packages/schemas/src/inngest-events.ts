@@ -513,3 +513,58 @@ export const snapshotRefreshEventSchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type SnapshotRefreshEvent = z.infer<typeof snapshotRefreshEventSchema>;
+
+// ---------------------------------------------------------------------------
+// app/session.completed — trigger event schema
+//
+// Models BOTH dispatch shapes:
+//   (a) Primary path (session-filing-dispatch.ts) — sends all fields.
+//   (b) Auto-close path (session-stale-cleanup.ts) — omits mode,
+//       escalationRungs, exchangeCount, qualityRating; always sends
+//       summaryStatus='auto_closed' + reason='silence_timeout'.
+//
+// safeParse at consumers (session-completed.ts, progress-summary.ts) throws
+// NonRetriableError on parse failure so malformed payloads dead-letter
+// immediately instead of silently coercing values.
+//
+// PII egress: no transcript content — payload carries only opaque ids,
+// numeric scalars, and timestamps. Inngest persists event payloads in its
+// third-party event store; transcripts are rehydrated from first-party DB.
+// ---------------------------------------------------------------------------
+export const sessionCompletedEventSchema = z.object({
+  profileId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  topicId: z.string().uuid().nullable().optional(),
+  subjectId: z.string().uuid().nullable().optional(),
+  sessionType: z.string().nullable().optional(),
+  verificationType: z.string().nullable().optional(),
+  /** Present on primary path; absent on auto_closed (stale-cleanup) path. */
+  mode: z.string().optional(),
+  /** Topic ids for interleaved sessions — UUIDs in production; kept as
+   *  z.string() (not .uuid()) for backward compatibility with in-flight events
+   *  and unit-test fixtures that use short string identifiers. */
+  interleavedTopicIds: z.array(z.string()).optional(),
+  /** Present on primary path; absent on auto_closed path. */
+  escalationRungs: z.array(z.number().int()).optional(),
+  /** May be absent on auto_closed path; re-read from DB by consumer when null. */
+  exchangeCount: z.number().int().nonnegative().optional(),
+  /** qualityRating — must be a number when present. Highest-risk field:
+   *  a non-numeric value (e.g. string 'bad') would silently corrupt SM-2
+   *  scheduling. The business-logic clamp to [0, 5] lives in the consumer
+   *  (vocabulary service); the schema gate enforces the type only. */
+  qualityRating: z.number().optional(),
+  summaryStatus: z.enum([
+    'pending',
+    'submitted',
+    'accepted',
+    'skipped',
+    'auto_closed',
+  ]),
+  /** reason — controls isUnattended flag; must be a string when present. */
+  reason: z.string().optional(),
+  // isoDateField — neon-serverless may return raw Date; union handles both.
+  // Optional: auto-closed path sends timestamp but some legacy in-flight events
+  // may omit it; consumers fall back to new Date() when absent.
+  timestamp: isoDateField.optional(),
+});
+export type SessionCompletedEvent = z.infer<typeof sessionCompletedEventSchema>;

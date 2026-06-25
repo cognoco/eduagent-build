@@ -222,6 +222,31 @@ describe('OpenAI Provider', () => {
         'OpenAI returned empty response',
       );
     });
+
+    // [WI-984] Regression: unexpected provider response shape (e.g. null JSON body)
+    // must throw a typed provider error, not a TypeError crash on property access.
+    // null JSON → old code: TypeError("Cannot read properties of null");
+    //             new code: createProviderApiError → "OpenAI API error [invalid_response_shape]"
+    it('[WI-984] throws a typed provider error (not TypeError) when JSON body is null', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => null,
+      });
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(TEST_MESSAGES, TEST_CONFIG);
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      // Must be a typed provider error (from createProviderApiError), not a raw TypeError.
+      expect((caughtError as Error).message).toContain('OpenAI API');
+      // Must NOT be a raw runtime TypeError from undefined field access.
+      expect(caughtError).not.toBeInstanceOf(TypeError);
+    });
   });
 
   describe('chatStream()', () => {

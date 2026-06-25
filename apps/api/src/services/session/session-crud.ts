@@ -8,11 +8,14 @@ import {
   asc,
   desc,
   gte,
+  gt,
   isNull,
   inArray,
   isNotNull,
   lt,
+  or,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -1234,70 +1237,109 @@ export interface StaleSessionCloseBatch {
   failures: StaleSessionCloseFailure[];
 }
 
+// [WI-958] Page size for the stale-session close scan. Mirrors the 500-row
+// limit used by the sibling filing-stranded-backfill job. Callers may pass a
+// smaller limit for testing the pagination path.
+export const CLOSE_STALE_SESSIONS_PAGE_SIZE = 500;
+
+// Composite (lastActivityAt, id) cursor for stable pagination when multiple
+// sessions share the same lastActivityAt timestamp.
+interface StaleSessionCursor {
+  lastActivityAt: Date;
+  lastId: string;
+}
+
 export async function closeStaleSessions(
   db: Database,
   cutoff: Date,
+  pageSize: number = CLOSE_STALE_SESSIONS_PAGE_SIZE,
 ): Promise<StaleSessionCloseBatch> {
-  // Intentional cross-profile batch query: this cron scans all active sessions
-  // and closes only those stale beyond the cutoff, so scoped-repo access does
-  // not apply here.
-  const staleSessions = await db.query.learningSessions.findMany({
-    where: and(
-      eq(learningSessions.status, 'active'),
-      lt(learningSessions.lastActivityAt, cutoff),
-    ),
-  });
-
+  // [WI-958] Bounded cursor-paginated scan: instead of loading the entire
+  // cross-profile backlog at once (unbounded memory + O(N) serial round-trips),
+  // process stale active sessions in pages of `pageSize`, advancing via a
+  // composite (lastActivityAt, id) cursor — mirroring the filing-stranded-backfill
+  // sibling. Intentional cross-profile batch: scoped-repo access does not apply.
   const results: StaleSessionCloseResult[] = [];
   const failures: StaleSessionCloseFailure[] = [];
 
-  for (const staleSession of staleSessions) {
-    // [BUG] Per-session error isolation: a single throwing close must not
-    // abort the whole backlog. Without this try/catch, every stale session
-    // AFTER the failing one stays status='active' until the next cron run.
-    // On failure we escalate via Sentry (silent recovery is banned) and
-    // continue, surfacing the failure in the returned batch's `failures`
-    // channel so the cron's outcome is observable.
-    try {
-      const result = await closeSession(
-        db,
-        staleSession.profileId,
-        staleSession.id,
-        {
-          reason: 'silence_timeout',
-          summaryStatus: 'auto_closed',
-        },
-      );
+  let cursor: StaleSessionCursor | null = null;
 
-      // BD-05: Skip sessions that were resumed between read and write
-      if (result.message === 'Session already closed or resumed') {
-        continue;
-      }
+  for (;;) {
+    const cursorFilter: SQL<unknown> | undefined = cursor
+      ? or(
+          gt(learningSessions.lastActivityAt, cursor.lastActivityAt),
+          and(
+            eq(learningSessions.lastActivityAt, cursor.lastActivityAt),
+            gt(learningSessions.id, cursor.lastId),
+          ),
+        )
+      : undefined;
 
-      results.push({
-        profileId: staleSession.profileId,
-        ...result,
+    const page: (typeof learningSessions.$inferSelect)[] =
+      await db.query.learningSessions.findMany({
+        where: and(
+          eq(learningSessions.status, 'active'),
+          lt(learningSessions.lastActivityAt, cutoff),
+          cursorFilter,
+        ),
+        orderBy: [
+          asc(learningSessions.lastActivityAt),
+          asc(learningSessions.id),
+        ],
+        limit: pageSize,
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error('closeStaleSessions: failed to close a stale session', {
-        profileId: staleSession.profileId,
-        sessionId: staleSession.id,
-        error: message,
-      });
-      captureException(error, {
-        tags: { area: 'session-stale-cleanup' },
-        extra: {
+
+    for (const staleSession of page) {
+      // Per-session error isolation: a single throwing close must not abort
+      // the whole backlog. On failure we escalate via Sentry (silent recovery
+      // is banned) and continue, surfacing the failure in `failures`.
+      try {
+        const result = await closeSession(
+          db,
+          staleSession.profileId,
+          staleSession.id,
+          {
+            reason: 'silence_timeout',
+            summaryStatus: 'auto_closed',
+          },
+        );
+
+        // BD-05: Skip sessions that were resumed between read and write
+        if (result.message === 'Session already closed or resumed') {
+          continue;
+        }
+
+        results.push({
+          profileId: staleSession.profileId,
+          ...result,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error('closeStaleSessions: failed to close a stale session', {
           profileId: staleSession.profileId,
           sessionId: staleSession.id,
-        },
-      });
-      failures.push({
-        profileId: staleSession.profileId,
-        sessionId: staleSession.id,
-        error: message,
-      });
+          error: message,
+        });
+        captureException(error, {
+          tags: { area: 'session-stale-cleanup' },
+          extra: {
+            profileId: staleSession.profileId,
+            sessionId: staleSession.id,
+          },
+        });
+        failures.push({
+          profileId: staleSession.profileId,
+          sessionId: staleSession.id,
+          error: message,
+        });
+      }
     }
+
+    // Advance cursor to last row. If the page was smaller than the limit,
+    // we have exhausted all stale sessions.
+    if (page.length < pageSize) break;
+    const last: typeof learningSessions.$inferSelect = page[page.length - 1]!;
+    cursor = { lastActivityAt: last.lastActivityAt, lastId: last.id };
   }
 
   // Return a plain object so `failures` survives the Inngest step.run JSON

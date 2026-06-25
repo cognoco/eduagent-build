@@ -102,6 +102,31 @@ describe('Cerebras Provider', () => {
     expect((caught as Error).message).not.toContain('Rate limited');
   });
 
+  // [WI-984] Regression: unexpected provider response shape (e.g. null JSON body)
+  // must throw a typed provider error, not a TypeError crash on property access.
+  // null JSON → old code: TypeError("Cannot read properties of null");
+  //             new code: createProviderApiError → "Cerebras API error [invalid_response_shape]"
+  it('[WI-984] throws a typed provider error (not TypeError) when JSON body is null', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => null,
+    });
+
+    let caught: unknown;
+    try {
+      await provider.chat(MESSAGES, CFG);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    // Must be a typed provider error (from createProviderApiError), not a raw TypeError.
+    expect((caught as Error).message).toContain('Cerebras API');
+    // Must NOT be a raw runtime TypeError from undefined field access.
+    expect(caught).not.toBeInstanceOf(TypeError);
+  });
+
   describe('chatStream()', () => {
     function sse(...events: string[]): ReadableStream<Uint8Array> {
       const encoder = new TextEncoder();

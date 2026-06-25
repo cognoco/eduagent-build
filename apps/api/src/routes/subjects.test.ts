@@ -209,6 +209,18 @@ describe('GET /v1/subjects', () => {
 
     expect(res.status).toBe(500);
   });
+
+  it('[WI-991] returns 400 when includeInactive query param has an invalid value', async () => {
+    const res = await makeApp().request(
+      '/v1/subjects?includeInactive=notabool',
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('[WI-991] returns 400 when includeInactive query param is an arbitrary string', async () => {
+    const res = await makeApp().request('/v1/subjects?includeInactive=yes');
+    expect(res.status).toBe(400);
+  });
 });
 
 // ---------------------------------------------------------------------------

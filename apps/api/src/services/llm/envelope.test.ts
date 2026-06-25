@@ -204,6 +204,15 @@ describe('parseEnvelope', () => {
       const input = 'No backslash sequences here.';
       expect(normalizeReplyText(input)).toBe(input);
     });
+
+    it('[#899] preserves a standalone literal `\\r`, only collapsing the `\\r\\n` pair', () => {
+      // A coding lesson that mentions the \r escape must survive intact; only a
+      // genuine CRLF pair is a real line break.
+      expect(normalizeReplyText('The \\r escape returns the cursor.')).toBe(
+        'The \\r escape returns the cursor.',
+      );
+      expect(normalizeReplyText('Line1\\r\\nLine2')).toBe('Line1\nLine2');
+    });
   });
 
   describe('stripEmbeddedEnvelopeTail', () => {

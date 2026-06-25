@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { SubjectResolveResult } from '@eduagent/schemas';
 import { routeAndCall, extractFirstJsonObject } from './llm';
 import type { ChatMessage } from './llm';
@@ -99,7 +100,26 @@ export async function resolveSubjectName(
     // [BUG-461] brace-depth walker replaces greedy regex
     const jsonStr = extractFirstJsonObject(result.response);
     if (jsonStr) {
-      const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+      const subjectResolveLlmSchema = z
+        .object({
+          status: z.unknown().optional(),
+          resolvedName: z.unknown().optional(),
+          focus: z.unknown().optional(),
+          focusDescription: z.unknown().optional(),
+          suggestions: z.unknown().optional(),
+          displayMessage: z.unknown().optional(),
+        })
+        .passthrough();
+      const envelope = subjectResolveLlmSchema.safeParse(JSON.parse(jsonStr));
+      if (!envelope.success) {
+        return {
+          status: 'no_match',
+          resolvedName: null,
+          suggestions: [],
+          displayMessage: '',
+        };
+      }
+      const parsed = envelope.data;
       const status = parseStatus(parsed.status);
       const suggestions = parseSuggestions(parsed.suggestions);
       const detectedLanguage = detectLanguageHint(

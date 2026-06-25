@@ -32,10 +32,24 @@ export const nowDeepLinkSchema = z.object({
 });
 export type NowDeepLink = z.infer<typeof nowDeepLinkSchema>;
 
+// Typed card params — routing-relevant UUID fields (from ROUTE_CATALOG) are
+// validated; non-routing display fields (subjectName, topicTitle, etc.) pass
+// through via the z.record base.
+// open-record: base for display fields not part of deep-link routing
+export const nowCardParamsSchema = z.record(z.string(), z.unknown()).and(
+  z.object({
+    sessionId: z.string().uuid().optional(),
+    subjectId: z.string().uuid().optional(),
+    bookId: z.string().uuid().optional(),
+    topicId: z.string().uuid().optional(),
+  }),
+);
+export type NowCardParams = z.infer<typeof nowCardParamsSchema>;
+
 export const nowCardSchema = z.object({
   kind: nowCardKindSchema,
   templateKey: z.string(),
-  params: z.record(z.string(), z.unknown()),
+  params: nowCardParamsSchema,
   deepLink: nowDeepLinkSchema,
   scope: nowScopeSchema,
   personId: z.string().uuid().optional(),
@@ -46,7 +60,7 @@ export type NowCard = z.infer<typeof nowCardSchema>;
 export const nowOverflowItemSchema = z.object({
   kind: nowCardKindSchema,
   templateKey: z.string(),
-  params: z.record(z.string(), z.unknown()),
+  params: nowCardParamsSchema,
   deepLink: nowDeepLinkSchema,
   scope: nowScopeSchema,
   personId: z.string().uuid().optional(),

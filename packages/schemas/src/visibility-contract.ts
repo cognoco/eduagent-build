@@ -70,6 +70,7 @@ export const reportableFactSchema = z.object({
   detail: z.string().max(1000).optional(),
   occurredAt: isoDateField.optional(),
   source: z.string().min(1).max(64),
+  // open-record: heterogeneous fact metadata — intentionally kept open
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type ReportableFact = z.infer<typeof reportableFactSchema>;
@@ -121,6 +122,33 @@ export const revocationNoticeSchema = z.object({
 });
 export type RevocationNotice = z.infer<typeof revocationNoticeSchema>;
 
+// Typed payloads per visibility notice type — two-variant union replacing the
+// open z.record on visibilityMomentSchema.payload. The payload does NOT carry
+// a `type` field at runtime (the outer moment's `type` discriminates); each
+// variant is identified by its typed shape. Each schema mirrors its sole
+// producer field-for-field:
+//   support_link_ended → apps/api/src/inngest/functions/supportership-revocation.ts
+//   graduation_contract_restamped → apps/api/src/services/graduation-narration.ts
+export const supportLinkEndedPayloadSchema = z.object({
+  supporteePersonId: z.string().uuid(),
+  revokedAt: isoDateField,
+  // SUPPORTERSHIP_GRACE_DAYS is a non-negative integer day count (currently 7),
+  // NOT an ISO date — the producer stores the day count, not a resolved deadline.
+  graceDays: z.number().int().nonnegative(),
+});
+export const graduationContractRestampedPayloadSchema = z.object({
+  supporterPersonId: z.string().uuid(),
+  occurredAt: isoDateField,
+  contractVersion: z.number().int().positive(),
+});
+export const visibilityMomentPayloadSchema = z.union([
+  supportLinkEndedPayloadSchema,
+  graduationContractRestampedPayloadSchema,
+]);
+export type VisibilityMomentPayload = z.infer<
+  typeof visibilityMomentPayloadSchema
+>;
+
 export const visibilityMomentSchema = z.object({
   id: z.string().min(1),
   type: visibilityNoticeTypeSchema,
@@ -129,7 +157,7 @@ export const visibilityMomentSchema = z.object({
   targetPersonId: z.string().uuid(),
   createdAt: isoDateField,
   acknowledgedAt: isoDateField.nullable(),
-  payload: z.record(z.string(), z.unknown()),
+  payload: visibilityMomentPayloadSchema,
 });
 export type VisibilityMoment = z.infer<typeof visibilityMomentSchema>;
 

@@ -260,6 +260,89 @@ describe('parseHomeworkSummaryResponse — [BUG-479] extractFirstJsonObject', ()
   });
 });
 
+// [WI-993] The cast `JSON.parse(jsonStr) as Partial<HomeworkSummary>` was
+// replaced with a lenient Zod `safeParse` + per-field merge. The schema only
+// guards that the JSON is an object with well-typed fields; the original
+// per-field graceful-degradation semantics are PRESERVED (each valid field is
+// kept, each missing/invalid one falls back). These tests pin that behavior.
+describe('[WI-993] parseHomeworkSummaryResponse — lenient parse preserves per-field degradation', () => {
+  const fallback = {
+    problemCount: 0,
+    practicedSkills: [],
+    independentProblemCount: 0,
+    guidedProblemCount: 0,
+    summary: 'Fallback summary.',
+    displayTitle: 'Fallback Title',
+  };
+
+  it('keeps a negative problemCount (any finite number is accepted, matching the original typeof guard)', () => {
+    const response = JSON.stringify({
+      problemCount: -5,
+      practicedSkills: ['algebra'],
+      independentProblemCount: 0,
+      guidedProblemCount: 0,
+      summary: 'Session complete.',
+      displayTitle: 'Algebra Homework',
+    });
+    const result = parseHomeworkSummaryResponse(response, fallback);
+    // Original behavior: -5 passes `typeof x === 'number'` and is kept verbatim.
+    expect(result.problemCount).toBe(-5);
+    // And the rest of the (valid) fields are kept too — not dropped to fallback.
+    expect(result.summary).toBe('Session complete.');
+    expect(result.displayTitle).toBe('Algebra Homework');
+  });
+
+  it('falls back ONLY for the empty summary, keeping every other valid field (per-field, not all-or-nothing)', () => {
+    const response = JSON.stringify({
+      problemCount: 2,
+      practicedSkills: ['fractions'],
+      independentProblemCount: 1,
+      guidedProblemCount: 1,
+      summary: '',
+      displayTitle: 'Homework',
+    });
+    const result = parseHomeworkSummaryResponse(response, fallback);
+    // Empty summary → original trimmed-and-`length > 0` guard substitutes fallback.
+    expect(result.summary).toBe('Fallback summary.');
+    // But the other good fields are preserved (all-or-nothing would have dropped these).
+    expect(result.problemCount).toBe(2);
+    expect(result.practicedSkills).toEqual(['fractions']);
+    expect(result.independentProblemCount).toBe(1);
+    expect(result.guidedProblemCount).toBe(1);
+    expect(result.displayTitle).toBe('Homework');
+  });
+
+  it('substitutes fallback for a single invalid numeric field while keeping the rest (per-field merge)', () => {
+    const response = JSON.stringify({
+      problemCount: 'not-a-number',
+      practicedSkills: ['geometry'],
+      independentProblemCount: 3,
+      guidedProblemCount: 1,
+      summary: 'Worked through proofs.',
+      displayTitle: 'Geometry Homework',
+    });
+    const result = parseHomeworkSummaryResponse(response, fallback);
+    // Bad problemCount → fallback (0), but the summary and other fields survive.
+    expect(result.problemCount).toBe(0);
+    expect(result.summary).toBe('Worked through proofs.');
+    expect(result.independentProblemCount).toBe(3);
+  });
+
+  // Red-green proof for the safe-parse fix: a non-object JSON (e.g. a bare
+  // string or array) must return the fallback. The old
+  // `JSON.parse(jsonStr) as Partial<HomeworkSummary>` cast would treat the
+  // parsed value as an object and read `.problemCount` etc. off it — on a
+  // string that silently yields all-fallback by luck, but on an array it would
+  // mis-handle; the lenient schema makes "must be an object" explicit.
+  it('returns the full fallback when the parsed JSON is not an object', () => {
+    const result = parseHomeworkSummaryResponse(
+      JSON.stringify(['unexpected', 'array']),
+      fallback,
+    );
+    expect(result).toEqual(fallback);
+  });
+});
+
 describe('extractHomeworkSummary', () => {
   beforeEach(() => {
     jest.clearAllMocks();

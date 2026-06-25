@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   celebrationSeenSchema,
+  pendingCelebrationsQuerySchema,
   pendingCelebrationsResponseSchema,
   celebrationSeenResponseSchema,
 } from '@eduagent/schemas';
@@ -26,31 +27,36 @@ type CelebrationRouteEnv = {
 };
 
 export const celebrationRoutes = new Hono<CelebrationRouteEnv>()
-  .get('/celebrations/pending', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const viewer = c.req.query('viewer') === 'parent' ? 'parent' : 'child';
-    const celebrations = await getPendingCelebrations(db, profileId, viewer);
+  .get(
+    '/celebrations/pending',
+    zValidator('query', pendingCelebrationsQuerySchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { viewer: rawViewer } = c.req.valid('query');
+      const viewer = rawViewer === 'parent' ? 'parent' : 'child';
+      const celebrations = await getPendingCelebrations(db, profileId, viewer);
 
-    if (viewer === 'parent') {
+      if (viewer === 'parent') {
+        return c.json(
+          pendingCelebrationsResponseSchema.parse({
+            pendingCelebrations: celebrations,
+          }),
+        );
+      }
+
+      const celebrationLevel = await getCelebrationLevel(db, profileId);
+
       return c.json(
         pendingCelebrationsResponseSchema.parse({
-          pendingCelebrations: celebrations,
+          pendingCelebrations: filterCelebrationsByLevel(
+            celebrations,
+            celebrationLevel,
+          ),
         }),
       );
-    }
-
-    const celebrationLevel = await getCelebrationLevel(db, profileId);
-
-    return c.json(
-      pendingCelebrationsResponseSchema.parse({
-        pendingCelebrations: filterCelebrationsByLevel(
-          celebrations,
-          celebrationLevel,
-        ),
-      }),
-    );
-  })
+    },
+  )
   .post(
     '/celebrations/seen',
     zValidator('json', celebrationSeenSchema),

@@ -1565,6 +1565,62 @@ describe('refreshProgressSnapshot', () => {
     expect(detectMilestones).not.toHaveBeenCalled();
     expect(storeMilestones).not.toHaveBeenCalled();
   });
+
+  // -------------------------------------------------------------------------
+  // [WI-962] previousSnapshotForToday and computeProgressMetrics run in parallel
+  // -------------------------------------------------------------------------
+
+  it('[WI-962] previousSnapshotForToday and computeProgressMetrics fan out in parallel', async () => {
+    // THE KEY GUARD: before the fix, refreshProgressSnapshot awaited
+    // previousSnapshotForToday (which calls db.query.progressSnapshots.findFirst)
+    // BEFORE calling computeProgressMetrics (which calls db.query.subjects.findMany).
+    // With Promise.all both are fired simultaneously.
+    //
+    // Strategy: defer progressSnapshots.findFirst by one microtask tick; track
+    // call order. Serial: 'findFirst-start', 'findFirst-done', 'subjects-start'.
+    // Parallel: 'findFirst-start', 'subjects-start', 'findFirst-done'.
+    // Assert: subjects.findMany is called BEFORE progressSnapshots.findFirst resolves.
+    jest.useRealTimers();
+
+    const callOrder: string[] = [];
+
+    const db = createSnapshotDb({ findFirst: undefined });
+
+    // Override progressSnapshots.findFirst to defer by one microtask.
+    // Cast to jest.Mock (not MockedFunction<typeof ...>) because the
+    // implementation returns a plain Promise while Drizzle's PgRelationalQuery
+    // carries extra properties — at runtime only the Promise matters.
+    (db.query.progressSnapshots.findFirst as jest.Mock).mockImplementation(
+      async () => {
+        callOrder.push('findFirst-start');
+        // Yield to the event loop so the subjects.findMany call can fire.
+        await new Promise<void>((resolve) => resolve());
+        callOrder.push('findFirst-done');
+        return undefined; // previousSnapshotForToday returns null → no previous metrics
+      },
+    );
+
+    // Override subjects.findMany to track when it is called.
+    (db.query.subjects.findMany as jest.Mock).mockImplementation(async () => {
+      callOrder.push('subjects-start');
+      return [];
+    });
+
+    await refreshProgressSnapshot(db, profileId);
+
+    const findFirstStart = callOrder.indexOf('findFirst-start');
+    const findFirstDone = callOrder.indexOf('findFirst-done');
+    const subjectsStart = callOrder.indexOf('subjects-start');
+
+    expect(findFirstStart).toBeGreaterThanOrEqual(0);
+    expect(findFirstDone).toBeGreaterThanOrEqual(0);
+    expect(subjectsStart).toBeGreaterThanOrEqual(0);
+
+    // With PARALLEL fan-out, subjects.findMany fires while progressSnapshots.findFirst
+    // is still waiting for its microtask. Reverting to the serial `await` would
+    // make findFirstDone < subjectsStart, failing this assertion.
+    expect(subjectsStart).toBeLessThan(findFirstDone);
+  });
 });
 
 describe('buildSubjectMetric mastery', () => {

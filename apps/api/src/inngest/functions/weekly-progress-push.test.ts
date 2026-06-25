@@ -1411,3 +1411,99 @@ describe('[BUG-842] email send and notificationLog write are atomic', () => {
     expect(mockLogNotification).not.toHaveBeenCalled();
   });
 });
+
+// [WI-998] Push dedup read must be inside the send step (atomic with send).
+//
+// Before the fix: getRecentNotificationCount was in the prepare step (memoized
+// by Inngest on the first run). A step retry on 'send-weekly-progress-push'
+// skipped the prepare body entirely — the dedup count was never re-read — and
+// the send step had no dedup check of its own. This meant a step retry (e.g.
+// prepare succeeded on run 1 but send step failed after the push API call)
+// would re-send the push notification to the parent.
+//
+// After the fix: getRecentNotificationCount is re-read inside the send step.
+// A step retry re-reads the count at the start of the step body, sees > 0 (the
+// logNotification write from run 1 committed inside sendPushNotification), and
+// skips the send.
+//
+// Red → green: remove the getRecentNotificationCount guard from the send step
+// body and the test fails — the second invocation calls sendPushNotification
+// again (count is ignored) — total calls = 2 instead of 1.
+describe('[WI-998] push dedup read is inside the send step (retry-safe atomicity)', () => {
+  // Prepared digest: push enabled, email disabled.
+  const preparedPushDigest = {
+    status: 'prepared',
+    parentId: PARENT_ID,
+    reportWeek: '2026-05-11',
+    childDigests: [{ childProfileId: CHILD_ID, snapshotDate: '2026-05-13' }],
+    shouldSendPush: true,
+    shouldSendEmail: false,
+    hasParentEmail: false,
+  };
+
+  function seedPushSendDb(): void {
+    // Satisfy parent + child live checks in the send step.
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      id: PARENT_ID,
+      displayName: 'Alex',
+    });
+    // Feed the in-step digest rehydration with current + previous snapshots
+    // so buildChildWeeklyDigestLine returns a non-null summaryLine.
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb.query.profiles.findFirst.mockResolvedValue(null);
+    mockSendPushNotification.mockResolvedValue({ sent: true });
+  });
+
+  it('[BREAK] does not re-send the push when the step retries after logNotification commits', async () => {
+    // Simulate two Inngest step executions (run 1 + retry) with the prepare
+    // step memoized in both. getRecentNotificationCount returns 0 on the first
+    // execution and 1 on the retry — modelling a logNotification row committed
+    // inside sendPushNotification during run 1.
+    //
+    // With the fix (dedup inside send step):
+    //   Run 1: count=0 → sendPushNotification called (1 call total)
+    //   Run 2: count=1 → skipped         (1 call total — no duplicate push)
+    //
+    // Without the fix:
+    //   Run 1: count=0 (no check in send step) → sendPushNotification called
+    //   Run 2: count=X (no check in send step) → sendPushNotification called again
+    //   → 2 calls total → test fails
+
+    seedPushSendDb();
+
+    // Run 1: dedup count = 0 → send goes ahead.
+    mockGetRecentNotificationCount.mockResolvedValueOnce(0);
+    await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      { runResults: { 'prepare-weekly-progress-digest': preparedPushDigest } },
+    );
+    expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+
+    // Between run 1 and run 2, logNotification committed (sendPushNotification
+    // called it inside its body in the real implementation). Mock count = 1.
+    mockGetRecentNotificationCount.mockResolvedValueOnce(1);
+
+    // Run 2: simulates Inngest retry with prepare step still memoized.
+    // seedPushSendDb already set up profiles.findFirst; snapshots need to be
+    // re-seeded because mockResolvedValue is consumed per-call.
+    seedPushSendDb();
+    await executeGenerateSteps(
+      { parentId: PARENT_ID },
+      { runResults: { 'prepare-weekly-progress-digest': preparedPushDigest } },
+    );
+
+    // Total across both runs: 1, not 2.
+    expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
+  });
+});

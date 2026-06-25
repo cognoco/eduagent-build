@@ -35,6 +35,7 @@ export * from './observers';
 
 // Subscription & Billing (Epic 5)
 export * from './billing';
+export * from './revenuecat';
 
 // Filing (Conversation-First Flow)
 export * from './filing';
@@ -65,6 +66,9 @@ export * from './llm-summary';
 
 // Suitability-judge verdict contract (MMT-ADR-0016 §2)
 export * from './judge';
+
+// LLM provider wire-format schemas (OpenAI/Cerebras/Mistral chat-completion shapes)
+export * from './llm-providers';
 
 // Database JSONB parsers (BUG-220 / BUG-222 / BUG-225) — runtime validation
 // helpers for jsonb columns that drizzle types as `unknown` or via `$type<…>`.

@@ -18,7 +18,7 @@
 // person.id = profiles.id throughout. FLAG-GATED via the calling seam.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import {
   consentGrant,
   membership,
@@ -181,15 +181,16 @@ export async function getFirstActiveChildNameV2(
   db: Database,
   guardianPersonId: string,
 ): Promise<string | null> {
+  // [WI-959] Single bounded query: fetch all charge ids then resolve the first
+  // active (non-archived) person in one IN-clause lookup instead of N serial
+  // findFirst calls. Null when the guardian has no charges or all are archived.
   const charges = await getChargePersonIds(db, guardianPersonId);
-  for (const chargeId of charges) {
-    const child = await db.query.person.findFirst({
-      where: and(eq(person.id, chargeId), isNull(person.archivedAt)),
-      columns: { displayName: true },
-    });
-    if (child) return child.displayName;
-  }
-  return null;
+  if (charges.length === 0) return null;
+  const child = await db.query.person.findFirst({
+    where: and(inArray(person.id, charges), isNull(person.archivedAt)),
+    columns: { displayName: true },
+  });
+  return child?.displayName ?? null;
 }
 
 /**

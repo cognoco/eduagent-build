@@ -8,6 +8,7 @@ import {
   languageSetupSchema,
   ERROR_CODES,
   subjectIdParamSchema,
+  subjectListQuerySchema,
   subjectResolveResultSchema,
   subjectClassifyResultSchema,
   subjectListResponseSchema,
@@ -93,10 +94,11 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       return c.json(subjectClassifyResultSchema.parse(result));
     },
   )
-  .get('/subjects', async (c) => {
+  .get('/subjects', zValidator('query', subjectListQuerySchema), async (c) => {
     const db = c.get('db');
     const profileId = requireProfileId(c.get('profileId'));
-    const includeInactive = c.req.query('includeInactive') === 'true';
+    const { includeInactive: includeInactiveParam } = c.req.valid('query');
+    const includeInactive = includeInactiveParam === 'true';
     const subjects = await listSubjects(db, profileId, { includeInactive });
     return c.json(subjectListResponseSchema.parse({ subjects }));
   })

@@ -768,6 +768,56 @@ describe('billing routes', () => {
       expect(mockSubscriptionsUpdate).not.toHaveBeenCalled();
       expect(mockMarkSubscriptionCancelled).not.toHaveBeenCalled();
     });
+
+    // [WI-994] Regression: stripeCancelResponseSchema replaces `as unknown as`.
+    // Red-green proof: revert to `updated as unknown as { current_period_end?: number }`
+    // and `typeof raw.current_period_end === 'number'` — when subscription level is
+    // absent the cast returns undefined (correct), but item-level is still read from
+    // `updated.items.data[0]` directly. The schema parses both levels safely.
+
+    it('[WI-994] uses item-level currentPeriodEnd when subscription level is absent', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      // No top-level current_period_end — only item-level (Stripe SDK v20 typical)
+      mockSubscriptionsUpdate.mockResolvedValue({
+        cancel_at_period_end: true,
+        items: {
+          data: [{ current_period_end: 1739577600 }], // 2025-02-15T00:00:00Z
+        },
+      });
+
+      const res = await app.request(
+        '/v1/subscription/cancel',
+        { method: 'POST', headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.currentPeriodEnd).toBe('2025-02-15T00:00:00.000Z');
+    });
+
+    it('[WI-994] falls back to new Date() when neither current_period_end field is present', async () => {
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      // Neither field — handler logs an error and uses current timestamp
+      mockSubscriptionsUpdate.mockResolvedValue({
+        cancel_at_period_end: true,
+        items: { data: [] },
+      });
+
+      const res = await app.request(
+        '/v1/subscription/cancel',
+        { method: 'POST', headers: OWNER_AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // currentPeriodEnd falls back to a current timestamp ISO string
+      expect(typeof body.currentPeriodEnd).toBe('string');
+      expect(
+        new Date(body.currentPeriodEnd).getFullYear(),
+      ).toBeGreaterThanOrEqual(2024);
+    });
   });
 
   // -------------------------------------------------------------------------

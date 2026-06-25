@@ -11,6 +11,10 @@ import { createLogger } from '../../logger';
 import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
 import { toOpenAIContent } from './openai';
+import {
+  mistralResponseSchema,
+  type MistralResponseParsed,
+} from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -52,17 +56,6 @@ interface MistralRequest {
   max_tokens: number;
   stream?: boolean;
   response_format?: { type: 'json_object' };
-}
-
-interface MistralChoice {
-  message?: { content?: string };
-  delta?: { content?: string };
-  finish_reason?: string;
-}
-
-interface MistralResponse {
-  choices?: MistralChoice[];
-  error?: { message: string; type: string; code?: string };
 }
 
 function toMistralMessages(messages: ChatMessage[]): MistralMessage[] {
@@ -126,7 +119,14 @@ export function createMistralProvider(apiKey: string): LLMProvider {
         );
       }
 
-      const data = (await res.json()) as MistralResponse;
+      const raw = await res.json();
+      const parsed = mistralResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        throw createProviderApiError('Mistral API', {
+          type: 'invalid_response_shape',
+        });
+      }
+      const data = parsed.data;
 
       if (data.error) {
         // Keep only the structured type/code tokens (mirrors openai.ts) — the
@@ -185,7 +185,9 @@ export function createMistralProvider(apiKey: string): LLMProvider {
           const decoder = new TextDecoder();
           let buffer = '';
 
-          function processChunk(chunk: MistralResponse): string | undefined {
+          function processChunk(
+            chunk: MistralResponseParsed,
+          ): string | undefined {
             const finish = chunk.choices?.[0]?.finish_reason;
             if (finish) rawFinishReason = finish;
             if (isContentFilterFinishReason(finish)) {
@@ -211,8 +213,18 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                 if (!jsonStr || jsonStr === '[DONE]') continue;
 
                 try {
-                  const chunk = JSON.parse(jsonStr) as MistralResponse;
-                  const text = processChunk(chunk);
+                  const rawChunk = JSON.parse(jsonStr);
+                  const chunkParsed = mistralResponseSchema.safeParse(rawChunk);
+                  if (!chunkParsed.success) {
+                    logger.warn('[llm:mistral] malformed SSE chunk discarded', {
+                      event: 'mistral.sse.malformed',
+                      site: 'stream_loop',
+                      chunk: jsonStr.slice(0, 200),
+                      error: chunkParsed.error.message,
+                    });
+                    continue;
+                  }
+                  const text = processChunk(chunkParsed.data);
                   if (text) yield text;
                 } catch (err) {
                   if (err instanceof SafetyFilterError) {
@@ -235,9 +247,23 @@ export function createMistralProvider(apiKey: string): LLMProvider {
                 const jsonStr = trimmed.slice(6);
                 if (jsonStr && jsonStr !== '[DONE]') {
                   try {
-                    const chunk = JSON.parse(jsonStr) as MistralResponse;
-                    const text = processChunk(chunk);
-                    if (text) yield text;
+                    const rawChunk = JSON.parse(jsonStr);
+                    const chunkParsed =
+                      mistralResponseSchema.safeParse(rawChunk);
+                    if (!chunkParsed.success) {
+                      logger.warn(
+                        '[llm:mistral] malformed SSE chunk discarded',
+                        {
+                          event: 'mistral.sse.malformed',
+                          site: 'flush_buffer',
+                          chunk: jsonStr.slice(0, 200),
+                          error: chunkParsed.error.message,
+                        },
+                      );
+                    } else {
+                      const text = processChunk(chunkParsed.data);
+                      if (text) yield text;
+                    }
                   } catch (err) {
                     if (err instanceof SafetyFilterError) {
                       throw err;

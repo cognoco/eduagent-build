@@ -21,7 +21,10 @@ export function GraduationCard({
       </Text>
       <Text className="mt-2 text-body-sm text-text-secondary">
         {t('visibility.graduation.version', {
-          version: String(moment.payload.contractVersion ?? ''),
+          version:
+            'contractVersion' in moment.payload
+              ? String(moment.payload.contractVersion)
+              : '',
         })}
       </Text>
     </View>

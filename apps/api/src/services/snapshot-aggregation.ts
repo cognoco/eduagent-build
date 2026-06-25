@@ -1326,12 +1326,12 @@ export async function refreshProgressSnapshot(
     }
   }
 
-  const previousMetrics = await previousSnapshotForToday(
-    db,
-    profileId,
-    snapshotDate,
-  );
-  const metrics = await computeProgressMetrics(db, profileId);
+  // [WI-962] previousSnapshotForToday and computeProgressMetrics are
+  // independent reads — fan out in parallel instead of awaiting serially.
+  const [previousMetrics, metrics] = await Promise.all([
+    previousSnapshotForToday(db, profileId, snapshotDate),
+    computeProgressMetrics(db, profileId),
+  ]);
 
   await upsertProgressSnapshot(db, profileId, snapshotDate, metrics);
 

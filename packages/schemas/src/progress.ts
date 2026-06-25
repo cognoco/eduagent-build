@@ -202,6 +202,14 @@ export type UpdateFamilyPoolBreakdownSharingResponse = z.infer<
   typeof updateFamilyPoolBreakdownSharingResponseSchema
 >;
 
+// GET /celebrations/pending — query param schema
+export const pendingCelebrationsQuerySchema = z.object({
+  viewer: z.enum(['child', 'parent']).optional(),
+});
+export type PendingCelebrationsQuery = z.infer<
+  typeof pendingCelebrationsQuerySchema
+>;
+
 // GET /celebrations/pending
 export const pendingCelebrationsResponseSchema = z.object({
   pendingCelebrations: z.array(pendingCelebrationSchema),

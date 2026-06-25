@@ -65,8 +65,10 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   cefrLevelSchema,
   computeAgeBracket,
+  sessionCompletedEventSchema,
   verificationTypeSchema,
 } from '@eduagent/schemas';
+import { NonRetriableError } from 'inngest';
 import {
   analyzeSessionTranscript,
   applyAnalysis,
@@ -391,6 +393,19 @@ export const sessionCompleted = inngest.createFunction(
   },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
+    // Validate event payload at entry. Malformed payloads (wrong
+    // types for qualityRating, exchangeCount, reason, or missing required
+    // ids) would otherwise silently corrupt SM-2 scheduling, streak credit,
+    // or isUnattended gating via raw `as` casts. NonRetriableError
+    // dead-letters the event immediately so ops can detect and investigate
+    // without accumulating incorrect state.
+    const parsed = sessionCompletedEventSchema.safeParse(event.data);
+    if (!parsed.success) {
+      throw new NonRetriableError(
+        `[session-completed] Invalid event payload: ${parsed.error.message}`,
+      );
+    }
+
     const {
       profileId,
       sessionId,

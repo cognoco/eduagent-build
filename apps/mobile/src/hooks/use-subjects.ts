@@ -84,9 +84,7 @@ export function useSubjects(
       try {
         const res = await client.subjects.$get(
           {
-            ...(includeInactive
-              ? { query: { includeInactive: 'true' } }
-              : undefined),
+            query: includeInactive ? { includeInactive: 'true' } : {},
           },
           { init: { signal } },
         );

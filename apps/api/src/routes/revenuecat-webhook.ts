@@ -17,8 +17,8 @@
 
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { z } from 'zod';
-import { ERROR_CODES } from '@eduagent/schemas';
+import { ERROR_CODES, revenuecatWebhookSchema } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
 import { apiError } from '../errors';
 // [CUT-B3 / WI-693] The handler seam dispatches: flag-off → legacy handlers
 // (byte-identical, accounts-keyed), flag-on → v2 handlers (login→membership→
@@ -29,7 +29,6 @@ import { captureException, captureMessage } from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
-import type { Database } from '@eduagent/database';
 
 export const LATE_REVENUECAT_EVENT_OBSERVATION_MS = 48 * 60 * 60 * 1000;
 
@@ -79,37 +78,6 @@ async function constantTimeCompare(a: string, b: string): Promise<boolean> {
   }
   return diff === 0;
 }
-
-// ---------------------------------------------------------------------------
-// Zod schema for RevenueCat webhook payload
-// ---------------------------------------------------------------------------
-
-const revenuecatWebhookSchema = z.object({
-  api_version: z.string().optional(),
-  event: z.object({
-    id: z.string(),
-    type: z.string(),
-    app_user_id: z.string(),
-    original_app_user_id: z.string().optional(),
-    product_id: z.string().optional(),
-    entitlement_ids: z.array(z.string()).optional(),
-    period_type: z.string().optional(),
-    purchased_at_ms: z.number().optional(),
-    expiration_at_ms: z.number().optional(),
-    store: z.string().optional(),
-    environment: z.string().optional(),
-    is_family_share: z.boolean().optional(),
-    transferred_from: z.array(z.string()).optional(),
-    transferred_to: z.array(z.string()).optional(),
-    new_product_id: z.string().optional(),
-    cancel_reason: z.string().optional(),
-    grace_period_expiration_at_ms: z.number().optional(),
-    transaction_id: z.string().optional(),
-    store_transaction_id: z.string().optional(),
-    /** BD-01: Event timestamp for ordering-based idempotency. */
-    event_timestamp_ms: z.number().optional(),
-  }),
-});
 
 // ---------------------------------------------------------------------------
 // Route
