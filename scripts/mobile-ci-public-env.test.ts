@@ -38,6 +38,8 @@ const easJson = JSON.parse(
   readFileSync(join(REPO_ROOT, 'apps', 'mobile', 'eas.json'), 'utf8'),
 ) as EasJson;
 
+// Update this list when adding new native build jobs to mobile-ci.yml — a new
+// job not listed here would silently skip public-env guard coverage.
 const NATIVE_BUILD_JOBS = ['build-preview', 'build-manual'] as const;
 
 const REQUIRED_PUBLIC_BUILD_ENV = {
