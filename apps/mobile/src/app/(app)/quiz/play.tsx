@@ -102,6 +102,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
   const [roundAutoSaveStarted, setRoundAutoSaveStarted] = useState(false);
   const [roundAutoSaved, setRoundAutoSaved] = useState(false);
+  // [WI-948] Mirrors roundSubmittedRef so the dispute affordance can re-render
+  // when the final question is submitted. roundSubmittedRef guards re-entry
+  // (no re-render needed there); roundSubmitted drives the JSX hide.
+  const [roundSubmitted, setRoundSubmitted] = useState(false);
   const [correctCelebrationKey, setCorrectCelebrationKey] = useState<
     number | null
   >(null);
@@ -217,6 +221,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
       setCompleteError(null);
       roundSubmittedRef.current = true;
+      setRoundSubmitted(true);
       if (!navigateOnSuccess) {
         setRoundAutoSaveStarted(true);
       }
@@ -234,6 +239,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           },
           onError: (err) => {
             roundSubmittedRef.current = false;
+            setRoundSubmitted(false);
             setRoundAutoSaveStarted(false);
             // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
             // string, network failure) — `err instanceof Error` returns false for
@@ -1049,7 +1055,12 @@ export default function QuizPlayScreen(): React.ReactElement {
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
                 nothing to dispute on a correct response, and showing the link
                 pollutes triage with noise on clearly-correct answers. */}
-            {answerState === 'wrong' && !disputedIndices.has(currentIndex) ? (
+            {/* [WI-948] Hide after round submission: handleDispute no-ops once
+                roundSubmittedRef is set, so showing the affordance is misleading.
+                roundSubmitted state mirrors the ref to drive this re-render. */}
+            {answerState === 'wrong' &&
+            !disputedIndices.has(currentIndex) &&
+            !roundSubmitted ? (
               <Pressable
                 onPress={handleDispute}
                 className="mt-2 items-center py-1"
