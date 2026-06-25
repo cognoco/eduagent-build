@@ -101,7 +101,7 @@ describe('SignInScreen', () => {
     clearPendingAuthRedirect();
     clearSessionExpiredNotice();
     clearSessionRevokedNotice();
-    delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY;
+    delete process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG;
     (useSignIn as jest.Mock).mockReturnValue({
       isLoaded: true,
       signIn: {
@@ -211,7 +211,7 @@ describe('SignInScreen', () => {
   });
 
   it('renders OpenAI SSO when configured', async () => {
-    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG = 'openai';
 
     render(<SignInScreen />);
     await act(async () => undefined);
@@ -960,7 +960,7 @@ describe('SignInScreen', () => {
   });
 
   it('calls startSSOFlow for OpenAI when configured', async () => {
-    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
+    process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_SLUG = 'openai';
     mockStartSSOFlow.mockResolvedValue({
       createdSessionId: 'sess_openai_123',
     });
