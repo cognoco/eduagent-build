@@ -1,4 +1,5 @@
 import type { NoteResponse } from '@eduagent/schemas';
+import { formatShortDate } from './format-datetime';
 
 /**
  * Formats the source line for a note card.
@@ -12,8 +13,7 @@ export function formatSourceLine(
   note: NoteResponse,
   locale: string | undefined,
 ): string {
-  const date = new Date(note.createdAt);
-  const monthDay = date.toLocaleDateString(locale, {
+  const monthDay = formatShortDate(note.createdAt, locale, {
     month: 'short',
     day: 'numeric',
   });

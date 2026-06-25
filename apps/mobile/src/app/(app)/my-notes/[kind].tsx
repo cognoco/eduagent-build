@@ -21,6 +21,7 @@ import { OWN_LEARNING_RETURN_TO } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../../lib/session-detail-navigation';
+import { formatShortDate } from '../../../lib/format-datetime';
 import {
   useRelativeDate,
   useDurationLabel,
@@ -99,8 +100,8 @@ function subtitleForKind(
   return t('library.myNotes.subtitleSessions', { count });
 }
 
-function formatInlineDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+function formatInlineDate(iso: string, locale: string | undefined): string {
+  return formatShortDate(iso, locale, {
     month: 'short',
     day: 'numeric',
   });
@@ -190,7 +191,11 @@ function groupItems(
   return rows;
 }
 
-function matchesQuery(item: ArchiveItem, query: string): boolean {
+function matchesQuery(
+  item: ArchiveItem,
+  query: string,
+  locale: string | undefined,
+): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return [
@@ -198,7 +203,7 @@ function matchesQuery(item: ArchiveItem, query: string): boolean {
     item.topicTitle,
     item.typeLabel,
     item.preview,
-    formatInlineDate(item.date),
+    formatInlineDate(item.date, locale),
   ]
     .filter((value): value is string => !!value)
     .some((value) => value.toLowerCase().includes(q));
@@ -255,12 +260,17 @@ function ArchiveCard({
   onPress: (item: ArchiveItem) => void;
 }) {
   const colors = useThemeColors();
+  const { i18n } = useTranslation();
   const durationLabel = useDurationLabel();
   const duration =
     getDurationParts(item.durationSeconds).unit === 'none'
       ? null
       : durationLabel(item.durationSeconds);
-  const meta = [item.topicTitle, item.typeLabel, formatInlineDate(item.date)]
+  const meta = [
+    item.topicTitle,
+    item.typeLabel,
+    formatInlineDate(item.date, i18n?.language),
+  ]
     .filter(Boolean)
     .join(' · ');
 
@@ -320,7 +330,7 @@ function ArchiveCard({
 }
 
 export default function MyNotesListScreen(): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -367,8 +377,8 @@ export default function MyNotesListScreen(): React.ReactElement {
   }, [bookmarksQuery.data, kind, notesQuery.data, sessionsQuery.data, t]);
 
   const items = useMemo(
-    () => rawItems.filter((item) => matchesQuery(item, query)),
-    [query, rawItems],
+    () => rawItems.filter((item) => matchesQuery(item, query, i18n?.language)),
+    [query, rawItems, i18n?.language],
   );
   const rows = useMemo(
     () => groupItems(items, groupMode, relativeDate),

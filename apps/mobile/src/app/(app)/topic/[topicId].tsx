@@ -42,6 +42,7 @@ import { useTopicSessions } from '../../../hooks/use-topic-sessions';
 import { useRelativeDate } from '../../../hooks/use-time-format';
 import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { withOpacity } from '../../../lib/color-opacity';
+import { formatShortDate } from '../../../lib/format-datetime';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
@@ -86,8 +87,10 @@ function formatSessionDate(
   createdAt: string,
   locale: string | undefined,
 ): string {
-  const date = new Date(createdAt);
-  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+  return formatShortDate(createdAt, locale, {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function formatSessionsSummary(

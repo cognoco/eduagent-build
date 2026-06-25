@@ -2,6 +2,7 @@ import { View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { MilestoneRecord } from '@eduagent/schemas';
 import type { Translate } from '../../i18n';
+import { formatShortDate } from '../../lib/format-datetime';
 
 const MILESTONE_COPY: Record<
   MilestoneRecord['milestoneType'],
@@ -75,7 +76,7 @@ interface MilestoneCardProps {
 export function MilestoneCard({
   milestone,
 }: MilestoneCardProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // The milestone_type DB column is free-text (no CHECK constraint), so an
   // unrecognized value can reach this component. Guard the MILESTONE_COPY
   // lookup so an unknown type renders a generic milestone card instead of
@@ -83,7 +84,10 @@ export function MilestoneCard({
   const config = MILESTONE_COPY[milestone.milestoneType] as
     | (typeof MILESTONE_COPY)[MilestoneRecord['milestoneType']]
     | undefined;
-  const createdAt = new Date(milestone.createdAt);
+  const createdAtLabel = formatShortDate(milestone.createdAt, i18n?.language, {
+    month: 'short',
+    day: 'numeric',
+  });
 
   if (!config) {
     return (
@@ -95,10 +99,7 @@ export function MilestoneCard({
               {t('progress.milestoneCard.unknown')}
             </Text>
             <Text className="text-caption text-text-secondary mt-1">
-              {createdAt.toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              })}
+              {createdAtLabel}
             </Text>
           </View>
         </View>
@@ -115,10 +116,7 @@ export function MilestoneCard({
             {config.label(milestone.threshold, t, milestone.metadata ?? null)}
           </Text>
           <Text className="text-caption text-text-secondary mt-1">
-            {createdAt.toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-            })}
+            {createdAtLabel}
           </Text>
         </View>
       </View>
