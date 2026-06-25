@@ -341,6 +341,16 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
             evaluation,
           );
         } catch (err) {
+          // [#887] Pair the Sentry capture with a structured error log so
+          // log-based alerting also sees the failed completion-activity write
+          // (captureException alone is invisible to the log pipeline).
+          logger.error('[assessments] completion-activity write failed', {
+            event: 'assessments.completion_activity_failed',
+            assessmentId,
+            topicId: assessment.topicId,
+            status: newStatus,
+            error: err instanceof Error ? err.message : String(err),
+          });
           captureException(err, {
             profileId,
             requestPath: '/v1/assessments/:assessmentId/answer',

@@ -240,7 +240,12 @@ export default function QuizPlayScreen(): React.ReactElement {
             // server-typed error envelopes, hiding the actionable reason behind
             // the generic fallback.
             setCompleteError(formatApiError(err));
-            Sentry.captureException(err);
+            // [#887] Tag so this surfaces as its own Sentry fingerprint rather
+            // than collapsing into one generic quiz/play bucket.
+            Sentry.captureException(err, {
+              tags: { component: 'quiz/play', action: 'complete_round' },
+              extra: { roundId },
+            });
           },
         },
       );
@@ -326,7 +331,11 @@ export default function QuizPlayScreen(): React.ReactElement {
         // Surface the failure visibly + capture for triage. Without this, the
         // user thinks their answer was validated when in fact it never was.
         setAnswerCheckFailed(true);
-        Sentry.captureException(err);
+        // [#887] Distinct fingerprint for the Guess-Who answer-check failure.
+        Sentry.captureException(err, {
+          tags: { component: 'quiz/play', action: 'check_guess_who_answer' },
+          extra: { roundId, currentIndex },
+        });
         platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
         return false;
       }
@@ -575,7 +584,11 @@ export default function QuizPlayScreen(): React.ReactElement {
       // the answer wasn't validated, instead of silently flipping the flag.
       correct = false;
       setAnswerCheckFailed(true);
-      Sentry.captureException(err);
+      // [#887] Distinct fingerprint for the per-question advance answer-check.
+      Sentry.captureException(err, {
+        tags: { component: 'quiz/play', action: 'check_answer_advance' },
+        extra: { roundId, questionIndex },
+      });
       platformAlert(t('quiz.play.checkErrorTitle'), formatApiError(err));
     }
 

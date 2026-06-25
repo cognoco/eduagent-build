@@ -133,7 +133,7 @@ export function hashProfileId(profileId: string): string {
   //   - Emit an `unkeyed_` tag so the missing-key state is visible in
   //     Sentry's tag values (operators can filter on `profile_id_hash
   //     starts_with unkeyed_`) without leaking the raw profile ID.
-  //   - Raise one warning breadcrumb per session so the misconfiguration
+  //   - Raise one warning message per session so the misconfiguration
   //     can't hide for long.
   // The keyless SHA-256 still provides per-user funnel correlation; it
   // does NOT provide a privacy boundary, which is fine because the
@@ -141,13 +141,15 @@ export function hashProfileId(profileId: string): string {
   if (!unkeyedWarningEmitted) {
     unkeyedWarningEmitted = true;
     try {
-      Sentry.addBreadcrumb({
-        category: 'analytics.config',
-        level: 'warning',
-        message:
-          'analytics.hashProfileId: EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing — ' +
+      // [#887] captureMessage, not addBreadcrumb: a breadcrumb only rides
+      // along on a later captured event, so the privacy-boundary degradation
+      // stays invisible in a session that is otherwise healthy. A message
+      // event is independently queryable/alertable in Sentry.
+      Sentry.captureMessage(
+        'analytics.hashProfileId: EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing — ' +
           'emitting `unkeyed_` tags. Provision the key via Doppler/EAS env injection.',
-      });
+        'warning',
+      );
     } catch {
       // Sentry not initialised yet (early-boot call); the next call attempts again.
       unkeyedWarningEmitted = false;

@@ -25,9 +25,17 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import { trialExpiryFailureObserve } from './trial-expiry-failure-observe';
+import * as sentryService from '../../services/sentry';
+
+// [#887] Spy on the real Sentry wrapper (no internal mock); it no-ops without
+// a DSN, so the spy only records that the billing failure escalated.
+const captureMessageSpy = jest
+  .spyOn(sentryService, 'captureMessage')
+  .mockImplementation(() => undefined);
 
 beforeEach(() => {
   consoleErrorSpy.mockClear();
+  captureMessageSpy.mockClear();
 });
 
 afterAll(() => {
@@ -95,5 +103,34 @@ describe('trialExpiryFailureObserve (BUG-843 / F-SVC-011)', () => {
       reason: 'Connection timeout',
       eventTimestamp: '2026-04-27T00:00:00.000Z',
     });
+  });
+
+  // [#887] Billing failures must escalate to Sentry, not just the log stream.
+  // Red-green proof: remove the captureMessage(...) call in
+  // trial-expiry-failure-observe.ts and this assertion fails (0 calls).
+  it('[#887] escalates the billing failure to Sentry as an error-level message with full context', async () => {
+    await invokeHandler({
+      step: 'process-expired-trials',
+      trialId: 'sub-3',
+      reason: 'DB constraint violation',
+      timestamp: '2026-04-27T00:00:00.000Z',
+    });
+
+    expect(captureMessageSpy).toHaveBeenCalledWith(
+      'billing.trial_expiry_failed',
+      expect.objectContaining({
+        level: 'error',
+        tags: expect.objectContaining({
+          surface: 'billing',
+          event: 'trial_expiry_failed',
+          step: 'process-expired-trials',
+        }),
+        extra: expect.objectContaining({
+          trialId: 'sub-3',
+          reason: 'DB constraint violation',
+          eventTimestamp: '2026-04-27T00:00:00.000Z',
+        }),
+      }),
+    );
   });
 });

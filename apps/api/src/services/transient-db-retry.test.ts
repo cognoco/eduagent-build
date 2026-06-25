@@ -3,14 +3,21 @@ import {
   withTransientDatabaseRetry,
 } from './transient-db-retry';
 
-jest.mock(
-  './sentry' /* gc1-allow: transient-retry unit test suppresses Sentry */,
-  () => ({ addBreadcrumb: jest.fn() }),
-);
+// [#887/GC6] Mock the external Sentry boundary (@sentry/cloudflare), NOT our
+// internal ./sentry wrapper, so the real addBreadcrumb/captureException
+// forwarding runs and is exercised by these tests.
+jest.mock('@sentry/cloudflare', () => ({
+  withScope: (fn: (scope: unknown) => void) =>
+    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
 
-const { addBreadcrumb } = jest.requireMock('./sentry') as {
-  addBreadcrumb: jest.Mock;
-};
+import * as CfSentry from '@sentry/cloudflare';
+
+const addBreadcrumb = CfSentry.addBreadcrumb as jest.Mock;
+const captureException = CfSentry.captureException as jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -62,16 +69,18 @@ describe('withTransientDatabaseRetry', () => {
     expect(result).toBe('recovered');
     expect(op).toHaveBeenCalledTimes(2);
     expect(addBreadcrumb).toHaveBeenCalledTimes(1);
-    expect(addBreadcrumb).toHaveBeenCalledWith(
-      'Transient database error; retrying',
-      'database',
-      'warning',
-      expect.objectContaining({
+    expect(addBreadcrumb).toHaveBeenCalledWith({
+      message: 'Transient database error; retrying',
+      category: 'database',
+      level: 'warning',
+      data: expect.objectContaining({
         retryable: true,
         operation: 'test_op',
         attempt: 1,
       }),
-    );
+    });
+    // Recovered before exhausting retries — no terminal capture.
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('throws immediately on non-transient error', async () => {
@@ -83,6 +92,8 @@ describe('withTransientDatabaseRetry', () => {
     ).rejects.toBe(nonTransient);
     expect(op).toHaveBeenCalledTimes(1);
     expect(addBreadcrumb).not.toHaveBeenCalled();
+    // Non-transient errors are the caller's to classify — not captured here.
+    expect(captureException).not.toHaveBeenCalled();
   });
 
   it('throws after exhausting all retries', async () => {
@@ -94,6 +105,24 @@ describe('withTransientDatabaseRetry', () => {
     ).rejects.toBe(transient);
     expect(op).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
     expect(addBreadcrumb).toHaveBeenCalledTimes(3);
+  });
+
+  // [#887] The exhausted-retries terminal failure must reach Sentry directly,
+  // because the per-retry breadcrumbs only attach to a later captured event
+  // and a caller may swallow this throw.
+  //
+  // Red-green proof: remove the `captureException(...)` block in
+  // transient-db-retry.ts and this assertion fails (0 calls).
+  it('[#887] captures the terminal failure once when retries are exhausted on a transient error', async () => {
+    const transient = new Error('Connection terminated');
+    const op = jest.fn(() => Promise.reject(transient));
+
+    await expect(
+      withTransientDatabaseRetry('exhaustion_op', op, { idempotent: true }),
+    ).rejects.toBe(transient);
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(transient);
   });
 
   // [BUG-495] Break test: idempotency contract enforcement.

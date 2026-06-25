@@ -9,6 +9,13 @@ jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => {
 
 import { validateEnv, validateProductionBindings } from '../config';
 import { envValidationMiddleware, resetEnvValidation } from './env-validation';
+import * as sentryService from '../services/sentry';
+
+// [#887] Spy on the real Sentry wrapper (no internal mock) — the wrapper
+// no-ops without a DSN, so the spy only records that escalation happened.
+const captureExceptionSpy = jest
+  .spyOn(sentryService, 'captureException')
+  .mockImplementation(() => undefined);
 
 const mockValidateEnv = validateEnv as jest.MockedFunction<typeof validateEnv>;
 const mockValidateProductionBindings =
@@ -146,6 +153,16 @@ describe('envValidationMiddleware', () => {
       500,
     );
     expect(errorSpy).toHaveBeenCalled();
+    // [#887] The zod-parse failure escalates to Sentry, not just the log.
+    expect(captureExceptionSpy).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          surface: 'env-validation',
+          phase: 'zod-parse',
+        }),
+      }),
+    );
 
     errorSpy.mockRestore();
   });
@@ -256,6 +273,17 @@ describe('envValidationMiddleware', () => {
       // they can't claim they didn't know how to bypass during prelaunch.
       const [body] = (c.json as jest.Mock).mock.calls[0];
       expect(body.message).toMatch(/ALLOW_MISSING_IDEMPOTENCY_KV/);
+      // [#887] The binding-gate failure escalates to Sentry too.
+      expect(captureExceptionSpy).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            surface: 'env-validation',
+            phase: 'binding-gate',
+          }),
+          extra: expect.objectContaining({ missing: ['IDEMPOTENCY_KV'] }),
+        }),
+      );
     });
 
     it('passes through when the binding is present', async () => {

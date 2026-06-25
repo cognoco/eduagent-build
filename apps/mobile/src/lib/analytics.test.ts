@@ -132,7 +132,7 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
     expect(hashProfileId('user-1')).not.toBe(hashProfileId('user-2'));
   });
 
-  it('[BREAK] in production with missing key, raises exactly one Sentry warning breadcrumb per session (operator visibility, not log spam)', () => {
+  it('[BREAK][#887] in production with missing key, raises exactly one Sentry warning MESSAGE per session (independently queryable, not a ride-along breadcrumb)', () => {
     delete process.env.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1;
     (global as { __DEV__?: boolean }).__DEV__ = false;
     jest.clearAllMocks();
@@ -141,15 +141,18 @@ describe('hashProfileId — HMAC-SHA256 hardening [WI-315]', () => {
     hashProfileId('user-2');
     hashProfileId('user-3');
 
-    const configBreadcrumbs = (Sentry.addBreadcrumb as jest.Mock).mock.calls
-      .map((args) => args[0])
-      .filter(
-        (call) =>
-          call?.category === 'analytics.config' &&
-          /EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing/.test(call?.message ?? ''),
-      );
-    expect(configBreadcrumbs).toHaveLength(1);
-    expect(configBreadcrumbs[0].level).toBe('warning');
+    // [#887] A breadcrumb only attaches to a later captured event, so the
+    // missing-key degradation could stay invisible in a healthy session.
+    // captureMessage emits an independently-queryable event instead.
+    const configMessages = (
+      Sentry.captureMessage as jest.Mock
+    ).mock.calls.filter(
+      ([message]) =>
+        typeof message === 'string' &&
+        /EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 missing/.test(message),
+    );
+    expect(configMessages).toHaveLength(1);
+    expect(configMessages[0][1]).toBe('warning');
   });
 
   it('returns the invalid-empty sentinel when profileId is empty (no sha256-of-empty collision bucket)', () => {
