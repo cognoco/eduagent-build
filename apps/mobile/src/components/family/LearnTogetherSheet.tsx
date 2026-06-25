@@ -1,4 +1,5 @@
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { BottomSheet } from '../common/BottomSheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
@@ -69,100 +70,89 @@ export function LearnTogetherSheet({
   };
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-      accessibilityViewIsModal
-    >
-      <View className="flex-1 justify-end bg-black/40">
-        <View
-          className="bg-surface rounded-t-3xl px-5 pt-5 pb-8"
-          testID="learn-together-sheet"
-        >
-          <View className="flex-row items-center justify-between mb-3">
-            <View className="flex-1 pr-3">
-              <Text className="text-h3 font-bold text-text-primary">
-                {t('home.parent.learnTogether.title')}
-              </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t('home.parent.learnTogether.subtitle', { name })}
-              </Text>
-            </View>
-            <Pressable
-              onPress={onClose}
-              accessibilityRole="button"
-              accessibilityLabel={t('home.parent.learnTogether.close')}
-              className="h-10 w-10 rounded-full bg-surface-elevated items-center justify-center"
-              testID="learn-together-sheet-close"
-            >
-              <Ionicons name="close" size={22} color={colors.textPrimary} />
-            </Pressable>
+    <BottomSheet visible onClose={onClose} animationType="fade">
+      <View className="bg-surface px-5 pt-5 pb-8" testID="learn-together-sheet">
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-1 pr-3">
+            <Text className="text-h3 font-bold text-text-primary">
+              {t('home.parent.learnTogether.title')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {t('home.parent.learnTogether.subtitle', { name })}
+            </Text>
           </View>
-
-          <ScrollView
-            style={{ maxHeight: 420 }}
-            showsVerticalScrollIndicator={false}
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.parent.learnTogether.close')}
+            className="h-10 w-10 rounded-full bg-surface-elevated items-center justify-center"
+            testID="learn-together-sheet-close"
           >
-            {canClone ? (
-              <View className="mb-4" testID="learn-together-clone-section">
-                <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
-                  {t('home.parent.learnTogether.learnItYourselfHeader')}
-                </Text>
-                <AddToMyLearningButton
-                  childProfileId={child.id}
-                  childDisplayName={child.displayName}
-                  topicId={cloneTopicId}
-                  topicTitle={latestRecap?.topicTitle ?? null}
-                  subjectName={latestRecap?.subjectName ?? null}
-                  triggerPath={TRIGGER_PATH}
-                />
-              </View>
-            ) : null}
-
-            {hasProposals ? (
-              <View testID="learn-together-proposals-section">
-                <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
-                  {t('home.parent.learnTogether.tryTogetherHeader')}
-                </Text>
-                <View style={{ gap: 6 }}>
-                  {proposals.map((prompt) => (
-                    <ConversationStarterCard
-                      key={`learn-together-${prompt.key}`}
-                      prompt={prompt}
-                      tint={undefined}
-                    />
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            {isEmpty ? (
-              <View testID="learn-together-empty">
-                <Text className="text-body-sm text-text-secondary mb-4">
-                  {t('home.parent.learnTogether.emptyBody', { name })}
-                </Text>
-                <Pressable
-                  onPress={handleOpenLibrary}
-                  accessibilityRole="button"
-                  className="flex-row items-center justify-center min-h-[48px] rounded-card bg-surface-elevated px-4"
-                  testID="learn-together-open-library"
-                >
-                  <Ionicons
-                    name="library-outline"
-                    size={18}
-                    color={colors.primary}
-                  />
-                  <Text className="text-body font-semibold text-primary ms-2">
-                    {t('home.parent.learnTogether.openLibrary', { name })}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </ScrollView>
+            <Ionicons name="close" size={22} color={colors.textPrimary} />
+          </Pressable>
         </View>
+
+        <ScrollView
+          style={{ maxHeight: 420 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {canClone ? (
+            <View className="mb-4" testID="learn-together-clone-section">
+              <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+                {t('home.parent.learnTogether.learnItYourselfHeader')}
+              </Text>
+              <AddToMyLearningButton
+                childProfileId={child.id}
+                childDisplayName={child.displayName}
+                topicId={cloneTopicId}
+                topicTitle={latestRecap?.topicTitle ?? null}
+                subjectName={latestRecap?.subjectName ?? null}
+                triggerPath={TRIGGER_PATH}
+              />
+            </View>
+          ) : null}
+
+          {hasProposals ? (
+            <View testID="learn-together-proposals-section">
+              <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+                {t('home.parent.learnTogether.tryTogetherHeader')}
+              </Text>
+              <View style={{ gap: 6 }}>
+                {proposals.map((prompt) => (
+                  <ConversationStarterCard
+                    key={`learn-together-${prompt.key}`}
+                    prompt={prompt}
+                    tint={undefined}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
+          {isEmpty ? (
+            <View testID="learn-together-empty">
+              <Text className="text-body-sm text-text-secondary mb-4">
+                {t('home.parent.learnTogether.emptyBody', { name })}
+              </Text>
+              <Pressable
+                onPress={handleOpenLibrary}
+                accessibilityRole="button"
+                className="flex-row items-center justify-center min-h-[48px] rounded-card bg-surface-elevated px-4"
+                testID="learn-together-open-library"
+              >
+                <Ionicons
+                  name="library-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text className="text-body font-semibold text-primary ms-2">
+                  {t('home.parent.learnTogether.openLibrary', { name })}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </ScrollView>
       </View>
-    </Modal>
+    </BottomSheet>
   );
 }
