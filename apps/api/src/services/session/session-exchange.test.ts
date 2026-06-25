@@ -338,12 +338,13 @@ describe('computeCorrectStreak', () => {
 });
 
 describe('resolveExchangeLlmRouting', () => {
-  it('keeps Plus easy turns on standard Gemini routing', () => {
+  it('keeps Plus easy turns on standard Gemini routing (adult learner)', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
         effectiveRung: 1,
+        isAdultLearner: true,
       }),
     ).toEqual({
       llmTier: 'standard',
@@ -352,12 +353,13 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('routes Plus rung 3 through the standard Gemini path', () => {
+  it('routes Plus rung 3 through the standard Gemini path (adult learner)', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
         effectiveRung: 3,
+        isAdultLearner: true,
       }),
     ).toEqual({
       llmTier: 'standard',
@@ -392,12 +394,13 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('keeps upgraded Family profiles on standard routing below rung 4', () => {
+  it('keeps upgraded Family profiles on standard routing below rung 4 (adult learner)', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'family',
         requestedLlmTier: 'premium',
         effectiveRung: 3,
+        isAdultLearner: true,
       }),
     ).toEqual({
       llmTier: 'standard',
@@ -432,18 +435,50 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('keeps Family standard profiles Gemini-only without the add-on', () => {
+  it('keeps Family standard profiles Gemini-only without the add-on (adult learner)', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'family',
         requestedLlmTier: 'standard',
         effectiveRung: 4,
+        isAdultLearner: true,
       }),
     ).toEqual({
       llmTier: 'standard',
       providerPolicy: 'gemini_only',
       routingReason: 'family_standard_gemini_only',
     });
+  });
+
+  // MMT-ADR-0016 §10.1 regression: under-18 must never route to Gemini (WI-1099)
+  it('does not apply gemini_only for under-18 family-plan standard learners (MMT-ADR-0016 §10.1)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: 'family',
+      requestedLlmTier: 'standard',
+      effectiveRung: 2,
+      isAdultLearner: false,
+    });
+    expect(result.providerPolicy).not.toBe('gemini_only');
+  });
+
+  it('does not apply gemini_only for under-18 plus-tier learners (MMT-ADR-0016 §10.1)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: 'plus',
+      requestedLlmTier: 'standard',
+      effectiveRung: 1,
+      isAdultLearner: false,
+    });
+    expect(result.providerPolicy).not.toBe('gemini_only');
+  });
+
+  it('does not apply gemini_only for under-18 premium-addon learners below rung 4 (MMT-ADR-0016 §10.1)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: 'family',
+      requestedLlmTier: 'premium',
+      effectiveRung: 2,
+      isAdultLearner: false,
+    });
+    expect(result.providerPolicy).not.toBe('gemini_only');
   });
 
   it('returns no explicit tier or policy for unknown subscriptionTier (passthrough)', () => {
