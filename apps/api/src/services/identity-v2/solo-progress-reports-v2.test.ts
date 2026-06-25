@@ -3,22 +3,8 @@ import type { Database } from '@eduagent/database';
 import * as guardianship from './guardianship';
 import * as consentStatusV2 from './consent-status-v2';
 
-// ---------------------------------------------------------------------------
-// [WI-961] listEligibleSelfReportPersonIdsV2 — guardian + consent fan-out.
-//
-// The function ran two serial for-loops:
-//   1. per-owner getGuardianPersonIds  (exclude linked children)
-//   2. per-self-managed resolveConsentStatus (GDPR gate)
-// The fix fans both out with Promise.all. These tests prove:
-//   - correctness: the returned person-id set is unchanged
-//   - parallelism: the second owner's lookup STARTS before the first owner's
-//     deferred lookup RESOLVES (impossible under serial awaiting)
-//
-// We spy on getGuardianPersonIds / resolveConsentStatus (real exported module
-// functions — jest.spyOn on the namespace, NOT jest.mock of an internal path,
-// so GC1/GC6 are satisfied). The DB is a hand-built fake standing in for the
-// two SELECT query builders the function issues before the loops.
-// ---------------------------------------------------------------------------
+// [WI-961] listEligibleSelfReportPersonIdsV2 — bounded parallel fan-out (batch=25).
+// Proves correctness + parallelism (2 owners < batch size → both run in one batch).
 
 const WINDOW = {
   start: new Date('2026-06-01T00:00:00.000Z'),
@@ -30,13 +16,7 @@ const PERSON_A = '11111111-1111-1111-1111-111111111111';
 const PERSON_B = '22222222-2222-2222-2222-222222222222';
 const ORG = '99999999-9999-9999-9999-999999999999';
 
-/**
- * Builds a fake Database covering the two queries the function issues before
- * the loops:
- *   1. selectDistinct(...).from(learningSessions).where(...)  → activity rows
- *   2. select(...).from(person).innerJoin(membership).where(...) → candidates
- * Both are thenable query builders; we resolve them with fixed fixtures.
- */
+// Fake Database for the two pre-loop queries (selectDistinct→activity, select→candidates).
 function makeFakeDb(): Database {
   let selectCall = 0;
   const db = {
