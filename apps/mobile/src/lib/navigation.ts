@@ -173,3 +173,22 @@ export function pushChildWeeklyReport(
     params: { profileId, weeklyReportId },
   } as Href);
 }
+
+/**
+ * Cross-tab push from the Progress or Home tab to a linked child's reports
+ * LIST screen (not a single report).
+ *
+ * [WI-1067] Mirrors {@link pushChildReport} but targets the `reports` index
+ * rather than a leaf `report/[reportId]` — so no reportId param is needed.
+ * See {@link pushChildReport} for the ancestor-chain rationale.
+ */
+export function pushChildReports(
+  router: Pick<Router, 'push'>,
+  profileId: string,
+): void {
+  router.push(childProfileHref(profileId));
+  router.push({
+    pathname: '/(app)/child/[profileId]/reports',
+    params: { profileId },
+  } as Href);
+}

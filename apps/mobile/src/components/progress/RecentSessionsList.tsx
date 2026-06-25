@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ChildSession } from '@eduagent/schemas';
@@ -46,7 +46,12 @@ export function RecentSessionsList({
         label: t('parentView.index.startSession', {
           defaultValue: 'Start a session',
         }),
-        onPress: () => router.push('/(app)/session'),
+        // [WI-1067] Push ancestor first so router.back() from session returns
+        // to the child profile view rather than falling through to Home tab.
+        onPress: () => {
+          router.push('/(app)/home' as Href);
+          router.push('/(app)/session' as Href);
+        },
       }
     : {
         label: t('parentView.index.goToCurriculum', {
