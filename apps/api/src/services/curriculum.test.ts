@@ -2380,6 +2380,25 @@ describe('[BUG-110+109] previewCurriculumTopic resilience', () => {
     expect(preview.estimatedMinutes).toBe(30);
   });
 
+  // [WI-993] SHOULD_FIX: a wrong-typed field (string estimatedMinutes) must NOT
+  // discard a valid LLM title and description — coercive defaults preserve the
+  // object. Red-green: with z.number().optional() the parse fails and returns
+  // the heuristic fallback; with z.unknown().optional() + Number() the title
+  // and description are kept.
+  it('preserves LLM title and description when estimatedMinutes is a string (coerces to number)', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+      estimatedMinutes: '25',
+    });
+    registerProvider(providerReturning(obj));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.title).toBe('Mitosis');
+    expect(preview.description).toBe('Cell division phases');
+    expect(preview.estimatedMinutes).toBe(25);
+  });
+
   // Red-green proof for [BUG-109]: revert the catch block to bare `catch {}`
   // and the warn spy receives zero calls — every transport failure is
   // invisible. With the fix, the structured log captures the surface +

@@ -219,14 +219,17 @@ export async function previewCurriculumTopic(
 
     // [WI-993] Replace `JSON.parse(jsonStr) as Record<string, unknown>` with a
     // lenient Zod parse: the schema only enforces that the JSON is an object
-    // with well-typed (optional) fields. The original defaulting + clamping
-    // semantics are PRESERVED below — a partial / out-of-range response still
-    // produces the same defaulted/clamped preview it did before; only a
-    // genuinely non-object response hits the fallback at this step.
+    // (not a string, array, null, etc.) — every field is `z.unknown()` so a
+    // single wrong-typed field (e.g. estimatedMinutes: "25") never fails the
+    // whole parse. The original defaulting + clamping semantics are PRESERVED
+    // below via coercive String()/Number() calls, matching the pattern in
+    // homework-summary.ts: a partial/wrong-typed response still produces the
+    // same defaulted/clamped preview; only a genuinely non-object response
+    // hits the fallback at this step.
     const curriculumTopicPreviewLlmSchema = z.object({
-      title: z.string().optional(),
-      description: z.string().optional(),
-      estimatedMinutes: z.number().optional(),
+      title: z.unknown().optional(),
+      description: z.unknown().optional(),
+      estimatedMinutes: z.unknown().optional(),
     });
     const parseResult = curriculumTopicPreviewLlmSchema.safeParse(
       JSON.parse(jsonStr),
@@ -242,9 +245,9 @@ export async function previewCurriculumTopic(
 
     const parsed = parseResult.data;
     const preview = {
-      title: (parsed.title ?? trimmedTitle).trim(),
-      description: (parsed.description ?? '').trim(),
-      estimatedMinutes: parsed.estimatedMinutes ?? 30,
+      title: String(parsed.title ?? trimmedTitle).trim(),
+      description: String(parsed.description ?? '').trim(),
+      estimatedMinutes: Number(parsed.estimatedMinutes ?? 30),
     };
 
     if (
