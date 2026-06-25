@@ -4,6 +4,7 @@ import {
   claimSessionForFilingRetry,
   closeSession,
   closeStaleSessions,
+  CLOSE_STALE_SESSIONS_PAGE_SIZE,
   flagContent,
   getSessionCompletionContext,
   matchTopicByIntent,
@@ -1556,6 +1557,257 @@ describe('closeStaleSessions — per-session error isolation', () => {
     const roundTripped = JSON.parse(JSON.stringify(result));
     expect(roundTripped.failures).toEqual(result.failures);
     expect(roundTripped.sessions).toEqual(result.sessions);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-958] closeStaleSessions — bounded cursor pagination
+//
+// Problem: the original implementation issued a single unbounded findMany,
+// loading the entire cross-profile stale backlog into memory.  After an
+// outage the result set grows O(N) — memory spike + serial round-trips.
+//
+// Fix: cursor-paginated loop (limit=CLOSE_STALE_SESSIONS_PAGE_SIZE, composite
+// (lastActivityAt, id) cursor) mirrors the filing-stranded-backfill pattern.
+//
+// Red-green evidence:
+//   GREEN (fix applied):  seeding 3 rows with pageSize=2 causes two findMany
+//     calls (page 1 = 2 rows, page 2 = 1 row); all 3 sessions are closed and
+//     failures from page 1 still surface without aborting page 2.
+//   RED   (fix reverted, i.e. pageSize not threaded to the db.query call):
+//     findMany is called once, returns all 3 rows in a single page, so the
+//     test's assertion that page-2 rows are also closed via a second findMany
+//     call would fail — the second-page session would be missing from results.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fake Database for the cursor-pagination test. It serves rows in pages of
+ * `pageSize` using a call-count offset, and tracks how many times findMany was
+ * called. The pageSize is determined by the `limit` option closeStaleSessions
+ * passes to findMany — so pagination is exercised end-to-end through the real
+ * function without introspecting the opaque Drizzle cursor AST.
+ *
+ * How it simulates pagination:
+ *   - Call 1 (no cursor): returns sorted[0..limit-1]
+ *   - Call 2 (cursor set): returns sorted[limit..2*limit-1]
+ *   - … until slice is empty
+ *
+ * This is safe because the real function advances the cursor from the last
+ * returned row and passes it on the next call; the call count maps 1:1 to
+ * the page index.
+ */
+function makePaginatedStaleBatchDb(options: {
+  staleRows: Array<{
+    id: string;
+    profileId: string;
+    subjectId: string;
+    sessionType: string;
+    lastActivityAt: Date;
+  }>;
+  throwForSessionId?: string;
+}) {
+  // Sort rows by (lastActivityAt asc, id asc) — mirrors the real ORDER BY.
+  const sorted = [...options.staleRows].sort((a, b) => {
+    const tDiff = a.lastActivityAt.getTime() - b.lastActivityAt.getTime();
+    if (tDiff !== 0) return tDiff;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+
+  const stubsById = new Map(sorted.map((r) => [r.id, r]));
+  let findManyCallCount = 0;
+
+  function fullSessionRow(stub: (typeof options.staleRows)[0]) {
+    return {
+      id: stub.id,
+      profileId: stub.profileId,
+      subjectId: stub.subjectId,
+      topicId: null,
+      sessionType: stub.sessionType,
+      inputMode: 'text',
+      verificationType: null,
+      status: 'active',
+      escalationRung: 0,
+      exchangeCount: 5,
+      startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      lastActivityAt: stub.lastActivityAt,
+      endedAt: null,
+      durationSeconds: null,
+      wallClockSeconds: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      metadata: null,
+    };
+  }
+
+  // Walk any Drizzle AST node and collect string leaf values that match known
+  // session ids. Used to identify the queried session id in findFirst.
+  function extractQueriedSessionId(where: unknown): string | undefined {
+    const seen = new Set<unknown>();
+    const stack: unknown[] = [where];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (node == null || typeof node !== 'object' || seen.has(node)) continue;
+      seen.add(node);
+      for (const value of Object.values(node as Record<string, unknown>)) {
+        if (typeof value === 'string' && stubsById.has(value)) {
+          return value;
+        }
+        if (value != null && typeof value === 'object') {
+          stack.push(value);
+        }
+      }
+    }
+    return undefined;
+  }
+
+  const db = {
+    query: {
+      learningSessions: {
+        findMany: jest
+          .fn()
+          .mockImplementation(
+            async (args?: { where?: unknown; limit?: number }) => {
+              const pageIndex = findManyCallCount;
+              findManyCallCount++;
+              const limit = args?.limit ?? sorted.length;
+              // Page-index offset: page 0 starts at 0, page 1 at limit, etc.
+              const slice = sorted.slice(
+                pageIndex * limit,
+                (pageIndex + 1) * limit,
+              );
+              return slice.map(fullSessionRow);
+            },
+          ),
+        findFirst: jest
+          .fn()
+          .mockImplementation(async (args?: { where?: unknown }) => {
+            const sessionId = extractQueriedSessionId(args?.where);
+            const stub = sessionId ? stubsById.get(sessionId) : undefined;
+            if (!stub) return undefined;
+            if (stub.id === options.throwForSessionId) {
+              throw new Error(`DB read failed for ${stub.id}`);
+            }
+            return fullSessionRow(stub);
+          }),
+      },
+      sessionEvents: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      sessionSummaries: {
+        findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+    },
+    transaction: jest
+      .fn()
+      .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+        fn(txBuilder),
+      ),
+
+    getFindManyCallCount: () => findManyCallCount,
+  };
+
+  const txBuilder = {
+    query: db.query,
+    update: () => txBuilder,
+    set: () => txBuilder,
+    where: () => txBuilder,
+    returning: async () => [{ id: 'closed-row' }],
+    insert: () => txBuilder,
+    values: () => txBuilder,
+  };
+
+  return db as never as typeof db;
+}
+
+describe('[WI-958] closeStaleSessions — bounded cursor pagination', () => {
+  let captureExceptionSpy: jest.SpiedFunction<
+    typeof sentryModule.captureException
+  >;
+
+  beforeEach(() => {
+    captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    captureExceptionSpy.mockRestore();
+  });
+
+  it('processes more rows than the page size via cursor pagination, preserving all results and failures', async () => {
+    // Seed 3 sessions but use pageSize=2 so the function must paginate.
+    // Red-green: with the old unbounded findMany, all 3 would come back in
+    // one call — findMany would be called once and the second page's session
+    // would still be closed (because it is in the same flat array), but
+    // findMany would only be called ONCE. With the fix, findMany is called
+    // TWICE: once for page 1 (2 rows) and once for page 2 (1 row).
+    const BASE_DATE = new Date('2026-01-01T00:00:00.000Z');
+    const staleRows = [
+      {
+        id: 'sess-p1a',
+        profileId: 'prof-p1a',
+        subjectId: 'subj-a',
+        sessionType: 'learning',
+        lastActivityAt: new Date(BASE_DATE.getTime()),
+      },
+      {
+        id: 'sess-p1b',
+        profileId: 'prof-p1b',
+        subjectId: 'subj-b',
+        sessionType: 'learning',
+        lastActivityAt: new Date(BASE_DATE.getTime() + 1000),
+      },
+      {
+        id: 'sess-p2a',
+        profileId: 'prof-p2a',
+        subjectId: 'subj-c',
+        sessionType: 'learning',
+        lastActivityAt: new Date(BASE_DATE.getTime() + 2000),
+      },
+    ];
+    // sess-p1b throws — page-1 failure must not abort page-2 processing.
+    const db = makePaginatedStaleBatchDb({
+      staleRows,
+      throwForSessionId: 'sess-p1b',
+    });
+
+    const cutoff = new Date(BASE_DATE.getTime() + 10000);
+    const result = await closeStaleSessions(db as never, cutoff, 2);
+
+    // All three sessions were attempted; sess-p1b threw.
+    const closedIds = result.sessions.map((r) => r.sessionId).sort();
+    expect(closedIds).toEqual(['sess-p1a', 'sess-p2a']);
+
+    // The failure surfaces without aborting the next page.
+    expect(result.failures).toHaveLength(1);
+    expect(result.failures[0]).toMatchObject({
+      sessionId: 'sess-p1b',
+      profileId: 'prof-p1b',
+    });
+
+    // findMany called at least twice: once per page. This is the key guard
+    // that proves pagination happened. With the old unbounded code the mock
+    // would return all rows on the first call and findMany would be called
+    // only once (and without a limit) — both assertions below would fail.
+    expect(db.getFindManyCallCount()).toBeGreaterThanOrEqual(2);
+
+    // Every findMany call must carry the limit=2 that was passed in. The old
+    // code passed no limit at all — asserting the bound value directly is the
+    // cleanest red-green guard.
+    const findManyCalls = (db.query.learningSessions.findMany as jest.Mock).mock
+      .calls as Array<[{ limit?: number }?]>;
+    for (const [arg] of findManyCalls) {
+      expect(arg?.limit).toBe(2);
+    }
+
+    // Failure escalated to Sentry (silent recovery is banned).
+    expect(captureExceptionSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('CLOSE_STALE_SESSIONS_PAGE_SIZE is 500 (mirrors filing-stranded-backfill limit)', () => {
+    expect(CLOSE_STALE_SESSIONS_PAGE_SIZE).toBe(500);
   });
 });
 
