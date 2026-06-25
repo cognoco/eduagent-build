@@ -390,7 +390,7 @@ export default function AssessmentScreen() {
           primaryAction: {
             label: t('session.quota.upgradePlan'),
             testID: 'assessment-error-upgrade',
-            onPress: () => router.push('/(app)/subscription'),
+            onPress: () => router.push('/(app)/subscription' as Href),
           },
           secondaryAction: {
             label: t('common.goHome'),

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useUser } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { AccountSecurity } from '../../../components/account-security';
 import {
@@ -75,7 +75,7 @@ export default function AccountScreen(): React.ReactElement {
         <SettingsRow
           label={t('more.account.profile')}
           value={displayName}
-          onPress={() => router.push('/profiles')}
+          onPress={() => router.push('/profiles' as Href)}
           testID="more-row-profile"
         />
         <AccountSecurity
@@ -105,7 +105,7 @@ export default function AccountScreen(): React.ReactElement {
                     .toUpperCase()}${subscription.tier.slice(1)}`
                 : undefined
             }
-            onPress={() => router.push('/(app)/subscription')}
+            onPress={() => router.push('/(app)/subscription' as Href)}
             testID="more-row-subscription"
           />
         ) : null}

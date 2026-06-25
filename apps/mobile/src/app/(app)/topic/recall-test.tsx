@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import {
   ChatShell,
   animateResponse,
@@ -359,7 +359,7 @@ export default function RecallTestScreen() {
       cooldownEndsAt={remediationData.cooldownEndsAt}
       onReviewRetest={handleReviewRetest}
       onRelearnTopic={handleRelearnTopic}
-      onBookPress={() => router.push('/(app)/library')}
+      onBookPress={() => router.push('/(app)/library' as Href)}
     />
   ) : inputDisabled ? (
     <View className="mt-4 items-center px-4">

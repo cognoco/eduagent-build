@@ -14,7 +14,7 @@ import {
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -474,7 +474,7 @@ export default function CreateProfileScreen() {
             { text: t('common.notNow'), style: 'cancel' },
             {
               text: t('createProfile.seePlans'),
-              onPress: () => router.push('/(app)/subscription'),
+              onPress: () => router.push('/(app)/subscription' as Href),
             },
           ],
         );

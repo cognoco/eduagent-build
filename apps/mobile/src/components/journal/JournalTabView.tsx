@@ -48,7 +48,7 @@ function useSectionErrorActions(
   const classified = classifyApiError(error);
   return recoveryActions(classified, {
     retry: onRetry,
-    goHome: () => router.push('/(app)/home'),
+    goHome: () => router.push('/(app)/home' as Href),
   });
 }
 
@@ -755,7 +755,7 @@ function JournalMemorySection(): React.ReactElement {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('journal.memory.open')}
-        onPress={() => router.push('/(app)/mentor-memory?returnTo=journal')}
+        onPress={() => router.push('/(app)/mentor-memory?returnTo=journal' as Href)}
         testID="journal-memory-open"
         className="mt-4 self-start rounded-button bg-primary px-4 py-2"
       >

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
   CONFLICT_ERROR_NAME,
@@ -131,7 +131,7 @@ export function FilingFailedBanner({ session }: { session: SessionLike }) {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => router.push('/(app)/home')}
+            onPress={() => router.push('/(app)/home' as Href)}
             accessibilityRole="button"
             accessibilityLabel={t('common.goHome')}
             className="rounded-button py-3 px-4 items-center mt-2 bg-surface"
