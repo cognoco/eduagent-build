@@ -3,6 +3,11 @@ import { relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(__dirname, '../../../..');
 const API_SRC_ROOT = resolve(REPO_ROOT, 'apps/api/src');
+// THIS_FILE is excluded from the scan so the guard does not flag its own
+// pattern strings (loadDatabaseEnv, createDatabase) as violations.
+// Motivated by WI-351: apply-retention-update.test.ts opened a real
+// DATABASE_URL-backed connection inside a *.test.ts file that the unit
+// runner picked up without Doppler — rename to *.db.integration.test.ts fixed it.
 const THIS_FILE = 'apps/api/src/test-utils/unit-db-boundary.guard.test.ts';
 const SKIPPED_DIRS = new Set([
   '.git',
