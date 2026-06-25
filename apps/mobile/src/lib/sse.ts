@@ -14,17 +14,16 @@
  */
 import {
   maybeReplayResponseSchema,
-  quotaExceededSchema,
   type ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
   BadRequestError,
+  classifyPaymentRequired,
   ConsentRequiredError,
   ForbiddenError,
   type IdempotencyReplayBody,
   NetworkError,
   NotFoundError,
-  QuotaExceededError,
   RateLimitedError,
   ResourceGoneError,
   triggerAuthExpired,
@@ -406,20 +405,16 @@ export function streamSSEViaXHR(
       return err;
     }
     if (status === 402) {
-      const quotaExceeded = quotaExceededSchema.safeParse(parsed);
-      if (quotaExceeded.success) {
-        return new QuotaExceededError(
-          quotaExceeded.data.message,
-          quotaExceeded.data.details,
-        );
-      }
-      // [BUG-545] Non-quota 402: use UpstreamError (not plain Error) so
-      // callers can inspect .status and .code without parsing message strings.
-      return new UpstreamError(
-        apiMessage ?? (responseText || 'Payment required'),
-        code ?? 'UPSTREAM_ERROR',
-        status,
-      );
+      // [#899 / BUG-545] Shared 402 classifier — quota body → QuotaExceededError,
+      // otherwise UpstreamError(402) so callers inspect .status/.code without
+      // parsing message strings.
+      return classifyPaymentRequired({
+        parsed,
+        message: apiMessage,
+        fallbackText: responseText,
+        code,
+        defaultCode: 'UPSTREAM_ERROR',
+      });
     }
     if (status === 403) {
       // [BUG-558] Mirror api-client.ts 403 branching: CONSENT_REQUIRED must
@@ -589,6 +584,15 @@ export function streamSSEViaXHR(
         throw streamError;
       }
       while (eventQueue.length > 0) {
+        // [#899] Re-check inside the drain, not just at the loop top. A 4xx can
+        // land *between* yields (the consumer awaits downstream work while the
+        // XHR error fires), and the entry guard above only covers the case
+        // where the error is already set when the generator resumes. Without
+        // this, still-buffered pre-error chunks would keep being yielded.
+        if (done && streamError) {
+          eventQueue.length = 0;
+          throw streamError;
+        }
         const event = eventQueue.shift();
         if (event) yield event;
       }

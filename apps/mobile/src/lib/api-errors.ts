@@ -21,6 +21,7 @@ import {
   RateLimitedError,
   ResourceGoneError,
   UnauthorizedError,
+  quotaExceededSchema,
   type QuotaExceededDetails,
   type UpgradeOption,
 } from '@eduagent/schemas';
@@ -147,4 +148,31 @@ export class UpstreamError extends Error {
     this.status = status;
     Object.setPrototypeOf(this, UpstreamError.prototype);
   }
+}
+
+/**
+ * [#899] Single source of truth for classifying an HTTP 402 body. The
+ * non-streaming client (`api-client.ts`) and the SSE path (`sse.ts`) each used
+ * to re-implement this — equivalent today, but a drift risk between the two
+ * payment-required surfaces. A structured quota envelope becomes a
+ * `QuotaExceededError`; any other 402 becomes an `UpstreamError` carrying the
+ * 402 status. Call-site-specific fallback text and default code are passed in
+ * so the two surfaces keep their existing wording.
+ */
+export function classifyPaymentRequired(args: {
+  parsed: unknown;
+  message?: string;
+  fallbackText?: string;
+  code?: string;
+  defaultCode: string;
+}): QuotaExceededError | UpstreamError {
+  const quota = quotaExceededSchema.safeParse(args.parsed);
+  if (quota.success) {
+    return new QuotaExceededError(quota.data.message, quota.data.details);
+  }
+  return new UpstreamError(
+    args.message ?? args.fallbackText ?? 'Payment required',
+    args.code ?? args.defaultCode,
+    402,
+  );
 }

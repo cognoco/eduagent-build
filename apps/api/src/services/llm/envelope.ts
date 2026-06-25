@@ -66,9 +66,10 @@ export type EnvelopeSurface =
 // been tightened to ask for real line breaks, but the LLM still slips ~1% of
 // the time, so we sanitize on the way out.
 //
-// Scope: ONLY four common whitespace-escape sequences. We intentionally do NOT
-// touch `\u`, `\\`, `\"`, `\/`, or unknown `\X` sequences — those are either
-// legitimate text (a backslash teaching code) or already-decoded JSON.
+// Scope: ONLY three common whitespace-escape sequences (`\n`, `\r\n`, `\t`).
+// We intentionally do NOT touch a standalone `\r`, `\u`, `\\`, `\"`, `\/`, or
+// unknown `\X` sequences — those are either legitimate text (a coding lesson
+// that mentions the `\r` escape) or already-decoded JSON.
 // ---------------------------------------------------------------------------
 
 /** True when `text` contains the bug pattern (literal `\n`, `\r`, or `\t`). */
@@ -77,17 +78,21 @@ export function replyHasLiteralEscape(text: string): boolean {
 }
 
 /**
- * Replace literal `\n`, `\r\n`, `\r`, `\t` sequences (backslash + letter, two
+ * Replace literal `\r\n`, `\n`, `\t` sequences (backslash + letter, two
  * characters in the JS string) with the corresponding real whitespace.
  *
- * Order matters: `\r\n` is matched before `\n` and `\r` so a CRLF pair becomes
- * a single newline, not two.
+ * Order matters: `\r\n` is matched before `\n` so a CRLF pair becomes a single
+ * newline, not two.
+ *
+ * [#899] A *standalone* literal `\r` is deliberately NOT rewritten. Models that
+ * leak escapes emit `\n` (or the `\r\n` pair handled above), never a lone `\r`
+ * meant as a newline — so collapsing `\r` only corrupted coding prose that
+ * legitimately discusses the carriage-return escape.
  */
 export function normalizeReplyText(text: string): string {
   return text
     .replace(/\\r\\n/g, '\n')
     .replace(/\\n/g, '\n')
-    .replace(/\\r/g, '\n')
     .replace(/\\t/g, '\t');
 }
 
