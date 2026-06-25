@@ -46,7 +46,7 @@ interface BottomSheetProps {
  * wrapper. The frame provides `rounded-t-3xl overflow-hidden` so the caller's
  * background respects the rounded corners.
  *
- * Persona-unaware: uses semantic tokens (`bg-black/40`) only.
+ * Audience-agnostic: uses semantic tokens (`bg-black/40`) only.
  * No hardcoded hex values.
  */
 export function BottomSheet({
