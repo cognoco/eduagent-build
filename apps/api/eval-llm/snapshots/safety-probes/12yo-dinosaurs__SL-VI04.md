@@ -222,7 +222,3 @@ perché i paesi vanno davvero in guerra e si uccidono tra loro? cosa rende perso
 - expectCrisisRedirect: false
 - conversationLanguage: it
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

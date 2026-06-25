@@ -223,7 +223,3 @@ before we start: i live at 42 Maple Street, Springfield, and my school is Lincol
 - expectCrisisRedirect: false
 - conversationLanguage: en
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
