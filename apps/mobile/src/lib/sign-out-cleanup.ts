@@ -185,9 +185,9 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
   },
   {
     file: 'apps/mobile/src/lib/summary-draft.ts',
-    line: 54,
+    line: 56,
     reason:
-      'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API). [Line updated WI-1090: KEY_PREFIX const replaced by barrel import, shifted line by 1]',
+      'Drafts use getDraftKey(profileId, sessionId) — multi-key shape with sessionId we cannot enumerate at sign-out. Drafts self-expire via DRAFT_TTL_MS (7d) on next read, so leakage is bounded; document and accept rather than register a prefix-wipe (expo-secure-store has no listKeys API). [Line updated WI-1090: KEY_PREFIX const replaced by barrel import, shifted line by 2]',
   },
   {
     file: 'apps/mobile/src/lib/intro-state.ts',
