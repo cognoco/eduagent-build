@@ -108,11 +108,16 @@ export const consentRevocation = inngest.createFunction(
       await safeSend(
         () =>
           inngest.send({
+            // orphan-allow: observability-only dead-letter signal (no handler
+            // needed); consumed out-of-band by ops alerting and queryable via
+            // the Inngest dashboard. Paired with the explicit captureMessage
+            // (above) which carries the escalation signal.
             name: 'app/consent.revocation.failed',
             data: {
               childProfileId,
               parentProfileId,
               error: error instanceof Error ? error.message : String(error),
+              timestamp: new Date().toISOString(),
             },
           }),
         'consent-revocation.terminal_failure',
