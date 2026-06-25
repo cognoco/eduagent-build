@@ -2,8 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nowResponseSchema, type NowResponse } from '@eduagent/schemas';
 
 import { Sentry } from './sentry';
-
-const KEY_PREFIX = 'now-feed-cache';
+import { NOW_FEED_CACHE_KEY_PREFIX as KEY_PREFIX } from './secure-store-keys';
 
 export const NOW_FEED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 

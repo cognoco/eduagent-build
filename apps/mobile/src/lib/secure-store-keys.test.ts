@@ -22,6 +22,9 @@ import {
   notificationFirstAskKey,
   guardianNotificationAskKey,
   summaryDraftKey,
+  AUTH_EXPIRY_EXPIRED_STORAGE_KEY,
+  AUTH_EXPIRY_REVOKED_STORAGE_KEY,
+  NOW_FEED_CACHE_KEY_PREFIX,
 } from './secure-store-keys';
 
 const SAMPLE_PROFILE_ID = 'abc-123-def';
@@ -108,6 +111,29 @@ describe('secure-store-keys barrel', () => {
       const key = summaryDraftKey(SAMPLE_PROFILE_ID, SAMPLE_SESSION_ID);
       expect(isCharSafe(key)).toBe(true);
       expect(sanitizeSecureStoreKey(key)).toBe(key);
+    });
+
+    // Non-SecureStore keys (sessionStorage / AsyncStorage) — char-safety still
+    // enforced here so the barrel remains a single sanitization checkpoint.
+    it('AUTH_EXPIRY_EXPIRED_STORAGE_KEY is char-safe', () => {
+      expect(isCharSafe(AUTH_EXPIRY_EXPIRED_STORAGE_KEY)).toBe(true);
+      expect(sanitizeSecureStoreKey(AUTH_EXPIRY_EXPIRED_STORAGE_KEY)).toBe(
+        AUTH_EXPIRY_EXPIRED_STORAGE_KEY,
+      );
+    });
+
+    it('AUTH_EXPIRY_REVOKED_STORAGE_KEY is char-safe', () => {
+      expect(isCharSafe(AUTH_EXPIRY_REVOKED_STORAGE_KEY)).toBe(true);
+      expect(sanitizeSecureStoreKey(AUTH_EXPIRY_REVOKED_STORAGE_KEY)).toBe(
+        AUTH_EXPIRY_REVOKED_STORAGE_KEY,
+      );
+    });
+
+    it('NOW_FEED_CACHE_KEY_PREFIX is char-safe', () => {
+      expect(isCharSafe(NOW_FEED_CACHE_KEY_PREFIX)).toBe(true);
+      expect(sanitizeSecureStoreKey(NOW_FEED_CACHE_KEY_PREFIX)).toBe(
+        NOW_FEED_CACHE_KEY_PREFIX,
+      );
     });
   });
 
