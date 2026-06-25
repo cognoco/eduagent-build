@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   analogyFramingSchema,
   interestContextValueSchema,
@@ -130,11 +131,18 @@ export async function extractSignalsFromExchangeHistory(
     return defaultExtractedSignals(exchangeHistory);
   }
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(jsonStr) as Record<string, unknown>;
-  } catch (err) {
-    captureException(err, {
+  const topicProbeSignalsLlmSchema = z.record(z.string(), z.unknown());
+  const parseResult = topicProbeSignalsLlmSchema.safeParse(
+    (() => {
+      try {
+        return JSON.parse(jsonStr);
+      } catch {
+        return null;
+      }
+    })(),
+  );
+  if (!parseResult.success) {
+    captureException(new Error('topic-probe signal extraction: invalid JSON'), {
       extra: {
         surface: 'topic-probe-signal-extraction',
         reason: 'invalid_json',
@@ -143,6 +151,7 @@ export async function extractSignalsFromExchangeHistory(
     });
     return defaultExtractedSignals(exchangeHistory);
   }
+  const parsed = parseResult.data;
 
   const rawInterests = Array.isArray(parsed.interests)
     ? (parsed.interests as unknown[])

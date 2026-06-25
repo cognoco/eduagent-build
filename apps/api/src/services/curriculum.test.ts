@@ -2335,6 +2335,70 @@ describe('[BUG-110+109] previewCurriculumTopic resilience', () => {
     expect(preview.estimatedMinutes).toBe(25);
   });
 
+  // [WI-993] The `JSON.parse(...) as Record<string, unknown>` cast was replaced
+  // with a lenient Zod parse, but the original defaulting + clamping semantics
+  // are PRESERVED: an out-of-range estimatedMinutes is clamped to [5, 240]
+  // rather than sending the whole (otherwise valid) preview to the fallback.
+  // Red-green: a strict `z.number().min(5).max(240)` schema would reject 9999
+  // and return the heuristic fallback instead of clamping to 240.
+  it('clamps an out-of-range estimatedMinutes to the [5, 240] bound (keeps the LLM preview)', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+      estimatedMinutes: 9999,
+    });
+    registerProvider(providerReturning(obj));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.title).toBe('Mitosis');
+    expect(preview.estimatedMinutes).toBe(240);
+  });
+
+  it('clamps a below-range estimatedMinutes up to 5 (keeps the LLM preview)', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+      estimatedMinutes: 1,
+    });
+    registerProvider(providerReturning(obj));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.estimatedMinutes).toBe(5);
+  });
+
+  // [WI-993] A missing estimatedMinutes defaults to 30 (original behavior),
+  // not a fallback — the strict schema would have required the field.
+  it('defaults a missing estimatedMinutes to 30 (keeps the LLM title/description)', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+    });
+    registerProvider(providerReturning(obj));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.title).toBe('Mitosis');
+    expect(preview.estimatedMinutes).toBe(30);
+  });
+
+  // [WI-993] SHOULD_FIX: a wrong-typed field (string estimatedMinutes) must NOT
+  // discard a valid LLM title and description — coercive defaults preserve the
+  // object. Red-green: with z.number().optional() the parse fails and returns
+  // the heuristic fallback; with z.unknown().optional() + Number() the title
+  // and description are kept.
+  it('preserves LLM title and description when estimatedMinutes is a string (coerces to number)', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+      estimatedMinutes: '25',
+    });
+    registerProvider(providerReturning(obj));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.title).toBe('Mitosis');
+    expect(preview.description).toBe('Cell division phases');
+    expect(preview.estimatedMinutes).toBe(25);
+  });
+
   // Red-green proof for [BUG-109]: revert the catch block to bare `catch {}`
   // and the warn spy receives zero calls — every transport failure is
   // invisible. With the fix, the structured log captures the surface +
