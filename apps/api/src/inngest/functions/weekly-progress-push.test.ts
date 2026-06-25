@@ -207,6 +207,10 @@ import {
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
 } from './weekly-progress-push';
+// `../plan-limits` is intentionally NOT mocked (unlike `../client`), so this is
+// the real plan cap the receiver registers against — single source of truth
+// shared with the function under test.
+import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 
 const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
 
@@ -356,10 +360,13 @@ afterEach(() => {
 // [BUG-260] The receiver function must cap parallelism. Without this,
 // the Monday-morning cron fan-out can stampede Neon and the
 // Resend/push providers when many parents qualify in the same UTC hour.
+// The intended bound was 25, but every per-function limit is clamped to the
+// Inngest hosted-plan cap (a higher value blocks the WHOLE app from syncing —
+// see plan-limits.ts), so the receiver registers at INNGEST_PLAN_CONCURRENCY_CAP.
 describe('[BUG-260] weeklyProgressPushGenerate concurrency', () => {
   it('declares a concurrency limit on the receiver', () => {
     const opts = (weeklyProgressPushGenerate as any).opts;
-    expect(opts.concurrency).toEqual({ limit: 25 });
+    expect(opts.concurrency).toEqual({ limit: INNGEST_PLAN_CONCURRENCY_CAP });
   });
 });
 

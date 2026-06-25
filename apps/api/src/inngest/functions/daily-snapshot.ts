@@ -22,7 +22,8 @@ import { learningSessions, person, profiles } from '@eduagent/database';
 // [BUG-248] Use the same canonical step-database helper everywhere else in
 // the file does — no new import needed for the SQL-side dedup; drizzle's
 // selectDistinct produces a `SELECT DISTINCT profile_id` plan.
-import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
+import { inngest } from '../client';
+import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { snapshotRefreshEventSchema } from '@eduagent/schemas';

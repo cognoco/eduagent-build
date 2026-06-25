@@ -200,17 +200,3 @@ export const inngest = new Inngest({
   id: 'eduagent',
   middleware: [envBindingMiddleware, piiScrubMiddleware],
 });
-
-/**
- * Hard cap on per-function `concurrency.limit` imposed by the current Inngest
- * hosted plan (Free = 5). The plan REJECTS app sync if ANY function declares a
- * higher limit — and because one rejected function blocks the WHOLE app from
- * registering, a single over-cap value silently kills every Inngest function
- * (all crons + background jobs go dark with no error in app logs). This is
- * exactly what happened to staging 2026-05→06.
- *
- * Every function's `concurrency.limit` MUST be <= this value. To run higher,
- * upgrade the Inngest plan FIRST, then raise this constant. Enforced forward-
- * only by `inngest-concurrency-cap.guard.test.ts`.
- */
-export const INNGEST_PLAN_CONCURRENCY_CAP = 5;

@@ -30,7 +30,8 @@ import {
   profiles,
   weeklyReports,
 } from '@eduagent/database';
-import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
+import { inngest } from '../client';
+import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import {
   getStepDatabase,
   getStepResendApiKey,

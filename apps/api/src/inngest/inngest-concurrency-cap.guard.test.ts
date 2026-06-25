@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { INNGEST_PLAN_CONCURRENCY_CAP } from './client';
+import { INNGEST_PLAN_CONCURRENCY_CAP } from './plan-limits';
 
 // ---------------------------------------------------------------------------
 // Forward-only guard: no Inngest function may declare a per-function
