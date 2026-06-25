@@ -13,7 +13,7 @@ const ciDefaults = process.env.CI
 /** @type {import('jest').Config} */
 module.exports = {
   transform: { '^.+\\.tsx?$': ['ts-jest', { useESM: false }] },
-  testMatch: ['<rootDir>/**/*.test.ts'],
+  testMatch: ['**/*.test.ts'],
   moduleFileExtensions: ['ts', 'js', 'json'],
   // WI-536 flaky-test quarantine (see tools/quarantine/).
   testPathIgnorePatterns: [
