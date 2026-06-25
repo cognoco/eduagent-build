@@ -83,3 +83,17 @@ export function mapProfileQuotaUsageRow(
     cycleResetAt: row.cycleResetAt.toISOString(),
   };
 }
+
+/**
+ * Extract the tier-level quota fields used when upgrading a subscription via a
+ * RevenueCat webhook (alias-merge and direct webhook handlers).
+ * Shared by alias-merge.ts and alias-merge-v2.ts to avoid each calling
+ * getTierConfig and re-extracting the same two fields independently.
+ */
+export function extractTierQuota(tier: SubscriptionTier): {
+  monthlyQuota: number;
+  dailyLimit: number | null;
+} {
+  const config = getTierConfig(tier);
+  return { monthlyQuota: config.monthlyQuota, dailyLimit: config.dailyLimit };
+}

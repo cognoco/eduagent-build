@@ -2,10 +2,12 @@
 // Verifies that the extracted helpers produce the same output that the inline
 // copies in quota-provision.ts / quota-provision-v2.ts previously produced.
 
+import { getTierConfig } from '../subscription';
 import {
   nextMonthlyReset,
   getProfileQuotaLimits,
   mapProfileQuotaUsageRow,
+  extractTierQuota,
 } from './billing-shared';
 
 describe('nextMonthlyReset', () => {
@@ -114,4 +116,17 @@ describe('mapProfileQuotaUsageRow', () => {
     const snapshot = mapProfileQuotaUsageRow(row);
     expect(snapshot.dailyLimit).toBeNull();
   });
+});
+
+describe('extractTierQuota', () => {
+  it.each(['free', 'plus', 'family', 'pro'] as const)(
+    'picks monthlyQuota and dailyLimit from the tier config for %s',
+    (tier) => {
+      const config = getTierConfig(tier);
+      expect(extractTierQuota(tier)).toEqual({
+        monthlyQuota: config.monthlyQuota,
+        dailyLimit: config.dailyLimit,
+      });
+    },
+  );
 });

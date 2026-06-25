@@ -38,7 +38,6 @@
 import type { Database } from '@eduagent/database';
 import type { BillingAliasReceivedEvent } from '@eduagent/schemas';
 
-import { getTierConfig } from '../../subscription';
 import { captureMessage } from '../../sentry';
 import { createLogger } from '../../logger';
 import { claimWebhookId } from '../../webhook-idempotency';
@@ -48,6 +47,7 @@ import {
   ALIAS_MERGE_IDEMPOTENCY_SOURCE,
   type AliasMergeResult,
 } from '../alias-merge';
+import { extractTierQuota } from '../billing-shared';
 import { resolveAccountIdV2 } from './revenuecat-webhook-handler-v2';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';
 import { updateSubscriptionAndQuotaFromRevenuecatWebhookV2 } from './revenuecat-v2';
@@ -141,7 +141,6 @@ export async function mergeAliasedSubscriptionV2(
     //     keys its internal dedup off the alias merge, not the original
     //     purchase event.
     if (decision.upgradeSurvivor) {
-      const tierConfig = getTierConfig(decision.survivorTier);
       const updated = await updateSubscriptionAndQuotaFromRevenuecatWebhookV2(
         txDb,
         toOrganizationId,
@@ -152,10 +151,7 @@ export async function mergeAliasedSubscriptionV2(
           currentPeriodEnd: decision.survivorPeriodEnd,
           trialEndsAt: decision.survivorTrialEndsAt,
         },
-        {
-          monthlyQuota: tierConfig.monthlyQuota,
-          dailyLimit: tierConfig.dailyLimit,
-        },
+        extractTierQuota(decision.survivorTier),
       );
       if (updated) {
         changed = true;
