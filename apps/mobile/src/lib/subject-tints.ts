@@ -6,6 +6,11 @@ import {
 
 export { SUBJECT_TINT_PALETTE };
 
+export interface LearningSubjectTint {
+  solid: string;
+  soft: string;
+}
+
 function getSubjectTintIndex(subjectId: string, paletteLength: number): number {
   const hex = subjectId.replace(/-/g, '');
   let hash = 0x811c9dc5; // FNV offset basis

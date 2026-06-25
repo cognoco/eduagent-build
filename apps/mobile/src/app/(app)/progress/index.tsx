@@ -55,7 +55,6 @@ import {
   pushChildWeeklyReport,
   pushLearningResumeTarget,
 } from '../../../lib/navigation';
-import { copyRegisterFor } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
@@ -66,7 +65,7 @@ import { useTheme } from '../../../lib/theme';
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
+  const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
   const { profileId: rawRequestedProfileId } = useLocalSearchParams<{
     profileId?: string;

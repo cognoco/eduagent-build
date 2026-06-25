@@ -9,7 +9,7 @@ import type {
 } from '@eduagent/schemas';
 
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
-import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import type { LearningSubjectTint } from '../../lib/subject-tints';
 import { ShelfRow } from './ShelfRow';
 
 export interface EnrichedSubjectResult {
