@@ -7,6 +7,7 @@
 
 import { Platform } from 'react-native';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import { Sentry } from './sentry';
 
 /**
  * Returns the platform-specific RevenueCat API key.
@@ -45,9 +46,13 @@ export function configureRevenueCat(): void {
     if (__DEV__) {
       console.warn(message);
     } else {
-      // Production: use console.error so crash reporters / log aggregators
-      // surface the misconfiguration rather than silently disabling purchases.
-      console.error(message);
+      Sentry.captureException(new Error(message), {
+        tags: {
+          component: 'revenuecat',
+          platform: Platform.OS,
+          reason: 'missing_api_key',
+        },
+      });
     }
     return;
   }
