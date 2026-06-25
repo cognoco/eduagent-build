@@ -57,6 +57,7 @@ import {
 } from '../../../lib/navigation';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
+import { useApiClient } from '../../../lib/api-client';
 import { getSubjectTintMap } from '../../../lib/subject-tints';
 import { useAppContext } from '../../../lib/app-context';
 import { FEATURE_FLAGS } from '../../../lib/feature-flags';
@@ -67,6 +68,7 @@ export default function ProgressScreen(): React.ReactElement {
   const role = useActiveProfileRole();
   const register = role === 'child' ? 'child' : 'adult';
   const router = useRouter();
+  const client = useApiClient();
   const { profileId: rawRequestedProfileId } = useLocalSearchParams<{
     profileId?: string;
   }>();
@@ -437,9 +439,13 @@ export default function ProgressScreen(): React.ReactElement {
 
   const handleEmptyProgressAction = () => {
     if (activeProfile) {
-      track('progress_empty_state_cta_tapped', {
-        profile_id_hash: hashProfileId(activeProfile.id),
-        account_age_bucket: bucketAccountAge(activeProfile.createdAt),
+      const profileId = activeProfile.id;
+      const accountAgeBucket = bucketAccountAge(activeProfile.createdAt);
+      void hashProfileId(profileId, client).then((profileIdHash) => {
+        track('progress_empty_state_cta_tapped', {
+          profile_id_hash: profileIdHash,
+          account_age_bucket: accountAgeBucket,
+        });
       });
     }
 

@@ -3,6 +3,10 @@ import * as StoreReview from 'expo-store-review';
 import * as SecureStore from '../lib/secure-storage';
 import { computeAgeBracket } from '@eduagent/schemas';
 import { useProfile } from '../lib/profile';
+import {
+  ratingRecallCountKey,
+  ratingLastPromptKey,
+} from '../lib/secure-store-keys';
 
 /** Minimum successful recalls before prompting. */
 const MIN_SUCCESSFUL_RECALLS = 5;
@@ -17,11 +21,9 @@ const MIN_DAYS_BETWEEN_PROMPTS = 90;
 // crashes on some Android devices. Legacy `rating-recall-success-count:${id}`
 // and `rating-last-prompt:${id}` migration removed 2026-05-24 (BUG-724 /
 // FCR-2026-05-23-L14.F10) — pre-launch, no real devices had the legacy keys.
-const RECALL_COUNT_KEY = (profileId: string): string =>
-  `rating-recall-success-count-${profileId}`;
-
-const LAST_PROMPT_KEY = (profileId: string): string =>
-  `rating-last-prompt-${profileId}`;
+// [WI-1090] Key definitions moved to secure-store-keys barrel.
+const RECALL_COUNT_KEY = ratingRecallCountKey;
+const LAST_PROMPT_KEY = ratingLastPromptKey;
 
 /**
  * Hook for prompting App Store rating at psychologically optimal moments.

@@ -13,6 +13,8 @@ import {
   getConsentStatus,
   isConsentRevocationGenerationCurrent,
   isGdprProcessingAllowed,
+  isGdprProcessingAllowedBatch,
+  getLatestGdprConsentByProfile,
   revokeConsent,
   restoreConsent,
   refreshConsentToken,
@@ -1747,5 +1749,175 @@ describe('resendConsent — rollback failure logging (errors-api F-048)', () => 
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLatestGdprConsentByProfile + isGdprProcessingAllowedBatch — WI-489
+// ---------------------------------------------------------------------------
+function makeBatchRow(
+  profileId: string,
+  status: 'CONSENTED' | 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'WITHDRAWN',
+  requestedAt: Date = NOW,
+  respondedAt: Date | null = null,
+) {
+  return { profileId, status, requestedAt, respondedAt };
+}
+
+function makeBatchDb(rows: ReturnType<typeof makeBatchRow>[]): Database {
+  return {
+    query: {
+      consentStates: {
+        findMany: jest.fn().mockResolvedValue(rows),
+      },
+    },
+  } as unknown as Database;
+}
+
+describe('getLatestGdprConsentByProfile', () => {
+  it('returns empty map for empty profileIds list', async () => {
+    const db = makeBatchDb([]);
+    const result = await getLatestGdprConsentByProfile(db, []);
+    expect(result.size).toBe(0);
+  });
+
+  it('OMITS profiles with no consent row (behaviour-preserving: → consentStatus null)', async () => {
+    // The original dashboard code only put profiles WITH a GDPR row into the
+    // map; a pre-consent-flow child therefore reported consentStatus: null.
+    // getLatestGdprConsentByProfile must NOT pre-populate no-row profiles.
+    const db = makeBatchDb([]);
+    const result = await getLatestGdprConsentByProfile(db, ['p-missing']);
+    expect(result.has('p-missing')).toBe(false);
+    expect(result.get('p-missing')).toBeUndefined();
+  });
+
+  it('preserves the real respondedAt for a CONSENTED profile (not nulled)', async () => {
+    const consentedAt = new Date('2025-03-01T08:00:00.000Z');
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'CONSENTED', NOW, consentedAt),
+    ]);
+    const result = await getLatestGdprConsentByProfile(db, ['p1']);
+    expect(result.get('p1')).toEqual({
+      status: 'CONSENTED',
+      respondedAt: consentedAt,
+    });
+  });
+
+  it('preserves the real respondedAt for a WITHDRAWN profile (grace-period countdown)', async () => {
+    const withdrawnAt = new Date('2025-06-10T12:00:00.000Z');
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'WITHDRAWN', NOW, withdrawnAt),
+    ]);
+    const result = await getLatestGdprConsentByProfile(db, ['p1']);
+    expect(result.get('p1')).toEqual({
+      status: 'WITHDRAWN',
+      respondedAt: withdrawnAt,
+    });
+  });
+
+  it('normalises an undefined respondedAt to null', async () => {
+    const db = makeBatchDb([makeBatchRow('p1', 'CONSENTED', NOW, null)]);
+    const result = await getLatestGdprConsentByProfile(db, ['p1']);
+    expect(result.get('p1')).toEqual({ status: 'CONSENTED', respondedAt: null });
+  });
+
+  it('keeps only the latest (first) row per profileId — mirrors BUG-394 ordering', async () => {
+    const older = makeBatchRow(
+      'p1',
+      'CONSENTED',
+      new Date('2025-01-01T00:00:00Z'),
+      new Date('2025-01-01T00:00:00Z'),
+    );
+    const newer = makeBatchRow(
+      'p1',
+      'WITHDRAWN',
+      new Date('2025-06-01T00:00:00Z'),
+      new Date('2025-06-01T00:00:00Z'),
+    );
+    // findMany returns newest-first (as the real ordered query would).
+    const db = makeBatchDb([newer, older]);
+    const result = await getLatestGdprConsentByProfile(db, ['p1']);
+    expect(result.get('p1')?.status).toBe('WITHDRAWN');
+    expect(result.get('p1')?.respondedAt).toEqual(
+      new Date('2025-06-01T00:00:00Z'),
+    );
+  });
+
+  it('returns only the profiles that have rows in a mixed batch', async () => {
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'CONSENTED'),
+      makeBatchRow('p2', 'WITHDRAWN'),
+    ]);
+    const result = await getLatestGdprConsentByProfile(db, ['p1', 'p2', 'p3']);
+    expect(result.has('p1')).toBe(true);
+    expect(result.has('p2')).toBe(true);
+    expect(result.has('p3')).toBe(false);
+  });
+});
+
+describe('isGdprProcessingAllowedBatch', () => {
+  it('returns empty map for empty profileIds list', async () => {
+    const db = makeBatchDb([]);
+    const result = await isGdprProcessingAllowedBatch(db, []);
+    expect(result.size).toBe(0);
+  });
+
+  it('allows profile with CONSENTED row', async () => {
+    const db = makeBatchDb([makeBatchRow('p1', 'CONSENTED')]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1']);
+    expect(result.get('p1')).toBe(true);
+  });
+
+  it('blocks profile with WITHDRAWN row', async () => {
+    const db = makeBatchDb([makeBatchRow('p1', 'WITHDRAWN')]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1']);
+    expect(result.get('p1')).toBe(false);
+  });
+
+  it('blocks profile with PENDING row', async () => {
+    const db = makeBatchDb([makeBatchRow('p1', 'PENDING')]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1']);
+    expect(result.get('p1')).toBe(false);
+  });
+
+  it('blocks profile with PARENTAL_CONSENT_REQUESTED row', async () => {
+    const db = makeBatchDb([makeBatchRow('p1', 'PARENTAL_CONSENT_REQUESTED')]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1']);
+    expect(result.get('p1')).toBe(false);
+  });
+
+  it('allows profile with no consent row (implicitly allowed)', async () => {
+    const db = makeBatchDb([]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p-missing']);
+    expect(result.get('p-missing')).toBe(true);
+  });
+
+  it('handles mixed allowed and blocked profileIds correctly', async () => {
+    // p1: CONSENTED → allowed
+    // p2: WITHDRAWN → blocked
+    // p3: no row → implicitly allowed
+    // p4: PENDING → blocked
+    const db = makeBatchDb([
+      makeBatchRow('p1', 'CONSENTED'),
+      makeBatchRow('p2', 'WITHDRAWN'),
+      makeBatchRow('p4', 'PENDING'),
+    ]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1', 'p2', 'p3', 'p4']);
+    expect(result.get('p1')).toBe(true);
+    expect(result.get('p2')).toBe(false);
+    expect(result.get('p3')).toBe(true);
+    expect(result.get('p4')).toBe(false);
+  });
+
+  it('uses first-row-wins dedup (latest row per profileId, mirroring BUG-394 ordering)', async () => {
+    // Simulate two rows for the same profile: findMany already ordered by
+    // desc(requestedAt), desc(id) — helper must keep only the first row.
+    const older = makeBatchRow('p1', 'CONSENTED', new Date('2025-01-01T00:00:00Z'));
+    const newer = makeBatchRow('p1', 'WITHDRAWN', new Date('2025-06-01T00:00:00Z'));
+    // findMany returns them ordered newest-first (as the real DB would).
+    const db = makeBatchDb([newer, older]);
+    const result = await isGdprProcessingAllowedBatch(db, ['p1']);
+    // The newer WITHDRAWN row wins → blocked.
+    expect(result.get('p1')).toBe(false);
   });
 });

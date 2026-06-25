@@ -427,9 +427,7 @@
     }
   },
   "family": {
-    "orientationCueBody": "Barnas fremgang og din egen læring, alt på ett sted.",
     "orientationCueDismiss": "Skjønner",
-    "orientationCueTitle": "Dette er hjemmet ditt",
     "withdrawal": {
       "bannerTitleSingle": "{{name}}s konto avsluttes om {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} kontoer avsluttes snart",

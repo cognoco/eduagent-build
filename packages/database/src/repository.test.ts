@@ -809,3 +809,68 @@ describe('createScopedRepository', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// quizRounds.findByIdForUpdate — BUG-851 row-lock invariant [WI-350]
+// ---------------------------------------------------------------------------
+
+describe('quizRounds.findByIdForUpdate', () => {
+  /**
+   * Invariant: findByIdForUpdate must call .for('update') on the select chain.
+   * Without the FOR UPDATE clause the row-lock is absent and concurrent
+   * appendRecordedAttempt writes can slip between the SELECT and the subsequent
+   * completion UPDATE — reintroducing the TOCTOU race fixed by BUG-851.
+   * Callers must invoke this method as the FIRST operation inside db.transaction
+   * (FOR UPDATE is a no-op when executed outside a transaction).
+   */
+  function makeSelectChain(returnRows: unknown[]) {
+    // Each builder method in the Drizzle select chain returns `this` so we
+    // can spy on the full call sequence.
+    const forSpy = jest.fn();
+    const limitFn = jest.fn().mockResolvedValue(returnRows);
+    const forFn = jest.fn().mockReturnValue({ limit: limitFn });
+    const whereFn = jest.fn().mockReturnValue({ for: forFn });
+    const fromFn = jest.fn().mockReturnValue({ where: whereFn });
+    const selectFn = jest.fn().mockReturnValue({ from: fromFn });
+
+    const db = {
+      query: new Proxy(
+        {},
+        { get: () => ({ findFirst: jest.fn(), findMany: jest.fn() }) },
+      ),
+      select: selectFn,
+    } as unknown as Database;
+
+    return { db, selectFn, fromFn, whereFn, forFn, forSpy, limitFn };
+  }
+
+  it('calls .for("update") on the select chain — FOR UPDATE clause is present', async () => {
+    const roundId = 'round-1';
+    const { db, forFn } = makeSelectChain([]);
+    const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+    await repo.quizRounds.findByIdForUpdate(roundId);
+
+    expect(forFn).toHaveBeenCalledWith('update');
+  });
+
+  it('returns the first row when a matching round exists', async () => {
+    const roundId = 'round-1';
+    const mockRow = { id: roundId, profileId: TEST_PROFILE_ID, status: 'active' };
+    const { db } = makeSelectChain([mockRow]);
+    const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+    const result = await repo.quizRounds.findByIdForUpdate(roundId);
+
+    expect(result).toEqual(mockRow);
+  });
+
+  it('returns null when no row matches', async () => {
+    const { db } = makeSelectChain([]);
+    const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+    const result = await repo.quizRounds.findByIdForUpdate('nonexistent-round');
+
+    expect(result).toBeNull();
+  });
+});

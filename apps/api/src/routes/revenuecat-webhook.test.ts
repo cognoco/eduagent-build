@@ -135,6 +135,10 @@ import {
   LATE_REVENUECAT_EVENT_OBSERVATION_MS,
   revenuecatWebhookRoute,
 } from './revenuecat-webhook';
+import {
+  revenuecatAuthFailureEscalator,
+  SIGNATURE_FAILURE_THRESHOLD,
+} from '../services/webhooks/signature-failure-escalator';
 import type { AppVariables } from '../types/hono';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
@@ -2463,5 +2467,127 @@ describe('KV outage tolerance [CR-2026-05-19-H6]', () => {
         'kv-cache-refresh',
     );
     expect(sentryCall).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sustained auth-failure escalation [WI-1064]
+//
+// Route-wiring regression: removing revenuecatAuthFailureEscalator.record()
+// from the auth-rejection branches must fail these tests. The escalator's
+// threshold/window logic itself is unit-tested in
+// services/webhooks/signature-failure-escalator.test.ts.
+// ---------------------------------------------------------------------------
+
+describe('sustained auth-failure escalation [WI-1064]', () => {
+  beforeEach(() => {
+    // The escalator singleton accumulates state across other tests in this
+    // file. Reset for deterministic threshold counting.
+    revenuecatAuthFailureEscalator.__resetForTesting();
+    mockCaptureException.mockClear();
+  });
+
+  afterEach(() => {
+    revenuecatAuthFailureEscalator.__resetForTesting();
+  });
+
+  async function sendMissingHeaderRequest(): Promise<Response> {
+    return app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV,
+    );
+  }
+
+  async function sendWrongTokenRequest(): Promise<Response> {
+    return app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer wrong_token',
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      TEST_ENV,
+    );
+  }
+
+  it('does not escalate to Sentry for a single missing-header failure (log-only)', async () => {
+    const res = await sendMissingHeaderRequest();
+    expect(res.status).toBe(401);
+    // Single failure — below threshold; captureException must not have fired
+    // for the auth failure (other captureException calls from unrelated paths
+    // are checked via context filter below)
+    const authFailureCall = mockCaptureException.mock.calls.find(
+      ([, ctx]: [unknown, unknown]) =>
+        (ctx as { extra?: { context?: string } } | undefined)?.extra
+          ?.context === 'revenuecat.webhook.sustained_auth_failure',
+    );
+    expect(authFailureCall).toBeUndefined();
+  });
+
+  it('escalates to Sentry exactly once when SIGNATURE_FAILURE_THRESHOLD missing-header failures occur [WI-1064 regression]', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
+      const res = await sendMissingHeaderRequest();
+      expect(res.status).toBe(401);
+    }
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'revenuecat.webhook.sustained_auth_failure',
+        }),
+      }),
+    );
+  });
+
+  it('escalates on SIGNATURE_FAILURE_THRESHOLD wrong-token failures [WI-1064 regression]', async () => {
+    for (let i = 0; i < SIGNATURE_FAILURE_THRESHOLD; i++) {
+      const res = await sendWrongTokenRequest();
+      expect(res.status).toBe(401);
+    }
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'revenuecat.webhook.sustained_auth_failure',
+        }),
+      }),
+    );
+  });
+
+  it('escalates captureMessage immediately for missing-secret configuration error', async () => {
+    mockCaptureMessage.mockClear();
+    const res = await app.request(
+      '/revenuecat/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer some_token',
+        },
+        body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
+      },
+      {}, // no REVENUECAT_WEBHOOK_SECRET
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      'RevenueCat REVENUECAT_WEBHOOK_SECRET is not configured',
+      expect.objectContaining({
+        level: 'error',
+        extra: expect.objectContaining({
+          context: 'revenuecat.webhook.missing_secret',
+        }),
+      }),
+    );
   });
 });

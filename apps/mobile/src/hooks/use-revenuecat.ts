@@ -25,6 +25,7 @@ import {
 import { useAuth } from '@clerk/clerk-expo';
 import { getRevenueCatApiKey } from '../lib/revenuecat';
 import { combinedSignal } from '../lib/query-timeout';
+import { queryKeys } from '../lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,7 +122,7 @@ export function useRevenueCatIdentity(): void {
             // different SDK identity — force a refetch now that the SDK
             // identity is confirmed to match the key.
             void queryClient.invalidateQueries({
-              queryKey: ['revenuecat', 'customerInfo', userId],
+              queryKey: queryKeys.revenuecat.customerInfo(userId),
             });
           }
         } else if (previousUserIdRef.current !== null) {
@@ -206,8 +207,10 @@ export function useRevenueCatIdentity(): void {
  * Returns `null` data on web or when RevenueCat is not configured.
  */
 export function useOfferings(): UseQueryResult<PurchasesOfferings | null> {
+  const { userId } = useAuth();
+
   return useQuery({
-    queryKey: ['revenuecat', 'offerings'],
+    queryKey: queryKeys.revenuecat.offerings(userId),
     queryFn: async ({
       signal: querySignal,
     }): Promise<PurchasesOfferings | null> => {
@@ -254,7 +257,7 @@ export function useCustomerInfo(): UseQueryResult<CustomerInfo | null> {
   const identityReady =
     !isRevenueCatAvailable() || syncedUserId === (userId ?? null);
   return useQuery({
-    queryKey: ['revenuecat', 'customerInfo', userId],
+    queryKey: queryKeys.revenuecat.customerInfo(userId),
     enabled: identityReady,
     queryFn: async ({ signal: querySignal }): Promise<CustomerInfo | null> => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -302,7 +305,7 @@ export function usePurchase(): UseMutationResult<
       // shared device. The customerInfo key includes userId (see
       // useCustomerInfo) so we mirror that scope here.
       void queryClient.invalidateQueries({
-        queryKey: ['revenuecat', 'customerInfo', userId],
+        queryKey: queryKeys.revenuecat.customerInfo(userId),
       });
     },
   });
@@ -336,7 +339,7 @@ export function useRestorePurchases(): UseMutationResult<
     onSuccess: () => {
       // [BUG-167] Scope invalidation by Clerk userId — see usePurchase.
       void queryClient.invalidateQueries({
-        queryKey: ['revenuecat', 'customerInfo', userId],
+        queryKey: queryKeys.revenuecat.customerInfo(userId),
       });
     },
   });

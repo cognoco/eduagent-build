@@ -1,4 +1,4 @@
-import { formatMediumDateTime } from './format-datetime';
+import { formatMediumDateTime, formatShortDate } from './format-datetime';
 
 describe('formatMediumDateTime (#11 Hermes ICU safety)', () => {
   const ISO = '2026-05-28T15:30:00.000Z';
@@ -48,5 +48,11 @@ describe('formatMediumDateTime (#11 Hermes ICU safety)', () => {
     });
 
     expect(formatMediumDateTime(ISO)).toBe(new Date(ISO).toISOString());
+  });
+});
+
+describe('formatShortDate', () => {
+  it('returns the raw value for an unparseable date', () => {
+    expect(formatShortDate('not-a-date', 'en')).toBe('not-a-date');
   });
 });

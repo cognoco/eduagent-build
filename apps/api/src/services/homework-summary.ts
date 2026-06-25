@@ -14,7 +14,7 @@ import type {
   HomeworkSummary,
   SessionMetadata,
 } from '@eduagent/schemas';
-import { routeAndCall, extractFirstJsonObject } from './llm';
+import { routeAndCall, parseStructuredLlmOutput } from './llm';
 import type { ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { projectAiResponseContent } from './llm/project-response';
@@ -109,57 +109,19 @@ export function parseHomeworkSummaryResponse(
   response: string,
   fallback: HomeworkSummary,
 ): HomeworkSummary {
-  try {
-    // [BUG-479] Replace greedy regex with brace-depth walker; markdown fences
-    // or appended commentary no longer silently returns the fallback.
-    const jsonStr = extractFirstJsonObject(response);
-    if (!jsonStr) {
-      return fallback;
-    }
-
-    const parseResult = homeworkSummaryLenientSchema.safeParse(
-      JSON.parse(jsonStr),
-    );
-    if (!parseResult.success) {
-      return fallback;
-    }
-    const parsed = parseResult.data;
-    // Per-field graceful degradation: keep each valid field, substitute the
-    // fallback only for missing/invalid ones (preserves the original behavior).
-    return {
-      problemCount:
-        typeof parsed.problemCount === 'number'
-          ? parsed.problemCount
-          : fallback.problemCount,
-      practicedSkills: Array.isArray(parsed.practicedSkills)
-        ? parsed.practicedSkills.filter(
-            (value): value is string => typeof value === 'string',
-          )
-        : fallback.practicedSkills,
-      independentProblemCount:
-        typeof parsed.independentProblemCount === 'number'
-          ? parsed.independentProblemCount
-          : fallback.independentProblemCount,
-      guidedProblemCount:
-        typeof parsed.guidedProblemCount === 'number'
-          ? parsed.guidedProblemCount
-          : fallback.guidedProblemCount,
-      summary:
-        typeof parsed.summary === 'string' && parsed.summary.trim().length > 0
-          ? parsed.summary.trim()
-          : fallback.summary,
-      displayTitle:
-        typeof parsed.displayTitle === 'string' &&
-        parsed.displayTitle.trim().length > 0
-          ? parsed.displayTitle.trim()
-          : fallback.displayTitle,
-    };
-  } catch (err) {
-    logger.error('[homework-summary] JSON parse failed, using fallback', {
-      event: 'homework_summary.parse.failed',
-      error: err instanceof Error ? err.message : String(err),
-    });
-    captureException(err, {
+  // [BUG-479] Use parseStructuredLlmOutput (brace-depth walker + safeParse seam)
+  // so markdown fences and appended commentary don't silently return the fallback.
+  // [F-074 / WI-579] On failure, captureException with shape-only diagnostics —
+  // never include a response slice (even truncated LLM output can leak learner
+  // content to Sentry). The helper logs the failure; we add the Sentry capture here
+  // because the site-specific context (site label, responseLength) belongs here.
+  const parsed = parseStructuredLlmOutput(
+    homeworkSummaryLenientSchema,
+    response,
+    'homework-summary',
+  );
+  if (!parsed) {
+    captureException(new Error('homework-summary: LLM JSON parse failed'), {
       extra: {
         site: 'parseHomeworkSummaryResponse',
         // Length only — even a truncated slice of LLM
@@ -169,6 +131,36 @@ export function parseHomeworkSummaryResponse(
     });
     return fallback;
   }
+  // Per-field graceful degradation: keep each valid field, substitute the
+  // fallback only for missing/invalid ones (preserves the original behavior).
+  return {
+    problemCount:
+      typeof parsed.problemCount === 'number'
+        ? parsed.problemCount
+        : fallback.problemCount,
+    practicedSkills: Array.isArray(parsed.practicedSkills)
+      ? parsed.practicedSkills.filter(
+          (value): value is string => typeof value === 'string',
+        )
+      : fallback.practicedSkills,
+    independentProblemCount:
+      typeof parsed.independentProblemCount === 'number'
+        ? parsed.independentProblemCount
+        : fallback.independentProblemCount,
+    guidedProblemCount:
+      typeof parsed.guidedProblemCount === 'number'
+        ? parsed.guidedProblemCount
+        : fallback.guidedProblemCount,
+    summary:
+      typeof parsed.summary === 'string' && parsed.summary.trim().length > 0
+        ? parsed.summary.trim()
+        : fallback.summary,
+    displayTitle:
+      typeof parsed.displayTitle === 'string' &&
+      parsed.displayTitle.trim().length > 0
+        ? parsed.displayTitle.trim()
+        : fallback.displayTitle,
+  };
 }
 
 /**

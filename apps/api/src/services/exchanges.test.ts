@@ -314,6 +314,27 @@ describe('processExchange/streamExchange — image/vision safety tripwire (Issue
     expect(parsed.crisisRedirect).toBe(false);
     expect(parsed.cleanResponse).toBe(imageUnscreenedResponse());
   });
+
+  it('[BREAK] processExchange returns image_unscreened when OCR extracts no text and the caption is empty (WI-1055 Option-A fail-safe)', async () => {
+    // Regression test: before the fix, a purely photographic/drawn catastrophic
+    // image with no embedded text AND an empty caption produced combined='\\n'
+    // which detectCatastrophicSafetyTrigger returned null for → 'clean', so the
+    // image silently reached the conversational model.
+    // After the fix: empty extractedText + empty caption → 'unscreened' (refuse).
+    // The conversational provider THROWS if called, proving the model is never invoked.
+    registerProvider(throwingProvider);
+    pinOcrText(''); // OCR returns empty — no embedded text in the image
+
+    const result = await processExchange(
+      baseContext,
+      '', // empty caption — image-only submission
+      imageData,
+    );
+
+    expect(result.provider).toBe('safety-tripwire');
+    expect(result.model).toBe('deterministic:image_unscreened');
+    expect(result.response).toBe(imageUnscreenedResponse());
+  });
 });
 
 // ---------------------------------------------------------------------------

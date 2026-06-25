@@ -111,6 +111,7 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
     expect(missing).toContain('RESEND_WEBHOOK_SECRET');
+    expect(missing).toContain('ANALYTICS_HASH_KEY');
     // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
     expect(missing).not.toContain('API_ORIGIN');
     // Stripe secrets are optional — dormant until web client added
@@ -119,8 +120,8 @@ describe('validateProductionKeys', () => {
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    // 8 originals + 2 new Inngest keys = 10
-    expect(missing).toHaveLength(10);
+    // 8 originals + 2 Inngest keys + analytics HMAC key = 11
+    expect(missing).toHaveLength(11);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -139,6 +140,7 @@ describe('validateProductionKeys', () => {
       RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -182,6 +184,7 @@ describe('validateProductionKeys', () => {
       'RESEND_API_KEY',
       'RESEND_WEBHOOK_SECRET',
       'REVENUECAT_WEBHOOK_SECRET',
+      'ANALYTICS_HASH_KEY',
     ]);
   });
 
@@ -324,6 +327,7 @@ describe('validateEnv', () => {
       RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+      ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 

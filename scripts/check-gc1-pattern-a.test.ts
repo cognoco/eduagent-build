@@ -247,6 +247,29 @@ describe('checkFile — integration', () => {
     expect(v[0].reason).toBe('missing-pattern-a');
   });
 
+  it('blocks a NEW multiline typed non-Pattern-A internal mock', () => {
+    const diff = [
+      '@@ -0,0 +1,6 @@',
+      '+jest.mock<typeof import(',
+      "+  './services/foo'",
+      '+)>(',
+      "+  './services/foo',",
+      '+  () => ({ bar: jest.fn() })',
+      '+);',
+    ].join('\n');
+    const staged = [
+      'jest.mock<typeof import(',
+      "  './services/foo'",
+      ')>(',
+      "  './services/foo',",
+      '  () => ({ bar: jest.fn() })',
+      ');',
+    ].join('\n');
+    const v = checkFile('a.test.ts', diff, staged);
+    expect(v).toHaveLength(1);
+    expect(v[0].reason).toBe('missing-pattern-a');
+  });
+
   it('allows a multiline internal mock with gc1-allow on the jest.mock( line', () => {
     const diff = [
       '@@ -0,0 +1,4 @@',

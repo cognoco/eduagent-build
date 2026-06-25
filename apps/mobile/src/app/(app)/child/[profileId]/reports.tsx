@@ -11,9 +11,13 @@ import {
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { useTranslation } from 'react-i18next';
 import { ReportsList } from '../../../../components/progress/ReportsList';
+import { formatShortDate } from '../../../../lib/format-datetime';
 
 /** Returns the formatted next report date and a human-friendly time context. */
-export function getNextReportInfo(now = new Date()): {
+export function getNextReportInfo(
+  now = new Date(),
+  locale?: string,
+): {
   date: string;
   timeContext: string;
 } {
@@ -32,7 +36,7 @@ export function getNextReportInfo(now = new Date()): {
   const daysUntil = Math.ceil(
     (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
   );
-  const formattedDate = nextRun.toLocaleDateString(undefined, {
+  const formattedDate = formatShortDate(nextRun, locale, {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -46,17 +50,21 @@ export function getNextReportInfo(now = new Date()): {
   return { date: formattedDate, timeContext };
 }
 
-function formatReportWeek(reportWeek: string, fallback: string): string {
+function formatReportWeek(
+  reportWeek: string,
+  fallback: string,
+  locale: string | undefined,
+): string {
   const start = new Date(`${reportWeek}T00:00:00Z`);
   if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
-  const startLabel = start.toLocaleDateString(undefined, {
+  const startLabel = formatShortDate(start, locale, {
     month: 'short',
     day: 'numeric',
     timeZone: 'UTC',
   });
-  const endLabel = end.toLocaleDateString(undefined, {
+  const endLabel = formatShortDate(end, locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -72,7 +80,7 @@ function ReportsHeaderSummary({
   latestReport: WeeklyReportSummary | undefined;
   showNewBadge?: boolean;
 }): React.ReactElement | null {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (!latestReport?.headlineStat) return null;
   const { headlineStat, thisWeek } = latestReport;
   return (
@@ -85,6 +93,7 @@ function ReportsHeaderSummary({
           {formatReportWeek(
             latestReport.reportWeek,
             t('guardian.latestWeekFallback'),
+            i18n?.language,
           )}
         </Text>
         {showNewBadge ? (
@@ -153,7 +162,7 @@ function ReportsHeaderSummary({
 const BODY_SENTINEL = [{ key: 'body' }] as const;
 
 export default function ChildReportsScreen(): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { profileId: rawProfileId } = useLocalSearchParams<{
@@ -365,7 +374,10 @@ export default function ChildReportsScreen(): React.ReactElement {
         testID="child-reports-empty"
       >
         {(() => {
-          const { date, timeContext } = getNextReportInfo();
+          const { date, timeContext } = getNextReportInfo(
+            new Date(),
+            i18n?.language,
+          );
           return (
             <Text
               className="text-body-sm text-text-secondary text-center"

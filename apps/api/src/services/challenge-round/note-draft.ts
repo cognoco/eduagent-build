@@ -125,23 +125,25 @@ export interface DraftValidationResult {
 }
 
 /**
- * [BUG-483] `validateNoteDraft` now accepts an optional `verifiedEventContents`
- * argument.  When supplied, the lexical-overlap guard tokenizes the VERIFIED
- * event content (real learner text from the database, as retrieved by
+ * [BUG-483 / WI-1056] `validateNoteDraft` requires a `verifiedEventContents`
+ * argument.  The lexical-overlap guard tokenizes the VERIFIED event content
+ * (real learner text from the database, as retrieved by
  * `validateEvaluationEventIds`) instead of `solidLearnerQuotes` (the LLM's
  * paraphrase).  This closes the last-mile attack surface where the LLM could
  * supply a paraphrase that overlaps with its own draft (~1.0 overlap), making
- * the guard a no-op for value substitution.
+ * the guard a no-op for value-substitution within shared vocabulary.
  *
- * When `verifiedEventContents` is not supplied (legacy / test calls), the guard
- * falls back to tokenizing `solidLearnerQuotes` — same behaviour as before.
- * Callers in the challenge-round pipeline MUST pass `verifiedEventContents`
- * sourced from `validateEvaluationEventIds` output.
+ * Pass an empty array (`[]`) only when no verified event content is available
+ * for a given concept; the guard then falls back to tokenizing
+ * `solidLearnerQuotes`.  Callers in the challenge-round pipeline MUST pass
+ * `verifiedEventContents` sourced from `validateEvaluationEventIds` output.
+ * The parameter is now required (not optional) to force compile-time
+ * enforcement at every call site (WI-1056).
  */
 export function validateNoteDraft(
   draft: string,
   solidLearnerQuotes: string[],
-  verifiedEventContents?: string[],
+  verifiedEventContents: string[],
 ): DraftValidationResult {
   if (!draft.trim()) {
     return { ok: false, overlapRatio: 0, reason: 'empty' };

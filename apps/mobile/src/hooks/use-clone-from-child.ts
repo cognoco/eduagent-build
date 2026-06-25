@@ -409,15 +409,22 @@ export function useCloneFromChild(): {
       );
 
       if (activeProfile?.id) {
-        track('add_to_my_learning.bridge', {
-          adultProfileHash: hashProfileId(activeProfile.id),
-          childProfileHash: hashProfileId(args.childProfileId),
-          triggerSurface: triggerSurface(args.triggerPath),
-          alreadyExisted: result.alreadyExisted,
-          descriptionDivergent: result.descriptionDivergent,
-          descriptionRefreshed: result.descriptionRefreshed,
-          topicState: result.topicState,
-          forceCopy: args.forceCopy === true,
+        const adultProfileId = activeProfile.id;
+        const childProfileId = args.childProfileId;
+        void Promise.all([
+          hashProfileId(adultProfileId, client),
+          hashProfileId(childProfileId, client),
+        ]).then(([adultProfileHash, childProfileHash]) => {
+          track('add_to_my_learning.bridge', {
+            adultProfileHash,
+            childProfileHash,
+            triggerSurface: triggerSurface(args.triggerPath),
+            alreadyExisted: result.alreadyExisted,
+            descriptionDivergent: result.descriptionDivergent,
+            descriptionRefreshed: result.descriptionRefreshed,
+            topicState: result.topicState,
+            forceCopy: args.forceCopy === true,
+          });
         });
       }
 

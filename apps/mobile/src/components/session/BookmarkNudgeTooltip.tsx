@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as SecureStore from '../../lib/secure-storage';
-import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
-
-const KEY_PREFIX = 'bookmark-nudge-shown';
+import {
+  bookmarkNudgeKey,
+  bookmarkNudgeLegacyKey,
+} from '../../lib/secure-store-keys';
 
 function getBookmarkNudgeKey(profileId: string | undefined): string {
-  return sanitizeSecureStoreKey(
-    profileId ? `${KEY_PREFIX}.${profileId}` : KEY_PREFIX,
-  );
+  return profileId ? bookmarkNudgeKey(profileId) : 'bookmark-nudge-shown';
 }
 
 // Pre-2026-05-23 the prefix was concatenated with `:` which `sanitizeSecureStoreKey`
@@ -17,9 +16,7 @@ function getBookmarkNudgeKey(profileId: string | undefined): string {
 // dismissed the nudge under the old key don't see it again, and migrate
 // forward by writing the new key on next dismiss.
 function getLegacyBookmarkNudgeKey(profileId: string | undefined): string {
-  return sanitizeSecureStoreKey(
-    profileId ? `${KEY_PREFIX}:${profileId}` : KEY_PREFIX,
-  );
+  return profileId ? bookmarkNudgeLegacyKey(profileId) : 'bookmark-nudge-shown';
 }
 
 interface BookmarkNudgeTooltipProps {

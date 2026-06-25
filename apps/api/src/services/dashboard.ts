@@ -76,6 +76,7 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
+import { getLatestGdprConsentByProfile } from './consent';
 import {
   getChildGdprConsentStatusV2,
   getChildPersonIdsForParentV2,
@@ -922,22 +923,17 @@ export async function getChildrenForParent(
       }
     }
   } else {
-    const allConsentStates = await db.query.consentStates.findMany({
-      where: and(
-        inArray(consentStates.profileId, childProfileIds),
-        eq(consentStates.consentType, 'GDPR'),
-      ),
-      // [BUG-394] Stable tiebreak on id to make consent dedup deterministic when
-      // two rows share the same requestedAt timestamp.
-      orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
-    });
-    for (const state of allConsentStates) {
-      if (!consentByProfile.has(state.profileId)) {
-        consentByProfile.set(state.profileId, {
-          status: state.status,
-          respondedAt: state.respondedAt ?? null,
-        });
-      }
+    // [WI-489] Replaced the inline findMany + manual dedup with the shared
+    // helper. getLatestGdprConsentByProfile issues a single query with the
+    // BUG-394 desc(id) tiebreak and carries the real {status, respondedAt} per
+    // profile. Behaviour-preserving: profiles with NO GDPR row are ABSENT from
+    // the map (→ consentStatus resolves to null below), exactly as before.
+    const latestByProfile = await getLatestGdprConsentByProfile(
+      db,
+      childProfileIds,
+    );
+    for (const [id, { status, respondedAt }] of latestByProfile) {
+      consentByProfile.set(id, { status, respondedAt });
     }
   }
 

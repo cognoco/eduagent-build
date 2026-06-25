@@ -54,6 +54,10 @@ const envSchema = z.object({
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),
 
+  // Analytics profile pseudonymisation — server-only HMAC key. Never expose
+  // this through EXPO_PUBLIC_*; mobile obtains hashes from the API route.
+  ANALYTICS_HASH_KEY: z.string().min(32).optional(),
+
   // Test seed — shared secret for /__test/* routes (optional, dev/staging only)
   TEST_SEED_SECRET: z.string().min(1).optional(),
 
@@ -389,6 +393,7 @@ const PRODUCTION_REQUIRED_BASE_KEYS: readonly (keyof Env)[] = [
   'RESEND_WEBHOOK_SECRET',
   'API_ORIGIN',
   'REVENUECAT_WEBHOOK_SECRET',
+  'ANALYTICS_HASH_KEY',
 ] as const;
 
 /**
