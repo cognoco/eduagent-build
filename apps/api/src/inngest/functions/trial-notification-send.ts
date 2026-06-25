@@ -18,7 +18,7 @@
 // concurrent fan-out fires.
 // ---------------------------------------------------------------------------
 
-import { inngest } from '../client';
+import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
 import { getStepDatabase } from '../helpers';
 import {
   sendTrialNotificationToAccountOwner,
@@ -30,9 +30,10 @@ export const trialNotificationSend = inngest.createFunction(
     id: 'trial-notification-send',
     name: 'Send one trial expiry notification',
     // [TRIAL-FANOUT] Bound parallelism so a large fan-out (many trials ending
-    // the same day) does not stampede Neon + the push provider. Mirrors the
-    // cadence used by weekly-progress-push fan-out receivers.
-    concurrency: { limit: 25 },
+    // the same day) does not stampede Neon + the push provider. Intended 25;
+    // capped to the Inngest plan limit (raise after a plan upgrade — see
+    // INNGEST_PLAN_CONCURRENCY_CAP).
+    concurrency: { limit: INNGEST_PLAN_CONCURRENCY_CAP },
   },
   { event: 'app/billing.trial_notification.send' },
   async ({ event, step }) => {

@@ -22,7 +22,7 @@ import { learningSessions, person, profiles } from '@eduagent/database';
 // [BUG-248] Use the same canonical step-database helper everywhere else in
 // the file does — no new import needed for the SQL-side dedup; drizzle's
 // selectDistinct produces a `SELECT DISTINCT profile_id` plan.
-import { inngest } from '../client';
+import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { snapshotRefreshEventSchema } from '@eduagent/schemas';
@@ -111,10 +111,11 @@ export const dailySnapshotRefresh = inngest.createFunction(
     // to thousands of `app/progress.snapshot.refresh` events; each refresh
     // runs ~6 parallel DB queries inside refreshProgressSnapshot. Without a
     // concurrency cap the receivers would all execute simultaneously and
-    // exhaust the Neon connection pool. limit=50 matches the transcript-purge
-    // pattern and keeps DB pressure bounded while still draining the daily
-    // batch within the cron's 21-hour gap.
-    concurrency: { limit: 50 },
+    // exhaust the Neon connection pool. Intended 50 to keep DB pressure bounded;
+    // capped to the Inngest plan limit (a lower cap only tightens Neon pressure
+    // further, at the cost of a slower daily drain). Raise after a plan upgrade —
+    // see INNGEST_PLAN_CONCURRENCY_CAP.
+    concurrency: { limit: INNGEST_PLAN_CONCURRENCY_CAP },
     // [CR-2026-05-21-035] Deduplicate per (profileId, day): Inngest's default
     // 24h idempotency window matches the cron cadence (24h between fires), so
     // keying on profileId alone risks dropping today's events at the dedup

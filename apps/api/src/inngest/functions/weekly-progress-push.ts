@@ -30,7 +30,7 @@ import {
   profiles,
   weeklyReports,
 } from '@eduagent/database';
-import { inngest } from '../client';
+import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
 import {
   getStepDatabase,
   getStepResendApiKey,
@@ -556,9 +556,9 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
     // [BUG-260] Bound parallelism on the fan-out receiver. The cron fans out
     // up to all eligible parents on Monday at their local 09:00; without a
     // concurrency cap the receivers stampede Neon and the Resend / push
-    // providers simultaneously. limit=25 mirrors the cadence already used for
-    // weekly-self-report fan-out and keeps DB + provider pressure bounded.
-    concurrency: { limit: 25 },
+    // providers simultaneously. Intended 25; capped to the Inngest plan limit
+    // (raise after a plan upgrade — see INNGEST_PLAN_CONCURRENCY_CAP).
+    concurrency: { limit: INNGEST_PLAN_CONCURRENCY_CAP },
     // [CR-2026-05-21-033] Dedup duplicate fan-out fires within the 24h Inngest
     // window so the LLM/snapshot math (which runs BEFORE the notificationLog
     // dedup inside prepare-weekly-progress-digest) is skipped on re-runs.

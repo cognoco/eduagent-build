@@ -1,4 +1,4 @@
-import { inngest } from '../client';
+import { inngest, INNGEST_PLAN_CONCURRENCY_CAP } from '../client';
 import {
   getStepDatabase,
   getStepMemoryFactsDedupConfig,
@@ -382,7 +382,12 @@ export const sessionCompleted = inngest.createFunction(
     // and Neon connection pool. limit=25 mirrors the heavy-LLM cadence
     // used by weekly-progress-push; keying on profileId spreads parallelism
     // across profiles without serialising the whole function.
-    concurrency: { limit: 25, key: 'event.data.profileId' },
+    // Intended 25 (per-profile); capped to the Inngest plan limit. Raise after
+    // a plan upgrade — see INNGEST_PLAN_CONCURRENCY_CAP.
+    concurrency: {
+      limit: INNGEST_PLAN_CONCURRENCY_CAP,
+      key: 'event.data.profileId',
+    },
     // [BUG-154] Function-level idempotency keyed on sessionId prevents
     // duplicate `app/session.completed` deliveries for the same session
     // from re-triggering the pipeline (which would re-emit dedup-events
