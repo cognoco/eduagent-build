@@ -2252,28 +2252,32 @@ export async function prepareExchangeContext(
   const priorLearning = buildPriorLearningContext(priorTopics);
   const crossSubjectContext =
     buildCrossSubjectContext(crossSubjectHighlights) || undefined;
-  const learningHistoryParts = [
-    topic?.bookId && topic?.topicId
-      ? await getCachedBookLearningHistoryContext(
-          db,
-          profileId,
-          sessionId,
-          session,
-          topic.topicId,
-          topic.bookId,
-          options?.identityV2Enabled ?? false,
-        )
-      : undefined,
-    session.sessionType === 'homework'
-      ? await getCachedHomeworkLibraryContext(
-          db,
-          profileId,
-          sessionId,
-          session,
-          options?.identityV2Enabled ?? false,
-        )
-      : undefined,
-  ].filter((part): part is string => Boolean(part));
+  // WI-963: resolve book-history and homework-library contexts in parallel —
+  // both are independent cache/DB calls and previously awaited sequentially.
+  const learningHistoryParts = (
+    await Promise.all([
+      topic?.bookId && topic?.topicId
+        ? getCachedBookLearningHistoryContext(
+            db,
+            profileId,
+            sessionId,
+            session,
+            topic.topicId,
+            topic.bookId,
+            options?.identityV2Enabled ?? false,
+          )
+        : Promise.resolve(undefined),
+      session.sessionType === 'homework'
+        ? getCachedHomeworkLibraryContext(
+            db,
+            profileId,
+            sessionId,
+            session,
+            options?.identityV2Enabled ?? false,
+          )
+        : Promise.resolve(undefined),
+    ])
+  ).filter((part): part is string => Boolean(part));
   const learningHistoryContext =
     learningHistoryParts.length > 0
       ? learningHistoryParts.join('\n\n')
