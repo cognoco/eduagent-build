@@ -11,6 +11,7 @@ import {
   OPENAI_ADVANCED_MODEL_MIN_RUNG,
   _setOpenAIAdvancedModelForTesting,
   setLlmRoutingV2Enabled,
+  getModelConfigForTest,
 } from './router';
 import { createMockProvider } from './providers/mock';
 import { createCerebrasProvider } from './providers/cerebras';
@@ -1817,6 +1818,78 @@ describe('LLM Router', () => {
 
       expect(plParsed.envelope.reply).not.toBe(enParsed.envelope.reply);
       expect(plParsed.envelope.reply.length).toBeGreaterThan(0);
+    });
+  });
+
+  // [Gemini-retirement Phase A / T-A5] With LLM_ROUTING_V2_ENABLED off (legacy
+  // path) and NO Gemini provider registered (e.g. GEMINI_API_KEY removed before
+  // the V2 cutover), getModelConfig must never resolve to an unservable Gemini
+  // config — it degrades to a registered approved provider. Behavior WITH Gemini
+  // registered is unchanged.
+  describe('[T-A5] legacy path degrades to approved providers when no Gemini is registered', () => {
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+    });
+
+    afterAll(() => {
+      // Restore the suite-wide baseline the top-level beforeAll established.
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    it('gemini_only policy returns Cerebras (never Gemini) when Gemini is absent', () => {
+      registerProvider(createMockProvider('cerebras'));
+      registerProvider(createMockProvider('openai'));
+
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('cerebras');
+    });
+
+    it('gemini_only policy falls to OpenAI when only OpenAI is registered', () => {
+      registerProvider(createMockProvider('openai'));
+
+      const cfg = getModelConfigForTest(4, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'standard',
+      });
+
+      expect(cfg.provider).not.toBe('gemini');
+      expect(cfg.provider).toBe('openai');
+    });
+
+    it('gemini_only policy STILL returns Gemini when Gemini IS registered (unchanged)', () => {
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+
+      const cfg = getModelConfigForTest(2, {
+        providerPolicy: 'gemini_only',
+        llmTier: 'flash',
+      });
+
+      expect(cfg.provider).toBe('gemini');
+      expect(cfg.model).toBe('gemini-2.5-flash');
+    });
+
+    it('default and preferred-Gemini routing never returns Gemini when Gemini is absent', () => {
+      registerProvider(createMockProvider('openai'));
+
+      const def = getModelConfigForTest(2, { llmTier: 'flash' });
+      expect(def.provider).not.toBe('gemini');
+
+      const preferred = getModelConfigForTest(2, {
+        preferredProvider: 'gemini',
+        llmTier: 'flash',
+      });
+      expect(preferred.provider).not.toBe('gemini');
     });
   });
 });

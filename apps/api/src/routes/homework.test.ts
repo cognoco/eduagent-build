@@ -375,6 +375,30 @@ describe('homework routes', () => {
       expect(body.regions[0].boundingBox).toEqual(expect.objectContaining({}));
     });
 
+    it('[T-A4] routes OCR through the registry (router-always, no Gemini key) at the free vision tier', async () => {
+      // Gemini-retirement Phase A: the route no longer passes GEMINI_API_KEY to
+      // getOcrProvider — it passes the router-always signal (true) plus the
+      // tier-derived llmTier. The billing mock yields effectiveAccessTier:'free'
+      // → subscriptionTier 'free' → getTierConfig('free').llmTier === 'flash'.
+      const { getOcrProvider } = require('../services/ocr') as {
+        getOcrProvider: jest.Mock;
+      };
+      const formData = new FormData();
+      formData.append(
+        'image',
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
+      );
+
+      const res = await app.request(
+        '/v1/ocr',
+        { method: 'POST', headers: OCR_HEADERS, body: formData },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(getOcrProvider).toHaveBeenCalledWith(true, false, 'flash');
+    });
+
     it('accepts image/png files', async () => {
       const formData = new FormData();
       formData.append(

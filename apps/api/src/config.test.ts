@@ -184,6 +184,68 @@ describe('validateProductionKeys', () => {
       'REVENUECAT_WEBHOOK_SECRET',
     ]);
   });
+
+  // [Gemini-retirement Phase A / T-A2] The production-required LLM key set must
+  // track the active routing path, not hard-wire Gemini. With the V2 matrix live
+  // (LLM_ROUTING_V2_ENABLED='true') production must boot on the approved
+  // providers (Cerebras/Mistral/OpenAI) with NO GEMINI_API_KEY; with the flag
+  // off the legacy Gemini-default path still requires it.
+  describe('path-aware LLM required keys (LLM_ROUTING_V2_ENABLED)', () => {
+    const PROD_BASE: Env = {
+      ...BASE_ENV,
+      ENVIRONMENT: 'production',
+      CLERK_SECRET_KEY: 'sk_live_xxx',
+      CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api',
+      INNGEST_SIGNING_KEY: 'signkey_prd_xxx',
+      INNGEST_EVENT_KEY: 'evtkey_prd_xxx',
+      VOYAGE_API_KEY: 'voyage-key',
+      RESEND_API_KEY: 're_xxx',
+      RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
+      API_ORIGIN: 'https://api.mentomate.com',
+      REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+    };
+
+    it('V2 on: passes with Cerebras+Mistral+OpenAI and NO Gemini key', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'true',
+        CEREBRAS_API_KEY: 'cb-key',
+        MISTRAL_API_KEY: 'ml-key',
+        OPENAI_API_KEY: 'oa-key',
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toEqual([]);
+    });
+
+    it('V2 on: requires the approved providers and NOT Gemini', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'true',
+        CEREBRAS_API_KEY: undefined,
+        MISTRAL_API_KEY: undefined,
+        OPENAI_API_KEY: undefined,
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toContain('CEREBRAS_API_KEY');
+      expect(missing).toContain('MISTRAL_API_KEY');
+      expect(missing).toContain('OPENAI_API_KEY');
+      expect(missing).not.toContain('GEMINI_API_KEY');
+    });
+
+    it('legacy (flag off): still requires GEMINI_API_KEY even when approved providers are present', () => {
+      const missing = validateProductionKeys({
+        ...PROD_BASE,
+        LLM_ROUTING_V2_ENABLED: 'false',
+        CEREBRAS_API_KEY: 'cb-key',
+        MISTRAL_API_KEY: 'ml-key',
+        OPENAI_API_KEY: 'oa-key',
+        GEMINI_API_KEY: undefined,
+      });
+      expect(missing).toContain('GEMINI_API_KEY');
+      expect(missing).not.toContain('CEREBRAS_API_KEY');
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

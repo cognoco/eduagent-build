@@ -383,14 +383,34 @@ const STAGING_AND_PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
 // Mobile billing uses native IAP via RevenueCat (Apple/Google handle payments).
 // ---------------------------------------------------------------------------
 
-const PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
-  'GEMINI_API_KEY',
+const PRODUCTION_REQUIRED_BASE_KEYS: readonly (keyof Env)[] = [
   'VOYAGE_API_KEY',
   'RESEND_API_KEY',
   'RESEND_WEBHOOK_SECRET',
   'API_ORIGIN',
   'REVENUECAT_WEBHOOK_SECRET',
 ] as const;
+
+/**
+ * [Gemini-retirement Phase A / T-A2] The LLM provider key(s) the *active*
+ * routing path needs to boot in production. Path-aware so a Gemini-free
+ * deployment is not blocked from booting by a hard GEMINI_API_KEY requirement.
+ *
+ * - V2 (LLM_ROUTING_V2_ENABLED='true'): the §1.5 matrix is Gemini-free —
+ *   Cerebras is the universal text primary, Mistral the free secondary +
+ *   free-tier vision, OpenAI the paid vision + EU branch. Those three must be
+ *   present; GEMINI_API_KEY is not required (and is never selected).
+ * - Legacy (flag off): Gemini is still the default primary, so it stays the
+ *   required LLM key — the flag-off path is unchanged.
+ *
+ * Required-ness is enforced only here (exactly as GEMINI_API_KEY was); all four
+ * keys remain parse-optional in the schema.
+ */
+function productionRequiredLlmKeys(env: Env): readonly (keyof Env)[] {
+  return isLlmRoutingV2Enabled(env.LLM_ROUTING_V2_ENABLED)
+    ? ['CEREBRAS_API_KEY', 'MISTRAL_API_KEY', 'OPENAI_API_KEY']
+    : ['GEMINI_API_KEY'];
+}
 
 /**
  * Validates that all environment-tier-critical keys are present.
@@ -414,9 +434,13 @@ export function validateProductionKeys(env: Env): string[] {
     }
   }
 
-  // Additional keys required only in production
+  // Additional keys required only in production. The LLM key set is path-aware
+  // (T-A2): V2 needs the approved providers, legacy still needs Gemini.
   if (env.ENVIRONMENT === 'production') {
-    for (const key of PRODUCTION_REQUIRED_KEYS) {
+    for (const key of [
+      ...PRODUCTION_REQUIRED_BASE_KEYS,
+      ...productionRequiredLlmKeys(env),
+    ]) {
       if (!env[key]) {
         missing.push(key);
       }

@@ -8,22 +8,26 @@ import {
   ocrResultSchema,
   homeworkStartResponseSchema,
   ERROR_CODES,
+  type SubscriptionTier,
 } from '@eduagent/schemas';
 import { validationError, apiError } from '../errors';
 import { startSession, SubjectInactiveError } from '../services/session';
 import { getOcrProvider } from '../services/ocr';
+import { getTierConfig } from '../services/subscription';
 import { captureException } from '../services/sentry';
 
 type HomeworkRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    GEMINI_API_KEY?: string;
   };
   Variables: {
     user: AuthUser;
     db: Database;
     profileId: string | undefined;
+    // Set by meteringMiddleware (/ocr is a metered LLM route); used to pick the
+    // tier-correct vision model. [Gemini-retirement Phase A / T-A4]
+    subscriptionTier: SubscriptionTier | undefined;
   };
 };
 
@@ -122,9 +126,18 @@ export const homeworkRoutes = new Hono<HomeworkRouteEnv>()
     }
 
     const imageBuffer = await file.arrayBuffer();
+    // [Gemini-retirement Phase A / T-A4] OCR no longer keys on GEMINI_API_KEY.
+    // Always route through the registered LLM provider, threading the request's
+    // subscription tier so the V2 vision matrix picks free→Mistral / paid→GPT-5
+    // mini. subscriptionTier is set by meteringMiddleware (/ocr is metered);
+    // absent → free/'flash' (cheapest, safest default).
+    const subscriptionTier = c.get('subscriptionTier');
+    const llmTier = subscriptionTier
+      ? getTierConfig(subscriptionTier).llmTier
+      : 'flash';
     let provider;
     try {
-      provider = getOcrProvider(c.env.GEMINI_API_KEY);
+      provider = getOcrProvider(true, false, llmTier);
     } catch (err) {
       // [FIX-API-5] 500 (not 503): missing config is a permanent server error,
       // not a transient service unavailability. Capture to Sentry so ops can see

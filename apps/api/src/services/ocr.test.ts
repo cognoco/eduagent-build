@@ -95,6 +95,31 @@ describe('getOcrProvider / setOcrProvider', () => {
     expect(() => getOcrProvider()).toThrow('OCR provider not configured');
   });
 
+  // [Gemini-retirement Phase A / T-A4] The not-configured error must not name
+  // GEMINI_API_KEY — OCR no longer depends on the Gemini key.
+  it('[T-A4] not-configured error is provider-neutral (no GEMINI_API_KEY)', () => {
+    expect(() => getOcrProvider()).toThrow(
+      'no approved LLM provider registered',
+    );
+    let message = '';
+    try {
+      getOcrProvider();
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toMatch(/GEMINI_API_KEY/);
+  });
+
+  it('[T-A4] getOcrProvider forwards llmTier to the router-backed provider', async () => {
+    const provider = getOcrProvider(true, false, 'standard');
+    await provider.extractText(new ArrayBuffer(8), 'image/jpeg');
+
+    expect(routeAndCall).toHaveBeenCalledWith(expect.any(Array), 1, {
+      flow: 'ocr.extract',
+      llmTier: 'standard',
+    });
+  });
+
   it('throws when no provider configured and allowStub is false', () => {
     expect(() => getOcrProvider(undefined, false)).toThrow(
       'OCR provider not configured',
@@ -254,5 +279,29 @@ describe('GeminiOcrProvider', () => {
 
     expect(result.text).toBe('No lang tag');
     expect(result.confidence).toBe(0.7);
+  });
+
+  // [Gemini-retirement Phase A / T-A4] The vision OCR call must carry the
+  // caller's llmTier so the V2 vision matrix can resolve free→Mistral Small /
+  // paid→GPT-5 mini. Without it the call defaults to 'standard' and every OCR
+  // request (including free) resolves to the paid vision model.
+  it('[T-A4] threads llmTier into routeAndCall when constructed with a free tier', async () => {
+    const provider = new GeminiOcrProvider('flash');
+    await provider.extractText(new ArrayBuffer(8), 'image/jpeg');
+
+    expect(routeAndCall).toHaveBeenCalledWith(expect.any(Array), 1, {
+      flow: 'ocr.extract',
+      llmTier: 'flash',
+    });
+  });
+
+  it('[T-A4] threads llmTier into routeAndCall when constructed with a paid tier', async () => {
+    const provider = new GeminiOcrProvider('standard');
+    await provider.extractText(new ArrayBuffer(8), 'image/jpeg');
+
+    expect(routeAndCall).toHaveBeenCalledWith(expect.any(Array), 1, {
+      flow: 'ocr.extract',
+      llmTier: 'standard',
+    });
   });
 });

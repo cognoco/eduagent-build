@@ -1,0 +1,306 @@
+[
+  {
+    "file": "apps/api/src/config.test.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/config.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/index.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.test.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.test.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.test.ts",
+    "token": "providers/gemini"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/middleware/llm.ts",
+    "token": "providers/gemini"
+  },
+  {
+    "file": "apps/api/src/routes/homework.test.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/routes/homework.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/services/book-generation.test.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/book-generation.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/dictation/generate.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/dictation/generate.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/dictation/prepare-homework.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/dictation/prepare-homework.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/dictation/review.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/dictation/review.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/exchanges.crisis-redirect.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/exchanges.crisis-redirect.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/language-detect.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/language-detect.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/index.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "apps/api/src/services/llm/index.ts",
+    "token": "providers/gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/integration-mock-guard.test.ts",
+    "token": "providers/gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/gemini.test.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/gemini.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/gemini.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/gemini.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/openai.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/providers/openai.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.fallback-compliance.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.policy-wiring.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.policy-wiring.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.test.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.test.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.test.ts",
+    "token": "preferredProvider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.v2-matrix.test.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.v2-matrix.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/llm/router.v2-matrix.test.ts",
+    "token": "preferredProvider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/ocr.test.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/services/ocr.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/ocr.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/ocr.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "apps/api/src/services/policy-engine/judge-dispatch.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/quiz/vocabulary.integration.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/session-summary.integration.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/session/session-exchange-judge-dispatch.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/session/session-exchange-router.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/session/session-exchange.test.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "apps/api/src/services/session/topic-probe-extraction.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/session/topic-probe-extraction.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/subject-classify.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/subject-classify.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/subject-resolve.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/subject-resolve.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/services/vocabulary-extract.test.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "apps/api/src/services/vocabulary-extract.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "apps/api/src/test-utils/llm-provider-fixtures.test.ts",
+    "token": "provider:gemini"
+  },
+  {
+    "file": "scripts/book-generation-pass.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "scripts/book-generation-pass.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "scripts/enduser-session-pass.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "scripts/enduser-session-pass.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "scripts/pre-commit-eval-guard.test.ts",
+    "token": "providers/gemini"
+  },
+  {
+    "file": "scripts/premium-routing-pass.ts",
+    "token": "createGeminiProvider"
+  },
+  {
+    "file": "scripts/premium-routing-pass.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "scripts/premium-routing-pass.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "scripts/premium-routing-pass.ts",
+    "token": "gemini-2.5"
+  },
+  {
+    "file": "scripts/provider-degradation-pass.ts",
+    "token": "gemini_only"
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "token": "GEMINI_API_KEY"
+  },
+  {
+    "file": "scripts/translate-gemini.ts",
+    "token": "gemini-2.5"
+  }
+]
