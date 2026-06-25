@@ -336,6 +336,7 @@ describe('[WI-1010] handleBillingIssueV2 inngest.send failure escalation', () =>
     // Happy path: inngest.send succeeds, safeSend resolves silently.
     await handleBillingIssueV2(noopDb, undefined, billingIssueEvent);
 
+    expect(mockInngestSend).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 });
