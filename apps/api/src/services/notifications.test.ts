@@ -852,10 +852,19 @@ describe('sendEmail structured logging', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-82] sendPushNotification — respectPushPreference option
+// [WI-82 / WI-369] sendPushNotification — push preference enforcement
+// WI-369: push preference check is now ON by default (was opt-in via
+// respectPushPreference). Transactional/regulatory callers, or callers that
+// pre-check pushEnabled, pass bypassPreferenceCheck: true to opt out.
+//
+// Covers the three AC variants:
+//   (a) no-flag caller is suppressed when pushEnabled=false  → push_disabled
+//   (b) bypass caller delivers regardless of pushEnabled=false
+//   (c) ex-opt-in (struggle) site unchanged — verified in the
+//       sendStruggleNotification describe block below.
 // ---------------------------------------------------------------------------
 
-describe('[WI-82] sendPushNotification respectPushPreference', () => {
+describe('[WI-82/WI-369] sendPushNotification push preference enforcement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -867,21 +876,20 @@ describe('[WI-82] sendPushNotification respectPushPreference', () => {
     type: 'review_reminder',
   };
 
-  it('returns push_disabled and does NOT call fetch when pushEnabled=false and respectPushPreference=true', async () => {
+  // [WI-369] (a) BREAK test: push_disabled returned by default when pushEnabled=false
+  it('[WI-369] (a) returns push_disabled and does NOT call fetch when pushEnabled=false (no flag — default enforcement)', async () => {
     mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
     mockGetDailyNotificationCount.mockResolvedValue(0);
     mockIsPushEnabled.mockResolvedValue(false);
 
-    const result = await sendPushNotification(mockDb, payload, {
-      respectPushPreference: true,
-    });
+    const result = await sendPushNotification(mockDb, payload);
 
     expect(result).toEqual({ sent: false, reason: 'push_disabled' });
     expect(mockFetchFn).not.toHaveBeenCalled();
     expect(mockIsPushEnabled).toHaveBeenCalledWith(mockDb, payload.profileId);
   });
 
-  it('proceeds with fetch when pushEnabled=true and respectPushPreference=true', async () => {
+  it('proceeds with fetch when pushEnabled=true (no flag — default enforcement)', async () => {
     mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
     mockGetDailyNotificationCount.mockResolvedValue(0);
     mockIsPushEnabled.mockResolvedValue(true);
@@ -891,25 +899,30 @@ describe('[WI-82] sendPushNotification respectPushPreference', () => {
     });
     mockLogNotification.mockResolvedValue(undefined);
 
-    const result = await sendPushNotification(mockDb, payload, {
-      respectPushPreference: true,
-    });
+    const result = await sendPushNotification(mockDb, payload);
 
     expect(result).toEqual({ sent: true, ticketId: 'ticket-pref' });
     expect(mockFetchFn).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT call isPushEnabled when respectPushPreference is omitted (default behavior unchanged)', async () => {
+  // [WI-369] (b) bypass caller delivers REGARDLESS of pushEnabled=false, and
+  // never queries isPushEnabled — the transactional/regulatory path.
+  it('[WI-369] (b) delivers regardless of pushEnabled=false when bypassPreferenceCheck=true', async () => {
     mockGetPushToken.mockResolvedValue('ExponentPushToken[abc123]');
     mockGetDailyNotificationCount.mockResolvedValue(0);
+    // pushEnabled would say "no" — but the bypass must override it.
+    mockIsPushEnabled.mockResolvedValue(false);
     mockFetchFn.mockResolvedValue({
       ok: true,
-      json: async () => ({ data: { id: 'ticket-no-pref' } }),
+      json: async () => ({ data: { id: 'ticket-bypass' } }),
     });
     mockLogNotification.mockResolvedValue(undefined);
 
-    await sendPushNotification(mockDb, payload);
+    const result = await sendPushNotification(mockDb, payload, {
+      bypassPreferenceCheck: true,
+    });
 
+    expect(result).toEqual({ sent: true, ticketId: 'ticket-bypass' });
     expect(mockIsPushEnabled).not.toHaveBeenCalled();
     expect(mockFetchFn).toHaveBeenCalledTimes(1);
   });

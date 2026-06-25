@@ -1281,6 +1281,7 @@ describe('monthlyReportGenerate', () => {
     it('sends a push notification to the parent', async () => {
       await executeGenerateSteps(makeGenerateEvent());
 
+      // [WI-369] Push preference is now enforced by default — no options arg passed.
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(), // db
         expect.objectContaining({
@@ -1289,7 +1290,6 @@ describe('monthlyReportGenerate', () => {
           title: expect.stringContaining('Emma'),
           body: expect.any(String),
         }),
-        expect.objectContaining({ respectPushPreference: true }),
       );
     });
 
@@ -2009,13 +2009,13 @@ describe('monthlyReportGenerate', () => {
         .mockResolvedValueOnce([]);
     });
 
-    it('passes respectPushPreference:true to sendPushNotification', async () => {
+    it('[WI-369] calls sendPushNotification without options (push preference enforced by default)', async () => {
       await executeGenerateSteps(makeGenerateEvent());
 
+      // [WI-369] No options arg — push preference is enforced by default in sendPushNotification.
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ type: 'monthly_report' }),
-        expect.objectContaining({ respectPushPreference: true }),
       );
     });
 
@@ -2184,10 +2184,10 @@ describe('memoized step-state PII break test [F-086]', () => {
     });
 
     // Content still flows to the parent-facing channels (rehydrated in-step)…
+    // [WI-369] No options arg — push preference enforced by default.
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ title: expect.stringContaining('Emma') }),
-      expect.anything(),
     );
     expect(mockFormatMonthlyProgressEmail).toHaveBeenCalledWith(
       'parent@example.test',

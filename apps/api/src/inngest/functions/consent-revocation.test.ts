@@ -272,6 +272,9 @@ describe('consentRevocation', () => {
         type: 'consent_warning',
         body: "Liam's account closes tomorrow. You can still reverse.",
       }),
+      // [WI-369] GDPR regulatory notice — must bypass the recipient's push
+      // preference so the warning always delivers.
+      { bypassPreferenceCheck: true },
     );
   });
 
@@ -381,6 +384,8 @@ describe('consentRevocation', () => {
           profileId: 'parent-001',
           type: 'consent_warning',
         }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
       // Child push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
@@ -390,6 +395,8 @@ describe('consentRevocation', () => {
           profileId: 'child-001',
           type: 'consent_expired',
         }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
       // Profile deletion — the real deleteProfileIfConsentWithdrawn issues the
       // DELETE through the mocked db.execute. [F-093] the SQL must carry the
@@ -409,6 +416,8 @@ describe('consentRevocation', () => {
           profileId: 'parent-001',
           type: 'consent_expired',
         }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
 
       // Step ordering: notify-child before delete-child-profile before
@@ -484,6 +493,8 @@ describe('consentRevocation', () => {
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ profileId: 'parent-001' }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
     });
 
@@ -511,6 +522,8 @@ describe('consentRevocation', () => {
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ profileId: 'child-001' }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
     });
 
@@ -535,6 +548,8 @@ describe('consentRevocation', () => {
       expect(mockSendPushNotification).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ type: 'consent_warning' }),
+        // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+        { bypassPreferenceCheck: true },
       );
       // Profile deletion proceeds regardless of push dedup. [F-093] the real
       // DELETE SQL carries the account guard bound to the resolved owner.
@@ -829,6 +844,8 @@ describe('memoized step-state PII break test [F-088]', () => {
         profileId: 'parent-001',
         body: expect.stringContaining('Emma'),
       }),
+      // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+      { bypassPreferenceCheck: true },
     );
   });
 
@@ -854,6 +871,8 @@ describe('memoized step-state PII break test [F-088]', () => {
         type: 'consent_archived',
         body: expect.stringContaining('Liam'),
       }),
+      // [WI-369] consent push bypasses preference (GDPR regulatory notice).
+      { bypassPreferenceCheck: true },
     );
   });
 });
