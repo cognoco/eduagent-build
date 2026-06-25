@@ -99,7 +99,8 @@ const RETRY_ID_B = '00000000-0000-7000-8000-0000000000bb';
 type FeedbackRetryEventData = {
   retryId: string;
   profileId: string;
-  userId: string;
+  // [WI-1066] Renamed from `userId`; Clerk user ID not profile ID.
+  clerkUserId: string;
 };
 
 function feedbackRetryEvent(
@@ -108,7 +109,7 @@ function feedbackRetryEvent(
   return {
     retryId: overrides.retryId ?? RETRY_ID,
     profileId: overrides.profileId ?? 'p-1',
-    userId: overrides.userId ?? 'user-1',
+    clerkUserId: overrides.clerkUserId ?? 'user_clerk_1',
   };
 }
 
@@ -239,13 +240,33 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('[F-090] rejects legacy raw-text payloads (message/supportTo, no retryId) as invalid', async () => {
       const { result } = await executeHandler({
         profileId: 'p-1',
-        userId: 'user-1',
+        clerkUserId: 'user-1',
         category: 'bug',
         message: 'My name is Milo Janssen and the quiz crashed',
         supportTo: 'support@mentomate.com',
         metaLines: 'Profile ID: p-1',
       });
       expect(result).toMatchObject({ status: 'skipped' });
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    // [WI-1066] Regression: the old ambiguous `userId` field name must be
+    // rejected — a payload using the pre-rename field name fails validation
+    // and is skipped (the schema now requires `clerkUserId`).
+    it('[WI-1066] rejects a payload with old `userId` field (schema now requires `clerkUserId`)', async () => {
+      // Payload uses the old field name — missing required `clerkUserId`.
+      const oldStylePayload = {
+        retryId: RETRY_ID,
+        profileId: 'p-1',
+        userId: 'clerk_user_abc', // old field name — rejected by schema
+      };
+
+      const { result } = await executeHandler(oldStylePayload);
+
+      expect(result).toMatchObject({
+        status: 'skipped',
+        reason: 'invalid_payload',
+      });
       expect(mockSendEmail).not.toHaveBeenCalled();
     });
   });
@@ -304,7 +325,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       await executeHandler(
         feedbackRetryEvent({
           profileId: 'profile-original-payload',
-          userId: 'user-original-payload',
+          clerkUserId: 'user-original-payload',
         }),
         'evt-original-payload',
       );

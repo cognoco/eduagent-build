@@ -178,6 +178,7 @@ type Bindings = {
   ALLOW_MISSING_IDEMPOTENCY_KV?: string;
   ADULT_OWNER_GATE_ENABLED?: string;
   CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+  JUDGE_FRAMEWORK_ENABLED?: string;
   LLM_ROUTING_V2_ENABLED?: string;
   MODE_NAV_V2_ENABLED?: string;
   // Identity Foundation cutover (CUT-B / WI-691). Single flag for the whole

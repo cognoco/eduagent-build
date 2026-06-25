@@ -132,7 +132,7 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
               data: {
                 retryId,
                 profileId,
-                userId,
+                clerkUserId: userId, // [WI-1066] field renamed in schema; local var stays `userId`
               } satisfies FeedbackDeliveryFailedEvent,
             }),
           'feedback.delivery-failed',
