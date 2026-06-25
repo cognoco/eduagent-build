@@ -1206,7 +1206,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       while (Date.now() - startedAt < 3000) {
         if (!mountedRef.current) return [];
-        const res = await apiClient.celebrations.pending.$get();
+        const res = await apiClient.celebrations.pending.$get({
+          query: { viewer: 'child' },
+        });
         if (!mountedRef.current) return [];
         if (res.ok) {
           const data = await res.json();

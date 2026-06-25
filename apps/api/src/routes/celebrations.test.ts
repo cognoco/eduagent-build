@@ -30,6 +30,26 @@ function makeProxyApp(opts?: { isOwner?: boolean }) {
   return app;
 }
 
+// ---------------------------------------------------------------------------
+// [WI-990] pendingCelebrationsQuerySchema — zValidator guard on GET /celebrations/pending
+// ---------------------------------------------------------------------------
+
+describe('[WI-990] GET /celebrations/pending viewer query param validation', () => {
+  it('returns 400 when viewer query param has an invalid value', async () => {
+    const res = await makeProxyApp({ isOwner: true }).request(
+      '/celebrations/pending?viewer=invalid_value',
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when viewer query param is an unexpected value (admin)', async () => {
+    const res = await makeProxyApp({ isOwner: true }).request(
+      '/celebrations/pending?viewer=admin',
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('[WI-143 / DS-054] celebrations proxy-mode guard', () => {
   it('POST /celebrations/seen returns 403 when caller is in proxy mode (isOwner=false)', async () => {
     const res = await makeProxyApp().request('/celebrations/seen', {
