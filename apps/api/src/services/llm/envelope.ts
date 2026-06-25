@@ -72,7 +72,12 @@ export type EnvelopeSurface =
 // that mentions the `\r` escape) or already-decoded JSON.
 // ---------------------------------------------------------------------------
 
-/** True when `text` contains the bug pattern (literal `\n`, `\r`, or `\t`). */
+/**
+ * True when `text` contains a literal whitespace-escape sequence (`\n`, `\r`,
+ * or `\t`) — the double-escape leak signal. Note: a standalone `\r` is detected
+ * here but, per the scope comment above, is deliberately left intact by
+ * `normalizeReplyText`; only `\n`, `\r\n`, and `\t` are rewritten. [#899]
+ */
 export function replyHasLiteralEscape(text: string): boolean {
   return /\\[nrt]/.test(text);
 }
