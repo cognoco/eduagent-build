@@ -446,7 +446,6 @@ export async function generateExport(
       : { email: '', createdAt: new Date(0).toISOString() },
     profiles: profileRows.map((row) => ({
       id: row.id,
-      accountId: row.accountId,
       displayName: row.displayName,
       avatarUrl: row.avatarUrl ?? null,
       birthYear: row.birthYear,

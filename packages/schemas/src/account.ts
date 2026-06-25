@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isoDateField } from './common.ts';
-import { profileSchema } from './profiles.ts';
+import { publicProfileSchema } from './profiles.ts';
 import { consentStatusSchema, consentTypeSchema } from './consent.ts';
 import { learningProfileSchema } from './learning-profiles.ts';
 import { subscriptionTierSchema, subscriptionStatusSchema } from './billing.ts';
@@ -235,7 +235,7 @@ export const dataExportSchema = z.object({
     email: z.string().email(),
     createdAt: isoDateField,
   }),
-  profiles: z.array(profileSchema),
+  profiles: z.array(publicProfileSchema),
   consentStates: z.array(dataExportConsentSchema),
   // GDPR Article 15 — all personal data.
   // [BUG-206] Each table is `dataExportRowSchema` (centralised passthrough)

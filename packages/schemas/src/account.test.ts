@@ -265,5 +265,74 @@ describe('account schemas', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    describe('[WI-995] dataExportSchema.profiles uses publicProfileSchema — accountId stripped', () => {
+      it('strips accountId from parsed profile output', () => {
+        // dataExportSchema.profiles must use publicProfileSchema (omits accountId).
+        // A profile with accountId set in the input must NOT have accountId in the output.
+        const result = dataExportSchema.safeParse({
+          account: { email: 'user@example.com', createdAt: ISO },
+          profiles: [
+            {
+              id: UUID,
+              accountId: UUID, // <-- must be stripped by publicProfileSchema
+              displayName: 'Alice',
+              avatarUrl: null,
+              birthYear: 2000,
+              location: null,
+              isOwner: true,
+              hasPremiumLlm: false,
+              defaultAppContext: null,
+              hasFamilyLinks: false,
+              conversationLanguage: 'en',
+              pronouns: null,
+              consentStatus: null,
+              linkCreatedAt: null,
+              createdAt: ISO,
+              updatedAt: ISO,
+            },
+          ],
+          consentStates: [],
+          exportedAt: ISO,
+        });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.profiles).toHaveLength(1);
+          const profile = result.data.profiles[0]!;
+          // accountId must not appear on the parsed profile
+          expect(Object.keys(profile)).not.toContain('accountId');
+        }
+      });
+
+      it('accepts profiles with no accountId (public shape)', () => {
+        // publicProfileSchema does not require accountId — a profile built without
+        // it must parse cleanly.
+        const result = dataExportSchema.safeParse({
+          account: { email: 'user@example.com', createdAt: ISO },
+          profiles: [
+            {
+              id: UUID,
+              displayName: 'Bob',
+              avatarUrl: null,
+              birthYear: 1995,
+              location: null,
+              isOwner: false,
+              hasPremiumLlm: false,
+              defaultAppContext: null,
+              hasFamilyLinks: false,
+              conversationLanguage: 'en',
+              pronouns: null,
+              consentStatus: null,
+              linkCreatedAt: null,
+              createdAt: ISO,
+              updatedAt: ISO,
+            },
+          ],
+          consentStates: [],
+          exportedAt: ISO,
+        });
+        expect(result.success).toBe(true);
+      });
+    });
   });
 });

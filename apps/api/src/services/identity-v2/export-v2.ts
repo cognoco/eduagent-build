@@ -195,7 +195,6 @@ export async function generateExportV2(
   // /avatarUrl/defaultAppContext from the re-homed person columns.
   const profilesExport: DataExport['profiles'] = personRows.map((p) => ({
     id: p.id,
-    accountId: organizationId,
     displayName: p.displayName,
     avatarUrl: p.avatarUrl ?? null,
     birthYear: Number(p.birthDate.slice(0, 4)),
