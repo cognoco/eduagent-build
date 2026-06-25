@@ -101,9 +101,14 @@ async function callBookGenerationJson<T>(
   schema: SafeParser<T>,
   labels: { invalidJson: string; unexpectedShape: string },
   conversationLanguage?: ConversationLanguage,
+  learnerAge?: number,
 ): Promise<T> {
   let firstFailure: Error | undefined;
   let lastFailureMessage = '';
+
+  // MMT-ADR-0016 §10.1: Gemini is banned for under-18 users.
+  // Only apply gemini_only on the V1 routing path for adult learners (age >= 18).
+  const isAdultLearner = learnerAge !== undefined && learnerAge >= 18;
 
   for (let attempt = 0; attempt < BOOK_GENERATION_JSON_ATTEMPTS; attempt++) {
     const attemptMessages =
@@ -124,7 +129,7 @@ async function callBookGenerationJson<T>(
 
     const result = await routeAndCall(attemptMessages, BOOK_GENERATION_RUNG, {
       flow: 'book.generation',
-      providerPolicy: 'gemini_only',
+      ...(isAdultLearner ? { providerPolicy: 'gemini_only' } : {}),
       responseFormat: 'json',
       conversationLanguage,
     });
@@ -181,6 +186,7 @@ export async function detectSubjectType(
       unexpectedShape: 'LLM returned unexpected subject detection structure',
     },
     options?.conversationLanguage,
+    learnerAge,
   );
 }
 
@@ -224,5 +230,6 @@ export async function generateBookTopics(
       unexpectedShape: 'LLM returned unexpected book topic structure',
     },
     options?.conversationLanguage,
+    learnerAge,
   );
 }
