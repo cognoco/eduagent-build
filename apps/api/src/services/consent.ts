@@ -1085,6 +1085,82 @@ export async function isGdprProcessingAllowed(
 }
 
 /**
+ * Latest GDPR consent disposition per profile, batched.
+ *
+ * Issues a SINGLE findMany (no N+1) covering all profileIds, applies the
+ * BUG-394 desc(id) tiebreak so deduplication is stable when two rows share the
+ * same requestedAt, and returns the latest row's `{ status, respondedAt }` per
+ * profile.
+ *
+ * Behaviour-preserving contract for callers:
+ * - **Profiles with NO GDPR row are ABSENT from the map** (not pre-populated).
+ *   This mirrors the original dashboard code, where a pre-consent-flow child
+ *   had no `consentByProfile` entry and therefore reported `consentStatus: null`.
+ * - The map carries the real `respondedAt` for every present profile (used by
+ *   the WithdrawalCountdownBanner grace-period countdown).
+ *
+ * [WI-489] Consolidates the two previously-inline batch GDPR-consent queries
+ * (dashboard.ts legacy path and solo-progress-reports.ts) behind one query.
+ */
+export async function getLatestGdprConsentByProfile(
+  db: Database,
+  profileIds: string[],
+): Promise<Map<string, { status: ConsentStatus; respondedAt: Date | null }>> {
+  const result = new Map<
+    string,
+    { status: ConsentStatus; respondedAt: Date | null }
+  >();
+  if (profileIds.length === 0) return result;
+
+  const rows = await db.query.consentStates.findMany({
+    where: and(
+      inArray(consentStates.profileId, profileIds),
+      eq(consentStates.consentType, 'GDPR'),
+    ),
+    // [BUG-394] Stable tiebreak on id when two rows share the same requestedAt.
+    orderBy: [desc(consentStates.requestedAt), desc(consentStates.id)],
+    columns: { profileId: true, status: true, respondedAt: true },
+  });
+
+  // Keep only the first (latest) row per profileId. No-row profiles stay absent.
+  for (const row of rows) {
+    if (!result.has(row.profileId)) {
+      result.set(row.profileId, {
+        status: row.status,
+        respondedAt: row.respondedAt ?? null,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Batch variant of isGdprProcessingAllowed — thin boolean wrapper over
+ * getLatestGdprConsentByProfile. Same single-query, BUG-394-tiebreak semantics:
+ *   - no row ⇒ allowed (pre-consent-flow account)
+ *   - latest GDPR row is CONSENTED ⇒ allowed
+ *   - PENDING / PARENTAL_CONSENT_REQUESTED / WITHDRAWN ⇒ blocked
+ *
+ * Profiles with no consent row are pre-populated `true` so a simple
+ * `map.get(id)` is sufficient (no `?? true` needed at the call site).
+ *
+ * [WI-489]
+ */
+export async function isGdprProcessingAllowedBatch(
+  db: Database,
+  profileIds: string[],
+): Promise<Map<string, boolean>> {
+  const latest = await getLatestGdprConsentByProfile(db, profileIds);
+  const result = new Map<string, boolean>();
+  for (const id of profileIds) {
+    const row = latest.get(id);
+    result.set(id, row == null || row.status === 'CONSENTED');
+  }
+  return result;
+}
+
+/**
  * Looks up a child's display name from a consent token.
  * Used by the web consent page to personalise the approval screen.
  * Returns null if the token is invalid or the profile doesn't exist.
