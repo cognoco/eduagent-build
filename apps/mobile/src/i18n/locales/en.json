@@ -449,9 +449,7 @@
     }
   },
   "family": {
-    "orientationCueBody": "Kids' progress and your own learning, all in one place.",
     "orientationCueDismiss": "Got it",
-    "orientationCueTitle": "This is your home",
     "withdrawal": {
       "bannerTitleSingle": "{{name}}'s account closes in {{days}} {{daysWord}}",
       "bannerTitleMulti": "{{count}} accounts closing soon",
