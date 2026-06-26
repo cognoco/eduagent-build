@@ -4013,9 +4013,24 @@
       "mastered": "Gemeistert"
     },
     "linkLabel": "Themen-Hub öffnen",
-    "empty": {
-      "title": "Hier gibt es noch nichts zu lernen",
-      "message": "Dieses Fach hat noch keine Themen. Versuche es gleich erneut oder gehe zurück zu deinen Fächern."
+    "preparing": {
+      "title": "Dein Lehrplan wird erstellt …",
+      "message": "Wir erstellen deine ersten Themen. Das dauert normalerweise nur wenige Sekunden.",
+      "slow": "Wird noch bearbeitet – fast fertig.",
+      "stalledMessage": "Das dauert länger als erwartet.",
+      "retry": "Erneut versuchen",
+      "titleNamed": "Dein {{subject}}-Lehrplan wird erstellt …"
+    },
+    "stuck": {
+      "title": "Wir konnten die Einrichtung nicht abschließen",
+      "message": "Tippe auf „Erneut versuchen“ und wir erstellen deine Themen erneut.",
+      "retry": "Erneut versuchen",
+      "retryFailedTitle": "Konnte gerade nicht wiederholt werden"
+    },
+    "pickBook": {
+      "title": "Wähle dein erstes Buch",
+      "message": "Wähle ein Buch, um mit dem Lernen dieses Fachs zu beginnen.",
+      "cta": "Bücher durchsuchen"
     }
   },
   "journal": {

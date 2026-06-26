@@ -6,12 +6,16 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
+import { Alert } from 'react-native';
 
 import {
   createScreenWrapper,
   createTestProfile,
 } from '../../../../test-utils/screen-render';
-import type { RoutedMockFetch } from '../../../../test-utils/mock-api-routes';
+import {
+  fetchCallsMatching,
+  type RoutedMockFetch,
+} from '../../../../test-utils/mock-api-routes';
 import SubjectHubRoute from './index';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 
@@ -256,14 +260,14 @@ describe('SubjectHubRoute', () => {
 // usable data must surface a recoverable empty state (not blank or stuck).
 // ---------------------------------------------------------------------------
 
-describe('SubjectHubRoute — settled with no usable data', () => {
+describe('SubjectHubRoute — no books (pick-book)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = () => ({ subjectId: SUBJECT_ID });
     seedRoutes();
-    // The subject exists, but it has no books → no generated topics → the hub
-    // settles with a non-null-but-empty payload. This is the case the old
-    // `(isLoading || !data)` branch could never represent.
+    // Subject is 'ready' (a broad subject has book *suggestions*, no book rows)
+    // but the hub sees zero books → the recovery is "choose your first book",
+    // not a generic dead-end.
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
     mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
       topics: [],
@@ -272,26 +276,168 @@ describe('SubjectHubRoute — settled with no usable data', () => {
     mockFetch.setRoute('/progress/resume-target', { target: null });
   });
 
-  it('shows a recoverable empty state with retry and back', async () => {
+  it('shows the pick-book empty state, not the hub surface', async () => {
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
     await waitFor(() => {
-      screen.getByTestId('subject-hub-empty');
+      screen.getByTestId('subject-hub-pick-book');
     });
-    screen.getByTestId('subject-hub-empty-retry');
-    screen.getByTestId('subject-hub-empty-back');
-    // The settled-empty state must not silently render the hub surface.
+    screen.getByTestId('subject-hub-pick-book-cta');
+    screen.getByTestId('subject-hub-pick-book-back');
     expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+  });
+
+  it('routes to pick-book from the CTA', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-pick-book-cta');
+    });
+    fireEvent.press(screen.getByTestId('subject-hub-pick-book-cta'));
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId: SUBJECT_ID },
+      }),
+    );
   });
 
   it('goes back from the empty state', async () => {
     render(<SubjectHubRoute />, { wrapper: wrapper() });
 
     await waitFor(() => {
-      screen.getByTestId('subject-hub-empty-back');
+      screen.getByTestId('subject-hub-pick-book-back');
     });
-    fireEvent.press(screen.getByTestId('subject-hub-empty-back'));
+    fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+});
+
+describe('SubjectHubRoute — preparing curriculum', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    // A book row exists but its topics are still generating → curriculumStatus
+    // 'preparing'. The hub must show the building state, not a dead-end.
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: SUBJECT_ID,
+          profileId: '990e8400-e29b-41d4-a716-446655440004',
+          name: 'Spanish',
+          status: 'active',
+          curriculumStatus: 'preparing',
+          pedagogyMode: 'socratic',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+      books: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          title: 'Spanish 1',
+          description: null,
+          emoji: null,
+          sortOrder: 1,
+          topicsGenerated: false,
+          status: 'NOT_STARTED',
+          topicCount: 0,
+          completedTopicCount: 0,
+          masteredTopicCount: 0,
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+  });
+
+  it('shows the building state with a back affordance, not the hub or a dead-end', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-preparing');
+    });
+    screen.getByTestId('subject-hub-preparing-back');
+    expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-pick-book')).toBeNull();
+  });
+});
+
+describe('SubjectHubRoute — stuck curriculum', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    // A generated book exists (curriculumStatus 'ready') but every topic is
+    // skipped → zero active topics. The honest recovery is a real retry that
+    // re-dispatches generation, not a re-read.
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+      book: {
+        id: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        title: 'Spanish 1',
+        description: null,
+        emoji: null,
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+      topics: [
+        {
+          id: TOPIC_ID,
+          title: 'Greetings',
+          description: 'Say hello.',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          bookId: BOOK_ID,
+          chapter: 'Basics',
+          skipped: true,
+        },
+      ],
+      connections: [],
+      status: 'IN_PROGRESS',
+      completedTopicIds: [],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retry-curriculum`, {
+      dispatched: 1,
+    });
+  });
+
+  it('shows the stuck state and re-dispatches curriculum on retry', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-stuck');
+    });
+    screen.getByTestId('subject-hub-stuck-retry');
+    expect(screen.queryByTestId('subject-hub-screen')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('subject-hub-stuck-retry'));
+
+    await waitFor(() => {
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/subjects/${SUBJECT_ID}/retry-curriculum`,
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[0]?.init?.method).toBe('POST');
+    });
   });
 });
 
@@ -335,5 +481,253 @@ describe('SubjectHubRoute — loading timeout escape', () => {
 
     // Reference the captured resolver to satisfy TypeScript (never called).
     void _capturedBooksResolver;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HIGH-3 — surface a platform alert when the retry mutation fails
+// ---------------------------------------------------------------------------
+//
+// Route-ordering note: `createRoutedMockFetch` matches by `url.includes(pattern)`.
+// The pattern `/subjects` (seeded by seedRoutes) sits at an earlier Map position
+// than `/subjects/${SUBJECT_ID}/retry-curriculum` and therefore matches the
+// retry-curriculum URL first (both contain the substring `/subjects`). To get the
+// right response we override the `/subjects` route with a function dispatcher that
+// branches on the URL — updating an existing key preserves Map order so the
+// dispatcher runs at the correct position.
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — stuck curriculum: retry error', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+      book: {
+        id: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        title: 'Spanish 1',
+        description: null,
+        emoji: null,
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+      topics: [
+        {
+          id: TOPIC_ID,
+          title: 'Greetings',
+          description: 'Say hello.',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          bookId: BOOK_ID,
+          chapter: 'Basics',
+          skipped: true,
+        },
+      ],
+      connections: [],
+      status: 'IN_PROGRESS',
+      completedTopicIds: [],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    // Override /subjects with a dispatcher: retry-curriculum POSTs get 500,
+    // ordinary subjects GETs get the list. This bypasses the Map-ordering
+    // ambiguity described above.
+    mockFetch.setRoute('/subjects', (url: string, init?: RequestInit) => {
+      if (url.includes('/retry-curriculum') && init?.method === 'POST') {
+        return new Response(JSON.stringify({ error: 'internal error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return {
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: '990e8400-e29b-41d4-a716-446655440004',
+            name: 'Spanish',
+            status: 'active',
+            curriculumStatus: 'ready',
+            pedagogyMode: 'socratic',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      };
+    });
+  });
+
+  it('surfaces a platform alert when the retry mutation fails', async () => {
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-stuck');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-hub-stuck-retry'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+
+    alertSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HIGH-2 — route to pick-book when retry-curriculum returns dispatched:0
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — stuck curriculum: dispatched:0', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+      book: {
+        id: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        title: 'Spanish 1',
+        description: null,
+        emoji: null,
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+      topics: [
+        {
+          id: TOPIC_ID,
+          title: 'Greetings',
+          description: 'Say hello.',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          bookId: BOOK_ID,
+          chapter: 'Basics',
+          skipped: true,
+        },
+      ],
+      connections: [],
+      status: 'IN_PROGRESS',
+      completedTopicIds: [],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    // Override /subjects with a dispatcher: retry-curriculum POSTs get
+    // dispatched:0, ordinary subjects GETs get the list. See note above.
+    mockFetch.setRoute('/subjects', (url: string) => {
+      if (url.includes('/retry-curriculum')) {
+        return { dispatched: 0 };
+      }
+      return {
+        subjects: [
+          {
+            id: SUBJECT_ID,
+            profileId: '990e8400-e29b-41d4-a716-446655440004',
+            name: 'Spanish',
+            status: 'active',
+            curriculumStatus: 'ready',
+            pedagogyMode: 'socratic',
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+        ],
+      };
+    });
+  });
+
+  it('routes to pick-book when retry-curriculum returns dispatched:0', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-stuck');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-hub-stuck-retry'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/pick-book/[subjectId]',
+          params: { subjectId: SUBJECT_ID },
+        }),
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MEDIUM-2 — preparing state passes subjectName to SubjectHubPreparing
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — preparing: personalized title', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: SUBJECT_ID,
+          profileId: '990e8400-e29b-41d4-a716-446655440004',
+          name: 'Spanish',
+          status: 'active',
+          curriculumStatus: 'preparing',
+          pedagogyMode: 'socratic',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+      books: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          title: 'Spanish 1',
+          description: null,
+          emoji: null,
+          sortOrder: 1,
+          topicsGenerated: false,
+          status: 'NOT_STARTED',
+          topicCount: 0,
+          completedTopicCount: 0,
+          masteredTopicCount: 0,
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+  });
+
+  it('renders the personalized preparing title with the subject name', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-preparing');
+    });
+
+    // mock-i18n resolves against real en.json — the named key interpolated with
+    // 'Spanish' produces the English string below.
+    screen.getByText('Building your Spanish curriculum…');
   });
 });

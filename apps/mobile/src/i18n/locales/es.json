@@ -4013,9 +4013,24 @@
       "mastered": "Dominado"
     },
     "linkLabel": "Abrir centro de asignaturas",
-    "empty": {
-      "title": "Aún no hay nada que estudiar aquí",
-      "message": "Esta asignatura aún no tiene temas. Inténtalo de nuevo en un momento o vuelve a tus asignaturas."
+    "preparing": {
+      "title": "Creando tu plan de estudios…",
+      "message": "Estamos preparando tus primeros temas. Esto suele tardar unos segundos.",
+      "slow": "Seguimos trabajando, ya casi está.",
+      "stalledMessage": "Esto está tardando más de lo esperado.",
+      "retry": "Intentar de nuevo",
+      "titleNamed": "Creando tu plan de estudios de {{subject}}…"
+    },
+    "stuck": {
+      "title": "No pudimos terminar de configurar esto",
+      "message": "Toca para reintentar y generaremos tus temas de nuevo.",
+      "retry": "Inténtalo de nuevo",
+      "retryFailedTitle": "No se pudo reintentar ahora mismo"
+    },
+    "pickBook": {
+      "title": "Elige tu primer libro",
+      "message": "Elige un libro para empezar a estudiar esta materia.",
+      "cta": "Explorar libros"
     }
   },
   "journal": {
