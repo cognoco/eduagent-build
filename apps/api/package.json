@@ -12,7 +12,8 @@
   },
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "eval:llm:sim": "tsx eval-llm/simulate.ts"
   },
   "dependencies": {
     "@eduagent/database": "workspace:*",

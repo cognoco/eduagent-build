@@ -155,6 +155,87 @@ Each snapshot is a single markdown file:
 
 Markdown lets you eyeball differences in a PR diff without the harness needing to render anything clever.
 
+## Challenge-Round simulated-learner harness (`eval:llm:sim`)
+
+A **standalone** dual-agent simulator (not a `FlowDefinition` — flows are
+single-turn). One LLM plays the **learner** in character from a hidden
+competence brief; the **real mentor pipeline** (`buildSystemPrompt` →
+`runHarnessLlm`) responds; the pure state machine
+(`transitionChallengeState`) and the pure mastery gate
+(`decideMasteryAndReview`) run in-memory. The driver compares the gate's
+outcome to each scenario's ground-truth `expectedOutcome` to compute
+over-/under-credit and per-mentor signal-emission rates.
+
+```bash
+# List the scenario grid — no LLM call, no Doppler, no provider bootstrap.
+pnpm --filter @eduagent/api eval:llm:sim -- --list
+
+# Live grid: a candidate mentor model grades a DISTINCT learner model.
+doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
+  --mentor-model openai/gpt-oss-120b \
+  --learner-model anthropic/claude-3.5-sonnet --runs 2 --max-live-calls 30
+```
+
+Flags: `--learner-model <slug>` (required for a run), `--mentor-model <slug>`
+(optional candidate; default = production routing), `--provider <slug>`,
+`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (default 30,
+~6 calls/round), `--list`, `--allow-same-family`. Output lands in
+`eval-llm/corpus/<timestamp>/` (gitignored) as one transcript JSON per round
+plus `metrics.json`.
+
+### Why this complements RR-2 but does NOT discharge it
+
+A model playing a 14-year-old emits **model-shaped, not teen-shaped** answers.
+Per spec **CH-4**, any mastery bar tuned on this synthetic corpus is
+**provisional**: it is a **pre-screen**, not the real-staging-transcript corpus
+RR-2 requires. RR-6 *depends* RR-2 and RR-12 *depends* RR-2+RR-6, so the
+synthetic corpus must **not** be read as "RR-2 done", and the post-launch
+recalibration against real learner data still stands.
+
+### The two-model guardrail
+
+The learner model and the mentor/grader model **must differ**, or correlated
+errors inflate the `solid` rate and produce a falsely lenient bar. The guard
+refuses to run when:
+
+1. The slugs are identical (explicit candidate or production-routing default —
+   the null case resolves the router's concrete mentor slug and applies the
+   same check).
+2. They share a **base family** (heuristic: provider prefix stripped, size/date
+   suffixes dropped, first two tokens compared — `openai/gpt-oss-120b` and
+   `gpt-oss-120b` both collapse to `gpt-oss`). This is heuristic (the same model
+   can be served under different slugs/providers); pass `--allow-same-family`
+   for a deliberate same-family A/B.
+
+### Scope limits (read before trusting a number)
+
+- **DB-free.** `decideMasteryAndReview` runs for real, but the production-only
+  `validateEvaluationEventIds` (DB lookup that swaps `learnerQuote` for the real
+  `session_events.content`) is **not** called — there is no seeded DB. The
+  simulator measures the LLM contract + the mastery decision, not the
+  DB-anchoring step (that stays covered by `evaluation.test.ts` + integration
+  tests).
+- **Note-overlap calibration is NOT in scope.** `MIN_LEXICAL_OVERLAP_NOTE_DRAFT`
+  is consumed only by the note-draft path against DB-verified content this
+  harness does not produce. RR-6's **note-overlap** half stays blocked on a
+  drafting-path harness or real transcripts; this feeds only the **mastery-bar**
+  half.
+- **Envelope parsing is the production path** (`parseEnvelope`, surface
+  `exchange.session`): a schema-violating or zero-eval mentor turn counts as a
+  dropped signal (`signalEmitted=false`), exactly as production treats it. That
+  is the **gpt-oss signal-drop** indicator on RR-12.
+- **`OPENROUTER_API_KEY` must be in the resolved Doppler config (`-c stg`)** for
+  any live run — the learner *always* calls OpenRouter, and bootstrap treats the
+  key as optional (it only fails at call time otherwise).
+- **`--provider` is a GLOBAL OpenRouter host pin** — it affects *every*
+  OpenRouter call this run, including an OpenRouter mentor candidate. Only use it
+  when the mentor is production-routed or both deliberately share the pinned
+  host.
+- **Language:** v1 learner answers are in plain English regardless of the
+  profile's conversation language — a deliberate simplification for the
+  synthetic pre-screen; language-faithful calibration comes from real-staging
+  transcripts (RR-2).
+
 ## Review loop during tuning
 
 1. Run Tier 1 baseline: `pnpm eval:llm` and commit the baseline snapshots
