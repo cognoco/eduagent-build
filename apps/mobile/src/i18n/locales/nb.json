@@ -4042,7 +4042,6 @@
       "quiz_personal_best": "Personlig rekord lagret."
     },
     "recaps": {
-      "empty": "Sammendragene fra dine fullførte økter vil vises her.",
       "error": "Kunne ikke laste inn sammendragene dine.",
       "openLabel": "Åpne sammendrag for {{title}}"
     },

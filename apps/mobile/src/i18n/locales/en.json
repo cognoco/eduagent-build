@@ -3141,7 +3141,6 @@
       "quiz_personal_best": "Personal best saved."
     },
     "recaps": {
-      "empty": "Your finished session summaries will appear here.",
       "error": "Could not load your recaps.",
       "openLabel": "Open recap for {{title}}"
     },

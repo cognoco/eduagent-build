@@ -4200,7 +4200,6 @@
       "quiz_personal_best": "Zapisano rekord osobisty."
     },
     "recaps": {
-      "empty": "Podsumowania ukończonych sesji pojawią się tutaj.",
       "error": "Nie udało się wczytać podsumowań.",
       "openLabel": "Otwórz podsumowanie dla {{title}}"
     },

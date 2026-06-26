@@ -4042,7 +4042,6 @@
       "quiz_personal_best": "Bestleistung gespeichert."
     },
     "recaps": {
-      "empty": "Zusammenfassungen deiner abgeschlossenen Sitzungen erscheinen hier.",
       "error": "Deine Zusammenfassungen konnten nicht geladen werden.",
       "openLabel": "Zusammenfassung für {{title}} öffnen"
     },

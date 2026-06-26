@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import type { ZodError } from 'zod';
 import {
   curriculumBooks,
   curriculumTopics,
@@ -9,6 +10,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type { RecapListItem } from '@eduagent/schemas';
+import { recapListItemSchema } from '@eduagent/schemas';
 import { ForbiddenError } from '../errors';
 
 import {
@@ -17,6 +19,10 @@ import {
   getChildrenForParent,
 } from './dashboard';
 import { listProfileSessions } from './session/session-crud';
+import { createLogger } from './logger';
+import { captureException } from './sentry';
+
+const logger = createLogger();
 
 type DashboardChildSummary = Awaited<
   ReturnType<typeof getChildrenForParent>
@@ -245,6 +251,59 @@ export async function listRecapsForParent(
     .slice(0, Math.min(Math.max(options.limit ?? 20, 1), 50));
 }
 
+/**
+ * Validates each mapped recap item against `recapListItemSchema`, DROPPING (not
+ * throwing on) any row that fails so a single malformed session can't 500 the
+ * whole list. The offending row is surfaced via `onInvalid` so the real cause
+ * is logged + captured in Sentry.
+ *
+ * Mirrors the monthly-report schema-drift pattern (services/monthly-report.ts →
+ * mapMonthlyReportRow), but skip-not-throw because this is a LIST endpoint: one
+ * bad row should degrade to N-1 cards, not blank the whole recap list with a
+ * 500. (The route's `recapsResponseSchema.parse` then always succeeds, so it
+ * stays a defensive safety net rather than the thing that fails the request.)
+ */
+export function validateRecapItems(
+  items: readonly unknown[],
+  onInvalid?: (error: ZodError, item: unknown) => void,
+): RecapListItem[] {
+  const valid: RecapListItem[] = [];
+  for (const item of items) {
+    const result = recapListItemSchema.safeParse(item);
+    if (result.success) {
+      valid.push(result.data);
+    } else {
+      onInvalid?.(result.error, item);
+    }
+  }
+  return valid;
+}
+
+function reportDroppedRecapRow(
+  profileId: string,
+  error: ZodError,
+  item: unknown,
+): void {
+  const sessionId =
+    item && typeof item === 'object' && 'sessionId' in item
+      ? String((item as { sessionId?: unknown }).sessionId)
+      : undefined;
+  logger.warn('listRecapsForProfile: dropped invalid recap row', {
+    profileId,
+    sessionId,
+    error: error.message,
+  });
+  captureException(error, {
+    profileId,
+    extra: {
+      context: 'listRecapsForProfile',
+      sessionId,
+      issues: error.issues,
+    },
+    tags: { surface: 'recaps.self' },
+  });
+}
+
 export async function listRecapsForProfile(
   db: Database,
   profileId: string,
@@ -269,13 +328,19 @@ export async function listRecapsForProfile(
     nextTopicBySession = new Map();
   }
 
-  return page.sessions.map((session) =>
+  const items = page.sessions.map((session) =>
     profileSessionToRecapItem(
       profileId,
       profile?.displayName ?? 'Learner',
       session,
       nextTopicBySession.get(session.sessionId),
     ),
+  );
+
+  // Per-row validation: a single malformed row is dropped + reported rather
+  // than left to 500 the whole self-recaps list at the route's response parse.
+  return validateRecapItems(items, (error, item) =>
+    reportDroppedRecapRow(profileId, error, item),
   );
 }
 

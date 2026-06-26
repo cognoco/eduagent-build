@@ -4042,7 +4042,6 @@
       "quiz_personal_best": "Recorde pessoal salvo."
     },
     "recaps": {
-      "empty": "Os resumos das suas sessões concluídas aparecerão aqui.",
       "error": "Não foi possível carregar seus resumos.",
       "openLabel": "Abrir resumo para {{title}}"
     },
