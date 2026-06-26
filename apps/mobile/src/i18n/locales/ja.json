@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "他{{count}}件の選択肢"
     },
-    "empty": {
-      "title": "今すぐやるべきことはありません",
-      "cta": "他の学習オプションを見る"
-    },
     "bar": {
       "unavailable": "チューターは一時的にオフラインです。入力は可能です。",
       "cameraLabel": "カメラ",
       "placeholder": "学習したいことを質問、貼り付け、または入力してください。",
       "micLabel": "マイク",
-      "homeworkChip": "宿題"
+      "homeworkChip": "宿題",
+      "title": "何でも質問"
     },
     "onTrack": {
       "label": "順調",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "カメラで問題を撮影するか、ここに入力してください。",
       "firstSessionTeach": "ここに書いたことを覚えておくので、次の一歩はもっとあなたに合ったところから始められます。"
     },
-    "title": "メンター",
-    "subtitle": "次に役立ついくつかのステップと、質問や記録ができる場所です。",
     "fallback": {
       "cached": "再接続中に、最後に保存されたフィードを表示しています。",
       "continue": "中断したところから続ける"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "解き方を教えて",
       "checkMyAnswer": "答え合わせをする"
     },
-    "homeworkPrompt": "今夜、宿題はありますか？写真を撮れば、一緒に取り組みます。"
+    "homeworkPrompt": "今夜、宿題はありますか？写真を撮れば、一緒に取り組みます。",
+    "headline": "何でも質問しよう"
   },
   "subjectsBrowse": {
     "title": "科目",
@@ -4061,7 +4057,6 @@
       "quiz_personal_best": "自己ベストが保存されました。"
     },
     "recaps": {
-      "empty": "完了したセッションの概要はここに表示されます。",
       "error": "概要を読み込めませんでした。",
       "openLabel": "{{title}}の概要を開く"
     },

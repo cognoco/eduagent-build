@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "{{count}} opciones más"
     },
-    "empty": {
-      "title": "Nada te necesita ahora mismo",
-      "cta": "Explora más opciones de aprendizaje"
-    },
     "bar": {
       "unavailable": "El tutor está desconectado un momento. Aún puedes escribir.",
       "cameraLabel": "Cámara",
       "placeholder": "Pregunta, pega o describe lo que quieres aprender.",
       "micLabel": "Micro",
-      "homeworkChip": "Tarea"
+      "homeworkChip": "Tarea",
+      "title": "Pregunta lo que sea"
     },
     "onTrack": {
       "label": "Al día",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "Usa la cámara para capturar el problema o escríbelo aquí.",
       "firstSessionTeach": "Recordaré lo que escribas aquí para que el próximo paso empiece más cerca de ti."
     },
-    "title": "Tutor",
-    "subtitle": "Algunos próximos pasos útiles, además de un lugar para preguntar o apuntar cualquier cosa.",
     "fallback": {
       "cached": "Mostrando la última información guardada mientras nos reconectamos.",
       "continue": "Continúa donde lo dejaste"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "Ayúdame a resolver esto",
       "checkMyAnswer": "Revisa mi respuesta"
     },
-    "homeworkPrompt": "¿Tienes deberes esta noche? Haz una foto y los resolveremos juntos."
+    "homeworkPrompt": "¿Tienes deberes esta noche? Haz una foto y los resolveremos juntos.",
+    "headline": "Obtén ayuda con cualquier cosa"
   },
   "subjectsBrowse": {
     "title": "Temas",
@@ -4061,7 +4057,6 @@
       "quiz_personal_best": "Récord personal guardado."
     },
     "recaps": {
-      "empty": "Aquí aparecerán los resúmenes de tus sesiones terminadas.",
       "error": "No se pudieron cargar tus resúmenes.",
       "openLabel": "Abrir resumen de {{title}}"
     },

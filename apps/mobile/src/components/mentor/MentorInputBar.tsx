@@ -29,8 +29,11 @@ export function MentorInputBar({
   return (
     <View
       testID="mentor-input-bar"
-      className="border-t border-border bg-surface px-4 py-3"
+      className="rounded-2xl border border-border bg-surface p-4"
     >
+      <Text className="mb-3 font-bold text-text-primary">
+        {t('mentorHome.bar.title')}
+      </Text>
       {unavailable ? (
         <Text className="mb-2 text-xs text-text-secondary">
           {t('mentorHome.bar.unavailable')}

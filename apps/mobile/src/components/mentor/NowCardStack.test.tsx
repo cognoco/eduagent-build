@@ -76,8 +76,8 @@ describe('NowCardStack', () => {
     expect(onShowOverflow).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the onboarding empty card only for an empty feed', () => {
-    const { getByTestId, getByText } = render(
+  it('renders nothing for an empty feed with no overflow (no dead-end card)', () => {
+    const { queryByTestId, toJSON } = render(
       <NowCardStack
         feed={feed([])}
         dismissedKeys={new Set()}
@@ -87,8 +87,28 @@ describe('NowCardStack', () => {
       />,
     );
 
-    expect(getByTestId('now-empty-card')).toBeTruthy();
-    expect(getByText('Nothing needs you right now')).toBeTruthy();
+    // The old "Nothing needs you / Browse" card was a dead-end (its tap called
+    // onShowOverflow with overflowCount === 0). The screen's always-present Ask
+    // box + light-practice affordance now own the empty state instead.
+    expect(queryByTestId('now-empty-card')).toBeNull();
+    expect(queryByTestId('now-card-stack')).toBeNull();
+    expect(toJSON()).toBeNull();
+  });
+
+  it('still renders the overflow entry for an empty feed that has overflow', () => {
+    const onShowOverflow = jest.fn();
+    const { getByTestId } = render(
+      <NowCardStack
+        feed={feed([], { overflowCount: 3 })}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={onShowOverflow}
+      />,
+    );
+
+    fireEvent.press(getByTestId('now-overflow-entry'));
+    expect(onShowOverflow).toHaveBeenCalledTimes(1);
   });
 
   it('filters locally dismissed cards and drops malformed non-action cards', () => {
@@ -153,22 +173,6 @@ describe('NowCardStack', () => {
     // Screen readers treat children of a 'list' container as list items implicitly.
     expect(getByTestId('now-card-slot-anchor')).toBeTruthy();
     expect(getByTestId('now-card-slot-module-0')).toBeTruthy();
-  });
-
-  it('[WI-1020] empty-state Pressable does not receive list role', () => {
-    const { getByTestId } = render(
-      <NowCardStack
-        feed={feed([])}
-        dismissedKeys={new Set()}
-        onContinue={jest.fn()}
-        onDecline={jest.fn()}
-        onShowOverflow={jest.fn()}
-      />,
-    );
-
-    expect(getByTestId('now-empty-card').props.accessibilityRole).toBe(
-      'button',
-    );
   });
 
   it('threads anchor arc state and completion events into actionable cards', () => {
