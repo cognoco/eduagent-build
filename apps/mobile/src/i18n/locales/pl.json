@@ -4171,9 +4171,24 @@
       "mastered": "Opanowane"
     },
     "linkLabel": "Otwórz centrum tematyczne",
-    "empty": {
-      "title": "Jeszcze nic tu nie ma do nauki",
-      "message": "Ten przedmiot nie ma jeszcze żadnych tematów. Spróbuj ponownie za chwilę lub wróć do swoich przedmiotów."
+    "preparing": {
+      "title": "Tworzymy Twój program nauczania…",
+      "message": "Przygotowujemy Twoje pierwsze tematy. Zwykle zajmuje to kilka sekund.",
+      "slow": "Nadal pracujemy — już prawie gotowe.",
+      "stalledMessage": "Trwa to dłużej, niż się spodziewaliśmy.",
+      "retry": "Spróbuj ponownie",
+      "titleNamed": "Tworzymy Twój program {{subject}}…"
+    },
+    "stuck": {
+      "title": "Nie udało nam się dokończyć konfiguracji",
+      "message": "Stuknij „Spróbuj ponownie”, a wygenerujemy tematy jeszcze raz.",
+      "retry": "Spróbuj ponownie",
+      "retryFailedTitle": "Nie można teraz spróbować ponownie"
+    },
+    "pickBook": {
+      "title": "Wybierz swoją pierwszą książkę",
+      "message": "Wybierz książkę, aby rozpocząć naukę tego przedmiotu.",
+      "cta": "Przeglądaj książki"
     }
   },
   "journal": {

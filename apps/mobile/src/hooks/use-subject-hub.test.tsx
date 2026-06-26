@@ -5,7 +5,11 @@ import type {
   LearningResumeTarget,
 } from '@eduagent/schemas';
 
-import { buildSubjectHubData, type SubjectHubNote } from './use-subject-hub';
+import {
+  buildSubjectHubData,
+  computeEmptyKind,
+  type SubjectHubNote,
+} from './use-subject-hub';
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const BOOK_ID = '660e8400-e29b-41d4-a716-446655440001';
@@ -97,6 +101,74 @@ const notes: SubjectHubNote[] = [
     sessionId: null,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// computeEmptyKind — emptyKind discriminator (pure helper)
+// ---------------------------------------------------------------------------
+
+describe('computeEmptyKind', () => {
+  // Hub data with zero active topics — hasUsableData will be false.
+  const emptyHubData = buildSubjectHubData({
+    subjectId: SUBJECT_ID,
+    subjectName: 'Test',
+    books: [],
+    bookDetails: [],
+    sessionsByBookId: new Map(),
+    retentionTopics: [],
+    resumeTarget: null,
+    notes: [],
+  });
+
+  // Hub data with active topics — hasUsableData will be true.
+  const hubDataWithTopics = buildSubjectHubData({
+    subjectId: SUBJECT_ID,
+    subjectName: 'Spanish',
+    books: [book()],
+    bookDetails: [bookWithTopics],
+    sessionsByBookId: new Map(),
+    retentionTopics: [],
+    resumeTarget: null,
+    notes: [],
+  });
+
+  it("returns 'none' when data is null (hub not yet settled)", () => {
+    expect(computeEmptyKind(null, null, 0)).toBe('none');
+  });
+
+  it("returns 'none' when hub has usable (studyable) topics", () => {
+    // hubDataWithTopics.aggregate.total === 2, so hasUsableData === true.
+    expect(computeEmptyKind(hubDataWithTopics, 'ready', 1)).toBe('none');
+  });
+
+  it("routes curriculumStatus='failed' to 'stuck' with no books", () => {
+    // 'failed' is terminal — routes directly to stuck without requiring books.
+    expect(computeEmptyKind(emptyHubData, 'failed', 0)).toBe('stuck');
+  });
+
+  it("routes curriculumStatus='failed' to 'stuck' even when books are present", () => {
+    // A failed subject with books still routes to stuck (books generated zero active topics).
+    expect(computeEmptyKind(emptyHubData, 'failed', 2)).toBe('stuck');
+  });
+
+  it("routes preparing with NO books to 'preparing' (NOT 'pick-book')", () => {
+    // Regression guard: the OLD discriminator checked books.length === 0 first,
+    // so preparing + no books → 'pick-book' (wrong flash). The fixed order checks
+    // preparing BEFORE pick-book, so no-book preparing → 'preparing'.
+    expect(computeEmptyKind(emptyHubData, 'preparing', 0)).toBe('preparing');
+  });
+
+  it("routes ready-but-empty with books present to 'stuck'", () => {
+    // Books generated but zero active topics after generation → stuck.
+    expect(computeEmptyKind(emptyHubData, 'ready', 2)).toBe('stuck');
+  });
+
+  it("routes no books + not preparing + not failed to 'pick-book'", () => {
+    // Subject initialised but user has not added any books yet.
+    expect(computeEmptyKind(emptyHubData, 'ready', 0)).toBe('pick-book');
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 describe('buildSubjectHubData', () => {
   it('composes hub data and preserves active-session resume identity', () => {

@@ -10,7 +10,13 @@ const mockSelectChain = {
   }),
 };
 
+// Capture chain for db.update(...).set(...).where(...) so tests can assert the
+// persisted terminal-failure payload (failedReason / failedAt).
+const updateWhere = jest.fn().mockResolvedValue(undefined);
+const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
 const mockDb: Record<string, any> = {
+  update: jest.fn().mockReturnValue({ set: updateSet }),
   query: {
     curriculumBooks: { findFirst: jest.fn().mockResolvedValue(null) },
     profiles: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -205,6 +211,9 @@ describe('subjectPrewarmCurriculum', () => {
       .mockReset()
       .mockResolvedValue(undefined);
     mockDb.query.person.findFirst.mockReset().mockResolvedValue(null);
+    updateWhere.mockReset().mockResolvedValue(undefined);
+    updateSet.mockReset().mockReturnValue({ where: updateWhere });
+    mockDb.update.mockReset().mockReturnValue({ set: updateSet });
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -467,6 +476,139 @@ describe('subjectPrewarmCurriculum', () => {
       expect(persistBookTopicsSpy).not.toHaveBeenCalled();
       // The handler returns status:'pending' (context.status) when generated===false.
       expect(result).toMatchObject({ status: 'pending', subjectId, bookId });
+    });
+  });
+
+  // Persisted terminal-failure signal (failedReason / failedAt). Before this,
+  // failure was Sentry-only and the subject looked "preparing" forever. Only the
+  // terminal failure is persisted: consent-blocked is owned by the consent gate
+  // (writes nothing) and there is no persisted "generating" flag.
+  describe('persisted failure signal', () => {
+    it("writes failedReason='empty_topics' + failedAt when generation returns no topics", async () => {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }));
+      generateBookTopicsSpy.mockResolvedValueOnce({
+        topics: [],
+        connections: [],
+      });
+
+      await expect(execute(createEventData())).rejects.toThrow(
+        'prewarm-empty-topics',
+      );
+
+      expect(updateSet).toHaveBeenCalledWith(
+        expect.objectContaining({
+          failedReason: 'empty_topics',
+          failedAt: expect.any(Date),
+        }),
+      );
+      expect(persistBookTopicsSpy).not.toHaveBeenCalled();
+    });
+
+    it('writes no failure signal when consent is not granted at load time (book stays "preparing")', async () => {
+      mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+        createBook({ topicsGenerated: false }),
+      );
+      // Legacy consent path blocked.
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'WITHDRAWN',
+      });
+      // v2 path blocked: membership present + grant withdrawn.
+      mockDb.query.membership.findFirst.mockResolvedValue({
+        organizationId: '550e8400-e29b-41d4-a716-446655440099',
+      });
+      mockDb.query.consentGrant.findFirst.mockResolvedValue({
+        granted: true,
+        withdrawnAt: new Date('2026-06-01T12:00:00.000Z'),
+        grantedAt: new Date('2026-06-01T12:00:00.000Z'),
+      });
+
+      const { result } = await execute(createEventData());
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      // Consent-blocked is owned by the consent gate — no curriculum failure write.
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(generateBookTopicsSpy).not.toHaveBeenCalled();
+    });
+
+    it('writes no failure signal on the success path (failure fields cleared by persistBookTopics)', async () => {
+      mockDb.query.curriculumBooks.findFirst
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: false }))
+        .mockResolvedValueOnce(createBook({ topicsGenerated: true }));
+
+      const { result } = await execute(createEventData());
+
+      expect(result).toMatchObject({ status: 'completed', subjectId, bookId });
+      // No terminal-failure write on success; clearing of failedReason/failedAt is
+      // owned by the real persistBookTopics (spied here, exercised in integration).
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(persistBookTopicsSpy).toHaveBeenCalled();
+    });
+
+    describe('onFailure terminal handler', () => {
+      const callOnFailure = (
+        overrides: Record<string, unknown> = {},
+        error: unknown = new Error('transient generation error'),
+      ) => {
+        const onFailure = (subjectPrewarmCurriculum as any).opts
+          .onFailure as (args: {
+          event: { data: { event?: { data?: unknown } } };
+          error: unknown;
+        }) => Promise<unknown>;
+        return onFailure({
+          event: { data: { event: { data: createEventData(overrides) } } },
+          error,
+        });
+      };
+
+      it('declares an onFailure handler', () => {
+        expect(typeof (subjectPrewarmCurriculum as any).opts.onFailure).toBe(
+          'function',
+        );
+      });
+
+      it("writes failedReason='generation_error' + failedAt when retries are exhausted", async () => {
+        mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+          createBook({ topicsGenerated: false, failedAt: null }),
+        );
+
+        await callOnFailure();
+
+        expect(updateSet).toHaveBeenCalledWith(
+          expect.objectContaining({
+            failedReason: 'generation_error',
+            failedAt: expect.any(Date),
+          }),
+        );
+      });
+
+      it('does not overwrite an already-generated book', async () => {
+        mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+          createBook({ topicsGenerated: true, failedAt: null }),
+        );
+
+        await callOnFailure();
+
+        expect(mockDb.update).not.toHaveBeenCalled();
+      });
+
+      it('does not overwrite a book whose failedAt is already set', async () => {
+        mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+          createBook({
+            topicsGenerated: false,
+            failedAt: new Date('2026-06-01T00:00:00.000Z'),
+          }),
+        );
+
+        await callOnFailure();
+
+        expect(mockDb.update).not.toHaveBeenCalled();
+      });
     });
   });
 });

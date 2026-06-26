@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -155,7 +155,7 @@ async function getSubjectCurriculumStatuses(
 ): Promise<Map<string, SubjectCurriculumStatus>> {
   if (subjectIds.length === 0) return new Map();
 
-  const [readyBooks, suggestions] = await Promise.all([
+  const [readyBooks, suggestions, failedBooks] = await Promise.all([
     db.query.curriculumBooks.findMany({
       where: and(
         inArray(curriculumBooks.subjectId, subjectIds),
@@ -165,6 +165,19 @@ async function getSubjectCurriculumStatuses(
     }),
     db.query.bookSuggestions.findMany({
       where: inArray(bookSuggestions.subjectId, subjectIds),
+      columns: { subjectId: true },
+    }),
+    // Books whose topic generation reached a terminal failure (failed_at set).
+    // This is the single authoritative failure signal; a subject is only
+    // surfaced as 'failed' when it has NO ready content (see precedence below)
+    // — a single failed sibling next to a ready book must not hide studyable
+    // content. Consent-blocked is deliberately NOT counted as failure here
+    // (it is owned by the consent gate; a retry cannot fix it).
+    db.query.curriculumBooks.findMany({
+      where: and(
+        inArray(curriculumBooks.subjectId, subjectIds),
+        isNotNull(curriculumBooks.failedAt),
+      ),
       columns: { subjectId: true },
     }),
   ]);
@@ -177,10 +190,26 @@ async function getSubjectCurriculumStatuses(
     readySubjectIds.add(suggestion.subjectId);
   }
 
+  const failedSubjectIds = new Set<string>();
+  for (const book of failedBooks) {
+    failedSubjectIds.add(book.subjectId);
+  }
+
+  // Precedence: ready beats failed beats preparing.
+  //  - 'ready'     — has studyable content / a next action (generated book or
+  //                  suggestion), even if a sibling book failed.
+  //  - 'failed'    — no ready content, but at least one book with failed_at set
+  //                  (terminal generation failure). Consent-blocked is NOT
+  //                  counted here (owned by the consent gate).
+  //  - 'preparing' — neither (generation still in flight, derived not persisted).
   return new Map(
     subjectIds.map((subjectId) => [
       subjectId,
-      readySubjectIds.has(subjectId) ? 'ready' : 'preparing',
+      readySubjectIds.has(subjectId)
+        ? 'ready'
+        : failedSubjectIds.has(subjectId)
+          ? 'failed'
+          : 'preparing',
     ]),
   );
 }
@@ -246,6 +275,14 @@ export async function retryCurriculumForSubject(
   const subjectRow = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subjectRow) throw new SubjectNotFoundError();
 
+  // `topicsGenerated=false` is the canonical "needs (re)generation" set — it
+  // captures every non-ready book (still preparing, or terminally failed with
+  // failed_at set; the retry-claim clears failed_at so the book derives back to
+  // preparing while regenerating). Do NOT broaden it to include generated books
+  // — the Inngest retry function early-returns on already-generated books, so
+  // re-dispatching them is a no-op. The rare "generated-but-zero-active-topics"
+  // stuck case is not regenerable here; it is surfaced client-side via
+  // `dispatched: 0`.
   const stuckBooks = await db.query.curriculumBooks.findMany({
     where: and(
       eq(curriculumBooks.subjectId, subjectId),

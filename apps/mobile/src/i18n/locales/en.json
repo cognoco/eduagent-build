@@ -3063,9 +3063,24 @@
       "loadTitle": "Could not load this subject",
       "loadMessage": "Try again, or go back to your subjects."
     },
-    "empty": {
-      "title": "Nothing to study here yet",
-      "message": "This subject has no topics yet. Try again in a moment, or go back to your subjects."
+    "preparing": {
+      "title": "Building your curriculum…",
+      "titleNamed": "Building your {{subject}} curriculum…",
+      "message": "We're writing your first topics. This usually takes a few seconds.",
+      "slow": "Still working — almost there.",
+      "stalledMessage": "This is taking longer than expected.",
+      "retry": "Try again"
+    },
+    "stuck": {
+      "title": "We couldn't finish setting this up",
+      "message": "Tap retry and we'll generate your topics again.",
+      "retry": "Try again",
+      "retryFailedTitle": "Couldn't retry right now"
+    },
+    "pickBook": {
+      "title": "Choose your first book",
+      "message": "Pick a book to start studying this subject.",
+      "cta": "Browse books"
     },
     "progress": {
       "threeState": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",

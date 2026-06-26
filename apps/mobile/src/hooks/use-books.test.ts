@@ -18,6 +18,7 @@ import {
   useBookWithTopics,
   useGenerateBookTopics,
   useDeleteBook,
+  useRetryCurriculum,
 } from './use-books';
 
 const mockFetch = jest.fn();
@@ -591,6 +592,91 @@ describe('useGenerateBookTopics', () => {
         queryKey: ['curriculum', 'subject-1', 'test-profile-id'],
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useRetryCurriculum
+// ---------------------------------------------------------------------------
+
+describe('useRetryCurriculum', () => {
+  it('invalidates subjects and books when dispatched > 0', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ dispatched: 2 }), { status: 200 }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useRetryCurriculum('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['subjects', 'test-profile-id'],
+      }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['books', 'subject-1', 'test-profile-id'],
+      }),
+    );
+  });
+
+  it('does NOT invalidate any query when dispatched === 0 (nothing was regeneratable)', async () => {
+    // Regression guard: the OLD onSuccess always called invalidateQueries
+    // regardless of dispatched, causing a fake 'preparing' cycle that led the
+    // learner back to the same dead screen. The fixed handler skips
+    // invalidation so the screen can show a terminal "nothing to retry" message.
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ dispatched: 0 }), { status: 200 }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useRetryCurriculum('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('surfaces API error via isError (onError is not swallowed)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 500 }),
+    );
+
+    const { result } = renderHook(() => useRetryCurriculum('subject-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await expect(result.current.mutateAsync()).rejects.toThrow();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
   });
 });
 

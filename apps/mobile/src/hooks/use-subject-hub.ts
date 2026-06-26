@@ -33,6 +33,23 @@ import { useSubjects } from './use-subjects';
 const MIN_EXCHANGES_FOR_TOPIC_COMPLETION = 4;
 const SEARCH_CHAPTER_THRESHOLD = 10;
 const SEARCH_TOPIC_THRESHOLD = 50;
+// Match the subjects-list poll cadence (use-subjects.ts) so the hub resolves to
+// ready topics on the same beat the list flips curriculumStatus.
+const PREPARING_POLL_MS = 3000;
+
+/**
+ * Discriminates the four distinct "no studyable topics" states the hub can
+ * settle into, so the screen renders a state-appropriate recovery instead of one
+ * generic dead-end:
+ *  - 'preparing'  — books exist, generation in flight → building UI + poll
+ *  - 'stuck'      — generated book(s) yield zero active topics, OR a persisted
+ *                   `curriculumStatus === 'failed'` (terminal state — no timer
+ *                   needed; the user retrying re-dispatches and derives the
+ *                   subject back to 'preparing') → retry-curriculum CTA
+ *  - 'pick-book'  — no book rows yet (broad suggestions, or nothing) → pick-book CTA
+ *  - 'none'       — has usable data, or hub not yet settled
+ */
+export type SubjectHubEmptyKind = 'none' | 'preparing' | 'stuck' | 'pick-book';
 
 export type { SubjectHubNote };
 
@@ -366,16 +383,54 @@ export function buildSubjectHubData({
   };
 }
 
+/**
+ * Pure discriminator for the hub's empty-state kind.
+ * Exported for unit tests — call sites should use `useSubjectHub` instead.
+ *
+ * Order of precedence (highest → lowest):
+ *  1. `data` is null → 'none' (hub not yet settled)
+ *  2. hub has usable topics → 'none'
+ *  3. `curriculumStatus === 'failed'` → 'stuck' (terminal; no poll needed)
+ *  4. `curriculumStatus === 'preparing'` → 'preparing' (poll active)
+ *  5. no book rows → 'pick-book'
+ *  6. books present but zero active topics → 'stuck'
+ */
+export function computeEmptyKind(
+  data: SubjectHubDataWithResume | null,
+  curriculumStatus: 'ready' | 'preparing' | 'failed' | null,
+  booksCount: number,
+): SubjectHubEmptyKind {
+  const hasUsableData =
+    !!data && (data.aggregate.total > 0 || data.chapters.length > 0);
+  if (!data || hasUsableData) return 'none';
+  if (curriculumStatus === 'failed') return 'stuck';
+  if (curriculumStatus === 'preparing') return 'preparing';
+  if (booksCount === 0) return 'pick-book';
+  return 'stuck';
+}
+
 export function useSubjectHub(subjectId: string | undefined): {
   data: SubjectHubDataWithResume | null;
   isLoading: boolean;
   isError: boolean;
+  curriculumStatus: 'ready' | 'preparing' | 'failed' | null;
+  emptyKind: SubjectHubEmptyKind;
   refetch: () => void;
 } {
   const client = useApiClient();
   const { activeProfile } = useProfile();
   const subjectsQuery = useSubjects({ enabled: !!subjectId });
-  const booksQuery = useBooks(subjectId);
+  const curriculumStatus = subjectId
+    ? (subjectsQuery.data?.find((subject) => subject.id === subjectId)
+        ?.curriculumStatus ?? null)
+    : null;
+  const isPreparing = curriculumStatus === 'preparing';
+  // While the curriculum is generating, poll the book + topic queries so the hub
+  // resolves to studyable topics on its own instead of stranding the learner on
+  // a static empty state. The poll self-disables the moment status flips to
+  // 'ready' (and stops entirely once the screen unmounts).
+  const preparingPoll = isPreparing ? PREPARING_POLL_MS : false;
+  const booksQuery = useBooks(subjectId, { refetchInterval: preparingPoll });
   const retentionQuery = useRetentionTopics(subjectId ?? '');
   const resumeTargetQuery = useLearningResumeTarget({ subjectId });
   const notesQuery = useSubjectNotes(subjectId);
@@ -387,6 +442,7 @@ export function useSubjectHub(subjectId: string | undefined): {
     queries: generatedBooks.map((book) => ({
       queryKey: ['book', subjectId, book.id, activeProfile?.id],
       enabled: !!activeProfile && !!subjectId,
+      refetchInterval: preparingPoll,
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         if (!subjectId) throw new Error('subjectId is required');
         const { signal, cleanup } = combinedSignal(
@@ -411,6 +467,7 @@ export function useSubjectHub(subjectId: string | undefined): {
     queries: generatedBooks.map((book) => ({
       queryKey: queryKeys.bookSessions(subjectId, book.id, activeProfile?.id),
       enabled: !!activeProfile && !!subjectId,
+      refetchInterval: preparingPoll,
       queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
         if (!subjectId) throw new Error('subjectId is required');
         const { signal, cleanup } = combinedSignal(
@@ -493,10 +550,14 @@ export function useSubjectHub(subjectId: string | undefined): {
     notesQuery.isError ||
     (!hasResumeFallback && bookDataFailed);
 
+  const emptyKind = computeEmptyKind(data, curriculumStatus, books.length);
+
   return {
     data,
     isLoading,
     isError,
+    curriculumStatus,
+    emptyKind,
     refetch: () => {
       void subjectsQuery.refetch();
       void booksQuery.refetch();

@@ -35,6 +35,7 @@ function retryBookDetailRead(failureCount: number, error: unknown): boolean {
 
 export function useBooks(
   subjectId: string | undefined,
+  options?: { refetchInterval?: number | false },
 ): UseQueryResult<CurriculumBook[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
@@ -42,6 +43,7 @@ export function useBooks(
 
   return useQuery({
     queryKey: ['books', subjectId, activeProfile?.id],
+    refetchInterval: options?.refetchInterval ?? false,
     initialData: () => {
       if (!activeProfile?.id || !subjectId) return undefined;
       const cachedLibrary =
@@ -231,6 +233,53 @@ export function useGenerateBookTopics(
     Error,
     BookTopicGenerateInput | undefined
   >;
+}
+
+/**
+ * Re-dispatch curriculum generation for a subject whose books are stuck at
+ * `topicsGenerated = false`. Wraps the server-built (previously mobile-dormant,
+ * SUBJECT-21) `POST /subjects/:id/retry-curriculum` endpoint, which returns the
+ * number of books re-dispatched. The route param is `:id` (not `:subjectId`).
+ *
+ * The Inngest function holds a 15-min single-flight claim per book, so a manual
+ * user-tap retry cannot stack duplicate generations. Do NOT wire this to an
+ * unattended auto-retry loop — the endpoint is not idempotent before its LLM
+ * call (security audit DS-036); user-tap recovery is the intended surface.
+ */
+export function useRetryCurriculum(
+  subjectId: string | undefined,
+): UseMutationResult<{ dispatched: number }, Error, void> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
+
+  return useMutation<{ dispatched: number }, Error, void>({
+    mutationFn: async () => {
+      if (!subjectId) throw new Error('subjectId is required');
+      const res = await client.subjects[':id']['retry-curriculum'].$post({
+        param: { id: subjectId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { dispatched: number };
+    },
+    onSuccess: (data) => {
+      const pid = activeProfile?.id;
+      if (data.dispatched > 0) {
+        // A successful re-dispatch flips the subject back toward 'preparing'.
+        // Invalidate the subjects list (curriculumStatus source) and this
+        // subject's books so the hub re-reads and resumes its preparing poll.
+        void queryClient.invalidateQueries({ queryKey: ['subjects', pid] });
+        void queryClient.invalidateQueries({
+          queryKey: ['books', subjectId, pid],
+        });
+      }
+      // dispatched === 0: nothing was regeneratable — do NOT fake a 'preparing'
+      // cycle. The screen reads retry result data.dispatched === 0 to show a
+      // terminal message instead. (The screen also reads mutation isError for
+      // network/500 failures — react-query tracks that automatically, so do
+      // NOT add an onError that swallows the error.)
+    },
+  });
 }
 
 export function useDeleteBook(
