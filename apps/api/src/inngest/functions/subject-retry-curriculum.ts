@@ -83,6 +83,9 @@ export const subjectRetryCurriculum = inngest.createFunction(
           eq(curriculumBooks.subjectId, subjectId),
         ),
       });
+      // Ownership is established by the parent-chain check in the main flow
+      // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
+      // onFailure operates on that same owner-verified event payload.
       if (book && !book.topicsGenerated && book.failedAt === null) {
         await db
           .update(curriculumBooks)
@@ -95,17 +98,23 @@ export const subjectRetryCurriculum = inngest.createFunction(
             and(
               eq(curriculumBooks.id, bookId),
               eq(curriculumBooks.subjectId, subjectId),
+              // Atomic guard: never stamp failure on a book a concurrent run
+              // already generated.
+              eq(curriculumBooks.topicsGenerated, false),
             ),
           );
       }
-      captureException(error, {
-        profileId,
-        extra: {
-          site: 'subjectRetryCurriculum.onFailure',
-          subjectId,
-          bookId,
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          profileId,
+          extra: {
+            site: 'subjectRetryCurriculum.onFailure',
+            subjectId,
+            bookId,
+          },
         },
-      });
+      );
       return { status: 'failed' as const, subjectId, bookId };
     },
   },
@@ -278,6 +287,9 @@ export const subjectRetryCurriculum = inngest.createFunction(
               and(
                 eq(curriculumBooks.id, bookId),
                 eq(curriculumBooks.subjectId, subjectId),
+                // Atomic guard: never stamp failure on a book a concurrent run
+                // already generated.
+                eq(curriculumBooks.topicsGenerated, false),
               ),
             );
           const err = new NonRetriableError('retry-empty-topics');

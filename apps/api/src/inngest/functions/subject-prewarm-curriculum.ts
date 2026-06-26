@@ -92,6 +92,10 @@ async function markBookFailed(
       and(
         eq(curriculumBooks.id, bookId),
         eq(curriculumBooks.subjectId, subjectId),
+        // Never stamp failure on a book a concurrent run already generated.
+        // This makes the failure write atomic against the success write so the
+        // row can never end up topicsGenerated=true AND failedAt set.
+        eq(curriculumBooks.topicsGenerated, false),
       ),
     );
 }
@@ -130,6 +134,9 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           eq(curriculumBooks.subjectId, subjectId),
         ),
       });
+      // Ownership is established by the parent-chain check in the main flow
+      // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
+      // onFailure operates on that same owner-verified event payload.
       if (book && !book.topicsGenerated && book.failedAt === null) {
         await markBookFailed(db, subjectId, bookId, 'generation_error');
       }

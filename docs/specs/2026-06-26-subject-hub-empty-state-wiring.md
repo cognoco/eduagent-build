@@ -476,3 +476,39 @@ Standardize across the surface.
 
 This dissolves HIGH-1 + HIGH-2 and demotes HIGH-3 (failure now renders from
 persisted state, not an ephemeral mutation rejection).
+
+### Pre-merge `/review` hardening (2026-06-27)
+
+A multi-agent + Codex adversarial `/review` before merge caught a regression in
+the headline recovery path plus several smaller items. Fixed on the branch:
+
+- **Retry-does-nothing race (merge-blocker).** The new `'failed'` state does not
+  poll, and `useRetryCurriculum.onSuccess` invalidated `subjects` once,
+  immediately — racing the *async* Inngest claim that clears `failed_at`. The
+  refetch read `'failed'`, no poll started, and the hub sat on `'stuck'`. Fix:
+  `retryCurriculumForSubject` now clears `failed_at` synchronously *after* a
+  successful dispatch, so the subject derives `'preparing'` in the same request
+  and the existing poll resumes (the Inngest claim re-clears idempotently).
+- **Silent retry dispatch.** `dispatchCurriculumRetry` used `safeSend` (swallows
+  failures) → the endpoint reported `dispatched>0` even when no event queued.
+  Changed to a core `inngest.send` (`// core-send:`) so a dispatch failure throws
+  and surfaces as the retry error the screen already shows; `failed_at` stays set.
+- **Atomic failure writes.** All failure writes (`markBookFailed`, both
+  `empty_topics` writes, both `onFailure` writes) now scope on
+  `topics_generated = false`, and the third `persistBookTopics` success write
+  clears `failed_at` — so a row can never be `topics_generated=true` AND
+  `failed_at` set.
+- **Latent schema trap.** `dispatchCurriculumRetry` validates with the *retry*
+  event schema (was prewarm's); identical today, but a future divergence would
+  have silently no-op'd every retry.
+- **Tests.** New `retryCurriculumForSubject` unit tests (clear-after-dispatch,
+  core-send-throws, no-clear-on-failure, ownership); a screen-level
+  `curriculumStatus:'failed' → stuck` test; stricter retry-error alert assertion;
+  `subjectCurriculumStatusSchema` now exercises `'failed'`.
+
+**Deferred (documented, not blocking):** a dedicated consent-blocked hub state
+(today a consent-blocked retry derives `'preparing'`; the consent gate owns it and
+reaching the hub in that state is gated upstream); a disabled/loading affordance on
+the stuck Retry button during a slow request; a "needs attention" home-card hint
+for `'failed'` subjects in `LearnerScreen` (currently a neutral, still-tappable
+tile so the user can reach the hub's Retry).
