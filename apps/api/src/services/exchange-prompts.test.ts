@@ -899,6 +899,89 @@ describe('buildSystemPrompt — Challenge Round runtime kill switch (Phase 0)', 
   });
 });
 
+// ---------------------------------------------------------------------------
+// Challenge Round mastery signal must be exposed in the RESPONSE FORMAT.
+//
+// The mastery pipeline depends entirely on the LLM emitting
+// `signals.challenge_round_evaluation` inline in the envelope (read at
+// exchanges.ts → session-exchange.ts → decideMasteryAndReview). But the
+// envelope's RESPONSE FORMAT template (getExchangeEnvelopeInstruction) only
+// ever enumerated partial_progress/needs_deepening/understanding_check/
+// crisis_redirect — the challenge_round_evaluation requirement lived ONLY as
+// mid-prompt prose in challenge-round/prompts.ts. Strong instruction-followers
+// (Gemini) infer it; strict template-followers (gpt-oss-120b, the V2 target
+// primary) obey the JSON shape and drop the field, silently breaking mastery
+// verification. Surfaced by live OpenRouter eval 2026-06-25. The field MUST
+// appear in the response-format signals shape whenever a round is active.
+// ---------------------------------------------------------------------------
+describe('buildSystemPrompt — Challenge Round mastery signal in RESPONSE FORMAT', () => {
+  const ENVELOPE_HEADER = 'RESPONSE FORMAT — CRITICAL';
+  // Quoted JSON key + colon discriminates the envelope template from the
+  // prose form `"signals.challenge_round_evaluation"` in the active prompt.
+  const ENVELOPE_EVAL_KEY = '"challenge_round_evaluation":';
+
+  function envelopeBlock(prompt: string): string {
+    return prompt.slice(prompt.lastIndexOf(ENVELOPE_HEADER));
+  }
+
+  function activeContext(
+    overrides: Partial<ExchangeContext> = {},
+  ): ExchangeContext {
+    return makeContext({
+      topicTitle: 'Photosynthesis',
+      topicDescription: 'How plants convert sunlight into energy.',
+      challengeRuntimeEnabled: true,
+      challengeRound: {
+        state: 'active',
+        offerCount: 0,
+        declinedDontAskAgain: false,
+        evaluations: [],
+      },
+      ...overrides,
+    });
+  }
+
+  it('lists challenge_round_evaluation in the response-format signals when a round is active', () => {
+    const env = envelopeBlock(buildSystemPrompt(activeContext()));
+    expect(env).toContain(ENVELOPE_EVAL_KEY);
+  });
+
+  it('lists challenge_round_evaluation when the round was just accepted', () => {
+    const env = envelopeBlock(
+      buildSystemPrompt(
+        activeContext({
+          challengeRound: {
+            state: 'accepted',
+            offerCount: 0,
+            declinedDontAskAgain: false,
+            evaluations: [],
+          },
+        }),
+      ),
+    );
+    expect(env).toContain(ENVELOPE_EVAL_KEY);
+  });
+
+  it('omits challenge_round_evaluation from the response format when no round is active', () => {
+    const env = envelopeBlock(
+      buildSystemPrompt(
+        makeContext({
+          topicTitle: 'Photosynthesis',
+          topicDescription: 'How plants convert sunlight into energy.',
+        }),
+      ),
+    );
+    expect(env).not.toContain(ENVELOPE_EVAL_KEY);
+  });
+
+  it('omits challenge_round_evaluation from the response format when the runtime flag is off, even if state is active', () => {
+    const env = envelopeBlock(
+      buildSystemPrompt(activeContext({ challengeRuntimeEnabled: false })),
+    );
+    expect(env).not.toContain(ENVELOPE_EVAL_KEY);
+  });
+});
+
 describe('buildSystemPrompt — CRITICAL THINKING block', () => {
   // Encourages reasoning-over-recall in everyday teaching turns. Gating is
   // load-bearing: homework's explain+verify contract forbids Socratic
