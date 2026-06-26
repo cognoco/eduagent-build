@@ -307,7 +307,11 @@ checked against.
     allowed to diverge: the credentialed tween **operates** their own profile (no act-for) yet still needs
     a guardian's **consent-authority**. *(Ruled — `MMT-ADR-0008`, Option A: the **whole edge is global**
     and stores consent-authority + the consent record only; `operate`/`manage`/`view` are **derived** —
-    `guardian-link ∧ shared-org ∧ charge-has-no-Login` — never stored per-org.)*
+    `guardian-link ∧ shared-org ∧ charge-has-no-Login` — never stored per-org.)* **Edge-less
+    exception:** an **email-consenting parent** (consent given by link; no `person` row, no edge)
+    cannot be served by this resolver, so their consent **withdrawal/restore** is authorized by a
+    signed, non-expiring **bearer token** — granting *only* withdraw/restore of that one charge's
+    consent, never `operate`/`manage`/`view` or any data access. *(Ruled — `MMT-ADR-0027`.)*
 24. **Time-triggered transitions must be scheduler-driven.** Age / consent-threshold / 18 crossings and
     `residence_jurisdiction` re-evaluation fire with **no user action** — a dormant account still
     transitions on its birthday — so they **cannot live only in request handlers**; a durable scheduler
