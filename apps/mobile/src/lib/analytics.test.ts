@@ -10,6 +10,8 @@ import {
 } from './analytics';
 
 const ANALYTICS_SOURCE_PATH = resolve(__dirname, 'analytics.ts');
+// Root-relative CI workflow — used for the build-injection guard below.
+const CI_YML_PATH = resolve(__dirname, '../../../../.github/workflows/ci.yml');
 
 function createHashClient(options?: { hash?: string; reject?: boolean }): {
   analytics: {
@@ -90,6 +92,19 @@ describe('hashProfileId — server-side hashing [WI-1046]', () => {
   it('[BREAK] analytics.ts does not read the old public HMAC key from the client bundle', () => {
     const source = readFileSync(ANALYTICS_SOURCE_PATH, 'utf8');
     expect(source).not.toContain('EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1');
+  });
+
+  it('[BREAK] ci.yml OTA publish step does not inject the HMAC key into the client bundle (WI-1046 review-gap guard)', () => {
+    // EXPO_PUBLIC_* vars are inlined into the JS bundle at OTA build time.
+    // The pattern checked below is the YAML env-var assignment form:
+    //   EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1: <value>
+    // Hashing is now server-side (ANALYTICS_HASH_KEY in Workers/Doppler, PR #1491).
+    // Any re-introduction of this injection re-embeds the secret in the OTA bundle.
+    const ciYml = readFileSync(CI_YML_PATH, 'utf8');
+    // Match the assignment form (key followed by a colon) — this catches any
+    // env-block injection without false-positiving on explanatory comments that
+    // use the key name as prose (which never have a colon directly after the name).
+    expect(ciYml).not.toMatch(/EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1\s*:/);
   });
 
   it('[BREAK] requests the hash from the server using the selected profile scope header', async () => {

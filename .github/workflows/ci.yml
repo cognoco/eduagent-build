@@ -544,11 +544,10 @@ jobs:
           # IAP disable for all users on the OTA channel.
           EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}
           EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID }}
-          # [M2 / config-secrets] Analytics HMAC key — excluded from eas.json via
-          # EAS_JSON_DENYLIST. Without this the analytics helper falls back to
-          # 'unkeyed_' prefix, breaking cross-event profile correlation and
-          # silently removing the HMAC privacy boundary.
-          EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1: ${{ secrets.EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 }}
+          # [M2 / config-secrets] Analytics HMAC key was removed from here (WI-1046 / PR #1491).
+          # Hashing is now server-side (ANALYTICS_HASH_KEY in Doppler/Workers); the old
+          # EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 secret must never be injected into the OTA
+          # bundle because EXPO_PUBLIC_* vars are inlined into the JS bundle at build time.
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -1 | tr -cd '[:print:]' | cut -c1-200)
           printf 'Publishing OTA update: %s\n' "$COMMIT_MSG"
