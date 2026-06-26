@@ -12,7 +12,18 @@ import { sessionTypeSchema } from './session-enums.ts';
 export const subjectStatusSchema = z.enum(['active', 'paused', 'archived']);
 export type SubjectStatus = z.infer<typeof subjectStatusSchema>;
 
-export const subjectCurriculumStatusSchema = z.enum(['ready', 'preparing']);
+// Coarse subject-level rollup derived over the per-book generation state.
+// 'failed' is surfaced when a subject has NO studyable content (no ready book,
+// no suggestion) AND at least one book has terminally failed (curriculum_books.
+// failed_at set) — so the hub can route straight to the actionable 'stuck' UI
+// instead of leaving the learner on a comforting-but-false "preparing" screen
+// until a client-side timer gives up. Consent-blocked is intentionally NOT
+// 'failed' (owned by the consent gate; a retry cannot fix it).
+export const subjectCurriculumStatusSchema = z.enum([
+  'ready',
+  'preparing',
+  'failed',
+]);
 export type SubjectCurriculumStatus = z.infer<
   typeof subjectCurriculumStatusSchema
 >;

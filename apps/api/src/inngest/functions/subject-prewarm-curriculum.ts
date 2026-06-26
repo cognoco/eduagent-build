@@ -70,6 +70,32 @@ async function loadBook(
   return book;
 }
 
+/**
+ * Persist the TERMINAL FAILURE signal for a book's topic generation. Scoped by
+ * id AND subjectId so a stray bookId can never touch a row it doesn't own
+ * (mirrors the parent-chain ownership verified by loadBook). We persist only the
+ * failure terminal — "ready" is derived from topics_generated and cleared-on-
+ * success by persistBookTopics; transient "preparing" is derived (not generated
+ * AND not failed). No `generating`/`pending` flag is persisted (it would be
+ * liveness-coupled and could strand a dead run "in progress" forever).
+ */
+async function markBookFailed(
+  db: Database,
+  subjectId: string,
+  bookId: string,
+  reason: 'empty_topics' | 'generation_error',
+): Promise<void> {
+  await db
+    .update(curriculumBooks)
+    .set({ failedReason: reason, failedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
+    );
+}
+
 export const subjectPrewarmCurriculum = inngest.createFunction(
   {
     id: 'subject-prewarm-curriculum',
@@ -77,6 +103,51 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
     retries: 2,
     concurrency: { limit: 5, key: 'event.data.profileId' },
     idempotency: 'event.data.bookId',
+    // Inngest calls onFailure once, after the configured retries are exhausted.
+    // That is the terminal branch for transient generation failures — without it
+    // a failed run leaves topics_generated=false with no persisted reason and the
+    // subject looks "preparing" forever. The failure event wraps the original
+    // payload under event.data.event.data (mirrors auto-file-session.ts).
+    onFailure: async ({
+      event,
+      error,
+    }: {
+      event: { data: { event?: { data?: unknown } } };
+      error: unknown;
+    }) => {
+      const parsed = subjectCurriculumPrewarmRequestedEventSchema.safeParse(
+        event.data.event?.data,
+      );
+      if (!parsed.success) {
+        return { status: 'skipped', reason: 'invalid_payload' };
+      }
+      const { profileId, subjectId, bookId } = parsed.data;
+
+      const db = getStepDatabase();
+      const book = await db.query.curriculumBooks.findFirst({
+        where: and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+        ),
+      });
+      if (book && !book.topicsGenerated && book.failedAt === null) {
+        await markBookFailed(db, subjectId, bookId, 'generation_error');
+      }
+
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          profileId,
+          extra: {
+            site: 'subjectPrewarmCurriculum.onFailure',
+            subjectId,
+            bookId,
+          },
+        },
+      );
+
+      return { status: 'failed', subjectId, bookId };
+    },
   },
   { event: 'app/subject.curriculum-prewarm-requested' },
   async ({ event, step }) => {
@@ -113,6 +184,11 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           ? await isGdprProcessingAllowedV2(db, profileId)
           : await isGdprProcessingAllowed(db, profileId);
         if (!gdprAllowed) {
+          // Consent-blocked is NOT a curriculum failure — it is owned by the
+          // consent gate (a retry cannot grant consent). Do not write failed_at
+          // here; the book stays derived-"preparing" until consent is granted
+          // and a re-dispatch generates topics, or the consent domain surfaces
+          // its own blocked state.
           return { status: 'consent-blocked' as const };
         }
 
@@ -175,6 +251,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           ? await isGdprProcessingAllowedV2(db, profileId)
           : await isGdprProcessingAllowed(db, profileId);
         if (!stepGdprAllowed) {
+          // Consent-blocked: not a curriculum failure (see load-context gate).
           return false;
         }
 
@@ -186,6 +263,7 @@ export const subjectPrewarmCurriculum = inngest.createFunction(
           { conversationLanguage: context.conversationLanguage },
         );
         if (result.topics.length === 0) {
+          await markBookFailed(db, subjectId, bookId, 'empty_topics');
           const err = new NonRetriableError('prewarm-empty-topics');
           captureException(err, {
             profileId,
