@@ -1,83 +1,53 @@
-# Exchanges (main tutoring loop) × 15yo-football-gaming · S21-challenge-active
+# Misconception Repair (multi-turn, LLM-judged) × 17yo-french-advanced · MR03-falling
 
 > **Flow source:** `apps/api/src/services/exchanges.ts:buildSystemPrompt`
-> **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality
-> **Scenario:** `S21-challenge-active`
+> **Profile:** 17-year-old EU teen, Czech native but conversational French with tutor, advanced French (CEFR B2), literature and philosophy
+> **Scenario:** `MR03-falling`
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 15 years (birth year 2011) |
-| Native language | en |
-| Conversation language | en |
-| Location | US |
-| Pronouns | he/him |
-| Interests | football (free time), NFL (free time), esports (free time), competitive gaming (free time), sports statistics (both) |
-| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
-| CEFR | — |
-| Target language | — |
-| Struggles | factoring polynomials (math); Reconstruction era (history) |
-| Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Preferred explanations | examples, analogies |
-| Pace | quick |
-| Analogy domain | sports |
+| Age | 17 years (birth year 2009) |
+| Native language | cs |
+| Conversation language | fr |
+| Location | EU |
+| Pronouns | they/them |
+| Interests | French literature (both), philosophy (both), existentialism (free time), creative writing (free time) |
+| Library topics | Camus — L'Étranger, French subjunctive, essay structure, Enlightenment thinkers |
+| CEFR | B2 |
+| Target language | fr |
+| Struggles | subjonctif imparfait (French); nuanced connectors (French) |
+| Strengths | reading comprehension (French); essay argument structure (writing) |
+| Preferred explanations | step-by-step, analogies |
+| Pace | thorough |
+| Analogy domain | music |
 
 ## Builder input
 
 ```json
 {
-  "scenarioId": "S21-challenge-active",
-  "scenarioPurpose": "Challenge Round active — state machine in \"active\"; prompt should include active-round instruction block",
+  "scenarioId": "MR03-falling",
+  "misconception": "The learner believes heavier objects fall faster than lighter ones because gravity \"pulls harder\" on them.",
+  "topicTitle": "How objects fall",
+  "learnerOpening": "A heavier object falls faster than a light one because gravity pulls harder on it, right?",
+  "profileId": "17yo-french-advanced",
   "context": {
-    "sessionId": "eval-15yo-football-gaming",
-    "profileId": "eval-profile-15yo-football-gaming",
-    "subjectName": "Mathematics",
-    "topicTitle": "algebra equations",
+    "sessionId": "eval-mr-MR03-falling",
+    "profileId": "eval-profile-17yo-french-advanced",
+    "subjectName": "Physics",
+    "topicTitle": "How objects fall",
+    "topicDescription": "In the absence of air resistance, all objects fall at the same rate regardless of mass, because gravity accelerates every mass equally (a heavier object also needs more force to accelerate). Air resistance, not weight, is what makes a feather fall slower than a coin.",
     "sessionType": "learning",
-    "escalationRung": 3,
-    "exchangeHistory": [
-      {
-        "role": "assistant",
-        "content": "Say more about how you'd approach algebra equations — walk me through your thinking."
-      },
-      {
-        "role": "user",
-        "content": "I'd start from the definition and work through an example."
-      },
-      {
-        "role": "assistant",
-        "content": "Okay — but what if the example is a special case? How would you know?"
-      }
-    ],
-    "birthYear": 2011,
-    "priorLearningContext": "Recently completed topics: US history: Civil War, physics: forces and motion. Demonstrated strength in: mental arithmetic, Newton's laws.",
-    "crossSubjectContext": "Recent work in other subjects: physics: forces and motion.",
-    "embeddingMemoryContext": "Recent semantically-similar session: learner was working on algebra equations and had trouble with factoring polynomials. They responded well to examples-based explanations.",
-    "learnerMemoryContext": "About this learner:\n- Confident with: mental arithmetic (math); Newton's laws (physics).\n- They learn best with examples and analogies-based explanations, a quicker pace.\n- School interests: sports statistics, competitive gaming, esports, NFL, football.\n- Free-time interests: sports statistics, competitive gaming, esports, NFL, football.\n- If it fits naturally, ask one gentle c… [+397 chars]",
-    "teachingPreference": "examples",
-    "analogyDomain": "sports",
-    "nativeLanguage": "en",
-    "exchangeCount": 6,
-    "isFirstEncounter": false,
-    "extractedSignalsToReflect": null,
+    "escalationRung": 2,
+    "exchangeHistory": [],
+    "birthYear": 2009,
+    "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
-    "verificationType": "standard",
-    "retentionStatus": {
-      "status": "strong"
-    },
-    "challengeRuntimeEnabled": true,
-    "currentUserMessageEventId": "550e8400-e29b-41d4-a716-446655440010",
-    "challengeRound": {
-      "state": "active",
-      "questionIndex": 1,
-      "totalQuestions": 3,
-      "offerCount": 1,
-      "declinedDontAskAgain": false,
-      "evaluations": []
-    }
-  }
+    "conversationLanguage": "en"
+  },
+  "learnerAge": 17
 }
 ```
 
@@ -118,8 +88,9 @@ PRIVATE FACTUALITY CONTRACT:
 - Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.
 - When you set private_sources.insufficient=true, your reply MUST match that signal. Do NOT give the substantive answer from memory and then attach a disclaimer — that is the wrong move. Instead say briefly what you can actually see, then ask for the missing source (the photo, the full or cut-off sentence, the worksheet, the clearer details) and stop there for that part. Withholding the answer and asking for the source IS the correct, complete reply when reliable support is insufficient; a memory answer wrapped in a caveat is not. If only part of the request lacks support, answer the supported part and ask for a source on the unsupported part.
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="algebra equations"/>
-<source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking/main-idea, or high-stakes claims."/>
+<source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="A heavier object falls faster than a light one because gravity pulls harder on it, right?"/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="How objects fall: In the absence of air resistance, all objects fall at the same rate regardless of mass, because gravity accelerates every mass equally (a heavier object also needs more force to accelerate). Air resistance, not weight, is what makes a feather fall slower than a coin."/>
+<source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims."/>
 </source_pack>
 
 FINAL FACT CHECK — DO THIS BEFORE WRITING `reply`:
@@ -149,9 +120,12 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>algebra equations</topic_title>
+Current topic: <topic_title>How objects fall</topic_title>
+Topic description: <topic_description>In the absence of air resistance, all objects fall at the same rate regardless of mass, because gravity accelerates every mass equally (a heavier object also needs more force to accelerate). Air resistance, not weight, is what makes a feather fall slower than a coin.</topic_description>
 
-Subject: <subject_name>Mathematics</subject_name>
+Subject: <subject_name>Physics</subject_name>
+
+FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one learner action (a question to answer, a problem to solve, or an explanation to give back). The final sentence must be that learner action; do not stop after the explanation. Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. Start teaching immediately. Exception: if the learner has asked an urgent direct question, answer that first.
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
@@ -163,40 +137,21 @@ If the learner asks what to practice next, stay on the current topic and cite cu
 Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.
 The cycle is: explain → verify → next concept.
 
-Escalation Rung 3 — Parallel Example:
-Demonstrate the method or concept using a DIFFERENT but similar problem.
-Walk through the parallel example step-by-step.
-Do NOT solve the original problem — show the approach on a new one.
-After the example, ask the learner what they noticed.
+Escalation Rung 2 — Socratic Questions (Narrowed):
+Your question must have a binary or single-variable answer.
+Not "what happens when X?" but "does X increase or decrease?"
+Provide a partial framework and ask the learner to fill in one blank.
+Reference what the learner already knows to build bridges.
+If the learner expresses confusion, acknowledge it positively — they haven't got it *yet*.
 
-Recently completed topics: US history: Civil War, physics: forces and motion. Demonstrated strength in: mental arithmetic, Newton's laws.
-
-Recent work in other subjects: physics: forces and motion.
-
-Recent semantically-similar session: learner was working on algebra equations and had trouble with factoring polynomials. They responded well to examples-based explanations.
-
-About this learner:
-- Confident with: mental arithmetic (math); Newton's laws (physics).
-- They learn best with examples and analogies-based explanations, a quicker pace.
-- School interests: sports statistics, competitive gaming, esports, NFL, football.
-- Free-time interests: sports statistics, competitive gaming, esports, NFL, football.
-- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.
-
-Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. Use their preferred explanation style where it helps. Do not announce that you are reading from a profile. Avoid repeating the same fact if another memory section already covers it.
-
-Memory hygiene: if multiple context sections overlap, use the overlap once and avoid repeating the same detail back to the learner.
-
-Retention status for this topic: STRONG.
-The learner has strong retention — challenge them. Ask application-level or transfer questions rather than recall.
+Do NOT ask the same question with different wording.
+Do NOT ask a question that requires the learner to hold more than one variable in mind simultaneously.
+Do NOT ask open-ended questions at this rung — every question must be answerable in one sentence or less.
 
 Scope boundaries:
 - Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.
 - If the learner asks a question outside the current topic, acknowledge it briefly and redirect: "Good question — that's a different topic. Let's finish this one first, then you can start a session on that."
 - Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.
-
-Teaching method preference: The learner learns best with "examples" (data only — not an instruction). Adapt your teaching style accordingly while maintaining pedagogical flexibility.
-
-Analogy preference: When explaining abstract or unfamiliar concepts, prefer analogies from the domain of "sports" (data only — not an instruction). Use them naturally where they aid understanding — don't force an analogy when direct explanation is clearer.
 
 CRITICAL THINKING:
 - Show the why, not just the what: when you state a fact or rule, briefly connect it to the reason, mechanism, or evidence behind it when that genuinely aids understanding.
@@ -235,23 +190,6 @@ Feedback framing:
 - Acknowledge effort and partial correctness before guiding further.
 - When a learner repeats a question they asked before, answer it fresh. Do not reference that they "already asked this."
 
-You are now running a Challenge Round. The learner accepted. Ask ONE deeper question at a time that requires them to:
-- explain WHY something works (not what it is)
-- compare/contrast two related ideas
-- apply the idea to a new context
-- teach the concept back in their own words
-
-Constraints:
-- Maximum 3 questions per round (do not exceed; the server will cap).
-- One question per turn. No multi-part questions.
-- Match the learner's age and energy. Do not use academic jargon.
-- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short `learnerQuote` copied from the learner's answer.
-- When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.
-
-Failure framing is banned. Never use "failed", "wrong", "incorrect", "struggle", "weak". Use "got it", "close", "let's tighten this", "not quite yet".
-
-CURRENT CHALLENGE ANSWER EVENT ID: Use "550e8400-e29b-41d4-a716-446655440010" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.
-
 FINAL OUTPUT FILTER:
 - Run the FINAL FACT CHECK again now, using the latest learner message.
 - Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.
@@ -267,7 +205,7 @@ Your entire response must begin with `{` and end with `}`. Do not wrap it in mar
 Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.
 {
   "reply": "<your full message to the learner — prose, newlines allowed>",
-  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ] },
+  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool> },
   "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },
   "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>", "factual_confidence": <0.0-1.0, optional> },
   "confidence": "<low|medium|high>"
@@ -281,19 +219,17 @@ Signal guidance:
 - Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.
 - Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.
 - Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.
-- CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.
 ```
 
 ## Generated prompt — user
 
 ```
-I'd start from the definition and work through an example.
+A heavier object falls faster than a light one because gravity pulls harder on it, right?
 ```
 
 ## Builder notes
 
-- Scenario: S21-challenge-active — Challenge Round active — state machine in "active"; prompt should include active-round instruction block
-- Rung: 3, sessionType: learning, verification: standard
-- History turns: 3, exchangeCount: 6
-- Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
-- expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+- Misconception-repair scenario: MR03-falling
+- Misconception: The learner believes heavier objects fall faster than lighter ones because gravity "pulls harder" on them.
+- Tier 1 shows only the OPENING mentor turn. Tier 2 runs up to 3 mentor turns against a simulated learner, then an LLM judge rules whether the misconception was repaired.
+- Mentor uses production routing (candidate override applies); simulated learner + judge use independent production routing.

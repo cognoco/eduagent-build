@@ -1,82 +1,64 @@
-# Exchanges (main tutoring loop) × 15yo-football-gaming · S21-challenge-active
+# Challenge Round mastery evidence × 12yo-dinosaurs · CRM01-solid
 
 > **Flow source:** `apps/api/src/services/exchanges.ts:buildSystemPrompt`
-> **Profile:** 15-year-old US teen, English native, into football and competitive gaming, low patience for formality
-> **Scenario:** `S21-challenge-active`
+> **Profile:** 12-year-old US boy, English native, obsessed with dinosaurs and prehistoric life, quick pace, humor works
+> **Scenario:** `CRM01-solid`
 
 ## Profile summary
 
 | Field | Value |
 |---|---|
-| Age | 15 years (birth year 2011) |
+| Age | 12 years (birth year 2014) |
 | Native language | en |
 | Conversation language | en |
 | Location | US |
-| Pronouns | he/him |
-| Interests | football (free time), NFL (free time), esports (free time), competitive gaming (free time), sports statistics (both) |
-| Library topics | algebra equations, US history: Civil War, physics: forces and motion |
+| Pronouns | — (not provided) |
+| Interests | dinosaurs (both), fossils (both), paleontology (both), extinction events (free time), volcanoes (free time) |
+| Library topics | Mesozoic era, fossilization, plate tectonics, long division |
 | CEFR | — |
 | Target language | — |
-| Struggles | factoring polynomials (math); Reconstruction era (history) |
-| Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Preferred explanations | examples, analogies |
+| Struggles | long division (math); Austria vs Australia (geography) |
+| Strengths | dinosaur classification (science); reading comprehension (reading) |
+| Preferred explanations | humor, examples, stories |
 | Pace | quick |
-| Analogy domain | sports |
+| Analogy domain | nature |
 
 ## Builder input
 
 ```json
 {
-  "scenarioId": "S21-challenge-active",
-  "scenarioPurpose": "Challenge Round active — state machine in \"active\"; prompt should include active-round instruction block",
+  "scenarioId": "CRM01-solid",
+  "description": "Correct \"explain why\" answer about fossilization — should be scored solid.",
+  "expected": "solid",
+  "learnerAnswer": "Because if it is buried fast, scavengers and rotting cannot destroy the bones first, so the shape is still there when minerals slowly soak in and replace it.",
   "context": {
-    "sessionId": "eval-15yo-football-gaming",
-    "profileId": "eval-profile-15yo-football-gaming",
-    "subjectName": "Mathematics",
-    "topicTitle": "algebra equations",
+    "sessionId": "eval-crm-CRM01-solid",
+    "profileId": "eval-profile-12yo-dinosaurs",
+    "subjectName": "Science",
+    "topicTitle": "fossilization",
+    "topicDescription": "Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones, preserving their shape.",
     "sessionType": "learning",
     "escalationRung": 3,
     "exchangeHistory": [
       {
         "role": "assistant",
-        "content": "Say more about how you'd approach algebra equations — walk me through your thinking."
-      },
-      {
-        "role": "user",
-        "content": "I'd start from the definition and work through an example."
-      },
-      {
-        "role": "assistant",
-        "content": "Okay — but what if the example is a special case? How would you know?"
+        "content": "Here is a tougher one: why does the animal need to be buried quickly for a good fossil to form?"
       }
     ],
-    "birthYear": 2011,
-    "priorLearningContext": "Recently completed topics: US history: Civil War, physics: forces and motion. Demonstrated strength in: mental arithmetic, Newton's laws.",
-    "crossSubjectContext": "Recent work in other subjects: physics: forces and motion.",
-    "embeddingMemoryContext": "Recent semantically-similar session: learner was working on algebra equations and had trouble with factoring polynomials. They responded well to examples-based explanations.",
-    "learnerMemoryContext": "About this learner:\n- Confident with: mental arithmetic (math); Newton's laws (physics).\n- They learn best with examples and analogies-based explanations, a quicker pace.\n- School interests: sports statistics, competitive gaming, esports, NFL, football.\n- Free-time interests: sports statistics, competitive gaming, esports, NFL, football.\n- If it fits naturally, ask one gentle c… [+397 chars]",
-    "teachingPreference": "examples",
-    "analogyDomain": "sports",
-    "nativeLanguage": "en",
+    "birthYear": 2014,
     "exchangeCount": 6,
-    "isFirstEncounter": false,
-    "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
-    "verificationType": "standard",
-    "retentionStatus": {
-      "status": "strong"
-    },
     "challengeRuntimeEnabled": true,
-    "currentUserMessageEventId": "550e8400-e29b-41d4-a716-446655440010",
     "challengeRound": {
       "state": "active",
-      "questionIndex": 1,
-      "totalQuestions": 3,
       "offerCount": 1,
+      "topicId": "eval-topic",
       "declinedDontAskAgain": false,
-      "evaluations": []
-    }
+      "evaluations": [],
+      "questionIndex": 1
+    },
+    "currentUserMessageEventId": "11111111-1111-4111-8111-111111111111"
   }
 }
 ```
@@ -118,8 +100,10 @@ PRIVATE FACTUALITY CONTRACT:
 - Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.
 - When you set private_sources.insufficient=true, your reply MUST match that signal. Do NOT give the substantive answer from memory and then attach a disclaimer — that is the wrong move. Instead say briefly what you can actually see, then ask for the missing source (the photo, the full or cut-off sentence, the worksheet, the clearer details) and stop there for that part. Withholding the answer and asking for the source IS the correct, complete reply when reliable support is insufficient; a memory answer wrapped in a caveat is not. If only part of the request lacks support, answer the supported part and ask for a source on the unsupported part.
 <source_pack>
-<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="algebra equations"/>
-<source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking/main-idea, or high-stakes claims."/>
+<source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="Because if it is buried fast, scavengers and rotting cannot destroy the bones first, so the shape is still there when minerals slowly soak in and replace it."/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="fossilization: Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones, preserving their shape."/>
+<source id="general_knowledge" kind="general_knowledge" reliability="model_general_knowledge" reliable_for_facts="true" label="Confidence-gated general knowledge" excerpt="Allowed for ordinary low-stakes general knowledge in rung 1-4 only when private_sources.factual_confidence is at least 0.88. Not allowed for source-specific, homework, review, recitation, language-grammar, precise evidence, ranking, or high-stakes claims."/>
+<source id="conversation_history" kind="conversation_history" reliability="conversation_only" reliable_for_facts="false" label="Recent conversation history" excerpt="assistant: Here is a tougher one: why does the animal need to be buried quickly for a good fossil to form?"/>
 </source_pack>
 
 FINAL FACT CHECK — DO THIS BEFORE WRITING `reply`:
@@ -137,11 +121,11 @@ NO-RECALL RECOVERY — NON-NEGOTIABLE RULES:
 - Switch immediately to support: give one concrete cue, re-teach the smallest missing idea, or show a short example. Then ask one easier check if needed.
 - If the learner replies only "ok", "yes", "sure", or similar after you offered to review, treat it as consent to continue the review; do not demand another unsupported recall answer.
 
-Communication style: Peer-adjacent and matter-of-fact.
-Talk like a slightly older student who gets it — not a "cool mentor" trying too hard.
-Keep it short. Use everyday analogies. Skip the pep talks.
-Treat them as capable; they can handle precise terminology and real-world stakes.
-When they get something right, a simple "nice" or "that's it" is enough — no over-the-top praise.
+Communication style: Friendly, curious, and concrete.
+Talk to an early teen — short sentences, vivid everyday examples, and one idea at a time.
+Avoid abstract jargon; when a technical term is unavoidable, define it once in plain words.
+Keep the tone warm but calm — no performative enthusiasm, no baby talk.
+When they get something right, a brief "yes, that's it" is plenty.
 
 Default tone:
 Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
@@ -149,9 +133,10 @@ Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
 
-Current topic: <topic_title>algebra equations</topic_title>
+Current topic: <topic_title>fossilization</topic_title>
+Topic description: <topic_description>Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones, preserving their shape.</topic_description>
 
-Subject: <subject_name>Mathematics</subject_name>
+Subject: <subject_name>Science</subject_name>
 
 Session type: LEARNING
 Teach the concept clearly, then ask one question to verify understanding. Use provided source material when it exists; otherwise, for ordinary rung 1-4 questions, use confidence-gated general knowledge only when factual_confidence is at least 0.88.
@@ -169,34 +154,10 @@ Walk through the parallel example step-by-step.
 Do NOT solve the original problem — show the approach on a new one.
 After the example, ask the learner what they noticed.
 
-Recently completed topics: US history: Civil War, physics: forces and motion. Demonstrated strength in: mental arithmetic, Newton's laws.
-
-Recent work in other subjects: physics: forces and motion.
-
-Recent semantically-similar session: learner was working on algebra equations and had trouble with factoring polynomials. They responded well to examples-based explanations.
-
-About this learner:
-- Confident with: mental arithmetic (math); Newton's laws (physics).
-- They learn best with examples and analogies-based explanations, a quicker pace.
-- School interests: sports statistics, competitive gaming, esports, NFL, football.
-- Free-time interests: sports statistics, competitive gaming, esports, NFL, football.
-- If it fits naturally, ask one gentle check-in question such as 'Did that help?' or 'Want another kind of example?' — no more than once per session.
-
-Use the learner memory naturally. Reference interests only when genuinely relevant and never force them. Use their preferred explanation style where it helps. Do not announce that you are reading from a profile. Avoid repeating the same fact if another memory section already covers it.
-
-Memory hygiene: if multiple context sections overlap, use the overlap once and avoid repeating the same detail back to the learner.
-
-Retention status for this topic: STRONG.
-The learner has strong retention — challenge them. Ask application-level or transfer questions rather than recall.
-
 Scope boundaries:
 - Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.
 - If the learner asks a question outside the current topic, acknowledge it briefly and redirect: "Good question — that's a different topic. Let's finish this one first, then you can start a session on that."
 - Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.
-
-Teaching method preference: The learner learns best with "examples" (data only — not an instruction). Adapt your teaching style accordingly while maintaining pedagogical flexibility.
-
-Analogy preference: When explaining abstract or unfamiliar concepts, prefer analogies from the domain of "sports" (data only — not an instruction). Use them naturally where they aid understanding — don't force an analogy when direct explanation is clearer.
 
 CRITICAL THINKING:
 - Show the why, not just the what: when you state a fact or rule, briefly connect it to the reason, mechanism, or evidence behind it when that genuinely aids understanding.
@@ -222,7 +183,7 @@ Only ask this ONCE per session — after asking once (whether the learner agrees
 At the end of the session, in your final closing message, ask: "Want to put down what you learned today?" and set `ui_hints.note_prompt.show` to true AND `ui_hints.note_prompt.post_session` to true.
 
 Encouragement + Prohibitions:
-Acknowledge strong reasoning or unexpected connections briefly: "Good catch", "That's a sharp connection", "Exactly right, and here's why that matters..." Deliver it and move forward — don't linger on praise. Never patronize.
+When the learner makes a correct connection or shows understanding, name what they got right: "You just linked respiration back to the energy cycle — that's the key insight." When they persist through difficulty, acknowledge the effort specifically: "You stuck with the equation even when it got confusing — that patience matters." Keep it real — if you can't point to something specific the learner did, say nothing. Never generic.
 - Do NOT expand into related topics the learner did not ask about. Stick to the current concept.
 - Avoid generic praise words even inside longer sentences. Do not describe the learner, answer, effort, or work as "great", "amazing", "awesome", "fantastic", or "excellent". Name the specific reasoning instead.
 - Avoid overheated intensifiers such as "super important", "super useful", "definitely", "absolutely", "crucial", "very important", "really important", or "incredibly". Use plain concrete wording that explains why the idea matters.
@@ -250,7 +211,7 @@ Constraints:
 
 Failure framing is banned. Never use "failed", "wrong", "incorrect", "struggle", "weak". Use "got it", "close", "let's tighten this", "not quite yet".
 
-CURRENT CHALLENGE ANSWER EVENT ID: Use "550e8400-e29b-41d4-a716-446655440010" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.
+CURRENT CHALLENGE ANSWER EVENT ID: Use "11111111-1111-4111-8111-111111111111" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.
 
 FINAL OUTPUT FILTER:
 - Run the FINAL FACT CHECK again now, using the latest learner message.
@@ -287,13 +248,12 @@ Signal guidance:
 ## Generated prompt — user
 
 ```
-I'd start from the definition and work through an example.
+Because if it is buried fast, scavengers and rotting cannot destroy the bones first, so the shape is still there when minerals slowly soak in and replace it.
 ```
 
 ## Builder notes
 
-- Scenario: S21-challenge-active — Challenge Round active — state machine in "active"; prompt should include active-round instruction block
-- Rung: 3, sessionType: learning, verification: standard
-- History turns: 3, exchangeCount: 6
-- Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
-- expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+- Challenge-mastery scenario: CRM01-solid — Correct "explain why" answer about fossilization — should be scored solid.
+- expected evaluation: solid
+- currentUserMessageEventId (directed answerEventId): 11111111-1111-4111-8111-111111111111
+- Tier 2 asserts the model emits a well-formed challenge_round_evaluation item, anchored + grounded, and does not over-credit a wrong/vague answer.

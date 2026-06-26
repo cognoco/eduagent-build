@@ -575,6 +575,210 @@ function evaluatePersonalizationProbe(
   return issues;
 }
 
+// ---------------------------------------------------------------------------
+// Pedagogy probes — promote the standard tutoring-loop probes from
+// snapshot-only observation to live assertions. Until now only the SGA/HW/PM
+// families had a quality gate; the actual teaching mechanics (teach-back,
+// streak escalation, worked-example fading) were rendered but never checked.
+// These heuristics bite on the specific failure mode each probe exists to
+// catch, and severity is calibrated to how crisp the prompt contract is:
+//   • ERROR  — a contract the prompt states explicitly (emit the teach-back
+//              rubric; never leak it into the reply; on an explicit "make it
+//              harder" you must actually pose a harder question/task).
+//   • WARN   — a softer pedagogical signal for tuning review (re-teaching when
+//              the learner is already strong; not handing a step back during
+//              fading) that should surface but not fail the gate.
+// ---------------------------------------------------------------------------
+
+interface PedagogyEnvelope {
+  reply?: unknown;
+  signals?: Record<string, unknown>;
+}
+
+function parsePedagogyEnvelope(
+  raw: string,
+):
+  | { reply: string; lowerReply: string; signals: Record<string, unknown> }
+  | { issues: QualityIssue[] } {
+  const parsed = parseFirstJsonObject<PedagogyEnvelope>(raw);
+  if (!parsed || typeof parsed.reply !== 'string') {
+    return {
+      issues: [
+        qualityError(
+          'envelope.parse',
+          'Live response did not contain a parseable envelope with a string reply.',
+        ),
+      ],
+    };
+  }
+  return {
+    reply: parsed.reply,
+    lowerReply: parsed.reply.toLowerCase(),
+    signals:
+      parsed.signals && typeof parsed.signals === 'object'
+        ? parsed.signals
+        : {},
+  };
+}
+
+// A reply "moves the learner forward" if it asks anything (a question mark) or
+// issues a challenge/transfer imperative. A strong learner who is stalled with
+// pure affirmation is the failure these probes guard against.
+const FORWARD_CHALLENGE =
+  /\b(try|apply|predict|prove|show me|teach me|walk me through|what if|why does|why do|how would|what would happen|explain why|in your own words|next step)\b/i;
+
+// Heuristic markers of re-teaching the basics — undesirable when retention is
+// strong or the learner just asked to be pushed harder.
+const RETEACH_OPENER =
+  /\b(let me explain|let'?s review|to review|the basic idea|as a reminder|going back to the basics|first,? recall|remember that)\b/i;
+
+const GENERIC_PRAISE =
+  /\b(excellent idea|great question|awesome|you'?re amazing|amazing|fantastic|incredible)\b/i;
+
+function repliesWithForwardMotion(reply: string): boolean {
+  return reply.includes('?') || FORWARD_CHALLENGE.test(reply);
+}
+
+function evaluateTeachBackProbe(
+  input: ProbeScenarioInput,
+  liveResponse: string,
+): QualityIssue[] {
+  const parsed = parsePedagogyEnvelope(liveResponse);
+  if ('issues' in parsed) return parsed.issues;
+  const { reply, lowerReply, signals } = parsed;
+  const issues: QualityIssue[] = [];
+
+  // Contract: the Feynman teach-back turn MUST emit the rubric via
+  // signals.teach_back_assessment with numeric sub-scores.
+  const rubric = signals.teach_back_assessment as
+    | Record<string, unknown>
+    | undefined;
+  const rubricOk =
+    rubric !== null &&
+    typeof rubric === 'object' &&
+    ['completeness', 'accuracy', 'clarity', 'overall_quality'].every(
+      (k) => typeof (rubric as Record<string, unknown>)[k] === 'number',
+    );
+  if (!rubricOk) {
+    issues.push(
+      qualityError(
+        `${input.probeId}.rubric-missing`,
+        'Teach-back turn must emit signals.teach_back_assessment with numeric completeness/accuracy/clarity/overall_quality.',
+      ),
+    );
+  }
+
+  // Contract: the rubric is private — it must NOT leak into the learner-facing
+  // reply (no JSON, code fences, or rubric field names with scores).
+  if (
+    reply.includes('```') ||
+    reply.trimStart().startsWith('{') ||
+    /\b(completeness|overall_quality)\b/i.test(reply)
+  ) {
+    issues.push(
+      qualityError(
+        `${input.probeId}.rubric-leak`,
+        'Teach-back rubric/JSON leaked into the visible reply; the reply must contain only the naive follow-up question.',
+      ),
+    );
+  }
+
+  // In teacher-flip mode the mentor plays a curious student and asks a naive
+  // follow-up; it should not directly grade or correct the learner.
+  if (!reply.includes('?')) {
+    issues.push(
+      qualityWarning(
+        `${input.probeId}.no-followup-question`,
+        'Teach-back reply should ask a naive follow-up question rather than lecture.',
+      ),
+    );
+  }
+  if (containsAny(lowerReply, [/\b(incorrect|that'?s wrong|not right)\b/i])) {
+    issues.push(
+      qualityWarning(
+        `${input.probeId}.direct-correction`,
+        'Teach-back should probe for gaps with naive questions, not correct the learner directly.',
+      ),
+    );
+  }
+
+  return issues;
+}
+
+function evaluateEscalationProbe(
+  input: ProbeScenarioInput,
+  liveResponse: string,
+): QualityIssue[] {
+  const parsed = parsePedagogyEnvelope(liveResponse);
+  if ('issues' in parsed) return parsed.issues;
+  const { reply } = parsed;
+  const issues: QualityIssue[] = [];
+
+  // P15 (4-correct streak) / P22 (strong retention + "can we try something
+  // harder?"): the mentor must escalate — pose a harder/application question
+  // or concrete challenge task — not stall on affirmation or re-teach.
+  if (!repliesWithForwardMotion(reply)) {
+    issues.push(
+      qualityError(
+        `${input.probeId}.no-forward-motion`,
+        'Learner is strong / asked to be pushed harder; reply must pose a harder question or challenge task, not just affirm.',
+      ),
+    );
+  }
+  if (RETEACH_OPENER.test(reply)) {
+    issues.push(
+      qualityWarning(
+        `${input.probeId}.reteach`,
+        'Learner has strong retention; reply re-teaches the basics instead of challenging.',
+      ),
+    );
+  }
+  if (GENERIC_PRAISE.test(reply)) {
+    issues.push(
+      qualityWarning(
+        `${input.probeId}.generic-praise`,
+        'Prefer a specific, calm next challenge over generic enthusiasm.',
+      ),
+    );
+  }
+
+  return issues;
+}
+
+function evaluateFadingProbe(
+  input: ProbeScenarioInput,
+  liveResponse: string,
+): QualityIssue[] {
+  const parsed = parsePedagogyEnvelope(liveResponse);
+  if ('issues' in parsed) return parsed.issues;
+  const { reply, lowerReply } = parsed;
+  const issues: QualityIssue[] = [];
+
+  // P08: worked-example FADING scaffold. The learner half-sees the pattern;
+  // a fading scaffold hands the next step back rather than working the whole
+  // problem for them. Soft signal → warnings only.
+  const handsBackStep =
+    reply.includes('?') ||
+    containsAny(lowerReply, [
+      /\byour turn\b/i,
+      /\byou try\b/i,
+      /\bgive it a (go|try|shot)\b/i,
+      /\bwhat'?s the next step\b/i,
+      /\bcan you\b/i,
+      /\bnow you\b/i,
+    ]);
+  if (!handsBackStep) {
+    issues.push(
+      qualityWarning(
+        `${input.probeId}.no-handback`,
+        'Fading scaffold should hand the next step back to the learner, not work the whole problem for them.',
+      ),
+    );
+  }
+
+  return issues;
+}
+
 function evaluateProbeQuality(
   input: ProbeScenarioInput,
   liveResponse: string,
@@ -587,6 +791,15 @@ function evaluateProbeQuality(
   }
   if (input.probeId.startsWith('PM')) {
     return evaluatePersonalizationProbe(input, liveResponse);
+  }
+  if (input.probeId === 'P17') {
+    return evaluateTeachBackProbe(input, liveResponse);
+  }
+  if (input.probeId === 'P15' || input.probeId === 'P22') {
+    return evaluateEscalationProbe(input, liveResponse);
+  }
+  if (input.probeId === 'P08') {
+    return evaluateFadingProbe(input, liveResponse);
   }
   return [];
 }

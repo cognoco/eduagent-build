@@ -64,6 +64,11 @@ import { nowParkReturnFlow } from './flows/now-park-return';
 import { parkAndReturnRankingFlow } from './flows/park-and-return-ranking';
 import { parkAndReturnReweaveFlow } from './flows/park-and-return-reweave';
 import { appHelpV2Flow } from './flows/app-help-v2';
+// Pedagogy-coverage flows: the harness proved epistemic safety (source
+// grounding, no-cheating, no-stereotyping) but only *observed* whether
+// teaching produces understanding. These two close that gap — see flow files.
+import { challengeRoundMasteryFlow } from './flows/challenge-round-mastery';
+import { misconceptionRepairFlow } from './flows/misconception-repair';
 import {
   listFlows,
   parseCliArgs,
@@ -131,6 +136,8 @@ const FLOWS: FlowDefinition[] = [
   parkAndReturnRankingFlow as FlowDefinition,
   parkAndReturnReweaveFlow as FlowDefinition,
   appHelpV2Flow as FlowDefinition,
+  challengeRoundMasteryFlow as FlowDefinition,
+  misconceptionRepairFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

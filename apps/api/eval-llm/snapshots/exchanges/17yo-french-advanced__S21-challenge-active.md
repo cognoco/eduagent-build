@@ -273,7 +273,7 @@ Your entire response must begin with `{` and end with `}`. Do not wrap it in mar
 Before finishing, verify the JSON is complete and syntactically valid — every opening brace and bracket has a matching closing one. A truncated or unclosed object is a hard failure.
 {
   "reply": "<your full message to the learner — prose, newlines allowed>",
-  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool> },
+  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ] },
   "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },
   "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>", "factual_confidence": <0.0-1.0, optional> },
   "confidence": "<low|medium|high>"
@@ -287,6 +287,7 @@ Signal guidance:
 - Set `signals.needs_deepening` to true on the final turn of a rung-5 exit (learner still stuck after three exchanges at the Teaching-Mode Pivot rung). The system will queue the topic for remediation.
 - Set `signals.understanding_check` to true when your reply asks the learner to explain, paraphrase, or otherwise confirm they understood — observational only.
 - Set `signals.crisis_redirect` to true when the SAFETY crisis rule fired this turn — the learner expressed distress, self-harm ideation, bullying, abuse, or another safeguarding concern and your reply redirected them to a parent, guardian, trusted adult, or helpline. Observational only — it never changes what you say to the learner. Do NOT set it for ordinary frustration with the schoolwork itself.
+- CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.
 ```
 
 ## Generated prompt — user

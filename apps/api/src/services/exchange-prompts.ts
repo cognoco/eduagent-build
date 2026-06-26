@@ -227,12 +227,22 @@ function getExchangeEnvelopeInstruction(context: {
   isRecitation: boolean;
   isLanguageMode: boolean;
   includeRetrievalScore: boolean;
+  isChallengeRoundActive: boolean;
 }): string {
+  // During an active Challenge Round the mastery pipeline reads
+  // `signals.challenge_round_evaluation` inline from this envelope. It MUST be
+  // enumerated in the response-format shape — prose-only instruction is silently
+  // dropped by strict template-followers (e.g. gpt-oss-120b), which leaves
+  // mastery permanently unverified. See challenge-round/evaluation.ts.
+  const challengeEvalField = context.isChallengeRoundActive
+    ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
+    : '';
+
   const signals = context.isRecitation
-    ? '  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool> },'
+    ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`
     : context.includeRetrievalScore
-      ? '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0> },'
-      : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool> },';
+      ? `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>, "retrieval_score": <0.0-1.0>${challengeEvalField} },`
+      : `  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`;
 
   const uiHints = context.isLanguageMode
     ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
@@ -256,6 +266,11 @@ function getExchangeEnvelopeInstruction(context: {
   if (context.includeRetrievalScore) {
     signalGuidance.push(
       'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',
+    );
+  }
+  if (context.isChallengeRoundActive) {
+    signalGuidance.push(
+      'CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.',
     );
   }
 
@@ -1317,6 +1332,12 @@ export function buildSystemPrompt(
       isRecitation,
       isLanguageMode,
       includeRetrievalScore: context.continuationOpenerPhase === 'score',
+      // Mirror the gate for challengeRoundActivePrompt above: the inline
+      // challenge_round_evaluation signal is only meaningful (and only read
+      // by the mastery pipeline) while a round is accepted/active.
+      isChallengeRoundActive:
+        challengeRuntimeEnabled &&
+        (cr?.state === 'accepted' || cr?.state === 'active'),
     }),
   );
 
