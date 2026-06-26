@@ -25,6 +25,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import * as Updates from 'expo-updates';
 
 /**
  * Legacy un-scoped persister key used pre-BUG-357. Retained as a constant
@@ -44,6 +45,33 @@ const SCOPED_CACHE_KEY_PREFIX = 'eduagent-query-cache::';
  */
 export function buildPersisterKey(userId: string | null | undefined): string {
   return `${SCOPED_CACHE_KEY_PREFIX}${userId ?? 'anon'}`;
+}
+
+/**
+ * Cache buster keyed to the running JS bundle.
+ *
+ * `PersistQueryClientProvider` rehydrates the dehydrated cache from disk
+ * **as-is** — it does not re-validate the shape of persisted query data. So
+ * when an OTA changes the shape of a persisted query (e.g. WI-992 retyped the
+ * now-feed / ledger / visibility payloads), the previous bundle's data stays on
+ * disk and, on the next cold start, rehydrates into the new render code and
+ * throws while painting the first screen. That is the root cause of the
+ * 2026-06-26 "Something went wrong" boot crash: it only hits devices that
+ * UPGRADED (fresh installs have no stale cache).
+ *
+ * Passing this value as `persistOptions.buster` makes react-query drop the
+ * persisted cache whenever it changes. `Updates.updateId` is a fresh UUID for
+ * every published OTA update **and** every native build, so the cache is
+ * invalidated exactly when persisted shapes could have changed.
+ *
+ * `runtimeVersion` is deliberately NOT used as a fallback: consecutive OTAs
+ * share a runtimeVersion (e.g. `1.0.1`), so it would not change between the
+ * updates that caused this drift — defeating the whole guard. `updateId` is
+ * `null` only in dev (Metro), where a stable constant is correct (we want the
+ * cache to survive fast-refresh reloads).
+ */
+export function getQueryCacheBuster(): string {
+  return Updates.updateId ?? 'dev';
 }
 
 /**
