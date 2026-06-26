@@ -4,7 +4,7 @@ date: 2026-06-26
 profile: code
 work_items: []          # create a Cosmo WI before execution (see § Execution note)
 spec: docs/adr/MMT-ADR-0016-safety-and-judge-architecture.md   # design canon this realizes
-status: draft
+status: in-progress
 ---
 
 # Challenge Round Grader — judge-emitted mastery signal — Implementation Plan
