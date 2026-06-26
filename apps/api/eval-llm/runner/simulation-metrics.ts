@@ -67,12 +67,23 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       conceptResultCounts[e.result as ConceptResult] += 1;
     }
 
+    // Over-credit (the dangerous direction): gate said `verified` but ground
+    // truth did not warrant it — the grader was too lenient.
     if (r.decision.outcome === 'verified' && r.expectedOutcome !== 'verified') {
       overCredit += 1;
     }
+    // Under-credit: a learner who DESERVED verification (ground-truth verified)
+    // did not get it. Includes `invalid` (the mentor dropped all signal so the
+    // gate got an empty evaluation set) — from the learner's lived outcome a
+    // dropped signal is still "deserved mastery, didn't verify". How much of
+    // under-credit is signal-drop vs. genuine harshness is read off
+    // `signalEmissionRate`, so the two numbers stay non-redundant. Both rates
+    // use the whole-corpus denominator (`total`), readable side by side.
     if (
-      (r.decision.outcome === 'partial' || r.decision.outcome === 'reteach') &&
-      r.expectedOutcome === 'verified'
+      r.expectedOutcome === 'verified' &&
+      (r.decision.outcome === 'partial' ||
+        r.decision.outcome === 'reteach' ||
+        r.decision.outcome === 'invalid')
     ) {
       underCredit += 1;
     }

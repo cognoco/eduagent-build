@@ -118,6 +118,46 @@ describe('aggregate', () => {
     });
   });
 
+  it('counts invalid (dropped-signal) on a verified-expected round as under-credit', () => {
+    // A learner who DESERVED verification (ground truth verified) but whose
+    // mentor dropped all signal → outcome 'invalid'. From the learner's lived
+    // outcome that is still "deserved mastery, didn't verify" = under-credit.
+    const results: SimulatedRoundResult[] = [
+      makeResult({
+        outcome: 'invalid',
+        marked: false,
+        expected: 'verified',
+        signalEmitted: false,
+        mentorModel: 'gpt-oss-120b',
+      }),
+      makeResult({
+        outcome: 'verified',
+        marked: true,
+        expected: 'verified',
+        signalEmitted: true,
+        mentorModel: 'gpt-oss-120b',
+      }),
+    ];
+    const m = aggregate(results);
+    // invalid-on-verified is under-credit; invalid-on-NON-verified is not.
+    expect(m.underCreditRate).toBeCloseTo(1 / 2);
+    expect(m.overCreditRate).toBe(0);
+    expect(m.signalEmissionRate).toBeCloseTo(1 / 2);
+  });
+
+  it('does NOT count invalid on a non-verified-expected round as under-credit', () => {
+    const m = aggregate([
+      makeResult({
+        outcome: 'invalid',
+        marked: false,
+        expected: 'partial',
+        signalEmitted: false,
+        mentorModel: 'gpt-oss-120b',
+      }),
+    ]);
+    expect(m.underCreditRate).toBe(0);
+  });
+
   it('separates signalEmissionRate per mentor model', () => {
     const results = [
       makeResult({

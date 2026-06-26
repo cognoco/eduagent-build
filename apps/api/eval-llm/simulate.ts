@@ -107,10 +107,15 @@ function parseArgs(argv: string[]): SimCliArgs {
       case '--runs':
         args.runs = Math.max(1, Number.parseInt(next(), 10) || 1);
         break;
-      case '--max-live-calls':
-        args.maxLiveCalls =
-          Number.parseInt(next(), 10) || DEFAULT_MAX_LIVE_CALLS;
+      case '--max-live-calls': {
+        // Keep an explicit 0 as 0 (a hard budget that runs nothing) instead of
+        // letting `|| DEFAULT` silently promote it to the default 30.
+        const parsed = Number.parseInt(next(), 10);
+        args.maxLiveCalls = Number.isFinite(parsed)
+          ? parsed
+          : DEFAULT_MAX_LIVE_CALLS;
         break;
+      }
       case '--list':
         args.list = true;
         break;
@@ -179,15 +184,19 @@ async function main(): Promise<void> {
     );
   }
 
-  // Build the grid, then cap to the live-call budget. Truncation is LOGGED, not
-  // silent (no-silent-caps rule).
-  const fullGrid = scenarios.flatMap((scenario) =>
-    Array.from({ length: args.runs }, () => scenario),
-  );
-  const maxRounds = Math.max(
-    1,
-    Math.floor(args.maxLiveCalls / CALLS_PER_ROUND),
-  );
+  // Build the grid ROUND-ROBIN (runs outer, scenarios inner): [s1..sN, s1..sN].
+  // A budget truncation then drops repeats of later runs, not whole topics, so
+  // the measured distribution stays representative across the scenario set.
+  const fullGrid = Array.from({ length: args.runs }, () => scenarios).flat();
+
+  // The budget is a HARD cap — never force a round that would overrun it (the
+  // old Math.max(1, …) could run ~CALLS_PER_ROUND calls under a smaller budget).
+  const maxRounds = Math.floor(args.maxLiveCalls / CALLS_PER_ROUND);
+  if (maxRounds < 1) {
+    throw new Error(
+      `--max-live-calls=${args.maxLiveCalls} is below the ~${CALLS_PER_ROUND} calls a single round needs; raise it to run at least one round.`,
+    );
+  }
   const grid = fullGrid.slice(0, maxRounds);
   if (grid.length < fullGrid.length) {
     console.warn(
@@ -212,13 +221,27 @@ async function main(): Promise<void> {
       console.warn(`  [skip] ${scenario.id}: profile not found`);
       continue;
     }
-    const result = await runSimulatedRound({
-      scenario,
-      profile,
-      learnerModel: args.learnerModel,
-      mentorModel: args.mentorModel,
-      allowSameFamily: args.allowSameFamily,
-    });
+    let result: SimulatedRoundResult;
+    try {
+      result = await runSimulatedRound({
+        scenario,
+        profile,
+        learnerModel: args.learnerModel,
+        mentorModel: args.mentorModel,
+        allowSameFamily: args.allowSameFamily,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // The two-model guard is a config error — hard-fail the whole run rather
+      // than silently emitting an empty/partial corpus. Any other error (a
+      // transient OpenRouter 429/5xx/network blip) skips just this round so a
+      // single failure near the end of a paid run doesn't discard the rest.
+      if (msg.startsWith('two-model guard')) throw err;
+      console.warn(
+        `  [${i + 1}/${grid.length}] ${scenario.id}: round FAILED (${msg}) — skipped; corpus keeps completed rounds.`,
+      );
+      continue;
+    }
     results.push(result);
     const flag =
       result.decision.outcome === 'verified' &&

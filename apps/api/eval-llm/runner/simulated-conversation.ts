@@ -46,6 +46,13 @@ import {
 /** The mentor turn runs at rung 3, mirroring flows/challenge-round-mastery.ts. */
 const MENTOR_RUNG = 3 as const;
 
+/**
+ * The tier the mentor turn routes at. Must stay in lockstep with
+ * `buildMentorContext`'s `llmTier` so the production-routing guard
+ * (`resolveProductionMentorModel`) resolves the exact model the turn will use.
+ */
+const MENTOR_LLM_TIER = 'standard' as const;
+
 export interface SimulatedRoundResult {
   scenarioId: string;
   profileId: string;
@@ -146,9 +153,21 @@ export function assertTwoModelGuard(
   }
 }
 
-/** Resolve the concrete model the production router would use for the mentor rung. */
-function resolveProductionMentorModel(): string {
-  return getModelConfigForTest(MENTOR_RUNG).model;
+/**
+ * Resolve the concrete model the production router would use for the mentor rung
+ * for THIS profile. Age-dependent on purpose: minors route to a different
+ * (approved non-Gemini) model than the age-unknown default
+ * (`router.ts` `isUnder18AgeBracket` → `approvedTextFallbackConfig`). Every sim
+ * scenario is a minor, so resolving WITHOUT the age bracket would validate the
+ * guard against the wrong model and let learner == real-grader slip through —
+ * defeating the guard. Mirror the mentor turn's routing inputs exactly:
+ * `llmTier` from `buildMentorContext` ('standard') and the profile's bracket.
+ */
+function resolveProductionMentorModel(profile: EvalProfile): string {
+  return getModelConfigForTest(MENTOR_RUNG, {
+    llmTier: MENTOR_LLM_TIER,
+    ageBracket: resolveAgeBracket(profile.birthYear),
+  }).model;
 }
 
 function toExchangeHistory(
@@ -176,7 +195,7 @@ function buildMentorContext(params: {
     birthYear: params.profile.birthYear,
     exchangeCount: 6,
     inputMode: 'text',
-    llmTier: 'standard',
+    llmTier: MENTOR_LLM_TIER,
     challengeRuntimeEnabled: true,
     challengeRound: params.challengeRound,
     currentUserMessageEventId: params.currentEventId,
@@ -214,7 +233,8 @@ export async function runSimulatedRound(
   // Two-model guard FIRST — before any LLM call. The null (production-routing)
   // case still resolves the concrete mentor slug and applies the same check.
   const mentorModelLabel = args.mentorModel ?? 'production-routing';
-  const mentorGuardSlug = args.mentorModel ?? resolveProductionMentorModel();
+  const mentorGuardSlug =
+    args.mentorModel ?? resolveProductionMentorModel(profile);
   assertTwoModelGuard(learnerModel, mentorGuardSlug, allowSameFamily);
 
   const learnerTurn = overrides.learnerTurn ?? runLearnerTurn;

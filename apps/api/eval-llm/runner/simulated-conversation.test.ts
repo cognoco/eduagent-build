@@ -115,6 +115,22 @@ describe('runSimulatedRound — conversation loop', () => {
     );
     expect(result.decision.outcome).toBe('verified');
     expect(result.decision.markMasteryVerified).toBe(true);
+    expect(result.signalEmitted).toBe(true);
+  });
+
+  it('all-missing answers → reteach (no mastery, signal still emitted)', async () => {
+    const overrides: SimulatedRoundOverrides = {
+      learnerTurn: async () => "I don't really know, sorry.",
+      mentorTurn: async () =>
+        scriptedEnvelope("That's okay — let's revisit it.", 'missing'),
+    };
+    const result = await runSimulatedRound(
+      { scenario, profile, learnerModel: LEARNER, mentorModel: MENTOR },
+      overrides,
+    );
+    expect(result.decision.outcome).toBe('reteach');
+    expect(result.decision.markMasteryVerified).toBe(false);
+    expect(result.signalEmitted).toBe(true);
   });
 
   it('throws when learner and mentor are the same model', async () => {
