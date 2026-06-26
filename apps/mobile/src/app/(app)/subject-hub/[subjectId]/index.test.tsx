@@ -579,8 +579,92 @@ describe('SubjectHubRoute — stuck curriculum: retry error', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled();
     });
+    // Assert a non-empty title AND body are shown — not just that alert fired —
+    // so an empty/wrong alert string can't pass green. platformAlert forwards
+    // (title, message, buttons, options) to Alert.alert; check the first two.
+    const [title, body] = alertSpy.mock.calls[0] ?? [];
+    expect(typeof title).toBe('string');
+    expect(title).toBeTruthy();
+    expect(typeof body).toBe('string');
+    expect(body).toBeTruthy();
 
     alertSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tier A — a persisted curriculumStatus:'failed' from /subjects routes the hub
+// to the 'stuck' empty state end-to-end (useSubjectHub → computeEmptyKind).
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — curriculumStatus:failed → stuck', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    // A book exists but yields no usable topics (the one topic is skipped), so
+    // hasUsableData is false. With curriculumStatus 'failed', computeEmptyKind
+    // must resolve to 'stuck'.
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+      book: {
+        id: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        title: 'Spanish 1',
+        description: null,
+        emoji: null,
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: '2026-06-01T00:00:00.000Z',
+        updatedAt: '2026-06-01T00:00:00.000Z',
+      },
+      topics: [
+        {
+          id: TOPIC_ID,
+          title: 'Greetings',
+          description: 'Say hello.',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 20,
+          bookId: BOOK_ID,
+          chapter: 'Basics',
+          skipped: true,
+        },
+      ],
+      connections: [],
+      status: 'IN_PROGRESS',
+      completedTopicIds: [],
+    });
+    mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+      topics: [],
+      reviewDueCount: 0,
+    });
+    mockFetch.setRoute('/progress/resume-target', { target: null });
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: SUBJECT_ID,
+          profileId: '990e8400-e29b-41d4-a716-446655440004',
+          name: 'Spanish',
+          status: 'active',
+          curriculumStatus: 'failed',
+          pedagogyMode: 'socratic',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('renders the stuck empty state (with a retry affordance) for a failed subject', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-stuck');
+    });
+    // The stuck state must offer the retry affordance, never the preparing
+    // spinner or the pick-book CTA.
+    expect(screen.getByTestId('subject-hub-stuck-retry')).toBeTruthy();
+    expect(screen.queryByTestId('subject-hub-preparing')).toBeNull();
   });
 });
 

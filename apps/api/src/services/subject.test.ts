@@ -8,6 +8,7 @@ import {
   deleteSubject,
   archiveInactiveSubjects,
   createSubjectWithStructure,
+  retryCurriculumForSubject,
   SubjectLimitError,
   MAX_TOTAL_SUBJECTS,
 } from './subject';
@@ -1385,5 +1386,135 @@ describe('archiveInactiveSubjects', () => {
     const result = await archiveInactiveSubjects(db, cutoff);
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('retryCurriculumForSubject', () => {
+  let sendSpy: jest.SpiedFunction<typeof inngest.send>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
+  });
+
+  afterEach(() => {
+    sendSpy.mockRestore();
+  });
+
+  function makeRetryDb(
+    stuckBooks: ReturnType<typeof mockBookRow>[],
+    updateSet: jest.Mock,
+  ): Database {
+    return {
+      query: {
+        // repo.subjects.findFirst → db.query.subjects.findFirst (scoped).
+        subjects: createSubjectQueryMocks(),
+        curriculumBooks: {
+          findMany: jest.fn().mockResolvedValue(stuckBooks),
+        },
+      },
+      update: jest.fn(() => ({ set: updateSet })),
+    } as unknown as Database;
+  }
+
+  it('dispatches a core retry per stuck book and clears failed_at after dispatch', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateWhere = jest.fn().mockResolvedValue(undefined);
+    const updateSet = jest.fn(() => ({ where: updateWhere }));
+    const db = makeRetryDb(
+      [mockBookRow({ id: uuidBookId, topicsGenerated: false })],
+      updateSet,
+    );
+
+    const dispatched = await retryCurriculumForSubject(
+      db,
+      uuidProfileId,
+      uuidSubjectId,
+    );
+
+    expect(dispatched).toBe(1);
+    expect(sendSpy).toHaveBeenCalledWith({
+      name: 'app/subject.curriculum-retry-requested',
+      data: expect.objectContaining({
+        version: 1,
+        subjectId: uuidSubjectId,
+        profileId: uuidProfileId,
+        bookId: uuidBookId,
+      }),
+    });
+    // Clears terminal failure so the subject derives 'preparing' synchronously
+    // (the hub's preparing-poll then starts and observes the regeneration).
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ failedReason: null, failedAt: null }),
+    );
+    // Pin the WHERE clause: the clear must be scoped to THIS subject's
+    // not-yet-generated books. A future widening (e.g. dropping subjectId) would
+    // clear failed_at across every subject's books — a cross-subject data bug
+    // the SET assertion alone would not catch.
+    const whereSql = extractSqlTextAndValues(updateWhere.mock.calls[0]?.[0]);
+    expect(whereSql).toContain(uuidSubjectId.toLowerCase());
+    expect(whereSql).toContain('topics_generated');
+  });
+
+  it('propagates a dispatch failure (core send) and leaves failed_at intact', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateSet = jest.fn(() => ({
+      where: jest.fn().mockResolvedValue(undefined),
+    }));
+    const db = makeRetryDb(
+      [mockBookRow({ id: uuidBookId, topicsGenerated: false })],
+      updateSet,
+    );
+    sendSpy.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+    // Core send: dispatch failure must surface (so the client shows the retry
+    // error) instead of being swallowed and reported as dispatched>0.
+    await expect(
+      retryCurriculumForSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toThrow('inngest unavailable');
+    // failed_at is NOT cleared on a failed dispatch → the subject stays 'failed'.
+    expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 without dispatching or clearing when there are no stuck books', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateSet = jest.fn();
+    const db = makeRetryDb([], updateSet);
+
+    const dispatched = await retryCurriculumForSubject(
+      db,
+      uuidProfileId,
+      uuidSubjectId,
+    );
+
+    expect(dispatched).toBe(0);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it('throws SubjectNotFoundError when the subject is not owned', async () => {
+    setupScopedRepo({ findFirstResult: undefined });
+    const updateSet = jest.fn();
+    const db = makeRetryDb([], updateSet);
+
+    await expect(
+      retryCurriculumForSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toThrow(SubjectNotFoundError);
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 });

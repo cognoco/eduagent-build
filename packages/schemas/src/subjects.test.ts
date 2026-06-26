@@ -76,7 +76,7 @@ describe('subjectStatusSchema', () => {
 });
 
 describe('subjectCurriculumStatusSchema', () => {
-  it.each(['ready', 'preparing'])('accepts status "%s"', (status) => {
+  it.each(['ready', 'preparing', 'failed'])('accepts status "%s"', (status) => {
     expect(subjectCurriculumStatusSchema.parse(status)).toBe(status);
   });
 });
