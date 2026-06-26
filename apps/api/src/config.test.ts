@@ -121,8 +121,10 @@ describe('validateProductionKeys', () => {
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    // 8 originals + 2 Inngest keys + analytics HMAC key = 11
-    expect(missing).toHaveLength(11);
+    // [P0 email-consent-withdrawal] withdrawal-token secret is prod-required.
+    expect(missing).toContain('CONSENT_WITHDRAWAL_TOKEN_SECRET');
+    // 8 originals + 2 Inngest keys + analytics HMAC key + withdrawal secret = 12
+    expect(missing).toHaveLength(12);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -142,6 +144,7 @@ describe('validateProductionKeys', () => {
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
+      CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
@@ -186,6 +189,7 @@ describe('validateProductionKeys', () => {
       'RESEND_WEBHOOK_SECRET',
       'REVENUECAT_WEBHOOK_SECRET',
       'ANALYTICS_HASH_KEY',
+      'CONSENT_WITHDRAWAL_TOKEN_SECRET',
     ]);
   });
 
@@ -209,6 +213,7 @@ describe('validateProductionKeys', () => {
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
+      CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
     };
 
     it('V2 on: passes with Cerebras+Mistral+OpenAI and NO Gemini key', () => {
@@ -330,6 +335,7 @@ describe('validateEnv', () => {
       API_ORIGIN: 'https://api.mentomate.com',
       REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
       ANALYTICS_HASH_KEY: 'analytics-hash-key-at-least-32-chars',
+      CONSENT_WITHDRAWAL_TOKEN_SECRET: 'consent-withdrawal-secret-32-chars-min',
       // Stripe secrets omitted — optional (dormant until web client)
     });
 
