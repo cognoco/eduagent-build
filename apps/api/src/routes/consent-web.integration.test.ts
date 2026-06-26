@@ -23,12 +23,21 @@ import {
   accounts,
   profiles,
   consentStates,
+  consentGrant,
+  membership,
+  organization,
+  person,
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
 import { app } from '../index';
+import { inngest } from '../inngest/client';
+import {
+  signWithdrawalToken,
+  verifyWithdrawalToken,
+} from '../services/consent-withdrawal-token';
 
 // ---------------------------------------------------------------------------
 // DB setup — mirrors pattern from consent.integration.test.ts
@@ -701,5 +710,255 @@ describe('GET /v1/consent-page — rate limiting [consent-web unauthenticated]',
     );
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get('Retry-After')).toBe('3600');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 6: P0 email-parent withdrawal / restore (identity-v2 graph)
+// ---------------------------------------------------------------------------
+//
+// These routes operate on the v2 person/consent_grant graph (not the legacy
+// consent_states the suites above use) and are authorized by a signed bearer
+// token rather than a Clerk session or guardianship edge (MMT-ADR-0027). The
+// only external boundary mocked is the Inngest dispatch — spied, not
+// jest.mock'd (GC1/GC6-clean; Inngest is a framework boundary). The DB, the
+// real Hono app, the token signer/verifier, and the consent service all run
+// for real.
+
+const WITHDRAW_SECRET = 'integration-consent-withdrawal-secret-0123456789';
+const WITHDRAW_ENV: Record<string, string> = {
+  ...buildEnv(),
+  CONSENT_WITHDRAWAL_TOKEN_SECRET: WITHDRAW_SECRET,
+};
+
+describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
+  const v2OrgIds: string[] = [];
+  const v2PersonIds: string[] = [];
+
+  beforeEach(() => {
+    // The withdraw POST/restore POST share the per-IP limiter; reset it so
+    // counts don't bleed in from the rate-limit suites above.
+    const { __resetConsentRespondRateLimit } = jest.requireActual(
+      './consent',
+    ) as {
+      __resetConsentRespondRateLimit: () => void;
+    };
+    __resetConsentRespondRateLimit();
+    v2OrgIds.length = 0;
+    v2PersonIds.length = 0;
+  });
+
+  afterEach(async () => {
+    const db = createIntegrationDb();
+    for (const pid of v2PersonIds) {
+      await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of v2OrgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+  });
+
+  // Seeds the email-parent end state directly: org → child person → membership
+  // → an APPROVED gdpr grant (optionally already withdrawn). Returns a signed
+  // withdrawal token for that (child × org), exactly as the approval route
+  // would have minted.
+  async function seedApprovedGrant(opts: {
+    displayName: string;
+    withdrawnAt?: Date | null;
+    grant?: boolean; // false → membership but NO grant (never-approved case)
+  }): Promise<{ orgId: string; childId: string; token: string }> {
+    const db = createIntegrationDb();
+    const [org] = await db
+      .insert(organization)
+      .values({ name: 'WV Org' })
+      .returning();
+    v2OrgIds.push(org!.id);
+    const [p] = await db
+      .insert(person)
+      .values({
+        displayName: opts.displayName,
+        birthDate: '2013-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    v2PersonIds.push(p!.id);
+    await db.insert(membership).values({
+      personId: p!.id,
+      organizationId: org!.id,
+      roles: ['learner'],
+    });
+    if (opts.grant !== false) {
+      await db.insert(consentGrant).values({
+        chargePersonId: p!.id,
+        organizationId: org!.id,
+        purpose: 'platform_use',
+        lawfulBasis: 'gdpr_parental_consent',
+        granted: true,
+        grantedAt: new Date(),
+        priorValue: null,
+        withdrawnAt: opts.withdrawnAt ?? null,
+        auditFact: { source: 'consent_response_approved' },
+      });
+    }
+    const token = signWithdrawalToken(p!.id, org!.id, WITHDRAW_SECRET);
+    return { orgId: org!.id, childId: p!.id, token };
+  }
+
+  function getW(path: string): Promise<Response> {
+    return app.request(
+      path,
+      { method: 'GET' },
+      WITHDRAW_ENV,
+    ) as Promise<Response>;
+  }
+  function postW(
+    path: string,
+    fields: Record<string, string>,
+  ): Promise<Response> {
+    return app.request(
+      path,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(fields).toString(),
+      },
+      WITHDRAW_ENV,
+    ) as Promise<Response>;
+  }
+
+  it('GET withdraw: forged/invalid token → 400 invalid-link page', async () => {
+    const res = await getW('/v1/consent-page/withdraw?token=not.a.valid.token');
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('Invalid link');
+  });
+
+  it('GET withdraw: valid token + active grant → "are you sure?" confirm page', async () => {
+    const { token } = await seedApprovedGrant({ displayName: 'Wendy' });
+    const res = await getW(
+      `/v1/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Withdraw consent for Wendy?');
+    expect(html).toContain('Yes, withdraw consent');
+    expect(html).toContain('/v1/consent-page/withdraw');
+  });
+
+  it('GET withdraw: valid token + already withdrawn (in grace) → undo landing', async () => {
+    const { token } = await seedApprovedGrant({
+      displayName: 'Wade',
+      withdrawnAt: new Date(),
+    });
+    const res = await getW(
+      `/v1/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Consent withdrawn');
+    expect(html).toContain('Undo — restore consent');
+    expect(html).toContain('/v1/consent-page/restore');
+  });
+
+  it('GET withdraw: valid token but no grant → "nothing to withdraw"', async () => {
+    const { token } = await seedApprovedGrant({
+      displayName: 'Nora',
+      grant: false,
+    });
+    const res = await getW(
+      `/v1/consent-page/withdraw?token=${encodeURIComponent(token)}`,
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Nothing to withdraw');
+  });
+
+  it('POST withdraw: stamps withdrawn_at and dispatches app/consent.email-revoked', async () => {
+    const sendSpy = jest
+      .spyOn(inngest, 'send')
+      .mockResolvedValue({ ids: [] } as never);
+    try {
+      const { childId, token } = await seedApprovedGrant({
+        displayName: 'Pia',
+      });
+      const res = await postW('/v1/consent-page/withdraw', { token });
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('Consent withdrawn');
+
+      const db = createIntegrationDb();
+      const grant = await db.query.consentGrant.findFirst({
+        where: eq(consentGrant.chargePersonId, childId),
+      });
+      expect(grant?.withdrawnAt).toBeTruthy();
+      expect((grant?.auditFact as { source?: string } | null)?.source).toBe(
+        'email_parent_revocation',
+      );
+
+      // The grace→delete dispatch is fire-and-forget (no executionCtx in the
+      // test runtime), so flush the microtask/timer queue before asserting.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'app/consent.email-revoked',
+          data: expect.objectContaining({ chargePersonId: childId }),
+        }),
+      );
+    } finally {
+      sendSpy.mockRestore();
+    }
+  });
+
+  it('POST withdraw: invalid token → 400 invalid-link page (no mutation)', async () => {
+    const res = await postW('/v1/consent-page/withdraw', {
+      token: 'forged.token',
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('Invalid link');
+  });
+
+  it('POST restore: within grace re-grants → "consent restored"', async () => {
+    const { childId, token } = await seedApprovedGrant({
+      displayName: 'Remy',
+      withdrawnAt: new Date(Date.now() - 60_000),
+    });
+    const res = await postW('/v1/consent-page/restore', { token });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('Consent restored');
+
+    const db = createIntegrationDb();
+    const grants = await db.query.consentGrant.findMany({
+      where: eq(consentGrant.chargePersonId, childId),
+    });
+    // Restore APPENDS a new un-withdrawn grant (does not un-stamp the old one).
+    const restored = grants.find(
+      (g) => g.priorValue === false && g.withdrawnAt === null,
+    );
+    expect(restored?.granted).toBe(true);
+  });
+
+  it('POST restore: after the 7-day grace → 410 grace-expired page', async () => {
+    const { token } = await seedApprovedGrant({
+      displayName: 'Gus',
+      withdrawnAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+    });
+    const res = await postW('/v1/consent-page/restore', { token });
+    expect(res.status).toBe(410);
+    const html = await res.text();
+    expect(html).toContain('Grace period has expired');
+  });
+
+  it('the signed withdrawal token round-trips through verifyWithdrawalToken', async () => {
+    const { childId, orgId, token } = await seedApprovedGrant({
+      displayName: 'Val',
+    });
+    expect(verifyWithdrawalToken(token, WITHDRAW_SECRET)).toEqual({
+      chargePersonId: childId,
+      organizationId: orgId,
+    });
   });
 });

@@ -173,14 +173,14 @@ const defaultConsentWithdrawn: ConsentWithdrawnCopy = {
   title: 'Account deletion pending',
   message: 'Your parent has withdrawn consent for your account.',
   details: 'Your data will be permanently deleted within 7 days.',
-  help: 'If this was a mistake, ask your parent to restore consent from their dashboard.',
+  help: 'If this was a mistake, talk to your parent or guardian — they can undo it within 7 days.',
 };
 
 const learnerConsentWithdrawn: ConsentWithdrawnCopy = {
   title: 'Your account is being closed',
   message: 'Your parent or guardian has decided to close your account.',
   details: 'Your learning data will be removed in 7 days.',
-  help: "If this wasn't meant to happen, ask your parent to fix it from their app.",
+  help: "If this wasn't meant to happen, tell your parent or guardian — they can undo it within 7 days.",
 };
 
 export function getConsentWithdrawnCopy(

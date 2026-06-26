@@ -144,7 +144,7 @@ describe('getConsentWithdrawnCopy', () => {
     expect(copy.details).toBe(
       'Your data will be permanently deleted within 7 days.',
     );
-    expect(copy.help).toContain('restore consent from their dashboard');
+    expect(copy.help).toContain('undo it within 7 days');
   });
 });
 

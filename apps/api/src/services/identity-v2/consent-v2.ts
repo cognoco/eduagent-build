@@ -431,6 +431,19 @@ export async function resendConsentV2(
 export interface ProcessConsentResponseV2Result {
   chargePersonId: string;
   approved: boolean;
+  /**
+   * The org the (charge person × basis) grant belongs to. Surfaced so the
+   * approval route can sign the P0 withdrawal token (`cw1:chargePersonId:
+   * organizationId`) without re-resolving membership. See spec §5.1.
+   */
+  organizationId: string;
+  /**
+   * The `guardian_email` the consent request was sent to (the email-consenting
+   * parent). Surfaced so the approval route can address the post-approval
+   * confirmation email carrying the durable withdrawal link. Null when the
+   * request never recorded one. See spec §5.1.
+   */
+  guardianEmail: string | null;
 }
 
 /**
@@ -562,7 +575,12 @@ export async function processConsentResponseV2(
     });
   }
 
-  return { chargePersonId, approved };
+  return {
+    chargePersonId,
+    approved,
+    organizationId: request.organizationId,
+    guardianEmail: request.guardianEmail ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -593,7 +611,61 @@ export async function revokeConsentV2(
     throw new ConsentNotAuthorizedError('revoke');
   }
   const basis = consentTypeToBasis(consentType);
+  return stampWithdrawal(db, chargePersonId, organizationId, basis, {
+    source: 'guardian_revocation',
+    guardianPersonId,
+  });
+}
 
+/**
+ * Bearer-token withdrawal for the email-consenting parent (P0, MMT-ADR-0027).
+ * The email-parent has NO `person` row and NO guardianship edge, so authority
+ * cannot be the `isGuardianOf` check `revokeConsentV2` uses — it is possession
+ * of the signed withdrawal link, which the web route has already verified
+ * before calling this. The mutation is byte-for-byte the same as
+ * `revokeConsentV2` (shared `stampWithdrawal` core); only the audit source
+ * (`email_parent_revocation`) and the absent edge check differ. The basis is
+ * the GDPR parental-consent basis the token encodes by construction.
+ *
+ * Idempotent: a second call on an already-withdrawn grant returns the existing
+ * `withdrawnAt`, inherited from the current-grant short-circuit in
+ * `stampWithdrawal`. See
+ * docs/specs/2026-06-26-p0-email-consent-withdrawal-design.md §5.3.
+ */
+export async function withdrawConsentByToken(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  audit?: { requestIp?: string; userAgent?: string },
+): Promise<RevokeConsentV2Result> {
+  return stampWithdrawal(
+    db,
+    chargePersonId,
+    organizationId,
+    'gdpr_parental_consent',
+    {
+      source: 'email_parent_revocation',
+      ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
+      ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
+    },
+  );
+}
+
+/**
+ * The post-authorization core of withdrawal: stamp `withdrawn_at` (+
+ * prior_value, audit_fact) on the current grant and clear the child's unread
+ * nudges, in one transaction. Carries NO authority check — every caller
+ * (`revokeConsentV2` via the edge check, `withdrawConsentByToken` via the
+ * verified bearer token) authorizes BEFORE calling. Idempotent: a second call
+ * on an already-withdrawn grant returns the existing `withdrawnAt`.
+ */
+async function stampWithdrawal(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+  auditFact: Record<string, unknown>,
+): Promise<RevokeConsentV2Result> {
   const current = await currentGrant(db, chargePersonId, organizationId, basis);
   if (!current) {
     throw new ConsentRecordNotFoundError();
@@ -609,7 +681,7 @@ export async function revokeConsentV2(
       .set({
         withdrawnAt: now,
         priorValue: true,
-        auditFact: { source: 'guardian_revocation', guardianPersonId },
+        auditFact,
       })
       .where(
         and(eq(consentGrant.id, current.id), isNull(consentGrant.withdrawnAt)),
@@ -652,7 +724,54 @@ export async function restoreConsentV2(
     throw new ConsentNotAuthorizedError('restore');
   }
   const basis = consentTypeToBasis(consentType);
+  return appendRestoreGrant(db, chargePersonId, organizationId, basis, {
+    source: 'guardian_restore',
+    guardianPersonId,
+  });
+}
 
+/**
+ * Bearer-token restore (undo) for the email-consenting parent (P0,
+ * MMT-ADR-0027). The mirror of `withdrawConsentByToken`: the same
+ * append-a-new-grant core as `restoreConsentV2`, authorized by the verified
+ * withdrawal token rather than a guardianship edge. Outside the 7-day grace it
+ * throws `ConsentGracePeriodExpiredError` (the data is already gone), identical
+ * to the edge-gated path. See spec §5.3.
+ */
+export async function restoreConsentByToken(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  audit?: { requestIp?: string; userAgent?: string },
+): Promise<RestoreConsentV2Result> {
+  return appendRestoreGrant(
+    db,
+    chargePersonId,
+    organizationId,
+    'gdpr_parental_consent',
+    {
+      source: 'email_parent_restore',
+      ...(audit?.requestIp !== undefined ? { requestIp: audit.requestIp } : {}),
+      ...(audit?.userAgent !== undefined ? { userAgent: audit.userAgent } : {}),
+    },
+  );
+}
+
+/**
+ * The post-authorization core of restore: take the per-person advisory lock,
+ * re-read the current grant, enforce the grace window, APPEND a new
+ * un-withdrawn grant, and clear `archived_at` — all in one serialized
+ * transaction. Carries NO authority check; callers authorize first (edge or
+ * verified bearer token). Idempotent on an already-restored grant (returns
+ * without appending).
+ */
+async function appendRestoreGrant(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+  basis: ConsentBasis,
+  auditFact: Record<string, unknown>,
+): Promise<RestoreConsentV2Result> {
   const now = new Date();
   // WI-583 race guard: the grace-end delete/archive predicates
   // (deletePersonIfConsentWithdrawnV2, deleteArchivedPersonIfStillEligibleV2)
@@ -700,7 +819,7 @@ export async function restoreConsentV2(
       granted: true,
       grantedAt: now,
       priorValue: false,
-      auditFact: { source: 'guardian_restore', guardianPersonId },
+      auditFact,
     });
     await tx
       .update(person)
@@ -1016,6 +1135,30 @@ export async function getPersonDisplayNameV2(
     columns: { displayName: true },
   });
   return row?.displayName ?? null;
+}
+
+/**
+ * Edge-free read for the P0 withdrawal web routes (MMT-ADR-0027): the current
+ * GDPR grant's withdrawal stamp for (charge person × org). Returns `null` when
+ * no grant exists (never approved, or already deleted past grace) so the GET
+ * `/consent-page/withdraw` route can render "nothing to withdraw"; otherwise
+ * `{ withdrawnAt }` lets it choose between the confirm page (not withdrawn) and
+ * the undo landing (withdrawn). Carries NO authority check — the route has
+ * already verified the signed bearer token. The grace window itself is enforced
+ * authoritatively by `restoreConsentByToken`, not here.
+ */
+export async function getGdprGrantWithdrawalStateV2(
+  db: Database,
+  chargePersonId: string,
+  organizationId: string,
+): Promise<{ withdrawnAt: Date | null } | null> {
+  const current = await currentGrant(
+    db,
+    chargePersonId,
+    organizationId,
+    'gdpr_parental_consent',
+  );
+  return current ? { withdrawnAt: current.withdrawnAt } : null;
 }
 
 /**
