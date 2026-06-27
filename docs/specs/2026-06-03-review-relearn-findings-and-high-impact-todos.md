@@ -13,7 +13,7 @@ relates:
 
 # Review & Re-learn — Findings + High-Impact Learning To-Dos
 
-> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 13 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: RR-1 + RR-13 thread → RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
+> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). **RR-1 + RR-13 minimal thread SHIPPED flag-dark** (branch `rr1-rr13-warm-review-callback`, `REVIEW_CALLBACK_OPENER_ENABLED` default false; spec archived at `docs/_archive/specs/Done/2026-06-27-rr1-rr13-warm-review-callback.md`). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 11 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: enable + RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
 
 ## Purpose
 
@@ -163,7 +163,7 @@ correctness/cleanup that must precede load-bearing.
 
 ### Backbone — make review feel like one relationship (FEEL)
 
-- **RR-1 — Replace "review mode" with a warm memory-callback opener. [P0 · FEEL · M]**
+- **RR-1 — Replace "review mode" with a warm memory-callback opener. [P0 · FEEL · M] — ✅ SHIPPED flag-dark 2026-06-27 (`REVIEW_CALLBACK_OPENER_ENABLED`; spec archived under `docs/_archive/specs/Done/`).**
   - *Impact:* the single change that most directly kills the "now we switch to review mode"
     seam the north star forbids. Turns review into a continuation of the tutoring
     conversation.
@@ -330,7 +330,7 @@ correctness/cleanup that must precede load-bearing.
 
 ### Continuity / memory — the backbone's missing tissue (CONTINUITY)
 
-- **RR-13 — Build the cross-session memory thread + ordered path preview. [minimal thread P1 · full preview P2 · CONTINUITY · M→L]**
+- **RR-13 — Build the cross-session memory thread + ordered path preview. [minimal thread P1 · full preview P2 · CONTINUITY · M→L] — ✅ minimal thread SHIPPED flag-dark 2026-06-27 (with RR-1, as the FEEL unit). Full path-preview (P2) still open.**
   - *Impact:* there is no "last week you cracked X — has it stuck?" anywhere, and after a
     session the learner sees only one next topic. The "here's how I'll build this with you"
     structure is unbuilt. **This is the north star's literal definition of the feature** ("feels

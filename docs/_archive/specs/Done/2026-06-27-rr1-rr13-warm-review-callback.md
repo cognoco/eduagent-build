@@ -2,7 +2,7 @@
 title: RR-1 + RR-13 — Warm Review-Callback Opener (FEEL unit) — Implementation Spec
 date: 2026-06-27
 profile: code
-status: draft
+status: implemented
 spec: docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md (RR-1, RR-13 minimal thread)
 relates:
   - docs/specs/2026-05-27-warm-chat-greeting.md (templated mobile greeting — RR-1 is the LLM upgrade of the same instinct; unshipped)
@@ -12,6 +12,8 @@ relates:
 ---
 
 # RR-1 + RR-13 — Warm Review-Callback Opener
+
+> **IMPLEMENTED & ARCHIVED 2026-06-27** (branch `rr1-rr13-warm-review-callback`). Shipped flag-dark behind `REVIEW_CALLBACK_OPENER_ENABLED` (default `false`). Code is ground truth: `apps/api/src/services/review-callback.ts`, the opener branch in `exchange-prompts.ts`, and the `session-exchange.ts` gating. Two adversarial-review amendments to the contract below: (1) **`ReviewCallback.daysOverdue` was dropped** — it was computed but no prompt consumer read it; the live `ReviewCallback` is `{ topicTitle, outcome, daysSinceLastReview, lastLearnerMessage }`. (2) `deriveReviewOutcome` requires `failureCount===0` (not just `repetitions===0`) before returning `first_time`, because SM-2 resets `repetitions` to 0 on a failed recall — a failed-only card now correctly resolves to `wobbled`. Known limitation (CH-1 design tradeoff, not fixed): `xpStatus`/`consecutiveSuccesses` are written only by the recall path, so a `verified` card followed by a weak non-recall session can still read as `cracked`; the SM-2 card is treated as authoritative.
 
 **Goal:** When a learner returns to a topic for review, the mentor opens with a warm, outcome-aware memory callback ("Last time you had photosynthesis down — let's see if it stuck") instead of the current cold seam ("this is a review check, not a fresh lesson") — making review feel like one continuous relationship.
 
