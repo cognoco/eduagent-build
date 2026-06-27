@@ -90,6 +90,7 @@ import {
 import { CircuitOpenError, parseConversationLanguage } from '../services/llm';
 import {
   isChallengeRoundRuntimeEnabled,
+  isChallengeRoundGraderEnabled,
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
@@ -209,6 +210,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
@@ -566,6 +568,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
+              c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
+            ),
           },
         );
         await markPersisted({
@@ -760,6 +765,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
+            challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
+              c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
+            ),
           },
         );
 

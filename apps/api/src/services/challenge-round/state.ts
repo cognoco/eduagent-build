@@ -169,3 +169,36 @@ export function transitionChallengeState(
     }
   }
 }
+
+/**
+ * T9 grader-stall terminal guard (plan 2026-06-26-challenge-round-grader-judge §T9).
+ *
+ * Problem: `answer_complete` only fires when `challengeRoundEvaluation.length > 0`.
+ * When the grader fail-opens to `[]`, no `answer_complete` fires and `questionIndex`
+ * never advances — the round stays `active` indefinitely.
+ *
+ * Fix: track `questionsAsked` independently (incremented every active turn a question
+ * is posed, regardless of grading success). When `questionsAsked >= MAX_CHALLENGE_QUESTIONS`
+ * AND `evaluations.length < questionsAsked` (some turns went ungraded), terminate
+ * the round immediately rather than looping. Always terminates to `complete` so
+ * mastery is never verified from incomplete grader data.
+ *
+ * Returns the terminal `ChallengeRoundSessionState` to persist, or `undefined`
+ * when the guard does not apply. The caller is responsible for persisting.
+ *
+ * Satisfies AGENTS.md: "every envelope signal must have a server-side hard cap so
+ * the flow terminates even if the LLM never emits the signal."
+ */
+export function resolveGraderStallTermination(
+  current: ChallengeRoundSessionState,
+): ChallengeRoundSessionState | undefined {
+  if (current.state !== 'active') return undefined;
+  const questionsAsked = current.questionsAsked ?? 0;
+  if (questionsAsked < MAX_CHALLENGE_QUESTIONS) return undefined;
+  // All questions have been asked — check for the stall condition.
+  if (current.evaluations.length >= questionsAsked) return undefined;
+
+  // Guard fires: grader stalled on ≥1 turn. Always route to `complete` (no mastery)
+  // rather than `drafting` — we cannot verify mastery from incomplete grader evidence.
+  return { ...current, state: 'complete' };
+}

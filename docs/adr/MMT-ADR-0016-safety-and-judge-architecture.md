@@ -43,3 +43,31 @@ Safety is decided by **judgment of how a topic is handled**, not by token/keywor
 - **The Gemini exclusion** — a compliance input recorded in the vetting trail; the routing supersession is MMT-ADR-0014.
 - **The judge's gating-mode thresholds per age** — operational tuning (envelope spec), not architecture.
 - **Formal definitions of `tutor` / `judge`** — Phase-J / canon-authorship to-do.
+
+## Amendment (2026-06-26) — Challenge-Round grader: first tutor→judge signal migration
+
+**Plan:** `docs/plans/2026-06-26-challenge-round-grader-judge.md` · **ADR:** this document (§2)
+
+### What changed
+
+`challenge_round_evaluation` is the **first structured signal migrated from tutor-inline emission to judge-emitted**, realizing the §2 judge role stated above. The tutor (gpt-oss-120b @ Cerebras) proved unreliable at emitting this signal: it returns `[]` on every Challenge Round turn, so mastery silently never verifies on the V2 tutor path. Adding the field to the JSON template with explicit "you MUST include it" guidance did not fix it — a genuine model instruction-following gap, not a prompt-template bug (see memory `project_gptoss_drops_challenge_eval_signal`).
+
+A dedicated grader service (`runChallengeRoundGrader`) now calls the judge to produce the evaluation array; the server deterministically injects `answerEventId` for every item in a turn. The downstream mastery gate (`decideMasteryAndReview`) is byte-identical — only the *source* of its input changes. Everything is behind `CHALLENGE_ROUND_GRADER_ENABLED` (default off).
+
+### The established pattern
+
+Migrating a structured signal from tutor-inline to judge-emitted is now the **established remediation pattern** for signals the tutor proves unreliable at. When a structured signal exhibits a silent-drop failure mode that prompt tightening cannot fix, the correct lever is a single-purpose judge call for that signal — not further prompt engineering on the tutor.
+
+### H4 progress: first tier/age-blind judge *capability* routing path
+
+This implementation advances open gate **H4** by adding the **first tier/age-blind judge *capability* routing path** (`capability: 'judge'` in `apps/api/src/services/llm/router.ts`, model constant `GRADER_MODEL = 'claude-sonnet-4-6'` non-reasoning, model-swappable pending the T10 bake-off).
+
+**Correction of record:** this is NOT the first callable judge. `runSuitabilityJudge` (`policy-engine/judge-suitability.ts`) was already callable before this plan and routes to Sonnet 4.6 via `preferredProvider: 'anthropic'`. What this plan adds is a **distinct `capability: 'judge'` routing branch that is explicitly tier/age-blind per §2** — it ignores tier, age, and region entirely. The suitability judge will adopt the same capability path next, replacing its current ad-hoc `preferredProvider` approach.
+
+### Vendor-independence: enforced, not coincidental
+
+§2 requires the judge to be vendor-independent of the tutor. The grader provider is resolved through `selectJudgeProvider(tutorVendor)` (`policy-engine/judge-suitability.ts:54`) — which returns `'openai'` when the active tutor is Anthropic, else `'anthropic'` — so §2 is **structurally enforced** rather than coincidentally satisfied. A future change to an Anthropic-hosted tutor cannot silently share the grader's vendor.
+
+### Cutover dependency
+
+The V2 cutover (`LLM_ROUTING_V2_ENABLED`) **must not flip on for minor traffic until `CHALLENGE_ROUND_GRADER_ENABLED=true`** is also set and validated on staging. Without the grader, mastery silently never verifies for any learner on the V2 tutor path — the flag-off behavior is fail-safe (empty evaluation → no mastery, no error), but it is a silent regression, not acceptable at cutover.

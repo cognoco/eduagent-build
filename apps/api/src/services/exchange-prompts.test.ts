@@ -980,6 +980,33 @@ describe('buildSystemPrompt — Challenge Round mastery signal in RESPONSE FORMA
     );
     expect(env).not.toContain(ENVELOPE_EVAL_KEY);
   });
+
+  // grader-on: the grader owns challenge_round_evaluation, so the tutor must
+  // NOT emit it (avoids double-grading). Both injection sites must be suppressed:
+  // (1) the JSON-shape template field in the envelope, and
+  // (2) the "emit signals.challenge_round_evaluation" prose in the active prompt.
+  it('omits challenge_round_evaluation from the envelope template and active-prompt prose when graderEnabled is true', () => {
+    const fullPrompt = buildSystemPrompt(activeContext(), {
+      graderEnabled: true,
+    });
+    const env = envelopeBlock(fullPrompt);
+
+    // JSON-shape template must not contain the field key
+    expect(env).not.toContain(ENVELOPE_EVAL_KEY);
+    // The signal-guidance "CHALLENGE ROUND ACTIVE" prose must also be absent
+    expect(env).not.toContain('CHALLENGE ROUND ACTIVE:');
+    // The prose instruction from challengeRoundActivePrompt must be absent
+    expect(fullPrompt).not.toContain(
+      'emit "signals.challenge_round_evaluation"',
+    );
+  });
+
+  // grader-off (default) — existing behavior must be byte-identical (no regression)
+  it('grader-off (default) still lists challenge_round_evaluation in the envelope when a round is active', () => {
+    // Param omitted → graderEnabled defaults to false
+    const env = envelopeBlock(buildSystemPrompt(activeContext()));
+    expect(env).toContain(ENVELOPE_EVAL_KEY);
+  });
 });
 
 describe('buildSystemPrompt — CRITICAL THINKING block', () => {

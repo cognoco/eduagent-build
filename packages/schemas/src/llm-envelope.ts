@@ -228,6 +228,50 @@ export type ChallengeRoundEvaluationItem = z.infer<
   typeof challengeRoundEvaluationItemSchema
 >;
 
+/**
+ * Verdict returned by the challenge-round grader judge (T1 — 2026-06-26 plan).
+ *
+ * The grader model returns only judgment fields; the server-owned `answerEventId`
+ * is injected by `runChallengeRoundGrader` after parsing so the model cannot
+ * supply or fabricate it. Hence `.omit({ answerEventId: true })`.
+ *
+ * At least one item is required (`min(1)`) — an empty array is the exact
+ * gpt-oss failure mode this grader path exists to eliminate (see memory
+ * `project_gptoss_drops_challenge_eval_signal`).
+ */
+export const challengeRoundGraderVerdictSchema = z.object({
+  items: z
+    .array(challengeRoundEvaluationItemSchema.omit({ answerEventId: true }))
+    .min(1)
+    .max(10),
+});
+export type ChallengeRoundGraderVerdict = z.infer<
+  typeof challengeRoundGraderVerdictSchema
+>;
+
+/**
+ * Payload for the `app/challenge-round.grader_degraded` Inngest observability
+ * event emitted via `safeSend` when `runChallengeRoundGrader` fails open.
+ *
+ * Privacy: opaque ids + a reason code ONLY — no learner text, quotes, or
+ * answer content. The Inngest event store is a third-party service and must
+ * never receive minor-learner content (same rule as filing retry events).
+ *
+ * Convention note: established Inngest event payload schemas live in
+ * `inngest-events.ts`. This schema is placed in `llm-envelope.ts` because it
+ * is a direct companion to the grader-verdict schema (both are defined in the
+ * same T1 implementation task) and the plan explicitly co-locates them here.
+ * Future grader-related event schemas should follow this file's pattern.
+ */
+export const challengeRoundGraderDegradedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  answerEventId: z.string().optional(),
+  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+});
+export type ChallengeRoundGraderDegradedEvent = z.infer<
+  typeof challengeRoundGraderDegradedEventSchema
+>;
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z

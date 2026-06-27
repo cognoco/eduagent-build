@@ -694,6 +694,60 @@ describe('Challenge Round runtime state decisions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// T6 — askedQuestion sourcing from last assistant message in exchangeHistory
+// Plan: 2026-06-26-challenge-round-grader-judge §T6
+//
+// applyChallengeRoundRuntimeSignals receives `askedQuestion` from the caller,
+// which extracts it from context.exchangeHistory (the last assistant entry).
+// This test verifies the sourcing pattern: filter assistant turns → at(-1) →
+// content is a re-wrapped JSON envelope → must project to clean prose.
+// ---------------------------------------------------------------------------
+
+describe('T6 — askedQuestion extraction from exchangeHistory', () => {
+  it('returns clean prose from the last assistant entry in a multi-turn history', () => {
+    // buildExchangeHistory re-wraps ai_response content as a JSON envelope
+    // (BUG-560 fix). The sourcing code in processMessage/streamMessage uses
+    // projectAiResponseContent to extract clean prose from that envelope.
+    // This test validates the extraction pattern end-to-end using
+    // buildExchangeHistory output.
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'ai_response', content: 'What is photosynthesis?' },
+      { eventType: 'user_message', content: 'It makes food from sunlight.' },
+      { eventType: 'ai_response', content: 'Correct! Now explain the inputs.' },
+    ];
+    const history = buildExchangeHistory(events);
+    const assistantEntries = history.filter((e) => e.role === 'assistant');
+    const lastAssistant = assistantEntries.at(-1);
+
+    expect(lastAssistant).toBeDefined();
+    expect(lastAssistant?.role).toBe('assistant');
+
+    // The content from buildExchangeHistory is a re-wrapped JSON envelope.
+    // Parse it to verify the reply field contains the clean question text.
+    const parsed = JSON.parse(lastAssistant!.content) as { reply: string };
+    expect(parsed.reply).toBe('Correct! Now explain the inputs.');
+
+    // There should be 2 assistant entries (the first ai_response + the last)
+    expect(assistantEntries).toHaveLength(2);
+    // The LAST one is the mentor question the learner is currently answering
+    expect(assistantEntries.at(-1)?.content).not.toBe(
+      assistantEntries.at(0)?.content,
+    );
+  });
+
+  it('returns undefined for last assistant when there are no prior AI turns (first turn)', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'What is 2+2?' },
+    ];
+    const history = buildExchangeHistory(events);
+    const lastAssistant = history.filter((e) => e.role === 'assistant').at(-1);
+
+    // First turn: no prior assistant message → askedQuestion falls back to ''
+    expect(lastAssistant).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildExchangeHistory — additional edge cases
 // ---------------------------------------------------------------------------
 

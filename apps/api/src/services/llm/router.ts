@@ -17,6 +17,7 @@ import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
 import {
   resolveExchangeRouter,
+  resolveJudgeConfig,
   NoEligibleModelError,
   type ExchangeRouterRow,
 } from '../policy-engine';
@@ -25,7 +26,7 @@ const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
 export type LlmProviderPolicy = 'default' | 'gemini_only';
-type LlmCapability = 'text' | 'vision';
+export type LlmCapability = 'text' | 'vision' | 'judge';
 
 function getMessageCapability(messages: ChatMessage[]): LlmCapability {
   return messages.some(
@@ -346,6 +347,13 @@ export type OpenAIAdvancedModel =
 export const OPENAI_ADVANCED_MODEL_MIN_RUNG = 5;
 export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6';
 
+// Default grader model for the Challenge Round judge (ADR-0016 §2, T3).
+// Defaults to the stronger candidate; demotion to a Haiku model after the
+// T10 bake-off is a one-line swap here.  Note: no Haiku model constant
+// exists in this file today (verified router.ts:334-411 at plan-write time);
+// adding one is part of the demotion edit, not free.
+export const GRADER_MODEL = 'claude-sonnet-4-6';
+
 let openAIAdvancedModelOverride: OpenAIAdvancedModel | null = null;
 
 export function getOpenAIAdvancedModel(): OpenAIAdvancedModel {
@@ -427,6 +435,36 @@ const V2_ADVANCED_MODEL_MIN_RUNG = 4;
 const FALLBACK_FORBIDDEN: ReadonlySet<string> = new Set(['gemini', 'vertex']);
 
 /**
+ * Resolve the ModelConfig for the judge/grader capability (ADR-0016 §2).
+ * Vendor-independent: grader never shares provider with the tutor.
+ * Non-reasoning: `reasoningEffort` is absent so the Anthropic adapter
+ * passes the model verbatim without extended-thinking headers.
+ *
+ * The logic mirrors `selectJudgeProvider()` in judge-suitability.ts —
+ * inlined here to avoid a circular dependency (judge-suitability.ts imports
+ * `routeAndCall` from this module, so router.ts cannot import from it).
+ * `resolveJudgeConfig` from policy-engine is safe to import because
+ * policy-engine/judge.ts has no dependency on router.ts.
+ */
+function resolveGraderConfig(tutorVendor: string): ModelConfig {
+  const { vendorConstraint } = resolveJudgeConfig({ tutorVendor });
+  const excluded = vendorConstraint.replace(/^!/, '').trim().toLowerCase();
+  // Prefer anthropic; fall to openai only when anthropic IS the excluded
+  // vendor.  Never Gemini (under-18 compliance, ADR-0016 §10.1).
+  const graderProvider: ModelConfig['provider'] =
+    excluded === 'anthropic' ? 'openai' : 'anthropic';
+  return {
+    provider: graderProvider,
+    // GRADER_MODEL is the anthropic occupant.  If the vendor guard forces
+    // openai, use the V2 lightweight secondary (OPENAI_MINI_MODEL) which is
+    // the smallest available OpenAI model in the V2 matrix.
+    model: graderProvider === 'anthropic' ? GRADER_MODEL : OPENAI_MINI_MODEL,
+    maxTokens: MIN_REPLY_MAX_TOKENS,
+    // reasoningEffort intentionally absent — non-reasoning per ADR-0016 §2.
+  };
+}
+
+/**
  * V2 model selection: the §1.5 matrix proposes a candidate, and the
  * policy-engine exchange router (`resolveExchangeRouter`) makes the pick —
  * see `pickThroughExchangeRouter` for the enforcement properties.
@@ -436,6 +474,13 @@ function getModelConfigV2(
   llmTier: LLMTier,
   capability: LlmCapability,
 ): ModelConfig {
+  // Judge capability: tier/age/region-blind, vendor-independent (ADR-0016 §2).
+  // Derive the tutor vendor from the V2 text matrix (same rung/tier) so the
+  // grader is always on a different vendor.
+  if (capability === 'judge') {
+    const tutorConfig = getModelConfigV2Matrix(rung, llmTier, 'text');
+    return resolveGraderConfig(tutorConfig.provider);
+  }
   return pickThroughExchangeRouter(
     getModelConfigV2Matrix(rung, llmTier, capability),
   );
@@ -615,6 +660,8 @@ function getModelConfig(
   // V2 cutover: the §1.5 matrix is authoritative for ALL tiers/policies. It is
   // checked before every legacy branch (including gemini_only and
   // preferredProvider) so no flag-on request can resolve to a banned vendor.
+  // The judge capability is passed through to getModelConfigV2 which handles
+  // it independently, keeping V2 and legacy paths in sync.
   if (routingV2Enabled) {
     return getModelConfigV2(rung, llmTier, capability);
   }
@@ -625,10 +672,26 @@ function getModelConfig(
   // preferred-provider 'gemini' hint — each with no age check, leaking minors to
   // a banned vendor. Gate them all here, before any Gemini selection, routing
   // minors to an approved non-Gemini provider (fails closed if none registered).
-  // Adults and age-unknown system calls (subject classification, language
-  // detection) fall through and keep existing behavior.
+  // This also covers a minor's grader/judge request: the under-18 gate runs
+  // before the judge branch below, so a minor never reaches Gemini grader
+  // selection. Adults and age-unknown system calls (subject classification,
+  // language detection) fall through and keep existing behavior.
   if (isUnder18AgeBracket(ageBracket)) {
     return approvedTextFallbackConfig(rung, llmTier);
+  }
+
+  // Legacy path: judge capability is tier/age/region-blind (ADR-0016 §2).
+  // Derive tutor vendor via a recursive text-routing call (not circular —
+  // the recursive call uses 'text' capability, never re-enters this branch).
+  if (capability === 'judge') {
+    const tutorConfig = getModelConfig(
+      rung,
+      llmTier,
+      preferredProvider,
+      providerPolicy,
+      'text',
+    );
+    return resolveGraderConfig(tutorConfig.provider);
   }
 
   if (providerPolicy === 'gemini_only') {
@@ -913,7 +976,7 @@ export function getFallbackConfigForTest(
   opts?: {
     providerPolicy?: LlmProviderPolicy;
     llmTier?: LLMTier;
-    capability?: 'text' | 'vision';
+    capability?: LlmCapability;
   },
 ): ModelConfig | null {
   return getFallbackConfig(
@@ -937,7 +1000,7 @@ export function getModelConfigForTest(
     llmTier?: LLMTier;
     preferredProvider?: PreferredLlmProvider;
     providerPolicy?: LlmProviderPolicy;
-    capability?: 'text' | 'vision';
+    capability?: LlmCapability;
     ageBracket?: AgeBracket;
   },
 ): ModelConfig {
@@ -1264,6 +1327,11 @@ export async function routeAndCall(
     flow?: string;
     sessionId?: string;
     responseFormat?: 'json';
+    // Explicit capability override for judge routing (ADR-0016 §2 T3).
+    // Only 'judge' is valid as an explicit override; 'text' and 'vision' are
+    // always derived from message content (inline_data detection) and must not
+    // be set explicitly — callers do not need to thread image detection.
+    capability?: 'judge';
   },
 ): Promise<RouteResult> {
   // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
@@ -1279,7 +1347,10 @@ export async function routeAndCall(
       session_id: _options.sessionId ?? null,
     });
   }
-  const capability = getMessageCapability(messages);
+  const messageCapability = getMessageCapability(messages);
+  // Explicit capability option overrides content-derived value.  Currently
+  // only 'judge' is a valid explicit override (see option JSDoc above).
+  const capability: LlmCapability = _options?.capability ?? messageCapability;
   const safeMessages = withSafetyPreamble(messages, _options?.ageBracket, {
     conversationLanguage: _options?.conversationLanguage,
     pronouns: _options?.pronouns,

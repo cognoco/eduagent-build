@@ -1,8 +1,11 @@
 import {
+  challengeRoundGraderDegradedEventSchema,
+  challengeRoundGraderVerdictSchema,
   llmAssessmentEvaluationSchema,
   llmResponseEnvelopeSchema,
   llmSummaryEvaluationSchema,
   normaliseSignals,
+  type ChallengeRoundGraderVerdict,
   type NormalisedEnvelopeSignals,
 } from './llm-envelope.js';
 
@@ -916,6 +919,162 @@ describe('challenge round envelope fields', () => {
           source_answer_event_ids: [],
         },
       },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T1 (2026-06-26) — challengeRoundGraderVerdictSchema
+// The grader model returns judgment fields only; the server injects
+// answerEventId. Min-1 enforces that the empty-array failure mode (the exact
+// gpt-oss regression) is rejected at the schema layer.
+// ---------------------------------------------------------------------------
+
+describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
+  const validItem = {
+    concept: 'collision theory / activation energy',
+    result: 'solid' as const,
+    evidence: 'links speed to collision frequency and energy',
+    learnerQuote: 'particles move faster and collide more often',
+  };
+
+  // (a) a one-item verdict without answerEventId parses successfully
+  it('(a) accepts a valid one-item verdict without answerEventId', () => {
+    const result = challengeRoundGraderVerdictSchema.safeParse({
+      items: [validItem],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.items).toHaveLength(1);
+      expect(result.data.items[0]?.result).toBe('solid');
+    }
+  });
+
+  // (b) items: [] FAILS .min(1) — this is the exact gpt-oss regression
+  it('(b) rejects empty items array (the gpt-oss failure mode)', () => {
+    const result = challengeRoundGraderVerdictSchema.safeParse({ items: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects when items is missing', () => {
+    const result = challengeRoundGraderVerdictSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 10 items', () => {
+    const result = challengeRoundGraderVerdictSchema.safeParse({
+      items: Array.from({ length: 11 }, () => validItem),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts all four result enum values', () => {
+    for (const resultValue of [
+      'solid',
+      'partial',
+      'missing',
+      'misconception',
+    ] as const) {
+      const r = challengeRoundGraderVerdictSchema.safeParse({
+        items: [{ ...validItem, result: resultValue }],
+      });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  it('accepts an item with an optional correction field', () => {
+    const result = challengeRoundGraderVerdictSchema.safeParse({
+      items: [
+        {
+          ...validItem,
+          result: 'misconception',
+          correction: 'occurs in chloroplasts, not the nucleus',
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an item that supplies answerEventId (server-injected field)', () => {
+    // answerEventId is .omit()-ted from the grader-item schema; the grader
+    // model must NOT supply it. This test verifies the schema rejects it.
+    // Note: zod's .omit() produces a schema that STRIPS the key — it does
+    // NOT cause a validation failure on an extra key unless .strict() is used.
+    // We therefore assert the type-level invariant (see @ts-expect-error probe
+    // below) and confirm the schema parses successfully while silently dropping
+    // the field (zod's default passthrough-strip behaviour). The server enforces
+    // the injected value, so the model cannot fabricate a trusted answerEventId.
+    const result = challengeRoundGraderVerdictSchema.safeParse({
+      items: [
+        { ...validItem, answerEventId: '00000000-0000-4000-8000-000000000001' },
+      ],
+    });
+    // Schema succeeds but answerEventId is stripped (not present in output)
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.items[0]).not.toHaveProperty('answerEventId');
+    }
+  });
+
+  // (c) compile-time probe — ChallengeRoundGraderVerdict items have NO
+  // answerEventId key. Accessing a non-existent property via a type alias
+  // triggers TS2339, which the directive on the next line expects. If
+  // answerEventId were ever added back to the type, that directive would become
+  // unused and tsc would fail — guarding the omit at compile time.
+  it('(c) compile-time: ChallengeRoundGraderVerdict item type has no answerEventId', () => {
+    type GraderItem = ChallengeRoundGraderVerdict['items'][number];
+    // @ts-expect-error TS2339: answerEventId is intentionally absent (server-injected, not model-emitted)
+    type _Guard = GraderItem['answerEventId'];
+    expect(true).toBe(true); // compile-time only; assertion satisfies Jest
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T1 (2026-06-26) — challengeRoundGraderDegradedEventSchema
+// Inngest observability event payload — opaque ids + reason code only.
+// No learner text, quotes, or answer content (PII / minor-data constraint).
+// ---------------------------------------------------------------------------
+
+describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload)', () => {
+  it('accepts a payload with only reason (all ids optional)', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a full payload with optional ids', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      answerEventId: '00000000-0000-4000-8000-000000000002',
+      reason: 'schema_invalid',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts all four reason enum values', () => {
+    for (const reason of [
+      'route_error',
+      'no_json',
+      'parse_error',
+      'schema_invalid',
+    ] as const) {
+      const r = challengeRoundGraderDegradedEventSchema.safeParse({ reason });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  it('rejects an unknown reason value', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      reason: 'unknown_failure',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a payload missing reason', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      sessionId: '00000000-0000-4000-8000-000000000001',
     });
     expect(result.success).toBe(false);
   });

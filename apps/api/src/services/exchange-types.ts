@@ -202,4 +202,10 @@ export interface ExchangeContext {
    * read-side hardening lands. See docs/plans/2026-05-18-challenge-round-targets.md.
    */
   challengeRuntimeEnabled?: boolean;
+  /**
+   * When true, a separate grader call on the judge owns the
+   * `challenge_round_evaluation` signal — so the tutor system prompt must NOT
+   * ask for it (converse-only). Threaded from `CHALLENGE_ROUND_GRADER_ENABLED`.
+   */
+  graderEnabled?: boolean;
 }

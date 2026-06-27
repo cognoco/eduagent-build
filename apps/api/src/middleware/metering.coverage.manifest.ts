@@ -38,6 +38,7 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/assessments.ts',
   'apps/api/src/services/book-generation.ts',
   'apps/api/src/services/book-suggestion-generation.ts',
+  'apps/api/src/services/challenge-round/grader.ts',
   'apps/api/src/services/curriculum.ts',
   'apps/api/src/services/dictation/generate.ts',
   'apps/api/src/services/dictation/prepare-homework.ts',

@@ -7,8 +7,8 @@ import {
 } from '@eduagent/schemas';
 import { buildAppHelpPromptBlock } from './app-help-map';
 import {
+  buildChallengeRoundActivePrompt,
   challengeOfferPrompt,
-  challengeRoundActivePrompt,
   challengeRoundDraftingPrompt,
 } from './challenge-round/prompts';
 import { getEscalationPromptGuidance } from './escalation';
@@ -228,15 +228,21 @@ function getExchangeEnvelopeInstruction(context: {
   isLanguageMode: boolean;
   includeRetrievalScore: boolean;
   isChallengeRoundActive: boolean;
+  /** When true the grader owns challenge_round_evaluation — omit the field
+   *  from the envelope template so the tutor does not also emit it. */
+  graderEnabled?: boolean;
 }): string {
   // During an active Challenge Round the mastery pipeline reads
   // `signals.challenge_round_evaluation` inline from this envelope. It MUST be
   // enumerated in the response-format shape — prose-only instruction is silently
   // dropped by strict template-followers (e.g. gpt-oss-120b), which leaves
   // mastery permanently unverified. See challenge-round/evaluation.ts.
-  const challengeEvalField = context.isChallengeRoundActive
-    ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
-    : '';
+  // When the grader owns the signal (graderEnabled=true), the field is omitted
+  // so the tutor does not double-emit it (the grader makes a separate judge call).
+  const challengeEvalField =
+    context.isChallengeRoundActive && !context.graderEnabled
+      ? ', "challenge_round_evaluation": [ { "concept": "<concept assessed>", "result": "<solid|partial|missing|misconception>", "evidence": "<what the learner demonstrated>", "answerEventId": "<the CURRENT CHALLENGE ANSWER EVENT ID for the learner answer judged>", "learnerQuote": "<short verbatim quote from the learner answer>", "correction": "<optional; the correct idea, only when result is not solid>" } ]'
+      : '';
 
   const signals = context.isRecitation
     ? `  "signals": { "understanding_check": <bool>, "crisis_redirect": <bool>${challengeEvalField} },`
@@ -268,7 +274,7 @@ function getExchangeEnvelopeInstruction(context: {
       'For this continuation opener scoring turn, set `signals.retrieval_score` from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',
     );
   }
-  if (context.isChallengeRoundActive) {
+  if (context.isChallengeRoundActive && !context.graderEnabled) {
     signalGuidance.push(
       'CHALLENGE ROUND ACTIVE: after each learner answer you MUST include `signals.challenge_round_evaluation` with one item per concept assessed — set `result` to one of solid/partial/missing/misconception, copy a short verbatim `learnerQuote` from their answer, and use the provided CURRENT CHALLENGE ANSWER EVENT ID as `answerEventId`. Omitting this field blocks mastery verification entirely.',
     );
@@ -502,6 +508,11 @@ function buildFinalGroundingCheckBlock(): string {
 
 export interface BuildSystemPromptOptions {
   includeAppHelpMap?: boolean;
+  /** When true, the challenge_round_evaluation signal is owned by a separate
+   *  grader call — suppress its injection from both the envelope template and
+   *  the active-round prose so the tutor converses only. Default false preserves
+   *  today's behavior (field present). */
+  graderEnabled?: boolean;
 }
 
 /** Builds the full system prompt from exchange context */
@@ -511,6 +522,7 @@ export function buildSystemPrompt(
 ): string {
   const sections: string[] = [];
   const includeAppHelpMap = options.includeAppHelpMap === true;
+  const graderEnabled = options.graderEnabled === true;
   const isLanguageMode = context.pedagogyMode === 'four_strands';
   const isRecitation = context.effectiveMode === 'recitation';
   const isReviewMode =
@@ -1283,7 +1295,7 @@ export function buildSystemPrompt(
     if (cr?.state === 'offered' || (!cr && challengeEligible)) {
       sections.push(challengeOfferPrompt);
     } else if (cr?.state === 'accepted' || cr?.state === 'active') {
-      sections.push(challengeRoundActivePrompt);
+      sections.push(buildChallengeRoundActivePrompt(graderEnabled));
       if (cr.state === 'active' && context.currentUserMessageEventId) {
         sections.push(
           `CURRENT CHALLENGE ANSWER EVENT ID: Use "${context.currentUserMessageEventId}" exactly as the answerEventId for any challenge_round_evaluation item about the learner's latest message.`,
@@ -1332,12 +1344,13 @@ export function buildSystemPrompt(
       isRecitation,
       isLanguageMode,
       includeRetrievalScore: context.continuationOpenerPhase === 'score',
-      // Mirror the gate for challengeRoundActivePrompt above: the inline
+      // Mirror the gate for buildChallengeRoundActivePrompt above: the inline
       // challenge_round_evaluation signal is only meaningful (and only read
       // by the mastery pipeline) while a round is accepted/active.
       isChallengeRoundActive:
         challengeRuntimeEnabled &&
         (cr?.state === 'accepted' || cr?.state === 'active'),
+      graderEnabled,
     }),
   );
 
