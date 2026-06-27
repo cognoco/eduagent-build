@@ -169,12 +169,16 @@ const envSchema = z.object({
 
   // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
   // challenge_round_evaluation from a dedicated judge call instead of the
-  // inline tutor envelope (gpt-oss silently drops the signal). Default-OFF:
-  // while 'false', the grader path is never invoked and the evaluation array
-  // is read from the tutor envelope as today. Flip to 'true' in Doppler on
-  // staging after validation against the V2 tutor; independent of
-  // LLM_ROUTING_V2_ENABLED so it can be staged and reverted separately.
-  CHALLENGE_ROUND_GRADER_ENABLED: z.enum(['true', 'false']).default('false'),
+  // inline tutor envelope (gpt-oss silently drops the signal). Default-ON as
+  // of 2026-06-27 (Sonnet 4.6 grader bake-off clean; flag set 'true' in all
+  // Doppler envs): the grader path runs unless explicitly disabled, so a
+  // missing/forgotten binding can never silently disable mastery. Set 'false'
+  // in Doppler as an emergency kill-switch to fall back to the inline-tutor
+  // path — a valid rollback ONLY while the tutor still emits the signal inline
+  // (i.e. pre-V2). The flag + legacy inline branch are slated for removal at
+  // the V2/gpt-oss cutover, when the inline path stops being a usable fallback.
+  // Independent of LLM_ROUTING_V2_ENABLED so it can be toggled separately.
+  CHALLENGE_ROUND_GRADER_ENABLED: z.enum(['true', 'false']).default('true'),
 
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
@@ -299,14 +303,15 @@ export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
  * Challenge Round grader gate (plan 2026-06-26 / MMT-ADR-0016 §2). Sources
  * challenge_round_evaluation from a dedicated judge call instead of the inline
  * tutor envelope. Threaded into the challenge-round runtime path at the
- * exchange route boundary. Default-closed: undefined / anything other than
- * 'true' keeps the legacy inline-envelope path so a missing binding never
- * accidentally enables the grader. Independent of LLM_ROUTING_V2_ENABLED.
+ * exchange route boundary. Default-OPEN as of 2026-06-27: undefined / any
+ * value other than the explicit kill-switch 'false' keeps the grader ON, so a
+ * missing binding never silently disables mastery. Set 'false' to fall back to
+ * the legacy inline path. Independent of LLM_ROUTING_V2_ENABLED.
  */
 export function isChallengeRoundGraderEnabled(
   value: string | undefined,
 ): boolean {
-  return value === 'true';
+  return value !== 'false';
 }
 
 /**
