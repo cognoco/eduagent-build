@@ -23,11 +23,12 @@ describe('deriveReviewOutcome', () => {
       expect(deriveReviewOutcome(null, 100)).toBe('first_time');
     });
 
-    it('returns first_time when repetitions === 0, regardless of other signals', () => {
+    it('returns first_time when repetitions === 0 and no failures, even with stale success signals', () => {
       expect(
         deriveReviewOutcome(
           card({
             repetitions: 0,
+            failureCount: 0,
             xpStatus: 'verified',
             consecutiveSuccesses: 3,
           }),
@@ -96,6 +97,18 @@ describe('deriveReviewOutcome', () => {
     it('returns wobbled when xpStatus is decayed', () => {
       expect(
         deriveReviewOutcome(card({ repetitions: 2, xpStatus: 'decayed' }), 3),
+      ).toBe('wobbled');
+    });
+
+    it('returns wobbled for a failed-only card (SM-2 reset repetitions to 0 but failureCount > 0)', () => {
+      // A learner who only ever missed this topic: SM-2 resets repetitions to 0
+      // on a failed recall (sm2: "quality 2 resets repetitions to 0"), so this
+      // must NOT short-circuit to first_time and lose the wobbled framing.
+      expect(
+        deriveReviewOutcome(
+          card({ repetitions: 0, failureCount: 1, xpStatus: 'decayed' }),
+          2,
+        ),
       ).toBe('wobbled');
     });
   });

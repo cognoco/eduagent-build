@@ -22,8 +22,6 @@ import {
 import type { RetentionState } from './retention';
 import type { ReviewCallback, ReviewOutcome } from './exchange-types';
 
-const DAY_MS = 1000 * 60 * 60 * 24;
-
 /** Beyond this gap the last outcome is too stale to claim — gentle re-entry. */
 const LONG_GAP_DAYS = 30;
 
@@ -37,7 +35,14 @@ export function deriveReviewOutcome(
   card: RetentionState | null,
   daysSinceLastReview: number | null,
 ): ReviewOutcome {
-  if (!card || card.repetitions === 0) return 'first_time';
+  // `first_time` means genuinely no recall history. A failed recall resets
+  // SM-2 `repetitions` to 0 (sm2: "quality 2 resets repetitions to 0"), so we
+  // must also require no failures here — otherwise a learner who only ever
+  // missed this topic would be mislabeled `first_time` and get neutral copy
+  // instead of the warmer `wobbled` pick-up-where-it-got-shaky framing.
+  if (!card || (card.repetitions === 0 && card.failureCount === 0)) {
+    return 'first_time';
+  }
   if (daysSinceLastReview !== null && daysSinceLastReview > LONG_GAP_DAYS) {
     return 'long_gap';
   }
@@ -77,14 +82,6 @@ export async function getReviewCallbackContext(
   );
   const outcome = deriveReviewOutcome(card, daysSinceLastReview);
 
-  const nextReviewMs = card?.nextReviewAt
-    ? new Date(card.nextReviewAt).getTime()
-    : null;
-  const daysOverdue =
-    nextReviewMs !== null && nextReviewMs < now.getTime()
-      ? Math.floor((now.getTime() - nextReviewMs) / DAY_MS)
-      : 0;
-
   let lastLearnerMessage: string | null = null;
   if (outcome === 'cracked') {
     const [last] = await db
@@ -106,7 +103,6 @@ export async function getReviewCallbackContext(
     topicTitle,
     outcome,
     daysSinceLastReview,
-    daysOverdue,
     lastLearnerMessage,
   };
 }

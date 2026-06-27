@@ -65,7 +65,6 @@
       "topicTitle": "Photosynthesis",
       "outcome": "cracked",
       "daysSinceLastReview": 16,
-      "daysOverdue": 3,
       "lastLearnerMessage": "plants turn sunlight into sugar using chlorophyll"
     }
   }

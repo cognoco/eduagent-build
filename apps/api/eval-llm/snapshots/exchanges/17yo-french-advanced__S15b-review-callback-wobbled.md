@@ -65,7 +65,6 @@
       "topicTitle": "Long division",
       "outcome": "wobbled",
       "daysSinceLastReview": 4,
-      "daysOverdue": 1,
       "lastLearnerMessage": null
     }
   }

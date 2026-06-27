@@ -3,8 +3,8 @@
  * learner quote (RR-1/RR-13 warm-review-callback).
  *
  * Tests three critical branches against a real database:
- *   1. cracked  — xpStatus='verified' card, daysOverdue >= 1, quote populated
- *                 from the most recent session_events user_message.
+ *   1. cracked  — xpStatus='verified' card, quote populated from the most
+ *                 recent session_events user_message.
  *   2. wobbled  — failureCount>0 card; quote NOT populated even though a
  *                 user_message exists (quote read is gated to the cracked branch).
  *   3. isolation — profile B calling with profile A's topicId gets first_time
@@ -201,12 +201,12 @@ afterAll(async () => {
 });
 
 describeIfDb('getReviewCallbackContext (integration) [RR-1/RR-13]', () => {
-  it('cracked: returns outcome=cracked, daysOverdue>=1, and lastLearnerMessage from session_events', async () => {
+  it('cracked: returns outcome=cracked and lastLearnerMessage from session_events', async () => {
     const seed = await seedTopicWithSession('cracked');
-    // Pin `now` so daysOverdue and daysSinceLastReview are deterministic.
+    // Pin `now` so daysSinceLastReview is deterministic.
     const now = new Date('2026-06-27T12:00:00Z');
     const lastReviewedAt = new Date('2026-06-25T12:00:00Z'); // 2 days before now
-    const nextReviewAt = new Date('2026-06-26T12:00:00Z'); // 1 day before now → 1 day overdue
+    const nextReviewAt = new Date('2026-06-26T12:00:00Z'); // 1 day before now
 
     await db.insert(retentionCards).values({
       profileId: seed.profileId,
@@ -239,7 +239,6 @@ describeIfDb('getReviewCallbackContext (integration) [RR-1/RR-13]', () => {
 
     expect(result.outcome).toBe('cracked');
     expect(result.lastLearnerMessage).toBe('mitochondria make ATP');
-    expect(result.daysOverdue).toBeGreaterThanOrEqual(1);
     expect(result.topicTitle).toBe('Cell Biology');
   });
 

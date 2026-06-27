@@ -59,7 +59,6 @@
       "topicTitle": "The water cycle",
       "outcome": "unknown",
       "daysSinceLastReview": 2,
-      "daysOverdue": 0,
       "lastLearnerMessage": null
     }
   }

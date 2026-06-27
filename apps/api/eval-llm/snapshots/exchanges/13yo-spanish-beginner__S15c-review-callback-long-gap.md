@@ -66,7 +66,6 @@
       "topicTitle": "Fractions",
       "outcome": "long_gap",
       "daysSinceLastReview": 40,
-      "daysOverdue": 12,
       "lastLearnerMessage": null
     }
   }

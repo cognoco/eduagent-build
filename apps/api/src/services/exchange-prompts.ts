@@ -495,6 +495,10 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
 }
 
 function buildReviewCallbackOpenerGuidance(cb: ReviewCallback): string {
+  // Topic titles are stored LLM-generated content — untrusted at the prompt
+  // boundary. Sanitize before interpolating into system-prompt guidance, same
+  // as `safeTopicTitle` does for the CALIBRATION line below (PROMPT-INJECT-4).
+  const title = sanitizeXmlValue(cb.topicTitle, 200);
   const gap =
     cb.daysSinceLastReview != null && cb.daysSinceLastReview >= 14
       ? ` It has been about ${cb.daysSinceLastReview} days.`
@@ -508,7 +512,7 @@ function buildReviewCallbackOpenerGuidance(cb: ReviewCallback): string {
     case 'cracked':
       return (
         base +
-        ` Last time, ${cb.topicTitle} clicked for them — frame this as checking whether it stuck (e.g. "Last time you had ${cb.topicTitle} down — let's see if it stuck").${gap}` +
+        ` Last time, ${title} clicked for them — frame this as checking whether it stuck (e.g. "Last time you had ${title} down — let's see if it stuck").${gap}` +
         (cb.lastLearnerMessage
           ? ` For your private grounding only — do NOT quote it or attribute exact words — their last message on this topic was: <last_message>${escapeXml(cb.lastLearnerMessage)}</last_message>.`
           : '')
@@ -516,19 +520,19 @@ function buildReviewCallbackOpenerGuidance(cb: ReviewCallback): string {
     case 'wobbled':
       return (
         base +
-        ` Last time, ${cb.topicTitle} was still settling — frame this warmly as picking up where it got shaky, never as a failure or a test.${gap}`
+        ` Last time, ${title} was still settling — frame this warmly as picking up where it got shaky, never as a failure or a test.${gap}`
       );
     case 'long_gap':
       return (
         base +
-        ` It has been a while since ${cb.topicTitle} — open gently ("it's been a bit since we did ${cb.topicTitle}"), no pressure, just see what they remember.${gap}`
+        ` It has been a while since ${title} — open gently ("it's been a bit since we did ${title}"), no pressure, just see what they remember.${gap}`
       );
     case 'first_time':
     case 'unknown':
     default:
       return (
         base +
-        ` You do not have a confident read on their last outcome for ${cb.topicTitle}. Use a safe neutral invitation ("Want to circle back to ${cb.topicTitle}?") and make NO claim about how they did before.`
+        ` You do not have a confident read on their last outcome for ${title}. Use a safe neutral invitation ("Want to circle back to ${title}?") and make NO claim about how they did before.`
       );
   }
 }

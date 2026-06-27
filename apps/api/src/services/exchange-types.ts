@@ -89,7 +89,6 @@ export interface ReviewCallback {
   topicTitle: string;
   outcome: ReviewOutcome;
   daysSinceLastReview: number | null;
-  daysOverdue: number;
   /**
    * Last learner message on this topic. Populated ONLY when outcome==='cracked';
    * used as PRIVATE grounding for the model, NEVER quoted verbatim (CH-1).
