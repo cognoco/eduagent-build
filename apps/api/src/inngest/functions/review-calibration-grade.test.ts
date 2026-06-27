@@ -59,6 +59,23 @@ function makeEu7SelectChain(rows: Array<Record<string, unknown>>) {
   return chain;
 }
 
+// Recursively search a value graph (e.g. a drizzle SQL condition) for a Date
+// whose ISO matches `iso`. Used to assert the EU-7 cap read is bounded by
+// lt(createdAt, eventAt) without coupling to drizzle's internal AST shape.
+function deepFindDateIso(
+  node: unknown,
+  iso: string,
+  seen = new Set<unknown>(),
+): boolean {
+  if (node instanceof Date) return node.toISOString() === iso;
+  if (node == null || typeof node !== 'object') return false;
+  if (seen.has(node)) return false;
+  seen.add(node);
+  return Object.values(node as Record<string, unknown>).some((v) =>
+    deepFindDateIso(v, iso, seen),
+  );
+}
+
 // Pattern A (jest.requireActual spread): only getStepDatabase is overridden —
 // it calls neon-serverless which needs a real DATABASE_URL, not exercisable in
 // Jest's Node env. The spread keeps every other helper export real, so no GC1
@@ -207,12 +224,17 @@ describe('reviewCalibrationGrade', () => {
       },
     );
 
-    expect(result).toMatchObject({
+    // Full shape (toEqual, not toMatchObject): a fresh card with 0 prior
+    // consecutive successes passing at quality 4 takes the success path with
+    // isDelayedRecall=false → xpChange:'none'. Asserting xpChange explicitly
+    // guards against a regression that returns 'decayed'/'verified' here.
+    expect(result).toEqual({
       sessionId: SESSION_ID,
       topicId: TOPIC_ID,
       quality: 4,
       verdict: 'solid',
       passed: true,
+      xpChange: 'none',
     });
     expect(runCalls).toHaveLength(5);
     // F-174: the cooldown claim MUST precede the paid LLM grade.
@@ -405,7 +427,8 @@ describe('reviewCalibrationGrade', () => {
     expect(runCalls.map((c) => c.name)).not.toContain(
       'finalize-retention-update',
     );
-    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThan(0);
+    // Exactly 1 update: the reschedule nudge (no SM-2 finalize).
+    expect((db.update as jest.Mock).mock.calls.length).toBe(1);
   });
 
   it('[T12] does NOT reschedule on a back-to-back (capped) fallback', async () => {
@@ -554,14 +577,13 @@ describe('reviewCalibrationGrade', () => {
   it('[T12] computes capped=true when the latest row is a prior fallback_heuristic', async () => {
     registerGrader('this is not valid grade json');
     const inserts: Array<{ table: unknown; v: unknown }> = [];
+    const eu7Chain = makeEu7SelectChain([{ gradedBy: 'fallback_heuristic' }]);
     const db = {
       ...makeInlineDbBase(inserts),
       select: jest
         .fn()
         .mockReturnValueOnce(makeTopicSelectChain(TOPIC_ROW))
-        .mockReturnValueOnce(
-          makeEu7SelectChain([{ gradedBy: 'fallback_heuristic' }]),
-        ),
+        .mockReturnValueOnce(eu7Chain),
     };
 
     const { result, rehydrateResult, runCalls } = await runWithInlineClosure({
@@ -573,6 +595,13 @@ describe('reviewCalibrationGrade', () => {
     });
 
     expect(rehydrateResult).toEqual({ outcome: 'fallback', capped: true });
+    // [EU-7 retry-idempotency] The cap read is bounded by lt(createdAt, eventAt)
+    // so a step retry can never see THIS invocation's own just-inserted fallback
+    // row and wrongly cap after one real failure. Dropping that bound removes
+    // EVENT_TS from the WHERE tree and breaks this assertion.
+    expect(deepFindDateIso(eu7Chain.where?.mock.calls[0]?.[0], EVENT_TS)).toBe(
+      true,
+    );
     // A fallback_heuristic row is still logged…
     const fbRow = inserts.find((i) => i.table === retrievalEvents);
     expect((fbRow!.v as Record<string, unknown>).gradedBy).toBe(
@@ -607,7 +636,8 @@ describe('reviewCalibrationGrade', () => {
 
     expect(rehydrateResult).toEqual({ outcome: 'fallback', capped: false });
     expect(runCalls).toContain('reschedule-after-grader-failure');
-    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThan(0);
+    // Exactly 1 update: the reschedule nudge (no SM-2 finalize).
+    expect((db.update as jest.Mock).mock.calls.length).toBe(1);
     expect(result).toEqual({
       skipped: 'grader_unavailable',
       sessionId: SESSION_ID,

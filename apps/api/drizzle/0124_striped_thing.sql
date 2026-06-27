@@ -26,4 +26,6 @@ ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_subject_id_subje
 ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_session_id_learning_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."learning_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "retrieval_events_profile_topic_idx" ON "retrieval_events" USING btree ("profile_id","topic_id");--> statement-breakpoint
-CREATE INDEX "retrieval_events_profile_created_idx" ON "retrieval_events" USING btree ("profile_id","created_at");
+CREATE INDEX "retrieval_events_profile_created_idx" ON "retrieval_events" USING btree ("profile_id","created_at");--> statement-breakpoint
+ALTER TABLE "retrieval_events" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE POLICY "retrieval_events_profile_isolation" ON "retrieval_events" USING ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid) WITH CHECK ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);

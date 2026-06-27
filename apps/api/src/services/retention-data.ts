@@ -29,6 +29,7 @@ import {
   sessionSummaries,
   assessments,
   createScopedRepository,
+  retrievalVerdictEnum,
   type Database,
 } from '@eduagent/database';
 import { MIN_EXCHANGES_FOR_TOPIC_COMPLETION } from '@eduagent/schemas';
@@ -38,6 +39,7 @@ import {
   recordRetrievalEvent,
   type RecallGrade,
   type RetrievalNextAction,
+  type RetrievalVerdict,
 } from './retrieval-events';
 import { UpstreamLlmError } from '../errors';
 import type {
@@ -70,6 +72,7 @@ import {
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { NotFoundError } from '../errors';
+import { captureException } from './sentry';
 import { createLogger } from './logger';
 import {
   assertOwnedCurriculumTopic,
@@ -151,12 +154,44 @@ Also classify the answer:
 Respond with ONLY a JSON object, no prose or code fences:
 {"quality": <0-5 integer>, "verdict": "solid"|"partial"|"missing"|"misconception", "rationale": "<one sentence>", "misconception": <string or null>}`;
 
-const recallGradeJsonSchema = z.object({
-  quality: z.number().int().min(0).max(5),
-  verdict: z.enum(['solid', 'partial', 'missing', 'misconception']),
-  rationale: z.string().nullish(),
-  misconception: z.string().nullish(),
-});
+// [Review High 4] A graded recall must be INTERNALLY CONSISTENT. The SM-2 pass
+// threshold is quality >= 3, so a verdict that means "the learner did NOT
+// recall" ("missing" / "misconception") must never ride a passing score, and
+// "solid" must never ride a near-blackout — otherwise the grader could advance
+// SM-2 (e.g. quality:5 + verdict:"misconception") on an answer it just judged
+// wrong. One rung of fuzz is allowed at band edges (the prompt's own bands
+// overlap). An inconsistent pair fails the schema → parseRecallGradeJson
+// returns null → the honest fallback path runs (no SM-2 advance, retryable
+// error), never fabricated progress.
+export function isRecallGradeConsistent(
+  quality: number,
+  verdict: RetrievalVerdict,
+): boolean {
+  switch (verdict) {
+    case 'solid':
+      return quality >= 3;
+    case 'partial':
+      return quality >= 1 && quality <= 4;
+    case 'missing':
+      return quality <= 2;
+    case 'misconception':
+      return quality <= 2;
+  }
+}
+
+// Exported so the eval harness validates live grader responses against the EXACT
+// contract processRecallTest enforces — one source of truth, no drift mirror.
+export const recallGradeJsonSchema = z
+  .object({
+    quality: z.number().int().min(0).max(5),
+    verdict: z.enum(retrievalVerdictEnum.enumValues),
+    rationale: z.string().nullish(),
+    misconception: z.string().nullish(),
+  })
+  .refine((g) => isRecallGradeConsistent(g.quality, g.verdict), {
+    message:
+      'verdict/quality inconsistent — a failing verdict cannot carry a passing SM-2 score (or vice versa)',
+  });
 
 /**
  * Parse the grader's JSON envelope. Tolerates surrounding prose / code fences
@@ -959,15 +994,30 @@ export async function processRecallTest(
   if (!grade.graded) {
     // [C-2] Grader unavailable: release the cooldown claim so the learner can
     // retry immediately. Guard on claimNow so a concurrent writer's row is not
-    // clobbered.
-    await applyRetentionUpdate({
-      db,
-      profileId,
-      cardId: effectiveCard.id,
-      set: { lastReviewedAt: priorLastReviewedAt },
-      guard: { kind: 'updatedAtEquals', updatedAt: claimNow },
-      updatedAt: new Date(),
-    });
+    // clobbered. The release is BEST-EFFORT: if it throws (transient DB error)
+    // we must NOT let that swallow the grader-unavailable signal — the honest
+    // fallback row and the retryable UpstreamLlmError below have to run
+    // regardless, so we capture the restore failure and fall through. Worst
+    // case the learner waits out the 24h cooldown instead of seeing a raw 500.
+    try {
+      await applyRetentionUpdate({
+        db,
+        profileId,
+        cardId: effectiveCard.id,
+        set: { lastReviewedAt: priorLastReviewedAt },
+        guard: { kind: 'updatedAtEquals', updatedAt: claimNow },
+        updatedAt: new Date(),
+      });
+    } catch (restoreError) {
+      captureException(restoreError, {
+        tags: { area: 'recall', op: 'cooldown_restore' },
+        extra: { profileId, topicId: input.topicId },
+      });
+      logger.error(
+        '[recall] failed to release cooldown claim after grader failure',
+        { profileId, topicId: input.topicId },
+      );
+    }
 
     // Honest log row — no SM-2 mutation, no advancing score.
     await safeWrite(

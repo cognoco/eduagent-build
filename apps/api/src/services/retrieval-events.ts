@@ -7,21 +7,23 @@
 // fallback explicitly instead of advancing SM-2 on a fabricated number.
 // ---------------------------------------------------------------------------
 
-import { retrievalEvents, type Database } from '@eduagent/database';
+import {
+  retrievalEvents,
+  retrievalGraderEnum,
+  retrievalNextActionEnum,
+  retrievalVerdictEnum,
+  type Database,
+} from '@eduagent/database';
 
-export type RetrievalVerdict =
-  | 'solid'
-  | 'partial'
-  | 'missing'
-  | 'misconception';
+// Single-source the union types from the pgEnum tuples so adding a value to the
+// schema can never silently drift from this service (the old hand-typed copies
+// only surfaced a mismatch at runtime when the DB rejected the value).
+export type RetrievalVerdict = (typeof retrievalVerdictEnum.enumValues)[number];
 
 export type RetrievalNextAction =
-  | 'advance'
-  | 'reschedule_soon'
-  | 'relearn'
-  | 'redirect_to_library';
+  (typeof retrievalNextActionEnum.enumValues)[number];
 
-export type RetrievalGrader = 'llm' | 'fallback_heuristic';
+export type RetrievalGrader = (typeof retrievalGraderEnum.enumValues)[number];
 
 /**
  * The outcome of grading a recall answer.

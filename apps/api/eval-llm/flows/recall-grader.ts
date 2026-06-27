@@ -1,5 +1,7 @@
-import { z } from 'zod';
-import { buildRecallGradeMessages } from '../../src/services/retention-data';
+import {
+  buildRecallGradeMessages,
+  recallGradeJsonSchema,
+} from '../../src/services/retention-data';
 import { getTextContent } from '../../src/services/llm/types';
 import type { EvalProfile } from '../fixtures/profiles';
 import { callLlm } from '../runner/llm-bootstrap';
@@ -11,23 +13,17 @@ interface RecallGraderInput {
   answer: string;
 }
 
-// Mirrors recallGradeJsonSchema in services/retention-data.ts — the contract
-// the grader's JSON response must satisfy so processRecallTest can advance SM-2
-// honestly (Flow 2 / RR-9 / T4). A response that drifts from this shape would
-// fall back to fallback_heuristic in production, so the eval guards it.
-const recallGraderResponseSchema = z.object({
-  quality: z.number().int().min(0).max(5),
-  verdict: z.enum(['solid', 'partial', 'missing', 'misconception']),
-  rationale: z.string().nullish(),
-  misconception: z.string().nullish(),
-});
-
+// expectedResponseSchema is the SAME schema processRecallTest enforces
+// (imported from services/retention-data.ts — no drift mirror). A live grader
+// response that drifts from this shape OR is internally inconsistent
+// (verdict/quality mismatch) falls back to fallback_heuristic in production, so
+// the eval guards the exact contract. (Flow 2 / RR-9 / T4.)
 export const recallGraderFlow: FlowDefinition<RecallGraderInput> = {
   id: 'recall-grader',
   name: 'Recall Grader',
   sourceFile:
     'apps/api/src/services/retention-data.ts:buildRecallGradeMessages',
-  expectedResponseSchema: recallGraderResponseSchema,
+  expectedResponseSchema: recallGradeJsonSchema,
 
   buildPromptInput(profile: EvalProfile): RecallGraderInput {
     const topic = profile.libraryTopics[0] ?? 'Current topic';

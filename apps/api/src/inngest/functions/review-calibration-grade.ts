@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import {
   createScopedRepository,
   retentionCards,
@@ -161,7 +161,11 @@ export async function handleReviewCalibrationGrade({
       if (!grade.graded) {
         // [T12 / EU-7] Was the previous attempt on this topic ALSO a grader
         // failure? If so, cap: do not reschedule again so a flaky grader can't
-        // trap a topic in a daily re-ask loop. Read BEFORE recording this row.
+        // trap a topic in a daily re-ask loop. Read BEFORE recording this row,
+        // AND only rows strictly before this invocation's eventAt — the step is
+        // retried on crash, so an unfiltered "latest row" read could otherwise
+        // see THIS run's own just-inserted fallback row after a partial failure
+        // and wrongly cap after a single real failure.
         const [previous] = await db
           .select({ gradedBy: retrievalEvents.gradedBy })
           .from(retrievalEvents)
@@ -169,6 +173,7 @@ export async function handleReviewCalibrationGrade({
             and(
               eq(retrievalEvents.profileId, profileId),
               eq(retrievalEvents.topicId, topicId),
+              lt(retrievalEvents.createdAt, eventAt),
             ),
           )
           .orderBy(desc(retrievalEvents.createdAt))

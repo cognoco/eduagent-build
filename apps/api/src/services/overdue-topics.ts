@@ -131,9 +131,14 @@ export async function getOverdueTopicsGrouped(
     .limit(500);
 
   // [Flow 3 / RR-10 / T10] Flagged-weak topics (needs_deepening_topics, status
-  // active/pending_review). Scoped two ways: the row's own profileId AND the
-  // sanctioned parent-chain join enforcing subjects.profileId = profileId, so a
-  // sibling profile's flagged topics can never leak into this queue.
+  // active/pending_review). Scoped through the full topic parent chain so a
+  // foreign topic title can never leak: the topic's real owning subject (via
+  // books + curricula) must equal the needs_deepening row's subjectId AND be
+  // owned by profileId. needs_deepening_topics carries an independent topicId FK
+  // (assessments.ts), so a corrupt/stale row with the caller's profileId +
+  // subjectId but another profile's topicId would otherwise pull that profile's
+  // curriculumTopics.title. Verifying curriculumTopics → books/curricula →
+  // subjects (matching the overdue query above) closes that gap.
   const flaggedRows = await db
     .select({
       topicId: needsDeepeningTopics.topicId,
@@ -148,9 +153,13 @@ export async function getOverdueTopicsGrouped(
       curriculumTopics,
       eq(curriculumTopics.id, needsDeepeningTopics.topicId),
     )
+    .innerJoin(curriculumBooks, eq(curriculumBooks.id, curriculumTopics.bookId))
+    .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
     .innerJoin(
       subjects,
       and(
+        eq(subjects.id, curriculumBooks.subjectId),
+        eq(subjects.id, curricula.subjectId),
         eq(subjects.id, needsDeepeningTopics.subjectId),
         eq(subjects.profileId, profileId),
       ),

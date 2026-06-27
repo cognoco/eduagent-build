@@ -33,6 +33,10 @@ export const retrievalVerdictEnum = pgEnum('retrieval_verdict', [
 export const retrievalNextActionEnum = pgEnum('retrieval_next_action', [
   'advance',
   'reschedule_soon',
+  // Reserved forward-compat value: no producer yet. The current write sites
+  // (retention-data.ts, review-calibration-grade.ts) only ever emit the other
+  // three. A future relearn-routing flow (RR queue → dedicated relearn action)
+  // will activate it; kept in the enum now so that flow needs no DB migration.
   'relearn',
   'redirect_to_library',
 ]);
@@ -93,4 +97,4 @@ export const retrievalEvents = pgTable(
       table.createdAt,
     ),
   ],
-);
+).enableRLS();

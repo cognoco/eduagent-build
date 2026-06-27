@@ -59,7 +59,7 @@ function createMockDb(options: {
   // Order of select() calls in getOverdueTopicsGrouped:
   // 1. count(*) for totalOverdue
   // 2. retentionCards ⋈ curriculumTopics ⋈ curricula ⋈ subjects (scoped display rows)
-  // 3. needs_deepening_topics ⋈ curriculumTopics ⋈ subjects (flagged-weak rows)
+  // 3. needs_deepening_topics ⋈ curriculumTopics ⋈ books ⋈ curricula ⋈ subjects (flagged-weak rows)
   const totalOverdueRows =
     options.totalOverdue != null ? [{ count: options.totalOverdue }] : [];
   const topicById = new Map((options.topicsRows ?? []).map((t) => [t.id, t]));
@@ -687,15 +687,16 @@ describe('getOverdueTopicsGrouped', () => {
 
       await getOverdueTopicsGrouped(db, profileId);
 
-      // The flagged read joins curriculum_topics + subjects (parent chain) and
-      // filters on the caller's profileId. A regression that drops the
-      // subjects.profileId join or the row-level profileId filter — the only
-      // things keeping a sibling profile's flagged topics out — breaks this.
-      expect(flaggedChain.innerJoin).toHaveBeenCalledTimes(2);
+      // The flagged read joins the full topic parent chain (curriculum_topics →
+      // books → curricula → subjects) and filters on the caller's profileId. A
+      // regression that drops the subjects.profileId join or the row-level
+      // profileId filter — the only things keeping a sibling profile's flagged
+      // topics out — breaks this. The subjects join is the 4th innerJoin.
+      expect(flaggedChain.innerJoin).toHaveBeenCalledTimes(4);
       expect(flaggedChain.where).toHaveBeenCalledTimes(1);
 
       const whereArg = flaggedChain.where.mock.calls[0]?.[0];
-      const subjectsJoinArg = flaggedChain.innerJoin.mock.calls[1]?.[1];
+      const subjectsJoinArg = flaggedChain.innerJoin.mock.calls[3]?.[1];
       expect(deepIncludesValue(whereArg, profileId)).toBe(true);
       expect(deepIncludesValue(subjectsJoinArg, profileId)).toBe(true);
       expect(deepIncludesValue(whereArg, FOREIGN_PROFILE)).toBe(false);

@@ -630,6 +630,62 @@ describe('processRecallTest', () => {
 
     // Honest contract: the SM-2 algorithm must NOT run on an ungraded recall.
     expect(processRecallResult).not.toHaveBeenCalled();
+
+    // …and the fallback path is not just a throw — before throwing it must:
+    // (a) write an honest fallback_heuristic recall-log row, and
+    // (b) RELEASE the cooldown claim (a second db.update restoring
+    //     lastReviewedAt) so the learner can retry immediately rather than
+    //     being locked out for 24h. [C-2 / Review P2]
+    const insertedTables = (db.insert as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(insertedTables).toContain(retrievalEvents);
+    // Exactly 2 updates: the pre-LLM cooldown claim + the post-failure restore.
+    expect((db.update as jest.Mock).mock.calls.length).toBe(2);
+  });
+
+  // [Flow 2 / T5 / C-2] Restore path is failure-safe: when the restore update
+  // itself throws (transient DB error), the honest fallback row must still be
+  // written and UpstreamLlmError must still propagate. Worst case the learner
+  // waits out the 24h cooldown; no raw DB error is surfaced instead.
+  it('[T5] [C-2] when the cooldown restore throws, fallback row is still inserted and UpstreamLlmError still thrown', async () => {
+    // Unparseable grader reply → evaluateRecallQuality returns { graded: false }.
+    registerJsonGrader('I think that answer was pretty good, maybe a 4?');
+
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+    const db = createMockDb();
+
+    // Override db.update: call #1 (cooldown claim) succeeds; call #2 (restore)
+    // rejects. The try/catch in processRecallTest must swallow the restore
+    // failure and still fall through to record the fallback row + throw.
+    let updateCallIndex = 0;
+    (db.update as jest.Mock).mockImplementation(() => {
+      const thisCallIndex = ++updateCallIndex;
+      return {
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation(() => {
+            const p = Promise.resolve(undefined);
+            (p as unknown as Record<string, unknown>).returning =
+              thisCallIndex === 2
+                ? jest.fn().mockRejectedValue(new Error('transient DB error'))
+                : jest.fn().mockResolvedValue([{ id: 'card-1' }]);
+            return p;
+          }),
+        }),
+      };
+    });
+
+    await expect(
+      processRecallTest(db, profileId, {
+        topicId,
+        answer: 'A'.repeat(60),
+      }),
+    ).rejects.toThrow(UpstreamLlmError);
+
+    // SM-2 must not run on an ungraded recall.
+    expect(processRecallResult).not.toHaveBeenCalled();
+    // Honest fallback row must be written even though the restore threw.
+    const insertedTables = (db.insert as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(insertedTables).toContain(retrievalEvents);
   });
 
   // [BUG-657 / FCR-2026-05-23-L3.M3.3] Break test: the topic ownership check
@@ -2347,9 +2403,44 @@ describe('evaluateRecallQuality', () => {
     expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 
-  it('returns an honest fallback when quality is out of range', async () => {
+  it('returns an honest fallback when quality is above range', async () => {
     registerGrader(
       '{"quality": 7, "verdict": "solid", "rationale": "x", "misconception": null}',
+    );
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+  });
+
+  it('returns an honest fallback when quality is below range (negative)', async () => {
+    registerGrader(
+      '{"quality": -1, "verdict": "missing", "rationale": "x", "misconception": null}',
+    );
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+  });
+
+  it('returns an honest fallback when verdict and quality are inconsistent', async () => {
+    // [Review High 4] quality:5 + verdict:"misconception" is internally
+    // contradictory — a passing SM-2 score under a failing verdict. The schema
+    // refinement rejects it so the grader can never advance SM-2 on an answer
+    // it just judged a misconception; the caller falls back honestly instead.
+    registerGrader(
+      '{"quality": 5, "verdict": "misconception", "rationale": "x", "misconception": "thinks mass and weight are identical"}',
+    );
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+  });
+
+  it('returns an honest fallback when quality is zero but verdict claims solid (reverse inconsistency)', async () => {
+    // [Review High 4 / reverse] quality:0 + verdict:"solid" is the mirror
+    // contradiction — a blackout score paired with a passing verdict. Both
+    // directions of the inconsistency must be caught so the grader cannot
+    // sneak through either flavour of contradictory output.
+    registerGrader(
+      '{"quality": 0, "verdict": "solid", "rationale": "x", "misconception": null}',
     );
 
     const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');

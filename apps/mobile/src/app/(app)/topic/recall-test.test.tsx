@@ -561,7 +561,8 @@ describe('RecallTestScreen', () => {
     await waitFor(() => {
       screen.getByTestId('recall-test-grading-unavailable');
     });
-    expect(screen.getByText(/couldn't check it just now/)).toBeTruthy();
+    // getByText throws if absent — it is itself the assertion (no toBeTruthy).
+    screen.getByText(/couldn't check it just now/);
 
     // The answer was submitted once and the typed text is preserved for retry.
     expect(mockRecallMutate).toHaveBeenCalledTimes(1);
