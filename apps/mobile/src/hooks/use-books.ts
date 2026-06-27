@@ -52,7 +52,7 @@ export function useBooks(
           'books',
           activeProfile.id,
         ]);
-      return cachedLibrary?.subjects.find((s) => s.subjectId === subjectId)
+      return cachedLibrary?.subjects?.find((s) => s.subjectId === subjectId)
         ?.books;
     },
     queryFn: async ({ signal: querySignal }) => {
