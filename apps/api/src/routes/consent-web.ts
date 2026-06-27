@@ -596,7 +596,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
              </a>
              ${
                withdrawalUrl
-                 ? `<p class="info">To withdraw your consent at any time, use the link we just emailed you — or <a href="${withdrawalUrl}" style="color:${BRAND_COLOR_PRIMARY};">this link</a>.</p>`
+                 ? `<p class="info">To withdraw your consent at any time, use the link we just emailed you — or <a href="${escapeHtml(
+                     withdrawalUrl,
+                   )}" style="color:${BRAND_COLOR_PRIMARY};">this link</a>.</p>`
                  : ''
              }
              <p class="info">You may now close this tab.</p>

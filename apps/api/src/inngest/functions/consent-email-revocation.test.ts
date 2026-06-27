@@ -43,7 +43,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 const mockIsConsentRevocationGenerationCurrentV2 = jest.fn();
 const mockGetPersonDisplayNameV2 = jest.fn();
 jest.mock(
-  '../../services/identity-v2/consent-v2' /* gc1-allow: pattern-a conversion — DB-backed */,
+  '../../services/identity-v2/consent-v2' /* gc1-allow: isConsentRevocationGenerationCurrentV2 / getPersonDisplayNameV2 issue scoped drizzle multi-join queries against the Neon DB; the createMockDb() proxy cannot emulate those query chains, so the real functions cannot run in this Jest environment */,
   () => {
     const actual = jest.requireActual(
       '../../services/identity-v2/consent-v2',
@@ -579,6 +579,21 @@ describe('malformed consent.email-revoked payload — NonRetriableError guard', 
       executeEmailRevocation({
         chargePersonId: 'charge-001',
         // revokedAt intentionally omitted — this is the malformed case
+      }),
+    ).rejects.toThrow(NonRetriableError);
+
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
+  });
+
+  it('throws NonRetriableError when revokedAt is not a valid ISO datetime', async () => {
+    // Regression guard: a non-ISO revokedAt (e.g. "bad") parses to an Invalid
+    // Date, which would null out revocationRespondedAt and make the generation
+    // guard vacuously report "restored" — silently aborting the GDPR cascade
+    // delete. The z.string().datetime() schema must reject it at the boundary.
+    await expect(
+      executeEmailRevocation({
+        chargePersonId: 'charge-001',
+        revokedAt: 'not-an-iso-datetime',
       }),
     ).rejects.toThrow(NonRetriableError);
 

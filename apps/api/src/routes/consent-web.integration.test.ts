@@ -24,6 +24,7 @@ import {
   profiles,
   consentStates,
   consentGrant,
+  consentRequest,
   membership,
   organization,
   person,
@@ -38,6 +39,11 @@ import {
   signWithdrawalToken,
   verifyWithdrawalToken,
 } from '../services/consent-withdrawal-token';
+import {
+  createPendingConsentRequest,
+  requestConsentV2,
+} from '../services/identity-v2/consent-v2';
+import * as emailModule from '../services/notifications/email';
 
 // ---------------------------------------------------------------------------
 // DB setup — mirrors pattern from consent.integration.test.ts
@@ -960,5 +966,177 @@ describe('P0 email-parent withdrawal/restore (identity-v2)', () => {
       chargePersonId: childId,
       organizationId: orgId,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 7: POST /consent-page/confirm — approval mints the withdrawal email
+// (identity-v2). Spec §8: on v2 approval the route must email the parent a
+// `consent_approved` message carrying a durable, signed withdrawal link
+// (MMT-ADR-0027). This is the *origin* of the bearer token that Suite 6
+// exercises — verify the confirm route produces a link that round-trips
+// through verifyWithdrawalToken to the seeded (child × org).
+//
+// Email delivery (Resend HTTP) is a true external boundary, so spying on
+// sendEmail is GC1/GC6-clean. Everything else — the real Hono app, the v2
+// consent service, the token signer — runs for real.
+// ---------------------------------------------------------------------------
+
+const CONFIRM_ENV: Record<string, string> = {
+  ...buildEnv(),
+  IDENTITY_V2_ENABLED: 'true',
+  CONSENT_WITHDRAWAL_TOKEN_SECRET: WITHDRAW_SECRET,
+  API_ORIGIN: 'https://api.test',
+};
+
+/** Extracts the first http(s) URL embedded in an email body. */
+function extractUrl(body: string): string {
+  const match = body.match(/https?:\/\/\S+/);
+  if (!match) throw new Error(`no URL found in email body: ${body}`);
+  return match[0];
+}
+
+describe('POST /v1/consent-page/confirm — approval mints withdrawal email (identity-v2)', () => {
+  const v2OrgIds: string[] = [];
+  const v2PersonIds: string[] = [];
+
+  beforeEach(() => {
+    const { __resetConsentRespondRateLimit } = jest.requireActual(
+      './consent',
+    ) as {
+      __resetConsentRespondRateLimit: () => void;
+    };
+    __resetConsentRespondRateLimit();
+    v2OrgIds.length = 0;
+    v2PersonIds.length = 0;
+  });
+
+  afterEach(async () => {
+    const db = createIntegrationDb();
+    for (const pid of v2PersonIds) {
+      // consent_request back-links consent_grant (consent_grant_id FK), so the
+      // request rows must be cleared before the grants they reference.
+      await db
+        .delete(consentRequest)
+        .where(eq(consentRequest.chargePersonId, pid));
+      await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of v2OrgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+  });
+
+  // Seeds the pending v2 consent request the email-parent would receive, and
+  // returns its (request) token plus the seeded child × org.
+  async function seedPendingRequest(opts: {
+    displayName: string;
+  }): Promise<{ orgId: string; childId: string; token: string }> {
+    const db = createIntegrationDb();
+    const [org] = await db
+      .insert(organization)
+      .values({ name: 'Confirm Org' })
+      .returning();
+    v2OrgIds.push(org!.id);
+    const [p] = await db
+      .insert(person)
+      .values({
+        displayName: opts.displayName,
+        birthDate: '2013-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    v2PersonIds.push(p!.id);
+    await db.insert(membership).values({
+      personId: p!.id,
+      organizationId: org!.id,
+      roles: ['learner'],
+    });
+    await createPendingConsentRequest(db, p!.id, org!.id, 'GDPR');
+    await requestConsentV2(db, {
+      chargePersonId: p!.id,
+      organizationId: org!.id,
+      consentType: 'GDPR',
+      guardianEmail: 'parent@example.com',
+      childName: opts.displayName,
+      appUrl: 'https://api.test',
+    });
+    const req = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, p!.id),
+    });
+    return { orgId: org!.id, childId: p!.id, token: req!.token! };
+  }
+
+  function postConfirm(
+    fields: Record<string, string>,
+    env: Record<string, string>,
+  ): Promise<Response> {
+    return app.request(
+      '/v1/consent-page/confirm',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(fields).toString(),
+      },
+      env,
+    ) as Promise<Response>;
+  }
+
+  it('approval emails a consent_approved link that verifyWithdrawalToken resolves to the seeded child', async () => {
+    const { orgId, childId, token } = await seedPendingRequest({
+      displayName: 'Quinn',
+    });
+    // Spy AFTER seeding so only the confirm-path send is captured (the v2
+    // service seeds purely via DB and sends no email itself).
+    const emailSpy = jest
+      .spyOn(emailModule, 'sendEmail')
+      .mockResolvedValue({ sent: true } as never);
+    try {
+      const res = await postConfirm({ token, approved: 'true' }, CONFIRM_ENV);
+      expect(res.status).toBe(200);
+
+      // The send is fire-and-forget (no executionCtx in the test runtime),
+      // so flush the microtask queue before asserting.
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(emailSpy).toHaveBeenCalledTimes(1);
+      const payload = emailSpy.mock.calls[0]![0] as emailModule.EmailPayload;
+      expect(payload.type).toBe('consent_approved');
+      expect(payload.to).toBe('parent@example.com');
+
+      const withdrawalUrl = extractUrl(payload.body);
+      const urlToken = new URL(withdrawalUrl).searchParams.get('token');
+      expect(urlToken).toBeTruthy();
+      expect(verifyWithdrawalToken(urlToken!, WITHDRAW_SECRET)).toEqual({
+        chargePersonId: childId,
+        organizationId: orgId,
+      });
+    } finally {
+      emailSpy.mockRestore();
+    }
+  });
+
+  it('approval still succeeds (200, no email) when the withdrawal-token secret is absent', async () => {
+    const { token } = await seedPendingRequest({ displayName: 'Riley' });
+    const emailSpy = jest
+      .spyOn(emailModule, 'sendEmail')
+      .mockResolvedValue({ sent: true } as never);
+    try {
+      // No CONSENT_WITHDRAWAL_TOKEN_SECRET / API_ORIGIN — the link cannot be
+      // minted, but the already-committed approval must never 500.
+      const res = await postConfirm(
+        { token, approved: 'true' },
+        { ...buildEnv(), IDENTITY_V2_ENABLED: 'true' },
+      );
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('Family account ready');
+
+      await new Promise((r) => setTimeout(r, 50));
+      expect(emailSpy).not.toHaveBeenCalled();
+    } finally {
+      emailSpy.mockRestore();
+    }
   });
 });

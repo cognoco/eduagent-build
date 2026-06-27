@@ -30,9 +30,14 @@ import { safeSend } from '../../services/safe-non-core';
 // Schema for the app/consent.email-revoked event payload.
 // Both chargePersonId and revokedAt are required — a missing revokedAt
 // would allow the generation guard to vacuously authorize cascade deletion.
+// revokedAt must be a valid ISO-8601 datetime: a non-ISO string (e.g. "bad")
+// parses to an Invalid Date, which would null out revocationRespondedAt and
+// make the generation guard vacuously report "restored" — silently aborting
+// the GDPR cascade delete. Rejecting at the schema boundary makes that a
+// NonRetriableError instead of a silent data-integrity failure.
 const consentEmailRevokedEventSchema = z.object({
   chargePersonId: z.string().min(1),
-  revokedAt: z.string().min(1),
+  revokedAt: z.string().datetime(),
 });
 
 export const consentEmailRevocation = inngest.createFunction(
@@ -114,12 +119,9 @@ export const consentEmailRevocation = inngest.createFunction(
       );
     }
     const { chargePersonId, revokedAt } = parsed.data;
-    const revokedAtDate =
-      typeof revokedAt === 'string' ? new Date(revokedAt) : undefined;
-    const revocationRespondedAt =
-      revokedAtDate && !Number.isNaN(revokedAtDate.getTime())
-        ? revokedAtDate
-        : undefined;
+    // revokedAt is schema-validated as ISO-8601 above, so new Date() is always
+    // a valid Date here — no NaN guard needed.
+    const revocationRespondedAt = new Date(revokedAt);
 
     // This path is identity-v2 ONLY — no legacy/v1 branch. The email-parent
     // consent flow only exists in the v2 (consent_grants / persons) world.
