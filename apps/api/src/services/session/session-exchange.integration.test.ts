@@ -62,7 +62,6 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
-  _clearProviders,
   _resetCircuits,
   registerProvider,
   unregisterProvider,
@@ -117,34 +116,46 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
 });
 
 /**
- * Tutor envelope for the flag=OFF inline path — includes a solid
- * `challengeRoundEvaluation` so the inline path can advance the state machine.
+ * Tutor envelope for the flag=OFF inline path — carries a solid inline
+ * `challenge_round_evaluation` so the legacy path advances the state machine.
+ *
+ * The eval item MUST reference a real `user_message` event id: the server's
+ * `validateEvaluationEventIds` re-reads every `answerEventId` from
+ * `session_events` (scoped to the session, `eventType = 'user_message'`) and
+ * REJECTS any item whose id is not found — so a missing `answerEventId` is
+ * silently dropped and the round never advances (evaluation.ts §[#477]). The
+ * caller seeds that answer event with a known id and passes it here.
  */
-const TUTOR_ENVELOPE_WITH_EVAL = JSON.stringify({
-  reply: 'Correct! Now explain the inputs to photosynthesis.',
-  signals: {
-    partial_progress: false,
-    needs_deepening: false,
-    understanding_check: false,
-    ready_to_finish: false,
-    challenge_round_evaluation: [
-      {
-        concept: 'photosynthesis',
-        result: 'solid',
-        evidence: 'Learner explained clearly.',
-        learnerQuote: 'Plants use CO2, water, and sunlight.',
-      },
-    ],
-  },
-  ui_hints: {
-    note_prompt: { show: false, post_session: false },
-  },
-  private_sources: {
-    relied_on: ['conversation_history'],
-    insufficient: false,
-    reason: 'test envelope with eval',
-  },
-});
+function tutorEnvelopeWithEval(answerEventId: string): string {
+  return JSON.stringify({
+    reply: 'Correct! Now explain the inputs to photosynthesis.',
+    signals: {
+      partial_progress: false,
+      needs_deepening: false,
+      understanding_check: false,
+      ready_to_finish: false,
+      challenge_round_evaluation: [
+        {
+          concept: 'photosynthesis',
+          result: 'solid',
+          evidence: 'Learner explained clearly.',
+          // learnerQuote is replaced server-side with the event's content;
+          // matched here for readability.
+          learnerQuote: 'The light reactions and the Calvin cycle.',
+          answerEventId,
+        },
+      ],
+    },
+    ui_hints: {
+      note_prompt: { show: false, post_session: false },
+    },
+    private_sources: {
+      relied_on: ['conversation_history'],
+      insufficient: false,
+      reason: 'test envelope with eval',
+    },
+  });
+}
 
 /** Solid grader verdict — matches the `challengeRoundGraderVerdictSchema`. */
 const GRADER_VERDICT_SOLID = JSON.stringify({
@@ -182,7 +193,7 @@ function isGraderMessages(messages: ChatMessage[]): boolean {
   );
 }
 
-function registerBranchingLlm() {
+function createBranchingLlm() {
   let tutorResponse = TUTOR_ENVELOPE_NO_EVAL;
   let graderResponse = GRADER_VERDICT_SOLID;
   const calls: ChatMessage[][] = [];
@@ -217,9 +228,15 @@ function registerBranchingLlm() {
     },
   }));
 
-  providers.forEach(registerProvider);
-
   return {
+    // Register inside beforeAll (NOT at module load): the router's provider
+    // registry is a shared singleton and the integration suite runs serially
+    // in ONE worker (jest.integration.config.cjs: maxWorkers:1, no
+    // resetModules). Module-level registration would pollute every other
+    // suite's LLM calls. Mirrors the session-summary.integration.test pattern.
+    register(): void {
+      providers.forEach(registerProvider);
+    },
     setTutorResponse(content: string): void {
       tutorResponse = content;
     },
@@ -234,13 +251,15 @@ function registerBranchingLlm() {
       graderResponse = GRADER_VERDICT_SOLID;
       calls.length = 0;
     },
+    // Unregister ONLY our own provider ids — never _clearProviders(), which
+    // would wipe providers other suites in the same worker depend on.
     dispose(): void {
       providers.forEach((p) => unregisterProvider(p.id));
     },
   };
 }
 
-const llm = registerBranchingLlm();
+const llm = createBranchingLlm();
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -464,6 +483,7 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
 
   beforeAll(() => {
     db = createDatabase(process.env.DATABASE_URL!);
+    llm.register();
   });
 
   afterAll(async () => {
@@ -471,9 +491,9 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
     await db
       .delete(accounts)
       .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+    // Unregister only our providers — leave the shared registry intact for
+    // other suites in this worker.
     llm.dispose();
-    _clearProviders();
-    _resetCircuits();
   });
 
   beforeEach(() => {
@@ -594,8 +614,23 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
       'What are the two main stages of photosynthesis?',
     );
 
+    // The inline eval must reference a real `user_message` event id, or the
+    // server's validateEvaluationEventIds rejects it and the round stays
+    // `active` (evaluation.ts §[#477]). Seed that answer event with a known id.
+    const answerEventId = generateUUIDv7();
+    await db.insert(sessionEvents).values({
+      id: answerEventId,
+      profileId,
+      subjectId,
+      sessionId: session.id,
+      topicId,
+      eventType: 'user_message',
+      content: 'The light reactions and the Calvin cycle.',
+      metadata: { source: 'client' },
+    });
+
     // Tutor envelope carries inline evaluation (flag=OFF path relies on this).
-    llm.setTutorResponse(TUTOR_ENVELOPE_WITH_EVAL);
+    llm.setTutorResponse(tutorEnvelopeWithEval(answerEventId));
 
     const result = await processMessage(
       db,
