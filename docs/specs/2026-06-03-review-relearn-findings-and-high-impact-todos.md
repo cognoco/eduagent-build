@@ -189,6 +189,11 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `config.ts:140` (`CHALLENGE_ROUND_RUNTIME_ENABLED` default `'false'`).
   - *First action:* flip the flag in **staging/Doppler stg only**, run real review sessions,
     read transcripts for feel. **Never flip prod here** (that is RR-12, the last step).
+  - *Pre-screen (does NOT discharge this):* the simulated-learner harness
+    (`apps/api/eval-llm/simulate.ts`, plan `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
+    generates SYNTHETIC multi-turn rounds to surface gpt-oss signal-drop (RR-12) and seed a
+    provisional mastery bar before real dogfooding. It is model-shaped, not teen-shaped (CH-4),
+    so it complements — never replaces — the real staging transcripts this item requires.
 
 - **RR-3 — Consolidate the two push crons into one warm daily check-in. [P1 · FEEL · S]**
   - *Impact:* removes same-day double-push; replaces cold "topics fading" framing with a warm,
@@ -241,6 +246,11 @@ correctness/cleanup that must precede load-bearing.
     `MIN_LEXICAL_OVERLAP_NOTE_DRAFT=0.4` is a TODO-flagged guess (`caps.ts`).
   - *First action:* histogram staging transcripts; decide whether "2 of 3 solid" warrants a
     softer outcome; run `pnpm eval:llm --live`.
+  - *Mastery-bar pre-screen:* the simulated-learner harness (`pnpm eval:llm:sim`, plan
+    `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) feeds the **mastery-bar
+    half** of this calibration with synthetic over-/under-credit rates against ground-truth
+    scenarios. The **note-overlap half** stays blocked on real transcripts (the harness is DB-free
+    and does not exercise the note-draft path); any synthetic-derived bar is provisional per CH-4.
   - *Constraint (CH-4 — staging calibration is provisional):* pre-launch there are no real
     learners (`project_pre_launch_no_users`); staging dogfooding yields **adult-team** transcripts,
     not 13–17-year-old phrasing or real forgetting curves. Thresholds tuned on engineers will

@@ -3,7 +3,7 @@ title: Challenge Round Simulated-Learner Harness — Implementation Plan
 date: 2026-06-26
 profile: code
 spec: docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md (RR-2 / RR-6)
-status: draft
+status: in-progress
 ---
 
 # Challenge Round Simulated-Learner Harness — Implementation Plan
@@ -131,7 +131,7 @@ Out of scope (must not change):
 
 ## Tasks
 
-- [ ] **T1: Persona + ground-truth competence fixtures.**
+- [x] **T1: Persona + ground-truth competence fixtures.**
   Create `fixtures/challenge-personas.ts` exporting `CHALLENGE_SIM_SCENARIOS:
   ChallengeSimScenario[]`. Each scenario references an existing `EvalProfile.id`
   (from `fixtures/profiles.ts`), and adds: `subjectName`, `topicTitle`,
@@ -146,7 +146,7 @@ Out of scope (must not change):
   profile id, ≥1 concept, a non-empty `competenceBrief`, and a valid `expectedOutcome`;
   `pnpm exec nx run api:typecheck` clean.
 
-- [ ] **T2: Learner agent.**
+- [x] **T2: Learner agent.**
   Create `runner/learner-agent.ts` exporting `runLearnerTurn(args): Promise<string>`
   where `args = { scenario, profile, mentorQuestion, history, learnerModel }`. It builds
   a learner system prompt embedding the persona (age/interests/level from the profile) +
@@ -164,7 +164,7 @@ Out of scope (must not change):
   competence brief and the mentor question, (b) the function returns the model's text
   verbatim. No internal mocks.
 
-- [ ] **T3: Conversation loop driver.** *(see `## Driver interface` for the exact shape)*
+- [x] **T3: Conversation loop driver.** *(see `## Driver interface` for the exact shape)*
   Create `runner/simulated-conversation.ts` exporting `runSimulatedRound(args):
   Promise<SimulatedRoundResult>`. **Seed the state machine via the real transitions, not
   by hand-constructing `active`.** `transitionChallengeState`'s `answer_complete` requires
@@ -198,7 +198,7 @@ Out of scope (must not change):
   `signalEmitted=false`. Real `transitionChallengeState` + `decideMasteryAndReview` +
   `parseEnvelope`.
 
-- [ ] **T4: Corpus + calibration metrics.**
+- [x] **T4: Corpus + calibration metrics.**
   Create `runner/simulation-metrics.ts` exporting `aggregate(results:
   SimulatedRoundResult[]): SimMetrics` and `writeCorpus(dir, results, metrics)`.
   `SimMetrics` includes: outcome distribution (`verified/partial/reteach/invalid`
@@ -216,7 +216,7 @@ Out of scope (must not change):
   (including one over-credited and one signal-dropped round) and asserts
   `overCreditRate`, `underCreditRate`, and `signalEmissionRate` compute correctly.
 
-- [ ] **T5: CLI entry + npm script.**
+- [x] **T5: CLI entry + npm script.**
   Create `simulate.ts` with flags: `--learner-model <slug>` (**required**),
   `--mentor-model <slug>` (optional candidate; default = production routing),
   `--provider <slug>` (optional learner host pin — **module-global**, applied via
@@ -237,7 +237,7 @@ Out of scope (must not change):
   call); invoking with `--mentor-model X --learner-model X` exits non-zero with the
   same-model error before any provider bootstrap.
 
-- [ ] **T6: Gitignore + README.**
+- [x] **T6: Gitignore + README.**
   Ignore `apps/api/eval-llm/corpus/` (transcripts are bulky, per-run, not source of
   truth). Add an `eval-llm/README.md` section: the command, the **two-model guardrail**
   rationale (incl. the production-routing default case and the slug-vs-family heuristic),
