@@ -43,6 +43,8 @@ test_patterns:
 
 # Tech-Spec: Study And Family Mode Navigation
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/` (spec; companion plan parked alongside). Phase 1 shipped as the live V1 shell (source of truth = `apps/mobile/src/lib/navigation-contract.ts`); stranded Phase 2/3 nav UI is superseded by the V2 shell and will not be built on V1. Design history only.
+
 **Created:** 2026-05-19
 
 > **Status (2026-05-23):** Foundation complete (migration `0089_ancient_naoko.sql`, `profiles.default_app_context`, `hasFamilyLinks` schema, `navigation-contract.ts` scaffolding, Recaps route+API). Task 1 (V0 `TabShape` rename) NOT executed — V0 still uses `'guardian'|'learner'`, V1 uses parallel `computeModeVisibleTabs()` path behind `MODE_NAV_V1_ENABLED`. `FAMILY_MODE_TABS` in `(app)/_layout.tsx` still `{home, progress, more}` (missing `recaps`). Tasks 6, 12, 13, 16-20 status varies; see implementation notes.

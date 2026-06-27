@@ -1,4 +1,4 @@
-# MMT-ADR-0025 — Login presence carries visibility tier; graduation restamps the contract
+# MMT-ADR-0028 — Login presence carries visibility tier; graduation restamps the contract
 
 **Status:** Accepted · 2026-06-20 · **Scope:** V2 managed/credentialed reporting tiers and graduation narration · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0000, MMT-ADR-0022
 

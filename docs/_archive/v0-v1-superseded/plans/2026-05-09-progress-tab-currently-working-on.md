@@ -1,5 +1,7 @@
 # Progress Tab — "Currently Working On" + Self-View Polish
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/`. Backend, schema, i18n (all 7 locales), parent surfaces, and test scaffolding shipped and are already reused. The ONLY remaining work — a `CurrentlyWorkingOnCard` + `ReportsList` extension — is V1 Progress-tab UI, and V2's `/now` feed already serves the "what am I working on" job. Not built on V1.
+
 > **Status (2026-05-25, deeper-dive revision):** More is shipped than the 2026-05-23 note recognised. The earlier "~50% missing" framing was wrong — backend, API, i18n strings for the new card, weekly mini-summary, parent-side surfaces, and detail-screen highlights/nextSteps render are all done. What remains is small, self-contained, and bounded.
 >
 > **✅ Done (verified in code 2026-05-25):**

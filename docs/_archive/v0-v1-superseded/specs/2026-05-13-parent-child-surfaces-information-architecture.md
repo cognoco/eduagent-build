@@ -31,6 +31,8 @@ test_patterns:
 
 # Tech-Spec: Parent Child Surfaces Information Architecture
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/`. Tasks 4-5 shipped (progress-summary contract + Inngest generator). Tasks 2/7 are unbuilt and built on `ParentHomeScreen` + `child/[profileId]/*` proxy routes that V2 S6 deletes (scope-chip + Support hub supersede them). Not built on V1.
+
 **Created:** 2026-05-13
 
 > **Status (2026-05-23):** Tasks 4 (progress summary contract with activityState, basedOnLastSessionAt, nudgeRecommended) and 5 (Inngest generation function) implemented. Tasks 2, 7 implementation status TBD.

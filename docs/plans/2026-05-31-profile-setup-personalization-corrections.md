@@ -11,6 +11,20 @@ gap_ids: [onboard-1, onboard-2, onboard-3, onboard-4]
 
 # Profile Setup, Personalization, and Corrections - Implementation Plan
 
+> ## ✅ RENAME-GATE CHECK (2026-06-27)
+>
+> Verified the `T1`/`T2`/`T3`/`T5` slice against the identity cutover: it is
+> **independent of the physical `profiles`→`person` rename** (WI-586
+> `m-repoint`/`m-drop`, still pending — inert in `apps/api/drizzle/_freeze-only/`,
+> migrate chain at `0123`). The slice adds **no migration and no new `profiles`-FK**;
+> it only wires existing mobile primitives and consumes already-live owner-gated
+> endpoints — so unlike the sibling parked plans (note-correctness, concept-capture,
+> which *do* add `profiles`-FK'd tables and wait for the rename), this slice has no
+> schema to re-home. The "identity re-triage" hard gate below is now satisfiable: the
+> identity model is settled and the reader cutover is live (`IDENTITY_V2_ENABLED`),
+> so the slice can be classified independent and built. `T4` (birth-date correction)
+> stays deferred for the reasons below — unaffected by this check.
+>
 > ## 🧭 STATUS AT A GLANCE (read this first — updated 2026-06-09)
 >
 > - **What this is:** make learner personalization (pronouns, tutor-prose language, interests, birth-date correction) reachable in first-run *and* editable later. Closes audit gaps `onboard-1..4`.

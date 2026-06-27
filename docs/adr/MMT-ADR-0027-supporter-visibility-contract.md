@@ -1,4 +1,4 @@
-# MMT-ADR-0024 — Supporter visibility contract: reportability is narrowed by trust, not edge reach
+# MMT-ADR-0027 — Supporter visibility contract: reportability is narrowed by trust, not edge reach
 
 **Status:** Accepted · 2026-06-20 · **Scope:** V2 supporter visibility surfaces · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0000, MMT-ADR-0022
 

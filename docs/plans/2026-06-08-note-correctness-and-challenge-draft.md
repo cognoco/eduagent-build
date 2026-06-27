@@ -8,6 +8,34 @@ status: parked
 
 # Note-Correctness Check + Challenge-Saved Note — Implementation Plan
 
+> **⚠️ MECHANISM CORRECTION (2026-06-27) — the rename is real but its method changed;
+> the PARKED banner and T3 below describe a superseded mechanism.** The
+> `profiles`→`person` rename this plan waits on is **still pending** (verified
+> 2026-06-27: `m-repoint` / `m-drop` sit inert in `apps/api/drizzle/_freeze-only/`,
+> NOT in the migrate chain — `meta/_journal.json` ends at `0123`;
+> `packages/database/src/schema/profiles.ts` is still the live FK target), so
+> **parking still stands.** But the **mechanism** named below — the `MMT-ADR-0012`
+> one-time *baseline reset* (collapse the chain; tables "born on `person`"; "never a
+> numbered migration"; `db:push:dev` only) — **was not what shipped.** The chain was
+> **never collapsed** (it is append-only, now at `0123`). The actual rename is the
+> **WI-586 convergence cutover** recorded in `MMT-ADR-0020`: the 8-table identity
+> model was added **additively** (`0108`/`0109`), readers cut over behind
+> `IDENTITY_V2_ENABLED`, and the legacy `profiles`/`subscriptions` tables are
+> repointed by the **catalog-driven `m-repoint`** (re-points *every* live
+> `profiles`-target FK → `person` from the `pg_constraint` catalog at run time,
+> fail-loud on any unmapped FK) then dropped by `m-drop`. **Implications for
+> execution:** (1) "sequence after the rename" **remains the recommendation**
+> (concept-capture is the same-gate sibling — `MMT-ADR-0017`); (2) T3's "no numbered
+> `0108` / post-reset baseline / `db:push:dev` only" posture is **obsolete** — at
+> un-park, author a normal **append-only** numbered migration; (3) because
+> `m-repoint` is catalog-driven, any `profiles`-FK'd table existing at the freeze is
+> repointed to `person` automatically, so the residual cost is the schema-module +
+> reader rewrite (`./profiles` → `person`) every `profiles`-FK'd surface pays at
+> cutover, not a manual table rebuild. `MMT-ADR-0012`'s status vs. `0020` is an
+> ADR-register hygiene item, tracked separately — do not hand-edit ADR status here.
+>
+> ---
+
 > **PARKED 2026-06-08 — execute on the post-reset baseline, not now.** This plan is
 > net-new code against today's `profiles` schema, which the identity-foundation
 > **one-time baseline reset** (`MMT-ADR-0012`) renames to `person`. Building it now

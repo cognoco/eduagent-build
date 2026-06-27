@@ -1,5 +1,7 @@
 # Handoff: EduAgent UI improvements (Home, Session, Parent Dashboard)
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/`. Screens 1-2 (Learner Home "Direction C", Session header/composer) shipped. Screen 3 (Parent Dashboard) is unbuilt and, with Screens 1-2, targets V0/V1 screens (`LearnerScreen`, `dashboard.tsx`) that V2 replaces (`mentor.tsx` + scope-chip). Not built. Design artifacts retained alongside.
+
 ## Overview
 
 Three high-leverage screens of the EduAgent mobile app are getting a substantial redesign. The goal is to close the gap between the product spec ("a coach who has already done the thinking") and the current UI (a chat app with shortcut tiles), **while preserving predictability** — the home screen is opened multiple times per day, so it must have a stable, scannable spine, with the AI's voice surfacing only when there's a real recommendation.

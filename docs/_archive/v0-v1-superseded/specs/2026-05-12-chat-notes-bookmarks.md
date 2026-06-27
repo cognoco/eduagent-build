@@ -1,5 +1,7 @@
 # Chat Notes And Bookmarks In Session
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/`. Steps 1-4 shipped (in-chat Add-note action, NoteInput, BookmarkCard with topic surfacing, API topicId filter). The only gap is Step 5 (bookmark results in Library search) — and V2 removes the Library tab, so it will not be built.
+
 **Date:** 2026-05-12
 **Status:** Ready for implementation
 

@@ -2,6 +2,26 @@
 
 > **STATUS (2026-06-27):** PARKED — migration 0107 is reference-only; the profiles→person rename (MMT-ADR-0012 one-time reset) has not yet executed (profiles table still exists), so the tables aren't live. Write side gated `CONCEPT_CAPTURE_ENABLED=false`. Read side (API /notes/concept-mastery + mobile NoteDisplay star/additions) is wired and works once tables exist. Scope items 5 (concept-targeted review) + 6 (note-correctness notification) not built. NEXT: re-home concepts/concept_mastery into the post-reset baseline (FKs→person), regenerate the migration, flip the flag.
 
+> **⚠️ MECHANISM CORRECTION (2026-06-27).** The STATUS line above and the "Dependency
+> — build on the post-baseline `person` schema" note below describe the rename as the
+> `MMT-ADR-0012` one-time *baseline reset* (chain collapse; tables "born on `person`";
+> "regenerate the migration"; §5.3 "API surface broken in the baseline commit and
+> re-built"). **That mechanism did not ship.** The chain was never collapsed (it is
+> append-only, now at `0123`); the identity model was added **additively** (`0108` /
+> `0109`) with readers behind `IDENTITY_V2_ENABLED`, and the `profiles`→`person`
+> rename is the **WI-586 convergence cutover** (`MMT-ADR-0020`) via the catalog-driven
+> `m-repoint` (re-points every live `profiles`-FK → `person`) + `m-drop`. The rename
+> is **still pending** (verified 2026-06-27: `m-repoint` / `m-drop` inert in
+> `apps/api/drizzle/_freeze-only/`; `meta/_journal.json` ends at `0123`;
+> `schema/profiles.ts` is still the live FK target), so **parking stands** and this is
+> the **same gate** that parks note-correctness
+> (`docs/plans/2026-06-08-note-correctness-and-challenge-draft.md`). At un-park: author
+> a normal **append-only** migration (not a "regenerated baseline"); `m-repoint` being
+> catalog-driven means a `profiles`-FK'd `concepts`/`concept_mastery` built before the
+> freeze is repointed to `person` automatically. **Resolve the open `person.id`
+> uuid-vs-bigint question (below) against the shipped `0108`/`0109` identity baseline,
+> not the `MMT-ADR-0012` §2A amendment text**, before authoring the FK column types.
+
 **Status:** Draft · 2026-06-08 · **Branch:** `conceptgrain` · **Decision record:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md)
 
 > **Rev. 2026-06-08 (post-review):** capture reads the enriched evaluation list (not the `MasteryDecision`, which drops `missing`); `concept_mastery.supersededAt` added so a stale near-duplicate concept can't permanently suppress a note's star; correction surfacing scoped to neutral topic-level framing pending note↔concept attribution; the note-correctness nudge is deduped against the review-due nudge; the note star resolves to **three** states (not-yet-assessed / verified / tutor-has-additions), never a two-way present/absent split, so an un-assessed note is never visually identical to one with a weak concept (legibility, north-star Invariant 6).

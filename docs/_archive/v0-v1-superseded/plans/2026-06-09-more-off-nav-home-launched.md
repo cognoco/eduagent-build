@@ -8,6 +8,8 @@ status: draft
 
 # V1 learner tab redesign — More off-nav + Practice promotion — Implementation Plan
 
+> **PARKED — V0/V1-only (2026-06-27).** Archived to `_archive/v0-v1-superseded/`: a V1 navigation reshape (remove the More tab, promote Practice/Recents). All 13 tasks are unbuilt and will NOT be built — the V2 shell ("mentor-is-the-app") restructures tabs entirely (Mentor/Subjects/Journal), so no new work lands on the V0/V1 nav. Kept for design history only.
+
 **Goal:** Under the V1 navigation flag, reshape the learner tab bar from
 `home, library, progress, more` to **`home, practice, library, progress`** — i.e.
 (Part A) remove `More` from the bottom bar and make it a quiet Home-launched
