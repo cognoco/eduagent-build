@@ -1702,7 +1702,9 @@
       "timeoutTitle": "Wciąż czekam…",
       "timeoutMessage": "Wysłanie odpowiedzi trwa dłużej niż zwykle. Sprawdź połączenie i spróbuj ponownie.",
       "dontRememberFirst": "Nie pamiętam.",
-      "dontRememberAgain": "Nadal nie wiem."
+      "dontRememberAgain": "Nadal nie wiem.",
+      "gradingUnavailableTitle": "Mam Twoją odpowiedź.",
+      "gradingUnavailableMessage": "W tej chwili nie mogę sprawdzić Twojej odpowiedzi, ale jest bezpieczna. Spróbuj ponownie lub wróć do tego później."
     },
     "lastStudied": "Ostatnia nauka {{when}}",
     "neverStudied": "Nigdy nie studiowano",

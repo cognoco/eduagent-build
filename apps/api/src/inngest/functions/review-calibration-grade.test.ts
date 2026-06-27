@@ -1,6 +1,63 @@
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { handleReviewCalibrationGrade } from './review-calibration-grade';
-import { xpLedger } from '@eduagent/database';
+import { retrievalEvents, xpLedger } from '@eduagent/database';
+import {
+  registerProvider,
+  type LLMProvider,
+  type ChatMessage,
+  type ModelConfig,
+} from '../../services/llm';
+import { makeChatStreamResult } from '../../services/llm/types';
+import type {
+  ChatResult,
+  ChatStreamResult,
+  StopReason,
+} from '../../services/llm/types';
+
+// Register a grader provider that returns a fixed body. The LLM is the only
+// external boundary the in-step closure touches; everything else (topic join,
+// session-event read, recordRetrievalEvent, EU-7 cap read) runs against the
+// mock db below. No internal module is mocked.
+function registerGrader(body: string): void {
+  const provider: LLMProvider = {
+    id: 'gemini',
+    async chat(
+      _messages: ChatMessage[],
+      _config: ModelConfig,
+    ): Promise<ChatResult> {
+      return { content: body, stopReason: 'stop' };
+    },
+    chatStream(): ChatStreamResult {
+      return makeChatStreamResult(
+        (async function* () {
+          yield body;
+        })(),
+        Promise.resolve<StopReason>('stop'),
+      );
+    },
+  };
+  registerProvider(provider);
+}
+
+// db.select() chain for findOwnedCurriculumTopic: .from().innerJoin()×3.where().limit().
+function makeTopicSelectChain(row: Record<string, unknown> | null) {
+  const chain: Record<string, jest.Mock> = {};
+  chain.from = jest.fn(() => chain);
+  chain.innerJoin = jest.fn(() => chain);
+  chain.where = jest.fn(() => chain);
+  chain.limit = jest.fn().mockResolvedValue(row ? [row] : []);
+  return chain;
+}
+
+// db.select() chain for the EU-7 latest-row read: .from().where().orderBy().limit().
+function makeEu7SelectChain(rows: Array<Record<string, unknown>>) {
+  const chain: Record<string, jest.Mock> = {};
+  chain.from = jest.fn(() => chain);
+  chain.where = jest.fn(() => chain);
+  chain.orderBy = jest.fn(() => chain);
+  chain.limit = jest.fn().mockResolvedValue(rows);
+  return chain;
+}
 
 // Pattern A (jest.requireActual spread): only getStepDatabase is overridden —
 // it calls neon-serverless which needs a real DATABASE_URL, not exercisable in
@@ -136,10 +193,15 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [{ id: CARD_ID }],
-        // [WI-620] Rehydration + grading share ONE step closure so the raw
-        // learner text / topic title stay local and only the non-PII quality
-        // number crosses the step boundary (Inngest memoizes step returns).
-        'rehydrate-and-grade-recall-quality': 4,
+        // [WI-620 / C-3] Rehydration + grading + recall-log capture share ONE
+        // step closure so the raw learner text / topic title / grader rationale
+        // stay local; only the non-PII decision { outcome, quality, verdict }
+        // crosses the step boundary (Inngest memoizes step returns).
+        'rehydrate-grade-and-record': {
+          outcome: 'graded',
+          quality: 4,
+          verdict: 'solid',
+        },
         'finalize-retention-update': undefined,
         'stamp-mastery-on-verify': undefined,
       },
@@ -149,6 +211,7 @@ describe('reviewCalibrationGrade', () => {
       sessionId: SESSION_ID,
       topicId: TOPIC_ID,
       quality: 4,
+      verdict: 'solid',
       passed: true,
     });
     expect(runCalls).toHaveLength(5);
@@ -156,7 +219,7 @@ describe('reviewCalibrationGrade', () => {
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
       'claim-cooldown-slot',
-      'rehydrate-and-grade-recall-quality',
+      'rehydrate-grade-and-record',
       'finalize-retention-update',
       'stamp-mastery-on-verify',
     ]);
@@ -171,7 +234,7 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [{ id: CARD_ID }],
-        'rehydrate-and-grade-recall-quality': null,
+        'rehydrate-grade-and-record': { outcome: 'skip' },
       },
     );
 
@@ -182,7 +245,7 @@ describe('reviewCalibrationGrade', () => {
     expect(runCalls.map((c) => c.name)).toEqual([
       'load-retention-card',
       'claim-cooldown-slot',
-      'rehydrate-and-grade-recall-quality',
+      'rehydrate-grade-and-record',
     ]);
     expect(runCalls.map((c) => c.name)).not.toContain(
       'finalize-retention-update',
@@ -197,7 +260,11 @@ describe('reviewCalibrationGrade', () => {
         'claim-cooldown-slot': [],
         // Safety net so a regression that runs grading before the claim cannot
         // leak a real LLM call out of this unit test.
-        'rehydrate-and-grade-recall-quality': 4,
+        'rehydrate-grade-and-record': {
+          outcome: 'graded',
+          quality: 4,
+          verdict: 'solid',
+        },
       },
     );
 
@@ -220,8 +287,12 @@ describe('reviewCalibrationGrade', () => {
       {
         'load-retention-card': makeFreshCard(),
         'claim-cooldown-slot': [], // 0 rows → claim lost
-        // Safety net — the merged rehydrate+grade step must NOT be reached.
-        'rehydrate-and-grade-recall-quality': 4,
+        // Safety net — the merged rehydrate+grade+record step must NOT be reached.
+        'rehydrate-grade-and-record': {
+          outcome: 'graded',
+          quality: 4,
+          verdict: 'solid',
+        },
       },
     );
 
@@ -230,7 +301,7 @@ describe('reviewCalibrationGrade', () => {
       sessionId: SESSION_ID,
     });
     expect(runCalls.map((c) => c.name)).not.toContain(
-      'rehydrate-and-grade-recall-quality',
+      'rehydrate-grade-and-record',
     );
   });
 
@@ -243,7 +314,12 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
-      'rehydrate-and-grade-recall-quality': 0, // quality 0 → processRecallResult yields xpChange:'decayed'
+      // quality 0 → processRecallResult yields xpChange:'decayed'
+      'rehydrate-grade-and-record': {
+        outcome: 'graded',
+        quality: 0,
+        verdict: 'missing',
+      },
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
     });
@@ -270,7 +346,12 @@ describe('reviewCalibrationGrade', () => {
     await executeHandlerWithResults(makeValidPayload(), {
       'load-retention-card': makeFreshCard(),
       'claim-cooldown-slot': [{ id: CARD_ID }],
-      'rehydrate-and-grade-recall-quality': 5, // quality 5 → processRecallResult yields xpChange:'verified'
+      // quality 5 → processRecallResult yields xpChange:'verified'
+      'rehydrate-grade-and-record': {
+        outcome: 'graded',
+        quality: 5,
+        verdict: 'solid',
+      },
       // finalize-retention-update: intentionally omitted so the callback runs inline
       'stamp-mastery-on-verify': undefined,
     });
@@ -290,5 +371,246 @@ describe('reviewCalibrationGrade', () => {
       );
     }
     // If xpLedger is not in the update tables at all, that also satisfies the assertion.
+  });
+
+  // -------------------------------------------------------------------------
+  // [T6 / T12] Grader-unavailable handling (handler branching on the typed
+  // CalibrationGradeStepResult). The step is memoized here so these assert the
+  // HANDLER's response to each outcome; the closure's own logic (recording +
+  // EU-7 cap computation + non-PII shape) is exercised inline further below.
+  // -------------------------------------------------------------------------
+
+  it('[T6] reschedules and returns grader_unavailable on an uncapped fallback', async () => {
+    const db = createMockStepDb();
+    mockGetStepDatabase.mockReturnValue(db);
+
+    const { result, runCalls } = await executeHandlerWithResults(
+      makeValidPayload(),
+      {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'rehydrate-grade-and-record': { outcome: 'fallback', capped: false },
+        // reschedule-after-grader-failure runs inline against the mock db.
+      },
+    );
+
+    expect(result).toEqual({
+      skipped: 'grader_unavailable',
+      sessionId: SESSION_ID,
+    });
+    // The nextReviewAt nudge ran; SM-2 finalize did NOT.
+    expect(runCalls.map((c) => c.name)).toContain(
+      'reschedule-after-grader-failure',
+    );
+    expect(runCalls.map((c) => c.name)).not.toContain(
+      'finalize-retention-update',
+    );
+    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('[T12] does NOT reschedule on a back-to-back (capped) fallback', async () => {
+    const db = createMockStepDb();
+    mockGetStepDatabase.mockReturnValue(db);
+
+    const { result, runCalls } = await executeHandlerWithResults(
+      makeValidPayload(),
+      {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'rehydrate-grade-and-record': { outcome: 'fallback', capped: true },
+      },
+    );
+
+    expect(result).toEqual({
+      skipped: 'grader_unavailable',
+      sessionId: SESSION_ID,
+    });
+    // EU-7 nag-cap: a second consecutive grader failure must not move the
+    // schedule again, so the reschedule step never runs and nextReviewAt holds.
+    expect(runCalls.map((c) => c.name)).not.toContain(
+      'reschedule-after-grader-failure',
+    );
+    expect((db.update as jest.Mock).mock.calls.length).toBe(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // [C-3 / T6 / T12] In-step closure exercised for real (only the LLM is a
+  // registered provider — an external boundary). Captures the value the closure
+  // resolves and asserts NO PII (raw answer / rationale / misconception) crosses
+  // the step boundary, plus that recording happens inside the step and the EU-7
+  // cap is computed from the latest retrieval_events row.
+  // -------------------------------------------------------------------------
+
+  const SUBJECT_ID = '00000000-0000-4000-8000-0000000000a1';
+  const LEARNER_ANSWER = 'the learner said photosynthesis needs sunlight (PII)';
+
+  async function runWithInlineClosure(opts: {
+    db: Record<string, unknown>;
+    memoized?: Record<string, unknown>;
+  }) {
+    const runCalls: string[] = [];
+    let rehydrateResult: unknown;
+    const memoized = opts.memoized ?? {};
+    const step = {
+      async run<T>(name: string, cb: () => T | Promise<T>): Promise<T> {
+        runCalls.push(name);
+        if (name in memoized) return memoized[name] as T;
+        const r = await cb();
+        if (name === 'rehydrate-grade-and-record') rehydrateResult = r;
+        return r;
+      },
+    };
+    mockGetStepDatabase.mockReturnValue(opts.db);
+    const result = await handleReviewCalibrationGrade({
+      event: { data: makeValidPayload() },
+      step: step as unknown as {
+        run: <T>(name: string, fn: () => T | Promise<T>) => Promise<T>;
+      },
+    });
+    return { result, runCalls, rehydrateResult };
+  }
+
+  function makeInlineDbBase(insertSink: Array<{ table: unknown; v: unknown }>) {
+    return {
+      query: {
+        sessionEvents: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: LEARNER_MESSAGE_EVENT_ID,
+            content: LEARNER_ANSWER,
+          }),
+        },
+      },
+      insert: jest.fn((table: unknown) => ({
+        values: jest.fn((v: unknown) => {
+          insertSink.push({ table, v });
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockImplementation(() => {
+            const p = Promise.resolve(undefined);
+            (p as unknown as Record<string, unknown>).returning = jest
+              .fn()
+              .mockResolvedValue([{ id: 'row-1' }]);
+            return p;
+          }),
+        }),
+      }),
+    };
+  }
+
+  const TOPIC_ROW = {
+    topicTitle: 'Photosynthesis',
+    subjectId: SUBJECT_ID,
+    topicDescription: 'How plants convert light to energy',
+  };
+
+  it('[C-3] records inside the step and crosses the boundary with NO PII (graded)', async () => {
+    registerGrader(
+      '{"quality": 4, "verdict": "solid", "rationale": "secret rationale text", "misconception": null}',
+    );
+    const inserts: Array<{ table: unknown; v: unknown }> = [];
+    const db = {
+      ...makeInlineDbBase(inserts),
+      select: jest.fn().mockReturnValueOnce(makeTopicSelectChain(TOPIC_ROW)),
+    };
+
+    const { rehydrateResult } = await runWithInlineClosure({
+      db,
+      memoized: {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+        'finalize-retention-update': undefined,
+        'stamp-mastery-on-verify': undefined,
+      },
+    });
+
+    // Only the non-PII decision crosses the boundary.
+    expect(Object.keys(rehydrateResult as object).sort()).toEqual([
+      'outcome',
+      'quality',
+      'verdict',
+    ]);
+    expect(rehydrateResult).toEqual({
+      outcome: 'graded',
+      quality: 4,
+      verdict: 'solid',
+    });
+    const serialized = JSON.stringify(rehydrateResult);
+    expect(serialized).not.toContain('secret rationale');
+    expect(serialized).not.toContain('photosynthesis needs sunlight');
+
+    // The graded llm row WAS recorded inside the step, and the PII it carries
+    // lives in the DB row — not on the step return.
+    const llmRow = inserts.find((i) => i.table === retrievalEvents);
+    expect(llmRow).toBeDefined();
+    const v = llmRow!.v as Record<string, unknown>;
+    expect(v.gradedBy).toBe('llm');
+    expect(v.learnerAnswer).toBe(LEARNER_ANSWER);
+    expect(v.rubricRationale).toBe('secret rationale text');
+  });
+
+  it('[T12] computes capped=true when the latest row is a prior fallback_heuristic', async () => {
+    registerGrader('this is not valid grade json');
+    const inserts: Array<{ table: unknown; v: unknown }> = [];
+    const db = {
+      ...makeInlineDbBase(inserts),
+      select: jest
+        .fn()
+        .mockReturnValueOnce(makeTopicSelectChain(TOPIC_ROW))
+        .mockReturnValueOnce(
+          makeEu7SelectChain([{ gradedBy: 'fallback_heuristic' }]),
+        ),
+    };
+
+    const { result, rehydrateResult, runCalls } = await runWithInlineClosure({
+      db,
+      memoized: {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+      },
+    });
+
+    expect(rehydrateResult).toEqual({ outcome: 'fallback', capped: true });
+    // A fallback_heuristic row is still logged…
+    const fbRow = inserts.find((i) => i.table === retrievalEvents);
+    expect((fbRow!.v as Record<string, unknown>).gradedBy).toBe(
+      'fallback_heuristic',
+    );
+    // …but the schedule is NOT nudged again (EU-7 cap).
+    expect(runCalls).not.toContain('reschedule-after-grader-failure');
+    expect(result).toEqual({
+      skipped: 'grader_unavailable',
+      sessionId: SESSION_ID,
+    });
+  });
+
+  it('[T6] computes capped=false and reschedules when no prior fallback exists', async () => {
+    registerGrader('still not json');
+    const inserts: Array<{ table: unknown; v: unknown }> = [];
+    const db = {
+      ...makeInlineDbBase(inserts),
+      select: jest
+        .fn()
+        .mockReturnValueOnce(makeTopicSelectChain(TOPIC_ROW))
+        .mockReturnValueOnce(makeEu7SelectChain([])),
+    };
+
+    const { result, rehydrateResult, runCalls } = await runWithInlineClosure({
+      db,
+      memoized: {
+        'load-retention-card': makeFreshCard(),
+        'claim-cooldown-slot': [{ id: CARD_ID }],
+      },
+    });
+
+    expect(rehydrateResult).toEqual({ outcome: 'fallback', capped: false });
+    expect(runCalls).toContain('reschedule-after-grader-failure');
+    expect((db.update as jest.Mock).mock.calls.length).toBeGreaterThan(0);
+    expect(result).toEqual({
+      skipped: 'grader_unavailable',
+      sessionId: SESSION_ID,
+    });
   });
 });

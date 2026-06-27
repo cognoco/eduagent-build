@@ -1,20 +1,65 @@
-import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import {
   createScopedRepository,
   curricula,
   curriculumBooks,
   curriculumTopics,
+  needsDeepeningTopics,
   retentionCards,
   subjects,
   type Database,
 } from '@eduagent/database';
-import type { OverdueSubject, OverdueTopicsResponse } from '@eduagent/schemas';
+import type {
+  OverdueSubject,
+  OverdueTopic,
+  OverdueTopicsResponse,
+  RetentionStatus,
+} from '@eduagent/schemas';
+import { getRetentionStatus } from './retention';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// [Flow 3 / RR-5 / T10] Worst-first ordering for the merged relearn queue:
+// forgotten topics surface above strong ones. getRetentionStatus()
+// (services/retention.ts) is the single source of truth for the band — we only
+// map its result to a sort rank here so thresholds never get duplicated.
+const BAND_RANK: Record<RetentionStatus, number> = {
+  forgotten: 0,
+  weak: 1,
+  fading: 2,
+  strong: 3,
+};
 
 function toOverdueDays(now: Date, nextReviewAt: Date | null): number {
   const reviewedAt = nextReviewAt?.getTime() ?? now.getTime();
   return Math.max(0, Math.floor((now.getTime() - reviewedAt) / DAY_MS));
+}
+
+// Compute the retention band for an overdue card from its SM-2 schedule.
+// getRetentionStatus reads only lastReviewedAt + intervalDays; the remaining
+// RetentionState fields are placeholders it never inspects.
+function bandForCard(
+  lastReviewedAt: Date | null,
+  intervalDays: number | null,
+): RetentionStatus {
+  return getRetentionStatus({
+    topicId: '',
+    easeFactor: 0,
+    intervalDays: intervalDays ?? 1,
+    repetitions: 0,
+    failureCount: 0,
+    consecutiveSuccesses: 0,
+    xpStatus: 'pending',
+    nextReviewAt: null,
+    lastReviewedAt: lastReviewedAt ? lastReviewedAt.toISOString() : null,
+  });
+}
+
+// Per-topic sort metadata kept out of the response shape. flaggedRecencyMs is
+// the needs_deepening row's createdAt (ms) for flagged-only rows; 0 otherwise.
+interface TopicSortMeta {
+  bandRank: number;
+  flaggedRecencyMs: number;
 }
 
 export async function getOverdueTopicsGrouped(
@@ -55,6 +100,8 @@ export async function getOverdueTopicsGrouped(
     .select({
       topicId: retentionCards.topicId,
       nextReviewAt: retentionCards.nextReviewAt,
+      lastReviewedAt: retentionCards.lastReviewedAt,
+      intervalDays: retentionCards.intervalDays,
       failureCount: retentionCards.failureCount,
       topicTitle: curriculumTopics.title,
       subjectId: subjects.id,
@@ -83,9 +130,42 @@ export async function getOverdueTopicsGrouped(
     .orderBy(asc(retentionCards.nextReviewAt))
     .limit(500);
 
+  // [Flow 3 / RR-10 / T10] Flagged-weak topics (needs_deepening_topics, status
+  // active/pending_review). Scoped two ways: the row's own profileId AND the
+  // sanctioned parent-chain join enforcing subjects.profileId = profileId, so a
+  // sibling profile's flagged topics can never leak into this queue.
+  const flaggedRows = await db
+    .select({
+      topicId: needsDeepeningTopics.topicId,
+      concept: needsDeepeningTopics.concept,
+      createdAt: needsDeepeningTopics.createdAt,
+      topicTitle: curriculumTopics.title,
+      subjectId: subjects.id,
+      subjectName: subjects.name,
+    })
+    .from(needsDeepeningTopics)
+    .innerJoin(
+      curriculumTopics,
+      eq(curriculumTopics.id, needsDeepeningTopics.topicId),
+    )
+    .innerJoin(
+      subjects,
+      and(
+        eq(subjects.id, needsDeepeningTopics.subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
+    .where(
+      and(
+        eq(needsDeepeningTopics.profileId, profileId),
+        inArray(needsDeepeningTopics.status, ['active', 'pending_review']),
+      ),
+    )
+    .orderBy(desc(needsDeepeningTopics.createdAt));
+
   const totalOverdue = countRow?.count ?? overdueCards.length;
 
-  if (totalOverdue === 0 && overdueCards.length === 0) {
+  if (overdueCards.length === 0 && flaggedRows.length === 0) {
     return {
       totalOverdue: 0,
       subjects: [],
@@ -94,6 +174,8 @@ export async function getOverdueTopicsGrouped(
     };
   }
 
+  // Resolve subject names for overdue subjects via the scoped repo; flagged-only
+  // subjects carry their name inline from the join above.
   const subjectIds = [...new Set(overdueCards.map((card) => card.subjectId))];
   const subjectsRows =
     subjectIds.length > 0
@@ -102,6 +184,10 @@ export async function getOverdueTopicsGrouped(
   const subjectLookup = new Map(subjectsRows.map((s) => [s.id, s]));
 
   const subjectMap = new Map<string, OverdueSubject>();
+  // topicId → its topic object (for reason-tag mutation when a flagged row
+  // matches an overdue topic) and its sort metadata.
+  const topicLookup = new Map<string, OverdueTopic>();
+  const sortMeta = new Map<string, TopicSortMeta>();
 
   for (const card of overdueCards) {
     const subject = subjectLookup.get(card.subjectId);
@@ -115,22 +201,82 @@ export async function getOverdueTopicsGrouped(
     };
 
     entry.overdueCount += 1;
-    entry.topics.push({
+    const topic: OverdueTopic = {
       topicId: card.topicId,
       topicTitle: card.topicTitle,
       overdueDays: toOverdueDays(now, card.nextReviewAt),
       failureCount: card.failureCount ?? 0,
+      reason: 'overdue',
+    };
+    entry.topics.push(topic);
+    topicLookup.set(card.topicId, topic);
+    sortMeta.set(card.topicId, {
+      bandRank: BAND_RANK[bandForCard(card.lastReviewedAt, card.intervalDays)],
+      flaggedRecencyMs: 0,
     });
 
     subjectMap.set(subject.id, entry);
+  }
+
+  // Merge flagged-weak rows: tag an existing overdue topic as 'both' (attaching
+  // its concept), or add a flagged-only topic tagged 'flagged_weak'. Dedup is by
+  // topicId; a topic belongs to exactly one subject. flaggedRows arrive newest
+  // first, so the first row seen for a topicId carries the freshest concept.
+  for (const flagged of flaggedRows) {
+    const existing = topicLookup.get(flagged.topicId);
+    if (existing) {
+      existing.reason = 'both';
+      if (existing.concept == null && flagged.concept != null) {
+        existing.concept = flagged.concept;
+      }
+      continue;
+    }
+
+    const entry = subjectMap.get(flagged.subjectId) ?? {
+      subjectId: flagged.subjectId,
+      subjectName: flagged.subjectName,
+      overdueCount: 0,
+      topics: [],
+    };
+
+    const topic: OverdueTopic = {
+      topicId: flagged.topicId,
+      topicTitle: flagged.topicTitle,
+      overdueDays: 0,
+      failureCount: 0,
+      reason: 'flagged_weak',
+      ...(flagged.concept != null ? { concept: flagged.concept } : {}),
+    };
+    entry.topics.push(topic);
+    topicLookup.set(flagged.topicId, topic);
+    // Flagged-only rows have no SM-2 schedule → forgotten band, ordered among
+    // themselves by needs_deepening recency (newest first).
+    sortMeta.set(flagged.topicId, {
+      bandRank: BAND_RANK.forgotten,
+      flaggedRecencyMs: flagged.createdAt.getTime(),
+    });
+
+    subjectMap.set(flagged.subjectId, entry);
   }
 
   const groupedSubjects = [...subjectMap.values()]
     .map((subject) => ({
       ...subject,
       topics: [...subject.topics].sort((a, b) => {
+        const aMeta = sortMeta.get(a.topicId);
+        const bMeta = sortMeta.get(b.topicId);
+        const aBand = aMeta?.bandRank ?? BAND_RANK.forgotten;
+        const bBand = bMeta?.bandRank ?? BAND_RANK.forgotten;
+        if (aBand !== bBand) {
+          return aBand - bBand;
+        }
         if (b.overdueDays !== a.overdueDays) {
           return b.overdueDays - a.overdueDays;
+        }
+        const aRecency = aMeta?.flaggedRecencyMs ?? 0;
+        const bRecency = bMeta?.flaggedRecencyMs ?? 0;
+        if (bRecency !== aRecency) {
+          return bRecency - aRecency;
         }
         return a.topicTitle.localeCompare(b.topicTitle);
       }),
@@ -145,7 +291,8 @@ export async function getOverdueTopicsGrouped(
   // [BUG-470 / P2] Surface truncation so the mobile UI can show "500+" rather
   // than implying the displayed list is the full backlog. The cap is 500 cards;
   // if the returned list hits exactly 500, totalOverdue > displayedCount signals
-  // the UX discrepancy and truncated:true makes it unambiguous.
+  // the UX discrepancy and truncated:true makes it unambiguous. Truncation is an
+  // overdue-card concern only — the flagged-weak merge does not affect the cap.
   //
   // Fail-open: if countRow?.count is null (e.g. the COUNT query returned no
   // row) and we already hit the 500-row cap, we cannot know the true total —

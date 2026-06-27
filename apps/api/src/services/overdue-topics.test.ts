@@ -41,14 +41,25 @@ function createMockDb(options: {
   displayedRows?: Array<{
     topicId: string;
     nextReviewAt: Date | null;
+    lastReviewedAt?: Date | null;
+    intervalDays?: number | null;
     failureCount?: number | null;
   }>;
   curriculaRows?: { id: string; subjectId: string }[];
   totalOverdue?: number;
+  flaggedRows?: Array<{
+    topicId: string;
+    topicTitle: string;
+    subjectId: string;
+    subjectName: string;
+    concept?: string | null;
+    createdAt?: Date;
+  }>;
 }): Database {
   // Order of select() calls in getOverdueTopicsGrouped:
   // 1. count(*) for totalOverdue
   // 2. retentionCards ⋈ curriculumTopics ⋈ curricula ⋈ subjects (scoped display rows)
+  // 3. needs_deepening_topics ⋈ curriculumTopics ⋈ subjects (flagged-weak rows)
   const totalOverdueRows =
     options.totalOverdue != null ? [{ count: options.totalOverdue }] : [];
   const topicById = new Map((options.topicsRows ?? []).map((t) => [t.id, t]));
@@ -71,14 +82,25 @@ function createMockDb(options: {
         curriculumId: topic.curriculumId,
         subjectId: subjectByCurriculum.get(topic.curriculumId) ?? 'subject-1',
         nextReviewAt: card.nextReviewAt,
+        lastReviewedAt: card.lastReviewedAt ?? null,
+        intervalDays: card.intervalDays ?? 1,
         failureCount: card.failureCount ?? 0,
       },
     ];
   });
+  const flaggedRows = (options.flaggedRows ?? []).map((row) => ({
+    topicId: row.topicId,
+    concept: row.concept ?? null,
+    createdAt: row.createdAt ?? NOW,
+    topicTitle: row.topicTitle,
+    subjectId: row.subjectId,
+    subjectName: row.subjectName,
+  }));
   const selectFn = jest.fn();
   selectFn
     .mockReturnValueOnce(createSelectChain(totalOverdueRows))
-    .mockReturnValueOnce(createSelectChain(displayedRows));
+    .mockReturnValueOnce(createSelectChain(displayedRows))
+    .mockReturnValueOnce(createSelectChain(flaggedRows));
 
   return { select: selectFn } as unknown as Database;
 }
@@ -103,6 +125,25 @@ function setupScopedRepo(options?: {
         .mockResolvedValue(options?.subjectsFindManyResults ?? []),
     },
   });
+}
+
+// Recursively search a value graph (e.g. a drizzle SQL condition object) for a
+// target string value. Used by the [T10] scoped-read break test to assert the
+// caller's profileId is bound into the needs_deepening filter/join without
+// coupling to drizzle's internal condition representation.
+function deepIncludesValue(
+  node: unknown,
+  target: string,
+  seen = new Set<unknown>(),
+): boolean {
+  if (node === target) return true;
+  if (node == null || typeof node !== 'object') return false;
+  if (seen.has(node)) return false;
+  seen.add(node);
+  for (const value of Object.values(node as Record<string, unknown>)) {
+    if (deepIncludesValue(value, target, seen)) return true;
+  }
+  return false;
 }
 
 describe('getOverdueTopicsGrouped', () => {
@@ -183,6 +224,7 @@ describe('getOverdueTopicsGrouped', () => {
             topicTitle: 'Fractions',
             overdueDays: 2,
             failureCount: 2,
+            reason: 'overdue',
           },
         ],
       },
@@ -196,6 +238,7 @@ describe('getOverdueTopicsGrouped', () => {
             topicTitle: 'Cells',
             overdueDays: 1,
             failureCount: 1,
+            reason: 'overdue',
           },
         ],
       },
@@ -355,7 +398,8 @@ describe('getOverdueTopicsGrouped', () => {
       select: jest
         .fn()
         .mockReturnValueOnce(countChain)
-        .mockReturnValueOnce(displayedChain),
+        .mockReturnValueOnce(displayedChain)
+        .mockReturnValueOnce(createSelectChain([])),
     } as unknown as Database;
     setupScopedRepo({
       retentionCardsFindMany: [
@@ -410,7 +454,8 @@ describe('getOverdueTopicsGrouped', () => {
       select: jest
         .fn()
         .mockReturnValueOnce(countChain)
-        .mockReturnValueOnce(displayedChain),
+        .mockReturnValueOnce(displayedChain)
+        .mockReturnValueOnce(createSelectChain([])),
     } as unknown as Database;
     setupScopedRepo({
       retentionCardsFindMany: staleCards,
@@ -505,5 +550,155 @@ describe('getOverdueTopicsGrouped', () => {
     expect(result.truncated).toBe(false);
     expect(result.displayedCount).toBe(0);
     expect(result.totalOverdue).toBe(0);
+  });
+
+  // [Flow 3 / RR-10 / T10] Merged relearn queue — overdue cards unioned with
+  // needs_deepening_topics (status active/pending_review), deduped by topicId
+  // and reason-tagged, ordered by retention band.
+  describe('[T10] merged relearn queue', () => {
+    it('dedups a topic that is both overdue and flagged into a single both-tagged row with its concept', async () => {
+      const db = createMockDb({
+        topicsRows: [
+          { id: 'topic-1', title: 'Fractions', curriculumId: 'curriculum-1' },
+        ],
+        displayedRows: [
+          {
+            topicId: 'topic-1',
+            nextReviewAt: new Date('2026-05-01T10:00:00.000Z'),
+            failureCount: 2,
+          },
+        ],
+        curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
+        flaggedRows: [
+          {
+            topicId: 'topic-1',
+            topicTitle: 'Fractions',
+            subjectId: 'subject-1',
+            subjectName: 'Math',
+            concept: 'Adding fractions',
+          },
+        ],
+      });
+
+      setupScopedRepo({
+        subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+      });
+
+      const result = await getOverdueTopicsGrouped(db, profileId);
+
+      expect(result.subjects).toHaveLength(1);
+      expect(result.subjects[0]?.topics).toHaveLength(1);
+      const topic = result.subjects[0]?.topics[0];
+      expect(topic?.topicId).toBe('topic-1');
+      expect(topic?.reason).toBe('both');
+      expect(topic?.concept).toBe('Adding fractions');
+      expect(topic?.failureCount).toBe(2);
+    });
+
+    it('surfaces a flagged-only topic (no overdue card) tagged flagged_weak with overdueDays 0', async () => {
+      const db = createMockDb({
+        topicsRows: [],
+        curriculaRows: [],
+        flaggedRows: [
+          {
+            topicId: 'topic-2',
+            topicTitle: 'Cells',
+            subjectId: 'subject-2',
+            subjectName: 'Science',
+            concept: 'Mitochondria',
+          },
+        ],
+      });
+
+      setupScopedRepo({});
+
+      const result = await getOverdueTopicsGrouped(db, profileId);
+
+      expect(result.totalOverdue).toBe(0);
+      expect(result.subjects).toHaveLength(1);
+      expect(result.subjects[0]?.subjectId).toBe('subject-2');
+      expect(result.subjects[0]?.overdueCount).toBe(0);
+      const topic = result.subjects[0]?.topics[0];
+      expect(topic?.topicId).toBe('topic-2');
+      expect(topic?.reason).toBe('flagged_weak');
+      expect(topic?.overdueDays).toBe(0);
+      expect(topic?.concept).toBe('Mitochondria');
+    });
+
+    it('orders topics by retention band (forgotten before strong) ahead of raw overdue days', async () => {
+      // topic-strong is MORE overdue by days but its band is "strong" (recently
+      // reviewed, long interval); topic-forgotten is less overdue but
+      // "forgotten". Band must win → forgotten first.
+      const db = createMockDb({
+        topicsRows: [
+          {
+            id: 'topic-strong',
+            title: 'Strong Topic',
+            curriculumId: 'curriculum-1',
+          },
+          {
+            id: 'topic-forgotten',
+            title: 'Forgotten Topic',
+            curriculumId: 'curriculum-1',
+          },
+        ],
+        displayedRows: [
+          {
+            topicId: 'topic-strong',
+            nextReviewAt: new Date('2026-04-25T10:00:00.000Z'), // 8 days overdue
+            lastReviewedAt: new Date('2026-05-02T10:00:00.000Z'),
+            intervalDays: 10, // ratio ~0.1 → strong
+          },
+          {
+            topicId: 'topic-forgotten',
+            nextReviewAt: new Date('2026-05-01T10:00:00.000Z'), // 2 days overdue
+            lastReviewedAt: new Date('2026-04-01T10:00:00.000Z'),
+            intervalDays: 1, // ratio ~32 → forgotten
+          },
+        ],
+        curriculaRows: [{ id: 'curriculum-1', subjectId: 'subject-1' }],
+      });
+
+      setupScopedRepo({
+        subjectsFindManyResults: [{ id: 'subject-1', name: 'Math' }],
+      });
+
+      const result = await getOverdueTopicsGrouped(db, profileId);
+
+      expect(result.subjects[0]?.topics.map((t) => t.topicId)).toEqual([
+        'topic-forgotten',
+        'topic-strong',
+      ]);
+    });
+
+    it('[BREAK] scopes the needs_deepening read to the caller profile (no second-profile leak)', async () => {
+      const FOREIGN_PROFILE = 'other-profile-id';
+      const countChain = createSelectChain([]);
+      const displayedChain = createSelectChain([]);
+      const flaggedChain = createSelectChain([]);
+      const db = {
+        select: jest
+          .fn()
+          .mockReturnValueOnce(countChain)
+          .mockReturnValueOnce(displayedChain)
+          .mockReturnValueOnce(flaggedChain),
+      } as unknown as Database;
+      setupScopedRepo({});
+
+      await getOverdueTopicsGrouped(db, profileId);
+
+      // The flagged read joins curriculum_topics + subjects (parent chain) and
+      // filters on the caller's profileId. A regression that drops the
+      // subjects.profileId join or the row-level profileId filter — the only
+      // things keeping a sibling profile's flagged topics out — breaks this.
+      expect(flaggedChain.innerJoin).toHaveBeenCalledTimes(2);
+      expect(flaggedChain.where).toHaveBeenCalledTimes(1);
+
+      const whereArg = flaggedChain.where.mock.calls[0]?.[0];
+      const subjectsJoinArg = flaggedChain.innerJoin.mock.calls[1]?.[1];
+      expect(deepIncludesValue(whereArg, profileId)).toBe(true);
+      expect(deepIncludesValue(subjectsJoinArg, profileId)).toBe(true);
+      expect(deepIncludesValue(whereArg, FOREIGN_PROFILE)).toBe(false);
+    });
   });
 });

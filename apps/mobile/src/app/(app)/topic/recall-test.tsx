@@ -13,7 +13,10 @@ import {
 } from '../../../components/progress';
 import { useSubmitRecallTest } from '../../../hooks/use-retention';
 import { useResolveTopicSubject } from '../../../hooks/use-progress';
-import { classifyApiError } from '../../../lib/format-api-error';
+import {
+  classifyApiError,
+  extractApiErrorCode,
+} from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 import { ErrorFallback } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -80,6 +83,12 @@ export default function RecallTestScreen() {
     retentionStatus: RetentionStatus;
   } | null>(null);
   const [submissionTimedOut, setSubmissionTimedOut] = useState(false);
+  // [Flow 2 / L-2 / T13] Holds the learner's typed answer when the recall
+  // grader is unavailable (502 UPSTREAM_ERROR). The server restored the recall
+  // cooldown (C-2) so a retry re-submits this preserved answer immediately.
+  const [graderUnavailableAnswer, setGraderUnavailableAnswer] = useState<
+    string | null
+  >(null);
 
   const cleanupRef = useRef<(() => void) | null>(null);
   const dontRememberPendingRef = useRef(false);
@@ -119,25 +128,14 @@ export default function RecallTestScreen() {
     return () => ref.current?.();
   }, []);
 
-  const handleSend = useCallback(
+  // Fire the recall-grade mutation for a typed answer. Kept separate from
+  // handleSend so the [T13] grader-unavailable retry can re-submit the
+  // preserved answer WITHOUT appending a duplicate user message.
+  const runRecallSubmission = useCallback(
     (text: string) => {
       if (!topicId) return;
-      if (
-        anySubmissionInFlightRef.current ||
-        submissionInFlightRef.current ||
-        isStreaming
-      )
-        return;
       anySubmissionInFlightRef.current = true;
       submissionInFlightRef.current = true;
-
-      // Add user message
-      const userMsg: ChatMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: text,
-      };
-      setMessages((prev) => [...prev, userMsg]);
 
       const token = ++submissionTokenRef.current;
       submitRecallTest.mutate(
@@ -186,6 +184,14 @@ export default function RecallTestScreen() {
           onError: (err: Error) => {
             if (token !== submissionTokenRef.current) return;
             releaseSubmissionBlock();
+            // [Flow 2 / L-2 / T13] Grader unavailable (502 UPSTREAM_ERROR): the
+            // server restored the recall cooldown (C-2), so the learner can
+            // retry right away. Preserve the typed answer and surface warm,
+            // answer-safe copy instead of a bare error alert.
+            if (extractApiErrorCode(err) === 'UPSTREAM_ERROR') {
+              setGraderUnavailableAnswer(text);
+              return;
+            }
             // UX-DE-L8: error is not an AI reply
             platformAlert(
               t('topic.recallTest.errorTitle'),
@@ -195,8 +201,40 @@ export default function RecallTestScreen() {
         },
       );
     },
-    [isStreaming, releaseSubmissionBlock, submitRecallTest, topicId, t],
+    [releaseSubmissionBlock, submitRecallTest, topicId, t],
   );
+
+  const handleSend = useCallback(
+    (text: string) => {
+      if (!topicId) return;
+      if (
+        anySubmissionInFlightRef.current ||
+        submissionInFlightRef.current ||
+        isStreaming
+      )
+        return;
+
+      // Add user message
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: text,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      runRecallSubmission(text);
+    },
+    [isStreaming, runRecallSubmission, topicId],
+  );
+
+  // [T13] Retry the preserved answer after a grader-unavailable error. No new
+  // user message is appended — the original is still in the transcript.
+  const handleGraderRetry = useCallback(() => {
+    const answer = graderUnavailableAnswer;
+    if (!answer) return;
+    setGraderUnavailableAnswer(null);
+    runRecallSubmission(answer);
+  }, [graderUnavailableAnswer, runRecallSubmission]);
 
   const handleReviewRetest = useCallback(() => {
     // Reset state and try again
@@ -349,6 +387,27 @@ export default function RecallTestScreen() {
           testID: 'recall-test-timeout-back',
         }}
         testID="recall-test-timeout"
+      />
+    );
+  }
+
+  if (graderUnavailableAnswer) {
+    return (
+      <ErrorFallback
+        variant="centered"
+        title={t('topic.recallTest.gradingUnavailableTitle')}
+        message={t('topic.recallTest.gradingUnavailableMessage')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: handleGraderRetry,
+          testID: 'recall-test-grading-retry',
+        }}
+        secondaryAction={{
+          label: t('topic.recallTest.goToLibrary'),
+          onPress: goToLibrary,
+          testID: 'recall-test-grading-back',
+        }}
+        testID="recall-test-grading-unavailable"
       />
     );
   }

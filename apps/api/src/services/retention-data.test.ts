@@ -49,8 +49,10 @@ import {
   createScopedRepository,
   curriculumBooks,
   retentionCards,
+  retrievalEvents,
   xpLedger,
 } from '@eduagent/database';
+import { UpstreamLlmError } from '../errors';
 import { processRecallResult, getRetentionStatus } from './retention';
 import {
   canExitNeedsDeepening,
@@ -543,6 +545,93 @@ describe('getTopicRetention', () => {
 // ---------------------------------------------------------------------------
 
 describe('processRecallTest', () => {
+  // [Flow 2 / T5] The global beforeEach registers a stock gemini mock whose
+  // reply is NOT valid grade JSON. Under the honest grading contract that yields
+  // `{ graded: false }` → an UpstreamLlmError throw, which is not what these
+  // SM-2-orchestration tests are exercising. Register a parseable JSON grader so
+  // every standard-mode test proceeds past the grade gate; the SM-2 outcome is
+  // still controlled per-test by the mocked processRecallResult.
+  function registerJsonGrader(body: string): void {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<ChatResult> {
+        return { content: body, stopReason: 'stop' };
+      },
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield body;
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    };
+    registerProvider(provider);
+  }
+
+  beforeEach(() => {
+    registerJsonGrader(
+      '{"quality": 4, "verdict": "solid", "rationale": "ok", "misconception": null}',
+    );
+  });
+
+  // [Flow 2 / T5] Honest grading: a standard recall records ONE graded `llm`
+  // row in the permanent recall log AND advances SM-2.
+  it('[T5] records a graded llm retrieval_events row and advances SM-2', async () => {
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    (processRecallResult as jest.Mock).mockReturnValue({
+      passed: true,
+      newState: {
+        topicId,
+        easeFactor: 2.6,
+        intervalDays: 10,
+        repetitions: 4,
+        failureCount: 0,
+        consecutiveSuccesses: 3,
+        xpStatus: 'verified',
+        nextReviewAt: '2026-02-25T10:00:00.000Z',
+        lastReviewedAt: NOW.toISOString(),
+      },
+      xpChange: 'verified',
+    });
+
+    const db = createMockDb();
+    await processRecallTest(db, profileId, {
+      topicId,
+      answer:
+        'A detailed explanation of photosynthesis and the light reactions',
+    });
+
+    // SM-2 advanced.
+    expect(processRecallResult).toHaveBeenCalled();
+    // The permanent recall log received an append (graded row).
+    const insertedTables = (db.insert as jest.Mock).mock.calls.map((c) => c[0]);
+    expect(insertedTables).toContain(retrievalEvents);
+  });
+
+  // [Flow 2 / T5 / C-2] Grader unavailable: NO fabricated score. The recall
+  // surfaces a retryable UpstreamLlmError and SM-2 is never advanced.
+  it('[T5] throws UpstreamLlmError and does not advance SM-2 when the grader is unavailable', async () => {
+    // Unparseable grader reply → evaluateRecallQuality returns { graded: false }.
+    registerJsonGrader('I think that answer was pretty good, maybe a 4?');
+
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+    const db = createMockDb();
+
+    await expect(
+      processRecallTest(db, profileId, {
+        topicId,
+        answer: 'A'.repeat(60),
+      }),
+    ).rejects.toThrow(UpstreamLlmError);
+
+    // Honest contract: the SM-2 algorithm must NOT run on an ungraded recall.
+    expect(processRecallResult).not.toHaveBeenCalled();
+  });
+
   // [BUG-657 / FCR-2026-05-23-L3.M3.3] Break test: the topic ownership check
   // + retention-card bootstrap must run inside a single db.transaction(),
   // so a concurrent topic transfer cannot slip between the ownership check
@@ -2127,226 +2216,144 @@ describe('evaluateRecallQuality', () => {
     registerProvider(createMockProvider('gemini'));
   });
 
-  it('returns parsed SM-2 quality from LLM response', async () => {
+  // Helper: register a grader provider that returns a fixed string body.
+  function registerGrader(body: string): void {
     const provider: LLMProvider = {
       id: 'gemini',
       async chat(
         _messages: ChatMessage[],
         _config: ModelConfig,
       ): Promise<ChatResult> {
-        return { content: '4', stopReason: 'stop' };
+        return { content: body, stopReason: 'stop' };
       },
       chatStream(): ChatStreamResult {
         return makeChatStreamResult(
           (async function* () {
-            yield '4';
+            yield body;
           })(),
           Promise.resolve<StopReason>('stop'),
         );
       },
     };
     registerProvider(provider);
+  }
+
+  it('returns a graded RecallGrade from a structured JSON response', async () => {
+    registerGrader(
+      '{"quality": 4, "verdict": "solid", "rationale": "Strong recall of the light reactions.", "misconception": null}',
+    );
 
     const result = await evaluateRecallQuality(
       'A thorough explanation of photosynthesis involving chlorophyll and light reactions',
       'Photosynthesis',
     );
-    expect(result).toBe(4);
+    expect(result).toEqual({
+      graded: true,
+      quality: 4,
+      gradedBy: 'llm',
+      verdict: 'solid',
+      rationale: 'Strong recall of the light reactions.',
+      misconception: null,
+      rung: 1,
+    });
   });
 
-  it('handles quality 0 (blackout)', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: '0', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '0';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
+  it('handles quality 0 / verdict "missing" (blackout)', async () => {
+    registerGrader(
+      '{"quality": 0, "verdict": "missing", "rationale": "No meaningful content.", "misconception": null}',
+    );
 
     const result = await evaluateRecallQuality('', 'Photosynthesis');
-    expect(result).toBe(0);
+    expect(result).toMatchObject({
+      graded: true,
+      quality: 0,
+      verdict: 'missing',
+    });
   });
 
-  it('handles quality 5 (perfect)', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: '5', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '5';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
+  it('handles quality 5 / verdict "solid" (perfect)', async () => {
+    registerGrader(
+      '{"quality": 5, "verdict": "solid", "rationale": "Complete and accurate.", "misconception": null}',
+    );
 
     const result = await evaluateRecallQuality(
       'Complete and perfect explanation of the topic',
       'Topic',
     );
-    expect(result).toBe(5);
+    expect(result).toMatchObject({
+      graded: true,
+      quality: 5,
+      verdict: 'solid',
+    });
   });
 
-  it('falls back to length heuristic on unparseable LLM response', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: 'I think the answer is good', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield 'good';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
+  it('carries the misconception string for a "misconception" verdict', async () => {
+    registerGrader(
+      '{"quality": 2, "verdict": "misconception", "rationale": "Confused mitosis with meiosis.", "misconception": "Thinks mitosis halves chromosome count."}',
+    );
 
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(3); // Mid-length answer -> fallback quality 3
+    const result = await evaluateRecallQuality(
+      'Mitosis makes four cells with half the chromosomes',
+      'Mitosis',
+    );
+    expect(result).toMatchObject({
+      graded: true,
+      verdict: 'misconception',
+      misconception: 'Thinks mitosis halves chromosome count.',
+    });
   });
 
-  it('falls back to short-answer heuristic on unparseable LLM response', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: 'not a number', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield 'not a number';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
-
-    const result = await evaluateRecallQuality('idk', 'Topic');
-    expect(result).toBe(2); // Short answer -> fallback quality 2
-  });
-
-  it('falls back to length heuristic on LLM error', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        throw new Error('LLM unavailable');
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
-
-    const result = await evaluateRecallQuality('idk', 'Topic');
-    expect(result).toBe(2); // Short answer -> fallback quality 2
-  });
-
-  it('falls back for long answer on LLM error', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        throw new Error('LLM unavailable');
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
-
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(3); // Mid-length answer -> fallback quality 3
-  });
-
-  it('clamps out-of-range values to fallback', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: '7', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '7';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
-
-    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
-    expect(result).toBe(3); // Fallback for mid-length answer
-  });
-
-  it('clamps negative values to fallback', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: '-1', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '-1';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
-
-    const result = await evaluateRecallQuality('short', 'Topic');
-    expect(result).toBe(2); // Fallback for short answer
-  });
-
-  it('handles LLM response with whitespace', async () => {
-    const provider: LLMProvider = {
-      id: 'gemini',
-      async chat(): Promise<ChatResult> {
-        return { content: '  3  \n', stopReason: 'stop' };
-      },
-      chatStream(): ChatStreamResult {
-        return makeChatStreamResult(
-          (async function* () {
-            yield '3';
-          })(),
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(provider);
+  it('parses JSON wrapped in code fences / surrounding prose', async () => {
+    registerGrader(
+      'Here is my grade:\n```json\n{"quality": 3, "verdict": "partial", "rationale": "Partial coverage.", "misconception": null}\n```',
+    );
 
     const result = await evaluateRecallQuality(
       'Some answer about the topic',
       'Topic',
     );
-    expect(result).toBe(3);
+    expect(result).toMatchObject({
+      graded: true,
+      quality: 3,
+      verdict: 'partial',
+    });
+  });
+
+  it('returns an honest fallback (no fabricated score) on an unparseable response', async () => {
+    registerGrader('I think the answer is pretty good, maybe a 4?');
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+  });
+
+  it('returns an honest fallback on an LLM error', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(): Promise<ChatResult> {
+        throw new Error('LLM unavailable');
+      },
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    };
+    registerProvider(provider);
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
+  });
+
+  it('returns an honest fallback when quality is out of range', async () => {
+    registerGrader(
+      '{"quality": 7, "verdict": "solid", "rationale": "x", "misconception": null}',
+    );
+
+    const result = await evaluateRecallQuality('A'.repeat(60), 'Topic');
+    expect(result).toEqual({ graded: false, gradedBy: 'fallback_heuristic' });
   });
 });
 

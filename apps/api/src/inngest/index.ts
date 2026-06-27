@@ -85,6 +85,7 @@ import {
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
 } from './functions/transcript-purge-cron';
+import { retrievalEventsRetentionCron } from './functions/retrieval-events-retention-cron';
 import { memoryFactsBackfill } from './functions/memory-facts-backfill';
 import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfill';
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
@@ -181,6 +182,7 @@ export {
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
+  retrievalEventsRetentionCron,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,
@@ -271,6 +273,7 @@ export const functions = [
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
+  retrievalEventsRetentionCron,
   memoryFactsBackfill,
   memoryFactsEmbedBackfill,
   reviewCalibrationGrade,

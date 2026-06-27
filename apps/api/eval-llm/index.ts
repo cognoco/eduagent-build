@@ -55,6 +55,7 @@ import { languageQualityFlow } from './flows/language-quality';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
 import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
+import { recallGraderFlow } from './flows/recall-grader';
 import { anthropicResponseFormatFlow } from './flows/anthropic-response-format';
 // [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
 // hook was previously blind to. See flow files for context.
@@ -154,6 +155,7 @@ const FLOWS: FlowDefinition[] = [
   teachingSessionFlow as FlowDefinition,
   challengeGraderFlow as FlowDefinition,
   reviewContinuityOpenerFlow as FlowDefinition,
+  recallGraderFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

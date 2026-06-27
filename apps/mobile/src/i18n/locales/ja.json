@@ -1627,7 +1627,9 @@
       "timeoutTitle": "まだ待機中…",
       "timeoutMessage": "回答の送信に時間がかかっています。接続を確認してもう一度お試しください。",
       "dontRememberFirst": "思い出せません。",
-      "dontRememberAgain": "まだ分かりません。"
+      "dontRememberAgain": "まだ分かりません。",
+      "gradingUnavailableTitle": "回答を受け付けました。",
+      "gradingUnavailableMessage": "ただいま採点できませんでした。回答は安全に保存されています。もう一度試すか、後で確認してください。"
     },
     "lastStudied": "最終学習：{{when}}",
     "neverStudied": "未学習",

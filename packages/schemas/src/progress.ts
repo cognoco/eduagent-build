@@ -627,6 +627,13 @@ export const overdueTopicSchema = z.object({
   topicTitle: z.string(),
   overdueDays: z.number().int().min(0),
   failureCount: z.number().int().min(0),
+  // [Flow 3 / RR-10 / T9] Why this topic is in the relearn queue: SM-2 overdue,
+  // flagged weak via needs_deepening_topics, or both. Optional → backward
+  // compatible (existing overdue-only callers omit it). The mobile reason-line
+  // render is deferred (former T11 / L-4) until rows actually differ post-RR-12.
+  reason: z.enum(['overdue', 'flagged_weak', 'both']).optional(),
+  // Concept label carried from a flagged needs-deepening row, when present.
+  concept: z.string().optional(),
 });
 export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
 

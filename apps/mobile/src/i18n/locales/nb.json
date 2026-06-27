@@ -1627,7 +1627,9 @@
       "timeoutTitle": "Venter fortsatt…",
       "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen.",
       "dontRememberFirst": "Jeg husker ikke.",
-      "dontRememberAgain": "Sitter fortsatt fast."
+      "dontRememberAgain": "Sitter fortsatt fast.",
+      "gradingUnavailableTitle": "Svaret ditt er mottatt.",
+      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",
