@@ -783,6 +783,11 @@
         "withNameSubject": "Hi {{name}}. You're here to work on {{subject}}. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
         "withName": "Hi {{name}}. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?",
         "generic": "Hi. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Welcome back, {{name}}. Ready to pick up {{subject}} again? Ask me anything — where should we go next?",
+        "withName": "Welcome back, {{name}}. What would you like to work on today?",
+        "generic": "Welcome back. What would you like to work on today?"
       }
     },
     "messageBubble": {

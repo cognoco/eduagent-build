@@ -783,6 +783,11 @@
         "withNameSubject": "Olá, {{name}}. Você está aqui para praticar {{subject}}. Pode me perguntar sobre qualquer coisa que você esteja aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Por onde vamos começar com {{subject}}?",
         "withName": "Olá, {{name}}. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?",
         "generic": "Olá. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Boas-vindas de volta, {{name}}. Pronto(a) para retomar {{subject}}? Pode perguntar qualquer coisa — para onde vamos agora?",
+        "withName": "Boas-vindas de volta, {{name}}. No que você gostaria de trabalhar hoje?",
+        "generic": "Boas-vindas de volta. No que você gostaria de trabalhar hoje?"
       }
     },
     "filingFailed": {

@@ -756,6 +756,11 @@
         "withNameSubject": "Hola, {{name}}. Estás aquí para practicar {{subject}}. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
         "withName": "Hola, {{name}}. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?",
         "generic": "Hola. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Hola de nuevo, {{name}}. ¿Listo para retomar {{subject}}? Pregúntame lo que quieras. ¿Por dónde seguimos?",
+        "withName": "Hola de nuevo, {{name}}. ¿En qué te gustaría trabajar hoy?",
+        "generic": "Hola de nuevo. ¿En qué te gustaría trabajar hoy?"
       }
     },
     "filingFailed": {
