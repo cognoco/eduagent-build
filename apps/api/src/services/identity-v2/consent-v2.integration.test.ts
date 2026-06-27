@@ -36,13 +36,17 @@ import {
   type Database,
 } from '@eduagent/database';
 import {
+  ConsentNotAuthorizedError,
+  ConsentRecordNotFoundError,
   createDirectConsentGrant,
   createPendingConsentRequest,
   getOrgMemberDisplayNameV2,
   processConsentResponseV2,
   requestConsentV2,
+  restoreConsentByToken,
   restoreConsentV2,
   revokeConsentV2,
+  withdrawConsentByToken,
 } from './consent-v2';
 import {
   consentPersonLockKey,
@@ -264,6 +268,122 @@ const COPPA = 'coppa_parental_consent';
       const newGrant = afterRestore.find((g) => g.priorValue === false);
       expect(newGrant?.granted).toBe(true);
       expect(newGrant?.withdrawnAt).toBeNull();
+    });
+
+    // -------------------------------------------------------------------------
+    // CRITICAL break test — bearer-token authority substitution (P0,
+    // MMT-ADR-0027). The email-consenting parent has NO `person` row and NO
+    // guardianship edge, so the edge-gated revokeConsentV2 is closed to them.
+    // withdrawConsentByToken MUST stamp withdrawn_at for exactly that
+    // no-edge case — the auth substitution that makes GDPR Art. 7(3)
+    // withdrawal reachable. Red-green discipline (spec §8): revert
+    // withdrawConsentByToken to an isGuardianOf check and the
+    // "STAMPS … with no edge" case below fails.
+    // -------------------------------------------------------------------------
+    describe('bearer-token withdrawal/restore (email-parent, no edge)', () => {
+      // The exact email-parent state: an APPROVED gdpr grant produced by the
+      // consent-response flow, which creates NO guardianship edge (inv 14,
+      // proven by the approval test above).
+      async function seedApprovedNoEdge(): Promise<{
+        orgId: string;
+        childId: string;
+      }> {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        await createPendingConsentRequest(db, childId, orgId, 'GDPR');
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const req = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        await processConsentResponseV2(db, req!.token!, true);
+        return { orgId, childId };
+      }
+
+      it('the edge-gated revokeConsentV2 REJECTS this case (no guardianship edge) and does not mutate', async () => {
+        const { orgId, childId } = await seedApprovedNoEdge();
+        // Any person is a non-guardian here — there is no edge. (The real
+        // email-parent has no person row at all; a stranger stands in for the
+        // "not a guardian" authority the edge check demands.)
+        const strangerId = await seedPerson(orgId, { displayName: 'Stranger' });
+
+        await expect(
+          revokeConsentV2(db, childId, strangerId, orgId, 'GDPR'),
+        ).rejects.toBeInstanceOf(ConsentNotAuthorizedError);
+
+        const grant = await db.query.consentGrant.findFirst({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grant?.withdrawnAt).toBeNull();
+      });
+
+      it('withdrawConsentByToken STAMPS withdrawn_at with NO edge (the auth substitution)', async () => {
+        const { orgId, childId } = await seedApprovedNoEdge();
+
+        const result = await withdrawConsentByToken(db, childId, orgId, {
+          requestIp: '203.0.113.7',
+          userAgent: 'jest',
+        });
+        expect(result.withdrawnAt).toBeTruthy();
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        // STAMP, not a new row — identical mutation to revokeConsentV2.
+        expect(grants).toHaveLength(1);
+        expect(grants[0]!.withdrawnAt).toBeTruthy();
+        expect(grants[0]!.priorValue).toBe(true);
+        expect(
+          (grants[0]!.auditFact as { source?: string } | null)?.source,
+        ).toBe('email_parent_revocation');
+      });
+
+      it('withdrawConsentByToken is idempotent (second call returns the same withdrawnAt, no new row)', async () => {
+        const { orgId, childId } = await seedApprovedNoEdge();
+        const first = await withdrawConsentByToken(db, childId, orgId);
+        const second = await withdrawConsentByToken(db, childId, orgId);
+        expect(second.withdrawnAt.getTime()).toBe(first.withdrawnAt.getTime());
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(1);
+      });
+
+      it('restoreConsentByToken APPENDS a new un-withdrawn grant within grace (undo)', async () => {
+        const { orgId, childId } = await seedApprovedNoEdge();
+        await withdrawConsentByToken(db, childId, orgId);
+
+        await restoreConsentByToken(db, childId, orgId, { userAgent: 'jest' });
+
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(2);
+        const restored = grants.find((g) => g.priorValue === false);
+        expect(restored?.granted).toBe(true);
+        expect(restored?.withdrawnAt).toBeNull();
+        expect(
+          (restored?.auditFact as { source?: string } | null)?.source,
+        ).toBe('email_parent_restore');
+      });
+
+      it('withdrawConsentByToken on a person with no grant throws and never mutates (safe no-op)', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId); // membership but NO grant
+        await expect(
+          withdrawConsentByToken(db, childId, orgId),
+        ).rejects.toBeInstanceOf(ConsentRecordNotFoundError);
+        const grants = await db.query.consentGrant.findMany({
+          where: eq(consentGrant.chargePersonId, childId),
+        });
+        expect(grants).toHaveLength(0);
+      });
     });
 
     // -------------------------------------------------------------------------

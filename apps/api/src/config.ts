@@ -51,6 +51,17 @@ const envSchema = z.object({
   // change. Format is freeform; suggest ISO date or semver.
   CONSENT_POLICY_VERSION: z.string().min(1).default('2026-05-31'),
 
+  // [P0 email-consent-withdrawal] Dedicated HMAC secret for the stateless,
+  // non-expiring consent-withdrawal token emailed to the email-consenting
+  // parent (who has no account / no guardianship edge). Independent of any
+  // consent *response* token so a leak of one never compromises the other.
+  // min(32) like ANALYTICS_HASH_KEY. Read only by the consent-web routes via
+  // Bindings; never logged, never exposed through EXPO_PUBLIC_*. Production-
+  // required (see PRODUCTION_REQUIRED_BASE_KEYS): a missing secret would make
+  // the GDPR Art. 7(3) withdrawal link unsignable/unverifiable — a silent
+  // compliance failure — so we fail prod boot loudly instead.
+  CONSENT_WITHDRAWAL_TOKEN_SECRET: z.string().min(32).optional(),
+
   // Sentry — error tracking
   SENTRY_DSN: z.string().url().optional(),
 
@@ -417,6 +428,10 @@ const PRODUCTION_REQUIRED_BASE_KEYS: readonly (keyof Env)[] = [
   'API_ORIGIN',
   'REVENUECAT_WEBHOOK_SECRET',
   'ANALYTICS_HASH_KEY',
+  // [P0 email-consent-withdrawal] Required in production so the GDPR Art. 7(3)
+  // withdrawal link is always signable/verifiable; a missing secret is a silent
+  // compliance failure, so fail prod boot loudly instead.
+  'CONSENT_WITHDRAWAL_TOKEN_SECRET',
 ] as const;
 
 /**

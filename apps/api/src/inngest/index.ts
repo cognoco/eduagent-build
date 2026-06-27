@@ -1,6 +1,7 @@
 import { inngest } from './client';
 import { consentReminder } from './functions/consent-reminders';
 import { consentRevocation } from './functions/consent-revocation';
+import { consentEmailRevocation } from './functions/consent-email-revocation';
 import { archiveCleanup } from './functions/archive-cleanup';
 import { webhookIdempotencyPurge } from './functions/webhook-idempotency-purge';
 import { scheduledDeletion } from './functions/account-deletion';
@@ -121,6 +122,7 @@ export {
   feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
+  consentEmailRevocation,
   archiveCleanup,
   webhookIdempotencyPurge,
   scheduledDeletion,
@@ -209,6 +211,7 @@ export const functions = [
   feedbackDeliveryFailed,
   consentReminder,
   consentRevocation,
+  consentEmailRevocation,
   archiveCleanup,
   webhookIdempotencyPurge,
   scheduledDeletion,

@@ -29,6 +29,7 @@ export interface EmailPayload {
   body: string;
   type:
     | 'consent_request'
+    | 'consent_approved'
     | 'consent_reminder'
     | 'consent_warning'
     | 'consent_expired'
@@ -179,6 +180,32 @@ export function formatConsentRequestEmail(
     subject: `Parental consent required for ${childName}'s MentoMate account`,
     body: `Your child ${childName} wants to use MentoMate. Under applicable data protection regulations, we need your consent before processing their personal data. Please click the link to approve or deny: ${tokenUrl}`,
     type: 'consent_request',
+  };
+}
+
+/**
+ * Formats the post-approval confirmation email for an email-consenting parent.
+ *
+ * This is the **durable home** of the withdrawal link: the email a parent will
+ * actually return to later when they decide to withdraw. The original consent
+ * *request* email is archived/deleted once actioned, so it is not a reliable
+ * home — hence a dedicated confirmation email (P0 spec Rev 2, GDPR Art. 7(3):
+ * withdrawal must be as easy as giving).
+ *
+ * @param withdrawalUrl - The signed, non-expiring withdrawal link
+ *   (`/v1/consent-page/withdraw?token=…`). Built from a withdrawal token; this
+ *   formatter never sees the secret.
+ */
+export function formatConsentApprovedEmail(
+  parentEmail: string,
+  childName: string,
+  withdrawalUrl: string,
+): EmailPayload {
+  return {
+    to: parentEmail,
+    subject: `You approved ${childName}'s MentoMate account`,
+    body: `Thank you — you approved ${childName}'s MentoMate account, and they can now start learning.\n\nYou can manage or withdraw your consent at any time using the link below. Please keep this email so you can find it later:\n\n${withdrawalUrl}`,
+    type: 'consent_approved',
   };
 }
 
