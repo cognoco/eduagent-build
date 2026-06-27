@@ -9,6 +9,7 @@ import {
   ANTHROPIC_SONNET_MODEL,
   OPENAI_ADVANCED_MODEL,
   OPENAI_ADVANCED_MODEL_MIN_RUNG,
+  GRADER_MODEL,
   _setOpenAIAdvancedModelForTesting,
   setLlmRoutingV2Enabled,
   getModelConfigForTest,
@@ -1830,6 +1831,147 @@ describe('LLM Router', () => {
   // the V2 cutover), getModelConfig must never resolve to an unservable Gemini
   // config — it degrades to a registered approved provider. Behavior WITH Gemini
   // registered is unchanged.
+  // ---------------------------------------------------------------------------
+  // T3 — Judge capability routing (ADR-0016 §2 vendor-independence).
+  //
+  // GRADER_MODEL defaults to the anthropic occupant (claude-sonnet-4-6).
+  // The vendor guard ensures the grader never shares a vendor with the active
+  // tutor — enforced structurally, not by convention.
+  //
+  // Break test pattern (Fix Development Rules): the §2 assertion that
+  // grader-vendor ≠ tutor-vendor is the architectural invariant; the test is
+  // written to fail when the guard is removed, then pass once it is in place.
+  // ---------------------------------------------------------------------------
+  describe('judge capability routing (ADR-0016 §2 vendor-independence)', () => {
+    function createCapturingProvider(id: string): LLMProvider & {
+      lastConfig: ModelConfig | null;
+    } {
+      let captured: ModelConfig | null = null;
+      const base = createMockProvider(id);
+      return {
+        ...base,
+        get lastConfig() {
+          return captured;
+        },
+        async chat(
+          messages: ChatMessage[],
+          config: ModelConfig,
+        ): Promise<ChatResult> {
+          captured = config;
+          return base.chat(messages, config);
+        },
+      };
+    }
+
+    beforeEach(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+    });
+
+    afterAll(() => {
+      _clearProviders();
+      _resetCircuits();
+      setLlmRoutingV2Enabled(false);
+      registerProvider(createMockProvider('gemini'));
+    });
+
+    // --- getModelConfigV2 path ---
+
+    it('[V2 path] judge with cerebras tutor resolves anthropic grader with GRADER_MODEL and no reasoningEffort', () => {
+      // V2 matrix (standard tier, rung 1) → tutor is cerebras → grader must be
+      // anthropic with GRADER_MODEL and no reasoningEffort (non-reasoning, §2).
+      setLlmRoutingV2Enabled(true);
+
+      const cfg = getModelConfigForTest(1, { capability: 'judge' });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+      expect(cfg.maxTokens).toBeGreaterThanOrEqual(MIN_REPLY_MAX_TOKENS);
+    });
+
+    it('[V2 path] judge with premium OpenAI tutor (rung 4) still resolves anthropic grader', () => {
+      // V2 matrix, premium tier, rung 4 → tutor is openai gpt-5.4.
+      // openai ≠ anthropic → grader stays anthropic.
+      setLlmRoutingV2Enabled(true);
+
+      const cfg = getModelConfigForTest(4, {
+        capability: 'judge',
+        llmTier: 'premium',
+      });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+    });
+
+    // --- getModelConfig legacy path ---
+
+    it('[legacy path] judge with gemini tutor resolves anthropic grader', () => {
+      // Legacy routing, standard tier → gemini tutor → grader must be anthropic.
+      registerProvider(createMockProvider('gemini'));
+      setLlmRoutingV2Enabled(false);
+
+      const cfg = getModelConfigForTest(1, { capability: 'judge' });
+
+      expect(cfg.provider).toBe('anthropic');
+      expect(cfg.model).toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+    });
+
+    // --- Break test (§2 enforcement, red → green) ---
+
+    it('[§2 break test] judge with anthropic tutor MUST NOT resolve to anthropic grader', () => {
+      // ADR-0016 §2: evaluator must not share blind spots with the tutor.
+      // With legacy routing, premium tier, anthropic registered → tutor is
+      // anthropic → vendor guard must redirect grader to a different vendor.
+      //
+      // RED: without the vendor guard, resolved provider would be 'anthropic'.
+      // GREEN: with the guard, resolved provider is 'openai' (the only
+      //        non-anthropic judge candidate, never Gemini per §10.1).
+      registerProvider(createMockProvider('anthropic'));
+      setLlmRoutingV2Enabled(false);
+
+      const cfg = getModelConfigForTest(1, {
+        capability: 'judge',
+        llmTier: 'premium',
+      });
+
+      // The grader vendor must differ from the tutor vendor (anthropic).
+      expect(cfg.provider).not.toBe('anthropic');
+      expect(cfg.provider).toBe('openai');
+      // The forced-openai path uses OPENAI_MINI_MODEL (gpt-5-mini), not
+      // GRADER_MODEL (which is the anthropic occupant).
+      expect(cfg.model).not.toBe(GRADER_MODEL);
+      expect(cfg.reasoningEffort).toBeUndefined();
+    });
+
+    // --- routeAndCall end-to-end ---
+
+    it('routeAndCall with capability:judge resolves anthropic provider, GRADER_MODEL, and no reasoningEffort', async () => {
+      // V2 on: default tutor is cerebras → grader is anthropic.
+      // Register a capturing anthropic provider so we can inspect the config.
+      setLlmRoutingV2Enabled(true);
+      const spy = createCapturingProvider('anthropic');
+      registerProvider(spy);
+
+      const result = await routeAndCall(
+        [{ role: 'user', content: 'Grade this answer.' }],
+        1,
+        { capability: 'judge', flow: 'challenge.grader' },
+      );
+
+      expect(result.provider).toBe('anthropic');
+      expect(result.model).toBe(GRADER_MODEL);
+      expect(spy.lastConfig?.model).toBe(GRADER_MODEL);
+      expect(spy.lastConfig?.reasoningEffort).toBeUndefined();
+      expect(spy.lastConfig?.maxTokens).toBeGreaterThanOrEqual(
+        MIN_REPLY_MAX_TOKENS,
+      );
+    });
+  });
+
   describe('[T-A5] legacy path degrades to approved providers when no Gemini is registered', () => {
     beforeEach(() => {
       _clearProviders();

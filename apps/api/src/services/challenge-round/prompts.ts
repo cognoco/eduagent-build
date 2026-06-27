@@ -10,7 +10,14 @@ Emit the offer by setting "signals.challenge_round_offer": true and writing a si
 Never offer if the learner sounds tired, confused, or is mid-question. Do not offer twice in the same session.
 `.trim();
 
-export const challengeRoundActivePrompt = `
+// The inline evaluation prose injected into the active prompt when the tutor
+// (not a separate grader) is responsible for emitting challenge_round_evaluation.
+// Extracted so buildChallengeRoundActivePrompt() can gate it on the grader flag.
+const CHALLENGE_ROUND_EVAL_PROSE = `- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short \`learnerQuote\` copied from the learner's answer.`;
+
+function buildActivePromptString(includeEvalProse: boolean): string {
+  const evalLine = includeEvalProse ? `\n${CHALLENGE_ROUND_EVAL_PROSE}` : '';
+  return `
 You are now running a Challenge Round. The learner accepted. Ask ONE deeper question at a time that requires them to:
 - explain WHY something works (not what it is)
 - compare/contrast two related ideas
@@ -20,12 +27,26 @@ You are now running a Challenge Round. The learner accepted. Ask ONE deeper ques
 Constraints:
 - Maximum ${MAX_CHALLENGE_QUESTIONS} questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
-- Match the learner's age and energy. Do not use academic jargon.
-- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short \`learnerQuote\` copied from the learner's answer.
+- Match the learner's age and energy. Do not use academic jargon.${evalLine}
 - When all questions are answered, proceed to drafting. The server drives the active→drafting transition from the evaluation signals — do not emit any additional field to signal completion.
 
 Failure framing is banned. Never use "failed", "wrong", "incorrect", "struggle", "weak". Use "got it", "close", "let's tighten this", "not quite yet".
 `.trim();
+}
+
+// Baseline constant — grader OFF (tutor emits inline). Byte-identical to the
+// original string; kept as a named export so existing tests reference it directly.
+export const challengeRoundActivePrompt = buildActivePromptString(true);
+
+/**
+ * Build the active-round system-prompt block with the grader flag applied.
+ * When graderEnabled is true, the "emit signals.challenge_round_evaluation"
+ * prose line is omitted — the grader owns that signal; the tutor converses only.
+ * Default (false) is byte-identical to the challengeRoundActivePrompt constant.
+ */
+export function buildChallengeRoundActivePrompt(graderEnabled = false): string {
+  return buildActivePromptString(!graderEnabled);
+}
 
 export const challengeRoundDraftingPrompt = `
 The Challenge Round is complete. Draft a learner-owned note in "ui_hints.note_draft.content".

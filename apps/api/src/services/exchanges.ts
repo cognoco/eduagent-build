@@ -1519,6 +1519,7 @@ export async function processExchange(
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
   const systemPrompt = _buildSystemPrompt(promptContext, {
     includeAppHelpMap: appHelpTurn,
+    graderEnabled: promptContext.graderEnabled,
   });
 
   const messages: ChatMessage[] = [
@@ -1714,6 +1715,7 @@ export async function streamExchange(
   const promptContext: ExchangeContext = { ...context, sourceEvidence };
   const systemPrompt = _buildSystemPrompt(promptContext, {
     includeAppHelpMap: appHelpTurn,
+    graderEnabled: promptContext.graderEnabled,
   });
 
   const messages: ChatMessage[] = [

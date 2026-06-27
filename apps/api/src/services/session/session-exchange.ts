@@ -18,6 +18,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import type {
+  AgeBracket,
   ChallengeRoundEvaluationItem,
   ChallengeRoundNoteDraftHint,
   ConversationLanguage,
@@ -33,6 +34,7 @@ import type {
   TopicProbeRequestedEvent,
   ReviewCalibrationRequestedEvent,
 } from '@eduagent/schemas';
+import { computeAgeBracket } from '@eduagent/schemas';
 import {
   ConflictError,
   NotFoundError,
@@ -133,8 +135,12 @@ import {
   type MasteryDecision,
 } from '../challenge-round/evaluation';
 import { validateNoteDraft } from '../challenge-round/note-draft';
-import { transitionChallengeState } from '../challenge-round/state';
+import {
+  transitionChallengeState,
+  resolveGraderStallTermination,
+} from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
+import { runChallengeRoundGrader } from '../challenge-round/grader';
 
 // [WI-571 WP-W1-spine] Spine slice carved to session-exchange-spine.ts
 import { resolveReadyToFinish } from './session-exchange-spine';
@@ -1067,6 +1073,13 @@ async function applyChallengeRoundRuntimeSignals(
     challengeRoundEvaluation?: ChallengeRoundEvaluationItem[];
     noteDraft?: ChallengeRoundNoteDraftHint | null;
     currentUserMessage?: CurrentUserMessageReference;
+    // T6: the most recent mentor question, sourced by the caller from the last
+    // assistant message in exchangeHistory. Passed to the grader judge so it
+    // has the question context without a DB round-trip.
+    askedQuestion?: string;
+    // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
+    // Threaded from processMessage/streamMessage options.
+    challengeRoundGraderEnabled?: boolean;
   },
 ): Promise<ChallengeRoundRuntimeOutcome> {
   if (context.challengeRuntimeEnabled !== true) return {};
@@ -1085,6 +1098,138 @@ async function applyChallengeRoundRuntimeSignals(
     );
   }
 
+  // T7: grader-ON path.
+  //
+  // CRITICAL guard-relaxation (plan §T7): the flag-OFF path is gated on
+  // `payload.challengeRoundEvaluation?.length` being truthy — the tutor emits
+  // the array. Under the grader flag the tutor emits NOTHING, so the tutor
+  // array arrives empty and the flag-OFF guard would silently skip the branch.
+  // The grader-ON path is therefore gated on `payload.currentUserMessage` (the
+  // grader PRODUCES the evaluation from the user message) — NOT on the incoming
+  // tutor array. The flag-OFF path below is byte-identical to the pre-T7 code.
+  if (
+    current?.state === 'active' &&
+    payload.currentUserMessage &&
+    payload.challengeRoundGraderEnabled
+  ) {
+    // T9: track how many questions have actually been asked, independent of
+    // whether the grader produced an evaluation (grader fail-open to [] never
+    // fires `answer_complete`, so `questionIndex` would otherwise stall).
+    const questionsAsked = (current.questionsAsked ?? 0) + 1;
+    const currentWithCounter: ChallengeRoundSessionState = {
+      ...current,
+      questionsAsked,
+    };
+
+    // Derive age bracket from birth year already in context — no DB read.
+    const ageBracket: AgeBracket = context.birthYear
+      ? computeAgeBracket(context.birthYear)
+      : 'adult';
+
+    // Call the judge (fail-open: emits a structured degraded event and returns
+    // [] on any error — never throws into this path).
+    const graderEvaluation = await runChallengeRoundGrader({
+      askedQuestion: payload.askedQuestion ?? '',
+      learnerAnswer: payload.currentUserMessage.content,
+      answerEventId: payload.currentUserMessage.id,
+      conversationLanguage: context.conversationLanguage,
+      ageBracket,
+      sessionId: context.sessionId,
+    });
+
+    if (!graderEvaluation.length) {
+      // Grader fail-opened. Check T9 stall guard before persisting.
+      const stallResult = resolveGraderStallTermination(currentWithCounter);
+      if (stallResult) {
+        // Guard fired: persist the terminal state and stop. The state machine
+        // is in `complete` — no mastery, no note, no further exchange looping.
+        await persistChallengeRoundState(
+          db,
+          profileId,
+          session.id,
+          stallResult,
+        );
+        return { challengeRound: stallResult };
+      }
+      // Guard not yet triggered (< MAX_CHALLENGE_QUESTIONS asked). Persist the
+      // counter increment so the next turn can evaluate the cap correctly.
+      await persistChallengeRoundState(
+        db,
+        profileId,
+        session.id,
+        currentWithCounter,
+      );
+      return { challengeRound: currentWithCounter };
+    }
+
+    // Grader produced a non-empty result: validate event IDs + run state machine.
+    let validatedEvaluation: ChallengeRoundEvaluationItem[];
+    try {
+      validatedEvaluation = await validateChallengeRoundEvaluationItems(
+        db,
+        profileId,
+        session.id,
+        graderEvaluation,
+        payload.currentUserMessage,
+      );
+    } catch (err) {
+      logger.warn(
+        '[session-exchange] Challenge Round grader evaluation rejected',
+        {
+          event: 'challenge_round.grader_evaluation_rejected',
+          profileId,
+          sessionId: session.id,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      captureException(err, {
+        profileId,
+        extra: {
+          surface: 'session-exchange.challenge-round.grader-evaluation',
+          sessionId: session.id,
+        },
+      });
+      return { challengeRound: currentWithCounter };
+    }
+
+    const result = resolveChallengeRoundRuntimeSignalState({
+      runtimeEnabled: true,
+      // Pass currentWithCounter so questionsAsked propagates through the
+      // answer_complete spread in transitionChallengeState.
+      challengeRound: currentWithCounter,
+      topicId: session.topicId,
+      challengeEligible: context.challengeEligible === true,
+      challengeRoundOffer: false,
+      challengeRoundEvaluation: validatedEvaluation,
+    });
+
+    if (!result.shouldPersist) return { challengeRound: currentWithCounter };
+
+    const finalized = await finalizeChallengeRoundIfReady(
+      db,
+      profileId,
+      session,
+      result.challengeRound,
+      payload.noteDraft,
+    );
+    if (finalized) return finalized;
+
+    await persistChallengeRoundState(
+      db,
+      profileId,
+      session.id,
+      result.challengeRound,
+    );
+    return {
+      ...(result.challengeRound
+        ? { challengeRound: result.challengeRound }
+        : {}),
+    };
+  }
+
+  // Flag-OFF path: original behaviour, byte-identical to pre-T7 code.
+  // Gated on `payload.challengeRoundEvaluation?.length` truthy (the tutor
+  // envelope must supply the array).
   if (current?.state === 'active' && payload.challengeRoundEvaluation?.length) {
     let validatedEvaluation: ChallengeRoundEvaluationItem[];
     try {
@@ -1685,6 +1830,7 @@ export async function prepareExchangeContext(
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
+    challengeRoundGraderEnabled?: boolean;
     currentUserMessageEventId?: string;
     identityV2Enabled?: boolean;
   },
@@ -2666,6 +2812,7 @@ export async function prepareExchangeContext(
     correctStreak,
     challengeEligible: challengeReadiness.eligible,
     challengeRuntimeEnabled: challengeRoundRuntimeEnabled,
+    graderEnabled: options?.challengeRoundGraderEnabled === true,
     challengeRound,
     currentUserMessageEventId: options?.currentUserMessageEventId,
   };
@@ -3064,6 +3211,10 @@ export async function processMessage(
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
+    // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
+    // Call sites read `c.env.CHALLENGE_ROUND_GRADER_ENABLED` and pass the
+    // result of `isChallengeRoundGraderEnabled(value)` here.
+    challengeRoundGraderEnabled?: boolean;
     identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
@@ -3158,6 +3309,18 @@ export async function processMessage(
     throw err;
   }
 
+  // T6: source the asked-question from the last assistant turn in history
+  // (the mentor's most recent question, assembled before this LLM call — no DB
+  // read). `content` is a re-wrapped JSON envelope; projectAiResponseContent
+  // extracts clean prose. Falls back to '' if history is empty (first turn).
+  const askedQuestion = (() => {
+    const lastAssistant = context.exchangeHistory
+      .filter((e) => e.role === 'assistant')
+      .at(-1);
+    if (!lastAssistant) return '';
+    return projectAiResponseContent(lastAssistant.content, { silent: true });
+  })();
+
   const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
     db,
     profileId,
@@ -3171,6 +3334,9 @@ export async function processMessage(
       currentUserMessage: currentUserMessageEventId
         ? { id: currentUserMessageEventId, content: input.message }
         : undefined,
+      // T6 + T7 + T8
+      askedQuestion,
+      challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
     },
   );
 
@@ -3325,6 +3491,8 @@ export async function streamMessage(
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
+    // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
+    challengeRoundGraderEnabled?: boolean;
     identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
@@ -3532,6 +3700,19 @@ export async function streamMessage(
         sourceSafe.response,
         context,
       );
+      // T6: source the asked-question from the last assistant turn in history.
+      // Same pattern as processMessage — no DB read; projectAiResponseContent
+      // extracts clean prose from the re-wrapped JSON envelope.
+      const askedQuestion = (() => {
+        const lastAssistant = context.exchangeHistory
+          .filter((e) => e.role === 'assistant')
+          .at(-1);
+        if (!lastAssistant) return '';
+        return projectAiResponseContent(lastAssistant.content, {
+          silent: true,
+        });
+      })();
+
       const challengeRoundRuntime = await applyChallengeRoundRuntimeSignals(
         db,
         profileId,
@@ -3545,6 +3726,9 @@ export async function streamMessage(
           currentUserMessage: currentUserMessageEventId
             ? { id: currentUserMessageEventId, content: input.message }
             : undefined,
+          // T6 + T7 + T8
+          askedQuestion,
+          challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
         },
       );
       const persisted = await persistExchangeResult(

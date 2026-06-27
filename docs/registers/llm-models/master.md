@@ -46,14 +46,14 @@ vendor is one adapter file.
 | **Deep reasoning — Family** (rungs 4–5) | gpt-oss-120b `high` | Cerebras | US | Family tier (gpt-5.4 carve-out, owner ruling 2026-06-07) | active | 2026-06-06 iter-1 |
 | **Rung 4–5 fallback** | Sonnet 4.6 | Anthropic | — | Plus / Pro / add-on | active (fallback) | 2026-06-06 iter-1 |
 | **Async deep jobs** (recaps, curriculum, assessment eval) | gpt-oss-120b `high` | Cerebras | US | all | active (shares primary path) | 2026-06-06 iter-1 |
-| **Judge** (envelope evaluator) | Haiku 4.5, non-reasoning | Anthropic | — | all | active | 2026-06-06 iter-1 |
+| **Judge** (envelope evaluator) | **Eval-selected (T10 bake-off pending), default Sonnet 4.6 non-reasoning.** Haiku 4.5 is a demotion candidate *only if* it passes the T10 bake-off on both format and judgment axes — no production decision until that evidence exists. | Anthropic | — | all | **Callable for grader flow** (`CHALLENGE_ROUND_GRADER_ENABLED`); first tier/age-blind `capability: 'judge'` routing path — see ADR Amendment 2026-06-26. Suitability judge adopts same capability next. | 2026-06-06 iter-1 |
 
 **Roles in one line:** gpt-oss is everyone's default text brain. When the
 business-rule layer routes away from US-hosted Cerebras — EU-residency required
 *or* Cerebras unavailable (one merged branch) — each tier falls to its secondary:
 **free → Mistral, paid → GPT-5 mini**, and that same secondary also handles the
 tier's **vision** (gpt-oss is text-only). gpt-5.4 is the deep-reasoning model for
-paying non-Family users; Haiku judges. The judge is **vendor-independent of the
+paying non-Family users; the judge runs on the eval-selected model (default Sonnet 4.6, see row above). The judge is **vendor-independent of the
 tutor and always non-reasoning** (an evaluator sharing the tutor's vendor shares
 its blind spots; reasoning mode breaks the JSON envelope — `MMT-ADR-0016` §2).
 
@@ -117,7 +117,7 @@ adversarial safety battery wired into `eval-llm`).
 
 | Gate | What's owed | Why it's open now |
 |---|---|---|
-| **H4 — provider safety net** | The Haiku judge (layer ③ replacement) must be live before flag-flip. Removing Gemini deletes the only configured provider-side classifier; OpenAI is detection-only, Anthropic/Cerebras/Mistral are prompt-only. | The judge is **scaffold only** (`apps/api/src/services/policy-engine/judge.ts` returns the constraint shape, not a callable model). Build = WP-W3-envelope-router. |
+| **H4 — provider safety net** | The judge (layer ③ replacement) must be live before flag-flip. Removing Gemini deletes the only configured provider-side classifier; OpenAI is detection-only, Anthropic/Cerebras/Mistral are prompt-only. | **Partially advanced (2026-06-26):** a tier/age-blind `capability: 'judge'` routing path is now callable for the grader flow (`CHALLENGE_ROUND_GRADER_ENABLED`). The judge is no longer scaffold-only. H4 remains open until the judge is on in production ahead of the V2 minor-traffic cutover. Suitability judge adopts the same capability next, completing H4. |
 | **H5 — output moderation** | A final output-content check (moderation pass or lightweight classifier) on the displayed reply. | Deferrable while Gemini's classifier guarded the main lane; **launch-relevant once Gemini is removed**. Scope after the judge lands. |
 | **H7 — safety observability** | A queryable safety-incident metric/dashboard (blocks per day, crisis redirects per week). | Crisis-redirect events now fire (H2); the aggregate dashboard does not exist yet. |
 | **Self-harm escalation** | **Ruled 2026-06-23: log-only.** Crisis redirect → structured `app/safety.crisis_redirect_fired` Inngest event (already shipped); **no guardian notification.** Option (b) guardian-notify is not foreclosed but is not being built. | Settled — no further decision owed; H7 dashboard surfaces these events. |
@@ -128,3 +128,5 @@ adversarial safety battery wired into `eval-llm`).
 `LLM_ROUTING_V2_ENABLED=true` (stg → validate → prd), then remove
 `GEMINI_API_KEY` as defense-in-depth. No code deploy needed for the flag flip.
 Run the safety battery against the cutover models first.
+
+**Dependency added 2026-06-26:** `LLM_ROUTING_V2_ENABLED` **must not flip on for minor traffic until `CHALLENGE_ROUND_GRADER_ENABLED=true` is also set and staging-validated.** Without the grader, mastery silently never verifies on the V2 tutor path (gpt-oss-120b returns `[]` for `challenge_round_evaluation`). The fail-safe behavior (empty → no mastery, no error) is correct for the flag-off state but is a silent regression at cutover.

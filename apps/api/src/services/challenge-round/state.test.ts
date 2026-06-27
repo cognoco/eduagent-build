@@ -2,7 +2,11 @@ import type {
   ChallengeRoundEvaluationItem,
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
-import { transitionChallengeState } from './state';
+import {
+  transitionChallengeState,
+  resolveGraderStallTermination,
+} from './state';
+import { MAX_CHALLENGE_QUESTIONS } from './caps';
 
 const TOPIC_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -387,5 +391,125 @@ describe('transitionChallengeState — draft_ready / complete / abort', () => {
     expect(
       transitionChallengeState(undefined, { type: 'abort' }),
     ).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T9 — resolveGraderStallTermination (grader stall terminal guard)
+// Plan: 2026-06-26-challenge-round-grader-judge §T9
+//
+// Regression spec: when the grader fail-opens to [] on every active turn,
+// questionIndex never advances (answer_complete never fires), and the round
+// stays active forever. The guard fires when questionsAsked reaches
+// MAX_CHALLENGE_QUESTIONS while evaluations.length < questionsAsked.
+// ---------------------------------------------------------------------------
+
+describe('resolveGraderStallTermination', () => {
+  const TOPIC_ID_STALL = '22222222-2222-2222-2222-222222222222';
+
+  function stallActiveState(
+    questionsAsked: number,
+    evaluations: ChallengeRoundEvaluationItem[],
+  ): ChallengeRoundSessionState {
+    return {
+      state: 'active',
+      offerCount: 1,
+      topicId: TOPIC_ID_STALL,
+      declinedDontAskAgain: false,
+      questionIndex: 0,
+      totalQuestions: MAX_CHALLENGE_QUESTIONS,
+      questionsAsked,
+      evaluations,
+    };
+  }
+
+  it('does not fire when questionsAsked < MAX_CHALLENGE_QUESTIONS', () => {
+    const result = resolveGraderStallTermination(
+      stallActiveState(MAX_CHALLENGE_QUESTIONS - 1, []),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('does not fire when all questions have evaluations (no stall)', () => {
+    const evals: ChallengeRoundEvaluationItem[] = Array.from(
+      { length: MAX_CHALLENGE_QUESTIONS },
+      (_, i) => ({
+        concept: `concept ${i}`,
+        result: 'solid' as const,
+        evidence: 'ok',
+        answerEventId: `00000000-0000-4000-8000-00000000000${i + 1}`,
+        learnerQuote: 'quote',
+      }),
+    );
+    const result = resolveGraderStallTermination(
+      stallActiveState(MAX_CHALLENGE_QUESTIONS, evals),
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('does not fire for non-active state', () => {
+    const drafting: ChallengeRoundSessionState = {
+      state: 'drafting',
+      offerCount: 1,
+      topicId: TOPIC_ID_STALL,
+      declinedDontAskAgain: false,
+      questionsAsked: MAX_CHALLENGE_QUESTIONS,
+      evaluations: [],
+    };
+    expect(resolveGraderStallTermination(drafting)).toBeUndefined();
+  });
+
+  // T9 key regression: MAX_CHALLENGE_QUESTIONS=3, 3 asked, 1 evaluation
+  // (exactly the grader fail-open stall scenario). The guard must fire and
+  // return a terminal NON-ACTIVE state so the round cannot loop forever.
+  // markMasteryVerified is NEVER true because the state is `complete` and
+  // finalizeChallengeRoundIfReady skips non-drafting states entirely.
+  it('[T9 RED→GREEN] 3 questions asked, 1 recorded evaluation → terminal complete state', () => {
+    const onePartialEval: ChallengeRoundEvaluationItem = {
+      concept: 'collision theory',
+      result: 'partial',
+      evidence: 'partial understanding shown',
+      answerEventId: '00000000-0000-4000-8000-000000000001',
+      learnerQuote: 'particles move faster',
+    };
+
+    const state = stallActiveState(MAX_CHALLENGE_QUESTIONS, [onePartialEval]);
+    // Precondition: questionsAsked (3) >= MAX (3) AND evaluations.length (1) < questionsAsked (3)
+    expect(state.questionsAsked).toBe(MAX_CHALLENGE_QUESTIONS);
+    expect(state.evaluations.length).toBeLessThan(MAX_CHALLENGE_QUESTIONS);
+
+    const terminal = resolveGraderStallTermination(state);
+
+    // Guard must fire: result is defined
+    expect(terminal).toBeDefined();
+    // Result MUST be terminal — not active (the round cannot loop)
+    expect(terminal?.state).not.toBe('active');
+    // With no solid evaluations, goes to complete (no note, no mastery path)
+    expect(terminal?.state).toBe('complete');
+    // Evaluations are preserved in the terminal state
+    expect(terminal?.evaluations).toEqual([onePartialEval]);
+  });
+
+  it('3 questions asked, 0 evaluations (all grader failures) → complete', () => {
+    const terminal = resolveGraderStallTermination(
+      stallActiveState(MAX_CHALLENGE_QUESTIONS, []),
+    );
+    expect(terminal?.state).toBe('complete');
+  });
+
+  it('questionsAsked defaults from undefined (legacy state) — guard treats as 0, no fire', () => {
+    // A state persisted before questionsAsked was added has questionsAsked=undefined.
+    // The ?? 0 default means it reads as 0, which is < MAX, so the guard does not fire.
+    const legacy: ChallengeRoundSessionState = {
+      state: 'active',
+      offerCount: 1,
+      topicId: TOPIC_ID_STALL,
+      declinedDontAskAgain: false,
+      questionIndex: 0,
+      totalQuestions: MAX_CHALLENGE_QUESTIONS,
+      // questionsAsked is absent (undefined) — pre-T9 persisted state
+      evaluations: [],
+    };
+    expect(resolveGraderStallTermination(legacy)).toBeUndefined();
   });
 });

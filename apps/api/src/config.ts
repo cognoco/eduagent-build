@@ -167,6 +167,15 @@ const envSchema = z.object({
   // fail-open, so the flag only controls whether the calibration dispatch fires.
   JUDGE_FRAMEWORK_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
+  // challenge_round_evaluation from a dedicated judge call instead of the
+  // inline tutor envelope (gpt-oss silently drops the signal). Default-OFF:
+  // while 'false', the grader path is never invoked and the evaluation array
+  // is read from the tutor envelope as today. Flip to 'true' in Doppler on
+  // staging after validation against the V2 tutor; independent of
+  // LLM_ROUTING_V2_ENABLED so it can be staged and reverted separately.
+  CHALLENGE_ROUND_GRADER_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -283,6 +292,20 @@ export function isChallengeRoundRuntimeEnabled(
  * never accidentally cuts over. See the gpt-oss-cerebras-build spec.
  */
 export function isLlmRoutingV2Enabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Challenge Round grader gate (plan 2026-06-26 / MMT-ADR-0016 §2). Sources
+ * challenge_round_evaluation from a dedicated judge call instead of the inline
+ * tutor envelope. Threaded into the challenge-round runtime path at the
+ * exchange route boundary. Default-closed: undefined / anything other than
+ * 'true' keeps the legacy inline-envelope path so a missing binding never
+ * accidentally enables the grader. Independent of LLM_ROUTING_V2_ENABLED.
+ */
+export function isChallengeRoundGraderEnabled(
+  value: string | undefined,
+): boolean {
   return value === 'true';
 }
 

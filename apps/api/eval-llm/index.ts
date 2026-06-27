@@ -69,6 +69,12 @@ import { appHelpV2Flow } from './flows/app-help-v2';
 // teaching produces understanding. These two close that gap — see flow files.
 import { challengeRoundMasteryFlow } from './flows/challenge-round-mastery';
 import { misconceptionRepairFlow } from './flows/misconception-repair';
+// [T10 — 2026-06-26 plan] Model-selection gate for the dedicated grader that
+// emits challenge_round_evaluation when the tutor (gpt-oss) drops it. Two-axis
+// fixture battery: format (non-empty schema-valid verdict) + judgment (solid /
+// misconception / missing / false-mastery guard). See flow file for bake-off
+// commands (--flow challenge-grader --live --openrouter-model <slug>).
+import { challengeGraderFlow } from './flows/challenge-grader';
 import {
   listFlows,
   parseCliArgs,
@@ -138,6 +144,7 @@ const FLOWS: FlowDefinition[] = [
   appHelpV2Flow as FlowDefinition,
   challengeRoundMasteryFlow as FlowDefinition,
   misconceptionRepairFlow as FlowDefinition,
+  challengeGraderFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

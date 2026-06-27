@@ -179,6 +179,15 @@ export const challengeRoundSessionStateSchema = z.object({
   topicId: z.string().uuid().optional(),
   declinedDontAskAgain: z.boolean().default(false),
   evaluations: z.array(challengeRoundEvaluationItemSchema).max(10).default([]),
+  /**
+   * T9 grader-stall guard (plan 2026-06-26): number of challenge questions
+   * actually asked in the active state, incremented on every active-round turn
+   * regardless of whether the grader produced an evaluation. Allows the terminal
+   * safeguard to fire when the grader fail-opens repeatedly and `questionIndex`
+   * (which only advances on a recorded evaluation) can never reach the cap.
+   * Persisted as JSON/JSONB inside session metadata — no SQL migration needed.
+   */
+  questionsAsked: z.number().int().min(0).optional(),
 });
 export type ChallengeRoundSessionState = z.infer<
   typeof challengeRoundSessionStateSchema

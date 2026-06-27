@@ -3,6 +3,7 @@ import {
   isMemoryFactsRelevanceEnabled,
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
+  isChallengeRoundGraderEnabled,
   isManagedTierActive,
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
@@ -625,6 +626,24 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled(undefined)).toBe(false);
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
+
+  it('CHALLENGE_ROUND_GRADER_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.CHALLENGE_ROUND_GRADER_ENABLED).toBe('false');
+    expect(
+      isChallengeRoundGraderEnabled(env.CHALLENGE_ROUND_GRADER_ENABLED),
+    ).toBe(false);
+  });
+
+  it('isChallengeRoundGraderEnabled returns true only for "true"', () => {
+    expect(isChallengeRoundGraderEnabled('true')).toBe(true);
+    expect(isChallengeRoundGraderEnabled('false')).toBe(false);
+    expect(isChallengeRoundGraderEnabled(undefined)).toBe(false);
+    expect(isChallengeRoundGraderEnabled('yes')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -692,6 +711,7 @@ describe('validateProductionBindings', () => {
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',
+    CHALLENGE_ROUND_GRADER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',
