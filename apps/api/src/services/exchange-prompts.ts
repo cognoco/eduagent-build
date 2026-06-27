@@ -21,7 +21,7 @@ import {
   buildReviewContinuityOpener,
 } from './review-continuity/opener';
 import type { ReviewContinuityContext } from './review-continuity/opener-context';
-import type { ExchangeContext } from './exchange-types';
+import type { ExchangeContext, ReviewCallback } from './exchange-types';
 
 // ---------------------------------------------------------------------------
 // Exchange prompt builders
@@ -494,6 +494,45 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
   );
 }
 
+function buildReviewCallbackOpenerGuidance(cb: ReviewCallback): string {
+  const gap =
+    cb.daysSinceLastReview != null && cb.daysSinceLastReview >= 14
+      ? ` It has been about ${cb.daysSinceLastReview} days.`
+      : '';
+  const base =
+    'WARM CALLBACK OPENER: Open as a tutor who remembers this learner — pick up the thread; do NOT announce "review mode" or "a review check". ' +
+    'Vary your wording every session; never reuse a stock phrase. ' +
+    'Make exactly one warm, specific reference to your shared history with this topic, then invite them back in with one light question. ' +
+    'HONESTY: only credit a past success when explicitly told below they succeeded; never claim they got something right otherwise.';
+  switch (cb.outcome) {
+    case 'cracked':
+      return (
+        base +
+        ` Last time, ${cb.topicTitle} clicked for them — frame this as checking whether it stuck (e.g. "Last time you had ${cb.topicTitle} down — let's see if it stuck").${gap}` +
+        (cb.lastLearnerMessage
+          ? ` For your private grounding only — do NOT quote it or attribute exact words — their last message on this topic was: <last_message>${escapeXml(cb.lastLearnerMessage)}</last_message>.`
+          : '')
+      );
+    case 'wobbled':
+      return (
+        base +
+        ` Last time, ${cb.topicTitle} was still settling — frame this warmly as picking up where it got shaky, never as a failure or a test.${gap}`
+      );
+    case 'long_gap':
+      return (
+        base +
+        ` It has been a while since ${cb.topicTitle} — open gently ("it's been a bit since we did ${cb.topicTitle}"), no pressure, just see what they remember.${gap}`
+      );
+    case 'first_time':
+    case 'unknown':
+    default:
+      return (
+        base +
+        ` You do not have a confident read on their last outcome for ${cb.topicTitle}. Use a safe neutral invitation ("Want to circle back to ${cb.topicTitle}?") and make NO claim about how they did before.`
+      );
+  }
+}
+
 function buildFinalGroundingCheckBlock(): string {
   return (
     'FINAL FACT CHECK — DO THIS BEFORE WRITING `reply`:\n' +
@@ -870,20 +909,40 @@ export function buildSystemPrompt(
     safeTopicTitle &&
     !isLanguageMode
   ) {
-    // Continuity-framed opener (review-only — NOT practice) when the assembler
-    // supplied a context behind REVIEW_CONTINUITY_OPENER_ENABLED; otherwise the
-    // byte-identical generic calibration block. The builder owns the shared
-    // generic-section text, so flag-off / no-context / practice all emit the
-    // exact pre-existing block. See services/review-continuity/opener.ts.
+    // Two flag-dark review-opener experiments share this first-turn slot; emit
+    // exactly one block. Precedence:
+    //   1. Continuity opener (#1547) — references the learner's prior work;
+    //      supplied via options.reviewContinuityContext behind
+    //      REVIEW_CONTINUITY_OPENER_ENABLED (review-only, NOT practice).
+    //   2. Warm review-callback opener (#1549, RR-1/RR-13) — picks up the
+    //      cross-session thread; supplied via context.reviewCallback.
+    //   3. Byte-identical generic calibration block when neither context is
+    //      present, so flag-off review turns are unchanged.
+    // The continuity builder owns the shared generic-section text, so flag-off /
+    // no-context / practice all emit the exact pre-existing block. See
+    // services/review-continuity/opener.ts.
     const continuityContext =
       context.effectiveMode === 'review'
         ? options.reviewContinuityContext
         : undefined;
-    sections.push(
-      continuityContext
-        ? buildReviewContinuityOpener(continuityContext)
-        : buildGenericReviewOpenerSection(safeTopicTitle),
-    );
+    const cb = context.reviewCallback;
+    if (continuityContext) {
+      sections.push(buildReviewContinuityOpener(continuityContext));
+    } else if (cb) {
+      sections.push(
+        'Session type: REVIEW (calibrated relearning)\n' +
+          buildReviewCallbackOpenerGuidance(cb) +
+          '\n' +
+          `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
+          "Use the learner's partial answer as the anchor. Explicitly say what they got and what is still missing. Do not pivot into a different subtopic just because it is nearby; stay inside the learner's answer and the current topic description.\n" +
+          'REVIEW SOURCE DISCIPLINE: In review mode, prefer source wording for hints. Use analogies, nearby examples, or extra biology/history facts only when they appear in provided source material or pass the 0.88 general-knowledge confidence gate.\n' +
+          'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
+          'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.\n' +
+          'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small source-wording cloze check. For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.',
+      );
+    } else {
+      sections.push(buildGenericReviewOpenerSection(safeTopicTitle));
+    }
   }
 
   // Session type — skip for recitation (dedicated prompt section handles it)

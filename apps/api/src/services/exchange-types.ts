@@ -68,6 +68,36 @@ export interface ExchangeSourceEvidence {
 }
 
 // ---------------------------------------------------------------------------
+// Review callback (RR-1 + RR-13 minimal thread)
+// ---------------------------------------------------------------------------
+
+/**
+ * The learner's last outcome on a topic, derived authoritatively from the SM-2
+ * retention card (NOT from the raw last message — see CH-1 in
+ * docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md). Drives the warm,
+ * honest branching of the review-callback opener.
+ */
+export type ReviewOutcome =
+  | 'cracked' // last review succeeded — "has it stuck?"
+  | 'wobbled' // last review missed / decayed — pick up where it got shaky
+  | 'first_time' // no prior review history on this card
+  | 'long_gap' // >30 days since last review — gentle re-entry, no outcome claim
+  | 'unknown'; // safe neutral default
+
+/** Minimal cross-session memory thread feeding the warm review opener. */
+export interface ReviewCallback {
+  topicTitle: string;
+  outcome: ReviewOutcome;
+  daysSinceLastReview: number | null;
+  daysOverdue: number;
+  /**
+   * Last learner message on this topic. Populated ONLY when outcome==='cracked';
+   * used as PRIVATE grounding for the model, NEVER quoted verbatim (CH-1).
+   */
+  lastLearnerMessage: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // ExchangeContext
 // ---------------------------------------------------------------------------
 
@@ -208,4 +238,11 @@ export interface ExchangeContext {
    * ask for it (converse-only). Threaded from `CHALLENGE_ROUND_GRADER_ENABLED`.
    */
   graderEnabled?: boolean;
+  /**
+   * Warm review-callback opener material (RR-1 + RR-13). Populated only when
+   * `REVIEW_CALLBACK_OPENER_ENABLED` is on AND this is a review-mode first turn.
+   * When present, the REVIEW prompt block emits the outcome-branched warm opener
+   * instead of the legacy "this is a review check" transition line.
+   */
+  reviewCallback?: ReviewCallback;
 }

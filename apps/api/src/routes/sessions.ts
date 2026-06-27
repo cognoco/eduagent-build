@@ -90,6 +90,7 @@ import {
 import { CircuitOpenError, parseConversationLanguage } from '../services/llm';
 import {
   isChallengeRoundRuntimeEnabled,
+  isReviewCallbackOpenerEnabled,
   isChallengeRoundGraderEnabled,
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
@@ -210,6 +211,7 @@ type SessionRouteEnv = {
     VOYAGE_API_KEY?: string;
     MATCHER_ENABLED?: string;
     CHALLENGE_ROUND_RUNTIME_ENABLED?: string;
+    REVIEW_CALLBACK_OPENER_ENABLED?: string;
     CHALLENGE_ROUND_GRADER_ENABLED?: string;
     JUDGE_FRAMEWORK_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
@@ -546,6 +548,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
       );
+      const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
+        c.env.REVIEW_CALLBACK_OPENER_ENABLED,
+      );
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
@@ -566,6 +571,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
@@ -743,6 +749,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const challengeRoundRuntimeEnabled = isChallengeRoundRuntimeEnabled(
         c.env.CHALLENGE_ROUND_RUNTIME_ENABLED,
       );
+      const reviewCallbackOpenerEnabled = isReviewCallbackOpenerEnabled(
+        c.env.REVIEW_CALLBACK_OPENER_ENABLED,
+      );
       const judgeFrameworkEnabled = isJudgeFrameworkEnabled(
         c.env.JUDGE_FRAMEWORK_ENABLED,
       );
@@ -763,6 +772,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             memoryFactsReadEnabled,
             memoryFactsRelevanceEnabled,
             challengeRoundRuntimeEnabled,
+            reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
             identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
@@ -837,6 +847,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     memoryFactsReadEnabled,
                     memoryFactsRelevanceEnabled,
                     challengeRoundRuntimeEnabled,
+                    reviewCallbackOpenerEnabled,
                     judgeFrameworkEnabled,
                     identityV2Enabled: isIdentityV2Enabled(
                       c.env?.IDENTITY_V2_ENABLED,
@@ -1177,6 +1188,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 memoryFactsReadEnabled,
                 memoryFactsRelevanceEnabled,
                 challengeRoundRuntimeEnabled,
+                reviewCallbackOpenerEnabled,
                 judgeFrameworkEnabled,
                 identityV2Enabled: isIdentityV2Enabled(
                   c.env?.IDENTITY_V2_ENABLED,

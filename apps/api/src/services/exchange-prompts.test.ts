@@ -3,6 +3,7 @@ import {
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import type { ExchangeContext } from './exchanges';
+import type { ReviewCallback } from './exchange-types';
 
 function makeContext(
   overrides: Partial<ExchangeContext> = {},
@@ -1186,5 +1187,95 @@ describe('buildSystemPrompt — ASK ANYTHING (freeform) guidance', () => {
 
     expect(prompt).not.toContain('Session type: ASK ANYTHING (freeform)');
     expect(prompt).toContain('Session type: LEARNING');
+  });
+});
+
+describe('review callback opener (RR-1)', () => {
+  function makeReviewContext(
+    reviewCallback?: ReviewCallback,
+    topicTitle = 'Photosynthesis',
+  ): ExchangeContext {
+    return makeContext({
+      effectiveMode: 'review',
+      topicTitle,
+      exchangeCount: 0,
+      exchangeHistory: [],
+      reviewCallback,
+    });
+  }
+
+  it("cracked outcome: contains WARM CALLBACK OPENER, let's see if it stuck, <last_message>, not legacy transition", () => {
+    const cb: ReviewCallback = {
+      topicTitle: 'Photosynthesis',
+      outcome: 'cracked',
+      daysSinceLastReview: null,
+      daysOverdue: 0,
+      lastLearnerMessage: 'photosynthesis turns light into sugar',
+    };
+    const prompt = buildSystemPrompt(makeReviewContext(cb));
+
+    expect(prompt).toContain('WARM CALLBACK OPENER');
+    expect(prompt).toContain("let's see if it stuck");
+    expect(prompt).toContain('<last_message>');
+    expect(prompt).not.toContain('this is a review check, not a fresh lesson');
+  });
+
+  it('wobbled outcome: contains still settling, not <last_message>, not cracked-branch phrases', () => {
+    const cb: ReviewCallback = {
+      topicTitle: 'Photosynthesis',
+      outcome: 'wobbled',
+      daysSinceLastReview: null,
+      daysOverdue: 0,
+      lastLearnerMessage: null,
+    };
+    const prompt = buildSystemPrompt(makeReviewContext(cb));
+
+    expect(prompt).toContain('still settling');
+    expect(prompt).not.toContain('<last_message>');
+    // 'stuck' appears in base prompt sections unrelated to the callback opener;
+    // assert the cracked-branch-specific phrase is absent instead
+    expect(prompt).not.toContain("let's see if it stuck");
+    expect(prompt).not.toContain('clicked for them');
+    expect(prompt).not.toContain('nailed');
+  });
+
+  it('unknown outcome: contains safe neutral invitation and NO claim directive', () => {
+    const cb: ReviewCallback = {
+      topicTitle: 'Photosynthesis',
+      outcome: 'unknown',
+      daysSinceLastReview: null,
+      daysOverdue: 0,
+      lastLearnerMessage: null,
+    };
+    const prompt = buildSystemPrompt(makeReviewContext(cb));
+
+    expect(prompt).toContain('Want to circle back to');
+    expect(prompt).toContain('make NO claim');
+  });
+
+  it('flag-off (reviewCallback undefined): contains legacy transition line', () => {
+    const prompt = buildSystemPrompt(makeReviewContext(undefined));
+
+    expect(prompt).toContain('this is a review check, not a fresh lesson');
+  });
+
+  it.each<ReviewCallback['outcome']>([
+    'wobbled',
+    'first_time',
+    'long_gap',
+    'unknown',
+  ])('honesty guard: outcome "%s" does not claim a past success', (outcome) => {
+    const cb: ReviewCallback = {
+      topicTitle: 'Photosynthesis',
+      outcome,
+      daysSinceLastReview: null,
+      daysOverdue: 0,
+      lastLearnerMessage: null,
+    };
+    const prompt = buildSystemPrompt(makeReviewContext(cb));
+
+    expect(prompt).not.toContain('down —');
+    expect(prompt).not.toContain('nailed');
+    expect(prompt).not.toContain('clicked for them');
   });
 });
