@@ -633,22 +633,24 @@ describe('validateEnv', () => {
     expect(isChallengeRoundRuntimeEnabled('yes')).toBe(false);
   });
 
-  it('CHALLENGE_ROUND_GRADER_ENABLED defaults to "false" when unset', () => {
+  it('CHALLENGE_ROUND_GRADER_ENABLED defaults to "true" when unset', () => {
     const env = validateEnv({
       ENVIRONMENT: 'development',
       DATABASE_URL: 'postgresql://localhost/test',
     });
-    expect(env.CHALLENGE_ROUND_GRADER_ENABLED).toBe('false');
+    expect(env.CHALLENGE_ROUND_GRADER_ENABLED).toBe('true');
     expect(
       isChallengeRoundGraderEnabled(env.CHALLENGE_ROUND_GRADER_ENABLED),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('isChallengeRoundGraderEnabled returns true only for "true"', () => {
+  it('isChallengeRoundGraderEnabled is on by default, off only for explicit "false"', () => {
     expect(isChallengeRoundGraderEnabled('true')).toBe(true);
     expect(isChallengeRoundGraderEnabled('false')).toBe(false);
-    expect(isChallengeRoundGraderEnabled(undefined)).toBe(false);
-    expect(isChallengeRoundGraderEnabled('yes')).toBe(false);
+    // Default-OPEN: a missing binding keeps the grader ON.
+    expect(isChallengeRoundGraderEnabled(undefined)).toBe(true);
+    // Any non-'false' value (incl. typos) stays ON — the safe direction.
+    expect(isChallengeRoundGraderEnabled('yes')).toBe(true);
   });
 });
 
