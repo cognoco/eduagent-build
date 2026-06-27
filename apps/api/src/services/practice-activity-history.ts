@@ -6,6 +6,7 @@ import {
 } from '@eduagent/database';
 import type {
   PracticeActivityHistoryItem,
+  PracticeActivityHistoryResponse,
   ReportPracticeActivityType,
 } from '@eduagent/schemas';
 import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
@@ -14,11 +15,6 @@ export interface ListPracticeActivityHistoryOptions {
   cursor?: string;
   limit?: number;
   type?: ReportPracticeActivityType;
-}
-
-export interface PracticeActivityHistoryPage {
-  items: PracticeActivityHistoryItem[];
-  nextCursor: string | null;
 }
 
 /**
@@ -48,7 +44,7 @@ export async function listPracticeActivityHistory(
   db: Database,
   profileId: string,
   options: ListPracticeActivityHistoryOptions = {},
-): Promise<PracticeActivityHistoryPage> {
+): Promise<PracticeActivityHistoryResponse> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
 
   const conditions = [eq(practiceActivityEvents.profileId, profileId)];
