@@ -7,6 +7,7 @@ import {
   toBaseline,
   validateBaselineStructure,
   writeCorpus,
+  MIN_ROUNDS_FOR_CALIBRATION,
   type SimMetrics,
   type SimulationBaseline,
 } from './simulation-metrics';
@@ -111,7 +112,7 @@ describe('aggregate', () => {
     expect(m.overCreditRate).toBeCloseTo(1 / 4);
     expect(m.underCreditRate).toBeCloseTo(1 / 4);
     expect(m.signalEmissionRate).toBeCloseTo(3 / 4);
-    expect(m.signalEmissionRateByMentor['gpt-oss-120b']).toBeCloseTo(3 / 4);
+    expect(m.signalEmissionRateByGrader['gpt-oss-120b']).toBeCloseTo(3 / 4);
     expect(m.masteryVerifiedRate).toBeCloseTo(2 / 4);
     expect(m.outcomeCounts).toEqual({
       verified: 2,
@@ -128,9 +129,6 @@ describe('aggregate', () => {
   });
 
   it('counts invalid (dropped-signal) on a verified-expected round as under-credit', () => {
-    // A learner who DESERVED verification (ground truth verified) but whose
-    // mentor dropped all signal → outcome 'invalid'. From the learner's lived
-    // outcome that is still "deserved mastery, didn't verify" = under-credit.
     const results: SimulatedRoundResult[] = [
       makeResult({
         outcome: 'invalid',
@@ -148,7 +146,6 @@ describe('aggregate', () => {
       }),
     ];
     const m = aggregate(results);
-    // invalid-on-verified is under-credit; invalid-on-NON-verified is not.
     expect(m.underCreditRate).toBeCloseTo(1 / 2);
     expect(m.overCreditRate).toBe(0);
     expect(m.signalEmissionRate).toBeCloseTo(1 / 2);
@@ -215,10 +212,41 @@ describe('aggregate', () => {
       }),
     ];
     const m = aggregate(results);
-    expect(m.signalEmissionRateByMentor).toEqual({
+    expect(m.signalEmissionRateByGrader).toEqual({
       'model-A': 1,
       'model-B': 0,
     });
+  });
+
+  it('attaches Wilson CIs with denominators and flags low-N as insufficient', () => {
+    const m = aggregate([
+      makeResult({
+        outcome: 'verified',
+        marked: true,
+        expected: 'partial',
+        signalEmitted: true,
+        graderModel: 'gpt-oss-120b',
+      }),
+    ]);
+    // 1/1 over-credit: rate 1.0 but the CI must be wide (lower bound well below 1).
+    expect(m.ci.overCredit.rate).toBe(1);
+    expect(m.ci.overCredit.total).toBe(1);
+    expect(m.ci.overCredit.low).toBeLessThan(0.5);
+    expect(m.ci.overCredit.high).toBeCloseTo(1);
+    expect(m.sufficientForCalibration).toBe(false);
+  });
+
+  it('flags a >=MIN_ROUNDS corpus as sufficient for calibration', () => {
+    const many = Array.from({ length: MIN_ROUNDS_FOR_CALIBRATION }, () =>
+      makeResult({
+        outcome: 'verified',
+        marked: true,
+        expected: 'verified',
+        signalEmitted: true,
+        graderModel: 'gpt-oss-120b',
+      }),
+    );
+    expect(aggregate(many).sufficientForCalibration).toBe(true);
   });
 
   it('handles an empty result set without dividing by zero', () => {
@@ -226,11 +254,12 @@ describe('aggregate', () => {
     expect(m.totalRounds).toBe(0);
     expect(m.overCreditRate).toBe(0);
     expect(m.signalEmissionRate).toBe(0);
+    expect(m.ci.overCredit.total).toBe(0);
   });
 });
 
 describe('writeCorpus', () => {
-  it('writes one JSON per round plus a metrics.json summary', async () => {
+  it('writes one JSON per round plus a STAMPED metrics.json summary', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'sim-corpus-'));
     try {
       const results = [
@@ -243,7 +272,10 @@ describe('writeCorpus', () => {
         }),
       ];
       const metrics: SimMetrics = aggregate(results);
-      await writeCorpus(dir, results, metrics);
+      await writeCorpus(dir, results, metrics, {
+        runs: 5,
+        gradingPath: 'production-grader',
+      });
 
       const round = JSON.parse(
         await readFile(join(dir, '000-CRS-test.json'), 'utf8'),
@@ -252,9 +284,21 @@ describe('writeCorpus', () => {
 
       const written = JSON.parse(
         await readFile(join(dir, 'metrics.json'), 'utf8'),
-      ) as SimMetrics & { note: string };
+      ) as SimMetrics & {
+        note: string;
+        provisional: boolean;
+        gradingPath: string;
+        runsPerScenario: number;
+        n: number;
+      };
       expect(written.totalRounds).toBe(1);
       expect(written.note).toMatch(/PROVISIONAL/);
+      expect(written.provisional).toBe(true);
+      expect(written.gradingPath).toBe('production-grader');
+      expect(written.runsPerScenario).toBe(5);
+      expect(written.n).toBe(1);
+      // Low-N corpus must carry the INSUFFICIENT marker in its note.
+      expect(written.note).toMatch(/INSUFFICIENT N/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -275,6 +319,7 @@ const OUTCOME_QUARTERS = {
 function makeMetrics(over: Partial<SimMetrics> = {}): SimMetrics {
   return {
     totalRounds: 20,
+    sufficientForCalibration: false,
     outcomeCounts: { verified: 5, partial: 5, reteach: 5, invalid: 5 },
     outcomeRates: { ...OUTCOME_QUARTERS },
     conceptResultCounts: { solid: 0, partial: 0, missing: 0, misconception: 0 },
@@ -283,7 +328,13 @@ function makeMetrics(over: Partial<SimMetrics> = {}): SimMetrics {
     overCreditScenarioIds: [],
     underCreditRate: 0.1,
     signalEmissionRate: 0.9,
-    signalEmissionRateByMentor: { 'production-routing': 0.9 },
+    signalEmissionRateByGrader: { 'production-routing': 0.9 },
+    ci: {
+      masteryVerified: { n: 10, total: 20, rate: 0.5, low: 0, high: 1 },
+      overCredit: { n: 0, total: 20, rate: 0, low: 0, high: 0 },
+      underCredit: { n: 2, total: 20, rate: 0.1, low: 0, high: 1 },
+      signalEmission: { n: 18, total: 20, rate: 0.9, low: 0, high: 1 },
+    },
     ...over,
   };
 }
@@ -303,7 +354,7 @@ function makeBaseline(
       outcome: { ...OUTCOME_QUARTERS },
       masteryVerified: 0.5,
       underCredit: 0.1,
-      signalEmissionByMentor: { 'production-routing': 0.9 },
+      signalEmissionByGrader: { 'production-routing': 0.9 },
       ...over,
     },
   };
@@ -338,17 +389,17 @@ describe('compareSimulationBaseline', () => {
     expect(gate.drift[0]!.delta).toBeCloseTo(0.3);
   });
 
-  it('signalEmissionByMentor delta beyond tolerance → drift entry named per model', () => {
+  it('signalEmissionByGrader delta beyond tolerance → drift entry named per model', () => {
     const gate = compareSimulationBaseline(
       makeMetrics({
-        signalEmissionRateByMentor: { 'production-routing': 0.5 },
+        signalEmissionRateByGrader: { 'production-routing': 0.5 },
       }), // Δ0.4
       makeBaseline(),
       0.15,
     );
     expect(gate.drift).toHaveLength(1);
     expect(gate.drift[0]!.metric).toBe(
-      'signalEmissionByMentor.production-routing',
+      'signalEmissionByGrader.production-routing',
     );
   });
 
@@ -394,7 +445,7 @@ describe('validateBaselineStructure', () => {
       graderModel: 'y',
       scenarioCount: 4,
       flows: {},
-      rates: { outcome: {} }, // lacks underCredit / masteryVerified / signalEmissionByMentor
+      rates: { outcome: {} }, // lacks underCredit / masteryVerified / signalEmissionByGrader
     };
     expect(validateBaselineStructure(mainHarness).ok).toBe(false);
   });

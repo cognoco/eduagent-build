@@ -181,23 +181,25 @@ pnpm --filter @eduagent/api eval:llm:sim -- --list
 
 # Live grid: a DISTINCT learner is graded by the production judge (default) or
 # by an explicit grader candidate. Learner and grader must differ (see guard).
+# Omit --max-live-calls to auto-fit the budget to the full grid (no silent truncation).
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --runs 2 --max-live-calls 30
+  --learner-model openai/gpt-4o --runs 2
 
 # Pin an explicit grader candidate instead of production routing:
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
   --learner-model openai/gpt-4o --grader-model anthropic/claude-3.5-sonnet \
-  --runs 2 --max-live-calls 30
+  --runs 2
 ```
 
 Flags: `--learner-model <slug>` (required for a run), `--grader-model <slug>`
 (optional candidate; default = production judge routing), `--provider <slug>`,
-`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (default 30 —
-**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`), `--list`,
-`--allow-same-family`, and the three **baseline verbs** below
-(`--validate-baseline`, `--check-baseline`, `--update-baseline`). Output lands in
-`eval-llm/corpus/<timestamp>/` (gitignored) as one transcript JSON per round
-plus `metrics.json`.
+`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (optional **hard
+cap**; when omitted the budget auto-fits to `grid × 9 calls/round`
+(**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`) so a run
+never silently truncates the grid), `--list`, `--allow-same-family`, and the
+three **baseline verbs** below (`--validate-baseline`, `--check-baseline`,
+`--update-baseline`). Output lands in `eval-llm/corpus/<timestamp>/` (gitignored)
+as one transcript JSON per round plus `metrics.json`.
 
 ### Over-credit gate + baseline (three verbs)
 
@@ -269,14 +271,27 @@ The guard refuses to run when:
    can be served under different slugs/providers); pass `--allow-same-family`
    for a deliberate same-family A/B.
 
+A third, **soft** axis warns but does not throw: a same-**vendor-root**,
+different-family pair (e.g. `deepseek-chat` vs `deepseek-r1`) — distinct enough
+to clear the family guard, but close enough lineage to be worth a `console.warn`
+so a correlated-error A/B isn't run unknowingly.
+
 ### Scope limits (read before trusting a number)
 
-- **DB-free.** `decideMasteryAndReview` runs for real, but the production-only
-  `validateEvaluationEventIds` (DB lookup that swaps `learnerQuote` for the real
-  `session_events.content`) is **not** called — there is no seeded DB. The
-  simulator measures the LLM contract + the mastery decision, not the
-  DB-anchoring step (that stays covered by `evaluation.test.ts` + integration
-  tests).
+- **DB-free → results are an UPPER BOUND.** `decideMasteryAndReview` runs for
+  real, but the production-only `validateEvaluationEventIds` (DB lookup that
+  drops evaluations whose `answerEventId` can't be matched to a real
+  `session_events` row) is **not** called — there is no seeded DB. That step can
+  only ever *remove* `solid` items, so skipping it biases in one direction:
+  the harness's `verified`/over-credit rates are an **upper bound** on
+  production, never a lower bound. `metrics.json` stamps this caveat. DB-anchoring
+  stays covered by `evaluation.test.ts` + integration tests.
+- **Low N is flagged, not hidden.** Below `MIN_ROUNDS_FOR_CALIBRATION` (30 — i.e.
+  ≥5 runs across the 6-scenario grid) the corpus is marked
+  `sufficientForCalibration:false` and every headline rate ships a **Wilson 95%
+  CI + denominator**. A 6×1 grid moves a rate ~17pp on a single flip; the CI and
+  the INSUFFICIENT-N note exist so that number can't be screenshotted as "the
+  bar is calibrated".
 - **Note-overlap calibration is NOT in scope.** `MIN_LEXICAL_OVERLAP_NOTE_DRAFT`
   is consumed only by the note-draft path against DB-verified content this
   harness does not produce. RR-6's **note-overlap** half stays blocked on a

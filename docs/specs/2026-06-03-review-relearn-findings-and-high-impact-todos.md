@@ -194,8 +194,13 @@ correctness/cleanup that must precede load-bearing.
   - *Pre-flip gate (replaces the staging flag-flip + dogfood):* the simulated-learner harness
     (`apps/api/eval-llm/simulate.ts`, `pnpm eval:llm:sim`, plan
     `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
-    multi-turn rounds (topic × persona × N) through the **real mentor pipeline + pure mastery gate**
-    and measures over-/under-credit against per-scenario ground truth. First live grid run
+    multi-turn rounds (topic × persona × N) through the **real production grader/judge + pure mastery
+    gate** and measures over-/under-credit against per-scenario ground truth. (Post-adversarial-review
+    correction 2026-06-27: the harness grades via the production judge path
+    `runChallengeRoundGrader` — the component prod runs with `CHALLENGE_ROUND_GRADER_ENABLED` on by
+    default — **not** the tutor's inline signal; the question-asking tutor is production-routed and
+    never the candidate, and the two-model guard targets the judge slug. See the plan's
+    "Post-adversarial-review corrections" section.) First live grid run
     2026-06-27 confirmed the gpt-oss signal-drop (de-risking RR-12) and that the control wiring is
     sound. The dedicated grader judge is validated separately by the
     **`pnpm eval:llm --flow challenge-grader`** bake-off (Sonnet 4.6 fully clean, 2026-06-27), and

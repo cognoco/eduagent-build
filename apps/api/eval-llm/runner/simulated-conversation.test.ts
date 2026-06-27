@@ -2,6 +2,7 @@ import {
   runSimulatedRound,
   assertTwoModelGuard,
   modelFamily,
+  vendorRoot,
   deterministicUuid,
   type SimulatedRoundOverrides,
 } from './simulated-conversation';
@@ -27,26 +28,24 @@ const profile = PROFILES.find((p) => p.id === scenario.profileId)!;
 // the outcome tests never depend on the live-resolved production judge slug
 // (which is claude-family for these minor profiles and would collide).
 const LEARNER = 'anthropic/claude-3.5-sonnet';
-const GRADER = 'openai/gpt-4o';
+const GRADER = 'gpt-oss-120b';
 
-/** One grader verdict item, mirroring the production judge's per-concept shape. */
-function graderItem(
-  result: ChallengeRoundEvaluationItem['result'],
-  answerEventId: string,
-): ChallengeRoundEvaluationItem {
-  return {
-    concept: 'why flip-and-multiply works',
-    result,
-    evidence: 'learner gave confident wrong reasoning',
-    answerEventId,
-    learnerQuote: 'because dividing always makes it smaller',
-  };
+/** One grader verdict item with the given result (or `[]` to model a drop). */
+function gradedItems(
+  result: ChallengeRoundEvaluationItem['result'] | null,
+): ChallengeRoundEvaluationItem[] {
+  if (result === null) return [];
+  return [
+    {
+      concept: 'why flip-and-multiply works',
+      result,
+      evidence: 'learner gave confident wrong reasoning',
+      answerEventId: deterministicUuid('crm-answer'),
+      learnerQuote: 'because dividing always makes it smaller',
+    },
+  ];
 }
 
-/**
- * Drives every answered turn through the grader seam. `result === null` returns
- * zero items (the gpt-oss signal-drop) — drop, not a parse error of the tutor.
- */
 function gradedOverrides(
   result: ChallengeRoundEvaluationItem['result'] | null,
 ): {
@@ -58,28 +57,28 @@ function gradedOverrides(
     learnerTurn: async () =>
       'You flip it because dividing always makes it smaller.',
     tutorTurn: async () => 'Interesting — can you say more about that?',
-    graderTurn: async (args) => {
+    graderTurn: async () => {
       graderCalls += 1;
-      return result === null ? [] : [graderItem(result, args.answerEventId)];
+      return gradedItems(result);
     },
   };
   return { overrides, graderCalls: () => graderCalls };
 }
 
 describe('runSimulatedRound — conversation loop', () => {
-  it('runs exactly MAX_CHALLENGE_QUESTIONS answered turns then stops (start-seeded totalQuestions drives termination)', async () => {
+  it('runs exactly MAX_CHALLENGE_QUESTIONS graded turns then stops (start-seeded totalQuestions drives termination)', async () => {
     const { overrides, graderCalls } = gradedOverrides('misconception');
     const result = await runSimulatedRound(
       { scenario, profile, learnerModel: LEARNER, graderModel: GRADER },
       overrides,
     );
-    // Grader is called once per answered turn — the loop runs exactly MAX.
     expect(graderCalls()).toBe(MAX_CHALLENGE_QUESTIONS);
+    // One seed assistant question + per turn a learner answer.
     const learnerTurns = result.transcript.filter((t) => t.role === 'user');
     expect(learnerTurns).toHaveLength(MAX_CHALLENGE_QUESTIONS);
   });
 
-  it('accumulates grader evaluations across all turns', async () => {
+  it('accumulates evaluations across all turns', async () => {
     const { overrides } = gradedOverrides('misconception');
     const result = await runSimulatedRound(
       { scenario, profile, learnerModel: LEARNER, graderModel: GRADER },
@@ -88,7 +87,7 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(result.evaluations).toHaveLength(MAX_CHALLENGE_QUESTIONS);
   });
 
-  it('gate outcome equals the scenario expectedOutcome (grader: misconception → partial)', async () => {
+  it('gate outcome equals the scenario expectedOutcome (misconception → partial)', async () => {
     const { overrides } = gradedOverrides('misconception');
     const result = await runSimulatedRound(
       { scenario, profile, learnerModel: LEARNER, graderModel: GRADER },
@@ -107,7 +106,12 @@ describe('runSimulatedRound — conversation loop', () => {
     const verifiedProfile = PROFILES.find(
       (p) => p.id === verifiedScenario.profileId,
     )!;
-    const { overrides } = gradedOverrides('solid');
+    const overrides: SimulatedRoundOverrides = {
+      learnerTurn: async () =>
+        'Because rapid burial protects the bones from decay.',
+      tutorTurn: async () => 'Great — and then what?',
+      graderTurn: async () => gradedItems('solid'),
+    };
     const result = await runSimulatedRound(
       {
         scenario: verifiedScenario,
@@ -122,8 +126,12 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(result.signalEmitted).toBe(true);
   });
 
-  it('all-missing grader verdicts → reteach (no mastery, signal still emitted)', async () => {
-    const { overrides } = gradedOverrides('missing');
+  it('all-missing answers → reteach (no mastery, signal still emitted)', async () => {
+    const overrides: SimulatedRoundOverrides = {
+      learnerTurn: async () => "I don't really know, sorry.",
+      tutorTurn: async () => "That's okay — let's revisit it.",
+      graderTurn: async () => gradedItems('missing'),
+    };
     const result = await runSimulatedRound(
       { scenario, profile, learnerModel: LEARNER, graderModel: GRADER },
       overrides,
@@ -187,7 +195,7 @@ describe('runSimulatedRound — conversation loop', () => {
     expect(result.decision.outcome).toBe('partial');
   });
 
-  it('sets signalEmitted=false when the grader returns zero eval items (gpt-oss drop)', async () => {
+  it('sets signalEmitted=false when the grader returns zero items (gpt-oss drop)', async () => {
     const { overrides } = gradedOverrides(null);
     const result = await runSimulatedRound(
       { scenario, profile, learnerModel: LEARNER, graderModel: GRADER },
@@ -206,6 +214,14 @@ describe('two-model guard helpers', () => {
     expect(modelFamily('anthropic/claude-3.5-sonnet')).toBe('claude-3.5');
   });
 
+  it('vendorRoot collapses same-lineage families to a shared root', () => {
+    // The family check passes these (distinct families) but the roots match —
+    // the soft-warning axis.
+    expect(vendorRoot('deepseek-chat')).toBe('deepseek');
+    expect(vendorRoot('deepseek-r1')).toBe('deepseek');
+    expect(modelFamily('deepseek-chat')).not.toBe(modelFamily('deepseek-r1'));
+  });
+
   it('assertTwoModelGuard throws on identical slugs and same family, passes on distinct', () => {
     expect(() => assertTwoModelGuard('m', 'm', false)).toThrow(/same model/i);
     expect(() =>
@@ -214,6 +230,20 @@ describe('two-model guard helpers', () => {
     expect(() =>
       assertTwoModelGuard('anthropic/claude-3.5-sonnet', 'gpt-oss-120b', false),
     ).not.toThrow();
+  });
+
+  it('warns (but does not throw) on a same-vendor-root, different-family pair', () => {
+    const warn = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      expect(() =>
+        assertTwoModelGuard('deepseek-chat', 'deepseek-r1', false),
+      ).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/vendor root/i));
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
