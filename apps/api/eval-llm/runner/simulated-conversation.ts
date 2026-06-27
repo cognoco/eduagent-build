@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
-import type {
-  ChallengeRoundEvaluationItem,
-  ChallengeRoundSessionState,
+import {
+  challengeRoundGraderVerdictSchema,
+  type AgeBracket,
+  type ChallengeRoundEvaluationItem,
+  type ChallengeRoundSessionState,
+  type ConversationLanguage,
 } from '@eduagent/schemas';
 import {
   buildExchangeSourceEvidence,
@@ -9,6 +12,7 @@ import {
   type ExchangeContext,
 } from '../../src/services/exchanges';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
+import { buildChallengeRoundGraderPrompt } from '../../src/services/challenge-round/grader-prompt';
 import { MAX_CHALLENGE_QUESTIONS } from '../../src/services/challenge-round/caps';
 import {
   decideMasteryAndReview,
@@ -16,7 +20,11 @@ import {
 } from '../../src/services/challenge-round/evaluation';
 import { transitionChallengeState } from '../../src/services/challenge-round/state';
 import { parseEnvelope } from '../../src/services/llm/envelope';
-import { getModelConfigForTest } from '../../src/services/llm/router';
+import { extractFirstJsonObject } from '../../src/services/llm';
+import {
+  getModelConfigForTest,
+  routeAndCall,
+} from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
 import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -28,43 +36,72 @@ import {
 } from './learner-agent';
 
 // ---------------------------------------------------------------------------
-// Simulated Challenge-Round driver.
+// Simulated Challenge-Round driver — PRODUCTION GRADER-ON path.
 //
-// Drives a non-scripted, multi-turn round: one LLM plays the learner (pinned
-// OpenRouter slug, hidden competence brief), the REAL mentor pipeline
-// (buildSystemPrompt → runHarnessLlm) responds, and the pure state machine +
-// pure mastery gate run in-memory, DB-free. The gate's outcome is compared to
-// the scenario's ground-truth `expectedOutcome` to make over-/under-credit
-// measurable.
+// Drives a non-scripted, multi-turn round. One LLM plays the learner (pinned
+// OpenRouter slug, hidden competence brief). Each learner answer is then:
+//   1. GRADED by the production judge (`buildChallengeRoundGraderPrompt` →
+//      rung 1, capability:'judge') — the component production actually runs when
+//      CHALLENGE_ROUND_GRADER_ENABLED is on (the default). This is the MEASURED
+//      component: its emission rate is the RR-12 gpt-oss-drop indicator, and its
+//      verdicts feed the mastery gate.
+//   2. answered by the TUTOR (`buildSystemPrompt` with graderEnabled:true →
+//      production routing) which just produces the next question. The tutor is
+//      NOT the candidate under test and is NEVER routed to the grader candidate.
 //
-// DB-free by design: `decideMasteryAndReview` is pure and runs for real; the
-// production-only `validateEvaluationEventIds` (DB lookup) is intentionally NOT
-// called — there is no seeded DB. The simulator measures the LLM contract + the
+// Why grader-ON, not the legacy inline-tutor signal: with the grader flag on,
+// the tutor emits NO `challenge_round_evaluation` — a separate judge call owns
+// it (`session/session-exchange.ts` → `runChallengeRoundGrader`,
+// `exchange-prompts.ts` gates the inline field on `!graderEnabled`). Measuring
+// the tutor envelope (as v1 did) describes a path prod has disabled by default;
+// the gpt-oss signal-drop was the very reason the judge was introduced. See the
+// 2026-06-27 post-review corrections in the plan.
+//
+// The pure state machine (`transitionChallengeState`) and pure mastery gate
+// (`decideMasteryAndReview`) run in-memory, DB-free. The gate's outcome is
+// compared to the scenario's ground-truth `expectedOutcome` to make over-/
+// under-credit measurable.
+//
+// DB-free by design: the production-only `validateEvaluationEventIds` (a strict
+// DB lookup that REJECTS the whole evaluation on any unresolved answerEventId,
+// → outcome 'invalid' in prod) is intentionally NOT called — there is no seeded
+// DB. Direction of the bias: because the harness skips that rejection, its
+// `verified` / over-credit rate is an UPPER BOUND on production's — production
+// can only be ≤ the harness here. The simulator measures the LLM contract + the
 // mastery decision, not the DB-anchoring step.
 // ---------------------------------------------------------------------------
 
-/** The mentor turn runs at rung 3, mirroring flows/challenge-round-mastery.ts. */
-const MENTOR_RUNG = 3 as const;
+/** The tutor turn runs at rung 3, mirroring flows/challenge-round-mastery.ts. */
+const TUTOR_RUNG = 3 as const;
+
+/** The grader judge runs at rung 1 — same as GRADER_RUNG in challenge-round/grader.ts. */
+const GRADER_RUNG = 1 as const;
 
 /**
- * The tier the mentor turn routes at. Must stay in lockstep with
- * `buildMentorContext`'s `llmTier` so the production-routing guard
- * (`resolveProductionMentorModel`) resolves the exact model the turn will use.
+ * The tier the turns route at. Must stay in lockstep with `buildMentorContext`'s
+ * `llmTier` so the production-routing guard (`resolveProductionGraderModel`)
+ * resolves the exact judge model the grading turn will use.
  */
-const MENTOR_LLM_TIER = 'standard' as const;
+const TURN_LLM_TIER = 'standard' as const;
+
+/** Fallback next-question if a tutor turn fails to parse — keeps the loop alive
+ *  (the tutor is not the measured component, so a parse miss must not strand the
+ *  round or corrupt the signal-emission measurement). */
+const FALLBACK_FOLLOWUP =
+  'Can you explain a bit more about why that is — what makes it work?';
 
 export interface SimulatedRoundResult {
   scenarioId: string;
   profileId: string;
-  /** 'production-routing' or the explicit candidate slug. */
-  mentorModel: string;
+  /** 'production-routing' or the explicit grader-candidate slug under test. */
+  graderModel: string;
   learnerModel: string;
   transcript: Array<{ role: 'assistant' | 'user'; content: string }>;
-  /** Accumulated across all answered turns. */
+  /** Accumulated across all answered turns (from the production judge). */
   evaluations: ChallengeRoundEvaluationItem[];
   decision: MasteryDecision;
   expectedOutcome: ChallengeSimScenario['expectedOutcome'];
-  /** false if any active turn's parseEnvelope failed OR returned 0 eval items. */
+  /** false if any active turn's GRADER returned 0 valid items (the gpt-oss drop). */
   signalEmitted: boolean;
 }
 
@@ -73,25 +110,43 @@ export interface RunSimulatedRoundArgs {
   profile: EvalProfile;
   /** Pinned learner OpenRouter slug. */
   learnerModel: string;
-  /** null = production routing via runHarnessLlm; a slug = explicit candidate. */
-  mentorModel: string | null;
+  /**
+   * The GRADER candidate under test: null = production routing (judge via
+   * routeAndCall); a slug = explicit candidate routed via the runHarnessLlm
+   * OpenRouter override (`--grader-model`).
+   */
+  graderModel: string | null;
   /** Override the heuristic same-base-family guard for a deliberate A/B. */
   allowSameFamily?: boolean;
 }
 
+export interface GraderTurnArgs {
+  askedQuestion: string;
+  learnerAnswer: string;
+  answerEventId: string;
+  ageBracket: AgeBracket;
+  conversationLanguage: ConversationLanguage;
+}
+
 /**
- * Dependency-injection seam for tests: replace the two LLM boundaries directly
- * (no internal jest.mock — GC1-clean). Defaults wire the real implementations.
+ * Dependency-injection seam for tests: replace the LLM boundaries directly (no
+ * internal jest.mock — GC1-clean). Defaults wire the real implementations.
  */
 export interface SimulatedRoundOverrides {
   learnerTurn?: (args: LearnerTurnArgs) => Promise<string>;
-  /** Returns the mentor's raw LLM response string (an envelope, ideally). */
-  mentorTurn?: (ctx: ExchangeContext, learnerAnswer: string) => Promise<string>;
+  /** Returns the tutor's next question (clean prose). */
+  tutorTurn?: (ctx: ExchangeContext, learnerAnswer: string) => Promise<string>;
+  /** Returns the production judge's evaluation items ([] on any drop/parse-fail). */
+  graderTurn?: (
+    args: GraderTurnArgs,
+  ) => Promise<ChallengeRoundEvaluationItem[]>;
 }
 
 /**
  * Stable v4-format UUID derived from a seed — answerEventId / topicId both
  * require `.uuid()`, and determinism keeps transcripts addressable + re-runnable.
+ * NOTE: this is a hand-rolled SHA-1 → v4-shaped formatter (a deterministic
+ * digest reshaped to satisfy `.uuid()`), NOT an RFC-4122 v5 namespaced UUID.
  */
 export function deterministicUuid(seed: string): string {
   const hex = createHash('sha1').update(seed).digest('hex');
@@ -125,48 +180,89 @@ export function modelFamily(slug: string): string {
 }
 
 /**
- * Two-model guard: refuse to run when the learner and grader are the same model
+ * Coarser vendor/base root (first family token) — `deepseek-chat` and
+ * `deepseek-r1` both → `deepseek`; `gpt-oss` and `gpt-4o` both → `gpt`. Used for
+ * a SOFT same-lineage warning the two-token family check misses (it leaks toward
+ * letting correlated pairs run, not toward false alarms).
+ */
+export function vendorRoot(slug: string): string {
+  return modelFamily(slug).split('-')[0] ?? '';
+}
+
+/**
+ * Two-model guard: refuse to run when the learner and GRADER are the same model
  * (or share a base family, heuristically) — correlated errors would inflate the
- * `solid` rate and yield a falsely lenient bar.
+ * `solid` rate and yield a falsely lenient bar. Note the axis: the correlation
+ * that matters is learner-vs-grader (the model answering vs the model judging),
+ * NOT learner-vs-tutor.
  */
 export function assertTwoModelGuard(
   learnerModel: string,
-  mentorModel: string,
+  graderModel: string,
   allowSameFamily: boolean,
 ): void {
-  if (learnerModel === mentorModel) {
+  if (learnerModel === graderModel) {
     throw new Error(
-      `two-model guard: learner and mentor are the same model (${learnerModel}). ` +
+      `two-model guard: learner and grader are the same model (${learnerModel}). ` +
         'The grader must differ from the learner or correlated errors inflate the solid rate.',
     );
   }
   if (!allowSameFamily) {
     const lf = modelFamily(learnerModel);
-    const mf = modelFamily(mentorModel);
+    const mf = modelFamily(graderModel);
     if (lf.length > 0 && lf === mf) {
       throw new Error(
-        `two-model guard (heuristic): learner (${learnerModel}) and mentor (${mentorModel}) ` +
+        `two-model guard (heuristic): learner (${learnerModel}) and grader (${graderModel}) ` +
           `share base family "${lf}". This is a heuristic slug/family check; pass ` +
           'allowSameFamily / --allow-same-family for a deliberate same-family A/B.',
+      );
+    }
+    // Family differs (we did not throw) but vendor roots match → possible
+    // same-lineage correlation the two-token family check cannot catch
+    // (e.g. deepseek-chat vs deepseek-r1). Warn, do NOT block — blocking would
+    // false-positive on genuinely distinct same-vendor models (gpt-4o vs gpt-oss).
+    const lr = vendorRoot(learnerModel);
+    const mr = vendorRoot(graderModel);
+    if (lr.length > 0 && lr === mr) {
+      console.warn(
+        `[two-model guard] learner (${learnerModel}) and grader (${graderModel}) share vendor ` +
+          `root "${lr}" but differ at the family level — possible same-lineage correlation the ` +
+          'family heuristic cannot catch. Proceeding; confirm these are genuinely distinct models.',
       );
     }
   }
 }
 
 /**
- * Resolve the concrete model the production router would use for the mentor rung
- * for THIS profile. Age-dependent on purpose: minors route to a different
- * (approved non-Gemini) model than the age-unknown default
- * (`router.ts` `isUnder18AgeBracket` → `approvedTextFallbackConfig`). Every sim
- * scenario is a minor, so resolving WITHOUT the age bracket would validate the
- * guard against the wrong model and let learner == real-grader slip through —
- * defeating the guard. Mirror the mentor turn's routing inputs exactly:
- * `llmTier` from `buildMentorContext` ('standard') and the profile's bracket.
+ * Resolve the concrete model the production router would use for the GRADER
+ * (the judge, rung 1, capability:'judge') for THIS profile. Age-dependent on
+ * purpose: minors short-circuit to the approved non-Gemini fallback BEFORE the
+ * judge branch (`router.ts` under-18 gate), and every sim scenario is a minor,
+ * so resolving WITHOUT the age bracket would validate the guard against the
+ * wrong model and let learner == real-grader slip through. Mirror the grader
+ * call's routing inputs exactly: rung 1, capability 'judge', tier 'standard'
+ * (the grader passes no llmTier → default standard), and the profile's bracket.
  */
-function resolveProductionMentorModel(profile: EvalProfile): string {
-  return getModelConfigForTest(MENTOR_RUNG, {
-    llmTier: MENTOR_LLM_TIER,
+export function resolveProductionGraderModel(profile: EvalProfile): string {
+  return getModelConfigForTest(GRADER_RUNG, {
+    llmTier: TURN_LLM_TIER,
+    capability: 'judge',
     ageBracket: resolveAgeBracket(profile.birthYear),
+  }).model;
+}
+
+/**
+ * Profile-independent judge-slug probe for the `--validate-baseline` drift
+ * check (which runs with no profile loaded). Every challenge-sim scenario is a
+ * MINOR, and all minor brackets resolve through the same under-18 gate to the
+ * same non-Gemini judge-of-record, so a fixed `'adolescent'` bracket yields the
+ * slug the baseline was seeded with. (Do not use for an adult-inclusive grid.)
+ */
+export function resolveJudgeSlugProbe(): string {
+  return getModelConfigForTest(GRADER_RUNG, {
+    llmTier: TURN_LLM_TIER,
+    capability: 'judge',
+    ageBracket: 'adolescent',
   }).model;
 }
 
@@ -179,6 +275,7 @@ function toExchangeHistory(
 function buildMentorContext(params: {
   scenario: ChallengeSimScenario;
   profile: EvalProfile;
+  conversationLanguage: ConversationLanguage;
   challengeRound: ChallengeRoundSessionState;
   exchangeHistory: ExchangeContext['exchangeHistory'];
   currentEventId: string;
@@ -190,38 +287,94 @@ function buildMentorContext(params: {
     topicTitle: params.scenario.topicTitle,
     topicDescription: params.scenario.topicDescription,
     sessionType: 'learning',
-    escalationRung: MENTOR_RUNG,
+    escalationRung: TUTOR_RUNG,
     exchangeHistory: params.exchangeHistory,
     birthYear: params.profile.birthYear,
     exchangeCount: 6,
     inputMode: 'text',
-    llmTier: MENTOR_LLM_TIER,
+    llmTier: TURN_LLM_TIER,
+    conversationLanguage: params.conversationLanguage,
     challengeRuntimeEnabled: true,
+    // grader-ON: the tutor must NOT be asked to emit the inline eval — the
+    // separate judge owns it. This mirrors production's default flag state.
+    graderEnabled: true,
     challengeRound: params.challengeRound,
     currentUserMessageEventId: params.currentEventId,
   };
 }
 
-async function defaultMentorTurn(
+/**
+ * Tutor turn — produces the next question. Routes through PRODUCTION routing
+ * (routeAndCall), never the grader candidate, so a `--grader-model` candidate
+ * cannot contaminate the conversation driver. Not the measured component.
+ */
+async function defaultTutorTurn(
   ctx: ExchangeContext,
   learnerAnswer: string,
 ): Promise<string> {
   const sourceEvidence = buildExchangeSourceEvidence(ctx, learnerAnswer);
   const system = buildSystemPrompt({ ...ctx, sourceEvidence });
-  const rung = (ctx.escalationRung ?? MENTOR_RUNG) as 1 | 2 | 3 | 4 | 5;
-  return runHarnessLlm(
+  const result = await routeAndCall(
     [
       { role: 'system', content: system },
       { role: 'user', content: learnerAnswer },
     ] satisfies ChatMessage[],
-    rung,
+    TUTOR_RUNG,
     {
+      flow: 'eval-harness',
       llmTier: ctx.llmTier,
       ageBracket: resolveAgeBracket(ctx.birthYear),
       responseFormat: 'json',
+      conversationLanguage: ctx.conversationLanguage,
       sessionId: `eval-sim-${ctx.sessionId}`,
     },
   );
+  const parsed = parseEnvelope(result.response, 'exchange.session');
+  return parsed.ok ? parsed.envelope.reply : FALLBACK_FOLLOWUP;
+}
+
+/**
+ * Grader turn — the MEASURED production component. Builds the real judge rubric
+ * (`buildChallengeRoundGraderPrompt`) and routes via `runHarnessLlm` so a
+ * `--grader-model` candidate is selected (override branch), or production judge
+ * routing applies (capability:'judge', rung 1) when null. Mirrors the production
+ * `runChallengeRoundGrader` parse contract: extract → JSON.parse → schema. Any
+ * failure (no JSON / parse error / schema invalid / items:[]) returns [] — a
+ * dropped signal, exactly as production fails open.
+ */
+async function defaultGraderTurn(
+  args: GraderTurnArgs,
+): Promise<ChallengeRoundEvaluationItem[]> {
+  const messages = buildChallengeRoundGraderPrompt({
+    askedQuestion: args.askedQuestion,
+    learnerAnswer: args.learnerAnswer,
+    ageBracket: args.ageBracket,
+    conversationLanguage: args.conversationLanguage,
+  });
+  const raw = await runHarnessLlm(messages, GRADER_RUNG, {
+    capability: 'judge',
+    responseFormat: 'json',
+    ageBracket: args.ageBracket,
+    conversationLanguage: args.conversationLanguage,
+    sessionId: 'eval-sim-grader',
+  });
+
+  const jsonText = extractFirstJsonObject(raw);
+  if (!jsonText) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return [];
+  }
+  const verdict = challengeRoundGraderVerdictSchema.safeParse(parsed);
+  if (!verdict.success) return [];
+  // Inject the server-owned answerEventId (the model never supplies it) —
+  // mirrors runChallengeRoundGrader's server-ownership invariant.
+  return verdict.data.items.map((item) => ({
+    ...item,
+    answerEventId: args.answerEventId,
+  }));
 }
 
 export async function runSimulatedRound(
@@ -231,14 +384,20 @@ export async function runSimulatedRound(
   const { scenario, profile, learnerModel, allowSameFamily = false } = args;
 
   // Two-model guard FIRST — before any LLM call. The null (production-routing)
-  // case still resolves the concrete mentor slug and applies the same check.
-  const mentorModelLabel = args.mentorModel ?? 'production-routing';
-  const mentorGuardSlug =
-    args.mentorModel ?? resolveProductionMentorModel(profile);
-  assertTwoModelGuard(learnerModel, mentorGuardSlug, allowSameFamily);
+  // case resolves the concrete JUDGE slug and applies the same check, so the
+  // guard protects the correct axis (learner vs the model that actually grades).
+  const graderModelLabel = args.graderModel ?? 'production-routing';
+  const graderGuardSlug =
+    args.graderModel ?? resolveProductionGraderModel(profile);
+  assertTwoModelGuard(learnerModel, graderGuardSlug, allowSameFamily);
 
   const learnerTurn = overrides.learnerTurn ?? runLearnerTurn;
-  const mentorTurn = overrides.mentorTurn ?? defaultMentorTurn;
+  const tutorTurn = overrides.tutorTurn ?? defaultTutorTurn;
+  const graderTurn = overrides.graderTurn ?? defaultGraderTurn;
+
+  const ageBracket = resolveAgeBracket(profile.birthYear);
+  const conversationLanguage =
+    profile.conversationLanguage as ConversationLanguage;
 
   // Seed via the REAL transitions so totalQuestions is set (a state missing it
   // routes straight to drafting after one turn — state.ts FCR-2026-05-23).
@@ -263,7 +422,7 @@ export async function runSimulatedRound(
   let turnIndex = 0;
 
   while (state?.state === 'active' && turnIndex < MAX_CHALLENGE_QUESTIONS) {
-    // 1. Learner answers the current question (history excludes this turn).
+    // 1. Learner answers the CURRENT question (history excludes this turn).
     const learnerAnswer = await learnerTurn({
       scenario,
       profile,
@@ -271,46 +430,48 @@ export async function runSimulatedRound(
       history: [...learnerHistory],
       learnerModel,
     });
-
-    // 2. Mentor turn — exchangeHistory ends with the mentor question; the
-    //    current answer is passed as the user message, not via history.
-    const ctx = buildMentorContext({
-      scenario,
-      profile,
-      challengeRound: state,
-      exchangeHistory: toExchangeHistory(transcript),
-      currentEventId: deterministicUuid(`${scenario.id}:q${turnIndex}`),
-    });
-
     transcript.push({ role: 'user', content: learnerAnswer });
     learnerHistory.push({ role: 'mentor', content: mentorQuestion });
     learnerHistory.push({ role: 'learner', content: learnerAnswer });
 
-    const rawMentor = await mentorTurn(ctx, learnerAnswer);
+    const answerEventId = deterministicUuid(`${scenario.id}:q${turnIndex}`);
 
-    // 3. PRODUCTION envelope path: an ok:false result is a dropped signal,
-    //    exactly as exchanges.ts treats it. No reply text → cannot continue.
-    const parsed = parseEnvelope(rawMentor, 'exchange.session');
-    if (!parsed.ok) {
-      signalEmitted = false;
-      break;
-    }
-    transcript.push({ role: 'assistant', content: parsed.envelope.reply });
+    // 2. GRADE the answer with the production judge (the MEASURED component).
+    //    askedQuestion = the question just answered (clean prose), mirroring
+    //    production's last-assistant-turn sourcing.
+    const items = await graderTurn({
+      askedQuestion: mentorQuestion,
+      learnerAnswer,
+      answerEventId,
+      ageBracket,
+      conversationLanguage,
+    });
+    if (items.length === 0) signalEmitted = false;
+    allEvals.push(...items);
 
-    const evals = parsed.envelope.signals?.challenge_round_evaluation ?? [];
-    if (evals.length === 0) {
-      signalEmitted = false;
-    }
-    allEvals.push(...evals);
-
-    // 4. Advance the state machine with the (possibly empty) evaluation.
+    // 3. Advance the state machine with the (possibly empty) evaluation.
     state = transitionChallengeState(state, {
       type: 'answer_complete',
-      evaluation: evals,
+      evaluation: items,
     });
-
-    mentorQuestion = parsed.envelope.reply;
     turnIndex += 1;
+
+    // 4. TUTOR produces the next question — only while the round continues.
+    //    Production-routed; failure to parse falls back so the loop is never
+    //    stranded (does NOT affect signalEmitted — the tutor is not the signal).
+    if (state?.state === 'active' && turnIndex < MAX_CHALLENGE_QUESTIONS) {
+      const ctx = buildMentorContext({
+        scenario,
+        profile,
+        conversationLanguage,
+        challengeRound: state,
+        exchangeHistory: toExchangeHistory(transcript),
+        currentEventId: deterministicUuid(`${scenario.id}:tutor-q${turnIndex}`),
+      });
+      const nextQuestion = await tutorTurn(ctx, learnerAnswer);
+      mentorQuestion = nextQuestion;
+      transcript.push({ role: 'assistant', content: nextQuestion });
+    }
   }
 
   // Drive to completion from drafting (normal) or active (early break / cap).
@@ -323,7 +484,7 @@ export async function runSimulatedRound(
   return {
     scenarioId: scenario.id,
     profileId: profile.id,
-    mentorModel: mentorModelLabel,
+    graderModel: graderModelLabel,
     learnerModel,
     transcript,
     evaluations: allEvals,

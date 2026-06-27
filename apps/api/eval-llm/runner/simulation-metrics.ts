@@ -29,11 +29,16 @@ export interface SimMetrics {
   masteryVerifiedRate: number;
   /** Gate said `verified` but the scenario's ground truth was not `verified`. */
   overCreditRate: number;
+  /** The exact scenario ids that over-credited (gate `verified`, ground truth
+   *  not). Feeds the hard ceiling: a non-empty list means a breach to name. */
+  overCreditScenarioIds: string[];
   /** Gate said `partial`/`reteach` but the scenario's ground truth was `verified`. */
   underCreditRate: number;
-  /** Share of rounds whose mentor emitted a usable evaluation signal, overall… */
+  /** Share of rounds whose GRADER emitted a usable evaluation signal, overall… */
   signalEmissionRate: number;
-  /** …and per mentor model (the gpt-oss-drop indicator). */
+  /** …and per grader model (the gpt-oss-drop indicator, now measured on the
+   *  grader since the grader-ON pipeline owns the evaluation signal). The field
+   *  name is retained for baseline continuity. */
   signalEmissionRateByMentor: Record<string, number>;
 }
 
@@ -55,9 +60,10 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
 
   let masteryVerified = 0;
   let overCredit = 0;
+  const overCreditScenarioIds: string[] = [];
   let underCredit = 0;
   let signalEmittedTotal = 0;
-  const mentorTotals: Record<string, { emitted: number; total: number }> = {};
+  const graderTotals: Record<string, { emitted: number; total: number }> = {};
 
   for (const r of results) {
     outcomeCounts[r.decision.outcome] += 1;
@@ -71,6 +77,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     // truth did not warrant it — the grader was too lenient.
     if (r.decision.outcome === 'verified' && r.expectedOutcome !== 'verified') {
       overCredit += 1;
+      overCreditScenarioIds.push(r.scenarioId);
     }
     // Under-credit: a learner who DESERVED verification (ground-truth verified)
     // did not get it. Includes `invalid` (the mentor dropped all signal so the
@@ -89,7 +96,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     }
 
     if (r.signalEmitted) signalEmittedTotal += 1;
-    const m = (mentorTotals[r.mentorModel] ??= { emitted: 0, total: 0 });
+    const m = (graderTotals[r.graderModel] ??= { emitted: 0, total: 0 });
     m.total += 1;
     if (r.signalEmitted) m.emitted += 1;
   }
@@ -100,7 +107,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
   for (const o of ALL_OUTCOMES) outcomeRates[o] = rate(outcomeCounts[o]);
 
   const signalEmissionRateByMentor: Record<string, number> = {};
-  for (const [model, { emitted, total: t }] of Object.entries(mentorTotals)) {
+  for (const [model, { emitted, total: t }] of Object.entries(graderTotals)) {
     signalEmissionRateByMentor[model] = t === 0 ? 0 : emitted / t;
   }
 
@@ -111,6 +118,7 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     conceptResultCounts,
     masteryVerifiedRate: rate(masteryVerified),
     overCreditRate: rate(overCredit),
+    overCreditScenarioIds,
     underCreditRate: rate(underCredit),
     signalEmissionRate: rate(signalEmittedTotal),
     signalEmissionRateByMentor,
@@ -147,4 +155,207 @@ export async function writeCorpus(
     ),
     'utf8',
   );
+}
+
+// ---------------------------------------------------------------------------
+// Committed-baseline machinery (the tracked gate). All pure — no LLM, no I/O.
+// `simulation-baseline.json` is the committed seed; the CLI verbs in
+// `simulate.ts` read/write it through `toBaseline` / `validateBaselineStructure`
+// and gate a live run with `compareSimulationBaseline`.
+// ---------------------------------------------------------------------------
+
+export interface SimulationBaseline {
+  version: 1;
+  /** ISO timestamp; stamped by the caller (simulate.ts is a plain tsx entry —
+   *  `Date` is available there; the Date.* ban is Workflow-script-only). */
+  updatedAt: string;
+  /** Provenance stamp. Only `--update-baseline` writes it, so a hand-authored
+   *  structurally-valid stub (which lacks it) fails `validateBaselineStructure`
+   *  → the per-PR gate stays red until a real baseline is seeded (T12). */
+  provenance: 'update-baseline';
+  learnerModel: string;
+  /** The tutor routing label (`production-routing` for the committed gate). */
+  mentorModel: string;
+  /** The resolved `capability:'judge'` slug at seed time. The per-PR
+   *  `--validate-baseline` judge-drift check reds when this ≠ the live judge,
+   *  so a judge reselection (T10 bake-off) forces a re-seed. */
+  graderModel: string;
+  scenarioCount: number;
+  rates: {
+    outcome: Record<MasteryOutcome, number>;
+    masteryVerified: number;
+    underCredit: number;
+    signalEmissionByMentor: Record<string, number>;
+  };
+}
+
+export interface SimulationGateResult {
+  /** HARD ceiling input — `pass` is exactly `overCreditCount === 0`. */
+  overCreditCount: number;
+  overCreditScenarioIds: string[];
+  drift: Array<{
+    metric: string;
+    baseline: number;
+    current: number;
+    delta: number;
+  }>;
+  pass: boolean;
+}
+
+/**
+ * Compare a live run's metrics against the committed baseline. The over-credit
+ * ceiling is the ONLY pass/fail input (hard `=== 0`); drift is advisory.
+ * Tolerance widens for small N (few rounds) where the soft rates are noisy.
+ */
+export function compareSimulationBaseline(
+  current: SimMetrics,
+  baseline: SimulationBaseline,
+  tolerancePp: number,
+): SimulationGateResult {
+  const widened = current.totalRounds < 10 ? tolerancePp * 2 : tolerancePp;
+  const drift: SimulationGateResult['drift'] = [];
+  const cmp = (metric: string, base: number, cur: number): void => {
+    const delta = +(cur - base).toFixed(3);
+    if (Math.abs(delta) > widened) {
+      drift.push({ metric, baseline: base, current: cur, delta });
+    }
+  };
+
+  cmp(
+    'masteryVerified',
+    baseline.rates.masteryVerified,
+    current.masteryVerifiedRate,
+  );
+  cmp('underCredit', baseline.rates.underCredit, current.underCreditRate);
+
+  // Per-grader-model fail-open health (the gpt-oss-drop indicator, now measured
+  // on the grader). Diff every model in either set; a model present on only one
+  // side reads as 0 on the other.
+  const graderKeys = new Set([
+    ...Object.keys(baseline.rates.signalEmissionByMentor),
+    ...Object.keys(current.signalEmissionRateByMentor),
+  ]);
+  for (const k of graderKeys) {
+    cmp(
+      `signalEmissionByMentor.${k}`,
+      baseline.rates.signalEmissionByMentor[k] ?? 0,
+      current.signalEmissionRateByMentor[k] ?? 0,
+    );
+  }
+
+  for (const o of Object.keys(baseline.rates.outcome) as MasteryOutcome[]) {
+    cmp(
+      `outcome.${o}`,
+      baseline.rates.outcome[o],
+      current.outcomeRates[o] ?? 0,
+    );
+  }
+
+  return {
+    overCreditCount: current.overCreditScenarioIds.length,
+    overCreditScenarioIds: current.overCreditScenarioIds,
+    drift,
+    pass: current.overCreditScenarioIds.length === 0,
+  };
+}
+
+/** Build a committed baseline payload from a seed run's metrics. */
+export function toBaseline(
+  metrics: SimMetrics,
+  opts: {
+    learnerModel: string;
+    mentorModel: string;
+    graderModel: string;
+    updatedAt: string;
+    provenance: 'update-baseline';
+  },
+): SimulationBaseline {
+  return {
+    version: 1,
+    updatedAt: opts.updatedAt,
+    provenance: opts.provenance,
+    learnerModel: opts.learnerModel,
+    mentorModel: opts.mentorModel,
+    graderModel: opts.graderModel,
+    scenarioCount: metrics.totalRounds,
+    rates: {
+      outcome: metrics.outcomeRates,
+      masteryVerified: metrics.masteryVerifiedRate,
+      underCredit: metrics.underCreditRate,
+      signalEmissionByMentor: metrics.signalEmissionRateByMentor,
+    },
+  };
+}
+
+/**
+ * Structural validation for the per-PR `--validate-baseline` gate (no LLM).
+ * Rejects: empty/null, wrong version, `scenarioCount:0`, a missing `graderModel`
+ * or `provenance` stamp (so a hand-written stub fails — the feature stays
+ * visibly inert until T12 seeds a real baseline), and a payload shaped like the
+ * main-harness `baseline.json` (it lacks these sim-specific fields).
+ */
+export function validateBaselineStructure(raw: unknown): {
+  ok: boolean;
+  reason?: string;
+} {
+  if (raw === null || typeof raw !== 'object') {
+    return { ok: false, reason: 'baseline is empty or not an object' };
+  }
+  const b = raw as Record<string, unknown>;
+  if (b.version !== 1) {
+    return { ok: false, reason: `unexpected version ${String(b.version)}` };
+  }
+  if (typeof b.learnerModel !== 'string' || b.learnerModel.length === 0) {
+    return { ok: false, reason: 'missing learnerModel' };
+  }
+  if (typeof b.graderModel !== 'string' || b.graderModel.length === 0) {
+    return {
+      ok: false,
+      reason: 'missing graderModel — re-seed via --update-baseline (T12)',
+    };
+  }
+  if (b.provenance !== 'update-baseline') {
+    return {
+      ok: false,
+      reason:
+        'missing provenance:"update-baseline" stamp — a hand-written stub is not a seeded baseline (T12)',
+    };
+  }
+  if (typeof b.scenarioCount !== 'number' || b.scenarioCount <= 0) {
+    return { ok: false, reason: 'scenarioCount must be > 0' };
+  }
+  const rates = b.rates;
+  if (rates === null || typeof rates !== 'object') {
+    return { ok: false, reason: 'missing rates block' };
+  }
+  const r = rates as Record<string, unknown>;
+  // Cross-baseline shape guard (F10): the main-harness baseline lacks these.
+  if (typeof r.underCredit !== 'number') {
+    return {
+      ok: false,
+      reason:
+        'missing rates.underCredit (looks like a non-simulation baseline)',
+    };
+  }
+  if (typeof r.masteryVerified !== 'number') {
+    return {
+      ok: false,
+      reason:
+        'missing rates.masteryVerified (looks like a non-simulation baseline)',
+    };
+  }
+  if (
+    r.signalEmissionByMentor === null ||
+    typeof r.signalEmissionByMentor !== 'object'
+  ) {
+    return {
+      ok: false,
+      reason:
+        'missing rates.signalEmissionByMentor (looks like a non-simulation baseline)',
+    };
+  }
+  if (r.outcome === null || typeof r.outcome !== 'object') {
+    return { ok: false, reason: 'missing rates.outcome' };
+  }
+  return { ok: true };
 }

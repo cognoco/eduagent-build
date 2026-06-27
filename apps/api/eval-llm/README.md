@@ -159,29 +159,89 @@ Markdown lets you eyeball differences in a PR diff without the harness needing t
 
 A **standalone** dual-agent simulator (not a `FlowDefinition` — flows are
 single-turn). One LLM plays the **learner** in character from a hidden
-competence brief; the **real mentor pipeline** (`buildSystemPrompt` →
-`runHarnessLlm`) responds; the pure state machine
-(`transitionChallengeState`) and the pure mastery gate
-(`decideMasteryAndReview`) run in-memory. The driver compares the gate's
-outcome to each scenario's ground-truth `expectedOutcome` to compute
-over-/under-credit and per-mentor signal-emission rates.
+competence brief. Each learner answer is then **graded by the production judge**
+(`buildChallengeRoundGraderPrompt` → rung 1, `capability:'judge'`) — the
+component production actually runs when `CHALLENGE_ROUND_GRADER_ENABLED` is on
+(the V2 default). A separate **tutor** turn (`buildSystemPrompt`,
+production-routed) only produces the next question. The pure state machine
+(`transitionChallengeState`) and the pure mastery gate (`decideMasteryAndReview`)
+run in-memory. The driver compares the gate's outcome to each scenario's
+ground-truth `expectedOutcome` to compute over-/under-credit and the grader's
+signal-emission rate.
+
+> **The GRADER is the measured component, not the tutor.** With the grader flag
+> on, the tutor emits **no** inline `challenge_round_evaluation` — a separate
+> judge call owns it (the gpt-oss signal-drop was the very reason the judge was
+> introduced). The candidate-under-test is therefore the **grader** (`--grader-model`),
+> production-routed by default; the tutor is never routed to the candidate slug.
 
 ```bash
 # List the scenario grid — no LLM call, no Doppler, no provider bootstrap.
 pnpm --filter @eduagent/api eval:llm:sim -- --list
 
-# Live grid: a candidate mentor model grades a DISTINCT learner model.
+# Live grid: a DISTINCT learner is graded by the production judge (default) or
+# by an explicit grader candidate. Learner and grader must differ (see guard).
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --mentor-model openai/gpt-oss-120b \
-  --learner-model anthropic/claude-3.5-sonnet --runs 2 --max-live-calls 30
+  --learner-model openai/gpt-4o --runs 2 --max-live-calls 30
+
+# Pin an explicit grader candidate instead of production routing:
+doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
+  --learner-model openai/gpt-4o --grader-model anthropic/claude-3.5-sonnet \
+  --runs 2 --max-live-calls 30
 ```
 
-Flags: `--learner-model <slug>` (required for a run), `--mentor-model <slug>`
-(optional candidate; default = production routing), `--provider <slug>`,
-`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (default 30,
-~6 calls/round), `--list`, `--allow-same-family`. Output lands in
+Flags: `--learner-model <slug>` (required for a run), `--grader-model <slug>`
+(optional candidate; default = production judge routing), `--provider <slug>`,
+`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (default 30 —
+**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`), `--list`,
+`--allow-same-family`, and the three **baseline verbs** below
+(`--validate-baseline`, `--check-baseline`, `--update-baseline`). Output lands in
 `eval-llm/corpus/<timestamp>/` (gitignored) as one transcript JSON per round
 plus `metrics.json`.
+
+### Over-credit gate + baseline (three verbs)
+
+The simulator is a **tracked gate**, not just an observation tool. The committed
+`eval-llm/simulation-baseline.json` (provenance-stamped, seeded operationally —
+see the seeding note) anchors three verbs:
+
+- **`--validate-baseline`** — **key-free, no LLM call.** Structurally validates
+  the committed baseline (`validateBaselineStructure`: version, `learnerModel`,
+  `graderModel`, `provenance`, `scenarioCount`, and the `rates` block) **and**
+  re-resolves the live `capability:'judge'` slug, exiting 1 if it ≠
+  `baseline.graderModel`. That **judge-slug drift check** closes the silent-
+  staleness hole: if the production judge is reselected, the baseline is
+  declared stale on the very next PR rather than scoring against the wrong model.
+  This is the per-PR step in `api-quality-gate.yml` (deterministic, no secrets).
+- **`--check-baseline`** — live grid (needs Doppler `-c stg`), then
+  `compareSimulationBaseline` vs the committed baseline. A reproduced over-credit
+  breach exits 1 (the **hard ceiling**, `overCreditScenarioIds.length === 0`);
+  soft drift beyond tolerance only warns. This is the **weekly** step in
+  `eval-live.yml`.
+- **`--update-baseline`** — re-seed: runs the grid, writes
+  `simulation-baseline.json` via `toBaseline` (stamps the resolved `graderModel`
+  + `provenance: 'update-baseline'`). Run this — and commit — whenever the
+  judge-slug drift check reds, or when a quality change intentionally moves the
+  distribution.
+
+> **`signalEmitted` now means "the GRADER emitted evals"** (its fail-open rate),
+> not "the tutor emitted the inline signal" — the metric (`signalEmissionByMentor`
+> in the baseline, kept for shape-compatibility) is reinterpreted accordingly and
+> remains the gpt-oss/grader health indicator, now also a drift metric in
+> `compareSimulationBaseline`.
+
+> **Disclosed empty-grader divergence.** On a `[]` grader result the simulator
+> falls open to the legacy inline-state `answer_complete` path; **production
+> instead** bumps `questionsAsked` and runs `resolveGraderStallTermination`. This
+> affects only the **soft** outcome/termination distribution — the **hard
+> over-credit ceiling is unaffected** (empty ⇒ no `solid` ⇒ no `verified`). Do
+> not read the empty branch as "production-faithful".
+
+> **Weekly-gate ownership (F11).** The weekly `eval-live.yml` run files a
+> `ci`-labelled issue on failure. Triage owner: **@jojorgen** (API / eval-harness
+> owner per `.github/CODEOWNERS`). A reproduced over-credit breach is a real
+> grader-leniency regression — fix the grader/prompt and re-seed; **never raise
+> the ceiling.**
 
 ### Why this complements RR-2 but does NOT discharge it
 
@@ -194,13 +254,15 @@ recalibration against real learner data still stands.
 
 ### The two-model guardrail
 
-The learner model and the mentor/grader model **must differ**, or correlated
-errors inflate the `solid` rate and produce a falsely lenient bar. The guard
-refuses to run when:
+The learner model and the **grader** model **must differ**, or correlated
+errors inflate the `solid` rate and produce a falsely lenient bar. The axis that
+matters is learner-vs-**grader** (the model answering vs the model judging), not
+learner-vs-tutor — a learner sharing the *tutor's* family is explicitly allowed.
+The guard refuses to run when:
 
-1. The slugs are identical (explicit candidate or production-routing default —
-   the null case resolves the router's concrete mentor slug and applies the
-   same check).
+1. The slugs are identical (explicit `--grader-model` candidate or the
+   production-routing default — the null case resolves the router's concrete
+   **judge** slug for the profile's age bracket and applies the same check).
 2. They share a **base family** (heuristic: provider prefix stripped, size/date
    suffixes dropped, first two tokens compared — `openai/gpt-oss-120b` and
    `gpt-oss-120b` both collapse to `gpt-oss`). This is heuristic (the same model
@@ -220,21 +282,74 @@ refuses to run when:
   harness does not produce. RR-6's **note-overlap** half stays blocked on a
   drafting-path harness or real transcripts; this feeds only the **mastery-bar**
   half.
-- **Envelope parsing is the production path** (`parseEnvelope`, surface
-  `exchange.session`): a schema-violating or zero-eval mentor turn counts as a
-  dropped signal (`signalEmitted=false`), exactly as production treats it. That
-  is the **gpt-oss signal-drop** indicator on RR-12.
+- **The grader parse contract is the production path** (`extractFirstJsonObject`
+  → `JSON.parse` → `challengeRoundGraderVerdictSchema`, mirroring
+  `runChallengeRoundGrader`): a no-JSON / parse-error / schema-invalid / `items:[]`
+  grader turn counts as a dropped signal (`signalEmitted=false`), exactly as
+  production fails open. That is the **gpt-oss signal-drop** indicator on RR-12.
+  (Soft termination on that `[]` differs from production — see the disclosed
+  empty-grader divergence above.)
 - **`OPENROUTER_API_KEY` must be in the resolved Doppler config (`-c stg`)** for
   any live run — the learner *always* calls OpenRouter, and bootstrap treats the
   key as optional (it only fails at call time otherwise).
 - **`--provider` is a GLOBAL OpenRouter host pin** — it affects *every*
-  OpenRouter call this run, including an OpenRouter mentor candidate. Only use it
-  when the mentor is production-routed or both deliberately share the pinned
+  OpenRouter call this run, including an OpenRouter grader candidate. Only use it
+  when the grader is production-routed or both deliberately share the pinned
   host.
 - **Language:** v1 learner answers are in plain English regardless of the
   profile's conversation language — a deliberate simplification for the
   synthetic pre-screen; language-faithful calibration comes from real-staging
   transcripts (RR-2).
+
+## Teaching-quality flow (`teaching-session`)
+
+A multi-turn, LLM-judged flow (registered in `FLOWS`, runs under `--live`) that
+answers a different question from the mastery gate: **"across a realistic
+session, does the mentor teach a concept well enough that the learner can use it
+afterward — without looping, losing context, or just handing over the answer?"**
+The real mentor pipeline (`buildSystemPrompt` → `runHarnessLlm`) teaches up to
+`MAX_MENTOR_TURNS = 8`; an **inline** simulated learner (copied from the
+`misconception-repair` pattern, **not** `learner-agent.ts`) stays pinned at its
+hidden `startingGap` competence the whole loop — it only advances on a concept
+the mentor *explicitly taught*, never via the model's own pretraining, so a
+too-capable learner cannot mask bad teaching. A final **transfer probe** (a novel
+question the mentor does **not** answer) is solved by the learner "using only what
+was taught", then an LLM judge returns a 4-field `TeachingVerdict`:
+
+| Dimension | Severity if bad |
+|---|---|
+| Transfer / retention (unaided novel probe) | **error** if `transfer: 'no'` |
+| Scaffolding / pace (matched age + gap) | warning |
+| Coherence (no looping / contradiction) | warning |
+| Told-not-taught (reasoned, not asserted) | warning |
+
+`evaluateTeachingVerdict()` is exported pure and unit-tested for the severity
+mapping; `assertScenarioProfilesResolve(PROFILES)` runs at import time so a
+mistyped `profileId` fails loud rather than silently dropping a scenario.
+
+> **⚠️ BAND SCOPE — `SCENARIO_BAND_LABEL`:** the 5 scenarios are
+> **PRE-TEEN/TEEN-BAND PRE-SCREEN ONLY (11–17yo)** — `12yo-dinosaurs`,
+> `15yo-football-gaming`, `13yo-spanish-beginner`, `17yo-french-advanced`, and
+> `11yo-czech-animals` (the last gives non-English tutor-prose coverage). They say
+> **nothing** about teaching quality for **under-10s** (on a parent's account) or
+> **adults** — the two bands with no `EvalProfile` yet. A green run is **not**
+> all-ages teaching quality. Authoring under-10 + adult scenarios is a tracked
+> follow-up (plan **T13**), not silently in-scope. The label is surfaced in the
+> flow snapshot header, here, and the weekly issue body so a non-coder reader
+> cannot misread the gate's reach.
+
+> **Judge temperature (M8/F3) — known limitation.** The plan calls for a pinned
+> `temperature: 0` judge, but `callLlm` exposes no temperature parameter, so the
+> judge runs at the harness default. The real flakiness defense is therefore the
+> operational **≥5× seed-stability calibration** (a known-good control scores
+> `transfer: 'yes'/'partial'` and a known-bad *not-taught* control scores
+> `transfer: 'no'` on every run) gated in T12 — not a per-call temperature pin.
+> Pinning the judge temperature would require threading the parameter through the
+> LLM service layer (out of scope for this feature).
+
+Like the mastery gate, this is **CI-free per-PR** beyond the Tier-1 snapshot —
+the transfer probe is only ever exercised against a real model in the T12 stg
+grid and the weekly cron.
 
 ## Review loop during tuning
 

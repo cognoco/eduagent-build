@@ -82,3 +82,16 @@ jobs:
       - name: LLM eval harness — validate signal baseline (deterministic)
         if: steps.change-class.outputs.eval == 'true'
         run: pnpm eval:llm -- --validate-baseline
+
+      # Mastery-SIMULATION baseline — a SEPARATE, deterministic, key-free guard
+      # (distinct simulation-baseline.json, not the signal baseline above). It
+      # structurally validates the committed sim baseline + checks the judge slug
+      # is current; makes NO live LLM call. continue-on-error UNTIL the baseline
+      # is seeded (T12): until then there is no committed simulation-baseline.json,
+      # so this step reds — that red signals "feature inert", not broken code.
+      # T12 commits the real provenance-stamped baseline AND removes
+      # continue-on-error here in the same PR (mirrors WI-556 for the main harness).
+      - name: LLM eval harness — validate SIMULATION baseline (deterministic)
+        if: steps.change-class.outputs.eval == 'true'
+        continue-on-error: true
+        run: pnpm --filter @eduagent/api eval:llm:sim -- --validate-baseline
