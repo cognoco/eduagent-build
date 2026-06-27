@@ -29,12 +29,18 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../services/curriculum' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
-  () => ({
+// GC6: real module via requireActual so the real markBookFailed performs its DB
+// write (asserted by the failure-signal tests); override only the heavy
+// LLM-backed persistBookTopics, which the Inngest step test stubs.
+jest.mock('../../services/curriculum', () => {
+  const actual = jest.requireActual(
+    '../../services/curriculum',
+  ) as typeof import('../../services/curriculum');
+  return {
+    ...actual,
     persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
-  }),
-);
+  };
+});
 
 jest.mock(
   '../../services/profile' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,

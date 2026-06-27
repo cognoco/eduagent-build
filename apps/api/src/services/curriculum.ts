@@ -1687,6 +1687,35 @@ export function prepareTopicExpansion(
   return { topics: expansionTopics, connections };
 }
 
+/**
+ * Atomic failure-marking write for a curriculum book — the failure-path
+ * counterpart to {@link persistBookTopics}'s success write. Both Inngest
+ * generation paths (subject-prewarm-curriculum, subject-retry-curriculum) call
+ * this from their terminal onFailure branch so a stuck book never strands the
+ * subject "preparing" forever with no persisted reason.
+ *
+ * The `topicsGenerated = false` predicate makes the write atomic against the
+ * success write: a book a concurrent run already generated can never end up
+ * topicsGenerated=true AND failedAt set.
+ */
+export async function markBookFailed(
+  db: Database,
+  subjectId: string,
+  bookId: string,
+  reason: 'empty_topics' | 'generation_error',
+): Promise<void> {
+  await db
+    .update(curriculumBooks)
+    .set({ failedReason: reason, failedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(curriculumBooks.topicsGenerated, false),
+      ),
+    );
+}
+
 export async function persistBookTopics(
   db: Database,
   profileId: string,

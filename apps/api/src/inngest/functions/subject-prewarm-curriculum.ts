@@ -15,7 +15,7 @@ import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
-import { persistBookTopics } from '../../services/curriculum';
+import { markBookFailed, persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
@@ -68,36 +68,6 @@ async function loadBook(
     throw new NonRetriableError('book-profile-mismatch');
   }
   return book;
-}
-
-/**
- * Persist the TERMINAL FAILURE signal for a book's topic generation. Scoped by
- * id AND subjectId so a stray bookId can never touch a row it doesn't own
- * (mirrors the parent-chain ownership verified by loadBook). We persist only the
- * failure terminal — "ready" is derived from topics_generated and cleared-on-
- * success by persistBookTopics; transient "preparing" is derived (not generated
- * AND not failed). No `generating`/`pending` flag is persisted (it would be
- * liveness-coupled and could strand a dead run "in progress" forever).
- */
-async function markBookFailed(
-  db: Database,
-  subjectId: string,
-  bookId: string,
-  reason: 'empty_topics' | 'generation_error',
-): Promise<void> {
-  await db
-    .update(curriculumBooks)
-    .set({ failedReason: reason, failedAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(curriculumBooks.id, bookId),
-        eq(curriculumBooks.subjectId, subjectId),
-        // Never stamp failure on a book a concurrent run already generated.
-        // This makes the failure write atomic against the success write so the
-        // row can never end up topicsGenerated=true AND failedAt set.
-        eq(curriculumBooks.topicsGenerated, false),
-      ),
-    );
 }
 
 export const subjectPrewarmCurriculum = inngest.createFunction(
