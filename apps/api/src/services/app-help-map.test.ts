@@ -33,8 +33,9 @@ interface EnglishLocale {
   tabs: { mentor: string; subjects: string; journal: string };
   journal: {
     sections: {
-      recaps: string;
       notes: string;
+      sessions: string;
+      practice: string;
       memory: string;
       reports: string;
     };
@@ -415,17 +416,16 @@ describe('buildAppHelpPromptBlock — V2 shell', () => {
   });
 
   it('routes notes / sessions / bookmarks / memory into the Journal tab', () => {
-    expect(en.journal.sections.notes).toBe('Saved notes');
-    expect(en.journal.sections.memory).toBe('Mentor memory');
+    // 2026-06-27 Journal redesign: the landing is five labelled buttons —
+    // Notes, Sessions, Practice, Memory, Reports (`JournalTabView.tsx`). The V2
+    // app-help map must route to those exact visible labels (notes + bookmarks
+    // merge into Notes; recaps fold into Sessions), so assert the live labels.
+    expect(en.journal.sections.notes).toBe('Notes');
+    expect(en.journal.sections.sessions).toBe('Sessions');
+    expect(en.journal.sections.memory).toBe('Memory');
     expect(v2).toContain(en.journal.sections.notes);
+    expect(v2).toContain(en.journal.sections.sessions);
     expect(v2).toContain(en.journal.sections.memory);
-    // #1316 (a2dd04cab) restructured `journal.notes` into a notes-list UI string set,
-    // removing the standalone `journal.notes.sessions` / `.bookmarks` labels. The V2
-    // app-help prompt still routes those concepts to the Journal tab via the literal
-    // wording in app-help-map.ts ("Recent learning sessions" / "Saved mentor replies"),
-    // so assert the shipped prompt strings directly instead of the removed en.json keys.
-    expect(v2).toContain('Recent learning sessions');
-    expect(v2).toContain('Saved mentor replies');
   });
 
   it('routes account/settings to the Account sheet (opened from the profile picture)', () => {

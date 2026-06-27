@@ -20,7 +20,11 @@ import * as ts from 'typescript';
 // green-up): useSubjectHub (2, useQueries) + useNowFeed (1, custom query
 // options + now-feed cache write) are non-migratable; the 2 migratable new V2
 // sites (useJournalRecaps, useNowOverflow) were migrated. See WI-844 / orch-009.
-const BASELINE = 95;
+// 95 → 96 (2026-06-27, Journal redesign): usePracticeActivityHistory is a
+// cursor-paginated useInfiniteQuery (Practice "My past activity"), which the
+// single-query useApiQuery wrapper cannot express — non-migratable, like the
+// sibling useAllNotes infinite query.
+const BASELINE = 96;
 
 const EXCLUDED = new Set([
   'apps/mobile/src/hooks/use-api-query.ts',
