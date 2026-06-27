@@ -4,6 +4,7 @@ import {
   modelFamily,
   vendorRoot,
   deterministicUuid,
+  parseGraderResponse,
   type SimulatedRoundOverrides,
 } from './simulated-conversation';
 import { MAX_CHALLENGE_QUESTIONS } from '../../src/services/challenge-round/caps';
@@ -256,5 +257,50 @@ describe('deterministicUuid', () => {
     expect(a).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
+  });
+});
+
+describe('parseGraderResponse — production fail-open contract', () => {
+  const EVENT = deterministicUuid('grader-parse');
+  const validRaw = JSON.stringify({
+    items: [
+      {
+        concept: 'collision theory',
+        result: 'solid',
+        evidence: 'links speed to collision frequency',
+        learnerQuote: 'particles move faster and collide more',
+      },
+    ],
+  });
+
+  it('parses a valid verdict and injects the server-owned answerEventId', () => {
+    const items = parseGraderResponse(validRaw, EVENT);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.result).toBe('solid');
+    // The model never supplies answerEventId — the server owns it.
+    expect(items[0]?.answerEventId).toBe(EVENT);
+  });
+
+  it('tolerates prose around the JSON object (extractFirstJsonObject)', () => {
+    const wrapped = `Here is my verdict:\n${validRaw}\nThanks!`;
+    expect(parseGraderResponse(wrapped, EVENT)).toHaveLength(1);
+  });
+
+  it('returns [] when the response contains no JSON object (dropped signal)', () => {
+    expect(
+      parseGraderResponse('I could not grade this answer.', EVENT),
+    ).toEqual([]);
+  });
+
+  it('returns [] on a malformed JSON object (parse error)', () => {
+    expect(parseGraderResponse('{"items": [oops]}', EVENT)).toEqual([]);
+  });
+
+  it('returns [] when the shape violates the schema', () => {
+    expect(parseGraderResponse('{"verdict": "good"}', EVENT)).toEqual([]);
+  });
+
+  it('returns [] on items:[] — the exact gpt-oss .min(1) drop production fails open on', () => {
+    expect(parseGraderResponse('{"items": []}', EVENT)).toEqual([]);
   });
 });

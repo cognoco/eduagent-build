@@ -357,7 +357,8 @@ for historical context.
   corrected to say so.
 
 **Status:** implemented; harness suites green
-(`simulated-conversation.test.ts` 13 + `simulation-metrics.test.ts` 8 = 21 tests),
-`api:typecheck` clean.
-</content>
-</invoke>
+(`simulated-conversation.test.ts` 19 + `simulation-metrics.test.ts` 8 = 27 tests),
+`api:typecheck` clean. Re-challenged by a 3-reviewer adversarial pass (correctness
+/ test-quality / maintainability) on 2026-06-27 — consensus APPROVE-with-nits, no
+P0/P1; the surfaced README accuracy nits + a `parseGraderResponse` drift-guard seam
+(+6 tests) were applied in the same PR.

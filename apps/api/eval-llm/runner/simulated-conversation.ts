@@ -342,6 +342,38 @@ async function defaultTutorTurn(
  * failure (no JSON / parse error / schema invalid / items:[]) returns [] — a
  * dropped signal, exactly as production fails open.
  */
+/**
+ * Pure parse seam mirroring `runChallengeRoundGrader`'s contract: extract first
+ * JSON object → `JSON.parse` → `challengeRoundGraderVerdictSchema` → inject the
+ * server-owned `answerEventId`. Any failure (no JSON / parse error / schema
+ * invalid / `items:[]`) returns `[]` — a dropped signal, exactly as production
+ * fails open. Exported so the failure paths are unit-tested directly (the live
+ * `defaultGraderTurn` can't call `runChallengeRoundGrader`, which uses
+ * `routeAndCall` and would ignore the `--grader-model` override) — this is the
+ * drift guard against `grader.ts`'s parse contract.
+ */
+export function parseGraderResponse(
+  raw: string,
+  answerEventId: string,
+): ChallengeRoundEvaluationItem[] {
+  const jsonText = extractFirstJsonObject(raw);
+  if (!jsonText) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return [];
+  }
+  const verdict = challengeRoundGraderVerdictSchema.safeParse(parsed);
+  if (!verdict.success) return [];
+  // Inject the server-owned answerEventId (the model never supplies it) —
+  // mirrors runChallengeRoundGrader's server-ownership invariant.
+  return verdict.data.items.map((item) => ({
+    ...item,
+    answerEventId,
+  }));
+}
+
 async function defaultGraderTurn(
   args: GraderTurnArgs,
 ): Promise<ChallengeRoundEvaluationItem[]> {
@@ -359,22 +391,7 @@ async function defaultGraderTurn(
     sessionId: 'eval-sim-grader',
   });
 
-  const jsonText = extractFirstJsonObject(raw);
-  if (!jsonText) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    return [];
-  }
-  const verdict = challengeRoundGraderVerdictSchema.safeParse(parsed);
-  if (!verdict.success) return [];
-  // Inject the server-owned answerEventId (the model never supplies it) —
-  // mirrors runChallengeRoundGrader's server-ownership invariant.
-  return verdict.data.items.map((item) => ({
-    ...item,
-    answerEventId: args.answerEventId,
-  }));
+  return parseGraderResponse(raw, args.answerEventId);
 }
 
 export async function runSimulatedRound(

@@ -159,15 +159,16 @@ Markdown lets you eyeball differences in a PR diff without the harness needing t
 
 A **standalone** dual-agent simulator (not a `FlowDefinition` — flows are
 single-turn). One LLM plays the **learner** in character from a hidden
-competence brief. Each learner answer is then **graded by the production judge**
-(`buildChallengeRoundGraderPrompt` → rung 1, `capability:'judge'`) — the
-component production actually runs when `CHALLENGE_ROUND_GRADER_ENABLED` is on
-(the V2 default). A separate **tutor** turn (`buildSystemPrompt`,
-production-routed) only produces the next question. The pure state machine
-(`transitionChallengeState`) and the pure mastery gate (`decideMasteryAndReview`)
-run in-memory. The driver compares the gate's outcome to each scenario's
-ground-truth `expectedOutcome` to compute over-/under-credit and the grader's
-signal-emission rate.
+competence brief; the **real mentor pipeline** (`buildSystemPrompt` →
+`routeAndCall`, production-routed so the `--grader-model` candidate never leaks
+into it) asks the next question; and — critically — the **production
+Challenge-Round judge** (`buildChallengeRoundGraderPrompt` → rung-1
+`capability:'judge'` via `runHarnessLlm`, the component prod runs with
+`CHALLENGE_ROUND_GRADER_ENABLED` on by default) grades each answer. The pure
+state machine (`transitionChallengeState`) and the pure mastery gate
+(`decideMasteryAndReview`) run in-memory over the judge's verdicts. The driver
+compares the gate's outcome to each scenario's ground-truth `expectedOutcome`
+to compute over-/under-credit and **per-grader** signal-emission rates.
 
 > **The GRADER is the measured component, not the tutor.** With the grader flag
 > on, the tutor emits **no** inline `challenge_round_evaluation` — a separate
@@ -280,12 +281,25 @@ so a correlated-error A/B isn't run unknowingly.
 
 - **DB-free → results are an UPPER BOUND.** `decideMasteryAndReview` runs for
   real, but the production-only `validateEvaluationEventIds` (DB lookup that
-  drops evaluations whose `answerEventId` can't be matched to a real
-  `session_events` row) is **not** called — there is no seeded DB. That step can
-  only ever *remove* `solid` items, so skipping it biases in one direction:
+  **rejects the *whole* evaluation** — `throw` on *any* `answerEventId` that
+  can't be matched to a real `session_events` row, routing the round to
+  `invalid`) is **not** called — there is no seeded DB. That step can only ever
+  *remove* a verdict, never upgrade one, so skipping it biases in one direction:
   the harness's `verified`/over-credit rates are an **upper bound** on
-  production, never a lower bound. `metrics.json` stamps this caveat. DB-anchoring
-  stays covered by `evaluation.test.ts` + integration tests.
+  production, never a lower bound (the all-or-nothing rejection makes production
+  *more* aggressive at dropping, so the bound holds). `metrics.json` stamps this
+  caveat. DB-anchoring stays covered by `evaluation.test.ts` + integration tests.
+- **Under-18 gate collapses the judge to the gpt-oss fallback for the shipped
+  grid.** Every sim scenario profile is a minor, and production's under-18 gate
+  (`router.ts`) short-circuits `capability:'judge'` to the approved text
+  fallback (Cerebras gpt-oss) *before* the vendor-independent grader model is
+  ever reached. The harness reflects this faithfully — `resolveProductionGraderModel`
+  and the null-routing path both hit the same gate, and the two-model guard
+  compares the learner against that *real resolved* slug — but it means the
+  default-routing run validates the **gpt-oss judge**, not a distinct anthropic
+  grader. Read "production JUDGE" as "the judge production actually runs for
+  these ages", not "a separate vendor's model". To exercise a distinct judge,
+  pass an explicit `--grader-model` (and accept it isn't what minors hit in prod).
 - **Low N is flagged, not hidden.** Below `MIN_ROUNDS_FOR_CALIBRATION` (30 — i.e.
   ≥5 runs across the 6-scenario grid) the corpus is marked
   `sufficientForCalibration:false` and every headline rate ships a **Wilson 95%
