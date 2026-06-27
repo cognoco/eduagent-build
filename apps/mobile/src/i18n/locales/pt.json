@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Teste-se",
-          "subtitle": "Revise o que está sumindo ou teste a si mesmo"
+          "subtitle": "Relembre um tópico ou faça um quiz"
         },
         "studyNew": {
           "title": "Aprender algo novo",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Continue de onde parou em {{name}}.",
       "coachBandResumeSessionNoName": "Continue de onde parou na sua sessão.",
       "coachBandResumeTarget": "Continue de onde parou em {{name}}.",
-      "coachBandRevisitTopic": "Revisite {{topic}} — está a começar a desvanecer-se."
+      "coachBandRevisitTopic": "Revisite {{topic}} — pronto para uma revisão rápida."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

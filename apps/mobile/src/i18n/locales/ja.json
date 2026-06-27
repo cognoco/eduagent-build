@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "力試し",
-          "subtitle": "忘れかけている内容を復習したり、自分をテスト"
+          "subtitle": "トピックの復習やクイズに挑戦"
         },
         "studyNew": {
           "title": "新しいことを学ぶ",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "{{name}}で中断したところから再開しましょう。",
       "coachBandResumeSessionNoName": "セッションで中断したところから再開しましょう。",
       "coachBandResumeTarget": "{{name}}で中断したところから再開しましょう。",
-      "coachBandRevisitTopic": "{{topic}}を復習しましょう — 記憶が薄れ始めています。"
+      "coachBandRevisitTopic": "{{topic}}をもう一度 — サクッと復習しよう。"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

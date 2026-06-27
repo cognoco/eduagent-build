@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Pon a prueba tus conocimientos",
-          "subtitle": "Repasa lo que se está olvidando o ponte a prueba"
+          "subtitle": "Repasa un tema o haz un quiz"
         },
         "studyNew": {
           "title": "Aprender algo nuevo",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Continúa donde te quedaste en {{name}}.",
       "coachBandResumeSessionNoName": "Continúa donde te quedaste en tu sesión.",
       "coachBandResumeTarget": "Continúa donde lo dejaste en {{name}}.",
-      "coachBandRevisitTopic": "Repasa {{topic}}, se te está olvidando."
+      "coachBandRevisitTopic": "Repasa {{topic}} — listo para un repaso rápido."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

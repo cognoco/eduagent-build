@@ -299,7 +299,7 @@
         },
         "practice": {
           "title": "Test yourself",
-          "subtitle": "Review what is fading or quiz yourself"
+          "subtitle": "Refresh a topic or quiz yourself"
         },
         "studyNew": {
           "title": "Learn something new",
@@ -327,7 +327,7 @@
       "coachBandResumeSession": "Pick up where you stopped in {{name}}.",
       "coachBandResumeSessionNoName": "Pick up where you stopped in your session.",
       "coachBandResumeTarget": "Pick up where you left off in {{name}}.",
-      "coachBandRevisitTopic": "Revisit {{topic}} — it's starting to fade."
+      "coachBandRevisitTopic": "Revisit {{topic}} — ready for a quick refresh."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

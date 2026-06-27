@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Sprawdź się",
-          "subtitle": "Powtórz to, co się zaciera, albo sprawdź się"
+          "subtitle": "Odśwież temat lub sprawdź się w quizie"
         },
         "studyNew": {
           "title": "Naucz się czegoś nowego",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Wróć do miejsca, w którym przerwano w {{name}}.",
       "coachBandResumeSessionNoName": "Wróć do miejsca, w którym przerwano sesję.",
       "coachBandResumeTarget": "Wróć do miejsca, w którym przerwano w {{name}}.",
-      "coachBandRevisitTopic": "Powtórz {{topic}} — zaczynasz zapominać."
+      "coachBandRevisitTopic": "Powtórz {{topic}} — czas na szybką powtórkę."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

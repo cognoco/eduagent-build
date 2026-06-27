@@ -277,7 +277,7 @@
         },
         "practice": {
           "title": "Teste dich selbst",
-          "subtitle": "Wiederhole, was verblasst, oder teste dich selbst"
+          "subtitle": "Frische ein Thema auf oder mach ein Quiz"
         },
         "studyNew": {
           "title": "Etwas Neues lernen",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Mach da weiter, wo du in {{name}} aufgehört hast.",
       "coachBandResumeSessionNoName": "Mach da weiter, wo du in deiner Sitzung aufgehört hast.",
       "coachBandResumeTarget": "Mach da weiter, wo du in {{name}} aufgehört hast.",
-      "coachBandRevisitTopic": "Wiederhole {{topic}} – es gerät in Vergessenheit."
+      "coachBandRevisitTopic": "Wiederhole {{topic}} – bereit für eine schnelle Auffrischung."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",

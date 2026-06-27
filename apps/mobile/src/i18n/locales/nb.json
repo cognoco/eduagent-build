@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Test deg selv",
-          "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
+          "subtitle": "Repeter et emne eller ta en quiz"
         },
         "studyNew": {
           "title": "Lær noe nytt",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Fortsett der du slapp i {{name}}.",
       "coachBandResumeSessionNoName": "Fortsett der du slapp i økten din.",
       "coachBandResumeTarget": "Fortsett der du slapp i {{name}}.",
-      "coachBandRevisitTopic": "Gå tilbake til {{topic}} – det begynner å bli glemt."
+      "coachBandRevisitTopic": "Repeter {{topic}} – klar for en rask oppfriskning."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
