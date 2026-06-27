@@ -1,6 +1,6 @@
 # Session Close → Summary → Pipeline + Mode Taxonomy: Deep-Dive
 
-> **STATUS (2026-06-27):** Partial — C1 (idempotency nuance documented and confirmed) done; C2 (recap-poll latency reduction) and C6 (GDPR embeddings-gate) still open.
+> **STATUS (2026-06-27):** Partial — C1 (idempotency nuance documented and confirmed) done; C6 (GDPR embeddings-gate) **done** — `generate-embeddings` now re-checks `isGdprProcessingAllowed`/`isGdprProcessingAllowedV2` and skips before any transcript leaves Neon (`session-completed.ts` step 5), with a `[C6 break]` regression test in `session-completed.test.ts`; C2 (recap-poll latency reduction) still open.
 
 > Cluster scope: session close → Summary screen → the `session-completed` Inngest pipeline + the 7-string UI mode taxonomy · Analyst: pipeline · Date 2026-06-10 · Sources verified at HEAD of `new-llm` (`git branch --show-current` = `new-llm`)
 
@@ -158,6 +158,7 @@ No regressions found to the V0 5-tab shell, envelope contract, `profileId` scopi
 - Classification: SHIP-NOW (or formally document as intentional per `learning-path-flows.md:662` open-question 6). This is a **legal decision**, not a UX one — flag to the compliance owner.
 - Risk: low code risk; the *decision* (gate vs document) is the open item.
 - Verdict: **CONDITIONAL** (real win if legal rules "gate"; no-op if they rule "intentional").
+- **Resolved 2026-06-27 — ruled "gate".** `generate-embeddings` now runs the same GDPR processing check the profile step uses (legacy `isGdprProcessingAllowed` / v2 `isGdprProcessingAllowedV2`) and returns before content extraction or the Voyage embed when consent is withdrawn. Covered by the `[C6 break]` negative-path test in `session-completed.test.ts`.
 
 ---
 
