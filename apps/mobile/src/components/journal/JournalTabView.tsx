@@ -3,14 +3,21 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useRouter, type Href } from 'expo-router';
-import type { NowCard, RecapListItem } from '@eduagent/schemas';
+import type {
+  NowCard,
+  RecapListItem,
+  ReportPracticeActivityType,
+} from '@eduagent/schemas';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { RecapsEmptyState } from '../recaps/RecapsEmptyState';
 import { VoiceRecordButton } from '../session/VoiceRecordButton';
 import { ReportsList } from '../progress/ReportsList';
+import { LatestReportCard } from '../../app/(app)/progress/_components/LatestReportCard';
+import { getLatestReport } from '../../app/(app)/progress/_view-models/progress-report-helpers';
 import { useAllNotes } from '../../hooks/use-notes';
 import { useBookmarks } from '../../hooks/use-bookmarks';
+import { usePracticeActivityHistory } from '../../hooks/use-practice-activity-history';
 import { useJournalRecaps } from '../../hooks/use-journal-recaps';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
 import {
@@ -23,13 +30,23 @@ import { useProfile } from '../../lib/profile';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 
-type JournalSectionId = 'recaps' | 'reports' | 'notes' | 'memory';
+type JournalSectionId =
+  | 'notes'
+  | 'sessions'
+  | 'practice'
+  | 'memory'
+  | 'reports';
 
+// Landing order drives the two-row count-driven grid: the first row fills with
+// the first three, the rest wrap. Adding a sixth button (e.g. a future
+// "Common learning" tab for linked accounts) simply flows to the next row — no
+// layout change required.
 const JOURNAL_SECTIONS: JournalSectionId[] = [
-  'recaps',
-  'reports',
   'notes',
+  'sessions',
+  'practice',
   'memory',
+  'reports',
 ];
 
 /**
@@ -166,27 +183,31 @@ function renderLedgerMomentText(card: NowCard, t: TFunction): string {
 
 function sectionTitle(section: JournalSectionId, t: TFunction): string {
   switch (section) {
-    case 'recaps':
-      return t('journal.sections.recaps');
-    case 'reports':
-      return t('journal.sections.reports');
     case 'notes':
       return t('journal.sections.notes');
+    case 'sessions':
+      return t('journal.sections.sessions');
+    case 'practice':
+      return t('journal.sections.practice');
     case 'memory':
       return t('journal.sections.memory');
+    case 'reports':
+      return t('journal.sections.reports');
   }
 }
 
 function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
   switch (section) {
-    case 'recaps':
-      return t('journal.sections.recapsSubtitle');
-    case 'reports':
-      return t('journal.sections.reportsSubtitle');
     case 'notes':
       return t('journal.sections.notesSubtitle');
+    case 'sessions':
+      return t('journal.sections.sessionsSubtitle');
+    case 'practice':
+      return t('journal.sections.practiceSubtitle');
     case 'memory':
       return t('journal.sections.memorySubtitle');
+    case 'reports':
+      return t('journal.sections.reportsSubtitle');
   }
 }
 
@@ -281,9 +302,14 @@ function JournalSegmentedControl({
 }): React.ReactElement {
   const { t } = useTranslation();
 
+  // Count-driven two-row grid. `basis-[30%]` seats three buttons per row; the
+  // remainder wraps and `grow` lets them fill the row. With five sections this
+  // renders 3 + 2; a sixth flows naturally to the second row. Bigger tap
+  // targets + single-line labels make the sections obvious on landing and end
+  // the small-screen truncation ("Saved not…", "Mentor m…").
   return (
     <View
-      className="flex-row rounded-card bg-surface-elevated p-1"
+      className="flex-row flex-wrap gap-2"
       testID="journal-segmented-control"
     >
       {JOURNAL_SECTIONS.map((section) => {
@@ -292,8 +318,10 @@ function JournalSegmentedControl({
           <Pressable
             key={section}
             onPress={() => onChange(section)}
-            className={`min-h-[40px] flex-1 items-center justify-center rounded-card px-1 ${
-              selected ? 'bg-surface' : ''
+            className={`min-h-[56px] grow basis-[30%] items-center justify-center rounded-card border px-2 py-3 ${
+              selected
+                ? 'border-primary bg-surface'
+                : 'border-border bg-surface-elevated'
             }`}
             accessibilityRole="button"
             accessibilityState={{ selected }}
@@ -301,12 +329,10 @@ function JournalSegmentedControl({
             testID={`journal-tab-${section}`}
           >
             <Text
-              className={`text-caption font-semibold text-center ${
+              className={`text-body font-semibold text-center ${
                 selected ? 'text-text-primary' : 'text-text-secondary'
               }`}
               numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
             >
               {sectionTitle(section, t)}
             </Text>
@@ -451,12 +477,30 @@ function JournalReportsSection(): React.ReactElement {
     (monthlyReports.isLoading && !monthlyReports.data) ||
     (weeklyReports.isLoading && !weeklyReports.data);
   const isError = monthlyReports.isError || weeklyReports.isError;
+  // Auto-surface the most recent available report (weekly each week, monthly
+  // each month) inline at the top — the same behavior as the V1 Progress tab.
+  const latestReport = getLatestReport(weeklyReports.data, monthlyReports.data);
+  const openLatestReport = () => {
+    if (!latestReport) return;
+    if (latestReport.kind === 'weekly') {
+      router.push({
+        pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+        params: { weeklyReportId: latestReport.report.id },
+      } as Href);
+    } else {
+      router.push({
+        pathname: '/(app)/progress/reports/[reportId]',
+        params: { reportId: latestReport.report.id },
+      } as Href);
+    }
+  };
+  const refetchReports = () => {
+    void monthlyReports.refetch();
+    void weeklyReports.refetch();
+  };
   const errorActions = useSectionErrorActions(
     monthlyReports.error ?? weeklyReports.error,
-    () => {
-      void monthlyReports.refetch();
-      void weeklyReports.refetch();
-    },
+    refetchReports,
   );
 
   if (isLoading) {
@@ -502,6 +546,13 @@ function JournalReportsSection(): React.ReactElement {
 
   return (
     <View testID="journal-reports-section">
+      <LatestReportCard
+        latestReport={latestReport}
+        isError={isError}
+        isLoading={isLoading}
+        onOpen={openLatestReport}
+        onRetry={refetchReports}
+      />
       <ReportsList
         monthlyReports={monthlyReports.data ?? []}
         weeklyReports={weeklyReports.data ?? []}
@@ -545,6 +596,9 @@ function JournalNotesArchive(): React.ReactElement {
   const notes = useAllNotes({ limit: 50 });
   const bookmarks = useBookmarks({ limit: 50 });
   const [filter, setFilter] = useState('');
+  const [authorFilter, setAuthorFilter] = useState<'all' | 'mine' | 'mentor'>(
+    'all',
+  );
 
   // Transcription-only STT — the same on-device speech primitive the session
   // input bar uses. It dictates text into the search filter and nothing more:
@@ -589,11 +643,23 @@ function JournalNotesArchive(): React.ReactElement {
     return [...noteRows, ...bookmarkRows];
   }, [noteItems, bookmarkItems]);
 
+  // One-click authorship filter (All / My notes / Bookmarks) narrows the merged
+  // archive before the free-text search runs, so a learner can isolate their
+  // own notes or saved mentor replies without leaving the single list.
+  const authorScopedItems =
+    authorFilter === 'all'
+      ? items
+      : items.filter((item) =>
+          authorFilter === 'mentor'
+            ? item.authorship === 'mentor'
+            : item.authorship === 'mine',
+        );
+
   const normalizedFilter = filter.trim().toLowerCase();
   const visibleItems =
     normalizedFilter.length === 0
-      ? items
-      : items.filter((item) =>
+      ? authorScopedItems
+      : authorScopedItems.filter((item) =>
           [item.content, item.subjectName, item.topicTitle]
             .filter((value): value is string => Boolean(value))
             .some((value) => value.toLowerCase().includes(normalizedFilter)),
@@ -654,6 +720,40 @@ function JournalNotesArchive(): React.ReactElement {
 
   return (
     <View testID="journal-notes-section" className="gap-3">
+      {/* One-click authorship filter — All / My notes / Bookmarks. */}
+      <View className="flex-row gap-2" testID="journal-notes-filter">
+        {(['all', 'mine', 'mentor'] as const).map((key) => {
+          const selected = authorFilter === key;
+          const label =
+            key === 'all'
+              ? t('journal.notes.filterAll')
+              : key === 'mine'
+                ? t('journal.notes.filterMine')
+                : t('journal.notes.filterMentor');
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setAuthorFilter(key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={label}
+              testID={`journal-notes-filter-${key}`}
+              className={`min-h-[36px] justify-center rounded-full px-3 py-1.5 ${
+                selected ? 'bg-primary' : 'bg-surface-elevated'
+              }`}
+            >
+              <Text
+                className={`text-caption font-semibold ${
+                  selected ? 'text-text-inverse' : 'text-text-secondary'
+                }`}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {/* Optional search/filter line — narrows the already-visible browse list.
           Carries a transcription-only mic (spec §16). */}
       <View
@@ -774,27 +874,205 @@ function JournalMemorySection(): React.ReactElement {
   );
 }
 
+// All practice activity types plus the "All" sentinel. The chip row drives the
+// SERVER query (the endpoint's `type` param) rather than client-filtering one
+// loaded page, so per-type pagination stays correct.
+type PracticeTypeFilter = 'all' | ReportPracticeActivityType;
+const PRACTICE_TYPE_FILTERS: PracticeTypeFilter[] = [
+  'all',
+  'quiz',
+  'review',
+  'assessment',
+  'dictation',
+  'recitation',
+  'fluency_drill',
+];
+
+function practiceTypeLabel(type: PracticeTypeFilter, t: TFunction): string {
+  return t(`journal.practice.type.${type}`);
+}
+
+function PracticeActivityRow({
+  item,
+  t,
+}: {
+  item: {
+    id: string;
+    activityType: ReportPracticeActivityType;
+    topicTitle: string | null;
+    subjectName: string | null;
+    occurredAt: string;
+  };
+  t: TFunction;
+}): React.ReactElement {
+  const typeLabel = practiceTypeLabel(item.activityType, t);
+  // Topic is the headline when known; otherwise the activity-type label leads.
+  const headline = item.topicTitle ?? typeLabel;
+  const occurred = new Date(item.occurredAt);
+  const dateLabel = Number.isNaN(occurred.getTime())
+    ? null
+    : occurred.toLocaleDateString();
+  // Type appears in the metadata line only when it is not already the headline,
+  // so a topic-less row never repeats its label twice.
+  const meta = [item.topicTitle ? typeLabel : null, item.subjectName, dateLabel]
+    .filter((value): value is string => Boolean(value))
+    .join(' · ');
+
+  return (
+    <View
+      testID={`journal-activity-${item.id}`}
+      className="rounded-card border border-border bg-surface p-4"
+    >
+      <Text className="text-body font-semibold text-text-primary">
+        {headline}
+      </Text>
+      {meta ? (
+        <Text className="mt-1 text-body-sm text-text-secondary">{meta}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function JournalPracticeSection(): React.ReactElement {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const [typeFilter, setTypeFilter] = useState<PracticeTypeFilter>('all');
+  const history = usePracticeActivityHistory({
+    limit: 50,
+    type: typeFilter === 'all' ? undefined : typeFilter,
+  });
+  const errorActions = useSectionErrorActions(
+    history.error,
+    () => void history.refetch(),
+  );
+
+  const items = useMemo(
+    () => history.data?.pages.flatMap((page) => page.items) ?? [],
+    [history.data],
+  );
+
+  return (
+    <View testID="journal-practice-section" className="gap-3">
+      {/* The full practice hub (quiz, review, assessment, dictation launchers)
+          stays one tap away — pinned on top rather than buried in a sub-tab. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('journal.practice.openHub')}
+        onPress={() => router.push('/(app)/practice' as Href)}
+        testID="journal-practice-open-hub"
+        className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
+      >
+        <Text className="text-body font-semibold text-text-inverse">
+          {t('journal.practice.openHub')}
+        </Text>
+      </Pressable>
+
+      <Text className="text-body font-semibold text-text-primary">
+        {t('journal.practice.pastActivityTitle')}
+      </Text>
+
+      {/* Type-filter chips — All + every activity type (the primary axis users
+          scan by). Wraps to a second row on small screens. */}
+      <View
+        className="flex-row flex-wrap gap-2"
+        testID="journal-practice-filter"
+      >
+        {PRACTICE_TYPE_FILTERS.map((key) => {
+          const selected = typeFilter === key;
+          const label = practiceTypeLabel(key, t);
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setTypeFilter(key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={label}
+              testID={`journal-practice-filter-${key}`}
+              className={`min-h-[36px] justify-center rounded-full px-3 py-1.5 ${
+                selected ? 'bg-primary' : 'bg-surface-elevated'
+              }`}
+            >
+              <Text
+                className={`text-caption font-semibold ${
+                  selected ? 'text-text-inverse' : 'text-text-secondary'
+                }`}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View testID="journal-practice-past-activity" className="gap-3">
+        {history.isLoading && !history.data ? (
+          <TimeoutLoader
+            isLoading
+            testID="journal-practice-loading"
+            loadingLabel={t('common.loading')}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => void history.refetch(),
+              testID: 'journal-practice-timeout-retry',
+            }}
+          />
+        ) : history.isError && items.length === 0 ? (
+          <ErrorFallback
+            variant="card"
+            testID="journal-practice-error"
+            title={t('journal.practice.error')}
+            primaryAction={
+              errorActions.primary
+                ? {
+                    ...errorActions.primary,
+                    testID: 'journal-practice-error-retry',
+                  }
+                : {
+                    label: t('common.tryAgain'),
+                    onPress: () => void history.refetch(),
+                    testID: 'journal-practice-error-retry',
+                  }
+            }
+            secondaryAction={errorActions.secondary}
+          />
+        ) : items.length === 0 ? (
+          <EmptyState
+            testID="journal-practice-empty"
+            title={t('journal.practice.empty')}
+          />
+        ) : (
+          items.map((item) => (
+            <PracticeActivityRow key={item.id} item={item} t={t} />
+          ))
+        )}
+      </View>
+    </View>
+  );
+}
+
 function ActiveSection({
   section,
 }: {
   section: JournalSectionId;
 }): React.ReactElement {
   switch (section) {
-    case 'recaps':
-      return <JournalRecapsSection />;
-    case 'reports':
-      return <JournalReportsSection />;
     case 'notes':
       return <JournalNotesArchive />;
+    case 'sessions':
+      return <JournalRecapsSection />;
+    case 'practice':
+      return <JournalPracticeSection />;
     case 'memory':
       return <JournalMemorySection />;
+    case 'reports':
+      return <JournalReportsSection />;
   }
 }
 
 export function JournalTabView(): React.ReactElement {
   const { t } = useTranslation();
   const [activeSection, setActiveSection] =
-    useState<JournalSectionId>('recaps');
+    useState<JournalSectionId>('sessions');
 
   return (
     <ScrollView

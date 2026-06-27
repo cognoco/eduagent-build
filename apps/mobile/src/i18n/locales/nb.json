@@ -4035,14 +4035,16 @@
       "privacyPromise": "Din private læringssti: lagrede øyeblikk, notater, rapporter og mentor-minne."
     },
     "sections": {
-      "recaps": "Oppsummeringer",
-      "recapsSubtitle": "Se gjennom nylige øktsoppsummeringer.",
-      "reports": "Mine rapporter",
+      "reports": "Rapporter",
       "reportsSubtitle": "Åpne ukentlige og månedlige fremdriftsrapporter.",
-      "notes": "Lagrede notater",
-      "notesSubtitle": "Bla gjennom notater, bokmerker og lagrede økter.",
-      "memory": "Mentor-minne",
-      "memorySubtitle": "Se og administrer hva mentoren din husker."
+      "notes": "Notater",
+      "notesSubtitle": "Bla gjennom notatene og de lagrede bokmerkene dine.",
+      "memory": "Minne",
+      "memorySubtitle": "Se og administrer hva mentoren din husker.",
+      "sessions": "Økter",
+      "sessionsSubtitle": "Se gjennom nylige øktsammendrag.",
+      "practice": "Øving",
+      "practiceSubtitle": "Åpne øvingssenteret eller se gjennom tidligere aktivitet."
     },
     "moments": {
       "title": "Nylige øyeblikk",
@@ -4074,7 +4076,25 @@
       "searchEmpty": "Ingen notater samsvarer med søket.",
       "empty": "Notater du lagrer og svar fra veileder som du bokmerker, vil vises her.",
       "authorshipMentor": "Fra veileder",
-      "authorshipMine": "Mitt notat"
+      "authorshipMine": "Mitt notat",
+      "filterAll": "Alle",
+      "filterMine": "Mine notater",
+      "filterMentor": "Bokmerker"
+    },
+    "practice": {
+      "openHub": "Åpne øvingssenter",
+      "pastActivityTitle": "Min tidligere aktivitet",
+      "empty": "Dine quizer, repetisjoner, vurderinger og øvelser vil vises her.",
+      "error": "Vi kunne ikke laste inn din tidligere aktivitet.",
+      "type": {
+        "all": "Alle",
+        "quiz": "Quiz",
+        "review": "Repetisjon",
+        "assessment": "Vurdering",
+        "dictation": "Diktat",
+        "recitation": "Resitasjon",
+        "fluency_drill": "Flytøvelse"
+      }
     }
   },
   "accountAdmin": {

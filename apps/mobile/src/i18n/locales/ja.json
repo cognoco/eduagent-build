@@ -4035,14 +4035,16 @@
       "privacyPromise": "あなたのプライベートな学習の記録：保存されたモーメント、ノート、レポート、メンターの記憶。"
     },
     "sections": {
-      "recaps": "要約",
-      "recapsSubtitle": "最近のセッションの概要を確認します。",
-      "reports": "マイレポート",
+      "reports": "レポート",
       "reportsSubtitle": "週次および月次の進捗レポートを開きます。",
-      "notes": "保存したノート",
-      "notesSubtitle": "ノート、ブックマーク、保存したセッションを閲覧します。",
-      "memory": "メンターの記憶",
-      "memorySubtitle": "メンターが記憶している内容を確認・管理します。"
+      "notes": "ノート",
+      "notesSubtitle": "ノートや保存したブックマークを閲覧できます。",
+      "memory": "記憶",
+      "memorySubtitle": "メンターが記憶している内容を確認・管理します。",
+      "sessions": "セッション",
+      "sessionsSubtitle": "最近のセッションの概要を確認できます。",
+      "practice": "練習",
+      "practiceSubtitle": "練習ハブを開いたり、過去のアクティビティを確認したりできます。"
     },
     "moments": {
       "title": "最近のモーメント",
@@ -4074,7 +4076,25 @@
       "searchEmpty": "その検索に一致するメモはありません。",
       "empty": "保存したメモやブックマークしたメンターからの返信は、ここに表示されます。",
       "authorshipMentor": "メンターから",
-      "authorshipMine": "自分のメモ"
+      "authorshipMine": "自分のメモ",
+      "filterAll": "すべて",
+      "filterMine": "自分のノート",
+      "filterMentor": "ブックマーク"
+    },
+    "practice": {
+      "openHub": "練習ハブを開く",
+      "pastActivityTitle": "過去のアクティビティ",
+      "empty": "クイズ、復習、アセスメント、ドリルがここに表示されます。",
+      "error": "過去のアクティビティを読み込めませんでした。",
+      "type": {
+        "all": "すべて",
+        "quiz": "クイズ",
+        "review": "復習",
+        "assessment": "アセスメント",
+        "dictation": "ディクテーション",
+        "recitation": "音読",
+        "fluency_drill": "流暢さドリル"
+      }
     }
   },
   "accountAdmin": {

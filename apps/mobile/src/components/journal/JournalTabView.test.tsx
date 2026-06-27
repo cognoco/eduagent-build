@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { NowResponse } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
@@ -16,6 +21,8 @@ let mockMonthlyReports: ReturnType<typeof query>;
 let mockWeeklyReports: ReturnType<typeof query>;
 let mockNotes: ReturnType<typeof infiniteQuery>;
 let mockBookmarks: ReturnType<typeof infiniteQuery>;
+let mockPracticeHistory!: ReturnType<typeof infiniteQuery>;
+let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -54,6 +61,16 @@ jest.mock(
   '../../hooks/use-bookmarks' /* gc1-allow: Journal only reads count previews from the archive hook */,
   () => ({
     useBookmarks: () => mockBookmarks,
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-practice-activity-history' /* gc1-allow: Journal composes the practice-history hook; the endpoint is covered by practice-activity-history.integration.test.ts and the hook mirrors the established useAllNotes RPC pattern */,
+  () => ({
+    usePracticeActivityHistory: (opts?: { limit?: number; type?: string }) => {
+      lastPracticeOpts = opts;
+      return mockPracticeHistory;
+    },
   }),
 );
 
@@ -222,9 +239,30 @@ describe('JournalTabView', () => {
         },
       ],
     });
+    lastPracticeOpts = undefined;
+    mockPracticeHistory = infiniteQuery({
+      items: [
+        {
+          // assessment carries a resolved topic → topic is the headline
+          id: 'activity-1',
+          activityType: 'assessment',
+          topicTitle: 'Photosynthesis',
+          subjectName: 'Biology',
+          occurredAt: '2026-06-20T10:00:00.000Z',
+        },
+        {
+          // dictation has no topic → the activity-type label is the headline
+          id: 'activity-2',
+          activityType: 'dictation',
+          topicTitle: null,
+          subjectName: 'Spanish',
+          occurredAt: '2026-06-19T10:00:00.000Z',
+        },
+      ],
+    });
   });
 
-  it('renders ledger moments and defaults to the self recap section', () => {
+  it('renders ledger moments and defaults to the sessions section', () => {
     render(<JournalTabView />);
 
     screen.getByTestId('journal-screen');
@@ -233,8 +271,102 @@ describe('JournalTabView', () => {
     screen.getByText('3 learning sessions completed');
     screen.getByText('+12 practice points for Fractions');
     screen.getByTestId('journal-segmented-control');
+    // The Sessions tab renders the recap list (recap = the session's row).
     screen.getByTestId('journal-recaps-section');
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
+  });
+
+  it('renders all five section buttons in the two-row control', () => {
+    render(<JournalTabView />);
+
+    screen.getByTestId('journal-tab-notes');
+    screen.getByTestId('journal-tab-sessions');
+    screen.getByTestId('journal-tab-practice');
+    screen.getByTestId('journal-tab-memory');
+    screen.getByTestId('journal-tab-reports');
+    // Full labels render (no truncation/font-shrink) — the original bug.
+    screen.getByText('Sessions');
+    screen.getByText('Practice');
+  });
+
+  it('opens the practice hub from the Practice section', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    screen.getByTestId('journal-practice-section');
+    screen.getByTestId('journal-practice-past-activity');
+
+    fireEvent.press(screen.getByTestId('journal-practice-open-hub'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('lists past practice activity of every type with topic as the headline', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+
+    // Both activities render (not quiz-only) — assessment + dictation.
+    expect(screen.getByTestId('journal-activity-activity-1')).toBeTruthy();
+    expect(screen.getByTestId('journal-activity-activity-2')).toBeTruthy();
+    // assessment has a resolved topic → topic is the headline.
+    within(screen.getByTestId('journal-activity-activity-1')).getByText(
+      'Photosynthesis',
+    );
+    // dictation has no topic → the activity-type label is the headline
+    // (scoped to the row so it isn't confused with the "Dictation" filter chip).
+    within(screen.getByTestId('journal-activity-activity-2')).getByText(
+      'Dictation',
+    );
+  });
+
+  it('filters past activity by type chips, driving the server query', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    screen.getByTestId('journal-practice-filter');
+
+    // Selecting a type chip narrows the SERVER query (passed to the hook),
+    // not just the loaded page.
+    fireEvent.press(screen.getByTestId('journal-practice-filter-dictation'));
+    expect(lastPracticeOpts?.type).toBe('dictation');
+
+    // "All" clears the type filter.
+    fireEvent.press(screen.getByTestId('journal-practice-filter-all'));
+    expect(lastPracticeOpts?.type).toBeUndefined();
+  });
+
+  it('auto-surfaces the latest report inline in the Reports section', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-reports'));
+    // The most-recent report is opened inline (not just listed) — the V1
+    // Progress "latest report" card, reused here.
+    screen.getByTestId('progress-latest-report-card');
+  });
+
+  it('filters the notes archive by authorship with one-click chips', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-notes'));
+    screen.getByTestId('journal-notes-filter');
+
+    // "My notes" → only the learner-authored note (note-1).
+    fireEvent.press(screen.getByTestId('journal-notes-filter-mine'));
+    expect(screen.getByTestId('journal-note-note:note-1')).toBeTruthy();
+    expect(screen.queryByTestId('journal-note-note:note-2')).toBeNull();
+    expect(screen.queryByTestId('journal-note-bookmark:bookmark-1')).toBeNull();
+
+    // "Bookmarks" → only saved-from-mentor items (note-2 + the bookmark).
+    fireEvent.press(screen.getByTestId('journal-notes-filter-mentor'));
+    expect(screen.queryByTestId('journal-note-note:note-1')).toBeNull();
+    expect(screen.getByTestId('journal-note-note:note-2')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-bookmark:bookmark-1')).toBeTruthy();
+
+    // "All" → everything restored.
+    fireEvent.press(screen.getByTestId('journal-notes-filter-all'));
+    expect(screen.getByTestId('journal-note-note:note-1')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-note:note-2')).toBeTruthy();
+    expect(screen.getByTestId('journal-note-bookmark:bookmark-1')).toBeTruthy();
   });
 
   it('routes self recap rows to the learner session-summary route', () => {

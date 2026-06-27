@@ -4035,14 +4035,16 @@
       "privacyPromise": "Dein privater Lernpfad: gespeicherte Momente, Notizen, Berichte und Mentor-Gedächtnis."
     },
     "sections": {
-      "recaps": "Zusammenfassungen",
-      "recapsSubtitle": "Zusammenfassungen letzter Sitzungen ansehen.",
-      "reports": "Meine Berichte",
+      "reports": "Berichte",
       "reportsSubtitle": "Wöchentliche und monatliche Fortschrittsberichte öffnen.",
-      "notes": "Gespeicherte Notizen",
-      "notesSubtitle": "Notizen, Lesezeichen und gespeicherte Sitzungen durchsuchen.",
-      "memory": "Mentor-Gedächtnis",
-      "memorySubtitle": "Sieh und verwalte, woran sich dein Mentor erinnert."
+      "notes": "Notizen",
+      "notesSubtitle": "Durchsuche deine Notizen und gespeicherten Lesezeichen.",
+      "memory": "Gedächtnis",
+      "memorySubtitle": "Sieh und verwalte, woran sich dein Mentor erinnert.",
+      "sessions": "Sitzungen",
+      "sessionsSubtitle": "Überprüfe Zusammenfassungen letzter Sitzungen.",
+      "practice": "Übung",
+      "practiceSubtitle": "Öffne den Übungs-Hub oder sieh dir deine bisherigen Aktivitäten an."
     },
     "moments": {
       "title": "Letzte Momente",
@@ -4074,7 +4076,25 @@
       "searchEmpty": "Keine Notizen entsprechen dieser Suche.",
       "empty": "Gespeicherte Notizen und markierte Antworten vom Mentor erscheinen hier.",
       "authorshipMentor": "Vom Mentor",
-      "authorshipMine": "Meine Notiz"
+      "authorshipMine": "Meine Notiz",
+      "filterAll": "Alle",
+      "filterMine": "Meine Notizen",
+      "filterMentor": "Lesezeichen"
+    },
+    "practice": {
+      "openHub": "Übungs-Hub öffnen",
+      "pastActivityTitle": "Meine bisherigen Aktivitäten",
+      "empty": "Deine Quizze, Wiederholungen, Bewertungen und Übungen erscheinen hier.",
+      "error": "Wir konnten deine vergangenen Aktivitäten nicht laden.",
+      "type": {
+        "all": "Alle",
+        "quiz": "Quiz",
+        "review": "Wiederholung",
+        "assessment": "Bewertung",
+        "dictation": "Diktat",
+        "recitation": "Sprechübung",
+        "fluency_drill": "Flüssigkeitsübung"
+      }
     }
   },
   "accountAdmin": {

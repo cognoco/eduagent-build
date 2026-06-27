@@ -4035,14 +4035,16 @@
       "privacyPromise": "Seu histórico de aprendizado privado: momentos salvos, notas, relatórios e memória do mentor."
     },
     "sections": {
-      "recaps": "Resumos",
-      "recapsSubtitle": "Reveja os resumos das sessões recentes.",
-      "reports": "Meus relatórios",
+      "reports": "Relatórios",
       "reportsSubtitle": "Abra os relatórios de progresso semanais e mensais.",
-      "notes": "Notas salvas",
-      "notesSubtitle": "Explore notas, favoritos e sessões salvas.",
-      "memory": "Memória do mentor",
-      "memorySubtitle": "Veja e gerencie o que seu mentor se lembra."
+      "notes": "Anotações",
+      "notesSubtitle": "Navegue pelas suas anotações e marcadores salvos.",
+      "memory": "Memória",
+      "memorySubtitle": "Veja e gerencie o que seu mentor se lembra.",
+      "sessions": "Sessões",
+      "sessionsSubtitle": "Reveja os resumos das sessões recentes.",
+      "practice": "Prática",
+      "practiceSubtitle": "Abra o centro de prática ou reveja a sua atividade passada."
     },
     "moments": {
       "title": "Momentos recentes",
@@ -4074,7 +4076,25 @@
       "searchEmpty": "Nenhuma nota corresponde a essa pesquisa.",
       "empty": "As notas que guardar e as respostas do tutor que marcar aparecerão aqui.",
       "authorshipMentor": "Do tutor",
-      "authorshipMine": "Minha nota"
+      "authorshipMine": "Minha nota",
+      "filterAll": "Tudo",
+      "filterMine": "Minhas anotações",
+      "filterMentor": "Marcadores"
+    },
+    "practice": {
+      "openHub": "Abrir centro de prática",
+      "pastActivityTitle": "Minha atividade passada",
+      "empty": "Os teus quizzes, revisões, avaliações e exercícios vão aparecer aqui.",
+      "error": "Não foi possível carregar a tua atividade anterior.",
+      "type": {
+        "all": "Todos",
+        "quiz": "Quiz",
+        "review": "Revisão",
+        "assessment": "Avaliação",
+        "dictation": "Ditado",
+        "recitation": "Recitação",
+        "fluency_drill": "Exercício de fluência"
+      }
     }
   },
   "accountAdmin": {

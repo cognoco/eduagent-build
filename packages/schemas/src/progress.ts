@@ -9,6 +9,7 @@ import {
   weeklyReportSummarySchema,
   weeklyReportRecordSchema,
   reportPracticeSummarySchema,
+  reportPracticeActivityTypeSchema,
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 import { struggleStatusSchema } from './struggle-status';
@@ -881,6 +882,38 @@ export const childSessionsPageResponseSchema =
   });
 export type ChildSessionsPageResponse = z.infer<
   typeof childSessionsPageResponseSchema
+>;
+
+// GET /progress/practice-activity-history — Journal "My past activity" feed.
+// A thin cursor-paginated list over practice_activity_events (all activity
+// types, not quiz-only). topicTitle/subjectName are best-effort from the
+// event's metadata.topicId / subject join and may be null.
+export const practiceActivityHistoryQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  type: reportPracticeActivityTypeSchema.optional(),
+});
+export type PracticeActivityHistoryQuery = z.infer<
+  typeof practiceActivityHistoryQuerySchema
+>;
+
+export const practiceActivityHistoryItemSchema = z.object({
+  id: z.string().uuid(),
+  activityType: reportPracticeActivityTypeSchema,
+  topicTitle: z.string().nullable(),
+  subjectName: z.string().nullable(),
+  occurredAt: isoDateField,
+});
+export type PracticeActivityHistoryItem = z.infer<
+  typeof practiceActivityHistoryItemSchema
+>;
+
+export const practiceActivityHistoryResponseSchema = z.object({
+  items: z.array(practiceActivityHistoryItemSchema),
+  nextCursor: z.string().uuid().nullable(),
+});
+export type PracticeActivityHistoryResponse = z.infer<
+  typeof practiceActivityHistoryResponseSchema
 >;
 
 // GET /dashboard/children/:profileId/sessions/:sessionId
