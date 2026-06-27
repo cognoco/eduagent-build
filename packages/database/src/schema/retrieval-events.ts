@@ -97,4 +97,4 @@ export const retrievalEvents = pgTable(
       table.createdAt,
     ),
   ],
-).enableRLS();
+);
