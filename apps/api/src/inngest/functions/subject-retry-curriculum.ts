@@ -12,7 +12,7 @@ import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
-import { persistBookTopics } from '../../services/curriculum';
+import { markBookFailed, persistBookTopics } from '../../services/curriculum';
 import { getProfileAge } from '../../services/profile';
 import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
@@ -87,22 +87,10 @@ export const subjectRetryCurriculum = inngest.createFunction(
       // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
       // onFailure operates on that same owner-verified event payload.
       if (book && !book.topicsGenerated && book.failedAt === null) {
-        await db
-          .update(curriculumBooks)
-          .set({
-            failedReason: 'generation_error',
-            failedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(curriculumBooks.id, bookId),
-              eq(curriculumBooks.subjectId, subjectId),
-              // Atomic guard: never stamp failure on a book a concurrent run
-              // already generated.
-              eq(curriculumBooks.topicsGenerated, false),
-            ),
-          );
+        // The pre-read above avoids re-stamping an existing failure; the
+        // shared writer carries the atomic `topicsGenerated = false` guard so
+        // the write can never race a concurrent success.
+        await markBookFailed(db, subjectId, bookId, 'generation_error');
       }
       captureException(
         error instanceof Error ? error : new Error(String(error)),
