@@ -1931,4 +1931,52 @@ describe('ChatShell', () => {
       expect(queryByTestId('chat-memory-hint')).toBeNull();
     });
   });
+
+  // -----------------------------------------------------------------------
+  // firstSessionGreeting prop — empty-state branch
+  // -----------------------------------------------------------------------
+
+  describe('firstSessionGreeting prop', () => {
+    const { Text } = require('react-native');
+
+    it('renders the greeting node (not the generic empty state) when messages is empty and firstSessionGreeting is provided', () => {
+      renderChatShell({
+        messages: [],
+        firstSessionGreeting: <Text testID="greet">hi</Text>,
+      });
+
+      screen.getByTestId('greet');
+      // The generic empty-state copy must NOT appear
+      expect(
+        screen.queryByText('Your conversation will appear here.'),
+      ).toBeNull();
+    });
+
+    it('renders the generic empty state when messages is empty and firstSessionGreeting is absent', () => {
+      renderChatShell({ messages: [] });
+
+      screen.getByText('Your conversation will appear here.');
+      expect(screen.queryByTestId('greet')).toBeNull();
+    });
+
+    it('chat-empty-state testID is present in both greeting and generic branches', () => {
+      const { rerender } = renderChatShell({
+        messages: [],
+        firstSessionGreeting: <Text testID="greet">hi</Text>,
+      });
+
+      screen.getByTestId('chat-empty-state');
+
+      rerender(
+        <ChatShell
+          title="Session"
+          messages={[]}
+          onSend={jest.fn()}
+          isStreaming={false}
+        />,
+      );
+
+      screen.getByTestId('chat-empty-state');
+    });
+  });
 });

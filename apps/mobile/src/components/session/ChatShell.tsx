@@ -83,6 +83,8 @@ interface ChatShellProps {
   onInputModeChange?: (mode: InputMode) => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
+  /** Optional warm empty-state node (e.g. first-session greeting). Rendered in place of the generic empty state when the message list is empty. */
+  firstSessionGreeting?: React.ReactNode;
   /** Compact controls rendered below the text input. */
   belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
@@ -280,6 +282,7 @@ export function ChatShell({
   onInputModeChange,
   speechRecognitionLanguage,
   textToSpeechLanguage,
+  firstSessionGreeting,
   belowInput,
   messagesTestID,
   backFallback,
@@ -893,14 +896,20 @@ export function ChatShell({
         }
         renderItem={renderMessageItem}
         ListEmptyComponent={
-          <View
-            className="flex-1 items-center justify-center py-16"
-            testID="chat-empty-state"
-          >
-            <Text className="text-body text-text-secondary text-center">
-              {t('session.chatShell.emptyState')}
-            </Text>
-          </View>
+          firstSessionGreeting ? (
+            <View className="flex-1 px-4 pt-4" testID="chat-empty-state">
+              {firstSessionGreeting}
+            </View>
+          ) : (
+            <View
+              className="flex-1 items-center justify-center py-16"
+              testID="chat-empty-state"
+            >
+              <Text className="text-body text-text-secondary text-center">
+                {t('session.chatShell.emptyState')}
+              </Text>
+            </View>
+          )
         }
         ListFooterComponent={
           <>

@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "力試し",
-          "subtitle": "忘れかけている内容を復習したり、自分をテスト"
+          "subtitle": "トピックの復習やクイズに挑戦"
         },
         "studyNew": {
           "title": "新しいことを学ぶ",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "{{name}}で中断したところから再開しましょう。",
       "coachBandResumeSessionNoName": "セッションで中断したところから再開しましょう。",
       "coachBandResumeTarget": "{{name}}で中断したところから再開しましょう。",
-      "coachBandRevisitTopic": "{{topic}}を復習しましょう — 記憶が薄れ始めています。"
+      "coachBandRevisitTopic": "{{topic}}をもう一度 — サクッと復習しよう。"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -750,7 +750,13 @@
       "a11yMessageInput": "メッセージ入力",
       "a11yEnableVoice": "音声メッセージを有効にする",
       "a11ySendMessage": "メッセージを送信",
-      "a11yVoiceErrorHint": "タップして音声入力を再試行"
+      "a11yVoiceErrorHint": "タップして音声入力を再試行",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "{{name}}さん、こんにちは。{{subject}}の勉強をしますね。{{interest}}に興味があるそうなので、関連する例を使いながら説明します。勉強していること、取り組んでいること、気になっていることなど、何でも質問してください。1日に10個、1か月に100個まで無料で質問できます。{{subject}}の何から始めましょうか？",
+        "withNameSubject": "{{name}}さん、こんにちは。{{subject}}の勉強をしますね。勉強していること、取り組んでいること、気になっていることなど、何でも質問してください。1日に10個、1か月に100個まで無料で質問できます。{{subject}}の何から始めましょうか？",
+        "withName": "{{name}}さん、こんにちは。あなたのメンターです。勉強していること、取り組んでいること、気になっていることなど、何でも質問してください。1日に10個、1か月に100個まで無料で質問できます。何から始めましょうか？",
+        "generic": "こんにちは。あなたのメンターです。勉強していること、取り組んでいること、気になっていることなど、何でも質問してください。1日に10個、1か月に100個まで無料で質問できます。何から始めましょうか？"
+      }
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -1109,19 +1115,19 @@
       "scoringRound": "ラウンドを採点中...",
       "couldNotSave": "ラウンドを保存できませんでした",
       "exit": "終了",
-      "pauseHere": "ここで中断しますか？",
+      "pauseHere": "このラウンドを終了しますか？",
       "leaveQuiz": "このクイズを中断しますか？",
-      "pauseBody": "ラウンドの途中まで解答しました。今すぐ保存するか、もう一問続けますか？",
+      "pauseBody": "ここまでの回答が最終スコアになります。未回答の問題は空欄のままです。",
       "leaveBody": "まだ解答していないため、保存するものはありません。",
       "keepPlaying": "続ける",
-      "saveAndFinish": "保存して終了",
+      "saveAndFinish": "ラウンドを終了",
       "leaveWithoutSaving": "保存せずに終了",
       "leaveQuizButton": "クイズをやめる",
       "seeResultsLabel": "クイズの結果を見る",
       "oneMoreLabel": "もう一度クイズを始める",
       "disputeLabel": "この回答に異議を唱える",
       "dismissLabel": "閉じる",
-      "saveAndFinishLabel": "進捗を保存してラウンドを終了",
+      "saveAndFinishLabel": "ここまでの回答を最終スコアとして提出します。",
       "correctAnnounce": "正解！答えは{{answer}}でした",
       "correctAnnounceNoAnswer": "正解！",
       "wrongAnnounce": "残念。答えは{{answer}}でした",

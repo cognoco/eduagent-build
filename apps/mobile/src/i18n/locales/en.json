@@ -299,7 +299,7 @@
         },
         "practice": {
           "title": "Test yourself",
-          "subtitle": "Review what is fading or quiz yourself"
+          "subtitle": "Refresh a topic or quiz yourself"
         },
         "studyNew": {
           "title": "Learn something new",
@@ -327,7 +327,7 @@
       "coachBandResumeSession": "Pick up where you stopped in {{name}}.",
       "coachBandResumeSessionNoName": "Pick up where you stopped in your session.",
       "coachBandResumeTarget": "Pick up where you left off in {{name}}.",
-      "coachBandRevisitTopic": "Revisit {{topic}} — it's starting to fade."
+      "coachBandRevisitTopic": "Revisit {{topic}} — ready for a quick refresh."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -777,7 +777,13 @@
       "a11yMessageInput": "Message input",
       "a11yEnableVoice": "Enable voice message",
       "a11ySendMessage": "Send message",
-      "a11yVoiceErrorHint": "Tap to retry voice input"
+      "a11yVoiceErrorHint": "Tap to retry voice input",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hi {{name}}. You're here to work on {{subject}} — and since you're into {{interest}}, I'll reach for examples that actually connect. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
+        "withNameSubject": "Hi {{name}}. You're here to work on {{subject}}. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
+        "withName": "Hi {{name}}. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?",
+        "generic": "Hi. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?"
+      }
     },
     "messageBubble": {
       "thinking": "Thinking",
@@ -1113,19 +1119,19 @@
       "scoringRound": "Scoring your round...",
       "couldNotSave": "Couldn't save your round",
       "exit": "Exit",
-      "pauseHere": "Pause here?",
+      "pauseHere": "End this round?",
       "leaveQuiz": "Leave this quiz?",
-      "pauseBody": "You've answered part of this round. Save it now, or jump back in for one more.",
+      "pauseBody": "Your answers so far become your final score — unanswered questions are left blank.",
       "leaveBody": "No answers yet, so there is nothing to save.",
       "keepPlaying": "Keep playing",
-      "saveAndFinish": "Save and finish",
+      "saveAndFinish": "End round now",
       "leaveWithoutSaving": "Leave without saving",
       "leaveQuizButton": "Leave quiz",
       "seeResultsLabel": "See quiz results",
       "oneMoreLabel": "Start one more quiz",
       "disputeLabel": "Dispute this answer",
       "dismissLabel": "Dismiss",
-      "saveAndFinishLabel": "Save progress and finish round",
+      "saveAndFinishLabel": "Submit your answers so far as final",
       "correctAnnounce": "Correct! The answer was {{answer}}",
       "correctAnnounceNoAnswer": "Correct!",
       "wrongAnnounce": "Not quite. The answer was {{answer}}",

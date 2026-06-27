@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Sprawdź się",
-          "subtitle": "Powtórz to, co się zaciera, albo sprawdź się"
+          "subtitle": "Odśwież temat lub sprawdź się w quizie"
         },
         "studyNew": {
           "title": "Naucz się czegoś nowego",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Wróć do miejsca, w którym przerwano w {{name}}.",
       "coachBandResumeSessionNoName": "Wróć do miejsca, w którym przerwano sesję.",
       "coachBandResumeTarget": "Wróć do miejsca, w którym przerwano w {{name}}.",
-      "coachBandRevisitTopic": "Powtórz {{topic}} — zaczynasz zapominać."
+      "coachBandRevisitTopic": "Powtórz {{topic}} — czas na szybką powtórkę."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -783,7 +783,13 @@
       "a11yMessageInput": "Wpisz wiadomość",
       "a11yEnableVoice": "Włącz wiadomość głosową",
       "a11ySendMessage": "Wyślij wiadomość",
-      "a11yVoiceErrorHint": "Stuknij, aby ponowić wprowadzanie głosowe"
+      "a11yVoiceErrorHint": "Stuknij, aby ponowić wprowadzanie głosowe",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Cześć, {{name}}. Jesteś tu, żeby popracować nad {{subject}} — a ponieważ interesujesz się {{interest}}, postaram się podawać przykłady, które do tego nawiązują. Pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego zaczniemy z {{subject}}?",
+        "withNameSubject": "Cześć, {{name}}. Jesteś tu, żeby popracować nad {{subject}}. Pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego zaczniemy z {{subject}}?",
+        "withName": "Cześć, {{name}}. Jestem Twoim mentorem — pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego chcesz zacząć?",
+        "generic": "Cześć. Jestem Twoim mentorem — pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego chcesz zacząć?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -1148,19 +1154,19 @@
       "scoringRound": "Oceniam rundę...",
       "couldNotSave": "Nie udało się zapisać rundy",
       "exit": "Wyjdź",
-      "pauseHere": "Wstrzymać?",
+      "pauseHere": "Zakończyć rundę?",
       "leaveQuiz": "Opuścić ten quiz?",
-      "pauseBody": "Odpowiedziałeś na część pytań w tej rundzie. Zapisz ją teraz lub wróć, by odpowiedzieć na jeszcze jedno.",
+      "pauseBody": "Twoje dotychczasowe odpowiedzi to Twój wynik końcowy. Pytania bez odpowiedzi zostaną pominięte.",
       "leaveBody": "Brak odpowiedzi, więc nie ma czego zapisywać.",
       "keepPlaying": "Graj dalej",
-      "saveAndFinish": "Zapisz i zakończ",
+      "saveAndFinish": "Zakończ rundę",
       "leaveWithoutSaving": "Wyjdź bez zapisywania",
       "leaveQuizButton": "Opuść quiz",
       "seeResultsLabel": "Zobacz wyniki quizu",
       "oneMoreLabel": "Rozpocznij kolejny quiz",
       "disputeLabel": "Zakwestionuj tę odpowiedź",
       "dismissLabel": "Zamknij",
-      "saveAndFinishLabel": "Zapisz postęp i zakończ rundę",
+      "saveAndFinishLabel": "Zatwierdź dotychczasowe odpowiedzi",
       "correctAnnounce": "Dobrze! Poprawna odpowiedź to {{answer}}",
       "correctAnnounceNoAnswer": "Dobrze!",
       "wrongAnnounce": "Niezupełnie. Poprawna odpowiedź to {{answer}}",

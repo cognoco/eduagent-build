@@ -395,7 +395,7 @@ describe('LearnerScreen', () => {
       screen.getByText('Help with an assignment');
       screen.getByText('Take a photo or type the problem');
       screen.getByText('Test yourself');
-      screen.getByText('Review what is fading or quiz yourself');
+      screen.getByText('Refresh a topic or quiz yourself');
       screen.getByText('Learn something new');
       screen.getByTestId('home-empty-subjects');
       screen.getByTestId('home-add-first-subject');

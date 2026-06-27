@@ -274,7 +274,7 @@
         },
         "practice": {
           "title": "Test deg selv",
-          "subtitle": "Repeter det som begynner å glippe, eller test deg selv"
+          "subtitle": "Repeter et emne eller ta en quiz"
         },
         "studyNew": {
           "title": "Lær noe nytt",
@@ -305,7 +305,7 @@
       "coachBandResumeSession": "Fortsett der du slapp i {{name}}.",
       "coachBandResumeSessionNoName": "Fortsett der du slapp i økten din.",
       "coachBandResumeTarget": "Fortsett der du slapp i {{name}}.",
-      "coachBandRevisitTopic": "Gå tilbake til {{topic}} – det begynner å bli glemt."
+      "coachBandRevisitTopic": "Repeter {{topic}} – klar for en rask oppfriskning."
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -750,7 +750,13 @@
       "a11yMessageInput": "Meldingsfelt",
       "a11yEnableVoice": "Aktiver talemelding",
       "a11ySendMessage": "Send melding",
-      "a11yVoiceErrorHint": "Trykk for å prøve stemmeinndata på nytt"
+      "a11yVoiceErrorHint": "Trykk for å prøve stemmeinndata på nytt",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hei {{name}}. Du er her for å jobbe med {{subject}} — og siden du er interessert i {{interest}}, skal jeg finne eksempler som er relevante for deg. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
+        "withNameSubject": "Hei {{name}}. Du er her for å jobbe med {{subject}}. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
+        "withName": "Hei {{name}}. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
+        "generic": "Hei. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -1109,19 +1115,19 @@
       "scoringRound": "Poengsetter runden din ...",
       "couldNotSave": "Kunne ikke lagre runden din",
       "exit": "Avslutt",
-      "pauseHere": "Pause her?",
+      "pauseHere": "Avslutte denne runden?",
       "leaveQuiz": "Forlate denne quizen?",
-      "pauseBody": "Du har svart på en del av denne runden. Lagre den nå, eller hopp tilbake for én til.",
+      "pauseBody": "Svarene dine så langt blir den endelige poengsummen din – ubesvarte spørsmål blir stående tomme.",
       "leaveBody": "Ingen svar ennå, så det er ingenting å lagre.",
       "keepPlaying": "Fortsett å spille",
-      "saveAndFinish": "Lagre og avslutt",
+      "saveAndFinish": "Avslutt runden nå",
       "leaveWithoutSaving": "Forlat uten å lagre",
       "leaveQuizButton": "Forlat quiz",
       "seeResultsLabel": "Se quiz-resultater",
       "oneMoreLabel": "Start en quiz til",
       "disputeLabel": "Bestrid dette svaret",
       "dismissLabel": "Lukk",
-      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden",
+      "saveAndFinishLabel": "Send inn svarene dine så langt som endelige",
       "correctAnnounce": "Riktig! Svaret var {{answer}}",
       "correctAnnounceNoAnswer": "Riktig!",
       "wrongAnnounce": "Ikke helt. Svaret var {{answer}}",

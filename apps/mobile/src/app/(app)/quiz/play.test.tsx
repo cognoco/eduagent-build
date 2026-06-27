@@ -1330,9 +1330,9 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-save');
-    screen.getByText('Pause here?');
+    screen.getByText('End this round?');
     screen.getByText(
-      "You've answered part of this round. Save it now, or jump back in for one more.",
+      'Your answers so far become your final score — unanswered questions are left blank.',
     );
     screen.getByTestId('quiz-quit-cancel');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
@@ -1494,7 +1494,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => screen.getByText('Correct'));
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    screen.getByText('Pause here?');
+    screen.getByText('End this round?');
 
     // The cancel button must render "Keep playing" (the keepPlaying key),
     // not "Wait, just one more!" (the oneMore key) — they map to different
@@ -1539,7 +1539,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     // Open the quit modal (pause branch is hasAnsweredQuestions=true).
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    screen.getByText('Pause here?');
+    screen.getByText('End this round?');
 
     // Save-and-quit must NOT be a silent no-op even though the round is
     // already submitted — it must produce a visible navigation effect.
@@ -1644,7 +1644,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => screen.getByText('Correct'));
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    screen.getByText('Pause here?');
+    screen.getByText('End this round?');
 
     fireEvent.press(screen.getByTestId('quiz-quit-save'));
 
