@@ -13,6 +13,8 @@ import {
   continueSuggestionResponseSchema,
   childSessionsQuerySchema,
   childSessionsPageResponseSchema,
+  practiceActivityHistoryQuerySchema,
+  practiceActivityHistoryResponseSchema,
   learningResumeScopeSchema,
   childReportsResponseSchema,
   weeklyReportsResponseSchema,
@@ -31,6 +33,7 @@ import {
   markMonthlyReportViewedForProfile,
 } from '../services/monthly-report';
 import { getOverdueTopicsGrouped } from '../services/overdue-topics';
+import { listPracticeActivityHistory } from '../services/practice-activity-history';
 import {
   getSubjectProgress,
   getTopicProgress,
@@ -122,6 +125,25 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
         limit,
       });
       return c.json(childSessionsPageResponseSchema.parse(result));
+    },
+  )
+
+  // List the active profile's practice activity (Journal "My past activity").
+  // Spans ALL activity types (quiz/review/assessment/dictation/recitation/
+  // fluency_drill), not the quiz-only history view. Cursor-paginated.
+  .get(
+    '/progress/practice-activity-history',
+    zValidator('query', practiceActivityHistoryQuerySchema),
+    async (c) => {
+      const { db, profileId } = withProfile(c);
+      const { cursor, limit, type } = c.req.valid('query');
+
+      const result = await listPracticeActivityHistory(db, profileId, {
+        cursor,
+        limit,
+        type,
+      });
+      return c.json(practiceActivityHistoryResponseSchema.parse(result));
     },
   )
 

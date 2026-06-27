@@ -69,6 +69,9 @@ import {
   childSessionsQuerySchema,
   childSessionsPageResponseSchema,
   childSessionDetailResponseSchema,
+  practiceActivityHistoryQuerySchema,
+  practiceActivityHistoryItemSchema,
+  practiceActivityHistoryResponseSchema,
   memoryCategoryKeySchema,
   curatedMemoryItemSchema,
   memoryCategorySchema,
@@ -1820,5 +1823,95 @@ describe('progressOverviewResponseSchema', () => {
 
     expect(parsed.totalTopicsMastered).toBe(3);
     expect(parsed.totalTopicsLearning).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Practice activity history (Journal "My past activity")
+// ---------------------------------------------------------------------------
+describe('practiceActivityHistoryQuerySchema', () => {
+  it('accepts an empty query', () => {
+    expect(practiceActivityHistoryQuerySchema.safeParse({}).success).toBe(true);
+  });
+
+  it('coerces limit from string', () => {
+    const result = practiceActivityHistoryQuerySchema.parse({ limit: '10' });
+    expect(result.limit).toBe(10);
+  });
+
+  it('rejects limit above 50', () => {
+    expect(
+      practiceActivityHistoryQuerySchema.safeParse({ limit: 51 }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an optional activity type filter', () => {
+    expect(
+      practiceActivityHistoryQuerySchema.parse({ type: 'dictation' }).type,
+    ).toBe('dictation');
+  });
+
+  it('rejects an unknown activity type', () => {
+    expect(
+      practiceActivityHistoryQuerySchema.safeParse({ type: 'homework' })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('practiceActivityHistoryItemSchema', () => {
+  it('accepts an item with a topic and subject', () => {
+    expect(
+      practiceActivityHistoryItemSchema.safeParse({
+        id: TEST_UUID,
+        activityType: 'assessment',
+        topicTitle: 'Photosynthesis',
+        subjectName: 'Biology',
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts null topic and subject (best-effort metadata)', () => {
+    expect(
+      practiceActivityHistoryItemSchema.safeParse({
+        id: TEST_UUID,
+        activityType: 'dictation',
+        topicTitle: null,
+        subjectName: null,
+        occurredAt: '2026-01-01T00:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('coerces a Date occurredAt to an ISO string', () => {
+    const parsed = practiceActivityHistoryItemSchema.parse({
+      id: TEST_UUID,
+      activityType: 'quiz',
+      topicTitle: null,
+      subjectName: 'Maths',
+      occurredAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    expect(parsed.occurredAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('practiceActivityHistoryResponseSchema', () => {
+  it('accepts an empty page with null cursor', () => {
+    expect(
+      practiceActivityHistoryResponseSchema.safeParse({
+        items: [],
+        nextCursor: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts a page with a UUID cursor', () => {
+    expect(
+      practiceActivityHistoryResponseSchema.safeParse({
+        items: [],
+        nextCursor: TEST_UUID,
+      }).success,
+    ).toBe(true);
   });
 });

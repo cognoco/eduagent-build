@@ -62,7 +62,7 @@ Do not output internal route paths, Expo routes, markdown links, or URLs.`;
 // in the top-right). app-help-map.test.ts cross-reads mobile en.json and
 // asserts these labels — if a V2 screen is renamed, update the map and the test
 // together.
-const APP_HELP_MAP_V2 = `APP HELP (map version 2026-06-14, V2 shell):
+const APP_HELP_MAP_V2 = `APP HELP (map version 2026-06-27, V2 shell):
 This section means the current learner message is an internal MentoMate app question. You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it. Do not say you cannot help with the app. Do not treat app questions as off-topic. Do not treat app questions as assessment answers. Answer in plain chat text using the visible destination labels below.
 
 Use this map only for internal MentoMate app questions: where to find things, how to change settings, what app modes mean, or how to use app features. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer to one or two sentences, then return to the learning thread if one was active. When answering in a non-English conversation, keep destination labels exactly as shown in this map; translate only the surrounding explanation. Never state prices, plan costs, quota numbers, daily limits, or claim the app is free or unlimited — you do not have that information. For any question about cost, billing, plans, upgrades, or usage limits, point to the Subscription destination below (and to "Account, then Help & feedback" for billing problems) without quoting any numbers. Never invent a fixed review schedule or "every N days" cadence — reviews are adaptive; describe the concept and point to where reviews live, but do not promise a number.
@@ -74,12 +74,12 @@ Destinations:
 - Help with an assignment / homework: Mentor tab, then the camera or Homework button on the bottom bar.
 - Practice / reviews: Mentor tab — review and practice cards appear in your feed when something is due, and you can pick a lighter practice activity from the feed. Reviews are adaptive, so they appear when the mentor judges you are due rather than on a fixed schedule.
 - How the Subjects tab is organised (subjects, books, topics): Open the Subjects tab to see your subjects; open a subject to see its books and topics. A "topic" is the smallest unit you study; a "book" is a collection of topics; a "subject" groups books.
-- All notes / study notes you saved: Journal tab, then Saved notes (Study notes you saved).
-- Past conversations / learning sessions: Journal tab, then Saved notes (Recent learning sessions).
-- Saved explanations / bookmarks: Journal tab, then Saved notes (Saved mentor replies).
-- Recaps of past sessions: Journal tab, then Recaps.
-- Reports: Journal tab, then My reports.
-- Mentor memory (what the mentor remembers about you): Journal tab, then Mentor memory. (It is also reachable from your Account.)
+- All notes / study notes you saved: Journal tab, then Notes.
+- Saved explanations / bookmarks: Journal tab, then Notes. Notes and saved bookmarks share one list, so filter by Bookmarks.
+- Past conversations / learning sessions / recaps of past sessions: Journal tab, then Sessions. Each row shows the recap; open one for the full chat.
+- Practice activities, or your past practice activity: Journal tab, then Practice.
+- Reports: Journal tab, then Reports.
+- Mentor memory (what the mentor remembers about you): Journal tab, then Memory. (It is also reachable from your Account.)
 - Profile / account: Tap your profile picture (top-right) to open Account, then Profile.
 - Account security: Tap your profile picture (top-right) to open Account, then Account security.
 - Subscription, plan, upgrade, or billing (account owner): Tap your profile picture (top-right) to open Account, then Subscription. Do not quote any prices, tiers, or limits.
@@ -188,15 +188,15 @@ function buildAppHelpDirectReplyV2(userMessage: string): string {
   }
 
   if (/\bnotes?\b/.test(text)) {
-    return 'You can find your saved notes in the Journal tab, under Saved notes. Notes tied to a specific subject, book, or topic appear there too.';
+    return 'You can find your saved notes in the Journal tab, under Notes. Notes tied to a specific subject, book, or topic appear there too.';
   }
 
   if (/\b(saved|bookmarks?|saved replies|saved explanations)\b/.test(text)) {
-    return 'Saved explanations are in the Journal tab, under Saved notes (Saved mentor replies).';
+    return 'Saved explanations are in the Journal tab, under Notes — notes and saved bookmarks share one list, so filter by Bookmarks.';
   }
 
   if (/\b(past|old|previous|sessions?|conversations?)\b/.test(text)) {
-    return 'Past conversations are in the Journal tab, under Saved notes (Recent learning sessions).';
+    return 'Past conversations are in the Journal tab, under Sessions.';
   }
 
   if (
@@ -214,7 +214,7 @@ function buildAppHelpDirectReplyV2(userMessage: string): string {
   }
 
   if (/\b(memory|remember)\b/.test(text)) {
-    return 'You can see what the mentor remembers in the Journal tab, under Mentor memory.';
+    return 'You can see what the mentor remembers in the Journal tab, under Memory.';
   }
 
   if (/\b(profile|account)\b/.test(text)) {

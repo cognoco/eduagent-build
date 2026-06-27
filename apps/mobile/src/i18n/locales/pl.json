@@ -4193,14 +4193,16 @@
       "privacyPromise": "Twoja prywatna ścieżka nauki: zapisane chwile, notatki, raporty i pamięć mentora."
     },
     "sections": {
-      "recaps": "Podsumowania",
-      "recapsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
-      "reports": "Moje raporty",
+      "reports": "Raporty",
       "reportsSubtitle": "Otwieraj tygodniowe i miesięczne raporty postępów.",
-      "notes": "Zapisane notatki",
-      "notesSubtitle": "Przeglądaj notatki, zakładki i zapisane sesje.",
-      "memory": "Pamięć mentora",
-      "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym."
+      "notes": "Notatki",
+      "notesSubtitle": "Przeglądaj swoje notatki i zapisane zakładki.",
+      "memory": "Pamięć",
+      "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym.",
+      "sessions": "Sesje",
+      "sessionsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
+      "practice": "Ćwiczenia",
+      "practiceSubtitle": "Otwórz centrum ćwiczeń lub przejrzyj swoją ostatnią aktywność."
     },
     "moments": {
       "title": "Ostatnie chwile",
@@ -4232,7 +4234,25 @@
       "searchEmpty": "Brak notatek pasujących do wyszukiwania.",
       "empty": "Zapisane notatki i odpowiedzi tutora dodane do zakładek pojawią się tutaj.",
       "authorshipMentor": "Od tutora",
-      "authorshipMine": "Moja notatka"
+      "authorshipMine": "Moja notatka",
+      "filterAll": "Wszystkie",
+      "filterMine": "Moje notatki",
+      "filterMentor": "Zakładki"
+    },
+    "practice": {
+      "openHub": "Otwórz centrum ćwiczeń",
+      "pastActivityTitle": "Moja ostatnia aktywność",
+      "empty": "Twoje quizy, powtórki, testy i ćwiczenia pojawią się tutaj.",
+      "error": "Nie udało się wczytać Twojej ostatniej aktywności.",
+      "type": {
+        "all": "Wszystkie",
+        "quiz": "Quiz",
+        "review": "Powtórka",
+        "assessment": "Test",
+        "dictation": "Dyktando",
+        "recitation": "Recytacja",
+        "fluency_drill": "Ćwiczenie płynności"
+      }
     }
   },
   "accountAdmin": {

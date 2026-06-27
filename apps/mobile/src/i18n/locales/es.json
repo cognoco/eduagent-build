@@ -4035,14 +4035,16 @@
       "privacyPromise": "Tu historial de aprendizaje privado: momentos guardados, notas, informes y memoria del tutor."
     },
     "sections": {
-      "recaps": "Resúmenes",
-      "recapsSubtitle": "Revisa los resúmenes de sesiones recientes.",
-      "reports": "Mis informes",
+      "reports": "Informes",
       "reportsSubtitle": "Abre los informes de progreso semanales y mensuales.",
-      "notes": "Notas guardadas",
-      "notesSubtitle": "Explora notas, marcadores y sesiones guardadas.",
-      "memory": "Memoria del tutor",
-      "memorySubtitle": "Ve y gestiona lo que tu tutor recuerda."
+      "notes": "Notas",
+      "notesSubtitle": "Explora tus notas y marcadores guardados.",
+      "memory": "Memoria",
+      "memorySubtitle": "Ve y gestiona lo que tu tutor recuerda.",
+      "sessions": "Sesiones",
+      "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes.",
+      "practice": "Práctica",
+      "practiceSubtitle": "Abre el centro de práctica o revisa tu actividad pasada."
     },
     "moments": {
       "title": "Momentos recientes",
@@ -4074,7 +4076,25 @@
       "searchEmpty": "Ninguna nota coincide con la búsqueda.",
       "empty": "Aquí aparecerán las notas que guardes y las respuestas del tutor que marques.",
       "authorshipMentor": "Del tutor",
-      "authorshipMine": "Mi nota"
+      "authorshipMine": "Mi nota",
+      "filterAll": "Todo",
+      "filterMine": "Mis notas",
+      "filterMentor": "Marcadores"
+    },
+    "practice": {
+      "openHub": "Abrir centro de práctica",
+      "pastActivityTitle": "Mi actividad pasada",
+      "empty": "Tus quizzes, repasos, evaluaciones y ejercicios aparecerán aquí.",
+      "error": "No pudimos cargar tu actividad anterior.",
+      "type": {
+        "all": "Todos",
+        "quiz": "Quiz",
+        "review": "Repaso",
+        "assessment": "Evaluación",
+        "dictation": "Dictado",
+        "recitation": "Recitación",
+        "fluency_drill": "Ejercicio de fluidez"
+      }
     }
   },
   "accountAdmin": {
