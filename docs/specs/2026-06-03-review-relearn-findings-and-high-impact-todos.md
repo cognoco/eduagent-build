@@ -182,18 +182,28 @@ correctness/cleanup that must precede load-bearing.
     callback without the cross-session thread (RR-13) feels canned within a few sessions — gate
     RR-1's richer copy on RR-13's minimal thread.
 
-- **RR-2 — Enable + dogfood the dark Challenge Round in staging; read transcripts. [P0 · FEEL · S]**
-  - *Impact:* the rigor layer is fully built but has never run, so we have **zero real
-    transcripts** to judge whether it feels like a check-in or a test, and **nothing to
-    calibrate against** (RR-6 depends on this). Prerequisite for ever going load-bearing.
+- **RR-2 — Validate the dark Challenge Round behaviour via the simulator; defer real-learner feel to a post-launch gate. [P0 · FEEL · S]**
+  - *Impact:* the rigor layer is fully built but had never run end-to-end. Pre-launch there are
+    **no real learners** (`project_pre_launch_no_users`), so a staging flag-flip can only ever
+    produce provisional **adult-team** transcripts — never the 13–17-year-old phrasing the original
+    "read real transcripts" framing assumed. The behaviour gate is therefore the **simulator**
+    (systematic, repeatable, scenario-controlled), not ad-hoc staging dogfooding.
   - *Evidence:* `config.ts:140` (`CHALLENGE_ROUND_RUNTIME_ENABLED` default `'false'`).
-  - *First action:* flip the flag in **staging/Doppler stg only**, run real review sessions,
-    read transcripts for feel. **Never flip prod here** (that is RR-12, the last step).
-  - *Pre-screen (does NOT discharge this):* the simulated-learner harness
-    (`apps/api/eval-llm/simulate.ts`, plan `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
-    generates SYNTHETIC multi-turn rounds to surface gpt-oss signal-drop (RR-12) and seed a
-    provisional mastery bar before real dogfooding. It is model-shaped, not teen-shaped (CH-4),
-    so it complements — never replaces — the real staging transcripts this item requires.
+  - *Pre-flip gate (replaces the staging flag-flip + dogfood):* the simulated-learner harness
+    (`apps/api/eval-llm/simulate.ts`, `pnpm eval:llm:sim`, plan
+    `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
+    multi-turn rounds (topic × persona × N) through the **real mentor pipeline + pure mastery gate**
+    and measures over-/under-credit against per-scenario ground truth. First live grid run
+    2026-06-27 confirmed the gpt-oss signal-drop (de-risking RR-12) and that the control wiring is
+    sound. The dedicated grader judge is validated separately by the
+    **`pnpm eval:llm --flow challenge-grader`** bake-off (Sonnet 4.6 fully clean, 2026-06-27), and
+    the flag-ON grader routing is regression-locked by the DB-backed integration test (**WI-1100**).
+    Together these three are the pre-prod-flip evidence. **Never flip prod here** (that is RR-12).
+  - *Residual — post-launch recalibration gate (CH-4, NOT a pre-flip blocker):* the simulator is
+    model-shaped, not teen-shaped; any synthetic-derived bar is **provisional**. Real-learner feel
+    and forgetting curves can only be read **after launch**. Keep the post-launch recalibration gate
+    against real learner data before treating the mastery bar (and the note-overlap threshold, see
+    RR-6) as settled.
 
 - **RR-3 — Consolidate the two push crons into one warm daily check-in. [P1 · FEEL · S]**
   - *Impact:* removes same-day double-push; replaces cold "topics fading" framing with a warm,
@@ -239,18 +249,21 @@ correctness/cleanup that must precede load-bearing.
 
 ### Correctness — make it true before it's load-bearing (CORRECT)
 
-- **RR-6 — Calibrate the mastery bar + note-overlap threshold from real transcripts. [P1 · CORRECT · M · depends RR-2]**
+- **RR-6 — Calibrate the mastery bar (simulator, pre-flip) and the note-overlap threshold (real transcripts, post-launch). [P1 · CORRECT · M · depends RR-2]**
   - *Impact:* the all-or-nothing mastery rule and the note-quality threshold are uncalibrated
-    guesses; they cannot be tuned until the feature has produced rounds.
+    guesses. The two halves now split: the **mastery bar** can be exercised pre-flip by the
+    simulator; the **note-overlap threshold** genuinely cannot, and moves to the post-launch gate.
   - *Evidence:* one `partial` of 3 blocks mastery (`evaluation.ts:169`);
     `MIN_LEXICAL_OVERLAP_NOTE_DRAFT=0.4` is a TODO-flagged guess (`caps.ts`).
-  - *First action:* histogram staging transcripts; decide whether "2 of 3 solid" warrants a
-    softer outcome; run `pnpm eval:llm --live`.
-  - *Mastery-bar pre-screen:* the simulated-learner harness (`pnpm eval:llm:sim`, plan
-    `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) feeds the **mastery-bar
-    half** of this calibration with synthetic over-/under-credit rates against ground-truth
-    scenarios. The **note-overlap half** stays blocked on real transcripts (the harness is DB-free
-    and does not exercise the note-draft path); any synthetic-derived bar is provisional per CH-4.
+  - *Mastery-bar half — pre-flip via the simulator:* the simulated-learner harness
+    (`pnpm eval:llm:sim`, plan `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
+    produces synthetic over-/under-credit rates against ground-truth scenarios — enough to set a
+    **provisional** bar and decide whether "2 of 3 solid" warrants a softer outcome before the flip.
+    Any bar so derived is provisional per CH-4 and re-tuned at the post-launch gate.
+  - *Note-overlap half — post-launch only:* this stays blocked on real transcripts — the harness is
+    DB-free and does not exercise the note-draft path (`MIN_LEXICAL_OVERLAP_NOTE_DRAFT` is consumed
+    only by `validateNoteDraft` over verified DB learner-event content the simulator never produces;
+    see the harness plan's DB-free / note-overlap bullets). It is **not** a pre-flip blocker.
   - *Constraint (CH-4 — staging calibration is provisional):* pre-launch there are no real
     learners (`project_pre_launch_no_users`); staging dogfooding yields **adult-team** transcripts,
     not 13–17-year-old phrasing or real forgetting curves. Thresholds tuned on engineers will
