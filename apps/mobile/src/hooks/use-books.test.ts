@@ -252,6 +252,29 @@ describe('useBooks', () => {
     expect(result.current.data).toEqual(mockBooks);
   });
 
+  it('does not crash when the cached library entry has no subjects array', async () => {
+    // [shelf-crash] queryClient.getQueryData casts the cached value to
+    // GetAllProfileBooksResponse, but the real cached object can lack a
+    // `subjects` array (e.g. a paged/legacy shape). Without a guard on
+    // `subjects`, initialData calls `.find` on undefined and the shelf
+    // screen renders its error boundary instead of the books. initialData
+    // must instead fall back to undefined and let the queryFn populate.
+    const wrapper = createWrapper();
+    queryClient.setQueryData(['library', 'books', 'test-profile-id'], {
+      pages: [],
+      pageParams: [],
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ books: mockBooks }), { status: 200 }),
+    );
+
+    const { result } = renderHook(() => useBooks('subject-1'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.data).toEqual(mockBooks);
+    });
+  });
+
   it('unwraps legacy wrapped cache entries from the books query key', async () => {
     const wrapper = createWrapper();
     queryClient.setQueryData(['books', 'subject-1', 'test-profile-id'], {
