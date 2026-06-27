@@ -193,7 +193,7 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `config.ts:140` (`CHALLENGE_ROUND_RUNTIME_ENABLED` default `'false'`).
   - *Pre-flip gate (replaces the staging flag-flip + dogfood):* the simulated-learner harness
     (`apps/api/eval-llm/simulate.ts`, `pnpm eval:llm:sim`, plan
-    `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
+    `docs/_archive/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
     multi-turn rounds (topic × persona × N) through the **real production grader/judge + pure mastery
     gate** and measures over-/under-credit against per-scenario ground truth. (Post-adversarial-review
     correction 2026-06-27: the harness grades via the production judge path
@@ -263,7 +263,7 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* one `partial` of 3 blocks mastery (`evaluation.ts:169`);
     `MIN_LEXICAL_OVERLAP_NOTE_DRAFT=0.4` is a TODO-flagged guess (`caps.ts`).
   - *Mastery-bar half — pre-flip via the simulator:* the simulated-learner harness
-    (`pnpm eval:llm:sim`, plan `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
+    (`pnpm eval:llm:sim`, plan `docs/_archive/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
     produces synthetic over-/under-credit rates against ground-truth scenarios — enough to set a
     **provisional** bar and decide whether "2 of 3 solid" warrants a softer outcome before the flip.
     Any bar so derived is provisional per CH-4 and re-tuned at the post-launch gate.
