@@ -16,6 +16,11 @@ import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
 import type { EscalationRung } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import {
+  buildGenericReviewOpenerSection,
+  buildReviewContinuityOpener,
+} from './review-continuity/opener';
+import type { ReviewContinuityContext } from './review-continuity/opener-context';
 import type { ExchangeContext } from './exchange-types';
 
 // ---------------------------------------------------------------------------
@@ -513,6 +518,14 @@ export interface BuildSystemPromptOptions {
    *  the active-round prose so the tutor converses only. Default false preserves
    *  today's behavior (field present). */
   graderEnabled?: boolean;
+  /** Continuity material for the review opener (plan 2026-06-27, spec
+   *  2026-06-08-memory-task-review-continuity.md). The future DB assembler
+   *  supplies it ONLY when REVIEW_CONTINUITY_OPENER_ENABLED is on AND
+   *  effectiveMode === 'review'; the assembler also enforces the EU-2 consent
+   *  gate. Production leaves it undefined today (the assembler lands with the
+   *  retrieval_events table slice), so the generic review block is emitted
+   *  byte-for-byte. */
+  reviewContinuityContext?: ReviewContinuityContext;
 }
 
 /** Builds the full system prompt from exchange context */
@@ -857,15 +870,19 @@ export function buildSystemPrompt(
     safeTopicTitle &&
     !isLanguageMode
   ) {
+    // Continuity-framed opener (review-only — NOT practice) when the assembler
+    // supplied a context behind REVIEW_CONTINUITY_OPENER_ENABLED; otherwise the
+    // byte-identical generic calibration block. The builder owns the shared
+    // generic-section text, so flag-off / no-context / practice all emit the
+    // exact pre-existing block. See services/review-continuity/opener.ts.
+    const continuityContext =
+      context.effectiveMode === 'review'
+        ? options.reviewContinuityContext
+        : undefined;
     sections.push(
-      'Session type: REVIEW (calibrated relearning)\n' +
-        'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
-        `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
-        "Use the learner's partial answer as the anchor. Explicitly say what they got and what is still missing. Do not pivot into a different subtopic just because it is nearby; stay inside the learner's answer and the current topic description.\n" +
-        'REVIEW SOURCE DISCIPLINE: In review mode, prefer source wording for hints. Use analogies, nearby examples, or extra biology/history facts only when they appear in provided source material or pass the 0.88 general-knowledge confidence gate.\n' +
-        'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
-        'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.\n' +
-        'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small source-wording cloze check. For the cells/energy review case, ask "Cells use inputs to make ____" or "Cells are the smallest ____ unit"; never ask what a cell can do on its own.',
+      continuityContext
+        ? buildReviewContinuityOpener(continuityContext)
+        : buildGenericReviewOpenerSection(safeTopicTitle),
     );
   }
 

@@ -454,6 +454,88 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('never ask what a cell can do on its own');
   });
 
+  // --- Review-continuity opener gate (plan 2026-06-27) ---------------------
+  // The builder swaps ONLY the cold calibration lines for a continuity opener
+  // when a ReviewContinuityContext is supplied (review-only). With no context
+  // (production today, flag-off), or in practice mode, the generic block is
+  // emitted byte-for-byte — the test above ("makes review mode pivot…") is the
+  // byte-identical regression guard for that path.
+  const continuityContext = {
+    topicTitle: 'Feudalism',
+    consentGranted: true,
+    priorSolidCount: 2,
+    priorRetrieval: {
+      learnerAnswerVerbatim: 'lords gave land to vassals for loyalty',
+      verdict: 'solid' as const,
+      daysSince: 5,
+    },
+  };
+
+  it('no continuity context (flag-off / production) keeps the generic block', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        topicTitle: 'Feudalism',
+        exchangeCount: 0,
+      }),
+    );
+    expect(prompt).toContain('CALIBRATION QUESTION:');
+    expect(prompt).not.toContain('CONTINUITY OPENER:');
+  });
+
+  it('continuity context in review mode swaps in the continuity opener', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        topicTitle: 'Feudalism',
+        exchangeCount: 0,
+      }),
+      { reviewContinuityContext: continuityContext },
+    );
+    expect(prompt).toContain('CONTINUITY OPENER:');
+    expect(prompt).toContain('lords gave land to vassals for loyalty');
+    // The cold calibration-question lines are gone…
+    expect(prompt).not.toContain('CALIBRATION QUESTION:');
+    expect(prompt).not.toContain('ask exactly one open question inviting them');
+    // …but the preserved surrounding lines survive.
+    expect(prompt).toContain("Use the learner's partial answer as the anchor");
+    expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
+    expect(prompt).toContain('do NOT keep asking them to recall');
+    expect(prompt).toContain('source-wording cloze check');
+  });
+
+  it('continuity context in PRACTICE mode is ignored (gate is review-only)', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'practice',
+        topicTitle: 'Feudalism',
+        exchangeCount: 0,
+      }),
+      { reviewContinuityContext: continuityContext },
+    );
+    expect(prompt).toContain('CALIBRATION QUESTION:');
+    expect(prompt).not.toContain('CONTINUITY OPENER:');
+  });
+
+  it('continuity opener honours declined consent — degrades to the generic block', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        topicTitle: 'Feudalism',
+        exchangeCount: 0,
+      }),
+      {
+        reviewContinuityContext: {
+          ...continuityContext,
+          consentGranted: false,
+        },
+      },
+    );
+    expect(prompt).toContain('CALIBRATION QUESTION:');
+    expect(prompt).not.toContain('CONTINUITY OPENER:');
+    expect(prompt).not.toContain('lords gave land to vassals for loyalty');
+  });
+
   it('keeps challenge verification sections out of review mode', () => {
     const prompt = buildSystemPrompt(
       makeContext({

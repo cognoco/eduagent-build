@@ -66,6 +66,16 @@ export function setOpenRouterModelOverride(
 }
 
 /**
+ * The currently-pinned candidate slug (`--openrouter-model`), or null when
+ * live calls go through production routing. Flows that need to name the model
+ * that produced a turn — e.g. the review-continuity opener flow, to two-model-
+ * guard it against an independent judge — read it here.
+ */
+export function getOpenRouterModelOverride(): string | null {
+  return openRouterModelOverride;
+}
+
+/**
  * Run a real LLM call from the eval harness.
  *
  * Returns the raw response string — the runner handles JSON extraction
