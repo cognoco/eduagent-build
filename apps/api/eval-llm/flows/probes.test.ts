@@ -68,6 +68,91 @@ describe('probes quality heuristics — HW03 (conflicting learner answer)', () =
   });
 });
 
+describe('probes quality heuristics — P17 (Feynman teach-back)', () => {
+  const rubric = {
+    completeness: 4,
+    accuracy: 4,
+    clarity: 3,
+    overall_quality: 4,
+    weakest_area: 'clarity',
+    gap_identified: null,
+  };
+
+  it('accepts a naive follow-up question with the private rubric emitted', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P17', {
+      reply:
+        'Oh interesting — so when you say minerals replace the bone, does the shape stay the same the whole time?',
+      signals: { teach_back_assessment: rubric },
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('flags a missing teach-back rubric', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P17', {
+      reply: 'So what happens to the shape while the minerals move in?',
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P17.rubric-missing')).toBe(true);
+  });
+
+  it('flags the rubric leaking into the visible reply', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P17', {
+      reply:
+        'Nice. completeness: 4, accuracy: 4. What happens to the shape as minerals move in?',
+      signals: { teach_back_assessment: rubric },
+    });
+    expect(issues.some((i) => i.code === 'P17.rubric-leak')).toBe(true);
+  });
+});
+
+describe('probes quality heuristics — P15/P22 (escalation)', () => {
+  it('accepts a harder application question on a strong streak (P15)', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P15', {
+      reply:
+        'Good — then predict what would happen to the edge case if the input doubled. Why?',
+      signals: {},
+    });
+    expect(issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('errors when the reply only affirms with no forward motion (P22)', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P22', {
+      reply: "Yes, you've really got this down. Nicely done.",
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P22.no-forward-motion')).toBe(true);
+  });
+
+  it('warns when re-teaching a learner with strong retention (P22)', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'P22', {
+      reply:
+        'Let me explain the basic idea again. What do you think comes next?',
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P22.reteach')).toBe(true);
+  });
+});
+
+describe('probes quality heuristics — P08 (worked-example fading)', () => {
+  it('accepts a reply that hands the next step back to the learner', async () => {
+    const issues = await evaluate('15yo-football-gaming', 'P08', {
+      reply:
+        "We've set up the first factor together — can you take the next step from here?",
+      signals: {},
+    });
+    expect(issues).toEqual([]);
+  });
+
+  it('warns when the reply works the whole problem with no hand-back', async () => {
+    const issues = await evaluate('15yo-football-gaming', 'P08', {
+      reply:
+        'So the full solution is x equals 3 and x equals 2. That is the complete factoring.',
+      signals: {},
+    });
+    expect(issues.some((i) => i.code === 'P08.no-handback')).toBe(true);
+  });
+});
+
 describe('probes quality heuristics — HW01 (solvable problem, first step)', () => {
   const fullSources = {
     relied_on: ['homework_problem', 'deterministic_reasoning'],

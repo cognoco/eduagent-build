@@ -51,7 +51,10 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
-import { createScopedPersister } from '../lib/query-persister';
+import {
+  createScopedPersister,
+  getQueryCacheBuster,
+} from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 import { getSentryQueryKeyTag } from '../lib/sentry-query-key';
 
@@ -410,6 +413,12 @@ function ScopedPersistProvider({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister: createScopedPersister(userId),
         maxAge: 24 * 60 * 60_000,
+        // [2026-06-26 boot-crash fix] Drop the persisted cache whenever the JS
+        // bundle changes, so an OTA that retypes a persisted query's shape can
+        // never rehydrate stale-shape data into the new render code on cold
+        // start. Keyed to Updates.updateId (per-OTA + per-build). See
+        // getQueryCacheBuster() for why runtimeVersion is not used.
+        buster: getQueryCacheBuster(),
       }}
       onSuccess={() => {
         // [CCR finding, 2026-05-14] Drop legacy root keys after the

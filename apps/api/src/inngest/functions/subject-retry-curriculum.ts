@@ -58,6 +58,65 @@ export const subjectRetryCurriculum = inngest.createFunction(
     // bookId are deduped server-side. This is defence-in-depth alongside the
     // DB-level atomic claim below.
     idempotency: 'event.data.bookId',
+    // [Tier A] Terminal failure: Inngest calls onFailure once the configured
+    // retries are exhausted. Persist the failed lifecycle state so a stuck book
+    // is not left mid-generation. Mirrors auto-file-session.ts onFailure: the
+    // original event payload lives at event.data.event.data.
+    onFailure: async ({
+      event,
+      error,
+    }: {
+      event: { data: { event?: { data?: unknown } } };
+      error: unknown;
+    }) => {
+      const parsed = subjectCurriculumRetryRequestedEventSchema.safeParse(
+        event.data.event?.data,
+      );
+      if (!parsed.success) {
+        return { status: 'skipped', reason: 'invalid_payload' as const };
+      }
+      const { profileId, subjectId, bookId } = parsed.data;
+      const db = getStepDatabase();
+      const book = await db.query.curriculumBooks.findFirst({
+        where: and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+        ),
+      });
+      // Ownership is established by the parent-chain check in the main flow
+      // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
+      // onFailure operates on that same owner-verified event payload.
+      if (book && !book.topicsGenerated && book.failedAt === null) {
+        await db
+          .update(curriculumBooks)
+          .set({
+            failedReason: 'generation_error',
+            failedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(curriculumBooks.id, bookId),
+              eq(curriculumBooks.subjectId, subjectId),
+              // Atomic guard: never stamp failure on a book a concurrent run
+              // already generated.
+              eq(curriculumBooks.topicsGenerated, false),
+            ),
+          );
+      }
+      captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          profileId,
+          extra: {
+            site: 'subjectRetryCurriculum.onFailure',
+            subjectId,
+            bookId,
+          },
+        },
+      );
+      return { status: 'failed' as const, subjectId, bookId };
+    },
   },
   { event: 'app/subject.curriculum-retry-requested' },
   async ({ event, step }) => {
@@ -86,6 +145,9 @@ export const subjectRetryCurriculum = inngest.createFunction(
         ? await isGdprProcessingAllowedV2(db, profileId)
         : await isGdprProcessingAllowed(db, profileId);
       if (!gdprAllowed) {
+        // Consent-blocked is NOT a curriculum failure — it is owned by the
+        // consent gate (a retry cannot grant consent). Leave failed_at unset so
+        // the book derives "preparing" rather than offering a futile retry.
         return { status: 'consent-blocked' as const };
       }
 
@@ -148,6 +210,12 @@ export const subjectRetryCurriculum = inngest.createFunction(
         .set({
           retryInFlight: true,
           retryClaimedAt: new Date(),
+          // Re-dispatch clears any prior terminal failure so the book derives
+          // back to "preparing" while this attempt runs (no persisted
+          // "generating" flag — that would be liveness-coupled). If this attempt
+          // also fails, the empty-topics write / onFailure re-sets failed_at.
+          failedReason: null,
+          failedAt: null,
           updatedAt: new Date(),
         })
         .where(
@@ -195,7 +263,10 @@ export const subjectRetryCurriculum = inngest.createFunction(
         const stepGdprAllowed = isIdentityV2EnabledInStep()
           ? await isGdprProcessingAllowedV2(db, profileId)
           : await isGdprProcessingAllowed(db, profileId);
-        if (!stepGdprAllowed) return;
+        if (!stepGdprAllowed) {
+          // Consent-blocked: not a curriculum failure (see load-context gate).
+          return;
+        }
 
         const result = await generateBookTopics(
           context.bookTitle,
@@ -205,6 +276,22 @@ export const subjectRetryCurriculum = inngest.createFunction(
           { conversationLanguage: context.conversationLanguage },
         );
         if (result.topics.length === 0) {
+          await db
+            .update(curriculumBooks)
+            .set({
+              failedReason: 'empty_topics',
+              failedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(curriculumBooks.id, bookId),
+                eq(curriculumBooks.subjectId, subjectId),
+                // Atomic guard: never stamp failure on a book a concurrent run
+                // already generated.
+                eq(curriculumBooks.topicsGenerated, false),
+              ),
+            );
           const err = new NonRetriableError('retry-empty-topics');
           captureException(err, {
             profileId,

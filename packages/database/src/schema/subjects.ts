@@ -155,6 +155,25 @@ export const curriculumBooks = pgTable(
     // NULL alongside retry_in_flight=false in the release step.
     retryClaimedAt: timestamp('retry_claimed_at', { withTimezone: true }),
     masteredAt: timestamp('mastered_at', { withTimezone: true }),
+    // Persisted TERMINAL FAILURE signal for curriculum topic generation. We
+    // deliberately persist only the failure terminal and DERIVE everything
+    // transient: `topics_generated=true` already means "ready", and "preparing"
+    // is simply (not generated AND not failed). Persisting a `generating`/`pending`
+    // flag would be liveness-coupled — a worker that dies mid-flight (deploy,
+    // timeout, OOM, the Inngest SDK-block stale-deploy trap this repo has hit)
+    // would strand the row "in progress" forever with no reconciler, re-creating
+    // the exact "stuck looks like in-progress" disease in the DB. Failure is
+    // monotonic and self-healing instead: set when generation terminally fails,
+    // cleared on the next retry-claim / successful (re)generation.
+    //
+    // `failed_at` is the signal (NOT NULL ⟺ terminally failed while not
+    // generated); `failed_reason` is observability metadata ('empty_topics',
+    // 'generation_error'). NOTE: consent-blocked is intentionally NOT recorded
+    // here — a consent-gated curriculum is not broken, it is waiting on the
+    // identity-v2 consent gate (a different domain); calling it "failed" would
+    // offer a Retry button that cannot fix a parent-consent problem.
+    failedReason: text('failed_reason'),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

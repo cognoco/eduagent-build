@@ -8,6 +8,7 @@ import {
   deleteSubject,
   archiveInactiveSubjects,
   createSubjectWithStructure,
+  retryCurriculumForSubject,
   SubjectLimitError,
   MAX_TOTAL_SUBJECTS,
 } from './subject';
@@ -131,6 +132,7 @@ function createMockDb({
   updateReturning = [] as ReturnType<typeof mockSubjectRow>[],
   readyBook = null as ReturnType<typeof mockBookRow> | null,
   readyBooks = [] as Array<Pick<ReturnType<typeof mockBookRow>, 'subjectId'>>,
+  failedBooks = [] as Array<{ subjectId: string }>,
   bookSuggestion = null as { id: string } | null,
   bookSuggestions = [] as Array<{ subjectId: string }>,
 } = {}): Database {
@@ -139,7 +141,17 @@ function createMockDb({
       subjects: createSubjectQueryMocks(),
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(readyBook),
-        findMany: jest.fn().mockResolvedValue(readyBooks),
+        // [Tier A] getSubjectCurriculumStatuses now issues TWO curriculumBooks
+        // batches: ready (filters on `topics_generated`) and failed (filters on
+        // `failed_at` via isNotNull — the single authoritative failure signal).
+        // Discriminate by which column the WHERE references; extractSqlTextAndValues
+        // surfaces the column names (`failed_at` only appears in the failed batch).
+        findMany: jest.fn((options?: { where?: unknown }) => {
+          if (extractSqlTextAndValues(options?.where).includes('failed_at')) {
+            return Promise.resolve(failedBooks);
+          }
+          return Promise.resolve(readyBooks);
+        }),
       },
       bookSuggestions: {
         findFirst: jest.fn().mockResolvedValue(bookSuggestion),
@@ -333,7 +345,9 @@ describe('listSubjects', () => {
 
     const result = await listSubjects(db, profileId, { includeInactive: true });
 
-    expect(db.query.curriculumBooks.findMany).toHaveBeenCalledTimes(1);
+    // Two batched curriculumBooks lookups (ready + failed), one bookSuggestions
+    // batch — still O(1) queries per category regardless of subject count.
+    expect(db.query.curriculumBooks.findMany).toHaveBeenCalledTimes(2);
     expect(db.query.bookSuggestions.findMany).toHaveBeenCalledTimes(1);
     expect(result.find((subject) => subject.id === 'ready-book')).toMatchObject(
       {
@@ -351,6 +365,120 @@ describe('listSubjects', () => {
     expect(
       result.find((subject) => subject.id === 'archived'),
     ).not.toHaveProperty('curriculumStatus');
+  });
+});
+
+describe('[Tier A] getSubjectCurriculumStatuses 3-way rollup (via listSubjects)', () => {
+  // Precedence: ready beats failed beats preparing. A subject with any
+  // studyable content (generated book OR suggestion) is 'ready' even if a
+  // sibling book failed; otherwise a book with `failed_at` set makes it
+  // 'failed'; otherwise 'preparing'. `failed_at` (isNotNull) is the single
+  // authoritative failure signal — consent-blocked is NOT a curriculum failure
+  // and derives as 'preparing'.
+  //
+  // `failedBooks` in the harness represents the rows the `failed_at` batch
+  // returns, i.e. books with a non-null `failedAt` timestamp.
+  it("surfaces 'failed' when a subject has a book with failedAt set and no ready content", async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-failed' })],
+    });
+    const db = createMockDb({
+      // Book whose generation terminally failed (failedAt timestamp set).
+      failedBooks: [{ subjectId: 'subj-failed' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-failed',
+      curriculumStatus: 'failed',
+    });
+  });
+
+  it("derives 'preparing' for a consent-blocked book (no failedAt, not a failure)", async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-blocked' })],
+    });
+    // A consent-blocked book sets NO failed_at, so the failed batch (isNotNull
+    // failedAt) never returns it; with no ready content it falls to 'preparing'.
+    const db = createMockDb();
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-blocked',
+      curriculumStatus: 'preparing',
+    });
+  });
+
+  it('ready beats failed: a ready book wins even alongside a failed sibling', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-mixed' })],
+    });
+    const db = createMockDb({
+      readyBooks: [{ subjectId: 'subj-mixed' }],
+      failedBooks: [{ subjectId: 'subj-mixed' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-mixed',
+      curriculumStatus: 'ready',
+    });
+  });
+
+  it('ready beats failed: a suggestion wins even alongside a failed sibling', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-sugg' })],
+    });
+    const db = createMockDb({
+      bookSuggestions: [{ subjectId: 'subj-sugg' }],
+      failedBooks: [{ subjectId: 'subj-sugg' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-sugg',
+      curriculumStatus: 'ready',
+    });
+  });
+
+  it("falls back to 'preparing' when there is no ready and no failed content", async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-prep' })],
+    });
+    const db = createMockDb();
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-prep',
+      curriculumStatus: 'preparing',
+    });
+  });
+
+  it('the failed batch filters on failed_at (isNotNull), distinct from the ready batch on topics_generated', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-prep' })],
+    });
+    const db = createMockDb();
+
+    await listSubjects(db, profileId);
+
+    const clauses = (
+      db.query.curriculumBooks.findMany as jest.Mock
+    ).mock.calls.map((call) => extractSqlTextAndValues(call?.[0]?.where));
+    // Two distinct batches: one references the `failed_at` column (failure
+    // signal), the other the `topics_generated` column (ready signal).
+    const failedClause = clauses.find((c) => c.includes('failed_at'));
+    const readyClause = clauses.find((c) => c.includes('topics_generated'));
+    expect(failedClause).toBeDefined();
+    expect(readyClause).toBeDefined();
+    // The failure signal is failed_at only — no leftover enum status literals.
+    expect(failedClause).not.toContain('consent_blocked');
+    expect(failedClause).not.toContain('topics_status');
   });
 });
 
@@ -1258,5 +1386,135 @@ describe('archiveInactiveSubjects', () => {
     const result = await archiveInactiveSubjects(db, cutoff);
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('retryCurriculumForSubject', () => {
+  let sendSpy: jest.SpiedFunction<typeof inngest.send>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
+  });
+
+  afterEach(() => {
+    sendSpy.mockRestore();
+  });
+
+  function makeRetryDb(
+    stuckBooks: ReturnType<typeof mockBookRow>[],
+    updateSet: jest.Mock,
+  ): Database {
+    return {
+      query: {
+        // repo.subjects.findFirst → db.query.subjects.findFirst (scoped).
+        subjects: createSubjectQueryMocks(),
+        curriculumBooks: {
+          findMany: jest.fn().mockResolvedValue(stuckBooks),
+        },
+      },
+      update: jest.fn(() => ({ set: updateSet })),
+    } as unknown as Database;
+  }
+
+  it('dispatches a core retry per stuck book and clears failed_at after dispatch', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateWhere = jest.fn().mockResolvedValue(undefined);
+    const updateSet = jest.fn(() => ({ where: updateWhere }));
+    const db = makeRetryDb(
+      [mockBookRow({ id: uuidBookId, topicsGenerated: false })],
+      updateSet,
+    );
+
+    const dispatched = await retryCurriculumForSubject(
+      db,
+      uuidProfileId,
+      uuidSubjectId,
+    );
+
+    expect(dispatched).toBe(1);
+    expect(sendSpy).toHaveBeenCalledWith({
+      name: 'app/subject.curriculum-retry-requested',
+      data: expect.objectContaining({
+        version: 1,
+        subjectId: uuidSubjectId,
+        profileId: uuidProfileId,
+        bookId: uuidBookId,
+      }),
+    });
+    // Clears terminal failure so the subject derives 'preparing' synchronously
+    // (the hub's preparing-poll then starts and observes the regeneration).
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ failedReason: null, failedAt: null }),
+    );
+    // Pin the WHERE clause: the clear must be scoped to THIS subject's
+    // not-yet-generated books. A future widening (e.g. dropping subjectId) would
+    // clear failed_at across every subject's books — a cross-subject data bug
+    // the SET assertion alone would not catch.
+    const whereSql = extractSqlTextAndValues(updateWhere.mock.calls[0]?.[0]);
+    expect(whereSql).toContain(uuidSubjectId.toLowerCase());
+    expect(whereSql).toContain('topics_generated');
+  });
+
+  it('propagates a dispatch failure (core send) and leaves failed_at intact', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateSet = jest.fn(() => ({
+      where: jest.fn().mockResolvedValue(undefined),
+    }));
+    const db = makeRetryDb(
+      [mockBookRow({ id: uuidBookId, topicsGenerated: false })],
+      updateSet,
+    );
+    sendSpy.mockRejectedValueOnce(new Error('inngest unavailable'));
+
+    // Core send: dispatch failure must surface (so the client shows the retry
+    // error) instead of being swallowed and reported as dispatched>0.
+    await expect(
+      retryCurriculumForSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toThrow('inngest unavailable');
+    // failed_at is NOT cleared on a failed dispatch → the subject stays 'failed'.
+    expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 without dispatching or clearing when there are no stuck books', async () => {
+    setupScopedRepo({
+      findFirstResult: mockSubjectRow({
+        id: uuidSubjectId,
+        profileId: uuidProfileId,
+      }),
+    });
+    const updateSet = jest.fn();
+    const db = makeRetryDb([], updateSet);
+
+    const dispatched = await retryCurriculumForSubject(
+      db,
+      uuidProfileId,
+      uuidSubjectId,
+    );
+
+    expect(dispatched).toBe(0);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it('throws SubjectNotFoundError when the subject is not owned', async () => {
+    setupScopedRepo({ findFirstResult: undefined });
+    const updateSet = jest.fn();
+    const db = makeRetryDb([], updateSet);
+
+    await expect(
+      retryCurriculumForSubject(db, uuidProfileId, uuidSubjectId),
+    ).rejects.toThrow(SubjectNotFoundError);
+    expect(sendSpy).not.toHaveBeenCalled();
   });
 });

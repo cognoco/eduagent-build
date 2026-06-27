@@ -1831,6 +1831,11 @@ export async function persistBookTopics(
             .update(curriculumBooks)
             .set({
               topicsGenerated: true,
+              // Success clears any prior terminal failure so a retry that
+              // succeeds leaves a clean state ("ready" is derived from
+              // topics_generated, not persisted separately).
+              failedReason: null,
+              failedAt: null,
               // [books topicsGenerated ordering] topics now exist — clear the
               // single-flight claim marker so the row is not seen as in-flight.
               topicsGenerationStartedAt: null,
@@ -1865,6 +1870,10 @@ export async function persistBookTopics(
         .update(curriculumBooks)
         .set({
           topicsGenerated: true,
+          // Success clears any prior terminal failure ("ready" is derived from
+          // topics_generated, not persisted separately).
+          failedReason: null,
+          failedAt: null,
           // [books topicsGenerated ordering] clear the in-flight claim marker.
           topicsGenerationStartedAt: null,
           updatedAt: new Date(),
@@ -1996,6 +2005,11 @@ export async function persistBookTopics(
       .update(curriculumBooks)
       .set({
         topicsGenerated: true,
+        // Success clears any prior terminal failure (consistent with the other
+        // topicsGenerated=true success writes above) so a row is never left
+        // topicsGenerated=true AND failedAt set.
+        failedReason: null,
+        failedAt: null,
         // [books topicsGenerated ordering] clear the in-flight claim marker.
         topicsGenerationStartedAt: null,
         updatedAt: new Date(),

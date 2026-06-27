@@ -3,11 +3,8 @@ import { Redirect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import {
-  Button,
-  ErrorFallback,
-  TimeoutLoader,
-} from '../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../components/common';
+import { RecapsEmptyState } from '../../../components/recaps/RecapsEmptyState';
 import { useNavigationContract } from '../../../hooks/use-navigation-contract';
 import { useRecaps } from '../../../hooks/use-recaps';
 import { formatRelativeDate } from '../../../lib/format-relative-date';
@@ -75,23 +72,9 @@ export default function RecapsScreen(): React.ReactElement {
             testID="recaps-error"
           />
         ) : (recapsQuery.data?.length ?? 0) === 0 ? (
-          <View
-            className="rounded-card border border-border bg-surface px-4 py-5"
-            testID="recaps-empty"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('recaps.emptyTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2 mb-4">
-              {t('recaps.emptyBody')}
-            </Text>
-            <Button
-              variant="primary"
-              label={t('recaps.emptyCtaStartSession')}
-              onPress={() => router.push('/(app)/home' as Href)}
-              testID="recaps-empty-start-session"
-            />
-          </View>
+          <RecapsEmptyState
+            onStart={() => router.push('/(app)/home' as Href)}
+          />
         ) : (
           <View className="gap-3">
             {recapsQuery.data?.map((recap) => (

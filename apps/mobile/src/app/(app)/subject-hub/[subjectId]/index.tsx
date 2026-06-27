@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,13 +8,20 @@ import {
   ErrorFallback,
   QueryStateView,
 } from '../../../../components/common';
-import { SubjectHub, type HubNextUp } from '../../../../components/subject-hub';
+import {
+  SubjectHub,
+  SubjectHubPreparing,
+  type HubNextUp,
+} from '../../../../components/subject-hub';
 import { useSubjectHub } from '../../../../hooks/use-subject-hub';
+import { useRetryCurriculum } from '../../../../hooks/use-books';
 import {
   goBackOrReplace,
   pushLearningResumeTarget,
 } from '../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
+import { platformAlert } from '../../../../lib/platform-alert';
+import { formatApiError } from '../../../../lib/format-api-error';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -26,6 +33,7 @@ export default function SubjectHubRoute(): React.ReactElement {
   const params = useLocalSearchParams<{ subjectId?: string | string[] }>();
   const subjectId = firstParam(params.subjectId);
   const hub = useSubjectHub(subjectId);
+  const retryCurriculum = useRetryCurriculum(subjectId);
 
   const goBack = useCallback(() => {
     // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
@@ -36,6 +44,13 @@ export default function SubjectHubRoute(): React.ReactElement {
     ) as Href;
     goBackOrReplace(router, fallback);
   }, [router]);
+
+  const goPickBook = useCallback(() => {
+    router.push({
+      pathname: '/(app)/pick-book/[subjectId]',
+      params: { subjectId },
+    } as Href);
+  }, [router, subjectId]);
 
   const openTopic = useCallback(
     (topicId: string, bookId?: string | null) => {
@@ -85,6 +100,31 @@ export default function SubjectHubRoute(): React.ReactElement {
     [handleReviewTopic, hub.data?.nextUp.resumeTarget, openTopic, router],
   );
 
+  // HIGH-3: surface a platform alert when the retry mutation fails so the
+  // learner knows the tap did not silently succeed. Classifying at this
+  // boundary (not inside the alert message) keeps the screen unaware of HTTP
+  // status codes — per repo UX Resilience Rules.
+  useEffect(() => {
+    if (retryCurriculum.isError && retryCurriculum.error) {
+      platformAlert(
+        t('subjectHub.stuck.retryFailedTitle'),
+        formatApiError(retryCurriculum.error),
+      );
+    }
+  }, [retryCurriculum.isError, retryCurriculum.error, t]);
+
+  // HIGH-2: dispatched:0 means every book for this subject is already claimed
+  // by an in-flight job and cannot be regenerated — the honest path is to pick
+  // a different book rather than showing a terminal empty state.
+  useEffect(() => {
+    if (retryCurriculum.data?.dispatched === 0 && subjectId) {
+      router.push({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId },
+      } as Href);
+    }
+  }, [retryCurriculum.data, router, subjectId]);
+
   if (!subjectId) {
     return (
       <ErrorFallback
@@ -110,8 +150,6 @@ export default function SubjectHubRoute(): React.ReactElement {
   // so an empty subject still surfaces a recoverable empty state below rather
   // than handing blank data to SubjectHub.
   const hubData = hub.data;
-  const hasUsableData =
-    !!hubData && (hubData.aggregate.total > 0 || hubData.chapters.length > 0);
 
   return (
     <QueryStateView
@@ -132,21 +170,49 @@ export default function SubjectHubRoute(): React.ReactElement {
         testID: 'subject-hub-back',
       }}
     >
-      {hubData && !hasUsableData ? (
+      {hubData && hub.emptyKind === 'preparing' ? (
+        <SubjectHubPreparing
+          subjectName={hubData.subjectName}
+          onRetry={() => {
+            if (!retryCurriculum.isPending) retryCurriculum.mutate();
+          }}
+          onBack={goBack}
+          isRetrying={retryCurriculum.isPending}
+        />
+      ) : hubData && hub.emptyKind === 'stuck' ? (
         <EmptyStateCard
           variant="centered"
-          testID="subject-hub-empty"
-          title={t('subjectHub.empty.title')}
-          message={t('subjectHub.empty.message')}
+          testID="subject-hub-stuck"
+          title={t('subjectHub.stuck.title')}
+          message={t('subjectHub.stuck.message')}
           primaryAction={{
-            label: t('common.retry'),
-            onPress: hub.refetch,
-            testID: 'subject-hub-empty-retry',
+            label: t('subjectHub.stuck.retry'),
+            onPress: () => {
+              if (!retryCurriculum.isPending) retryCurriculum.mutate();
+            },
+            testID: 'subject-hub-stuck-retry',
           }}
           secondaryAction={{
             label: t('common.goBack'),
             onPress: goBack,
-            testID: 'subject-hub-empty-back',
+            testID: 'subject-hub-stuck-back',
+          }}
+        />
+      ) : hubData && hub.emptyKind === 'pick-book' ? (
+        <EmptyStateCard
+          variant="centered"
+          testID="subject-hub-pick-book"
+          title={t('subjectHub.pickBook.title')}
+          message={t('subjectHub.pickBook.message')}
+          primaryAction={{
+            label: t('subjectHub.pickBook.cta'),
+            onPress: goPickBook,
+            testID: 'subject-hub-pick-book-cta',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: goBack,
+            testID: 'subject-hub-pick-book-back',
           }}
         />
       ) : hubData ? (

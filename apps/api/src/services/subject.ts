@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -15,6 +15,7 @@ import {
 import {
   SubjectNotFoundError,
   subjectCurriculumPrewarmRequestedEventSchema,
+  subjectCurriculumRetryRequestedEventSchema,
 } from '@eduagent/schemas';
 import type {
   ConversationLanguage,
@@ -155,7 +156,7 @@ async function getSubjectCurriculumStatuses(
 ): Promise<Map<string, SubjectCurriculumStatus>> {
   if (subjectIds.length === 0) return new Map();
 
-  const [readyBooks, suggestions] = await Promise.all([
+  const [readyBooks, suggestions, failedBooks] = await Promise.all([
     db.query.curriculumBooks.findMany({
       where: and(
         inArray(curriculumBooks.subjectId, subjectIds),
@@ -165,6 +166,19 @@ async function getSubjectCurriculumStatuses(
     }),
     db.query.bookSuggestions.findMany({
       where: inArray(bookSuggestions.subjectId, subjectIds),
+      columns: { subjectId: true },
+    }),
+    // Books whose topic generation reached a terminal failure (failed_at set).
+    // This is the single authoritative failure signal; a subject is only
+    // surfaced as 'failed' when it has NO ready content (see precedence below)
+    // — a single failed sibling next to a ready book must not hide studyable
+    // content. Consent-blocked is deliberately NOT counted as failure here
+    // (it is owned by the consent gate; a retry cannot fix it).
+    db.query.curriculumBooks.findMany({
+      where: and(
+        inArray(curriculumBooks.subjectId, subjectIds),
+        isNotNull(curriculumBooks.failedAt),
+      ),
       columns: { subjectId: true },
     }),
   ]);
@@ -177,10 +191,26 @@ async function getSubjectCurriculumStatuses(
     readySubjectIds.add(suggestion.subjectId);
   }
 
+  const failedSubjectIds = new Set<string>();
+  for (const book of failedBooks) {
+    failedSubjectIds.add(book.subjectId);
+  }
+
+  // Precedence: ready beats failed beats preparing.
+  //  - 'ready'     — has studyable content / a next action (generated book or
+  //                  suggestion), even if a sibling book failed.
+  //  - 'failed'    — no ready content, but at least one book with failed_at set
+  //                  (terminal generation failure). Consent-blocked is NOT
+  //                  counted here (owned by the consent gate).
+  //  - 'preparing' — neither (generation still in flight, derived not persisted).
   return new Map(
     subjectIds.map((subjectId) => [
       subjectId,
-      readySubjectIds.has(subjectId) ? 'ready' : 'preparing',
+      readySubjectIds.has(subjectId)
+        ? 'ready'
+        : failedSubjectIds.has(subjectId)
+          ? 'failed'
+          : 'preparing',
     ]),
   );
 }
@@ -216,25 +246,24 @@ async function dispatchCurriculumRetry(args: {
   profileId: string;
   bookId: string;
 }): Promise<void> {
-  const data = subjectCurriculumPrewarmRequestedEventSchema.parse({
+  // Validate with the RETRY schema (not prewarm) so a future divergence between
+  // the two event shapes can't silently build a payload the retry function
+  // rejects with NonRetriableError('invalid-retry-payload') — which would make
+  // every retry a no-op while the endpoint still reports dispatched>0.
+  const data = subjectCurriculumRetryRequestedEventSchema.parse({
     version: 1,
     ...args,
     timestamp: new Date().toISOString(),
   });
 
-  await safeSend(
-    () =>
-      inngest.send({
-        name: 'app/subject.curriculum-retry-requested',
-        data,
-      }),
-    'subject.curriculum-retry',
-    {
-      profileId: args.profileId,
-      subjectId: args.subjectId,
-      bookId: args.bookId,
-    },
-  );
+  // core-send: user-initiated Retry — a swallowed dispatch would make the
+  // endpoint report dispatched>0 while no regeneration is queued (the "Retry
+  // does nothing" failure). Dispatch failure must short-circuit so the caller
+  // leaves failed_at intact and the client surfaces the retry error.
+  await inngest.send({
+    name: 'app/subject.curriculum-retry-requested',
+    data,
+  });
 }
 
 export async function retryCurriculumForSubject(
@@ -246,6 +275,14 @@ export async function retryCurriculumForSubject(
   const subjectRow = await repo.subjects.findFirst(eq(subjects.id, subjectId));
   if (!subjectRow) throw new SubjectNotFoundError();
 
+  // `topicsGenerated=false` is the canonical "needs (re)generation" set — it
+  // captures every non-ready book (still preparing, or terminally failed with
+  // failed_at set; the retry-claim clears failed_at so the book derives back to
+  // preparing while regenerating). Do NOT broaden it to include generated books
+  // — the Inngest retry function early-returns on already-generated books, so
+  // re-dispatching them is a no-op. The rare "generated-but-zero-active-topics"
+  // stuck case is not regenerable here; it is surfaced client-side via
+  // `dispatched: 0`.
   const stuckBooks = await db.query.curriculumBooks.findMany({
     where: and(
       eq(curriculumBooks.subjectId, subjectId),
@@ -255,9 +292,34 @@ export async function retryCurriculumForSubject(
 
   let dispatched = 0;
   for (const book of stuckBooks) {
+    // Core send (throws on dispatch failure). If this throws, the loop aborts
+    // BEFORE the failed_at clear below, so failed_at stays set, the subject
+    // stays 'failed', and the client surfaces the retry error.
     await dispatchCurriculumRetry({ subjectId, profileId, bookId: book.id });
     dispatched++;
   }
+
+  if (dispatched > 0) {
+    // Only AFTER a successful dispatch: clear any terminal failure on the
+    // re-dispatched books, in THIS request, so the subject derives 'preparing'
+    // synchronously. Without it, the client's refetch immediately after this
+    // call still reads failed_at set → status 'failed' → the hub's
+    // preparing-poll never starts (polling is gated on status==='preparing') →
+    // the screen sits on 'stuck' even though regeneration is queued, recreating
+    // "Retry does nothing". The Inngest claim re-clears failed_at idempotently.
+    // Ownership is already enforced above via the scoped `repo.subjects` lookup
+    // (throws if not owned), so scoping by subjectId here is safe.
+    await db
+      .update(curriculumBooks)
+      .set({ failedReason: null, failedAt: null, updatedAt: new Date() })
+      .where(
+        and(
+          eq(curriculumBooks.subjectId, subjectId),
+          eq(curriculumBooks.topicsGenerated, false),
+        ),
+      );
+  }
+
   return dispatched;
 }
 

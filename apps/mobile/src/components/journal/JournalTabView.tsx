@@ -6,6 +6,7 @@ import { useRouter, type Href } from 'expo-router';
 import type { NowCard, RecapListItem } from '@eduagent/schemas';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
+import { RecapsEmptyState } from '../recaps/RecapsEmptyState';
 import { VoiceRecordButton } from '../session/VoiceRecordButton';
 import { ReportsList } from '../progress/ReportsList';
 import { useAllNotes } from '../../hooks/use-notes';
@@ -291,7 +292,7 @@ function JournalSegmentedControl({
           <Pressable
             key={section}
             onPress={() => onChange(section)}
-            className={`min-h-[40px] flex-1 items-center justify-center rounded-card px-2 ${
+            className={`min-h-[40px] flex-1 items-center justify-center rounded-card px-1 ${
               selected ? 'bg-surface' : ''
             }`}
             accessibilityRole="button"
@@ -300,10 +301,12 @@ function JournalSegmentedControl({
             testID={`journal-tab-${section}`}
           >
             <Text
-              className={`text-caption font-semibold ${
+              className={`text-caption font-semibold text-center ${
                 selected ? 'text-text-primary' : 'text-text-secondary'
               }`}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
             >
               {sectionTitle(section, t)}
             </Text>
@@ -376,6 +379,7 @@ function RecapRow({ recap }: { recap: RecapListItem }): React.ReactElement {
 
 function JournalRecapsSection(): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const recaps = useJournalRecaps(10);
   const errorActions = useSectionErrorActions(
     recaps.error,
@@ -420,9 +424,10 @@ function JournalRecapsSection(): React.ReactElement {
   const rows = recaps.data ?? [];
   if (rows.length === 0) {
     return (
-      <EmptyState
+      <RecapsEmptyState
         testID="journal-recaps-empty"
-        title={t('journal.recaps.empty')}
+        ctaTestID="journal-recaps-empty-start-session"
+        onStart={() => router.push('/(app)/mentor')}
       />
     );
   }
@@ -755,7 +760,9 @@ function JournalMemorySection(): React.ReactElement {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('journal.memory.open')}
-        onPress={() => router.push('/(app)/mentor-memory?returnTo=journal' as Href)}
+        onPress={() =>
+          router.push('/(app)/mentor-memory?returnTo=journal' as Href)
+        }
         testID="journal-memory-open"
         className="mt-4 self-start rounded-button bg-primary px-4 py-2"
       >

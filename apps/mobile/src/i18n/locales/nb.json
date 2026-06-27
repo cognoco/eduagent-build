@@ -3871,16 +3871,13 @@
     "overflow": {
       "more": "{{count}} flere alternativer"
     },
-    "empty": {
-      "title": "Ingenting trenger deg akkurat nå",
-      "cta": "Utforsk flere læringsalternativer"
-    },
     "bar": {
       "unavailable": "Veilederen er frakoblet et øyeblikk. Du kan fortsatt skrive.",
       "cameraLabel": "Kamera",
       "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
       "micLabel": "Mikrofon",
-      "homeworkChip": "Lekser"
+      "homeworkChip": "Lekser",
+      "title": "Spør om hva som helst"
     },
     "onTrack": {
       "label": "I rute",
@@ -3923,8 +3920,6 @@
       "homeworkReply": "Bruk kameraet til å ta bilde av oppgaven, eller skriv den her.",
       "firstSessionTeach": "Jeg husker det du skriver her, slik at neste steg starter nærmere deg."
     },
-    "title": "Mentor",
-    "subtitle": "Noen nyttige neste steg, pluss ett sted for å spørre eller notere hva som helst.",
     "fallback": {
       "cached": "Viser den sist lagrede strømmen mens vi kobler til på nytt.",
       "continue": "Fortsett der du slapp"
@@ -3939,7 +3934,8 @@
       "helpMeSolve": "Hjelp meg å løse denne",
       "checkMyAnswer": "Sjekk svaret mitt"
     },
-    "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen."
+    "homeworkPrompt": "Har du lekser i kveld? Ta et bilde, så jobber vi med dem sammen.",
+    "headline": "Få hjelp med hva som helst"
   },
   "subjectsBrowse": {
     "title": "Emner",
@@ -4013,9 +4009,24 @@
       "mastered": "Mestret"
     },
     "linkLabel": "Åpne fag-hub",
-    "empty": {
-      "title": "Ingenting å studere her ennå",
-      "message": "Dette faget har ingen emner ennå. Prøv igjen om et øyeblikk, eller gå tilbake til fagene dine."
+    "preparing": {
+      "title": "Bygger pensumet ditt …",
+      "message": "Vi skriver dine første emner. Dette tar vanligvis noen få sekunder.",
+      "slow": "Jobber fortsatt – nesten ferdig.",
+      "stalledMessage": "Dette tar lengre tid enn forventet.",
+      "retry": "Prøv igjen",
+      "titleNamed": "Lager {{subject}}-læreplanen din …"
+    },
+    "stuck": {
+      "title": "Vi kunne ikke fullføre oppsettet",
+      "message": "Trykk på Prøv igjen, så genererer vi emnene dine på nytt.",
+      "retry": "Prøv igjen",
+      "retryFailedTitle": "Kunne ikke prøve på nytt nå"
+    },
+    "pickBook": {
+      "title": "Velg din første bok",
+      "message": "Velg en bok for å begynne å studere dette emnet.",
+      "cta": "Se bøker"
     }
   },
   "journal": {
@@ -4046,7 +4057,6 @@
       "quiz_personal_best": "Personlig rekord lagret."
     },
     "recaps": {
-      "empty": "Sammendragene fra dine fullførte økter vil vises her.",
       "error": "Kunne ikke laste inn sammendragene dine.",
       "openLabel": "Åpne sammendrag for {{title}}"
     },

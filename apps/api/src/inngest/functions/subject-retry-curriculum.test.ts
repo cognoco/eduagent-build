@@ -526,4 +526,198 @@ describe('subjectRetryCurriculum', () => {
       expect(releaseCall![0].retryClaimedAt).toBeNull();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // [Tier A] Failure-only signal persistence (failedReason / failedAt)
+  // No topics_status column: the only persisted curriculum lifecycle signal is
+  // a terminal FAILURE (failedReason + failedAt). Claim clears any prior
+  // failure (re-dispatch → book derives back to "preparing"); consent-blocked
+  // writes nothing (owned by the consent gate); empty-topics + onFailure set
+  // the failure; release touches only the claim flags; success clears failure
+  // via persistBookTopics.
+  // -------------------------------------------------------------------------
+
+  describe('[Tier A] failure-signal persistence', () => {
+    // Build a db whose update().set() is a single inspectable jest.fn and whose
+    // where() resolves (with .returning() for the claim step).
+    function makeInspectableDb(bookOverrides?: Record<string, unknown>) {
+      const mockDb = makeMockDb(bookOverrides);
+      const updateSet = jest.fn().mockImplementation(() => ({
+        where: jest.fn().mockImplementation(() => {
+          const p: Promise<unknown> & { returning?: jest.Mock } =
+            Promise.resolve(undefined);
+          p.returning = jest.fn().mockResolvedValue([{ id: BOOK_ID }]);
+          return p;
+        }),
+      }));
+      mockDb.update = jest.fn().mockReturnValue({ set: updateSet });
+      return { mockDb, updateSet };
+    }
+
+    it('clears prior failure on claim and does not touch failure fields on release', async () => {
+      const { mockDb, updateSet } = makeInspectableDb();
+      const confirmDb = makeMockDb({ topicsGenerated: true });
+      let callCount = 0;
+      mockGetStepDatabase.mockImplementation(() => {
+        callCount++;
+        return callCount <= 4 ? mockDb : confirmDb;
+      });
+      const { step } = createInngestStepRunner();
+
+      const result = await handler({ event: { data: validPayload() }, step });
+
+      expect(result).toMatchObject({ status: 'retried' });
+
+      // Claim re-dispatch clears any prior terminal failure so the book derives
+      // back to "preparing" — failedReason/failedAt set to null. No persisted
+      // 'generating' flag.
+      const claimCall = updateSet.mock.calls.find(
+        (c) => c[0]?.retryInFlight === true,
+      );
+      expect(claimCall).toBeDefined();
+      expect(claimCall![0]).toMatchObject({
+        retryInFlight: true,
+        failedReason: null,
+        failedAt: null,
+      });
+      expect(claimCall![0]).not.toHaveProperty('topicsStatus');
+
+      // Release only flips the claim flags — it must not touch the failure
+      // signal (success clears it via persistBookTopics).
+      const releaseCall = updateSet.mock.calls.find(
+        (c) => c[0]?.retryInFlight === false,
+      );
+      expect(releaseCall).toBeDefined();
+      expect(releaseCall![0]).not.toHaveProperty('failedReason');
+      expect(releaseCall![0]).not.toHaveProperty('failedAt');
+    });
+
+    it('sets failedReason=empty_topics before throwing, and it survives the finally release', async () => {
+      const { mockDb, updateSet } = makeInspectableDb();
+      mockGetStepDatabase.mockReturnValue(mockDb);
+      mockGenerateBookTopics.mockResolvedValue({ topics: [], connections: [] });
+      const { step } = createInngestStepRunner();
+
+      await expect(
+        handler({ event: { data: validPayload() }, step }),
+      ).rejects.toThrow(NonRetriableError);
+
+      const failedCall = updateSet.mock.calls.find(
+        (c) => c[0]?.failedReason === 'empty_topics',
+      );
+      expect(failedCall).toBeDefined();
+      expect(failedCall![0].failedAt).toBeInstanceOf(Date);
+
+      // The failure write must survive the finally release: the throw
+      // propagates AFTER finally runs, and release does not reset the failure
+      // fields (it only clears the claim flags).
+      const releaseCall = updateSet.mock.calls.find(
+        (c) => c[0]?.retryInFlight === false,
+      );
+      expect(releaseCall).toBeDefined();
+      expect(releaseCall![0]).not.toHaveProperty('failedReason');
+      expect(releaseCall![0]).not.toHaveProperty('failedAt');
+    });
+
+    it('writes NO failure signal when consent is not granted in load-retry-context', async () => {
+      const { mockDb, updateSet } = makeInspectableDb();
+      mockDb.query.consentStates.findFirst.mockResolvedValue({
+        status: 'WITHDRAWN',
+      });
+      mockGetStepDatabase.mockReturnValue(mockDb);
+      const { step } = createInngestStepRunner();
+
+      const result = await handler({ event: { data: validPayload() }, step });
+
+      expect(result).toEqual({
+        status: 'skipped',
+        reason: 'consent_not_granted',
+      });
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      // Consent-blocked is owned by the consent gate, not a curriculum failure:
+      // the handler returns before the claim, so NO update runs at all.
+      expect(updateSet).not.toHaveBeenCalled();
+    });
+
+    it('writes NO failure signal in the in-step gate when consent is withdrawn between steps', async () => {
+      const { mockDb, updateSet } = makeInspectableDb();
+      // load step sees CONSENTED → context 'pending'; in-step gate sees WITHDRAWN.
+      mockDb.query.consentStates.findFirst
+        .mockResolvedValueOnce({ status: 'CONSENTED' })
+        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      mockGetStepDatabase.mockReturnValue(mockDb);
+      const { step } = createInngestStepRunner();
+
+      await handler({ event: { data: validPayload() }, step });
+
+      expect(mockGenerateBookTopics).not.toHaveBeenCalled();
+      // The claim + release updates run (they clear/flip the claim flags), but
+      // the consent-blocked in-step gate must NOT write a failure — no update
+      // sets failedReason to a non-null string.
+      const failureWrite = updateSet.mock.calls.find(
+        (c) => typeof c[0]?.failedReason === 'string',
+      );
+      expect(failureWrite).toBeUndefined();
+    });
+
+    describe('onFailure (retries exhausted)', () => {
+      it('declares an onFailure handler', () => {
+        const opts = (subjectRetryCurriculum as any).opts;
+        expect(typeof opts.onFailure).toBe('function');
+      });
+
+      it('sets failedReason=generation_error when book is unfinished and failedAt is null', async () => {
+        const { mockDb, updateSet } = makeInspectableDb({ failedAt: null });
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const onFailure = (subjectRetryCurriculum as any).opts.onFailure;
+
+        const result = await onFailure({
+          event: { data: { event: { data: validPayload() } } },
+          error: new Error('generation blew up'),
+        });
+
+        const failedCall = updateSet.mock.calls.find(
+          (c) => c[0]?.failedReason === 'generation_error',
+        );
+        expect(failedCall).toBeDefined();
+        expect(failedCall![0].failedAt).toBeInstanceOf(Date);
+        expect(result).toMatchObject({
+          status: 'failed',
+          subjectId: SUBJECT_ID,
+          bookId: BOOK_ID,
+        });
+      });
+
+      it('does not overwrite the failure when failedAt is already set', async () => {
+        const { mockDb, updateSet } = makeInspectableDb({
+          failedAt: new Date('2026-06-01T00:00:00Z'),
+        });
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const onFailure = (subjectRetryCurriculum as any).opts.onFailure;
+
+        await onFailure({
+          event: { data: { event: { data: validPayload() } } },
+          error: new Error('boom'),
+        });
+
+        expect(updateSet).not.toHaveBeenCalled();
+      });
+
+      it('does not write when book is already generated', async () => {
+        const { mockDb, updateSet } = makeInspectableDb({
+          topicsGenerated: true,
+          failedAt: null,
+        });
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const onFailure = (subjectRetryCurriculum as any).opts.onFailure;
+
+        await onFailure({
+          event: { data: { event: { data: validPayload() } } },
+          error: new Error('boom'),
+        });
+
+        expect(updateSet).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

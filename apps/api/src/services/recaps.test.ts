@@ -57,6 +57,7 @@ import {
   getRecapForParent,
   listRecapsForParent,
   listRecapsForProfile,
+  validateRecapItems,
 } from './recaps';
 
 const PARENT_ID = 'a0000000-0000-4000-8000-000000000001';
@@ -392,5 +393,81 @@ describe('listRecapsForProfile — self-scope session mapping', () => {
       childProfileId: VISIBLE_CHILD,
       childDisplayName: 'Learner',
     });
+  });
+
+  it('drops a malformed recap row instead of throwing the whole self-recaps list', async () => {
+    const BAD_SESSION = 'b0000000-0000-4000-8000-000000000777';
+    mockListProfileSessions.mockResolvedValue({
+      sessions: [
+        sessionRow(RECAP_ID),
+        // sessionType outside the enum → recapListItemSchema rejects this row.
+        // Before the per-row hardening the route-level recapsResponseSchema.parse
+        // threw on this single bad row and 500'd the entire self-recaps list.
+        { ...sessionRow(BAD_SESSION), sessionType: 'not-a-real-type' },
+      ],
+      nextCursor: null,
+    });
+
+    const profileDb = {
+      query: {
+        profiles: {
+          findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
+        },
+      },
+    } as unknown as Database;
+
+    const recaps = await listRecapsForProfile(profileDb, VISIBLE_CHILD);
+
+    expect(recaps).toHaveLength(1);
+    expect(recaps[0]).toMatchObject({ recapId: RECAP_ID });
+    expect(recaps.some((recap) => recap.recapId === BAD_SESSION)).toBe(false);
+  });
+});
+
+describe('validateRecapItems', () => {
+  const validRecap = {
+    recapId: RECAP_ID,
+    sessionId: RECAP_ID,
+    childProfileId: VISIBLE_CHILD,
+    childDisplayName: 'Self Learner',
+    subjectId: 'c0000000-0000-4000-8000-000000000001',
+    subjectName: 'Mathematics',
+    topicId: null,
+    topicTitle: null,
+    sessionType: 'learning',
+    startedAt: '2026-05-01T10:00:00.000Z',
+    endedAt: '2026-05-01T10:30:00.000Z',
+    exchangeCount: 5,
+    displayTitle: 'Session',
+    displaySummary: null,
+    highlight: null,
+    narrative: null,
+    conversationPrompt: null,
+    engagementSignal: null,
+    nextTopicTitle: null,
+    nextTopicReason: null,
+  };
+
+  it('keeps schema-valid items and reports invalid ones via onInvalid without throwing', () => {
+    const invalidRecap = { ...validRecap, sessionType: 'not-a-real-type' };
+    const reported: string[] = [];
+
+    const result = validateRecapItems([validRecap, invalidRecap], (error) => {
+      reported.push(error.issues[0]?.path.join('.') ?? '');
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ recapId: RECAP_ID });
+    // The real cause is surfaced to the caller (which logs + captures it),
+    // pointing at the offending field rather than swallowing the failure.
+    expect(reported).toEqual(['sessionType']);
+  });
+
+  it('returns every item unchanged when all are valid', () => {
+    const onInvalid = jest.fn();
+    const result = validateRecapItems([validRecap], onInvalid);
+
+    expect(result).toHaveLength(1);
+    expect(onInvalid).not.toHaveBeenCalled();
   });
 });
