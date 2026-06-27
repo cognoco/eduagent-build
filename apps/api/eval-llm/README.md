@@ -214,10 +214,15 @@ see the seeding note) anchors three verbs:
   declared stale on the very next PR rather than scoring against the wrong model.
   This is the per-PR step in `api-quality-gate.yml` (deterministic, no secrets).
 - **`--check-baseline`** — live grid (needs Doppler `-c stg`), then
-  `compareSimulationBaseline` vs the committed baseline. A reproduced over-credit
-  breach exits 1 (the **hard ceiling**, `overCreditScenarioIds.length === 0`);
-  soft drift beyond tolerance only warns. This is the **weekly** step in
-  `eval-live.yml`.
+  `compareSimulationBaseline` vs the committed baseline. The over-credit ceiling
+  is **reproduce-gated**: a first-pass over-credit is re-tested `REPRODUCE_N=3`×
+  and exits 1 only if it **reproduces** — so a one-off LLM slip does not red CI.
+  It **fails closed**, never open: if the re-test can't fully requalify every
+  offender within the `--max-live-calls` budget, or any re-test round is skipped,
+  the detected breach stands (exit 1) — a breach is never exonerated by missing
+  data. The committed baseline is loaded + validated **before** the paid run, and
+  a 0-round (empty) corpus hard-fails rather than passing green. Soft drift
+  beyond tolerance only warns. This is the **weekly** step in `eval-live.yml`.
 - **`--update-baseline`** — re-seed: runs the grid, writes
   `simulation-baseline.json` via `toBaseline` (stamps the resolved `graderModel`
   + `provenance: 'update-baseline'`). Run this — and commit — whenever the
@@ -300,6 +305,17 @@ The guard refuses to run when:
   profile's conversation language — a deliberate simplification for the
   synthetic pre-screen; language-faithful calibration comes from real-staging
   transcripts (RR-2).
+- **The "production judge" for this grid is the minor-routed model, which may not
+  be the adult judge.** Every challenge-sim scenario is a minor, and the router's
+  under-18 gate resolves BEFORE the `capability:'judge'` branch, so the resolved
+  grader is the age-appropriate approved model — under the current routing that
+  can be the **same family as the tutor** (gpt-oss), not the adult judge
+  (claude-sonnet). This is faithful to what minors actually get in production, but
+  it means the all-minor grid does **not** exercise the adult claude judge; that
+  coverage needs the adult `EvalProfile`s + scenarios tracked as **T13**. The
+  two-model guard still holds (the learner is a distinct family from the grader),
+  so the over-credit measurement remains valid — it is a coverage limit, not a
+  guard bypass.
 
 ## Teaching-quality flow (`teaching-session`)
 

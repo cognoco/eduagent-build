@@ -163,6 +163,10 @@ jobs:
                 `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model openai/gpt-4o --runs 3 --max-live-calls 189 --update-baseline\``,
                 `and commit. A reproduced over-credit breach is a real grader-leniency`,
                 `regression — fix the grader/prompt; do NOT raise the ceiling.`,
+                ``,
+                `Scope: the teaching-session flow is PRE-TEEN/TEEN-BAND PRE-SCREEN`,
+                `ONLY (11–17yo) — it says nothing about under-10 or adult teaching`,
+                `quality. A green run is not all-ages teaching quality.`,
               ].join('\n'),
               labels: ['ci'],
             });

@@ -330,18 +330,22 @@ export function validateBaselineStructure(raw: unknown): {
   }
   const r = rates as Record<string, unknown>;
   // Cross-baseline shape guard (F10): the main-harness baseline lacks these.
-  if (typeof r.underCredit !== 'number') {
+  // Each scalar rate must be a FINITE number — `NaN` is `typeof 'number'`, and a
+  // NaN baseline silently disables the drift channel downstream
+  // (`Math.abs(NaN) > tolerance` is always false), so a corrupted baseline would
+  // pass as "valid" and turn drift detection into a no-op. Reject it here.
+  if (!Number.isFinite(r.underCredit)) {
     return {
       ok: false,
       reason:
-        'missing rates.underCredit (looks like a non-simulation baseline)',
+        'rates.underCredit must be a finite number (missing/NaN — non-simulation or corrupted baseline)',
     };
   }
-  if (typeof r.masteryVerified !== 'number') {
+  if (!Number.isFinite(r.masteryVerified)) {
     return {
       ok: false,
       reason:
-        'missing rates.masteryVerified (looks like a non-simulation baseline)',
+        'rates.masteryVerified must be a finite number (missing/NaN — non-simulation or corrupted baseline)',
     };
   }
   if (
@@ -354,8 +358,30 @@ export function validateBaselineStructure(raw: unknown): {
         'missing rates.signalEmissionByMentor (looks like a non-simulation baseline)',
     };
   }
+  for (const [k, v] of Object.entries(
+    r.signalEmissionByMentor as Record<string, unknown>,
+  )) {
+    if (!Number.isFinite(v)) {
+      return {
+        ok: false,
+        reason: `rates.signalEmissionByMentor[${k}] must be a finite number (got ${String(v)})`,
+      };
+    }
+  }
   if (r.outcome === null || typeof r.outcome !== 'object') {
     return { ok: false, reason: 'missing rates.outcome' };
+  }
+  const outcomeEntries = Object.entries(r.outcome as Record<string, unknown>);
+  if (outcomeEntries.length === 0) {
+    return { ok: false, reason: 'rates.outcome is empty' };
+  }
+  for (const [k, v] of outcomeEntries) {
+    if (!Number.isFinite(v)) {
+      return {
+        ok: false,
+        reason: `rates.outcome[${k}] must be a finite number (got ${String(v)})`,
+      };
+    }
   }
   return { ok: true };
 }
