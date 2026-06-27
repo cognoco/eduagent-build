@@ -1,26 +1,10 @@
 [
   {
-    "file": "docs/plans/2026-05-09-progress-tab-currently-working-on.md",
-    "heading": "Decisions"
-  },
-  {
     "file": "docs/plans/2026-05-19-mobile-lab-macos-setup-plan.md",
     "heading": "Open Decisions"
   },
   {
-    "file": "docs/plans/2026-05-25-agents-claude-md-merge-plan.md",
-    "heading": "Sync mechanism decision"
-  },
-  {
-    "file": "docs/plans/2026-05-30-topic-mastery-three-states.md",
-    "heading": "Key design decisions (locked 2026-05-30)"
-  },
-  {
     "file": "docs/plans/2026-05-31-billing-recovery-learner-capacity.md",
-    "heading": "Product Decisions"
-  },
-  {
-    "file": "docs/plans/2026-05-31-learning-library-cleanup.md",
     "heading": "Product Decisions"
   },
   {
@@ -40,10 +24,6 @@
     "heading": "Product Decisions"
   },
   {
-    "file": "docs/plans/2026-06-09-more-off-nav-home-launched.md",
-    "heading": "Decisions (resolved — no open forks)"
-  },
-  {
     "file": "docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md",
     "heading": "Driver interface (T3 — the shape is the decision)"
   },
@@ -56,15 +36,11 @@
     "heading": "The decisions that are yours"
   },
   {
-    "file": "docs/specs/2026-05-13-parent-child-surfaces-information-architecture.md",
-    "heading": "Technical Decisions"
-  },
-  {
     "file": "docs/specs/2026-05-18-trial-intent-save-onboarding.md",
     "heading": "Decision Log"
   },
   {
-    "file": "docs/specs/2026-05-19-study-and-family-mode-navigation-FULL.md",
-    "heading": "Technical Decisions"
+    "file": "docs/specs/2026-06-27-journal-redesign.md",
+    "heading": "Open decisions (small)"
   }
 ]

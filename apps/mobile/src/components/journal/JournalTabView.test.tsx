@@ -65,7 +65,8 @@ jest.mock(
 );
 
 jest.mock(
-  '../../hooks/use-practice-activity-history' /* gc1-allow: Journal composes the practice-history hook; the endpoint is covered by practice-activity-history.integration.test.ts and the hook mirrors the established useAllNotes RPC pattern */,
+  // gc1-allow: Journal composes the practice-history hook; the endpoint is covered by practice-activity-history.integration.test.ts and the hook mirrors the established useAllNotes RPC pattern
+  '../../hooks/use-practice-activity-history',
   () => ({
     usePracticeActivityHistory: (opts?: { limit?: number; type?: string }) => {
       lastPracticeOpts = opts;
