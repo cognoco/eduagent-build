@@ -29,7 +29,6 @@ import {
   sessionSummaries,
   assessments,
   createScopedRepository,
-  retrievalVerdictEnum,
   type Database,
 } from '@eduagent/database';
 import { MIN_EXCHANGES_FOR_TOPIC_COMPLETION } from '@eduagent/schemas';
@@ -181,10 +180,15 @@ export function isRecallGradeConsistent(
 
 // Exported so the eval harness validates live grader responses against the EXACT
 // contract processRecallTest enforces — one source of truth, no drift mirror.
+// NB: the verdict values are a LITERAL here, not `retrievalVerdictEnum.enumValues`
+// — this schema is constructed at module load, and suites that mock
+// `@eduagent/database` without that export would throw a TypeError on import.
+// The literal stays in lockstep with the pgEnum (4 values); an unknown verdict
+// is rejected → honest fallback, never a crash.
 export const recallGradeJsonSchema = z
   .object({
     quality: z.number().int().min(0).max(5),
-    verdict: z.enum(retrievalVerdictEnum.enumValues),
+    verdict: z.enum(['solid', 'partial', 'missing', 'misconception']),
     rationale: z.string().nullish(),
     misconception: z.string().nullish(),
   })
