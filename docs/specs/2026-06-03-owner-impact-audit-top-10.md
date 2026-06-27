@@ -1,5 +1,7 @@
 # Owner Impact Audit — Top 10 High-Impact Improvements
 
+> **STATUS (2026-06-27):** 1 of 10 top items done (#5 eval gate). Runner-up #14 (migration immutability guard) already existed before the audit. Items #1, #6, #8 are the fast-win batch; #2 is the flagged launch-blocker. Items #3→#4→#7 form the correctness-chain epic, none started. #9 (prompt caching) and #10 (scope guard) unstarted. Runner-up #3 (streak_warning sender) still has no cron. NEXT: batch #1 + #6 + #8, then #2.
+
 **Date:** 2026-06-03
 **Status:** Backlog / not started
 **Source:** Multi-agent codebase audit (9 dimensions: maintainability, teaching engine, review/mastery, feature surface, data/API architecture, test reality, LLM quality/cost, retention loops, compliance/auth gating). 51 raw findings distilled to this ranked top 10 + runners-up.

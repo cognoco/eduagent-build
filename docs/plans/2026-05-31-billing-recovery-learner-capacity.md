@@ -9,6 +9,8 @@ gap_ids: [billing-3, billing-4, notif-3]
 
 # Billing Recovery and Learner Capacity - Implementation Plan
 
+> **STATUS (2026-06-27):** PARKED — nothing shipped; the T1/T2 do-now carve was deferred. Re-triage before acting.
+
 > ## ⏸️ STATUS — PARKED (last reviewed 2026-06-08)
 >
 > **Do not implement yet.** Waiting on the identity/backend rework

@@ -1,4 +1,7 @@
 # Paths 6+8 — Recitation + Dictation: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — #1 (dictation personalization via `fetchGenerateContext`) and #2 (60s filing-wait bypass for recitation) shipped; voice-first compliance wording, `subjects[0]` pollution, Beta gating, and OCR items still open.
+
 > Cluster scope: Path 6 (Recitation Beta, in-session) + Path 8 (Dictation, standalone activity) — the two practice activities with the weakest integration · Analyst: paths68 · Date 2026-06-10 · Sources verified at HEAD of `new-llm`
 
 **Method note.** Every claim below was re-derived from source on `new-llm`; `learning-path-flows.md`, the atlas, and the proposed/diff docs were used only as leads. Where they diverge from code, the code wins and the divergence is flagged in §4. Two of the brief's cited paths were wrong (`hooks/use-subject-classification.ts` → actually `components/session/use-subject-classification.ts`; `text-preview.tsx` `ocrText` reader → **does not exist**, see §4).

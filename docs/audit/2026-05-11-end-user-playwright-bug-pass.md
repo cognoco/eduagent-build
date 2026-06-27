@@ -2,6 +2,8 @@
 
 # End-User Playwright Bug Pass - 2026-05-11
 
+> **STATUS (2026-06-27):** EUPW-2 fixed, EUPW-1 mitigated (splash layer hardening); W-05 unverified. Per-item status in the table below.
+
 Date: 2026-05-11
 Branch: `parent-profile-carveout`
 Scope: Expo web app with seeded single learner and seeded parent-with-children accounts.

@@ -1,4 +1,7 @@
 # Path 7 + Assessment + Interleaved — Quiz & Self-Test Surfaces: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — T2 (Quiz XP ledger wiring), T6 (`gap_fill` chrome fix), and prefetch dead-code deletion done; T1 (missed-items visibility), T3 (Interleaved mobile caller), and T4 still open.
+
 > Cluster scope: Quiz mini-game (Capitals/Guess-Who/Vocabulary), the Assessment verification-depth ladder (recall→explain→transfer), the three parallel retention universes (`retention_cards` vs `vocabulary_retention_cards` vs `quiz_mastery_items`), the dormant Interleaved Retrieval engine, and the `gap_fill` spawn. · Analyst: quiz · Date 2026-06-10 · Sources verified at HEAD of `new-llm`.
 
 VERIFIED = read in source this session. INFERRED = reasoned from verified facts, not directly observed. Line numbers cited from HEAD of `new-llm`.

@@ -8,6 +8,8 @@ status: draft
 
 # S0-R Retention Gate — `applyRetentionUpdate()` core-SRS chokepoint — Implementation Plan
 
+> **STATUS (2026-06-27):** IMPLEMENTED. `applyRetentionUpdate()` chokepoint exists in `apps/api/src/services/apply-retention-update.ts` and routes all ~11 `retention_cards` writers. T12 reward decoupling (`syncRewardStatusFromRetention`) done. No remaining scope.
+
 > Synced to spec amendment 2026-06-10; amended 2026-06-13 (§2.1/§2.2 earned motivation — XP/practice points and reflection bonus are retained; coercive presentation is removed). See **T12** + the `## Rollback` reward-decoupling subsection.
 
 **Goal:** Introduce a single new chokepoint function `applyRetentionUpdate()` in

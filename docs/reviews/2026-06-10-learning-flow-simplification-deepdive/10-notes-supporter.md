@@ -1,4 +1,7 @@
 # Notes + Bookmarks + Supporter Surfaces: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — C2 (bookmarks `topicId` nullable wiring) done; C1 (saved-stuff surface collapse) pending; C4 (supporter digest) blocked on V2 shell S3/S4.
+
 > Cluster scope: Notes (4 creation routes) · Bookmarks · the "saved stuff" surfaces · supporter/parent surfaces (ParentHomeScreen, Recaps tab, `child/*` stack, clone-from-child) · Analyst: notes-supporter · Date 2026-06-10 · Sources verified at HEAD of `new-llm`
 
 All claims tagged **VERIFIED** (read the file:line) or **INFERRED** (reasoned from verified facts). file:line on every load-bearing claim.

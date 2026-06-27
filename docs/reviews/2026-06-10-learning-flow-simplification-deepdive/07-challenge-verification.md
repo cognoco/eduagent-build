@@ -1,4 +1,7 @@
 # Challenge Round + Verification Overlays: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — `validateNoteDraft` hallucination guard built (still unwired, no production caller); Challenge Round dark in prod (`CHALLENGE_ROUND_RUNTIME_ENABLED=false`); age-gate, C3, and C4 decisions still pending.
+
 > Cluster scope: Challenge Round (flag-gated, `CHALLENGE_ROUND_RUNTIME_ENABLED=false`) + the two LIVE mid-session verification overlays — Devil's Advocate (`evaluate`) and Feynman (`teach_back`). The in-session checking mechanisms. · Analyst: checks · Date 2026-06-10 · Sources verified at HEAD of `new-llm` (read-only).
 
 **Verification key:** VERIFIED = read in source at the cited file:line at HEAD. INFERRED = reasoned from verified facts, not directly observed.

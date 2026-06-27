@@ -1,5 +1,7 @@
 # The Forever Notebook — North Star & Roadmap
 
+> **STATUS (2026-06-27):** Slice 1 (concept capture) PARKED — same gate as concept-capture-layer-design.md. Slices 2-5 not started; their Roadmap/Parked labels are accurate. The Grounding section still correctly describes the shipped baseline. Working as designed (living north star). NEXT: un-park Slice 1 after the identity reset; weigh Slice 2 once Slice 1 captures real data.
+
 **Status:** Vision · 2026-06-08 · **Branch:** `conceptgrain` · **First slice:** [concept-capture layer](./2026-06-08-concept-capture-layer-design.md) · **Grain decision:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md)
 
 > This is the durable home for the design dialogue behind the concept-grain work. The concept-capture spec is **slice 1** of this vision; everything below it is roadmap. Nothing here is committed scope except where a linked spec exists.

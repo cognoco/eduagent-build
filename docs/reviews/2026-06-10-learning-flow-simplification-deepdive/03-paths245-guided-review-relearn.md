@@ -1,5 +1,7 @@
 # Paths 2+4+5 — Guided / Review / Relearn: Deep-Dive
 
+> **STATUS (2026-06-27):** Partial — no SHIP-NOW items done; C1 (relearn method-picker cosmetic removal), C3 (orphaned recall-test screen deletion), and C4 (CTA intent copy) still open.
+
 > Cluster scope: the "study this topic again" complex — Path 2 (Guided Learning), Path 4 (Practice/Review), Path 5 (Retention Relearn), plus the orphaned recall-test screen and the merge question at their centre. · Analyst: paths245 · Date 2026-06-10 · Sources verified at HEAD of `new-llm`.
 
 **Verification key:** `[V]` = read the source line(s) myself this session; `[I]` = inferred from verified facts (reasoning stated).

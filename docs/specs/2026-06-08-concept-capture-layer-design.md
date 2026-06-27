@@ -1,5 +1,7 @@
 # Concept-Capture Layer — Additive Concept-Grain Mastery
 
+> **STATUS (2026-06-27):** PARKED — migration 0107 is reference-only; the profiles→person rename (MMT-ADR-0012 one-time reset) has not yet executed (profiles table still exists), so the tables aren't live. Write side gated `CONCEPT_CAPTURE_ENABLED=false`. Read side (API /notes/concept-mastery + mobile NoteDisplay star/additions) is wired and works once tables exist. Scope items 5 (concept-targeted review) + 6 (note-correctness notification) not built. NEXT: re-home concepts/concept_mastery into the post-reset baseline (FKs→person), regenerate the migration, flip the flag.
+
 **Status:** Draft · 2026-06-08 · **Branch:** `conceptgrain` · **Decision record:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md)
 
 > **Rev. 2026-06-08 (post-review):** capture reads the enriched evaluation list (not the `MasteryDecision`, which drops `missing`); `concept_mastery.supersededAt` added so a stale near-duplicate concept can't permanently suppress a note's star; correction surfacing scoped to neutral topic-level framing pending note↔concept attribution; the note-correctness nudge is deduped against the review-due nudge; the note star resolves to **three** states (not-yet-assessed / verified / tutor-has-additions), never a two-way present/absent split, so an un-assessed note is never visually identical to one with a weak concept (legibility, north-star Invariant 6).

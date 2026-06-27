@@ -10,6 +10,8 @@ revised: 2026-06-09 (end-user critique + 80/20 carve folded in — see Review Hi
 
 # Notification Reachability and Nudges - Implementation Plan
 
+> **STATUS (2026-06-27):** Do-now T1-T3 (reachability copy/surfacing) shipped; the deferred nudge-engine work T4-T6 not built.
+
 ## ⏱ At a glance — read this header before re-opening the plan
 
 > **What it is.** Two unrelated things bundled in one doc: (A) a *bug-fix* that

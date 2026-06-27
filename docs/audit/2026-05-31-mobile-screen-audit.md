@@ -1,5 +1,7 @@
 # Mobile Screen Assumption-Breaker Audit — 2026-05-31
 
+> **STATUS (2026-06-27):** Mostly open — mic/audio resource-leak findings (dictation, homework camera) and majority of 118 findings not yet addressed; treat as active work backlog.
+
 Audit method: `/my:deep-bugfixing` skill (5-category assumption audit — navigation, layout, data shape, platform, timing) run by 7 parallel agents across 44 core learner/parent screens. Read-only, no code changes in this PR.
 
 **Total findings: 118** (39 high-impact, 40 medium, 39 low)

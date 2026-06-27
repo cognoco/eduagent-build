@@ -1,5 +1,7 @@
 # Logical-Gap Audit — Missing Flows & Dead-Ends
 
+> **STATUS (2026-06-27):** Audit backlog — findings tracked inline below; not wholesale re-verified in the 2026-06-27 doc-audit pass; treat per-item status as point-in-time.
+
 > Generated 2026-05-31 by a 10-domain x 5-persona multi-agent sweep with adversarial verification.
 > 54 candidate gaps found -> **36 confirmed** (survived a refute pass), 18 refuted.
 > A "logical gap" = a plausible user intent with **no path** through the system, or a path that **dead-ends with no recovery**. Not styling, not crashes.

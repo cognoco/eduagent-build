@@ -1,5 +1,7 @@
 # Persona Copy And Store Compliance Triage
 
+> **STATUS (2026-06-27):** Most items addressed or stale; PC-2 (product/UX call on subscription warning) and SC-1 (privacy policy DNS) remain open.
+
 Date: 2026-05-15
 
 Status: checkpoint for follow-up implementation. This file captures the two read-only subagent reports so the work is durable before new agents continue.

@@ -1,5 +1,7 @@
 # Goal Spike — Cross-Agent Idea Analysis
 
+> **STATUS (2026-06-27):** #7 done; #5/#9/#3 open.
+
 Source: [`goal-spike.md`](goal-spike.md) — five agent/model combinations each proposed ranked ideas for a `/goal` showcase.
 
 ## Agent Key

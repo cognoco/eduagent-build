@@ -13,6 +13,8 @@ relates:
 
 # Review & Re-learn — Findings + High-Impact Learning To-Dos
 
+> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 13 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: RR-1 + RR-13 thread → RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
+
 ## Purpose
 
 Capture the full verified state of how **review** and **re-learn** work in EduAgent

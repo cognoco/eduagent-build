@@ -1,5 +1,7 @@
 # /goal Spike: GC1 Internal Mock Drain (API) — Claude Code Edition
 
+> **STATUS (2026-06-27):** Mock-drain executed; formal exit metric (shadow-count = 0) not re-run as of this date.
+
 ## Goal Statement
 
 Eliminate all **shadow internal mocks** from API test files. A shadow mock is `jest.mock('./relative-path', ...)` whose factory returns a fully synthetic module — no `jest.requireActual()` call, no spread of the real module. Shadow mocks hide real bugs because the test exercises only the fake.

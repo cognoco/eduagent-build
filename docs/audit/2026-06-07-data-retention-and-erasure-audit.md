@@ -1,5 +1,7 @@
 # Data Retention & Erasure — Code-Verified Audit
 
+> **STATUS (2026-06-27):** Partial — R1/R2/A24-a resolved (2026-06-08); R3 (orphaned org row/BYOK email) and embeddings-erasure gate (cross-ref review C6) remain open.
+
 **Date:** 2026-06-07
 **Trigger:** Compliance question — "the mentor remembers what the student has learned, and chat transcripts are kept for 30 days. Is the surviving learning memory a GDPR problem?"
 **Method:** Source-of-truth code audit (DB schema FK behaviour + deletion flows + purge cron), not policy-doc reading. All claims carry `file:line`.

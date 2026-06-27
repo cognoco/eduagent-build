@@ -1,5 +1,7 @@
 # Path 1 — Freeform Chat: Deep-Dive
 
+> **STATUS (2026-06-27):** IMPLEMENTED — freeform path shipped; retained in the deepdive set because 00-INDEX references it.
+
 > Cluster scope: Freeform "Ask Anything" — first-message subject classification (CFLF), the filing machinery (≥5-exchange close-path auto-file, MMT-ADR-0021), and the freeform note CTA / "cannot-save" trap. · Analyst: path1 · Date 2026-06-10 · Sources verified at HEAD of `new-llm` (branch confirmed via `git branch --show-current`).
 
 All `file:line` cites verified against source unless marked **INFERRED**. Path 1 logic does **not** live in `session/index.tsx` as the brief's line hints suggested — the classification engine is `apps/mobile/src/components/session/use-subject-classification.ts`; index.tsx only wires the disabled-state. Corrections in §4.

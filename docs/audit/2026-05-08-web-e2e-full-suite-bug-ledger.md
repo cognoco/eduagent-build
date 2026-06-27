@@ -2,6 +2,8 @@
 
 # Web E2E Full-Suite Bug Ledger — 2026-05-08
 
+> **STATUS (2026-06-27):** Living bug ledger — some items fixed (J-10, J-19, W-01/W-04); J-05/09/11/12/13/17 remain runtime-unverified. Per-item status tracked inline below.
+
 **Run date:** 2026-05-08
 **Command:** `C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web`
 **Result:** 16 passed, 14 failed

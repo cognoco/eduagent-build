@@ -1,5 +1,7 @@
 # Agent Suggestions
 
+> **STATUS (2026-06-27):** Living spike backlog — #7/#13/#15/#16 done; ~16 workstreams still open. Per-item status tracked inline below.
+
 ## Hermes - Qwen3.6-plus
 Here are identified use cases ranked by suitability for a /goal showcase:
     

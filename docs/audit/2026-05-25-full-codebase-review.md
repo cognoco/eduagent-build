@@ -1,5 +1,7 @@
 # Full Codebase Review — 2026-05-25
 
+> **STATUS (2026-06-27):** Audit backlog — findings tracked inline below; not wholesale re-verified in the 2026-06-27 doc-audit pass; treat per-item status as point-in-time. Mix of fixed (marked [FIXED]) and open items.
+
 Branch: `date-notionbugfix` (from `origin/main` at `9dcc4b906`)
 Reviewers: 15 parallel Sonnet lenses. Total raw findings: ≈ 182.
 Verification deep-dive: 1 (L15-001).

@@ -1,5 +1,7 @@
 # Single Learner UX Pass
 
+> **STATUS (2026-06-27):** SL-UX-07/09/10 fixed; SL-UX-01 and 03/04/05/06/08 remain open.
+
 Date: 2026-05-11
 
 Method: Seeded single-learner Playwright crawl using the web build, then visual inspection of captured screenshots in `apps/mobile/e2e-web/test-results/manual-learner-ux/`. The first action-click run exposed a blocker on the Home practice action, so the coverage run used direct navigation for breadth.

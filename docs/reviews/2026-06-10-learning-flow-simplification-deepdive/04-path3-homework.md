@@ -1,4 +1,7 @@
 # Path 3 — Homework Help: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — C2 (sub-mode default `undefined`) pre-existing; C3 (OCR spinner escape) partial; C1 (auto-file on close) and C4 (Recall Bridge trigger on submit path) still open.
+
 > Cluster scope: camera capture · OCR cascade · subject auto-classify · homework session (sub-modes, multi-problem state) · exit filing prompt · Recall Bridge · homework-state sync · parent homeworkSummary. · Analyst: path3 · Date 2026-06-10 · Sources verified at HEAD of `new-llm` (`git branch --show-current` = `new-llm`).
 
 Legend: **[V]** = verified by reading source at HEAD · **[I]** = inferred from naming/structure, not line-proven.

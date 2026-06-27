@@ -8,6 +8,8 @@ status: draft
 
 # S0 — Backend Primitives — Implementation Plan
 
+> **STATUS (2026-06-27):** IMPLEMENTED (core). `mentor_activity_ledger` table + RLS, `writeActivityMoment` writer, deterministic `GET /now` + `/now/overflow`, ranking service, `MMT-ADR-0022`, and `MODE_NAV_V2_ENABLED` API env var all landed. PARTIAL on the producer sweep: only `session_filed` and `snapshot_ready` wired to the ledger (~2 of ~7 producers); `milestone_reached`, `recap_ready`, `topic_mastered`, `retention_due`, and `needs_deepening_added` not yet wired. NEXT: finish the remaining producers before any consumer depends on ledger moments beyond those two.
+
 **Goal:** Ship three identity-independent, dark backend primitives the mentor-is-the-app shell needs — an append-only `mentor_activity_ledger` table keyed by `profileId`, a best-effort non-throwing writer helper, and a deterministic `GET /now` ranked feed (no LLM in the ranking path) that reads `retention_cards` / `parking_lot_items` / `needs_deepening_topics` / `learning_sessions` / `assessments` / the ledger as-is.
 
 > Synced to spec amendment 2026-06-10 (§2 P5 route-catalog target, §2 superseded LLM-ranked-feed note).

@@ -1,5 +1,7 @@
 # Learning-Flow Simplification Deep-Dive — Synthesis & Ranking
 
+> **STATUS (2026-06-27):** Partial — W1 items #1/#5/#6/#8/#10 and W2 #13 done; remaining SHIP-NOW items open. See per-path files 01–10 for current status per cluster.
+
 **Date:** 2026-06-10 · **Branch:** `new-llm` · **Method:** 10 parallel read-only Opus analysts, one per flow cluster; every claim re-verified in source with file:line (dossiers `01`–`10` in this directory carry the evidence). Inputs: `docs/flows/learning-path-flows.md` (trusted current-state map), the 2026-06-09 codebase atlas, and the ratified [mentor-is-the-app shell spec](../../specs/2026-06-09-mentor-is-the-app-shell-redesign.md).
 
 **Why this exists.** The earlier `learning-path-flows-proposed.md` + `learning-path-flows-diff-analysis.md` were directionally interesting but unverified. This deep-dive re-derives the simplification question from code: per flow, what actually exists, what is load-bearing vs incidental, and which simplifications are REAL — classified as **SHIP-NOW** (shell-independent), **SPEC-ABSORBED** (already ruled by the mentor-is-the-app spec — sequence it, don't re-decide it), or **MIRAGE/CONFLICTS** (refuted by code or contradicts a ratified ruling).

@@ -1,4 +1,7 @@
 # Session Close → Summary → Pipeline + Mode Taxonomy: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — C1 (idempotency nuance documented and confirmed) done; C2 (recap-poll latency reduction) and C6 (GDPR embeddings-gate) still open.
+
 > Cluster scope: session close → Summary screen → the `session-completed` Inngest pipeline + the 7-string UI mode taxonomy · Analyst: pipeline · Date 2026-06-10 · Sources verified at HEAD of `new-llm` (`git branch --show-current` = `new-llm`)
 
 All file:line citations re-verified against source this session. VERIFIED = I read the line. INFERRED = reasoned from verified facts. Where the current doc (`learning-path-flows.md`) or the atlas is wrong at HEAD, §4 gives file:line proof.

@@ -1,5 +1,7 @@
 # Test Mock Audit
 
+> **STATUS (2026-06-27):** A4/A5 done; A1 partial; A2 (~76 unit files using createMockDb) highest-risk item still open; A3 not done.
+
 **Date**: 2026-05-12
 **Scope**: `apps/api`, `apps/mobile`, `tests/integration`, `packages/*`
 

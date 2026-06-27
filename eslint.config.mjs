@@ -39,7 +39,7 @@ export default [
     },
   },
   {
-    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**', '.agents/**', '.claude/**'],
+    ignores: ['**/dist', '**/out-tsc', '**/coverage', '**/.nx', '**/.wrangler', 'design_handoff_ui_improvements/**', 'docs/_archive/**', '.agents/**', '.claude/**'],
   },
   // -------------------------------------------------------------------------
   // GC1 — warn on jest.mock() of internal (relative-path) modules. Internal

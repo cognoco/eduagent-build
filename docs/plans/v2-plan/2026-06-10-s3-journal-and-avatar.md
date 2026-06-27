@@ -9,6 +9,8 @@ gated_on: product-risk waiver recorded 2026-06-14; no observed-cohort evidence b
 
 # S3 — Journal Tab + Avatar Admin Split + Park-and-Return Eval Coverage — Implementation Plan
 
+> **STATUS (2026-06-27):** IMPLEMENTED. Journal tab, `AccountAdminSheet` + `AccountAvatar` (settings/billing/security behind avatar, owner-gating intact), and park-and-return P3 evals (`park-and-return-ranking.ts` + `park-and-return-reweave.ts`) registered. Satisfies S6 gate (a) — P3 deterministic-ranking gate. No remaining scope.
+
 > **Synced to spec amendment 2026-06-10 (§2.1 mentor character + celebration, §16 voice, §15.17 motivation) and amended 2026-06-13 for earned reward history + learner-authored reflection artifacts.**
 
 > **NO-COHORT RULING — READ FIRST.** The original S3 plan was gated on S1+S2 observed-cohort evidence (spec §11 / §13.6). Product ruled on 2026-06-14 that no S2/S3 cohort evidence data will exist before this work. The gate is removed as an execution blocker rather than treated as passed. S3 proceeds as an explicit product-risk choice behind `MODE_NAV_V2_ENABLED` — **`MODE_NAV_V2_ENABLED` = the V2 three-tab shell build flag; from `EXPO_PUBLIC_ENABLE_MODE_NAV_V2`; reserved API-side at S0 T9, consumed mobile-side at S1; dev/preview/staging-OTA on, prod off**. This ruling does not authorize S6 deletions.

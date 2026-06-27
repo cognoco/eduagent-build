@@ -1,4 +1,7 @@
 # Path 0 — Learn Something New: Deep-Dive
+
+> **STATUS (2026-06-27):** Partial — W1 #8 (`/ready` skip already active for four_strands) confirmed; C1 (drop `/ready` for all returning users) and C6 (`MATCHER_ENABLED` topic-intent matcher) still open.
+
 > Cluster scope: create-subject / first-curriculum onboarding-to-first-session (the "Learn something new" cold-start gauntlet). · Analyst: path0 · Date 2026-06-10 · Sources verified at HEAD of `new-llm`.
 
 All file:line citations below are **VERIFIED** (file read in this session) unless tagged **INFERRED**. The trusted map is `docs/flows/learning-path-flows.md` §"Path 0"; the proposed/diff docs are mined for ideas only and independently re-verified.

@@ -1,5 +1,7 @@
 # Open-decision ledger — with recommendations
 
+> **STATUS (2026-06-27):** Mostly current, but §13.6 (cohort/segmentation) is stale vs the 2026-06-14 no-cohort ruling — cross-check §13.6 against that decision before relying on it.
+
 > Every unresolved decision across the spec (§13), the plan set, and the audit —
 > each with what it blocks and a concrete recommendation, so each one is a ruling,
 > not a research task. Sources: spec §13 (lines 329–337), `v2-plan/00-README.md`

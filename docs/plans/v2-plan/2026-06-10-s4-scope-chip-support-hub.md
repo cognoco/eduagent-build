@@ -8,6 +8,8 @@ status: draft
 
 # S4 — Scope Chip + Support Hub + Person Scopes + Structural Rendering Mask — Implementation Plan
 
+> **STATUS (2026-06-27):** PARTIAL. Landed: scope schema/resolution, supporter structural mask, `ScopeChip` + scope-context, Support hub tabs, person-scope structural subjects, `/now` extended to supporter scope, `MMT-ADR-0024` (scope-chip). MISSING (verified absent): `apps/api/src/services/supporter-co-learning.ts`, `apps/mobile/src/app/(app)/support/SupporterColdStart.tsx`, `SupporterSelfLearningDoorway.tsx`, and `CoLearningDoorway.tsx`. NEXT: build the cold-start and co-learning doorway surfaces before S5 can proceed.
+
 > Synced to spec amendment 2026-06-10 (§3.2 supporter cold-start, §4.2 pointer module, §15.18) and amended 2026-06-13 for first-class supporter/adult self-learning and contextual co-learning.
 
 > **Challenge amendments (2026-06-20, resolves `WI-782` plan contradiction).** `MMT-ADR-0022` is binding for S4: do **not** add `mentor_activity_ledger.edge_id`, do **not** write `visibility='supporter'`, and do **not** materialize supporter moments into the ledger. Supporter visibility is derived from the active `supportership` edge at read time. S4 may add only narrow view-state / carrier storage that records UI state for a derived source (surfaced/snoozed/dismissed) or the non-reconstructable supporter-authored encouragement text; neither is an event-of-record and neither stores a visibility policy. See [`MMT-ADR-0022`](../../adr/MMT-ADR-0022-activity-ledger-narration-substrate.md).
