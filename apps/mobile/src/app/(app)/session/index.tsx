@@ -26,6 +26,7 @@ import {
   FluencyDrillStrip,
   type ChatMessage,
 } from '../../../components/session';
+import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
 import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
   useStreamMessage,
@@ -1519,6 +1520,15 @@ function SessionScreenInner() {
         backBehavior={chatBackFallback ? 'replace' : undefined}
         onBackPress={handleChatBackPress}
         messages={messages}
+        firstSessionGreeting={
+          isFirstSession ? (
+            <FirstSessionGreeting
+              name={activeProfile?.displayName}
+              subject={subjectName ?? undefined}
+              interest={learnerProfile?.interests?.[0]?.label}
+            />
+          ) : undefined
+        }
         onSend={handleSend}
         isStreaming={isStreaming}
         inputDisabled={

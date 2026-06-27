@@ -777,7 +777,13 @@
       "a11yMessageInput": "Message input",
       "a11yEnableVoice": "Enable voice message",
       "a11ySendMessage": "Send message",
-      "a11yVoiceErrorHint": "Tap to retry voice input"
+      "a11yVoiceErrorHint": "Tap to retry voice input",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hi {{name}}. You're here to work on {{subject}} — and since you're into {{interest}}, I'll reach for examples that actually connect. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
+        "withNameSubject": "Hi {{name}}. You're here to work on {{subject}}. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
+        "withName": "Hi {{name}}. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?",
+        "generic": "Hi. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?"
+      }
     },
     "messageBubble": {
       "thinking": "Thinking",

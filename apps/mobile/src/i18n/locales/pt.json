@@ -777,7 +777,13 @@
       "a11yMessageInput": "Entrada de mensagem",
       "a11yEnableVoice": "Ativar mensagem de voz",
       "a11ySendMessage": "Enviar mensagem",
-      "a11yVoiceErrorHint": "Toque para repetir a entrada de voz"
+      "a11yVoiceErrorHint": "Toque para repetir a entrada de voz",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Olá, {{name}}. Você está aqui para praticar {{subject}} — e como você gosta de {{interest}}, vou usar exemplos que tenham a ver com isso. Pode me perguntar sobre qualquer coisa que você esteja aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Por onde vamos começar com {{subject}}?",
+        "withNameSubject": "Olá, {{name}}. Você está aqui para praticar {{subject}}. Pode me perguntar sobre qualquer coisa que você esteja aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Por onde vamos começar com {{subject}}?",
+        "withName": "Olá, {{name}}. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?",
+        "generic": "Olá. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",

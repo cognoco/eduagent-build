@@ -783,7 +783,13 @@
       "a11yMessageInput": "Wpisz wiadomość",
       "a11yEnableVoice": "Włącz wiadomość głosową",
       "a11ySendMessage": "Wyślij wiadomość",
-      "a11yVoiceErrorHint": "Stuknij, aby ponowić wprowadzanie głosowe"
+      "a11yVoiceErrorHint": "Stuknij, aby ponowić wprowadzanie głosowe",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Cześć, {{name}}. Jesteś tu, żeby popracować nad {{subject}} — a ponieważ interesujesz się {{interest}}, postaram się podawać przykłady, które do tego nawiązują. Pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego zaczniemy z {{subject}}?",
+        "withNameSubject": "Cześć, {{name}}. Jesteś tu, żeby popracować nad {{subject}}. Pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego zaczniemy z {{subject}}?",
+        "withName": "Cześć, {{name}}. Jestem Twoim mentorem — pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego chcesz zacząć?",
+        "generic": "Cześć. Jestem Twoim mentorem — pytaj mnie o wszystko, czego się uczysz, nad czym pracujesz lub co Cię ciekawi. Masz 10 darmowych pytań dziennie i 100 miesięcznie. Od czego chcesz zacząć?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",

@@ -750,7 +750,13 @@
       "a11yMessageInput": "Meldingsfelt",
       "a11yEnableVoice": "Aktiver talemelding",
       "a11ySendMessage": "Send melding",
-      "a11yVoiceErrorHint": "Trykk for å prøve stemmeinndata på nytt"
+      "a11yVoiceErrorHint": "Trykk for å prøve stemmeinndata på nytt",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hei {{name}}. Du er her for å jobbe med {{subject}} — og siden du er interessert i {{interest}}, skal jeg finne eksempler som er relevante for deg. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
+        "withNameSubject": "Hei {{name}}. Du er her for å jobbe med {{subject}}. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
+        "withName": "Hei {{name}}. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
+        "generic": "Hei. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",

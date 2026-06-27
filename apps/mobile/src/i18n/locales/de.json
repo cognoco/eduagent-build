@@ -750,7 +750,13 @@
       "a11yMessageInput": "Nachrichteneingabe",
       "a11yEnableVoice": "Sprachnachricht aktivieren",
       "a11ySendMessage": "Nachricht senden",
-      "a11yVoiceErrorHint": "Tippen, um Spracheingabe zu wiederholen"
+      "a11yVoiceErrorHint": "Tippen, um Spracheingabe zu wiederholen",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hi {{name}}. Du bist hier, um an {{subject}} zu arbeiten – und da du dich für {{interest}} interessierst, werde ich Beispiele suchen, die dazu passen. Frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit sollen wir bei {{subject}} anfangen?",
+        "withNameSubject": "Hi {{name}}. Du bist hier, um an {{subject}} zu arbeiten. Frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit sollen wir bei {{subject}} anfangen?",
+        "withName": "Hi {{name}}. Ich bin dein Mentor – frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit möchtest du anfangen?",
+        "generic": "Hi. Ich bin dein Mentor – frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit möchtest du anfangen?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",

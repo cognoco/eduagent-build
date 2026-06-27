@@ -750,7 +750,13 @@
       "a11yMessageInput": "Entrada de mensaje",
       "a11yEnableVoice": "Activar mensaje de voz",
       "a11ySendMessage": "Enviar mensaje",
-      "a11yVoiceErrorHint": "Toca para reintentar la entrada de voz"
+      "a11yVoiceErrorHint": "Toca para reintentar la entrada de voz",
+      "firstSessionGreeting": {
+        "withNameSubjectInterest": "Hola, {{name}}. Estás aquí para practicar {{subject}}, y como te interesa {{interest}}, usaré ejemplos que tengan que ver. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
+        "withNameSubject": "Hola, {{name}}. Estás aquí para practicar {{subject}}. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
+        "withName": "Hola, {{name}}. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?",
+        "generic": "Hola. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?"
+      }
     },
     "filingFailed": {
       "retryInProgress": "Ya hay un reintento en curso.",
