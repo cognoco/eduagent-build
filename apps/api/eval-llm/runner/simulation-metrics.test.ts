@@ -1,7 +1,15 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { aggregate, writeCorpus, type SimMetrics } from './simulation-metrics';
+import {
+  aggregate,
+  compareSimulationBaseline,
+  toBaseline,
+  validateBaselineStructure,
+  writeCorpus,
+  type SimMetrics,
+  type SimulationBaseline,
+} from './simulation-metrics';
 import type { SimulatedRoundResult } from './simulated-conversation';
 import type {
   MasteryDecision,
@@ -41,13 +49,14 @@ function makeResult(p: {
   marked: boolean;
   expected: SimulatedRoundResult['expectedOutcome'];
   signalEmitted: boolean;
-  mentorModel: string;
+  graderModel: string;
   evaluations?: ChallengeRoundEvaluationItem[];
+  scenarioId?: string;
 }): SimulatedRoundResult {
   return {
-    scenarioId: 'CRS-test',
+    scenarioId: p.scenarioId ?? 'CRS-test',
     profileId: '12yo-dinosaurs',
-    mentorModel: p.mentorModel,
+    graderModel: p.graderModel,
     learnerModel: 'anthropic/claude-3.5-sonnet',
     transcript: [],
     evaluations: p.evaluations ?? [],
@@ -66,7 +75,7 @@ describe('aggregate', () => {
         marked: true,
         expected: 'partial',
         signalEmitted: true,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
         evaluations: [evalItem('solid'), evalItem('solid')],
       }),
       // under-credited: gate partial, ground truth was verified
@@ -75,7 +84,7 @@ describe('aggregate', () => {
         marked: false,
         expected: 'verified',
         signalEmitted: true,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
         evaluations: [evalItem('partial')],
       }),
       // correct verified
@@ -84,7 +93,7 @@ describe('aggregate', () => {
         marked: true,
         expected: 'verified',
         signalEmitted: true,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
       }),
       // signal-dropped round
       makeResult({
@@ -92,7 +101,7 @@ describe('aggregate', () => {
         marked: false,
         expected: 'partial',
         signalEmitted: false,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
       }),
     ];
 
@@ -128,14 +137,14 @@ describe('aggregate', () => {
         marked: false,
         expected: 'verified',
         signalEmitted: false,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
       }),
       makeResult({
         outcome: 'verified',
         marked: true,
         expected: 'verified',
         signalEmitted: true,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
       }),
     ];
     const m = aggregate(results);
@@ -152,27 +161,57 @@ describe('aggregate', () => {
         marked: false,
         expected: 'partial',
         signalEmitted: false,
-        mentorModel: 'gpt-oss-120b',
+        graderModel: 'gpt-oss-120b',
       }),
     ]);
     expect(m.underCreditRate).toBe(0);
   });
 
-  it('separates signalEmissionRate per mentor model', () => {
+  it('lists exactly the ids that over-credit in overCreditScenarioIds', () => {
+    const m = aggregate([
+      makeResult({
+        scenarioId: 'OVER-1',
+        outcome: 'verified',
+        marked: true,
+        expected: 'partial',
+        signalEmitted: true,
+        graderModel: 'production-routing',
+      }),
+      makeResult({
+        scenarioId: 'OK-deserved',
+        outcome: 'verified',
+        marked: true,
+        expected: 'verified',
+        signalEmitted: true,
+        graderModel: 'production-routing',
+      }),
+      makeResult({
+        scenarioId: 'UNDER-1',
+        outcome: 'reteach',
+        marked: false,
+        expected: 'verified',
+        signalEmitted: true,
+        graderModel: 'production-routing',
+      }),
+    ]);
+    expect(m.overCreditScenarioIds).toEqual(['OVER-1']);
+  });
+
+  it('separates signalEmissionRate per grader model', () => {
     const results = [
       makeResult({
         outcome: 'verified',
         marked: true,
         expected: 'verified',
         signalEmitted: true,
-        mentorModel: 'model-A',
+        graderModel: 'model-A',
       }),
       makeResult({
         outcome: 'invalid',
         marked: false,
         expected: 'verified',
         signalEmitted: false,
-        mentorModel: 'model-B',
+        graderModel: 'model-B',
       }),
     ];
     const m = aggregate(results);
@@ -200,7 +239,7 @@ describe('writeCorpus', () => {
           marked: true,
           expected: 'verified',
           signalEmitted: true,
-          mentorModel: 'gpt-oss-120b',
+          graderModel: 'gpt-oss-120b',
         }),
       ];
       const metrics: SimMetrics = aggregate(results);
@@ -219,5 +258,161 @@ describe('writeCorpus', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Committed-baseline machinery (the tracked gate).
+// ---------------------------------------------------------------------------
+
+const OUTCOME_QUARTERS = {
+  verified: 0.25,
+  partial: 0.25,
+  reteach: 0.25,
+  invalid: 0.25,
+} as const;
+
+function makeMetrics(over: Partial<SimMetrics> = {}): SimMetrics {
+  return {
+    totalRounds: 20,
+    outcomeCounts: { verified: 5, partial: 5, reteach: 5, invalid: 5 },
+    outcomeRates: { ...OUTCOME_QUARTERS },
+    conceptResultCounts: { solid: 0, partial: 0, missing: 0, misconception: 0 },
+    masteryVerifiedRate: 0.5,
+    overCreditRate: 0,
+    overCreditScenarioIds: [],
+    underCreditRate: 0.1,
+    signalEmissionRate: 0.9,
+    signalEmissionRateByMentor: { 'production-routing': 0.9 },
+    ...over,
+  };
+}
+
+function makeBaseline(
+  over: Partial<SimulationBaseline['rates']> = {},
+): SimulationBaseline {
+  return {
+    version: 1,
+    updatedAt: '2026-06-27T00:00:00.000Z',
+    provenance: 'update-baseline',
+    learnerModel: 'openai/gpt-4o',
+    mentorModel: 'production-routing',
+    graderModel: 'claude-sonnet-4-6',
+    scenarioCount: 20,
+    rates: {
+      outcome: { ...OUTCOME_QUARTERS },
+      masteryVerified: 0.5,
+      underCredit: 0.1,
+      signalEmissionByMentor: { 'production-routing': 0.9 },
+      ...over,
+    },
+  };
+}
+
+describe('compareSimulationBaseline', () => {
+  it('over-credit ids present → pass:false + ids echoed', () => {
+    const gate = compareSimulationBaseline(
+      makeMetrics({ overCreditScenarioIds: ['OVER-1', 'OVER-2'] }),
+      makeBaseline(),
+      0.15,
+    );
+    expect(gate.pass).toBe(false);
+    expect(gate.overCreditCount).toBe(2);
+    expect(gate.overCreditScenarioIds).toEqual(['OVER-1', 'OVER-2']);
+  });
+
+  it('identical metrics → no drift, pass:true', () => {
+    const gate = compareSimulationBaseline(makeMetrics(), makeBaseline(), 0.15);
+    expect(gate.drift).toEqual([]);
+    expect(gate.pass).toBe(true);
+  });
+
+  it('one rate beyond tolerance → exactly one drift entry, named', () => {
+    const gate = compareSimulationBaseline(
+      makeMetrics({ masteryVerifiedRate: 0.8 }), // Δ0.3 > 0.15
+      makeBaseline(),
+      0.15,
+    );
+    expect(gate.drift).toHaveLength(1);
+    expect(gate.drift[0]!.metric).toBe('masteryVerified');
+    expect(gate.drift[0]!.delta).toBeCloseTo(0.3);
+  });
+
+  it('signalEmissionByMentor delta beyond tolerance → drift entry named per model', () => {
+    const gate = compareSimulationBaseline(
+      makeMetrics({
+        signalEmissionRateByMentor: { 'production-routing': 0.5 },
+      }), // Δ0.4
+      makeBaseline(),
+      0.15,
+    );
+    expect(gate.drift).toHaveLength(1);
+    expect(gate.drift[0]!.metric).toBe(
+      'signalEmissionByMentor.production-routing',
+    );
+  });
+
+  it('totalRounds < 10 widens tolerance (passes at 2×, fails at 1×)', () => {
+    // Δ0.2: below 2×0.15=0.30 (widened, small-N) but above 1×0.15.
+    const smallN = makeMetrics({ totalRounds: 5, masteryVerifiedRate: 0.7 });
+    expect(
+      compareSimulationBaseline(smallN, makeBaseline(), 0.15).drift,
+    ).toEqual([]);
+    const largeN = makeMetrics({ totalRounds: 20, masteryVerifiedRate: 0.7 });
+    expect(
+      compareSimulationBaseline(largeN, makeBaseline(), 0.15).drift,
+    ).toHaveLength(1);
+  });
+});
+
+describe('validateBaselineStructure', () => {
+  it('rejects empty / non-object / scenarioCount:0', () => {
+    expect(validateBaselineStructure(null).ok).toBe(false);
+    expect(validateBaselineStructure({}).ok).toBe(false);
+    expect(
+      validateBaselineStructure({ ...makeBaseline(), scenarioCount: 0 }).ok,
+    ).toBe(false);
+  });
+
+  it('rejects a payload missing graderModel', () => {
+    const { graderModel: _omit, ...noGrader } = makeBaseline();
+    void _omit;
+    expect(validateBaselineStructure(noGrader).ok).toBe(false);
+  });
+
+  it('rejects a payload missing the provenance stamp (hand-written stub)', () => {
+    const { provenance: _omit, ...noProvenance } = makeBaseline();
+    void _omit;
+    expect(validateBaselineStructure(noProvenance).ok).toBe(false);
+  });
+
+  it('rejects a main-harness-shaped payload (no over-credit fields)', () => {
+    const mainHarness = {
+      version: 1,
+      provenance: 'update-baseline',
+      learnerModel: 'x',
+      graderModel: 'y',
+      scenarioCount: 4,
+      flows: {},
+      rates: { outcome: {} }, // lacks underCredit / masteryVerified / signalEmissionByMentor
+    };
+    expect(validateBaselineStructure(mainHarness).ok).toBe(false);
+  });
+
+  it('accepts a full, provenance-stamped, judge-stamped baseline', () => {
+    const result = validateBaselineStructure(makeBaseline());
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('round-trips through toBaseline → validateBaselineStructure', () => {
+    const baseline = toBaseline(makeMetrics(), {
+      learnerModel: 'openai/gpt-4o',
+      mentorModel: 'production-routing',
+      graderModel: 'claude-sonnet-4-6',
+      updatedAt: '2026-06-27T00:00:00.000Z',
+      provenance: 'update-baseline',
+    });
+    expect(validateBaselineStructure(baseline).ok).toBe(true);
   });
 });

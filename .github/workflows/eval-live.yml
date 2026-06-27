@@ -94,6 +94,22 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: doppler run -- pnpm eval:llm -- --live --check-baseline
 
+      # Mastery-SIMULATION gate (over-credit ceiling + drift). Production tutor
+      # (gpt-oss in stg) + production judge grade a distinct pinned learner
+      # (gpt-4o, NOT production-approved — a different family from the grader so
+      # the two-model guard holds). Budget: 7 challenge-sim scenarios × 3 runs ×
+      # 9 calls/round (3 calls/question × MAX_CHALLENGE_QUESTIONS=3) = 189, so
+      # every round runs. A reproduced over-credit breach exits 1 (the hard
+      # ceiling); soft drift only warns. Distinct baseline from the signal one
+      # above — this reads simulation-baseline.json. Gated on T12 seeding it.
+      - name: Mastery-simulation gate (over-credit ceiling + drift)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: >-
+          doppler run -- pnpm --filter @eduagent/api eval:llm:sim --
+          --learner-model openai/gpt-4o --runs 3 --max-live-calls 189
+          --check-baseline
+
       # Alert on drift/break: scheduled runs have no PR surface to go red on,
       # so a silent failure would defeat the point (same rationale as the
       # BUG-953 deploy-failure issue). Only file from scheduled runs — label
@@ -140,6 +156,13 @@ jobs:
                 `Triage: re-run to rule out provider flakiness; if drift is real and`,
                 `intentional, re-baseline with`,
                 `\`doppler run -- pnpm eval:llm -- --live --update-baseline\` and commit.`,
+                ``,
+                `If the failing step was the **Mastery-simulation gate** (over-credit`,
+                `ceiling / simulation-baseline.json drift), it is a DIFFERENT baseline —`,
+                `re-seed with`,
+                `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model openai/gpt-4o --runs 3 --max-live-calls 189 --update-baseline\``,
+                `and commit. A reproduced over-credit breach is a real grader-leniency`,
+                `regression — fix the grader/prompt; do NOT raise the ceiling.`,
               ].join('\n'),
               labels: ['ci'],
             });
