@@ -16,74 +16,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  getProfileScopedTables,
+  PROFILE_SCOPED_SCAN_EXCEPTIONS,
+} from './profile-scoped-tables.js';
 
-const SCHEMA_DIR = path.resolve(__dirname, 'schema');
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../../apps/api/drizzle');
-
-/**
- * Tables that intentionally do NOT have RLS. Annotate each with a reason.
- * Keep this list as small as possible — every entry is a security decision.
- */
-const RLS_EXCEPTIONS: Record<string, string> = {
-  // accounts is keyed by clerk_user_id, not profile_id.
-  // The profile_id column in the grep match is actually the profiles table
-  // referencing accounts, not accounts having a profile_id.
-
-  // topic_connections has NO profile_id column and no RLS policy.
-  // Scanned as profile-scoped because the BUG-226 comment block (describing
-  // the deferred RLS migration) sits inside its pgTable scan window.
-  // Ownership is enforced TRANSITIVELY: topic_a_id / topic_b_id →
-  //   curriculum_topics → curriculum_books → subjects → subjects.profile_id.
-  // Every reader must resolve topicIds through a profile-scoped curriculum
-  // read before querying topic_connections. Path forward: add profile_id
-  // column + backfill + RLS policy (tracked as BUG-226, P3, deferred).
-  topic_connections:
-    'BUG-226 (P3): transitive ownership via topics→books→subjects; ' +
-    'dedicated migration required for direct profile_id + RLS',
-
-  // curriculum_topics has no owner profile_id column; ownership remains
-  // transitive through curriculum_topics.book_id → curriculum_books →
-  // subjects.profile_id. The source_child_profile_id column is nullable
-  // parent-bridge provenance and often points to a different child than the
-  // owner of the cloned topic, so it cannot drive row-level security.
-  curriculum_topics:
-    'Parent-bridge source_child_profile_id is provenance, not ownership; ' +
-    'topic ownership remains topics→books→subjects.profile_id',
-};
-
-function getProfileScopedTables(): string[] {
-  const schemaFiles = fs
-    .readdirSync(SCHEMA_DIR)
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
-
-  const tables: string[] = [];
-
-  for (const file of schemaFiles) {
-    const content = fs.readFileSync(path.join(SCHEMA_DIR, file), 'utf8');
-
-    // Find all pgTable declarations
-    const tableMatches = content.matchAll(/pgTable\(\s*['"]([a-z_]+)['"]/g);
-
-    for (const match of tableMatches) {
-      const tableName = match[1]!;
-      const tableStart = match.index!;
-
-      // Look ahead in the file for a profile_id column within this table
-      // definition (up to the next pgTable or end of file)
-      const nextTableMatch = content.indexOf('pgTable(', tableStart + 1);
-      const tableBlock = content.slice(
-        tableStart,
-        nextTableMatch === -1 ? undefined : nextTableMatch,
-      );
-
-      if (/profile_id/.test(tableBlock)) {
-        tables.push(tableName);
-      }
-    }
-  }
-
-  return tables;
-}
 
 function getRlsEnabledTables(): Set<string> {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
@@ -124,7 +62,7 @@ describe('RLS coverage invariant', () => {
     const missing: string[] = [];
 
     for (const table of profileTables) {
-      if (RLS_EXCEPTIONS[table]) continue;
+      if (PROFILE_SCOPED_SCAN_EXCEPTIONS[table]) continue;
       if (!rlsTables.has(table)) {
         missing.push(table);
       }
@@ -136,7 +74,7 @@ describe('RLS coverage invariant', () => {
           `ENABLE ROW LEVEL SECURITY in migrations:\n` +
           missing.map((t) => `  - ${t}`).join('\n') +
           '\n\nAdd them to an existing or new migration, or add an entry ' +
-          'to RLS_EXCEPTIONS in this test with a documented reason.',
+          'to PROFILE_SCOPED_SCAN_EXCEPTIONS in profile-scoped-tables.ts with a documented reason.',
       );
     }
   });
