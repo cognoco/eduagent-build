@@ -174,7 +174,7 @@ Groups separated by blank lines. **Named exports only.** No default exports exce
   @eduagent/retention →  (no workspace deps)
   @eduagent/schemas   →  (no workspace deps — leaf package)
   ```
-  This applies to: runtime `import` statements, `tsconfig.json` project `references`, AND `package.json` `dependencies`. For example, `apps/mobile/tsconfig.json` must NOT reference `../api` — that would create a build-time dependency from mobile→api.
+  This applies to: runtime `import` statements, `tsconfig.json` project `references`, AND `package.json` `dependencies`. The one documented exception is `apps/mobile/tsconfig.json` referencing `../api` so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. Type-only imports from `@eduagent/api` are accepted for that contract; runtime imports and `package.json` dependencies on `@eduagent/api` remain forbidden because they can pull API server code into the mobile bundle.
   `packages/` never imports from `apps/`. Circular dependencies are build-breaking errors.
 - **Cross-service calls through exported function interfaces.** Never import internals from another service file.
 
