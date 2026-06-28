@@ -92,6 +92,11 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // Added migration 0110: feedback_retry_queue profile_isolation policy.
   // Exposed by WI-688 schema scanner (was absent from hand-maintained list).
   'feedback_retry_queue',
+  // Added migration 0124 (review-continuity Flow 2 — recall log): RLS +
+  // retrieval_events_profile_isolation policy anchored on profile_id. The
+  // Drizzle schema omits .enableRLS() by repo convention (RLS DDL lives in the
+  // migration SQL); the WI-688 schema scanner still derives it from profile_id.
+  'retrieval_events',
 ] as const;
 
 /**
