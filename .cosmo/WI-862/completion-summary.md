@@ -1,9 +1,22 @@
-## Completion Summary
+## Completion Summary — WI-862 ([QUIZ-02/16] intercepted Chrome coverage for quiz loading timeout + discovery)
 
-**What was done:** Added intercepted Chrome coverage for the quiz loading-timeout state and the discovery card ([QUIZ-02/16]), following the Chrome-intercept-seeded pattern from WI-853 / PR #1242.
+**What was done:** Added deterministic intercepted-Chrome (Playwright web E2E) coverage
+for two P0 quiz surfaces that had no prior browser-level evidence — quiz launch
+loading/timeout recovery (QUIZ-02) and quiz-discovery card routing (QUIZ-16).
 
-**What changed:** New Playwright journey `apps/mobile/e2e-web/flows/journeys/j26-quiz-loading-discovery.spec.ts`. The plan doc `_plan-WI-862.md` was also committed in the PR.
+**What changed:** `apps/mobile/e2e-web/flows/journeys/j26-quiz-loading-discovery.spec.ts`
+(+281). QUIZ-02: stalls `POST /v1/quiz/rounds` via `page.route` and drives the screen's
+own 20s/30s watchdogs with a Playwright fake clock; asserts `quiz-launch-loading` +
+rotating copy, `quiz-launch-timed-out` at 20s, `quiz-launch-error-fallback` +
+`quiz-launch-retry` at 30s; BUG-271 regression guard that retry re-arms the watchdog.
+QUIZ-16: stubs `GET /v1/coaching-card` to force a `quiz_discovery` card, taps
+`home-coach-band-continue`, asserts `mark-surfaced` body carries the card `activityType`,
+non-vocabulary routes to `/quiz/launch`, vocabulary routes to the `/quiz` picker.
+`_plan-WI-862.md` added.
 
-**Verification:** All required CI checks SUCCESS on the merged commit; claude-review check green (no blocking findings). Merged to main via PR #1246 (merge commit de172aa4e).
+**Verification:** Delivered via PR #1246 (author `crowka`), merged to `main` (merge
+commit `de172aa4e`; content commit `cb00df9da`). `main` branch-protection required
+checks green at merge. Test-only — no production code touched; the spec auto-includes
+into the later-phases Playwright project and self-seeds via `seedAndSignIn`.
 
-**Caveats / Follow-ups:** Pairs with WI-865 (CC-05 continuation coverage), which shares `LearnerScreen.test.tsx` and is now in flight. Follow-up: `_plan-WI-862.md` landed in the repo — remove it if plan docs should not be tracked.
+**Caveats / Follow-ups:** Browser E2E test + plan only. No follow-ups.

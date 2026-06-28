@@ -265,7 +265,3 @@ apps/mobile/GoogleService-Info.plist
 
 # Identity-cutover orchestration channel scratch — working-tree-only, never tracked (WI-586 hygiene, ic-orch-065)
 _wip/identity-cutover/_state/*.jsonl
-
-# Cosmo work-item lifecycle scratch — per-WI completion summaries, workitem.json, and
-# parallel-agent fleet checkpoints. Local coordination artifacts, not deliverables.
-.cosmo-artifacts/
