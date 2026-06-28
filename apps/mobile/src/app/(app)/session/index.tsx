@@ -27,6 +27,7 @@ import {
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
+import { ReturningSessionGreeting } from '../../../components/session/ReturningSessionGreeting';
 import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
   useStreamMessage,
@@ -1520,14 +1521,19 @@ function SessionScreenInner() {
         backBehavior={chatBackFallback ? 'replace' : undefined}
         onBackPress={handleChatBackPress}
         messages={messages}
-        firstSessionGreeting={
+        emptyStateGreeting={
           isFirstSession ? (
             <FirstSessionGreeting
               name={activeProfile?.displayName}
               subject={subjectName ?? undefined}
               interest={learnerProfile?.interests?.[0]?.label}
             />
-          ) : undefined
+          ) : (
+            <ReturningSessionGreeting
+              name={activeProfile?.displayName}
+              subject={subjectName ?? undefined}
+            />
+          )
         }
         onSend={handleSend}
         isStreaming={isStreaming}

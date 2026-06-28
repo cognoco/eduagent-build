@@ -756,6 +756,11 @@
         "withNameSubject": "Hei {{name}}. Du er her for å jobbe med {{subject}}. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
         "withName": "Hei {{name}}. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
         "generic": "Hei. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Velkommen tilbake, {{name}}. Klar for å fortsette med {{subject}}? Spør meg om hva som helst – hvor skal vi gå videre?",
+        "withName": "Velkommen tilbake, {{name}}. Hva vil du jobbe med i dag?",
+        "generic": "Velkommen tilbake. Hva vil du jobbe med i dag?"
       }
     },
     "filingFailed": {
