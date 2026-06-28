@@ -78,6 +78,10 @@ import { teachingSessionFlow } from './flows/teaching-session';
 // misconception / missing / false-mastery guard). See flow file for bake-off
 // commands (--flow challenge-grader --live --openrouter-model <slug>).
 import { challengeGraderFlow } from './flows/challenge-grader';
+// [plan 2026-06-27] Review-continuity opener faithfulness — deterministic
+// builder snapshots + two-independent-model judge (model A pinned mentor,
+// model B independent OpenRouter judge). See flow file.
+import { reviewContinuityOpenerFlow } from './flows/review-continuity-opener';
 import {
   listFlows,
   parseCliArgs,
@@ -149,6 +153,7 @@ const FLOWS: FlowDefinition[] = [
   misconceptionRepairFlow as FlowDefinition,
   teachingSessionFlow as FlowDefinition,
   challengeGraderFlow as FlowDefinition,
+  reviewContinuityOpenerFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

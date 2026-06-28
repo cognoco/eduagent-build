@@ -1,21 +1,20 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-09T21:57:04.266Z",
-  "ref": "b9964c225",
+  "updatedAt": "2026-06-28T15:13:41.845Z",
   "flows": {
     "exchanges": {
       "n": 102,
       "rates": {
-        "envelopeOk": 0.9901960784313726,
-        "hasReply": 0.9901960784313726,
-        "replyHasLiteralEscape": 0,
-        "partialProgress": 0.0392156862745098,
-        "needsDeepening": 0.049019607843137254,
-        "understandingCheck": 0.6666666666666666,
+        "envelopeOk": 0.9705882352941176,
+        "hasReply": 0.9705882352941176,
+        "replyHasLiteralEscape": 0.00980392156862745,
+        "partialProgress": 0.16666666666666666,
+        "needsDeepening": 0.0392156862745098,
+        "understandingCheck": 0.5980392156862745,
         "readyToFinish": 0,
-        "notePromptShow": 0,
-        "fluencyDrillActive": 0.0196078431372549,
-        "confidenceLow": 0.049019607843137254
+        "notePromptShow": 0.00980392156862745,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0.12745098039215685
       }
     },
     "probes": {
@@ -24,13 +23,13 @@
         "envelopeOk": 1,
         "hasReply": 1,
         "replyHasLiteralEscape": 0,
-        "partialProgress": 0.0875,
+        "partialProgress": 0.2125,
         "needsDeepening": 0,
-        "understandingCheck": 0.7625,
+        "understandingCheck": 0.725,
         "readyToFinish": 0,
-        "notePromptShow": 0.0625,
+        "notePromptShow": 0,
         "fluencyDrillActive": 0,
-        "confidenceLow": 0
+        "confidenceLow": 0.0875
       }
     },
     "safety-probes": {
@@ -38,25 +37,40 @@
       "rates": {
         "envelopeOk": 1,
         "hasReply": 1,
-        "replyHasLiteralEscape": 0,
-        "partialProgress": 0,
+        "replyHasLiteralEscape": 0.022727272727272728,
+        "partialProgress": 0.022727272727272728,
         "needsDeepening": 0,
-        "understandingCheck": 0.7272727272727273,
+        "understandingCheck": 0.5,
         "readyToFinish": 0,
         "notePromptShow": 0,
         "fluencyDrillActive": 0,
-        "confidenceLow": 0.06818181818181818
+        "confidenceLow": 0.13636363636363635
       }
     },
     "language-quality": {
       "n": 6,
       "rates": {
-        "envelopeOk": 0.8333333333333334,
-        "hasReply": 0.8333333333333334,
+        "envelopeOk": 1,
+        "hasReply": 1,
         "replyHasLiteralEscape": 0,
         "partialProgress": 0,
         "needsDeepening": 0,
-        "understandingCheck": 0.8333333333333334,
+        "understandingCheck": 1,
+        "readyToFinish": 0,
+        "notePromptShow": 0,
+        "fluencyDrillActive": 0,
+        "confidenceLow": 0
+      }
+    },
+    "review-continuity-opener": {
+      "n": 10,
+      "rates": {
+        "envelopeOk": 1,
+        "hasReply": 1,
+        "replyHasLiteralEscape": 0,
+        "partialProgress": 0.4,
+        "needsDeepening": 0,
+        "understandingCheck": 0.9,
         "readyToFinish": 0,
         "notePromptShow": 0,
         "fluencyDrillActive": 0,

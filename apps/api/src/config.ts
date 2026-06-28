@@ -191,6 +191,18 @@ const envSchema = z.object({
   // Independent of LLM_ROUTING_V2_ENABLED so it can be toggled separately.
   CHALLENGE_ROUND_GRADER_ENABLED: z.enum(['true', 'false']).default('true'),
 
+  // Review-continuity opener (plan 2026-06-27 / spec
+  // 2026-06-08-memory-task-review-continuity.md, requirements EU-1/EU-2/EU-4).
+  // Default-OFF: while 'false', exchange-prompts.ts emits the existing generic
+  // review calibration block byte-for-byte — the continuity-framed opener
+  // builder is unwired in production. The builder + harness land behind this
+  // flag (the same "infra built behind a flag" pattern as LLM_ROUTING_V2_ENABLED);
+  // the prod assembler that fills the ReviewContinuityContext from
+  // retrieval_events + the EU-2 consent gate land with the table slice, after
+  // which this flag is flipped (staging first). This flag only controls the
+  // code path.
+  REVIEW_CONTINUITY_OPENER_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
   MODE_NAV_V2_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -323,6 +335,21 @@ export function isChallengeRoundGraderEnabled(
   value: string | undefined,
 ): boolean {
   return value !== 'false';
+}
+
+/**
+ * Review-continuity opener gate (plan 2026-06-27 / spec
+ * 2026-06-08-memory-task-review-continuity.md). Read at the system-prompt
+ * assembly boundary (exchange-prompts.ts) and threaded as
+ * `options.reviewContinuityContext` presence: gates whether the
+ * continuity-framed review opener replaces the generic calibration line.
+ * Default-closed: undefined / anything other than 'true' keeps the existing
+ * generic block, so a missing binding never wires the unreleased opener.
+ */
+export function isReviewContinuityOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
 }
 
 /**
