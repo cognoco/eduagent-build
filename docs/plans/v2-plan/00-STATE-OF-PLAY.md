@@ -19,6 +19,8 @@ related:
 
 > Verified 2026-06-27 from code + the S2/S3 plans + the memory specs. Re-verify any status before acting; flags and "IMPLEMENTED" annotations drift.
 
+> **⚠️ Identity-state correction (2026-06-28, verified by live DB query).** Earlier wording in this doc said `S4`/`S5` are *"BLOCKED on the identity-foundation flip"* and that concept-grain is *"parked behind the identity cutover."* **That is stale.** The identity migration is **done** on the live DBs. Queried `doppler -c <cfg> -- node` over `DATABASE_URL`, 2026-06-28: on **stg `ep-fancy-cherry`** (the DB the app actually serves — phone/emulator/local all hit `api-stg`, per [`project_dev_schema_drift_trap`]) legacy `accounts`/`profiles`/`family_links` are **DROPPED**, `login`(125)/`person`(229) are live, and `subjects.profile_id`'s FK is repointed to **`person`** (151/151 rows match); **prd `ep-holy-leaf`** is the same shape (empty). Only the **orphan `dev` DB** still holds legacy tables, and nothing reads it. **Consequence:** `S4`/`S5` are **unbuilt, buildable now** — not identity-blocked; the supporter tables are empty only because no linking UI exists yet. Caveat: schema *code* still drifts from the DB (`subjects.ts:54` references the dropped `profiles`) — `WI-1128`. App is also **pre-launch, zero users, all DB rows disposable test data** ([`project_pre_launch_no_users`]). Full audit: [`03-gap-analysis-2026-06-28.md`](03-gap-analysis-2026-06-28.md).
+
 ---
 
 ## 1. The two axes (this is the thing that confuses everyone)
@@ -48,8 +50,8 @@ When `MODE_NAV_V2_ENABLED` is on, `useNavigationShellContract` **hard-returns** 
 | `S1` Mentor home | ≤3-card feed + ever-present bar + camera/homework | **plan marked IMPLEMENTED** (richness gaps — §4) |
 | `S2` Subject hub | shelf+progress merge → hub + Subjects tab | **plan marked IMPLEMENTED** (richness gaps — §4) |
 | `S3` Journal + avatar | recaps + cross-subject archive + mentor-memory surfacing | **plan marked IMPLEMENTED** |
-| `S4` scope chip / support hub | supporter scopes, server mask | **BLOCKED** on identity-foundation flip |
-| `S5` visibility contract | trust/consent ceremony | **BLOCKED** on identity flip + S4 |
+| `S4` scope chip / support hub | supporter scopes, server mask | **Unbuilt, buildable now** (identity is live — see correction note; backend pre-built, mobile/route gaps remain) |
+| `S5` visibility contract | trust/consent ceremony | **Unbuilt, buildable now** (depends on S4; backend pre-built, link screens + break-tests missing) |
 | `S6` cutover + deletions | delete V0/V1 shells, retire old tabs | **DEFERRED + IRREVERSIBLE** (human sign-off) |
 
 ### Axis C — the founder's informal words ("v1 = the app I like", "V2 = barren")
@@ -138,7 +140,7 @@ The canonical memory spec `2026-06-08-memory-task-review-continuity.md` (DRAFT) 
 | **`evidence_links`** ("you learned this from your own note on X") | Bind memory/openers to the learner's own **notes, bookmarks, transcripts, homework OCR** as citable sources | **Tier 2 — decided, not built** | spec §"Probably-worth-it" item 4; R6 |
 | **Live mid-conversation binding** (freeform → knowledge map) | Mentor recognizes where you are *during* a freeform chat and binds it live | **Telemetry-only** — classification written, acted on by nothing | `ask-silent-classify.ts:196-214` |
 | **`taskType` catalog** (`recall` + `teach_back` + new `explain`) | Memory-task type vocabulary | **Tier 2 — decided, not built** | spec §"Probably-worth-it" item 5; R7 |
-| **Concept-grain mastery** (`concepts` / `concept_mastery`) | Know the learner at concept resolution, not just topic | **PARKED** behind identity-foundation cutover (`CONCEPT_CAPTURE_ENABLED=false`) | `2026-06-08-concept-capture-layer-design.md` (PARKED 2026-06-27); `MMT-ADR-0017` |
+| **Concept-grain mastery** (`concepts` / `concept_mastery`) | Know the learner at concept resolution, not just topic | **PARKED** behind the hardcoded `CONCEPT_CAPTURE_ENABLED=false` flag (`concept-capture.ts:19`). NOTE: the identity cutover and the `concepts`/`concept_mastery` tables it once waited on are **both now done** — both tables exist on stg (verified 2026-06-28) — so enabling is now a flag + product call, not identity-blocked | `2026-06-08-concept-capture-layer-design.md` (PARKED 2026-06-27); `MMT-ADR-0017` |
 
 ### Other freeform-binding facts (verified earlier in this thread)
 
@@ -183,7 +185,7 @@ Scope the four-part felt-knowing loop as **one coherent experience**, in this or
 3. **Wire `evidence_links`** (Tier 2 of the same spec, `:187-191` / R6) so memory/openers cite the learner's own notes/bookmarks/transcripts — renders on the now-writable notes surface from (1). **This is the still-open connective tissue.** → felt-knowing-loop spec **Flow 3** (citation *surfacing* in live exchanges via the envelope's structured `citations[]`, flag+eval-gated; adds only `fromKind='exchange'` to slice 2a's enum, no new migration).
 4. **Live freeform binding** — promote `ask-silent-classify` from telemetry to a live signal: bind the freeform chat to the recognized subject/topic mid-conversation, and stop dropping `experienceLevel` before the prompt. (This is the original "stuck chat" ask.) → felt-knowing-loop spec **Flow 2** captures the user-facing slice: a freeform "keep this" becomes a citable **bookmark** (`topicId`-nullable, so no schema fork), replacing the lying read-only "Write note" CTA.
 
-**Sequencing note:** (1) is identity-independent and cheap; (2) is in-flight; (3) builds on the Tier-1 retrieval log + the writable notes from (1); (4) is the deepest. Concept-grain "knowing" (§4) stays **parked** behind the identity-foundation flip regardless.
+**Sequencing note:** (1) is identity-independent and cheap; (2) is in-flight; (3) builds on the Tier-1 retrieval log + the writable notes from (1); (4) is the deepest. Concept-grain "knowing" (§4) stays **parked** behind the `CONCEPT_CAPTURE_ENABLED` flag — *not* the identity flip (which is done; see the correction note up top) — so it remains a separate flag + product decision.
 
 ---
 
