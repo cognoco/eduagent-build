@@ -21,10 +21,13 @@ import {
   EXPLICITLY_EXCLUDED_TABLES,
   RLS_TABLE_META,
 } from './database-rls-coverage';
+// ponytail: direct src import avoids polluting the production barrel with Node.js
+// fs/path built-ins that are unavailable in Cloudflare Workers.
+// This file is test-only (never bundled) so NX boundaries allow the relative path.
 import {
   getProfileScopedTables,
   PROFILE_SCOPED_SCAN_EXCEPTIONS,
-} from '@eduagent/database';
+} from '../../../../packages/database/src/profile-scoped-tables';
 
 describe('database-rls-coverage manifest', () => {
   it('ALL_RLS_TABLES is the union of profile-scoped, owner-scoped, charge-scoped, and or-scoped', () => {
