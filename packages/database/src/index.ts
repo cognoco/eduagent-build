@@ -6,5 +6,6 @@ export * from './rls';
 export * from './utils/uuid';
 export * from './queries/embeddings';
 export * from './streaks-rules';
+export * from './profile-scoped-tables';
 export type MemoryFactRow =
   typeof import('./schema/index').memoryFacts.$inferSelect;

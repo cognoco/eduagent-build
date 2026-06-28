@@ -89,6 +89,9 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // Added migration 0112 (WI-676): RLS + profile_isolation policy for
   // mentor_activity_ledger. TS-side registration: WI-687.
   'mentor_activity_ledger',
+  // Added migration 0110: feedback_retry_queue profile_isolation policy.
+  // Exposed by WI-688 schema scanner (was absent from hand-maintained list).
+  'feedback_retry_queue',
 ] as const;
 
 /**
@@ -100,6 +103,9 @@ export const OWNER_SCOPED_TABLES: readonly string[] = [
   // Added S3-C1 (manifest drift): policy created in migration 0066 but
   // omitted from this manifest. See drizzle/0066_enable_rls_pending_tables.sql.
   'family_preferences',
+  // Added migration 0103: child_cap_notifications owner_profile_isolation policy.
+  // Exposed by WI-688 schema scanner (was absent from hand-maintained list).
+  'child_cap_notifications',
 ] as const;
 
 /**
@@ -137,6 +143,10 @@ export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
   'top_up_credits',
   'usage_events',
   'challenge_round_cooldowns',
+  // RLS enabled (migrations 0107/0113) but no USING policy yet.
+  // Exposed by WI-688 schema scanner. Needs dedicated policy migration.
+  'concepts',
+  'concept_mastery',
 ] as const;
 
 /**

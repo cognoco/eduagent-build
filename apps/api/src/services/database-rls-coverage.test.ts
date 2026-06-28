@@ -21,6 +21,10 @@ import {
   EXPLICITLY_EXCLUDED_TABLES,
   RLS_TABLE_META,
 } from './database-rls-coverage';
+import {
+  getProfileScopedTables,
+  PROFILE_SCOPED_SCAN_EXCEPTIONS,
+} from '@eduagent/database';
 
 describe('database-rls-coverage manifest', () => {
   it('ALL_RLS_TABLES is the union of profile-scoped, owner-scoped, charge-scoped, and or-scoped', () => {
@@ -75,83 +79,23 @@ describe('database-rls-coverage manifest', () => {
 });
 
 /**
- * Omission guard (S3-M2 closeout)
+ * Omission guard (S3-M2 closeout — hardened WI-688)
  *
- * Every profile-scoped table known to exist in the schema must appear in either
- * ALL_RLS_TABLES (has a policy) or EXPLICITLY_EXCLUDED_TABLES (RLS enabled but
- * policy not yet added, with a documented tracking item).
+ * Every profile-scoped table DERIVED from the Drizzle schema (via
+ * getProfileScopedTables()) must appear in ALL_RLS_TABLES (has a policy) or
+ * EXPLICITLY_EXCLUDED_TABLES (RLS enabled, policy not yet added). An
+ * unregistered profile-scoped table FAILS this test — closing the vacuous-pass
+ * blind spot of the previous hand-maintained KNOWN_PROFILE_TABLES list.
  *
- * Update KNOWN_PROFILE_TABLES when adding new profile-scoped tables.
- * Verified against schema by Worker B 2026-05-21.
+ * Known scanner false positives (substring-match artifacts) are filtered via
+ * PROFILE_SCOPED_SCAN_EXCEPTIONS from @eduagent/database.
  */
-
-// The full set of tables that carry personal profile data (profile_id or
-// owner_profile_id foreign key to profiles). This list is the source of truth
-// for the omission guard — any new table with a profileId/ownerProfileId FK
-// must be added here AND to either ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES.
-const KNOWN_PROFILE_TABLES: readonly string[] = [
-  // Profile-scoped (profile_id FK)
-  'assessments',
-  'retention_cards',
-  'needs_deepening_topics',
-  'teaching_preferences',
-  'consent_states',
-  'subjects',
-  'curriculum_adaptations',
-  'learning_sessions',
-  'session_events',
-  'session_summaries',
-  'parking_lot_items',
-  'streaks',
-  'xp_ledger',
-  'notification_log',
-  'notification_preferences',
-  'learning_modes',
-  'coaching_card_cache',
-  'vocabulary',
-  'vocabulary_retention_cards',
-  'session_embeddings',
-  'dictation_results',
-  'learning_profiles',
-  'progress_snapshots',
-  'milestones',
-  'monthly_reports',
-  'topic_notes',
-  'memory_facts',
-  'memory_dedup_decisions',
-  'nudges',
-  'quiz_rounds',
-  'quiz_missed_items',
-  'quiz_mastery_items',
-  'bookmarks',
-  'progress_summaries',
-  'support_messages',
-  'weekly_reports',
-  'profile_quota_usage',
-  'practice_activity_events',
-  'celebration_events',
-  'onboarding_drafts',
-  // Profile-linked buyer attribution, but policy remains account/subscription-scoped.
-  'top_up_credits',
-  'challenge_round_cooldowns',
-  'usage_events',
-  // Added migration 0112 (WI-676/WI-687): mentor_activity_ledger profile-scoped.
-  'mentor_activity_ledger',
-  // Added migration 0114 (WI-689 / MMT-ADR-0020): consent_request charge-scoped
-  // (charge_person_id FK to person; person.id = profiles.id).
-  'consent_request',
-  // Owner-scoped (owner_profile_id FK)
-  'withdrawal_archive_preferences',
-  'pending_notices',
-  'family_preferences',
-  // OR-scoped (parent_profile_id OR child_profile_id)
-  'family_links',
-] as const;
-
 describe('database-rls-coverage omission guard (S3-M2)', () => {
-  it('every known profile-scoped table appears in ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES', () => {
+  it('every profile-scoped table in the schema appears in ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES', () => {
     const covered = new Set([...ALL_RLS_TABLES, ...EXPLICITLY_EXCLUDED_TABLES]);
-    const missing = KNOWN_PROFILE_TABLES.filter((t) => !covered.has(t));
+    const missing = getProfileScopedTables()
+      .filter((t) => !PROFILE_SCOPED_SCAN_EXCEPTIONS[t])
+      .filter((t) => !covered.has(t));
     expect(missing).toEqual([]);
   });
 
