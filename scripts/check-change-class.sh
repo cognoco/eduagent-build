@@ -79,6 +79,8 @@ filter_files() {
 #   classes=<csv>        all matched classes (or "unresolved" on fail-open)
 #   integration=<bool>   matrix demands API/cross-package integration tests
 #   eval=<bool>          matrix demands the LLM eval harness (Tier 1)
+#   unit=<bool>          matrix demands the API unit suite for a cross-package
+#                        read that nx affected cannot see (i18n-cross-package)
 # Fail-open invariant: if no diff base resolves, the router cannot prove a
 # slow suite unaffected, so it demands them ALL — never silently skips.
 emit_github_output() {
@@ -90,11 +92,19 @@ emit_github_output() {
       echo "classes=unresolved"
       echo "integration=true"
       echo "eval=true"
+      echo "unit=true"
     } >> "$out"
     return 0
   fi
-  local classes integration=false eval_needed=false entry cmd
+  local classes integration=false eval_needed=false unit=false entry cmd
   classes=$(join_unique_classes | tr ' ' ',')
+  # unit: the API unit suite must run for a cross-package read nx affected can't
+  # see — currently only the i18n-cross-package class (en.json → app-help-map
+  # readFileSync). Class-scoped on purpose: ordinary api changes already get
+  # api unit tests via `nx affected`, so don't double-run them here.
+  case ",${classes}," in
+    *,i18n-cross-package,*) unit=true ;;
+  esac
   if [[ ${#SLOW_CMDS[@]} -gt 0 ]]; then
     for entry in "${SLOW_CMDS[@]}"; do
       cmd="${entry%%|*}"
@@ -118,6 +128,7 @@ emit_github_output() {
     echo "classes=${classes}"
     echo "integration=${integration}"
     echo "eval=${eval_needed}"
+    echo "unit=${unit}"
   } >> "$out"
 }
 
