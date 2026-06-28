@@ -646,6 +646,11 @@ export const overdueSubjectSchema = z.object({
 export type OverdueSubject = z.infer<typeof overdueSubjectSchema>;
 
 export const overdueTopicsResponseSchema = z.object({
+  // Count of overdue retention cards only — NOT the full merged relearn queue.
+  // A profile with flagged-weak topics (needs_deepening_topics rows) but no
+  // retention cards past their nextReviewAt will have totalOverdue:0 while
+  // subjects[] is non-empty. Badge/count UI must use displayedCount or sum
+  // subjects[*].topics.length to reflect the true visible workload.
   totalOverdue: z.number().int().min(0),
   subjects: z.array(overdueSubjectSchema),
   // [BUG-470 / P2] Truncation indicator — true when the displayed list is a

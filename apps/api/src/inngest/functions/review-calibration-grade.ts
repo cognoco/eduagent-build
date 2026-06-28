@@ -166,6 +166,16 @@ export async function handleReviewCalibrationGrade({
         // retried on crash, so an unfiltered "latest row" read could otherwise
         // see THIS run's own just-inserted fallback row after a partial failure
         // and wrongly cap after a single real failure.
+        // [EU-7 scoped-repo exception] Direct db.select() is intentional here.
+        // retrievalEvents is a single profile-scoped table and would normally
+        // go through createScopedRepository (AGENTS.md non-negotiable rule).
+        // However, this query requires three clauses that the scoped repo's
+        // findFirst/findMany API cannot express together: a strict time-bound
+        // lt(createdAt, eventAt) filter, orderBy(desc(createdAt)), and limit(1).
+        // profileId is enforced explicitly in the WHERE clause — no row from
+        // another profile can be returned. See the parent-chain exception
+        // in AGENTS.md ("...use direct db.select() and enforce profileId via
+        // subjects.profileId...") for the sanctioned alternative pattern.
         const [previous] = await db
           .select({ gradedBy: retrievalEvents.gradedBy })
           .from(retrievalEvents)

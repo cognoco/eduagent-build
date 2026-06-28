@@ -37,6 +37,7 @@ export const retrievalNextActionEnum = pgEnum('retrieval_next_action', [
   // (retention-data.ts, review-calibration-grade.ts) only ever emit the other
   // three. A future relearn-routing flow (RR queue → dedicated relearn action)
   // will activate it; kept in the enum now so that flow needs no DB migration.
+  // Activating plan: docs/plans/2026-06-27-recall-log-and-merged-relearn-queue.md
   'relearn',
   'redirect_to_library',
 ]);
