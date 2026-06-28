@@ -363,8 +363,10 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(true);
     expect(typeof body.result.nextReviewAt).toBe('string');
     expect(body.result.failureCount).toBe(0);
-    // SM-2 advance: a pass on a fresh card increments repetitions and lifts the
-    // interval past its 1-day seed; the grade drove the real schedule.
+    // SM-2 advance: a pass on a fresh card takes the first-recall branch —
+    // repetitions 0 → 1 and intervalDays 0 → 1 (the 6-day interval is the
+    // SECOND recall, per packages/retention sm2 FCR-L1.C1.10). The grade drove
+    // the real schedule.
     const db = createIntegrationDb();
     const card = await db.query.retentionCards.findFirst({
       where: and(
@@ -373,7 +375,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
       ),
     });
     expect(card!.repetitions).toBe(1);
-    expect(card!.intervalDays).toBeGreaterThan(1);
+    expect(card!.intervalDays).toBe(1);
     expect(card!.lastReviewedAt).not.toBeNull();
     // The pass is logged as an LLM-graded retrieval event, never a heuristic.
     const events = await db
