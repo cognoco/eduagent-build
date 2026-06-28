@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   challengeRoundGraderVerdictSchema,
+  conversationLanguageSchema,
   type AgeBracket,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundSessionState,
@@ -20,11 +21,8 @@ import {
 } from '../../src/services/challenge-round/evaluation';
 import { transitionChallengeState } from '../../src/services/challenge-round/state';
 import { parseEnvelope } from '../../src/services/llm/envelope';
-import { extractFirstJsonObject } from '../../src/services/llm';
-import {
-  getModelConfigForTest,
-  routeAndCall,
-} from '../../src/services/llm/router';
+import { extractFirstJsonObject, routeAndCall } from '../../src/services/llm';
+import { getModelConfigForTest } from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
 import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -334,15 +332,6 @@ async function defaultTutorTurn(
 }
 
 /**
- * Grader turn — the MEASURED production component. Builds the real judge rubric
- * (`buildChallengeRoundGraderPrompt`) and routes via `runHarnessLlm` so a
- * `--grader-model` candidate is selected (override branch), or production judge
- * routing applies (capability:'judge', rung 1) when null. Mirrors the production
- * `runChallengeRoundGrader` parse contract: extract → JSON.parse → schema. Any
- * failure (no JSON / parse error / schema invalid / items:[]) returns [] — a
- * dropped signal, exactly as production fails open.
- */
-/**
  * Pure parse seam mirroring `runChallengeRoundGrader`'s contract: extract first
  * JSON object → `JSON.parse` → `challengeRoundGraderVerdictSchema` → inject the
  * server-owned `answerEventId`. Any failure (no JSON / parse error / schema
@@ -374,6 +363,15 @@ export function parseGraderResponse(
   }));
 }
 
+/**
+ * Grader turn — the MEASURED production component. Builds the real judge rubric
+ * (`buildChallengeRoundGraderPrompt`) and routes via `runHarnessLlm` so a
+ * `--grader-model` candidate is selected (override branch), or production judge
+ * routing applies (capability:'judge', rung 1) when null. Mirrors the production
+ * `runChallengeRoundGrader` parse contract: extract → JSON.parse → schema. Any
+ * failure (no JSON / parse error / schema invalid / items:[]) returns [] — a
+ * dropped signal, exactly as production fails open.
+ */
 async function defaultGraderTurn(
   args: GraderTurnArgs,
 ): Promise<ChallengeRoundEvaluationItem[]> {
@@ -413,8 +411,9 @@ export async function runSimulatedRound(
   const graderTurn = overrides.graderTurn ?? defaultGraderTurn;
 
   const ageBracket = resolveAgeBracket(profile.birthYear);
-  const conversationLanguage =
-    profile.conversationLanguage as ConversationLanguage;
+  const conversationLanguage = conversationLanguageSchema.parse(
+    profile.conversationLanguage,
+  );
 
   // Seed via the REAL transitions so totalQuestions is set (a state missing it
   // routes straight to drafting after one turn — state.ts FCR-2026-05-23).
