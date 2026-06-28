@@ -6,19 +6,16 @@
 // entirely and renders English to every locale. There was no guard against
 // this class until now (see AGENTS.md → "Known gap").
 //
-// Scope (deliberately narrow — matches the AGENTS.md Phase 3 definition):
+// Scope:
 //   1. JsxText nodes: the literal text between JSX tags
 //      (`<Text>Add child</Text>` → "Add child").
 //   2. JSX-children StringLiteral / NoSubstitutionTemplateLiteral nodes: a
 //      string rendered directly as a child through a `{…}` expression
 //      container (`<Text>{'Continue'}</Text>`, `<Text>{cond ? 'A' : 'B'}</Text>`,
 //      `<Text>{cond && 'Saved'}</Text>`).
-//
-// Out of scope (a larger, noisier surface deferred to a later phase):
-//   - JSX *attribute* string literals (`label="Continue"`, `title="Delete"`).
-//     These mix real copy with testID/style/accessibility-role values, so they
-//     need a per-prop allow/deny model the audit team has scoped separately
-//     (docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json).
+//   3. JSX attribute literals for known user-copy props
+//      (`label="Continue"`, `accessibilityLabel="Go back"`), with an explicit
+//      non-copy prop classifier for test IDs, styles, roles, IDs, and paths.
 //
 // Ratchet model (mirrors scripts/check-no-clinical-copy.ts and the GC1
 // jest.mock ratchet):
@@ -28,9 +25,10 @@
 //   - Baseline entries no longer present are reported (not failed) so the
 //     baseline can be pruned as copy is migrated to t().
 //
-// A violation is keyed on { file, kind, text } — NOT line number — so routine
-// reformatting (prettier rewrapping a long JsxText across lines) and unrelated
-// edits above it never churn the baseline or manufacture false "new" findings.
+// A child/text violation is keyed on { file, kind, text }; an attribute
+// violation is keyed on { file, kind, prop, text } — NOT line number — so
+// routine reformatting and unrelated edits above it never churn the baseline or
+// manufacture false "new" findings.
 //
 // CLI usage:
 //   pnpm exec tsx scripts/check-i18n-jsx-literals.ts          # check
@@ -50,7 +48,12 @@ const BASELINE_PATH = path.resolve(
   'i18n-jsx-literals-baseline.json',
 );
 
-export type LiteralKind = 'jsx-text' | 'jsx-child-string';
+export type LiteralKind =
+  | 'jsx-text'
+  | 'jsx-child-string'
+  | 'jsx-attribute-string';
+
+export type AttributePropClassification = 'copy' | 'non-copy' | 'unknown';
 
 export interface Violation {
   /** Repo-relative POSIX path (stable across OS). */
@@ -58,6 +61,8 @@ export interface Violation {
   /** 1-based line of the literal — informational only, not part of identity. */
   line: number;
   kind: LiteralKind;
+  /** JSX prop name for attribute literals. Not part of child/text entries. */
+  prop?: string;
   /** Whitespace-normalized literal text. */
   text: string;
 }
@@ -65,7 +70,116 @@ export interface Violation {
 export interface BaselineEntry {
   file: string;
   kind: LiteralKind;
+  prop?: string;
   text: string;
+}
+
+const NON_COPY_ATTRIBUTE_PROPS = new Set([
+  'testID',
+  'id',
+  'nativeID',
+  'key',
+  'role',
+  'accessibilityRole',
+  'accessibilityState',
+  'accessibilityValue',
+  'accessibilityActions',
+  'accessibilityLiveRegion',
+  'importantForAccessibility',
+  'style',
+  'className',
+  'class',
+  'href',
+  'src',
+  'source',
+  'image',
+  'imageSource',
+  'uri',
+  'url',
+  'path',
+  'pathname',
+  'routeName',
+  'screenName',
+  'name',
+  'variant',
+  'size',
+  'color',
+  'type',
+  'mode',
+  'status',
+  'icon',
+]);
+
+const COPY_ATTRIBUTE_PROPS = new Set([
+  'accessibilityLabel',
+  'accessibilityHint',
+  'aria-label',
+  'aria-description',
+  'actionLabel',
+  'buttonText',
+  'cancelText',
+  'confirmText',
+  'content',
+  'description',
+  'disabledReason',
+  'dismissLabel',
+  'displayLanguage',
+  'emptyBody',
+  'emptyTitle',
+  'errorTitle',
+  'label',
+  'loadingLabel',
+  'message',
+  'methodIntro',
+  'placeholder',
+  'progressLabel',
+  'subjectIntro',
+  'subjectName',
+  'subtitle',
+  'summary',
+  'text',
+  'title',
+  'topicIntro',
+  'usualMethod',
+]);
+
+const COPY_PROP_SUFFIX_PATTERN =
+  /(Label|Title|Subtitle|Description|Message|Summary|Placeholder|Text|Content|Hint|Body|Reason)$/;
+
+export function classifyJsxAttributeProp(
+  propName: string,
+): AttributePropClassification {
+  if (
+    NON_COPY_ATTRIBUTE_PROPS.has(propName) ||
+    propName.startsWith('data-') ||
+    propName === 'aria-labelledby' ||
+    propName === 'aria-describedby' ||
+    /(?:ID|Id|id)$/.test(propName)
+  ) {
+    return 'non-copy';
+  }
+  if (
+    COPY_ATTRIBUTE_PROPS.has(propName) ||
+    COPY_PROP_SUFFIX_PATTERN.test(propName)
+  ) {
+    return 'copy';
+  }
+  return 'unknown';
+}
+
+function getJsxAttributeParentTagName(node: Node): string | undefined {
+  const element = node.getParent()?.getParent();
+  if (
+    element &&
+    (Node.isJsxSelfClosingElement(element) || Node.isJsxOpeningElement(element))
+  ) {
+    return element.getTagNameNode().getText();
+  }
+  return undefined;
+}
+
+function shouldIgnoreCopyAttributeOnElement(prop: string, node: Node): boolean {
+  return prop === 'content' && getJsxAttributeParentTagName(node) === 'meta';
 }
 
 // Collapse internal runs of whitespace and trim. Keeps the baseline stable when
@@ -81,6 +195,10 @@ export function normalizeText(raw: string): string {
 // is ONLY an emoji is correctly skipped; mixed "Save 💾" still trips on "Save".
 export function isTranslatableProse(text: string): boolean {
   return /[A-Za-z]{2,}/.test(text);
+}
+
+function isTranslationKeyLike(text: string): boolean {
+  return /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)+$/.test(text);
 }
 
 function toPosixRelative(absFile: string): string {
@@ -140,6 +258,104 @@ function collectRenderedStrings(rawNode: Node, out: Node[]): void {
   // not a statically-rendered string literal.
 }
 
+function getLiteralText(node: Node): string | undefined {
+  if (
+    Node.isStringLiteral(node) ||
+    Node.isNoSubstitutionTemplateLiteral(node)
+  ) {
+    return node.getLiteralText();
+  }
+  return undefined;
+}
+
+function templateExpressionShape(node: Node): string | undefined {
+  if (Node.isNoSubstitutionTemplateLiteral(node)) {
+    return node.getLiteralText();
+  }
+  if (!Node.isTemplateExpression(node)) return undefined;
+  let text = node.getHead().getLiteralText();
+  for (const span of node.getTemplateSpans()) {
+    text += '${}';
+    text += span.getLiteral().getLiteralText();
+  }
+  return text;
+}
+
+function concatShape(rawNode: Node): string {
+  const node = unwrap(rawNode);
+  const literal = getLiteralText(node);
+  if (literal !== undefined) return literal;
+  const template = templateExpressionShape(node);
+  if (template !== undefined) return template;
+
+  if (
+    Node.isBinaryExpression(node) &&
+    node.getOperatorToken().getText() === '+'
+  ) {
+    return `${concatShape(node.getLeft())}${concatShape(node.getRight())}`;
+  }
+
+  return '${}';
+}
+
+function pushAttributeText(
+  rawText: string,
+  sourceNode: Node,
+  prop: string,
+  out: Violation[],
+  file: string,
+): void {
+  const text = normalizeText(rawText);
+  if (text !== '' && isTranslatableProse(text) && !isTranslationKeyLike(text)) {
+    out.push({
+      file,
+      line: sourceNode.getStartLineNumber(),
+      kind: 'jsx-attribute-string',
+      prop,
+      text,
+    });
+  }
+}
+
+function collectAttributeStrings(
+  rawNode: Node,
+  prop: string,
+  out: Violation[],
+  file: string,
+): void {
+  const node = unwrap(rawNode);
+
+  const literal = getLiteralText(node);
+  if (literal !== undefined) {
+    pushAttributeText(literal, node, prop, out, file);
+    return;
+  }
+
+  const template = templateExpressionShape(node);
+  if (template !== undefined) {
+    pushAttributeText(template, node, prop, out, file);
+    return;
+  }
+
+  if (Node.isConditionalExpression(node)) {
+    collectAttributeStrings(node.getWhenTrue(), prop, out, file);
+    collectAttributeStrings(node.getWhenFalse(), prop, out, file);
+    return;
+  }
+
+  if (Node.isBinaryExpression(node)) {
+    const op = node.getOperatorToken().getText();
+    if (op === '??' || op === '||' || op === '&&') {
+      collectAttributeStrings(node.getLeft(), prop, out, file);
+      collectAttributeStrings(node.getRight(), prop, out, file);
+      return;
+    }
+    if (op === '+') {
+      pushAttributeText(concatShape(node), node, prop, out, file);
+    }
+  }
+}
+
 export function findViolationsInSourceFile(sf: SourceFile): Violation[] {
   const file = toPosixRelative(sf.getFilePath());
   const violations: Violation[] = [];
@@ -159,9 +375,35 @@ export function findViolationsInSourceFile(sf: SourceFile): Violation[] {
       return;
     }
 
-    // (2) `{…}` expression container rendered as a JSX child. Its parent is the
+    // (2) JSX attribute values for known user-copy props.
+    if (Node.isJsxAttribute(node)) {
+      const prop = node.getNameNode().getText();
+      if (classifyJsxAttributeProp(prop) !== 'copy') return;
+      if (shouldIgnoreCopyAttributeOnElement(prop, node)) return;
+      const initializer = node.getInitializer();
+      if (!initializer) return;
+
+      if (Node.isStringLiteral(initializer)) {
+        pushAttributeText(
+          initializer.getLiteralText(),
+          initializer,
+          prop,
+          violations,
+          file,
+        );
+        return;
+      }
+
+      if (Node.isJsxExpression(initializer)) {
+        const expr = initializer.getExpression();
+        if (expr) collectAttributeStrings(expr, prop, violations, file);
+      }
+      return;
+    }
+
+    // (3) `{…}` expression container rendered as a JSX child. Its parent is the
     // JSX element/fragment (attribute containers have a JsxAttribute parent, so
-    // they are excluded here — props are out of scope).
+    // they are handled by the attribute branch above).
     if (Node.isJsxExpression(node)) {
       const parent = node.getParent();
       if (
@@ -220,8 +462,12 @@ export interface DiffResult {
   cleanedBaselineEntries: BaselineEntry[];
 }
 
-const entryKey = (e: { file: string; kind: string; text: string }) =>
-  `${e.file}::${e.kind}::${e.text}`;
+const entryKey = (e: {
+  file: string;
+  kind: string;
+  prop?: string;
+  text: string;
+}) => `${e.file}::${e.kind}::${e.prop ?? ''}::${e.text}`;
 
 export function diffAgainstBaseline(
   current: Violation[],
@@ -250,7 +496,7 @@ function loadBaseline(): BaselineEntry[] {
   const parsed = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')) as unknown;
   if (!Array.isArray(parsed)) {
     throw new Error(
-      `Baseline at ${BASELINE_PATH} must be a JSON array of {file, kind, text} entries`,
+      `Baseline at ${BASELINE_PATH} must be a JSON array of {file, kind, text} or {file, kind, prop, text} entries`,
     );
   }
   return parsed as BaselineEntry[];
@@ -263,14 +509,25 @@ function writeBaseline(violations: Violation[]): void {
     const k = entryKey(v);
     if (seen.has(k)) continue;
     seen.add(k);
-    dedup.push({ file: v.file, kind: v.kind, text: v.text });
+    if (v.kind === 'jsx-attribute-string') {
+      dedup.push({
+        file: v.file,
+        kind: v.kind,
+        prop: v.prop,
+        text: v.text,
+      });
+    } else {
+      dedup.push({ file: v.file, kind: v.kind, text: v.text });
+    }
   }
   dedup.sort((a, b) =>
     a.file !== b.file
       ? a.file.localeCompare(b.file)
       : a.kind !== b.kind
         ? a.kind.localeCompare(b.kind)
-        : a.text.localeCompare(b.text),
+        : (a.prop ?? '') !== (b.prop ?? '')
+          ? (a.prop ?? '').localeCompare(b.prop ?? '')
+          : a.text.localeCompare(b.text),
   );
   fs.writeFileSync(
     BASELINE_PATH,
@@ -324,8 +581,9 @@ function main(): number {
       `i18n-jsx-literals: ${cleanedBaselineEntries.length} baseline entries no longer present (clean up with --accept):\n`,
     );
     for (const e of cleanedBaselineEntries) {
+      const prop = e.prop ? ` ${e.prop}` : '';
       process.stdout.write(
-        `  - ${e.file} (${e.kind}): ${JSON.stringify(e.text)}\n`,
+        `  - ${e.file} (${e.kind}${prop}): ${JSON.stringify(e.text)}\n`,
       );
     }
   }
@@ -344,8 +602,9 @@ function main(): number {
     `  Move the string into apps/mobile/src/i18n/locales/en.json and render t('…'), or — if this is genuinely non-translatable (a code sample, a brand token) — re-run with --accept and justify in the commit message.\n`,
   );
   for (const v of newViolations) {
+    const prop = v.prop ? ` ${v.prop}` : '';
     process.stderr.write(
-      `  ${v.file}:${v.line} (${v.kind}): ${JSON.stringify(v.text)}\n`,
+      `  ${v.file}:${v.line} (${v.kind}${prop}): ${JSON.stringify(v.text)}\n`,
     );
   }
   return 1;
