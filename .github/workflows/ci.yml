@@ -171,10 +171,11 @@ jobs:
       - name: i18n orphan-key check
         run: pnpm exec tsx scripts/check-i18n-orphan-keys.ts
 
-      # Phase 3 ratchet: block NEW hardcoded English in JSX (`<Text>Add
-      # child</Text>`, `<Text>{'Continue'}</Text>`) that bypasses t() and
-      # renders English to every locale. The orphan-key check above only sees
-      # strings already inside t(); this is the complementary read-side guard.
+      # Phase 3 ratchet: block NEW hardcoded English in JSX children and
+      # known user-copy JSX attributes (`label`, `accessibilityLabel`, etc.)
+      # that bypass t() and render English to every locale. The orphan-key
+      # check above only sees strings already inside t(); this is the
+      # complementary read-side guard.
       # Existing literals are grandfathered in scripts/i18n-jsx-literals-baseline.json.
       - name: i18n hardcoded-JSX-literal check
         run: pnpm exec tsx scripts/check-i18n-jsx-literals.ts

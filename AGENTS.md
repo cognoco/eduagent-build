@@ -297,24 +297,26 @@ English literals in JSX (e.g. `<Text>Add child</Text>`) bypass i18n entirely
 and render English to every locale. `scripts/check-i18n-jsx-literals.ts` is the
 read-side guard: a `ts-morph` AST walker that flags `JsxText` nodes and
 JSX-children `StringLiteral` / `NoSubstitutionTemplateLiteral` nodes (including
-through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) in
+through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) plus
+user-visible JSX attribute literals for known copy props (`label`,
+`accessibilityLabel`, `title`, `placeholder`, etc.) in
 `apps/mobile/src/**/*.tsx`. It is a forward-only baseline ratchet mirroring the
 `no-clinical-copy` pattern: existing literals are grandfathered in
-`scripts/i18n-jsx-literals-baseline.json` (361 entries), and only NEW literals
-fail CI (the `i18n hardcoded-JSX-literal check` step in `ci.yml`). Violations are
-keyed on `{file, kind, text}` — not line number — so reformatting never churns
-the baseline. Run `pnpm check:i18n:jsx-literals --accept` to refresh the
-baseline when you genuinely add non-translatable JSX copy (a code sample, a
-brand token) and justify it in the commit message.
-
-**Scope deliberately excludes JSX *attribute* literals** (`label="Continue"`,
-`title="Delete"`) — that surface mixes real copy with testID/style/a11y-role
-values and needs a per-prop allow/deny model scoped separately
-(`docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json`).
+`scripts/i18n-jsx-literals-baseline.json`, and only NEW literals fail CI (the
+`i18n hardcoded-JSX-literal check` step in `ci.yml`). Child/text violations are
+keyed on `{file, kind, text}`; attribute violations are keyed on
+`{file, kind, prop, text}` — never line number — so reformatting does not churn
+the baseline. The attribute scanner deliberately ignores non-copy props such as
+`testID`, style/class props, role-like values, IDs, routes, image/source paths,
+metadata, unknown custom props, and translation-key literals. Run
+`pnpm check:i18n:jsx-literals --accept` to refresh the baseline when you
+genuinely add non-translatable JSX copy (a code sample, a brand token) and
+justify it in the commit message.
 
 When adding user-visible copy, route it through `t('…')` and add the key to
 `en.json` in the same PR — the ratchet enforces this for the JsxText/child
-surface, but attribute copy still relies on review.
+surface and known copy attributes; review remains responsible for copy hidden
+behind unknown custom prop names.
 
 ### Variable-interpolation fallbacks
 

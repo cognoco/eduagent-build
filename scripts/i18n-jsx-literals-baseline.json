@@ -1,8 +1,20 @@
 [
   {
     "file": "apps/mobile/src/app/(app)/dictation/complete.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "Pick from gallery (E2E)"
+  },
+  {
+    "file": "apps/mobile/src/app/(app)/dictation/complete.tsx",
     "kind": "jsx-text",
     "text": "Pick from gallery (E2E)"
+  },
+  {
+    "file": "apps/mobile/src/app/create-subject.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "Choose ${}${}"
   },
   {
     "file": "apps/mobile/src/app/dev-only/seed-pending-redirect.tsx",
@@ -45,6 +57,18 @@
     "text": "Debug details (screenshot this)"
   },
   {
+    "file": "apps/mobile/src/components/home/SubjectTile.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "${}. ${}. ${}/${} topics"
+  },
+  {
+    "file": "apps/mobile/src/components/MentomateLogo.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "Mentomate"
+  },
+  {
     "file": "apps/mobile/src/components/MentomateLogo.tsx",
     "kind": "jsx-text",
     "text": "mate"
@@ -53,6 +77,18 @@
     "file": "apps/mobile/src/components/MentomateLogo.tsx",
     "kind": "jsx-text",
     "text": "ment"
+  },
+  {
+    "file": "apps/mobile/src/components/onboarding/OnboardingStepIndicator.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "Step ${} of ${}${}"
+  },
+  {
+    "file": "apps/mobile/src/components/progress/RetentionSignal.tsx",
+    "kind": "jsx-attribute-string",
+    "prop": "accessibilityLabel",
+    "text": "Review status: ${}"
   },
   {
     "file": "apps/mobile/src/components/session/ChatShell.tsx",
