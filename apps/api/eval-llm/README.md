@@ -159,15 +159,16 @@ Markdown lets you eyeball differences in a PR diff without the harness needing t
 
 A **standalone** dual-agent simulator (not a `FlowDefinition` — flows are
 single-turn). One LLM plays the **learner** in character from a hidden
-competence brief. Each learner answer is then **graded by the production judge**
-(`buildChallengeRoundGraderPrompt` → rung 1, `capability:'judge'`) — the
-component production actually runs when `CHALLENGE_ROUND_GRADER_ENABLED` is on
-(the V2 default). A separate **tutor** turn (`buildSystemPrompt`,
-production-routed) only produces the next question. The pure state machine
-(`transitionChallengeState`) and the pure mastery gate (`decideMasteryAndReview`)
-run in-memory. The driver compares the gate's outcome to each scenario's
-ground-truth `expectedOutcome` to compute over-/under-credit and the grader's
-signal-emission rate.
+competence brief; the **real mentor pipeline** (`buildSystemPrompt` →
+`routeAndCall`, production-routed so the `--grader-model` candidate never leaks
+into it) asks the next question; and — critically — the **production
+Challenge-Round judge** (`buildChallengeRoundGraderPrompt` → rung-1
+`capability:'judge'` via `runHarnessLlm`, the component prod runs with
+`CHALLENGE_ROUND_GRADER_ENABLED` on by default) grades each answer. The pure
+state machine (`transitionChallengeState`) and the pure mastery gate
+(`decideMasteryAndReview`) run in-memory over the judge's verdicts. The driver
+compares the gate's outcome to each scenario's ground-truth `expectedOutcome`
+to compute over-/under-credit and **per-grader** signal-emission rates.
 
 > **The GRADER is the measured component, not the tutor.** With the grader flag
 > on, the tutor emits **no** inline `challenge_round_evaluation` — a separate
@@ -181,23 +182,25 @@ pnpm --filter @eduagent/api eval:llm:sim -- --list
 
 # Live grid: a DISTINCT learner is graded by the production judge (default) or
 # by an explicit grader candidate. Learner and grader must differ (see guard).
+# Omit --max-live-calls to auto-fit the budget to the full grid (no silent truncation).
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --runs 2 --max-live-calls 30
+  --learner-model openai/gpt-4o --runs 2
 
 # Pin an explicit grader candidate instead of production routing:
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
   --learner-model openai/gpt-4o --grader-model anthropic/claude-3.5-sonnet \
-  --runs 2 --max-live-calls 30
+  --runs 2
 ```
 
 Flags: `--learner-model <slug>` (required for a run), `--grader-model <slug>`
 (optional candidate; default = production judge routing), `--provider <slug>`,
-`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (default 30 —
-**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`), `--list`,
-`--allow-same-family`, and the three **baseline verbs** below
-(`--validate-baseline`, `--check-baseline`, `--update-baseline`). Output lands in
-`eval-llm/corpus/<timestamp>/` (gitignored) as one transcript JSON per round
-plus `metrics.json`.
+`--topics <csv|all>`, `--runs <n>`, `--max-live-calls <n>` (optional **hard
+cap**; when omitted the budget auto-fits to `grid × 9 calls/round`
+(**9 calls/round** = 3 calls/question × `MAX_CHALLENGE_QUESTIONS=3`) so a run
+never silently truncates the grid), `--list`, `--allow-same-family`, and the
+three **baseline verbs** below (`--validate-baseline`, `--check-baseline`,
+`--update-baseline`). Output lands in `eval-llm/corpus/<timestamp>/` (gitignored)
+as one transcript JSON per round plus `metrics.json`.
 
 ### Over-credit gate + baseline (three verbs)
 
@@ -269,14 +272,40 @@ The guard refuses to run when:
    can be served under different slugs/providers); pass `--allow-same-family`
    for a deliberate same-family A/B.
 
+A third, **soft** axis warns but does not throw: a same-**vendor-root**,
+different-family pair (e.g. `deepseek-chat` vs `deepseek-r1`) — distinct enough
+to clear the family guard, but close enough lineage to be worth a `console.warn`
+so a correlated-error A/B isn't run unknowingly.
+
 ### Scope limits (read before trusting a number)
 
-- **DB-free.** `decideMasteryAndReview` runs for real, but the production-only
-  `validateEvaluationEventIds` (DB lookup that swaps `learnerQuote` for the real
-  `session_events.content`) is **not** called — there is no seeded DB. The
-  simulator measures the LLM contract + the mastery decision, not the
-  DB-anchoring step (that stays covered by `evaluation.test.ts` + integration
-  tests).
+- **DB-free → results are an UPPER BOUND.** `decideMasteryAndReview` runs for
+  real, but the production-only `validateEvaluationEventIds` (DB lookup that
+  **rejects the *whole* evaluation** — `throw` on *any* `answerEventId` that
+  can't be matched to a real `session_events` row, routing the round to
+  `invalid`) is **not** called — there is no seeded DB. That step can only ever
+  *remove* a verdict, never upgrade one, so skipping it biases in one direction:
+  the harness's `verified`/over-credit rates are an **upper bound** on
+  production, never a lower bound (the all-or-nothing rejection makes production
+  *more* aggressive at dropping, so the bound holds). `metrics.json` stamps this
+  caveat. DB-anchoring stays covered by `evaluation.test.ts` + integration tests.
+- **Under-18 gate collapses the judge to the gpt-oss fallback for the shipped
+  grid.** Every sim scenario profile is a minor, and production's under-18 gate
+  (`router.ts`) short-circuits `capability:'judge'` to the approved text
+  fallback (Cerebras gpt-oss) *before* the vendor-independent grader model is
+  ever reached. The harness reflects this faithfully — `resolveProductionGraderModel`
+  and the null-routing path both hit the same gate, and the two-model guard
+  compares the learner against that *real resolved* slug — but it means the
+  default-routing run validates the **gpt-oss judge**, not a distinct anthropic
+  grader. Read "production JUDGE" as "the judge production actually runs for
+  these ages", not "a separate vendor's model". To exercise a distinct judge,
+  pass an explicit `--grader-model` (and accept it isn't what minors hit in prod).
+- **Low N is flagged, not hidden.** Below `MIN_ROUNDS_FOR_CALIBRATION` (30 — i.e.
+  ≥5 runs across the 6-scenario grid) the corpus is marked
+  `sufficientForCalibration:false` and every headline rate ships a **Wilson 95%
+  CI + denominator**. A 6×1 grid moves a rate ~17pp on a single flip; the CI and
+  the INSUFFICIENT-N note exist so that number can't be screenshotted as "the
+  bar is calibrated".
 - **Note-overlap calibration is NOT in scope.** `MIN_LEXICAL_OVERLAP_NOTE_DRAFT`
   is consumed only by the note-draft path against DB-verified content this
   harness does not produce. RR-6's **note-overlap** half stays blocked on a

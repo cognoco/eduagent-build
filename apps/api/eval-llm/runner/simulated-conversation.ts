@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   challengeRoundGraderVerdictSchema,
+  conversationLanguageSchema,
   type AgeBracket,
   type ChallengeRoundEvaluationItem,
   type ChallengeRoundSessionState,
@@ -20,11 +21,8 @@ import {
 } from '../../src/services/challenge-round/evaluation';
 import { transitionChallengeState } from '../../src/services/challenge-round/state';
 import { parseEnvelope } from '../../src/services/llm/envelope';
-import { extractFirstJsonObject } from '../../src/services/llm';
-import {
-  getModelConfigForTest,
-  routeAndCall,
-} from '../../src/services/llm/router';
+import { extractFirstJsonObject, routeAndCall } from '../../src/services/llm';
+import { getModelConfigForTest } from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
 import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -334,6 +332,38 @@ async function defaultTutorTurn(
 }
 
 /**
+ * Pure parse seam mirroring `runChallengeRoundGrader`'s contract: extract first
+ * JSON object → `JSON.parse` → `challengeRoundGraderVerdictSchema` → inject the
+ * server-owned `answerEventId`. Any failure (no JSON / parse error / schema
+ * invalid / `items:[]`) returns `[]` — a dropped signal, exactly as production
+ * fails open. Exported so the failure paths are unit-tested directly (the live
+ * `defaultGraderTurn` can't call `runChallengeRoundGrader`, which uses
+ * `routeAndCall` and would ignore the `--grader-model` override) — this is the
+ * drift guard against `grader.ts`'s parse contract.
+ */
+export function parseGraderResponse(
+  raw: string,
+  answerEventId: string,
+): ChallengeRoundEvaluationItem[] {
+  const jsonText = extractFirstJsonObject(raw);
+  if (!jsonText) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return [];
+  }
+  const verdict = challengeRoundGraderVerdictSchema.safeParse(parsed);
+  if (!verdict.success) return [];
+  // Inject the server-owned answerEventId (the model never supplies it) —
+  // mirrors runChallengeRoundGrader's server-ownership invariant.
+  return verdict.data.items.map((item) => ({
+    ...item,
+    answerEventId,
+  }));
+}
+
+/**
  * Grader turn — the MEASURED production component. Builds the real judge rubric
  * (`buildChallengeRoundGraderPrompt`) and routes via `runHarnessLlm` so a
  * `--grader-model` candidate is selected (override branch), or production judge
@@ -359,22 +389,7 @@ async function defaultGraderTurn(
     sessionId: 'eval-sim-grader',
   });
 
-  const jsonText = extractFirstJsonObject(raw);
-  if (!jsonText) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    return [];
-  }
-  const verdict = challengeRoundGraderVerdictSchema.safeParse(parsed);
-  if (!verdict.success) return [];
-  // Inject the server-owned answerEventId (the model never supplies it) —
-  // mirrors runChallengeRoundGrader's server-ownership invariant.
-  return verdict.data.items.map((item) => ({
-    ...item,
-    answerEventId: args.answerEventId,
-  }));
+  return parseGraderResponse(raw, args.answerEventId);
 }
 
 export async function runSimulatedRound(
@@ -396,8 +411,9 @@ export async function runSimulatedRound(
   const graderTurn = overrides.graderTurn ?? defaultGraderTurn;
 
   const ageBracket = resolveAgeBracket(profile.birthYear);
-  const conversationLanguage =
-    profile.conversationLanguage as ConversationLanguage;
+  const conversationLanguage = conversationLanguageSchema.parse(
+    profile.conversationLanguage,
+  );
 
   // Seed via the REAL transitions so totalQuestions is set (a state missing it
   // routes straight to drafting after one turn — state.ts FCR-2026-05-23).

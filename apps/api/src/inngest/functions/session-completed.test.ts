@@ -1697,6 +1697,29 @@ describe('sessionCompleted', () => {
         'pa-test-key-123',
       );
     });
+
+    it('[C6 break] does not transmit transcript to Voyage embeddings when GDPR consent is WITHDRAWN', async () => {
+      // Closes the consent asymmetry flagged in the session-close-pipeline
+      // deep-dive (C6): analyze-learner-profile gates transcript transmission
+      // on the GDPR processing consent (isGdprProcessingAllowed), but
+      // generate-embeddings previously sent transcript content to Voyage
+      // ungated. revokeConsent sets GDPR WITHDRAWN without clearing the memory
+      // gate, so the embeddings step must re-check the GDPR processing gate
+      // itself and skip both content extraction and the external embed call.
+      // mockResolvedValueOnce (not ...Value): default beforeEach memory consent
+      // is 'pending', so analyze-learner-profile short-circuits at the memory
+      // gate without reading GDPR consent — generate-embeddings is the sole
+      // consumer here. A persistent mock would leak WITHDRAWN into later tests
+      // (jest.clearAllMocks does not reset implementations).
+      mockSessionCompletedDb.query.consentStates.findFirst.mockResolvedValueOnce(
+        { status: 'WITHDRAWN', consentType: 'GDPR' },
+      );
+
+      await executeSteps(createEventData());
+
+      expect(mockExtractSessionContent).not.toHaveBeenCalled();
+      expect(mockStoreSessionEmbedding).not.toHaveBeenCalled();
+    });
   });
 
   describe('generate-llm-summary step', () => {

@@ -8,10 +8,22 @@ import type { SimulatedRoundResult } from './simulated-conversation';
 //
 // Feeds the MASTERY-BAR half of RR-6 (outcome distribution + over/under-credit
 // against ground truth) and the RR-12 gpt-oss de-risk (signalEmissionRate per
-// mentor model). It deliberately does NOT compute a note-overlap histogram —
-// that needs a drafting step + DB-verified learner content this DB-free harness
-// does not produce (see the plan's note-overlap scoping bullet).
+// GRADER model — the production judge is what now owns the signal). It
+// deliberately does NOT compute a note-overlap histogram — that needs a drafting
+// step + DB-verified learner content this DB-free harness does not produce.
+//
+// Every headline rate ships a Wilson 95% CI and a denominator so a low-N rate
+// can never be read as a calibration result. Below MIN_ROUNDS_FOR_CALIBRATION
+// the corpus is flagged `sufficientForCalibration: false` — a 6-scenario ×
+// 1-run grid moves a rate ~17pp on a single flip and is NOT a calibration basis.
 // ---------------------------------------------------------------------------
+
+/**
+ * Minimum total rounds before the over/under-credit + signal rates should be
+ * treated as a calibration input rather than a smoke-test. A real RR-6 decision
+ * wants ≥5 runs/scenario (≥30 rounds at 6 scenarios) so the Wilson CI tightens.
+ */
+export const MIN_ROUNDS_FOR_CALIBRATION = 30;
 
 const ALL_OUTCOMES: MasteryOutcome[] = [
   'verified',
@@ -21,8 +33,41 @@ const ALL_OUTCOMES: MasteryOutcome[] = [
 ];
 type ConceptResult = 'solid' | 'partial' | 'missing' | 'misconception';
 
+/** Wilson score 95% confidence interval for a binomial proportion. */
+export interface RateCI {
+  /** numerator (successes) */
+  n: number;
+  /** denominator (rounds) */
+  total: number;
+  rate: number;
+  low: number;
+  high: number;
+}
+
+function wilsonCI(successes: number, total: number): RateCI {
+  if (total === 0) {
+    return { n: 0, total: 0, rate: 0, low: 0, high: 0 };
+  }
+  const z = 1.96; // 95%
+  const phat = successes / total;
+  const denom = 1 + (z * z) / total;
+  const center = (phat + (z * z) / (2 * total)) / denom;
+  const margin =
+    (z * Math.sqrt((phat * (1 - phat) + (z * z) / (4 * total)) / total)) /
+    denom;
+  return {
+    n: successes,
+    total,
+    rate: phat,
+    low: Math.max(0, center - margin),
+    high: Math.min(1, center + margin),
+  };
+}
+
 export interface SimMetrics {
   totalRounds: number;
+  /** false until totalRounds >= MIN_ROUNDS_FOR_CALIBRATION — do not tune on this. */
+  sufficientForCalibration: boolean;
   outcomeCounts: Record<MasteryOutcome, number>;
   outcomeRates: Record<MasteryOutcome, number>;
   conceptResultCounts: Record<ConceptResult, number>;
@@ -32,14 +77,19 @@ export interface SimMetrics {
   /** The exact scenario ids that over-credited (gate `verified`, ground truth
    *  not). Feeds the hard ceiling: a non-empty list means a breach to name. */
   overCreditScenarioIds: string[];
-  /** Gate said `partial`/`reteach` but the scenario's ground truth was `verified`. */
+  /** Gate said `partial`/`reteach`/`invalid` but ground truth was `verified`. */
   underCreditRate: number;
   /** Share of rounds whose GRADER emitted a usable evaluation signal, overall… */
   signalEmissionRate: number;
-  /** …and per grader model (the gpt-oss-drop indicator, now measured on the
-   *  grader since the grader-ON pipeline owns the evaluation signal). The field
-   *  name is retained for baseline continuity. */
-  signalEmissionRateByMentor: Record<string, number>;
+  /** …and per GRADER model (the gpt-oss-drop indicator). */
+  signalEmissionRateByGrader: Record<string, number>;
+  /** Wilson 95% CIs + denominators for the four headline rates. */
+  ci: {
+    masteryVerified: RateCI;
+    overCredit: RateCI;
+    underCredit: RateCI;
+    signalEmission: RateCI;
+  };
 }
 
 export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
@@ -80,12 +130,11 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
       overCreditScenarioIds.push(r.scenarioId);
     }
     // Under-credit: a learner who DESERVED verification (ground-truth verified)
-    // did not get it. Includes `invalid` (the mentor dropped all signal so the
+    // did not get it. Includes `invalid` (the grader dropped all signal so the
     // gate got an empty evaluation set) — from the learner's lived outcome a
     // dropped signal is still "deserved mastery, didn't verify". How much of
     // under-credit is signal-drop vs. genuine harshness is read off
-    // `signalEmissionRate`, so the two numbers stay non-redundant. Both rates
-    // use the whole-corpus denominator (`total`), readable side by side.
+    // `signalEmissionRate`, so the two numbers stay non-redundant.
     if (
       r.expectedOutcome === 'verified' &&
       (r.decision.outcome === 'partial' ||
@@ -106,13 +155,14 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
   const outcomeRates = {} as Record<MasteryOutcome, number>;
   for (const o of ALL_OUTCOMES) outcomeRates[o] = rate(outcomeCounts[o]);
 
-  const signalEmissionRateByMentor: Record<string, number> = {};
+  const signalEmissionRateByGrader: Record<string, number> = {};
   for (const [model, { emitted, total: t }] of Object.entries(graderTotals)) {
-    signalEmissionRateByMentor[model] = t === 0 ? 0 : emitted / t;
+    signalEmissionRateByGrader[model] = t === 0 ? 0 : emitted / t;
   }
 
   return {
     totalRounds: total,
+    sufficientForCalibration: total >= MIN_ROUNDS_FOR_CALIBRATION,
     outcomeCounts,
     outcomeRates,
     conceptResultCounts,
@@ -121,19 +171,35 @@ export function aggregate(results: SimulatedRoundResult[]): SimMetrics {
     overCreditScenarioIds,
     underCreditRate: rate(underCredit),
     signalEmissionRate: rate(signalEmittedTotal),
-    signalEmissionRateByMentor,
+    signalEmissionRateByGrader,
+    ci: {
+      masteryVerified: wilsonCI(masteryVerified, total),
+      overCredit: wilsonCI(overCredit, total),
+      underCredit: wilsonCI(underCredit, total),
+      signalEmission: wilsonCI(signalEmittedTotal, total),
+    },
   };
+}
+
+export interface WriteCorpusMeta {
+  /** Number of runs/scenario requested (stamped so a rate cannot travel without N). */
+  runs: number;
+  /** Which production path was measured. */
+  gradingPath: 'production-grader' | 'legacy-inline';
 }
 
 /**
  * Write one transcript JSON per round plus a `metrics.json` summary into `dir`.
  * `dir` is created if missing. Transcripts are bulky + per-run and the corpus
- * dir is gitignored (T6).
+ * dir is gitignored (T6). `metrics.json` is STAMPED with the grading path, N,
+ * runs, and `provisional:true` so a screenshotted number can never be misread
+ * as "RR-2/RR-12 cleared".
  */
 export async function writeCorpus(
   dir: string,
   results: SimulatedRoundResult[],
   metrics: SimMetrics,
+  meta: WriteCorpusMeta = { runs: 1, gradingPath: 'production-grader' },
 ): Promise<void> {
   await mkdir(dir, { recursive: true });
   await Promise.all(
@@ -147,7 +213,20 @@ export async function writeCorpus(
     join(dir, 'metrics.json'),
     JSON.stringify(
       {
-        note: 'SYNTHETIC pre-screen (RR-2 complement, NOT a substitute). Bar tuned here is PROVISIONAL per spec CH-4; post-launch recalibration against real learner transcripts is required.',
+        provisional: true,
+        gradingPath: meta.gradingPath,
+        runsPerScenario: meta.runs,
+        n: metrics.totalRounds,
+        note:
+          'SYNTHETIC pre-screen (RR-2 complement, NOT a substitute). Bar tuned here is ' +
+          'PROVISIONAL per spec CH-4; post-launch recalibration against real learner ' +
+          'transcripts is required. Grading measures the PRODUCTION JUDGE ' +
+          '(challenge-round/grader.ts), the component prod runs with ' +
+          'CHALLENGE_ROUND_GRADER_ENABLED on (default). DB-free: validateEvaluationEventIds ' +
+          'is skipped, so verified/over-credit here is an UPPER BOUND on production. ' +
+          (metrics.sufficientForCalibration
+            ? ''
+            : `INSUFFICIENT N (${metrics.totalRounds} < ${MIN_ROUNDS_FOR_CALIBRATION}) — smoke run, NOT a calibration basis.`),
         ...metrics,
       },
       null,
@@ -185,7 +264,7 @@ export interface SimulationBaseline {
     outcome: Record<MasteryOutcome, number>;
     masteryVerified: number;
     underCredit: number;
-    signalEmissionByMentor: Record<string, number>;
+    signalEmissionByGrader: Record<string, number>;
   };
 }
 
@@ -232,14 +311,14 @@ export function compareSimulationBaseline(
   // on the grader). Diff every model in either set; a model present on only one
   // side reads as 0 on the other.
   const graderKeys = new Set([
-    ...Object.keys(baseline.rates.signalEmissionByMentor),
-    ...Object.keys(current.signalEmissionRateByMentor),
+    ...Object.keys(baseline.rates.signalEmissionByGrader),
+    ...Object.keys(current.signalEmissionRateByGrader),
   ]);
   for (const k of graderKeys) {
     cmp(
-      `signalEmissionByMentor.${k}`,
-      baseline.rates.signalEmissionByMentor[k] ?? 0,
-      current.signalEmissionRateByMentor[k] ?? 0,
+      `signalEmissionByGrader.${k}`,
+      baseline.rates.signalEmissionByGrader[k] ?? 0,
+      current.signalEmissionRateByGrader[k] ?? 0,
     );
   }
 
@@ -282,7 +361,7 @@ export function toBaseline(
       outcome: metrics.outcomeRates,
       masteryVerified: metrics.masteryVerifiedRate,
       underCredit: metrics.underCreditRate,
-      signalEmissionByMentor: metrics.signalEmissionRateByMentor,
+      signalEmissionByGrader: metrics.signalEmissionRateByGrader,
     },
   };
 }
@@ -345,13 +424,13 @@ export function validateBaselineStructure(raw: unknown): {
     };
   }
   if (
-    r.signalEmissionByMentor === null ||
-    typeof r.signalEmissionByMentor !== 'object'
+    r.signalEmissionByGrader === null ||
+    typeof r.signalEmissionByGrader !== 'object'
   ) {
     return {
       ok: false,
       reason:
-        'missing rates.signalEmissionByMentor (looks like a non-simulation baseline)',
+        'missing rates.signalEmissionByGrader (looks like a non-simulation baseline)',
     };
   }
   if (r.outcome === null || typeof r.outcome !== 'object') {

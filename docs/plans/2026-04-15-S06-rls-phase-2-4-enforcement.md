@@ -1,6 +1,19 @@
 # S-06 RLS — Phase 2-4: Enforcement (Post-Launch Sprint 2+)
 
-> **STATUS (2026-06-27):** Phase 2 (RLS policies authored) + Phase 4.1 landed, but the policies are INERT — Phase 3 (the enforcement cutover wiring `withProfileScope`) never landed, so row-level security is NOT actually enforced at runtime. Do not assume RLS isolation from this doc. NEXT: Phase 3 enforcement.
+> **⏸️ PARKED (2026-06-27) — do not resume Phase 3 until the `profiles`→`person` physical rename lands.**
+>
+> Phase 3 (the enforcement cutover) is deliberately parked, not abandoned. The reason it is parked rather than scheduled:
+>
+> **Premises this park stands on (all must still hold to keep it parked):**
+> 1. **App-layer scoping is the live, sufficient control.** Row isolation is enforced today by `createScopedRepository(profileId)` + the parent-chain `WHERE profileId = …` pattern (the AGENTS.md data-access rules). RLS is *defense-in-depth* — a second wall behind that one — not the only wall. With the app-layer wall intact, the missing DB wall is a hardening gap, not a live leak.
+> 2. **Pre-launch, no real users / no production learner data at risk.** There is no live cross-tenant data to leak while RLS sits inert (see memory `project_pre_launch_no_users`).
+> 3. **The `profiles`→`person` rename (MMT-ADR-0012) would invalidate the Phase 3 work if done first.** Every RLS policy in migration `0085` keys on the `profile_id` column (`USING (profile_id = current_setting('app.current_profile_id')::uuid)`). The physical rename changes the very table/column these policies reference, so enforcing RLS *before* the rename means authoring policies against names that are about to change — wasted work and a guaranteed re-migration. **Phase 3 must be sequenced AFTER the rename**, against the final `person`/`person_id` names.
+>
+> **Revisit trigger:** when the `profiles`→`person` physical rename (MMT-ADR-0012) is in place. At that point, re-scope Phase 3 against the renamed schema before doing the role/middleware wiring below.
+>
+> **What "inert" concretely means (verified 2026-06-27, two independent dead layers):** (a) the app connects as `neondb_owner`, which holds `BYPASSRLS`, so policies never apply (`packages/database/src/client.ts:103`, comment at `0085_bug216_rls_policies_sweep.sql:6-9`); no `app_user`/`DATABASE_URL_APP` role split exists. (b) `withProfileScope` (`packages/database/src/rls.ts:44`), which sets the `app.current_profile_id` session var the policies read, is called in exactly ONE place (`apps/api/src/services/quiz/queries.ts:170`) — middleware never wraps requests with it, so the session var is NULL and policies fail-closed everywhere else. Fixing one layer alone changes nothing.
+
+> **STATUS (2026-06-27) [superseded by PARKED banner above]:** Phase 2 (RLS policies authored) + Phase 4.1 landed, but the policies are INERT — Phase 3 (the enforcement cutover wiring `withProfileScope`) never landed, so row-level security is NOT actually enforced at runtime. Do not assume RLS isolation from this doc.
 
 > **Status (2026-05-25):** Unchanged since 2026-05-23 — Phase 2 policies shipped but **inert** (the API still connects as DB owner, which bypasses RLS). Phase 3 has not started: `withProfileScope` signature in `packages/database/src/rls.ts:46-66` lacks `accountId`, no `DATABASE_URL_APP` exists, no dual `ownerDb`/`appDb` connection in `client.ts`, no `app.current_account_id` setter. Parent-read policies via `family_links` also missing from migration `0085`. **Resume here:** Phase 3.1 — add `DATABASE_URL_APP` (non-owner role) + dual-connection in `client.ts`, then extend `withProfileScope` to accept `accountId`. Until that lands, the shipped policies provide no protection.
 
