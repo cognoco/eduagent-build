@@ -7,9 +7,14 @@
 // SYNTHETIC pre-screen that COMPLEMENTS RR-2 (it does NOT discharge RR-2's
 // real-staging-transcript dependency) and feeds the mastery-bar half of RR-6.
 //
-// PRODUCTION GRADER-ON pipeline: the TUTOR is production-routed (gpt-oss-120b in
-// stg) and only drives the conversation; the measured component is the GRADER
-// (the production judge), which owns the mastery evaluation. The optional
+// PRODUCTION GRADER-ON pipeline: the TUTOR is pinned to gpt-oss-120b (MENTOR_MODEL,
+// via OpenRouter — the harness router can't reach the production gpt-oss host) and
+// only drives the conversation; the measured component is the GRADER (the
+// production-routed grading model), which owns the mastery evaluation. NOTE:
+// every sim scenario is a minor, and the router's under-18 gate resolves before
+// the capability:'judge' branch, so the resolved grader is the age-appropriate
+// approved model (possibly the same family as the tutor), NOT necessarily the
+// adult claude judge — adult-judge coverage needs the T13 adult scenarios. The optional
 // `--grader-model` override pins a grader CANDIDATE for an A/B; omit it (the
 // committed-gate default) and the grader is production-routed to the
 // judge-of-record. The learner is always a pinned OpenRouter slug (`--learner-model`).
@@ -21,6 +26,13 @@
 //     Deterministic, key-free: structurally validate the committed
 //     simulation-baseline.json + check the judge slug is current. No LLM call.
 //
+//   doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
+//     --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 \
+//     --max-live-calls 189 --check-baseline
+//     Live grid: gpt-oss tutor + production judge grade a distinct learner;
+//     enforce the over-credit ceiling + drift vs the committed baseline. The
+//     learner must be a non-gpt family (the stg minor judge is gpt-4o-mini —
+//     openai/gpt-4o collides and the two-model guard hard-fails).
 //   doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
 //     --grader-model openai/gpt-oss-120b \
 //     --learner-model anthropic/claude-3.5-sonnet --runs 5
@@ -59,6 +71,7 @@ import {
 } from './runner/llm-bootstrap';
 import {
   assertTwoModelGuard,
+  MENTOR_MODEL,
   resolveJudgeSlugProbe,
   resolveProductionGraderModel,
   runSimulatedRound,
@@ -263,23 +276,42 @@ async function runRounds(
   return results;
 }
 
+interface ReproduceResult {
+  /** Scenario ids that over-credited AGAIN on the re-run. */
+  reproducedIds: string[];
+  /** Re-test rounds we attempted (offenders × n). */
+  attempted: number;
+  /** Re-test rounds that actually completed (attempted minus transient skips). */
+  completed: number;
+}
+
 /**
- * Re-run just the named over-credit scenarios N× and return the ids that breach
- * AGAIN — so a one-off LLM slip (non-reproducing) does not red CI, but a genuine
- * leniency regression (reproducing) does. Runs after bootstrap (providers ready).
+ * Re-run just the named over-credit scenarios N× to tell a one-off LLM slip
+ * (non-reproducing) from a genuine leniency regression (reproducing). Returns
+ * BOTH the reproduced ids AND attempted/completed counts so the caller can fail
+ * CLOSED when re-test rounds get skipped — a detected breach must never be
+ * exonerated by transient flakiness in the verification step. Runs after
+ * bootstrap (providers ready). The caller pre-checks budget so this never
+ * overspends the `--max-live-calls` hard cap.
  */
 async function reproduceOverCredit(
   ids: string[],
   n: number,
   args: SimCliArgs,
-): Promise<string[]> {
+): Promise<ReproduceResult> {
   const wanted = new Set(ids);
   const offenders = CHALLENGE_SIM_SCENARIOS.filter((s) => wanted.has(s.id));
-  if (offenders.length === 0) return [];
+  if (offenders.length === 0) {
+    return { reproducedIds: [], attempted: 0, completed: 0 };
+  }
   const grid = Array.from({ length: n }, () => offenders).flat();
   const results = await runRounds(grid, args);
   const metrics = aggregate(results);
-  return [...new Set(metrics.overCreditScenarioIds)];
+  return {
+    reproducedIds: [...new Set(metrics.overCreditScenarioIds)],
+    attempted: grid.length,
+    completed: results.length,
+  };
 }
 
 async function main(): Promise<void> {
@@ -336,6 +368,25 @@ async function main(): Promise<void> {
     );
   }
 
+  // --check-baseline: load + structurally validate the committed baseline BEFORE
+  // spending a single live call. The read used to happen after the full grid ran,
+  // so a missing/invalid baseline (e.g. pre-T12 seeding) burned the entire paid
+  // budget and THEN threw. Fail fast on cost instead.
+  let loadedBaseline: SimulationBaseline | null = null;
+  if (args.checkBaseline) {
+    const raw = JSON.parse(
+      await readFile(BASELINE_PATH, 'utf8').catch(() => 'null'),
+    ) as unknown;
+    const v = validateBaselineStructure(raw);
+    if (!v.ok) {
+      console.error(
+        `[eval:llm:sim] cannot --check-baseline: ${v.reason}. Seed it via --update-baseline (T12) before gating.`,
+      );
+      process.exit(1);
+    }
+    loadedBaseline = raw as SimulationBaseline;
+  }
+
   const scenarios = selectScenarios(args.topics);
   if (scenarios.length === 0) {
     throw new Error(
@@ -369,18 +420,39 @@ async function main(): Promise<void> {
 
   // Provider pin + grader-candidate override BEFORE bootstrap. The override
   // pins the GRADER candidate (defaultGraderTurn → runHarnessLlm honors it);
-  // the tutor is always production-routed (routeAndCall, ignores the override).
+  // the tutor is pinned to MENTOR_MODEL via callOpenRouterModel directly, so it
+  // ignores the grader override (but a --provider host pin DOES apply to it).
   setOpenRouterProviderPin(args.provider ? [args.provider] : null);
   setOpenRouterModelOverride(args.graderModel ?? null);
   bootstrapLlmProviders();
 
   console.log(
-    `Running ${grid.length} simulated round(s): learner=${args.learnerModel}, tutor=production-routing, grader=${args.graderModel ?? 'production-routing'}\n`,
+    `Running ${grid.length} simulated round(s): learner=${args.learnerModel}, tutor=${MENTOR_MODEL}, grader=${args.graderModel ?? 'production-routing'}\n`,
   );
 
   const results = await runRounds(grid, args);
 
   const metrics = aggregate(results);
+
+  // Empty-corpus guard (gate-integrity): if EVERY round skipped — a missing
+  // provider key (bootstrap treats keys as optional and fails at call time) or a
+  // mass transient failure — `results` is [] and every rate is 0/empty. An
+  // over-credit gate over an empty corpus would exit GREEN having measured
+  // nothing. Refuse to emit/seed/gate on zero rounds; warn on a partial corpus.
+  if (metrics.totalRounds === 0) {
+    console.error(
+      `[eval:llm:sim] measured 0 rounds — every round skipped (missing provider key or mass transient failure). ` +
+        `Refusing to report, seed, or gate over an empty corpus.`,
+    );
+    process.exit(1);
+  }
+  if (metrics.totalRounds < grid.length) {
+    console.warn(
+      `[eval:llm:sim] coverage gap: ${grid.length - metrics.totalRounds}/${grid.length} round(s) skipped; ` +
+        `metrics below cover only ${metrics.totalRounds} round(s).`,
+    );
+  }
+
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const corpusDir = path.resolve(__dirname, 'corpus', ts);
   await writeCorpus(corpusDir, results, metrics, {
@@ -431,7 +503,7 @@ async function main(): Promise<void> {
     }
     const baseline = toBaseline(metrics, {
       learnerModel: args.learnerModel,
-      mentorModel: 'production-routing',
+      mentorModel: MENTOR_MODEL,
       graderModel: args.graderModel ?? resolveProductionGraderModel(repProfile),
       updatedAt: new Date().toISOString(),
       provenance: 'update-baseline',
@@ -445,15 +517,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  // --check-baseline: enforce the over-credit ceiling (hard) + report drift.
+  // --check-baseline: enforce the reproduce-gated over-credit ceiling + report
+  // drift. The baseline was already loaded + validated BEFORE the paid run.
   if (args.checkBaseline) {
-    const raw = JSON.parse(await readFile(BASELINE_PATH, 'utf8')) as unknown;
-    const v = validateBaselineStructure(raw);
-    if (!v.ok) {
-      console.error(`[eval:llm:sim] invalid baseline: ${v.reason}`);
-      process.exit(1);
-    }
-    const baseline = raw as SimulationBaseline;
+    const baseline = loadedBaseline!;
     const gate = compareSimulationBaseline(
       metrics,
       baseline,
@@ -465,22 +532,42 @@ async function main(): Promise<void> {
       );
     }
     if (gate.overCreditCount > 0) {
-      console.warn(
-        `[eval:llm:sim] over-credit on ${gate.overCreditScenarioIds.join(', ')} — reproducing ${REPRODUCE_N}× before failing…`,
-      );
-      const reproduced = await reproduceOverCredit(
-        gate.overCreditScenarioIds,
-        REPRODUCE_N,
-        args,
-      );
-      if (reproduced.length > 0) {
+      const ids = gate.overCreditScenarioIds;
+      // Budget the re-test against the HARD --max-live-calls cap. If we cannot
+      // requalify EVERY offender REPRODUCE_N× within the remaining budget, fail
+      // CLOSED — a detected breach is never silently dropped for lack of budget.
+      const neededRounds = ids.length * REPRODUCE_N;
+      const remainingRounds = Math.max(0, maxRounds - grid.length);
+      if (remainingRounds < neededRounds) {
         console.error(
-          `[eval:llm:sim] OVER-CREDIT CEILING BREACH (reproduced): ${reproduced.join(', ')}`,
+          `[eval:llm:sim] OVER-CREDIT CEILING BREACH on ${ids.join(', ')} — ` +
+            `insufficient budget to requalify (${remainingRounds} round(s) left, need ${neededRounds}). ` +
+            `Failing closed; re-run with a higher --max-live-calls to re-test a suspected one-off slip.`,
         );
         process.exit(1);
       }
       console.warn(
-        `[eval:llm:sim] [slip] over-credit did not reproduce on ${gate.overCreditScenarioIds.join(', ')} — passing.`,
+        `[eval:llm:sim] over-credit on ${ids.join(', ')} — reproducing ${REPRODUCE_N}× before failing…`,
+      );
+      const rep = await reproduceOverCredit(ids, REPRODUCE_N, args);
+      if (rep.reproducedIds.length > 0) {
+        console.error(
+          `[eval:llm:sim] OVER-CREDIT CEILING BREACH (reproduced): ${rep.reproducedIds.join(', ')}`,
+        );
+        process.exit(1);
+      }
+      // Inconclusive re-test (some re-run rounds skipped) must NOT exonerate a
+      // breach found in the main run — fail closed, never pass on missing data.
+      if (rep.completed < rep.attempted) {
+        console.error(
+          `[eval:llm:sim] OVER-CREDIT detected on ${ids.join(', ')}; reproduce INCONCLUSIVE ` +
+            `(${rep.attempted - rep.completed}/${rep.attempted} re-test round(s) skipped). ` +
+            `Failing closed — a breach is never exonerated by skipped re-tests.`,
+        );
+        process.exit(1);
+      }
+      console.warn(
+        `[eval:llm:sim] [slip] over-credit did not reproduce across ${rep.completed} clean re-test round(s) on ${ids.join(', ')} — passing.`,
       );
     }
     console.log('[eval:llm:sim] over-credit ceiling held (0).');

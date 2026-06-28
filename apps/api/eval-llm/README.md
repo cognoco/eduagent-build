@@ -159,16 +159,18 @@ Markdown lets you eyeball differences in a PR diff without the harness needing t
 
 A **standalone** dual-agent simulator (not a `FlowDefinition` — flows are
 single-turn). One LLM plays the **learner** in character from a hidden
-competence brief; the **real mentor pipeline** (`buildSystemPrompt` →
-`routeAndCall`, production-routed so the `--grader-model` candidate never leaks
-into it) asks the next question; and — critically — the **production
-Challenge-Round judge** (`buildChallengeRoundGraderPrompt` → rung-1
-`capability:'judge'` via `runHarnessLlm`, the component prod runs with
-`CHALLENGE_ROUND_GRADER_ENABLED` on by default) grades each answer. The pure
-state machine (`transitionChallengeState`) and the pure mastery gate
-(`decideMasteryAndReview`) run in-memory over the judge's verdicts. The driver
-compares the gate's outcome to each scenario's ground-truth `expectedOutcome`
-to compute over-/under-credit and **per-grader** signal-emission rates.
+competence brief. Each learner answer is then **graded by the production judge**
+(`buildChallengeRoundGraderPrompt` → rung 1, `capability:'judge'`) — the
+component production actually runs when `CHALLENGE_ROUND_GRADER_ENABLED` is on
+(the V2 default). A separate **tutor** turn (`buildSystemPrompt`, pinned to
+`MENTOR_MODEL` = `openai/gpt-oss-120b` via the OpenRouter candidate path —
+the harness router can't reach the production gpt-oss host, and under stg
+production routing would resolve a minor's tutor to Gemini/gpt-4o, never
+gpt-oss) only produces the next question. The pure state machine
+(`transitionChallengeState`) and the pure mastery gate (`decideMasteryAndReview`)
+run in-memory over the judge's verdicts. The driver compares the gate's outcome to
+each scenario's ground-truth `expectedOutcome` to compute over-/under-credit and
+**per-grader** signal-emission rates.
 
 > **The GRADER is the measured component, not the tutor.** With the grader flag
 > on, the tutor emits **no** inline `challenge_round_evaluation` — a separate
@@ -182,14 +184,18 @@ pnpm --filter @eduagent/api eval:llm:sim -- --list
 
 # Live grid: a DISTINCT learner is graded by the production judge (default) or
 # by an explicit grader candidate. Learner and grader must differ (see guard).
+# The learner must be a valid OpenRouter slug AND a different family from the
+# resolved grader — under stg the minor judge is gpt-4o-mini, so `openai/gpt-4o`
+# COLLIDES (guard hard-fails); use a non-gpt learner like llama-3.3-70b.
 # Omit --max-live-calls to auto-fit the budget to the full grid (no silent truncation).
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --runs 2
+  --learner-model meta-llama/llama-3.3-70b-instruct --runs 2 --max-live-calls 30
 
-# Pin an explicit grader candidate instead of production routing:
+# Pin an explicit grader candidate instead of production routing (any valid
+# OpenRouter slug; must differ from the learner family):
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --grader-model anthropic/claude-3.5-sonnet \
-  --runs 2
+  --learner-model meta-llama/llama-3.3-70b-instruct --grader-model deepseek/deepseek-chat \
+  --runs 2 --max-live-calls 30
 ```
 
 Flags: `--learner-model <slug>` (required for a run), `--grader-model <slug>`
@@ -217,10 +223,15 @@ see the seeding note) anchors three verbs:
   declared stale on the very next PR rather than scoring against the wrong model.
   This is the per-PR step in `api-quality-gate.yml` (deterministic, no secrets).
 - **`--check-baseline`** — live grid (needs Doppler `-c stg`), then
-  `compareSimulationBaseline` vs the committed baseline. A reproduced over-credit
-  breach exits 1 (the **hard ceiling**, `overCreditScenarioIds.length === 0`);
-  soft drift beyond tolerance only warns. This is the **weekly** step in
-  `eval-live.yml`.
+  `compareSimulationBaseline` vs the committed baseline. The over-credit ceiling
+  is **reproduce-gated**: a first-pass over-credit is re-tested `REPRODUCE_N=3`×
+  and exits 1 only if it **reproduces** — so a one-off LLM slip does not red CI.
+  It **fails closed**, never open: if the re-test can't fully requalify every
+  offender within the `--max-live-calls` budget, or any re-test round is skipped,
+  the detected breach stands (exit 1) — a breach is never exonerated by missing
+  data. The committed baseline is loaded + validated **before** the paid run, and
+  a 0-round (empty) corpus hard-fails rather than passing green. Soft drift
+  beyond tolerance only warns. This is the **weekly** step in `eval-live.yml`.
 - **`--update-baseline`** — re-seed: runs the grid, writes
   `simulation-baseline.json` via `toBaseline` (stamps the resolved `graderModel`
   + `provenance: 'update-baseline'`). Run this — and commit — whenever the
@@ -319,16 +330,28 @@ so a correlated-error A/B isn't run unknowingly.
   (Soft termination on that `[]` differs from production — see the disclosed
   empty-grader divergence above.)
 - **`OPENROUTER_API_KEY` must be in the resolved Doppler config (`-c stg`)** for
-  any live run — the learner *always* calls OpenRouter, and bootstrap treats the
-  key as optional (it only fails at call time otherwise).
+  any live run — the learner *and the tutor* (`MENTOR_MODEL`) always call
+  OpenRouter, and bootstrap treats the key as optional (it only fails at call
+  time otherwise).
 - **`--provider` is a GLOBAL OpenRouter host pin** — it affects *every*
-  OpenRouter call this run, including an OpenRouter grader candidate. Only use it
-  when the grader is production-routed or both deliberately share the pinned
-  host.
+  OpenRouter call this run, including the tutor and an OpenRouter grader
+  candidate. Only use it when the grader is production-routed or all OpenRouter
+  calls deliberately share the pinned host.
 - **Language:** v1 learner answers are in plain English regardless of the
   profile's conversation language — a deliberate simplification for the
   synthetic pre-screen; language-faithful calibration comes from real-staging
   transcripts (RR-2).
+- **The "production judge" for this grid is the minor-routed model, which may not
+  be the adult judge.** Every challenge-sim scenario is a minor, and the router's
+  under-18 gate resolves BEFORE the `capability:'judge'` branch, so the resolved
+  grader is the age-appropriate approved model — under the current routing that
+  can be the **same family as the tutor** (gpt-oss), not the adult judge
+  (claude-sonnet). This is faithful to what minors actually get in production, but
+  it means the all-minor grid does **not** exercise the adult claude judge; that
+  coverage needs the adult `EvalProfile`s + scenarios tracked as **T13**. The
+  two-model guard still holds (the learner is a distinct family from the grader),
+  so the over-credit measurement remains valid — it is a coverage limit, not a
+  guard bypass.
 
 ## Teaching-quality flow (`teaching-session`)
 

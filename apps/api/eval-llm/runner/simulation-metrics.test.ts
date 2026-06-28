@@ -450,6 +450,41 @@ describe('validateBaselineStructure', () => {
     expect(validateBaselineStructure(mainHarness).ok).toBe(false);
   });
 
+  it('rejects NaN / non-finite scalar rates (a corrupted baseline that would silently disable drift)', () => {
+    // NaN is `typeof 'number'`, so the old check passed it; downstream
+    // `Math.abs(NaN) > tolerance` is always false, silently killing the drift
+    // channel. The validator must reject it.
+    expect(
+      validateBaselineStructure(makeBaseline({ masteryVerified: NaN })).ok,
+    ).toBe(false);
+    expect(
+      validateBaselineStructure(makeBaseline({ underCredit: NaN })).ok,
+    ).toBe(false);
+    expect(
+      validateBaselineStructure(
+        makeBaseline({ signalEmissionByGrader: { 'production-routing': NaN } }),
+      ).ok,
+    ).toBe(false);
+    // A non-number value smuggled into a rate (e.g. a string) is also rejected.
+    expect(
+      validateBaselineStructure(
+        makeBaseline({
+          outcome: { verified: 'high' } as unknown as Record<string, number>,
+        }),
+      ).ok,
+    ).toBe(false);
+  });
+
+  it('rejects an empty rates.outcome map', () => {
+    expect(
+      validateBaselineStructure(
+        makeBaseline({
+          outcome: {} as unknown as Record<string, number>,
+        }),
+      ).ok,
+    ).toBe(false);
+  });
+
   it('accepts a full, provenance-stamped, judge-stamped baseline', () => {
     const result = validateBaselineStructure(makeBaseline());
     expect(result.ok).toBe(true);

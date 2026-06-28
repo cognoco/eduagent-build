@@ -94,21 +94,24 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: doppler run -- pnpm eval:llm -- --live --check-baseline
 
-      # Mastery-SIMULATION gate (over-credit ceiling + drift). Production tutor
-      # (gpt-oss in stg) + production judge grade a distinct pinned learner
-      # (gpt-4o, NOT production-approved — a different family from the grader so
-      # the two-model guard holds). Budget: 7 challenge-sim scenarios × 3 runs ×
-      # 9 calls/round (3 calls/question × MAX_CHALLENGE_QUESTIONS=3) = 189, so
-      # every round runs. A reproduced over-credit breach exits 1 (the hard
-      # ceiling); soft drift only warns. Distinct baseline from the signal one
-      # above — this reads simulation-baseline.json. Gated on T12 seeding it.
+      # Mastery-SIMULATION gate (over-credit ceiling + drift). Tutor pinned to
+      # gpt-oss-120b (MENTOR_MODEL, via OpenRouter) + production judge (the
+      # minor-routed gpt-4o-mini under stg/V2-off) grade a distinct pinned
+      # learner. The learner is meta-llama/llama-3.3-70b-instruct: a different
+      # family from BOTH the gpt-4o-mini grader (gpt-4o, the documented learner,
+      # COLLIDES → two-model guard hard-fails) and gpt-oss tutor, so the guard
+      # holds. Budget: 7 challenge-sim scenarios × 3 runs × 9 calls/round
+      # (3 calls/question × MAX_CHALLENGE_QUESTIONS=3) = 189, so every round runs.
+      # A reproduced over-credit breach exits 1 (the hard ceiling); soft drift
+      # only warns. Distinct baseline from the signal one above — this reads
+      # simulation-baseline.json. Seeded under DOPPLER_TOKEN_STG (same judge slug).
       - name: Mastery-simulation gate (over-credit ceiling + drift)
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
         run: >-
           doppler run -- pnpm --filter @eduagent/api eval:llm:sim --
-          --learner-model openai/gpt-4o --runs 3 --max-live-calls 189
-          --check-baseline
+          --learner-model meta-llama/llama-3.3-70b-instruct --runs 3
+          --max-live-calls 189 --check-baseline
 
       # Alert on drift/break: scheduled runs have no PR surface to go red on,
       # so a silent failure would defeat the point (same rationale as the
@@ -160,9 +163,13 @@ jobs:
                 `If the failing step was the **Mastery-simulation gate** (over-credit`,
                 `ceiling / simulation-baseline.json drift), it is a DIFFERENT baseline —`,
                 `re-seed with`,
-                `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model openai/gpt-4o --runs 3 --max-live-calls 189 --update-baseline\``,
+                `\`doppler run -- pnpm --filter @eduagent/api eval:llm:sim -- --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 --max-live-calls 189 --update-baseline\``,
                 `and commit. A reproduced over-credit breach is a real grader-leniency`,
                 `regression — fix the grader/prompt; do NOT raise the ceiling.`,
+                ``,
+                `Scope: the teaching-session flow is PRE-TEEN/TEEN-BAND PRE-SCREEN`,
+                `ONLY (11–17yo) — it says nothing about under-10 or adult teaching`,
+                `quality. A green run is not all-ages teaching quality.`,
               ].join('\n'),
               labels: ['ci'],
             });
