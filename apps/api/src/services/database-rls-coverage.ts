@@ -8,6 +8,8 @@
  *
  * Profile-scoped tables: the RLS USING predicate references `profile_id`.
  * Owner-scoped tables:   the RLS USING predicate references `owner_profile_id`.
+ * Person-model tables:   explicit manifest entries only. Do not blanket-scan
+ *                         `person_id`; not every person FK is an RLS boundary.
  * Special tables (family_links): OR across both FK columns — see RLS_TABLE_META.
  *
  * Tables with RLS ENABLED but no USING policy yet (cannot appear in
@@ -119,6 +121,9 @@ export const OWNER_SCOPED_TABLES: readonly string[] = [
  * person.id = profiles.id by the deterministic reseed, the
  * app.current_profile_id GUC value carries over unchanged. consent_request's
  * `consent_request_charge_isolation` policy mirrors `consent_states_profile_isolation`.
+ *
+ * This explicit list is the post-cutover boundary for person-model RLS coverage:
+ * a table joins this manifest only when its policy predicate is known.
  */
 export const CHARGE_SCOPED_TABLES: readonly string[] = [
   'consent_request',

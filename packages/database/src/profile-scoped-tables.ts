@@ -13,20 +13,11 @@ import * as path from 'path';
 const SCHEMA_DIR = path.resolve(__dirname, 'schema');
 
 /**
- * Tables that match the `profile_id` substring scan but are NOT actually
- * profile-scoped (scanner false positives). Annotate each with a reason.
+ * Tables that declare a profile-like column but are NOT actually
+ * profile-scoped ownership tables. Annotate each with a reason.
  * Single source of truth — both rls-coverage suites import this.
  */
 export const PROFILE_SCOPED_SCAN_EXCEPTIONS: Record<string, string> = {
-  // topic_connections has NO profile_id column and no RLS policy.
-  // Scanned as profile-scoped because the BUG-226 comment block (describing
-  // the deferred RLS migration) sits inside its pgTable scan window.
-  // Ownership is enforced TRANSITIVELY: topic_a_id / topic_b_id →
-  //   curriculum_topics → curriculum_books → subjects → subjects.profile_id.
-  topic_connections:
-    'BUG-226 (P3): transitive ownership via topics→books→subjects; ' +
-    'dedicated migration required for direct profile_id + RLS',
-
   // curriculum_topics has no owner profile_id column; ownership remains
   // transitive through curriculum_topics.book_id → curriculum_books →
   // subjects.profile_id. The source_child_profile_id column is nullable
@@ -37,11 +28,13 @@ export const PROFILE_SCOPED_SCAN_EXCEPTIONS: Record<string, string> = {
 };
 
 /**
- * Scans Drizzle schema files to find all tables whose pgTable block contains
- * the substring `profile_id`. Catches profile_id, owner_profile_id,
- * parent_profile_id, child_profile_id — but NOT charge_person_id.
+ * Scans Drizzle schema files to find tables whose pgTable block declares a
+ * real profile-column builder. Catches profile_id, owner_profile_id,
+ * parent_profile_id, child_profile_id — but NOT comment text or post-cutover
+ * person_id columns.
  *
- * Known false positives are documented in PROFILE_SCOPED_SCAN_EXCEPTIONS.
+ * Person-model RLS is manifest-owned in apps/api/src/services/database-rls-coverage.ts
+ * because person_id is not uniformly an ownership/RLS column.
  */
 export function getProfileScopedTables(): string[] {
   const schemaFiles = fs
@@ -64,11 +57,17 @@ export function getProfileScopedTables(): string[] {
         nextTableMatch === -1 ? undefined : nextTableMatch,
       );
 
-      if (/profile_id/.test(tableBlock)) {
+      if (declaresProfileColumn(tableBlock)) {
         tables.push(tableName);
       }
     }
   }
 
   return tables;
+}
+
+function declaresProfileColumn(tableBlock: string): boolean {
+  return /\b[A-Za-z_$][\w$]*\s*:\s*(?:uuid|text)\(\s*['"](?:[a-z_]+_)?profile_id['"]/m.test(
+    tableBlock,
+  );
 }
