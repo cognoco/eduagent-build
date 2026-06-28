@@ -1,5 +1,12 @@
 # Memory Task — Review Continuity, Retrieval Log & Unified Relearn Queue
 
+> **Status (archived 2026-06-28): PARTIALLY SHIPPED — load-bearing plumbing done.**
+> - **Flow 2** (`retrieval_events` recall log, RR-9 + stop-faking-grades) — **SHIPPED** in PR #1546.
+> - **Flow 3** (unified relearn queue, RR-10 dedup/reason-tag, RR-5 ordering, EU-3/EU-5/EU-6/EU-7) — **SHIPPED** in PR #1546 (API-side merge; mobile render of flagged-only topics is **deferred to T11** per the plan's L-4 — flagged-only topics ride in the response but `totalOverdue`/`displayedCount` stay overdue-card-only until T11).
+> - **Flow 1** (the `/now` opener surface) — **SUPERSEDED**, folded into the mentor-is-the-app shell redesign S3 (`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`, relationship table). Not built here.
+> - **R5** (needs-deepening promotion fix) — **DEFERRED** per user.
+> Implementation plan: `docs/_archive/plans/done/2026-06-27-recall-log-and-merged-relearn-queue.md`.
+
 **Status:** Draft · 2026-06-08 · **Branch:** `conceptgrain`
 **Parent vision:** [The Forever Notebook](./2026-06-08-forever-notebook-north-star.md) (this is a **topic-grain sibling** of [concept-capture slice 1](./2026-06-08-concept-capture-layer-design.md))
 **Grain decision inherited:** [MMT-ADR-0017](../adr/MMT-ADR-0017-concept-capture-additive-layer.md) — topic-grained spine stays topic-keyed; this slice is **additive** and reuses `retention_cards.topicId`. No new ADR required (every item below is additive and reversible; see Open Items).

@@ -2,11 +2,13 @@
 title: Recall Log + Merged Relearn Queue — Implementation Plan
 date: 2026-06-27
 profile: code
-spec: docs/specs/2026-06-08-memory-task-review-continuity.md
-status: approved
+spec: docs/_archive/specs/Done/2026-06-08-memory-task-review-continuity.md
+status: shipped
+landed: PR #1546 — review-continuity-buildables (a9eee56 + review fixes 27bab0d5, ae1d126, 95f576c6), 2026-06-28
 reviews:
   - end-user (learner seat) — 2026-06-27
   - code-vs-plan verification — 2026-06-27
+  - /review adversarial fan-out (5 reviewers + Codex) — 2026-06-28
 ---
 
 # Recall Log + Merged Relearn Queue — Implementation Plan
