@@ -5,6 +5,26 @@ import {
   type AccentPreset,
 } from './design-tokens';
 
+type TailwindConfigWithColors = {
+  theme?: {
+    extend?: {
+      colors?: Record<string, string>;
+    };
+  };
+};
+
+const tailwindConfig =
+  require('../../tailwind.config.js') as TailwindConfigWithColors;
+
+function getTailwindColors(): Record<string, string> {
+  const tailwindColors = tailwindConfig.theme?.extend?.colors;
+  if (!tailwindColors) {
+    throw new Error('Expected Tailwind config to define theme.extend.colors');
+  }
+
+  return tailwindColors;
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace('#', '');
   if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
@@ -65,6 +85,27 @@ describe('tokensToCssVars', () => {
     expect(cssVars['--color-practice-chip-bg']).toBe(
       base.colors.practiceChipBg,
     );
+  });
+
+  it('wires every emitted color CSS variable into Tailwind colors', () => {
+    const cssVars = tokensToCssVars(tokens.light);
+    const tailwindColors = getTailwindColors();
+
+    const missingTailwindColors = Object.keys(cssVars)
+      .filter((cssVar) => cssVar.startsWith('--color-'))
+      .map((cssVar) => {
+        const tailwindKey = cssVar.replace('--color-', '');
+        const expectedValue = `var(${cssVar})`;
+        return { tailwindKey, expectedValue };
+      })
+      .filter(({ tailwindKey, expectedValue }) => {
+        return tailwindColors[tailwindKey] !== expectedValue;
+      })
+      .map(({ tailwindKey, expectedValue }) => {
+        return `${tailwindKey}: ${expectedValue}`;
+      });
+
+    expect(missingTailwindColors).toEqual([]);
   });
 
   it('includes radii and spacing', () => {
