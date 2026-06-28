@@ -143,8 +143,10 @@ export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
   'top_up_credits',
   'usage_events',
   'challenge_round_cooldowns',
-  // RLS enabled (migrations 0107/0113) but no USING policy yet.
-  // Exposed by WI-688 schema scanner. Needs dedicated policy migration.
+  // WI-1104: RLS enabled (migrations 0107/0113), no USING policy yet — both
+  // carry per-learner data (profile_id NOT NULL) and a live read route already
+  // targets them. Add isolation policy + move to PROFILE_SCOPED before the
+  // CONCEPT_CAPTURE_ENABLED flip. Exposed by the WI-688 schema scanner.
   'concepts',
   'concept_mastery',
 ] as const;
