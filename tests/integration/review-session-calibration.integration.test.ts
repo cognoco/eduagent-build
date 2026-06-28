@@ -33,7 +33,6 @@ import {
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
-import { registerProvider } from '../../apps/api/src/services/llm';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing modules that use them
@@ -66,28 +65,17 @@ const SUBSTANTIVE_ANSWER =
 const NON_SUBSTANTIVE_ANSWER = 'idk';
 
 // ---------------------------------------------------------------------------
-// Mock LLM provider
+// LLM provider
+//
+// The shared mock provider registered in setup.ts detects the recall-grader
+// prompt and returns a schema-valid grade, so the calibration grade handler
+// runs the REAL grade → SM-2 → retention-card update path. A bespoke provider
+// here previously returned a generic non-grade reply, which made the grader
+// read as "unavailable" and the card never moved.
 // ---------------------------------------------------------------------------
-
-const mockChat = jest
-  .fn<Promise<string>, [unknown, unknown]>()
-  .mockResolvedValue(
-    JSON.stringify({
-      reply: 'Good recall! Let me build on what you remembered.',
-    }),
-  );
 
 beforeAll(() => {
   mockInngestEvents();
-  registerProvider({
-    id: 'gemini',
-    chat: mockChat,
-    async *chatStream() {
-      yield JSON.stringify({
-        reply: 'Good recall! Let me build on what you remembered.',
-      });
-    },
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -285,11 +273,6 @@ async function executeHandler(eventData: unknown) {
 beforeEach(async () => {
   jest.clearAllMocks();
   clearFetchCalls();
-  mockChat.mockResolvedValue(
-    JSON.stringify({
-      reply: 'Good recall! Let me build on what you remembered.',
-    }),
-  );
   await cleanupAccounts({
     emails: [AUTH_EMAIL],
     clerkUserIds: [AUTH_USER_ID],
@@ -341,18 +324,22 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     );
     expect(metadata['reviewCalibrationAttempts']).toBe(1);
 
-    // Run the Inngest handler against the real DB
+    // Run the Inngest handler against the real DB. The mock grader marks the
+    // substantive answer `solid` (quality 4) → SM-2 pass.
     const result = await executeHandler(eventData);
     expect(result).toMatchObject({
       sessionId,
       topicId,
-      passed: expect.any(Boolean),
+      quality: 4,
+      verdict: 'solid',
+      passed: true,
     });
     expect(result).not.toMatchObject({ skipped: expect.any(String) });
 
-    // Retention card should have been updated
+    // Retention card moved: a pass on the fresh card advances the repetition.
     const card = await loadRetentionCard(profileId, topicId);
     expect(card!.lastReviewedAt).not.toBeNull();
+    expect(card!.repetitions).toBe(1);
   });
 
   it('non-substantive turn-1 does NOT grade; keeps window open', async () => {

@@ -3,19 +3,26 @@
  *
  * Exercises the SM-2 retention routes via the real app + real database.
  * JWT verification uses real signed tokens via the fetch interceptor in setup.ts.
- * The mock LLM provider registered in setup.ts handles recall quality evaluation
- * (falls back to the length-based heuristic: >100 chars → 4, >20 chars → 3, else → 2).
+ *
+ * Recall grading is a real LLM call (evaluateRecallQuality → routeAndCall). The
+ * mock provider registered in setup.ts detects the recall-grader prompt and
+ * returns a schema-valid grade keyed off the answer's substance: a substantive
+ * answer grades `solid` (quality 4 → SM-2 pass), a thin answer grades `partial`
+ * (quality 2 → SM-2 fail). A learner answer carrying RECALL_GRADER_FORCE_UNPARSEABLE
+ * forces an unparseable grader reply → the honest grader-unavailable path
+ * (retryable 502, no SM-2 advance). The server NEVER fabricates a passing score.
  *
  * Validates:
  * 1. GET /v1/subjects/:subjectId/retention — returns retention cards
  * 2. GET /v1/topics/:topicId/retention — returns single retention card
  * 3. POST /v1/retention/recall-test — processes recall with real SM-2
  * 4. POST /v1/retention/recall-test — failure path and remediation
- * 5. POST /v1/retention/relearn — resets retention card and creates session
- * 6. GET /v1/subjects/:subjectId/needs-deepening — lists active topics
- * 7. Teaching preference CRUD (GET/PUT/DELETE)
- * 8. GET /v1/retention/stability — returns stable topics
- * 9. Auth and validation edge cases (401, 400)
+ * 5. POST /v1/retention/recall-test — honest grader-unavailable → 502
+ * 6. POST /v1/retention/relearn — resets retention card and creates session
+ * 7. GET /v1/subjects/:subjectId/needs-deepening — lists active topics
+ * 8. Teaching preference CRUD (GET/PUT/DELETE)
+ * 9. GET /v1/retention/stability — returns stable topics
+ * 10. Auth and validation edge cases (401, 400)
  */
 
 import {
@@ -23,8 +30,9 @@ import {
   curriculumBooks,
   curriculumTopics,
   retentionCards,
+  retrievalEvents,
 } from '@eduagent/database';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 
 import {
   buildIntegrationEnv,
@@ -32,6 +40,7 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { RECALL_GRADER_FORCE_UNPARSEABLE } from '../../apps/api/src/services/llm/test-utils';
 
 import { app } from '../../apps/api/src/index';
 
@@ -322,7 +331,7 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: POST /v1/retention/recall-test', () => {
-  it('submits successful recall test (long answer → quality 3+ via length heuristic)', async () => {
+  it('passes a substantive answer the LLM grader marks solid (SM-2 advance)', async () => {
     const profileId = await createOwnerProfile();
 
     const subjectId = await createSubject(profileId, 'Calculus');
@@ -331,7 +340,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     ]);
     await seedRetentionCard(profileId, topicIds[0]!);
 
-    // Answer > 20 chars triggers length heuristic quality=3 → pass
+    // The mock grader marks a substantive answer `solid` (quality 4) → SM-2 pass.
     const res = await app.request(
       '/v1/retention/recall-test',
       {
@@ -354,9 +363,37 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(true);
     expect(typeof body.result.nextReviewAt).toBe('string');
     expect(body.result.failureCount).toBe(0);
+    // SM-2 advance: a pass on a fresh card increments repetitions and lifts the
+    // interval past its 1-day seed; the grade drove the real schedule.
+    const db = createIntegrationDb();
+    const card = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, topicIds[0]!),
+      ),
+    });
+    expect(card!.repetitions).toBe(1);
+    expect(card!.intervalDays).toBeGreaterThan(1);
+    expect(card!.lastReviewedAt).not.toBeNull();
+    // The pass is logged as an LLM-graded retrieval event, never a heuristic.
+    const events = await db
+      .select({
+        gradedBy: retrievalEvents.gradedBy,
+        quality: retrievalEvents.quality,
+      })
+      .from(retrievalEvents)
+      .where(
+        and(
+          eq(retrievalEvents.profileId, profileId),
+          eq(retrievalEvents.topicId, topicIds[0]!),
+        ),
+      );
+    expect(events).toHaveLength(1);
+    expect(events[0]!.gradedBy).toBe('llm');
+    expect(events[0]!.quality).toBe(4);
   });
 
-  it('submits failed recall test (short answer → quality 2 via length heuristic)', async () => {
+  it('fails a thin answer the LLM grader marks partial (no SM-2 advance)', async () => {
     const profileId = await createOwnerProfile();
 
     const subjectId = await createSubject(profileId, 'Calculus');
@@ -365,7 +402,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     ]);
     await seedRetentionCard(profileId, topicIds[0]!);
 
-    // Answer ≤ 20 chars triggers length heuristic quality=2 → fail
+    // The mock grader marks a thin answer `partial` (quality 2) → SM-2 fail.
     const res = await app.request(
       '/v1/retention/recall-test',
       {
@@ -387,6 +424,16 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     expect(body.result.passed).toBe(false);
     expect(body.result.failureCount).toBe(1);
     expect(body.result.failureAction).toBe('feedback_only');
+    // SM-2 fail resets the repetition streak; the topic stays at zero reps.
+    const db = createIntegrationDb();
+    const card = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, topicIds[0]!),
+      ),
+    });
+    expect(card!.repetitions).toBe(0);
+    expect(card!.failureCount).toBe(1);
   });
 
   it('returns remediation after 3+ failures (FR52-58)', async () => {
@@ -399,6 +446,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     // Seed card with 2 existing failures — next failure triggers remediation
     await seedRetentionCard(profileId, topicIds[0]!, { failureCount: 2 });
 
+    // A thin answer grades `partial` (quality 2) → SM-2 fail → 3rd failure.
     const res = await app.request(
       '/v1/retention/recall-test',
       {
@@ -425,6 +473,69 @@ describe('Integration: POST /v1/retention/recall-test', () => {
     });
     expect(body.result.remediation.options).toContain('relearn_topic');
     expect(body.result.remediation.topicTitle).toBe('Introduction to Calculus');
+  });
+
+  it('surfaces a retryable 502 and does NOT advance the card when the grader is unavailable', async () => {
+    const profileId = await createOwnerProfile();
+
+    const subjectId = await createSubject(profileId, 'Calculus');
+    const { topicIds } = await seedCurriculumWithTopics(subjectId, ['Limits']);
+    await seedRetentionCard(profileId, topicIds[0]!);
+
+    // The sentinel forces the mock grader to emit an unparseable reply, so
+    // evaluateRecallQuality returns { graded: false } and the route throws
+    // UpstreamLlmError → 502 (intentional, retryable). The server must NEVER
+    // fabricate a passing score from an ungradeable answer.
+    const res = await app.request(
+      '/v1/retention/recall-test',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: AUTH_USER_ID, email: AUTH_EMAIL },
+          profileId,
+        ),
+        body: JSON.stringify({
+          topicId: topicIds[0],
+          answer: `The chain rule ${RECALL_GRADER_FORCE_UNPARSEABLE} relates derivatives`,
+        }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.code).toBe('UPSTREAM_ERROR');
+
+    // Card untouched: no SM-2 advance, no failure recorded, and the cooldown
+    // claim was released (lastReviewedAt restored to null) so the learner can
+    // retry immediately.
+    const db = createIntegrationDb();
+    const card = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, topicIds[0]!),
+      ),
+    });
+    expect(card!.repetitions).toBe(0);
+    expect(card!.failureCount).toBe(0);
+    expect(card!.lastReviewedAt).toBeNull();
+
+    // The failure is logged honestly as a fallback_heuristic row with no grade.
+    const events = await db
+      .select({
+        gradedBy: retrievalEvents.gradedBy,
+        quality: retrievalEvents.quality,
+      })
+      .from(retrievalEvents)
+      .where(
+        and(
+          eq(retrievalEvents.profileId, profileId),
+          eq(retrievalEvents.topicId, topicIds[0]!),
+        ),
+      );
+    expect(events).toHaveLength(1);
+    expect(events[0]!.gradedBy).toBe('fallback_heuristic');
+    expect(events[0]!.quality).toBeNull();
   });
 
   it('rejects missing topicId', async () => {
