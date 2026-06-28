@@ -14,7 +14,6 @@ import { useTranslation } from 'react-i18next';
 
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
-import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import {
   childProfileHref,
   FAMILY_HOME_PATH,
@@ -188,7 +187,6 @@ export default function ChildCurriculumScreen(): React.ReactElement {
   );
 
   if (
-    FEATURE_FLAGS.MODE_NAV_V1_ENABLED &&
     profileId &&
     !navigationContract.canEnter('child/[profileId]/curriculum', { profileId })
   ) {
