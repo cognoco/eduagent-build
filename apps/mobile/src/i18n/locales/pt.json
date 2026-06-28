@@ -1654,7 +1654,9 @@
       "timeoutTitle": "Ainda aguardando…",
       "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente.",
       "dontRememberFirst": "Não me lembro.",
-      "dontRememberAgain": "Ainda não sei."
+      "dontRememberAgain": "Ainda não sei.",
+      "gradingUnavailableTitle": "Resposta recebida.",
+      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",

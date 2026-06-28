@@ -1720,7 +1720,9 @@
       "timeoutTitle": "Still waiting…",
       "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again.",
       "dontRememberFirst": "I don't remember.",
-      "dontRememberAgain": "Still stuck."
+      "dontRememberAgain": "Still stuck.",
+      "gradingUnavailableTitle": "Got your answer.",
+      "gradingUnavailableMessage": "I couldn't check it just now — your answer is safe. Try again, or come back to it later."
     },
     "notFoundTitle": "Topic not found",
     "notFoundMessage": "This topic could not be opened. Please go back and try again.",

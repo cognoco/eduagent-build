@@ -627,6 +627,13 @@ export const overdueTopicSchema = z.object({
   topicTitle: z.string(),
   overdueDays: z.number().int().min(0),
   failureCount: z.number().int().min(0),
+  // [Flow 3 / RR-10 / T9] Why this topic is in the relearn queue: SM-2 overdue,
+  // flagged weak via needs_deepening_topics, or both. Optional → backward
+  // compatible (existing overdue-only callers omit it). The mobile reason-line
+  // render is deferred (former T11 / L-4) until rows actually differ post-RR-12.
+  reason: z.enum(['overdue', 'flagged_weak', 'both']).optional(),
+  // Concept label carried from a flagged needs-deepening row, when present.
+  concept: z.string().optional(),
 });
 export type OverdueTopic = z.infer<typeof overdueTopicSchema>;
 
@@ -639,6 +646,11 @@ export const overdueSubjectSchema = z.object({
 export type OverdueSubject = z.infer<typeof overdueSubjectSchema>;
 
 export const overdueTopicsResponseSchema = z.object({
+  // Count of overdue retention cards only — NOT the full merged relearn queue.
+  // A profile with flagged-weak topics (needs_deepening_topics rows) but no
+  // retention cards past their nextReviewAt will have totalOverdue:0 while
+  // subjects[] is non-empty. Badge/count UI must use displayedCount or sum
+  // subjects[*].topics.length to reflect the true visible workload.
   totalOverdue: z.number().int().min(0),
   subjects: z.array(overdueSubjectSchema),
   // [BUG-470 / P2] Truncation indicator — true when the displayed list is a

@@ -536,6 +536,78 @@ describe('RecallTestScreen', () => {
     expect(mockRecallMutate).toHaveBeenCalledTimes(2);
   });
 
+  it('[T13] shows warm grader-unavailable copy and re-submits the preserved answer on retry', async () => {
+    // Construct a 502 UPSTREAM_ERROR (recall grader unavailable). We can't import
+    // the UpstreamError class here, so replicate its detectable shape.
+    const graderDown = new Error('recall grader unavailable');
+    graderDown.name = 'UpstreamError';
+    Object.assign(graderDown, { code: 'UPSTREAM_ERROR', status: 502 });
+
+    queuedRecallResults = [
+      graderDown,
+      {
+        passed: true,
+        failureCount: 0,
+        masteryScore: 0.8,
+        nextReviewAt: '2026-04-02T10:00:00.000Z',
+      },
+    ];
+
+    render(<RecallTestScreen />);
+
+    // First send → grader unavailable → warm, answer-safe fallback (not an alert).
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('recall-test-grading-unavailable');
+    });
+    // getByText throws if absent — it is itself the assertion (no toBeTruthy).
+    screen.getByText(/couldn't check it just now/);
+
+    // The answer was submitted once and the typed text is preserved for retry.
+    expect(mockRecallMutate).toHaveBeenCalledTimes(1);
+    expect(mockRecallMutate).toHaveBeenNthCalledWith(
+      1,
+      { topicId: 'topic-1', answer: 'I remember this topic well' },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+
+    // Retry re-submits the SAME preserved answer (works because the server
+    // restored the cooldown, C-2) — without re-prompting the learner.
+    fireEvent.press(screen.getByTestId('recall-test-grading-retry'));
+
+    await waitFor(() => {
+      expect(mockRecallMutate).toHaveBeenCalledTimes(2);
+    });
+    expect(mockRecallMutate).toHaveBeenNthCalledWith(
+      2,
+      { topicId: 'topic-1', answer: 'I remember this topic well' },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+
+    await waitFor(() => {
+      screen.getByText(/your memory of this is solid/);
+    });
+    expect(screen.queryByTestId('recall-test-grading-unavailable')).toBeNull();
+  });
+
+  it('[T13] a non-grader send error still surfaces the generic alert (no false grading fallback)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockReturnValue(undefined);
+    queuedRecallResults = [
+      new Error('network error') as unknown as Record<string, unknown>,
+    ];
+
+    render(<RecallTestScreen />);
+
+    fireEvent.press(screen.getByTestId('mock-send-button'));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    expect(screen.queryByTestId('recall-test-grading-unavailable')).toBeNull();
+    alertSpy.mockRestore();
+  });
+
   it('[LEARN-14] Relearn CTA still navigates (to picker) when subjectId is fully unresolved — no silent no-op', async () => {
     mockSearchParams = { topicId: 'topic-1' };
     mockResolveResult = undefined;

@@ -1627,7 +1627,9 @@
       "timeoutTitle": "Noch am Warten…",
       "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal.",
       "dontRememberFirst": "Weiß ich nicht mehr.",
-      "dontRememberAgain": "Stecke immer noch fest."
+      "dontRememberAgain": "Stecke immer noch fest.",
+      "gradingUnavailableTitle": "Antwort erhalten.",
+      "gradingUnavailableMessage": "Ich konnte deine Antwort gerade nicht überprüfen, aber sie ist sicher. Versuch es erneut oder komm später darauf zurück."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
     "neverStudied": "Nie gelernt",

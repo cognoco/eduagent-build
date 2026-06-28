@@ -6,6 +6,7 @@ export * from './sessions';
 export * from './support';
 export * from './bookmarks';
 export * from './assessments';
+export * from './retrieval-events';
 export * from './progress';
 export * from './snapshots';
 export * from './billing';

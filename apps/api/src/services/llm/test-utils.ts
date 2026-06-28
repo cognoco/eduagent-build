@@ -16,4 +16,8 @@ export {
   _getLlmRoutingV2Enabled,
 } from './router';
 
-export { mockProvider, createMockProvider } from './providers/mock';
+export {
+  mockProvider,
+  createMockProvider,
+  RECALL_GRADER_FORCE_UNPARSEABLE,
+} from './providers/mock';

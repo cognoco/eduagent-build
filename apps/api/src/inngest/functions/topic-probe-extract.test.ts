@@ -83,6 +83,7 @@ jest.mock(
 import {
   curriculumTopics,
   learningSessions,
+  retentionCards,
   sessionEvents,
 } from '@eduagent/database';
 import {
@@ -212,7 +213,17 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
       card: { id: 'card-1', repetitions: 0, lastReviewedAt: null },
       isNew: true,
     });
-    mockEvaluateRecallQuality.mockResolvedValue(4);
+    // [Flow 2 / C-6] evaluateRecallQuality now returns the discriminated
+    // RecallGrade, not a bare number. Default: a graded llm result.
+    mockEvaluateRecallQuality.mockResolvedValue({
+      graded: true,
+      quality: 4,
+      gradedBy: 'llm',
+      verdict: 'solid',
+      rationale: null,
+      misconception: null,
+      rung: 1,
+    });
   });
 
   it('rehydrates the learner message and topic title from the DB by reference', async () => {
@@ -233,6 +244,30 @@ describe('handleTopicProbeExtract — seed-retention-card rehydration [WI-577]',
       sessionId: SESSION_ROW.id,
       priorKnowledgeQuality: 4,
     });
+  });
+
+  it('[T7] leaves the new card unseeded when the grader is unavailable (graded:false)', async () => {
+    // Honest contract: never seed SM-2 state from a guess.
+    mockEvaluateRecallQuality.mockResolvedValue({
+      graded: false,
+      gradedBy: 'fallback_heuristic',
+    });
+    const { update } = stubDb([
+      [SESSION_ROW], // load-session
+      [{ id: SESSION_ROW.topicId, title: 'Atomic structure' }], // topic + title
+      [{ content: 'I know atoms have protons and electrons.' }], // learner message
+      TRANSCRIPT_ROWS, // transcript (extract-signals)
+    ]);
+
+    const { result } = await execute(topicProbePayload());
+
+    // Grader ran, but no SM-2 seed was written to the retention card (it stays
+    // repetitions:0, no nextReviewAt) and no priorKnowledgeQuality is reported.
+    // (The unrelated learning_sessions status write still happens.)
+    expect(mockEvaluateRecallQuality).toHaveBeenCalled();
+    const updatedTables = update.mock.calls.map(([table]: [unknown]) => table);
+    expect(updatedTables).not.toContain(retentionCards);
+    expect(result).toMatchObject({ priorKnowledgeQuality: null });
   });
 
   it('skips retention seeding when the referenced message row is gone (e.g. transcript purged)', async () => {

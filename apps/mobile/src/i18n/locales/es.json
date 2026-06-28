@@ -1627,7 +1627,9 @@
       "timeoutTitle": "Sigue esperando…",
       "timeoutMessage": "Tu respuesta está tardando más de lo habitual en enviarse. Comprueba tu conexión e inténtalo de nuevo.",
       "dontRememberFirst": "No me acuerdo.",
-      "dontRememberAgain": "Sigo sin saber."
+      "dontRememberAgain": "Sigo sin saber.",
+      "gradingUnavailableTitle": "Recibí tu respuesta.",
+      "gradingUnavailableMessage": "No pude revisarla ahora mismo, pero tu respuesta está a salvo. Inténtalo de nuevo o vuelve más tarde."
     },
     "lastStudied": "Estudiado por última vez {{when}}",
     "neverStudied": "Nunca estudiado",
