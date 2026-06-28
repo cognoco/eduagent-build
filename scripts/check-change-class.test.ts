@@ -285,6 +285,44 @@ describe('check-change-class.sh', () => {
     }
   });
 
+  // ── i18n cross-package routing (WI-886) ─────────────────────────────────
+  // app-help-map.test.ts reads en.json via readFileSync — invisible to nx
+  // affected. Pins that the router schedules pnpm test:api:unit for en.json.
+
+  it('routes en.json changes to API unit tests (cross-package read in app-help-map.test.ts)', () => {
+    mkdirSync(join(repo, 'apps', 'mobile', 'src', 'i18n', 'locales'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'mobile', 'src', 'i18n', 'locales', 'en.json'),
+      '{ "home": {} }\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+
+    expect(output).toContain('i18n-cross-package');
+    expect(output).toContain('pnpm test:api:unit');
+  });
+
+  it('does NOT route other locale files to API unit tests', () => {
+    mkdirSync(join(repo, 'apps', 'mobile', 'src', 'i18n', 'locales'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(repo, 'apps', 'mobile', 'src', 'i18n', 'locales', 'de.json'),
+      '{ "home": {} }\n',
+    );
+    git(repo, ['add', '.']);
+
+    const output = runChangeClass(repo, ['--branch'], { encoding: 'utf8' });
+
+    expect(output).not.toContain('i18n-cross-package');
+    // de.json still triggers the i18n class (path matches i18n_delta_needs_checks)
+    // but must NOT schedule the API unit tests
+    expect(output).not.toContain('pnpm test:api:unit');
+  });
+
   it('declares a database package test target for RLS coverage', () => {
     const project = JSON.parse(
       readFileSync(

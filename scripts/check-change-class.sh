@@ -308,6 +308,16 @@ if i18n_delta_needs_checks "$FILES"; then
   note "i18n: Runs for mobile source changes because new t() calls can stale locale files"
 fi
 
+# ── i18n cross-package ────────────────────────────────────────────────────
+# apps/api/src/services/app-help-map.test.ts reads en.json at module load
+# via readFileSync (cross-package read invisible to nx affected). An en.json-
+# only change can break the API unit suite without touching any API source
+# file.
+if hit '^apps/mobile/src/i18n/locales/en\.json$'; then
+  CLASSES+=("i18n-cross-package")
+  add_cmd fast  "pnpm test:api:unit"  "API unit tests (en.json cross-package read in app-help-map.test.ts)"
+fi
+
 # ── Shared Schemas (@eduagent/schemas) ───────────────────────────────────
 if hit '^packages/schemas/src/'; then
   CLASSES+=("shared-schemas")
