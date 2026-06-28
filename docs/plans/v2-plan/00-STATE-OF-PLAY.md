@@ -170,18 +170,18 @@ The spine (1) and the display (5) are built; the remembered opener (3) is now in
 
 ## 6. Forward work — the "knows-me" loop (proposed scope)
 
-> Status: **proposed, not yet a formal spec or claimed WIs.** Captured here so the full picture lives in one place; promote to `docs/specs/` + Cosmo work items when scheduled. Each item is identity-independent (Tier-1 buildable now) unless noted.
+> Status: **now specced** — the connective glue is captured in **[`docs/specs/2026-06-27-felt-knowing-loop.md`](../../specs/2026-06-27-felt-knowing-loop.md)** (Draft, paper-only). That spec owns the *unowned* glue of this loop — items (1)-note-authoring, (3), and (4) below — and deliberately does NOT re-own its siblings (`memory-task-review-continuity.md` owns `evidence_links`/`LearnerSource`/opener/`retrieval_events`; `2026-06-27-journal-redesign.md` owns the merged notes+bookmarks *browse* surface). No Cosmo WIs claimed yet; promote when scheduled. Each item is identity-independent (Tier-1 buildable now) unless noted.
 
 Scope the four-part felt-knowing loop as **one coherent experience**, in this order:
 
 1. **Make the built V2 surface not barren** (§3 punch-list, no new architecture):
    - Restore **add-subject + manage** on the populated Subjects path (not just empty state).
-   - **Un-defer note persistence** — wire `onAddNote` so the hub notes section is writable (`SubjectHubNotesSection.tsx:33-35`).
+   - **Un-defer note persistence** — wire `onAddNote` so the hub notes section is writable (`SubjectHubNotesSection.tsx:33-35`). → felt-knowing-loop spec **Flow 1** (pure wiring; `SubjectHub.tsx:115` withholds the handler, API already complete).
    - Re-add **cross-entity search** (notes + sessions), porting the legacy `useLibrarySearch` behavior.
    - Bring **real animation** to `NowCard` / `MentorCelebration` per the S1 spec copy that never became code.
 2. **Review-continuity opener + `retrieval_events` + unified relearn queue** — **already in flight** (Tier 1 of `memory-task-review-continuity.md`, in worktrees `review-continuity-opener` / `-buildables` / `continuity-copy-wins`). Track to merge; this item is *land it*, not *scope it*.
-3. **Wire `evidence_links`** (Tier 2 of the same spec, `:187-191` / R6) so memory/openers cite the learner's own notes/bookmarks/transcripts — renders on the now-writable notes surface from (1). **This is the still-open connective tissue.**
-4. **Live freeform binding** — promote `ask-silent-classify` from telemetry to a live signal: bind the freeform chat to the recognized subject/topic mid-conversation, and stop dropping `experienceLevel` before the prompt. (This is the original "stuck chat" ask.)
+3. **Wire `evidence_links`** (Tier 2 of the same spec, `:187-191` / R6) so memory/openers cite the learner's own notes/bookmarks/transcripts — renders on the now-writable notes surface from (1). **This is the still-open connective tissue.** → felt-knowing-loop spec **Flow 3** (citation *surfacing* in live exchanges via the envelope's structured `citations[]`, flag+eval-gated; adds only `fromKind='exchange'` to slice 2a's enum, no new migration).
+4. **Live freeform binding** — promote `ask-silent-classify` from telemetry to a live signal: bind the freeform chat to the recognized subject/topic mid-conversation, and stop dropping `experienceLevel` before the prompt. (This is the original "stuck chat" ask.) → felt-knowing-loop spec **Flow 2** captures the user-facing slice: a freeform "keep this" becomes a citable **bookmark** (`topicId`-nullable, so no schema fork), replacing the lying read-only "Write note" CTA.
 
 **Sequencing note:** (1) is identity-independent and cheap; (2) is in-flight; (3) builds on the Tier-1 retrieval log + the writable notes from (1); (4) is the deepest. Concept-grain "knowing" (§4) stays **parked** behind the identity-foundation flip regardless.
 
@@ -191,5 +191,6 @@ Scope the four-part felt-knowing loop as **one coherent experience**, in this or
 
 - **Library/shell intent:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md`; phase plans in this folder ([`00-README.md`](00-README.md) is the index); coverage map [`02-flow-map.md`](02-flow-map.md).
 - **Memory intent:** `docs/specs/2026-06-08-memory-task-review-continuity.md` (current canonical, DRAFT); foundation `docs/_archive/specs/Done/2026-05-05-memory-architecture-upgrade.md`; concept-grain `docs/specs/2026-06-08-concept-capture-layer-design.md` + `MMT-ADR-0017`.
+- **Felt-knowing connective glue:** `docs/specs/2026-06-27-felt-knowing-loop.md` (the note-authoring + freeform-keep + citation-surfacing glue, §6 above); merged notes+bookmarks *browse* surface `docs/specs/2026-06-27-journal-redesign.md`.
 - **Freeform filing:** `MMT-ADR-0021` (5-exchange threshold); `auto-file-session.ts`; `resolveFilingResult()` in `apps/api/src/services/filing.ts`.
 - **Code ground truth:** the `file:line` citations above. When a status here disagrees with the code, **the code wins — fix this doc.**
