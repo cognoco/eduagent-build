@@ -250,7 +250,7 @@ if [[ -n "$PROMPT_HITS" ]]; then
   add_cmd fast  "pnpm eval:llm"              "Snapshot prompts (Tier 1 — no LLM call)"
   add_cmd slow  "pnpm eval:llm --live"       "Real LLM validation (Tier 2)"
   add_cmd slow  "pnpm test:llm:enduser"      "Live end-user LLM quality gate"
-  note "llm-prompts: Pre-commit requires eval snapshot files staged with prompt changes"
+  note "llm-prompts: Pre-commit requires staged eval snapshots when drift exists, or a full-run zero-drift receipt"
 fi
 
 # ── LLM Commercial Routing ───────────────────────────────────────────────

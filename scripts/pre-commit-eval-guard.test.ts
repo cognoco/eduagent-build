@@ -16,44 +16,44 @@
 // (which has an associated snapshot under eval-llm/snapshots/dictation-generate/) was
 // likewise uncovered.
 //
-// This test parses the literal regex out of the hook and runs the (paths -> match)
-// table against it, locking in the post-fix behaviour.
+// This test imports the helper logic used by the hook. The hook must delegate
+// to the TypeScript guard instead of carrying its own duplicated path regex.
 
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  evaluatePrecommitEvalSnapshotGuard,
+  isPromptTouchingPath,
+} from './check-precommit-eval-snapshot-guard';
+import {
+  removeZeroDriftReceipt,
+  writeZeroDriftReceipt,
+} from '../apps/api/eval-llm/runner/zero-drift-receipt';
 
-const repoRoot = join(__dirname, '..');
-const hookSrc = readFileSync(join(repoRoot, '.husky/pre-commit'), 'utf8');
-
-// Extract the regex used in the PROMPT_CHANGED guard. The hook line looks like:
-//   | grep -E '(apps/api/src/services/.*-prompts\.ts$|...)'
-const match = hookSrc.match(/grep -E '\((apps\/api\/src\/services[^']+)\)'/);
-if (!match) {
-  throw new Error(
-    'Could not locate PROMPT_CHANGED regex in .husky/pre-commit. ' +
-      'The test parser must be updated alongside any restructuring of the hook.',
-  );
+function git(repo: string, args: string[]): void {
+  execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
 }
 
-// The shell regex uses POSIX ERE which JS RegExp accepts for these constructs.
-// We unescape the shell-escaped backslashes (\\. -> \.) and rebuild as JS RegExp.
-const promptRegex = new RegExp(match[1]);
-// Anchor the exclusion search AFTER the PROMPT_CHANGED grep: the secret/large-file
-// guard (WI-450) higher up in the hook has its own `grep -vE`, and a whole-file
-// first-match would capture that one instead of the eval-guard exclusion.
-const excludeMatch = hookSrc
-  .slice(hookSrc.indexOf(match[0]))
-  .match(/\| grep -vE '([^']+)'/);
-if (!excludeMatch) {
-  throw new Error(
-    'Could not locate PROMPT_CHANGED exclusion regex in .husky/pre-commit. ' +
-      'The test parser must be updated alongside any restructuring of the hook.',
-  );
+function removeTempRepo(path: string): void {
+  rmSync(path, { recursive: true, force: true });
 }
-const promptExcludeRegex = new RegExp(excludeMatch[1]);
 
-function isPromptFile(path: string): boolean {
-  return promptRegex.test(path) && !promptExcludeRegex.test(path);
+function writeRepoFile(repo: string, path: string, body: string): void {
+  const abs = join(repo, ...path.split('/'));
+  mkdirSync(join(abs, '..'), { recursive: true });
+  writeFileSync(abs, body);
+}
+
+function readHook(): string {
+  return readFileSync(join(__dirname, '..', '.husky/pre-commit'), 'utf8');
 }
 
 describe('[BUG-45] pre-commit eval-harness guard regex', () => {
@@ -75,7 +75,7 @@ describe('[BUG-45] pre-commit eval-harness guard regex', () => {
 
     for (const path of SHOULD_MATCH) {
       it(`matches ${path}`, () => {
-        expect(isPromptFile(path)).toBe(true);
+        expect(isPromptTouchingPath(path)).toBe(true);
       });
     }
   });
@@ -102,8 +102,155 @@ describe('[BUG-45] pre-commit eval-harness guard regex', () => {
 
     for (const path of SHOULD_NOT_MATCH) {
       it(`does not match ${path}`, () => {
-        expect(isPromptFile(path)).toBe(false);
+        expect(isPromptTouchingPath(path)).toBe(false);
       });
     }
+  });
+});
+
+describe('pre-commit eval-snapshot guard behavior', () => {
+  let repo: string;
+
+  beforeEach(() => {
+    repo = mkdtempSync(join(tmpdir(), 'precommit-eval-guard-'));
+    git(repo, ['init', '-b', 'main']);
+    git(repo, ['config', 'user.email', 'test@example.com']);
+    git(repo, ['config', 'user.name', 'Test User']);
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "base";\n',
+    );
+    writeRepoFile(
+      repo,
+      'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md',
+      '# base snapshot\n',
+    );
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'init']);
+  });
+
+  afterEach(() => {
+    removeZeroDriftReceipt(repo);
+    removeTempRepo(repo);
+  });
+
+  it('passes when no prompt-touching files are staged', () => {
+    writeRepoFile(repo, 'notes.txt', 'hello\n');
+    git(repo, ['add', 'notes.txt']);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails when a prompt file is staged without snapshots or a receipt', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "comment-only";\n',
+    );
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('without snapshot evidence');
+  });
+
+  it('passes when a prompt file and eval snapshots are staged together', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "changed";\n',
+    );
+    writeRepoFile(
+      repo,
+      'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md',
+      '# changed snapshot\n',
+    );
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+    git(repo, ['add', 'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md']);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('passes a zero-drift prompt change with a receipt from the evaluated file contents', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "base";\n// refactor only\n',
+    );
+    const receipt = writeZeroDriftReceipt(repo, {
+      command: 'pnpm eval:llm',
+      promptPathPredicate: isPromptTouchingPath,
+    });
+    expect(receipt.written).toBe(true);
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('fails closed when the staged prompt blob differs from the receipt-evaluated content', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "base";\n// evaluated\n',
+    );
+    const receipt = writeZeroDriftReceipt(repo, {
+      command: 'pnpm eval:llm',
+      promptPathPredicate: isPromptTouchingPath,
+    });
+    expect(receipt.written).toBe(true);
+
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "base";\n// staged later\n',
+    );
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+
+    const result = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain(
+      'does not match the prompt file evaluated',
+    );
+  });
+
+  it('fails a prompt change with dirty snapshots until the snapshots are staged', () => {
+    writeRepoFile(
+      repo,
+      'apps/api/src/services/session/session-prompts.ts',
+      'export const prompt = "changed";\n',
+    );
+    writeRepoFile(
+      repo,
+      'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md',
+      '# dirty snapshot\n',
+    );
+    git(repo, ['add', 'apps/api/src/services/session/session-prompts.ts']);
+
+    const blocked = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(blocked.ok).toBe(false);
+
+    git(repo, ['add', 'apps/api/eval-llm/snapshots/session/12yo-dinosaurs.md']);
+
+    const accepted = evaluatePrecommitEvalSnapshotGuard(repo);
+
+    expect(accepted.ok).toBe(true);
+  });
+
+  it('keeps prompt include/exclude patterns out of .husky/pre-commit', () => {
+    const hook = readHook();
+
+    expect(hook).toContain('scripts/check-precommit-eval-snapshot-guard.ts');
+    expect(hook).not.toContain('apps/api/src/services/.*-prompts');
+    expect(hook).not.toContain('apps/api/src/services/llm/.+');
   });
 });
