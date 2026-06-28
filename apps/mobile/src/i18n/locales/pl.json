@@ -825,20 +825,6 @@
       "saveFailedTitle": "Nie można zapisać notatki",
       "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
     },
-    "filingPrompt": {
-      "title": "Dodać do biblioteki?",
-      "descriptionWithTopic": "Czy chcesz dodać tę sesję do {{topic}} w swojej bibliotece?",
-      "description": "Czy chcesz dodać tę sesję do swojej biblioteki?",
-      "addFailedTitle": "Nie można dodać do biblioteki",
-      "addFailedMessage": "Spróbuj ponownie",
-      "adding": "Dodawanie…",
-      "yesAddLabel": "Tak, dodaj do biblioteki",
-      "yesAdd": "Tak, dodaj",
-      "noThanksLabel": "Nie, dziękuję",
-      "noThanks": "Nie, dziękuję",
-      "tryAgain": "Spróbuj ponownie",
-      "skipForNow": "Pomiń na razie"
-    },
     "parkingLot": {
       "title": "Przechowalnia",
       "description": "Zapisuj pytania lub pomysły, do których chcesz wrócić",
@@ -1011,8 +997,7 @@
     "disabledReason": {
       "offline": "Jesteś offline — wprowadzanie danych będzie możliwe po ponownym połączeniu",
       "expired": "Ta sesja się zakończyła",
-      "quotaReached": "Osiągnięto limit sesji",
-      "chooseSave": "Wybierz, gdzie zapisać tę sesję"
+      "quotaReached": "Osiągnięto limit sesji"
     },
     "imageAttach": {
       "timeout": "Twoje zdjęcie ładowało się zbyt długo, więc zaczynam od samego tekstu. Jeśli coś wygląda nie tak, dotknij ponownie aparatu, aby spróbować jeszcze raz.",

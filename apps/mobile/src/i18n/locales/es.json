@@ -792,20 +792,6 @@
       "saveFailedTitle": "No se pudo guardar la nota",
       "summaryPlaceholder": "¿Qué deberíamos recordar de esta sesión?"
     },
-    "filingPrompt": {
-      "title": "¿Añadir a la biblioteca?",
-      "descriptionWithTopic": "¿Quieres añadir esta sesión a {{topic}} en tu biblioteca?",
-      "description": "¿Quieres añadir esta sesión a tu biblioteca?",
-      "addFailedTitle": "No se pudo añadir a la biblioteca",
-      "addFailedMessage": "Inténtalo de nuevo",
-      "adding": "Añadiendo…",
-      "yesAddLabel": "Sí, añadir a la biblioteca",
-      "yesAdd": "Sí, añadirla",
-      "noThanksLabel": "No, gracias",
-      "noThanks": "No, gracias",
-      "tryAgain": "Reintentar",
-      "skipForNow": "Omitir por ahora"
-    },
     "parkingLot": {
       "title": "Parking",
       "description": "Anota preguntas o ideas a las que quieras volver",
@@ -972,8 +958,7 @@
     "disabledReason": {
       "offline": "Estás sin conexión. La entrada volverá cuando te reconectes.",
       "expired": "Esta sesión ha terminado.",
-      "quotaReached": "Has alcanzado tu límite de sesiones.",
-      "chooseSave": "Elige dónde guardar esta sesión."
+      "quotaReached": "Has alcanzado tu límite de sesiones."
     },
     "imageAttach": {
       "timeout": "Tu foto tardó mucho en cargarse, así que empezaré solo con el texto. Si algo no se ve bien, toca la cámara de nuevo para reintentar.",

@@ -18,6 +18,7 @@ import type {
   useAddParkingLotItem,
   useSetSessionInputMode,
 } from '../../hooks/use-sessions';
+import type { useFiling } from '../../hooks/use-filing';
 import { clearSessionRecoveryMarker } from '../../lib/session-recovery';
 import * as SecureStore from '../../lib/secure-storage';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
@@ -51,7 +52,6 @@ export interface UseSessionActionsOptions {
   setShowWrongSubjectChip: React.Dispatch<React.SetStateAction<boolean>>;
   setShowTopicSwitcher: React.Dispatch<React.SetStateAction<boolean>>;
   setShowParkingLot: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
   setConsumedQuickChipMessageId: React.Dispatch<
     React.SetStateAction<string | null>
   >;
@@ -81,6 +81,7 @@ export interface UseSessionActionsOptions {
   activeProfileId: string | undefined;
 
   // Mutation hooks
+  filing: ReturnType<typeof useFiling>;
   closeSession: ReturnType<typeof useCloseSession>;
   recordSystemPrompt: ReturnType<typeof useRecordSystemPrompt>;
   recordSessionEvent: ReturnType<typeof useRecordSessionEvent>;
@@ -129,7 +130,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
-    setShowFilingPrompt,
+    filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
     homeworkProblemsState,
@@ -396,15 +397,22 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               };
 
               if (effectiveMode === 'homework') {
-                setShowFilingPrompt(true);
-                setIsClosing(false);
-              } else {
-                navigateToSummary(
-                  activeSessionId,
-                  result.wallClockSeconds,
-                  fastCelebrations,
-                );
+                // W2 #11: silent auto-file replaces the old blocking filing
+                // prompt. Fire-and-forget — the server commit lives in the
+                // mutationFn and persists even as this screen unmounts on
+                // navigation; the summary's filing controls reflect
+                // pending→added→failed. Never block exit on the /filing
+                // round-trip.
+                filing.mutate({
+                  sessionId: activeSessionId,
+                  sessionMode: 'homework',
+                });
               }
+              navigateToSummary(
+                activeSessionId,
+                result.wallClockSeconds,
+                fastCelebrations,
+              );
             } catch (err: unknown) {
               if (timeoutId) {
                 clearTimeout(timeoutId);
@@ -458,12 +466,12 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     activeProfileId,
     milestonesReached,
     effectiveMode,
+    filing,
     navigateToSummary,
     onSessionClosed,
     returnTo,
     router,
     setIsClosing,
-    setShowFilingPrompt,
     closedSessionRef,
   ]);
 

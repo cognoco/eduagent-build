@@ -852,20 +852,6 @@
       "saveFailedTitle": "Could not save note",
       "summaryPlaceholder": "What should we remember from this session?"
     },
-    "filingPrompt": {
-      "title": "Add to library?",
-      "descriptionWithTopic": "Would you like to add this session to {{topic}} in your library?",
-      "description": "Would you like to add this session to your library?",
-      "addFailedTitle": "Could not add to library",
-      "addFailedMessage": "Please try again",
-      "adding": "Adding…",
-      "yesAddLabel": "Yes, add to library",
-      "yesAdd": "Yes, add it",
-      "noThanksLabel": "No thanks",
-      "noThanks": "No thanks",
-      "tryAgain": "Try again",
-      "skipForNow": "Skip for now"
-    },
     "parkingLot": {
       "title": "Parking lot",
       "description": "Jot down questions or ideas you want to come back to",
@@ -994,8 +980,7 @@
     "disabledReason": {
       "offline": "You're offline — input will return when you reconnect",
       "expired": "This session has ended",
-      "quotaReached": "Your session limit has been reached",
-      "chooseSave": "Choose where to save this session"
+      "quotaReached": "Your session limit has been reached"
     },
     "imageAttach": {
       "timeout": "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
