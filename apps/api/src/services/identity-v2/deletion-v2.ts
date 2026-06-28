@@ -19,7 +19,9 @@
 //   G1. DELETE subscription WHERE organization_id = $org (WI-849 Gap 1). Satisfies
 //       payer_person_id + organization_id RESTRICT before person/org drops.
 //       subscription_payers cascade off the subscription row automatically.
-//       Stripe/RC store-cancellation deferred to WI-885.
+//       Provider teardown targets are pre-read by the scheduled deletion
+//       workflow before this transaction, then dispatched durably after this
+//       DB erasure commits (WI-885).
 //   3. delete the live consent_grant rows (RESTRICT now satisfied)
 //   3b. write financial_record rows per person (tax/chargeback retain-tier)
 //   4. write a deletion_audit row per person (deleted_by per path; reason)
@@ -27,8 +29,8 @@
 //   6. erase byok_waitlist WHERE email = login.email  (D2 GDPR Art-17 leg)
 //
 // Gap 1 (WI-849): subscription DB-row teardown is handled here — see Step G1
-// below. The Stripe/RC store-cancellation (billing-domain API call) is deferred
-// to WI-885.
+// below. WI-885 handles the provider teardown as a durable Inngest event from
+// the scheduled deletion workflow, not as a provider call inside this DB tx.
 //
 // NOT BUILT (WI-849 Gap 2 — ruled MOOT 2026-06-20 (operator)): "v2 erasure leaves
 // the legacy `accounts` row + its PII behind." On the reset environments where
@@ -115,6 +117,21 @@ export type DeletionReason =
   | 'user_initiated'
   | 'guardian_initiated'
   | 'abandonment';
+
+export type SubscriptionStoreTeardownTargetV2 = {
+  subscriptionId: string;
+  planTier: string;
+  status: string;
+  stripe: {
+    customerId: string | null;
+    subscriptionId: string | null;
+  };
+  revenueCat: {
+    originalAppUserId: string | null;
+    storeProductId: string | null;
+    storePlatform: string | null;
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Schedule / cancel / status — v2 of the legacy accounts-stamp surface, keyed on
@@ -456,7 +473,8 @@ export async function executeDeletionV2(
     // organization (org FK) while any subscription row stands. DB-row teardown
     // is owned here (WI-849 Gap 1). `subscription_payers.subscription_id` is
     // ON DELETE CASCADE, so deleting the subscription row auto-removes its
-    // payer rows. Stripe/RC store-cancellation deferred to WI-885.
+    // payer rows. Stripe/RC provider teardown is owned by the scheduled
+    // deletion workflow so external calls never run inside this DB transaction.
     if (orgSubscriptions.length > 0) {
       await tx
         .delete(subscription)
@@ -918,6 +936,48 @@ async function readOrgSubscriptionsTx(
       stripeSubscriptionId: true,
     },
   });
+}
+
+/**
+ * Pre-read store provider identifiers for whole-org erasure before
+ * executeDeletionV2 removes the subscription rows. The scheduled Inngest
+ * workflow memoizes this snapshot, runs the DB deletion, then emits a durable
+ * event from the captured identifiers. This avoids both unsafe provider calls
+ * inside the DB transaction and the lost-ID failure mode where event dispatch
+ * fails after the subscription rows are already gone.
+ */
+export async function getSubscriptionStoreTeardownTargetsV2(
+  db: Database,
+  organizationId: string,
+): Promise<SubscriptionStoreTeardownTargetV2[]> {
+  const rows = await db.query.subscription.findMany({
+    where: eq(subscription.organizationId, organizationId),
+    columns: {
+      id: true,
+      planTier: true,
+      status: true,
+      stripeCustomerId: true,
+      stripeSubscriptionId: true,
+      revenuecatOriginalAppUserId: true,
+      storeProductId: true,
+      storePlatform: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    subscriptionId: row.id,
+    planTier: row.planTier,
+    status: row.status,
+    stripe: {
+      customerId: row.stripeCustomerId,
+      subscriptionId: row.stripeSubscriptionId,
+    },
+    revenueCat: {
+      originalAppUserId: row.revenuecatOriginalAppUserId,
+      storeProductId: row.storeProductId,
+      storePlatform: row.storePlatform,
+    },
+  }));
 }
 
 /**

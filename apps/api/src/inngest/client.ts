@@ -52,6 +52,11 @@ const envBindingMiddleware = new InngestMiddleware({
             'RETENTION_PURGE_ENABLED',
           ),
           clerkSecretKey: readStringBinding(env, 'CLERK_SECRET_KEY'),
+          stripeSecretKey: readStringBinding(env, 'STRIPE_SECRET_KEY'),
+          revenueCatRestApiKey: readStringBinding(
+            env,
+            'REVENUECAT_REST_API_KEY',
+          ),
           memoryFactsDedupEnabled: readStringBinding(
             env,
             'MEMORY_FACTS_DEDUP_ENABLED',

@@ -22,6 +22,7 @@ const mockIsDeletionCancelledV2 = jest.fn();
 const mockExecuteDeletionV2 = jest.fn();
 const mockGetOrganizationOwnerClerkUserIdV2 = jest.fn();
 const mockGetOrganizationOwnerEmailV2 = jest.fn();
+const mockGetSubscriptionStoreTeardownTargetsV2 = jest.fn();
 
 jest.mock(
   '../helpers' /* gc1-allow: getStepDatabase/getStepClerkSecretKey wrap Inngest step-level binding acquisition; must be intercepted to inject test doubles without a real Neon connection or CF env */,
@@ -58,6 +59,8 @@ jest.mock(
         mockGetOrganizationOwnerClerkUserIdV2(...args),
       getOrganizationOwnerEmailV2: (...args: unknown[]) =>
         mockGetOrganizationOwnerEmailV2(...args),
+      getSubscriptionStoreTeardownTargetsV2: (...args: unknown[]) =>
+        mockGetSubscriptionStoreTeardownTargetsV2(...args),
     };
   },
 );
@@ -574,11 +577,27 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     mockExecuteDeletionV2.mockResolvedValue('deleted');
     mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_org_owner');
     mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([
+      {
+        subscriptionId: 'subrow-1',
+        planTier: 'plus',
+        status: 'active',
+        stripe: {
+          customerId: 'cus_123',
+          subscriptionId: 'sub_123',
+        },
+        revenueCat: {
+          originalAppUserId: 'rc_original_123',
+          storeProductId: 'com.mentomate.plus.monthly',
+          storePlatform: 'APP_STORE',
+        },
+      },
+    ]);
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   });
 
   it('routes every step onto its v2 twin and erases via executeDeletionV2 (flag on, no pin)', async () => {
-    const { step } = createInngestStepRunner();
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
       event: { data: { accountId: 'org-1' } },
@@ -597,11 +616,43 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       'org-1',
     );
     expect(mockIsDeletionCancelledV2).toHaveBeenCalledWith(mockDb, 'org-1');
+    expect(mockGetSubscriptionStoreTeardownTargetsV2).toHaveBeenCalledWith(
+      mockDb,
+      'org-1',
+    );
     expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
       organizationId: 'org-1',
       ownerEmail: 'owner@example.com',
       reason: 'user_initiated',
       deletedBy: null,
+    });
+    expect(sendEventCalls).toContainEqual({
+      name: 'request-subscription-store-teardown',
+      payload: {
+        name: 'app/billing.subscription_store_teardown_requested',
+        data: {
+          accountId: 'org-1',
+          identityVersion: 'v2',
+          reason: 'whole_org_erasure',
+          requestedAt: expect.any(String),
+          subscriptions: [
+            {
+              subscriptionId: 'subrow-1',
+              planTier: 'plus',
+              status: 'active',
+              stripe: {
+                customerId: 'cus_123',
+                subscriptionId: 'sub_123',
+              },
+              revenueCat: {
+                originalAppUserId: 'rc_original_123',
+                storeProductId: 'com.mentomate.plus.monthly',
+                storePlatform: 'APP_STORE',
+              },
+            },
+          ],
+        },
+      },
     });
     // Clerk erasure used the v2-captured owner id.
     expect(mockDeleteClerkUser).toHaveBeenCalledWith({
@@ -614,15 +665,16 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     expect(mockGetAccountClerkUserId).not.toHaveBeenCalled();
   });
 
-  it('calls getStepDatabase once per v2 DB step (5 total)', async () => {
+  it('calls getStepDatabase once per v2 DB step (6 total)', async () => {
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     await handler({ event: { data: { accountId: 'org-1' } }, step });
 
     // check-account-exists, capture-clerk-user-id, capture-owner-email,
-    // check-cancellation, delete-account-data — delete-clerk-user uses
-    // getStepClerkSecretKey, not getStepDatabase.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(5);
+    // check-cancellation, capture-subscription-store-teardown-targets,
+    // delete-account-data — delete-clerk-user uses getStepClerkSecretKey,
+    // not getStepDatabase.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
   });
 
   it('[BREAK CODEX-P1] pinned v2 survives a mid-grace-period flip to legacy — erases via executeDeletionV2', async () => {
