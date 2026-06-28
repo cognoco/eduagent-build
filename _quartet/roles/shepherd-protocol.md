@@ -69,9 +69,11 @@ then reads identically to "no change."** Maintain a monitor manifest and **recon
 restart (`clacks/monitor-hygiene.md`); periodically spot-check Cosmo directly rather than trust
 prolonged silence. React to each verdict:
 - **rework** (Reviewing → Executing): re-claim, read the reviewer's note, re-dispatch an executor
-  to address it, re-`complete`. Adjudicate reviewer misfires — e.g. open absorbed-provenance
-  children are NOT a WP DoD gap (disposition-done + the close ceremony handle them); post your
-  adjudication on the WP page if you override.
+  to address it, re-`complete`. **Adjudicate each finding against the WI's AC, not in the abstract**
+  — the operator can clear a content gate and defer polish, and the separate reviewer honors a
+  **logged** deferral. Adjudicate reviewer misfires too — e.g. open absorbed-provenance children are
+  NOT a WP DoD gap (disposition-done + the close ceremony handle them); post your adjudication on the
+  WP page if you override.
 - **done** (→ Closed): advance; for a WP, verify the child bulk-close actually ran (a review-side
   `done` can strand children — replicate the close ceremony if so).
 - **human**: escalate to the operator with the specific question. This is the *only* verdict that

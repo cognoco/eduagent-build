@@ -90,6 +90,25 @@ accepted trade.
   with no inherited context.
 - A fork must not re-delegate (harness rule); tiering applies to fresh agents only.
 
+**Fork-isolation caveat (read-only is NOT self-enforcing).** A fork spawned *without* isolation
+runs in the parent's cwd and inherits its edit tools — so a "read-only" instruction is unenforced
+(a review fork has edited the worktree despite the brief). Enforce read-only structurally:
+`isolation:"worktree"` **or** the `Explore` agent type (no Edit/Write). If a non-isolated agent
+does mutate state, treat its edits as **untrusted** — kill it, re-verify and re-own each change,
+and re-run the proof on the final state. Harness gotcha: `isolation:"worktree"` pins the parent
+session's cwd into `.claude/worktrees/agent-*`, after which Edit/Write refuse shared-checkout
+paths — write shared/`_state` paths via absolute-path shell until un-pinned.
+
+### Dispatching CI-failure work — pin the commit first
+A sub-agent told to "reproduce / classify this CI failure" runs against the *session's* local
+checkout, which on a shared tree can sit behind `origin/main` → it reads different code and
+confabulates causation (it has blamed a PR that never touched the files). Any CI-repro dispatch
+must: run against a **fresh worktree from `origin/main`**, confirm `git rev-parse HEAD` == the
+failing run's commit before trusting anything, pull the real CI job log as the primary source
+(`gh run view --job <id> --log-failed`), and spot-verify the pivotal claim against
+`git show origin/main:<file>`. **Static analysis at the correct commit beats reproduction at the
+wrong one.**
+
 ### `/workflows` cost tiers (read-only research / audit / sweep only; builder/merge excluded)
 
 | Tier | When autonomous | Cap |

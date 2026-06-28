@@ -443,6 +443,32 @@ backlog 20–29), mirroring the harness tracker's increment convention.
 
 ---
 
+## Standing Lanes — perpetual operational lanes (NOT proto-epics)
+
+> These are **not** `PRG-NN` rows. A standing lane has **no `Outcome` ("done means") and never
+> graduates** — it's a continuous queue-drain, an operational service, not a bounded initiative.
+> Kept here for **visibility/health** (so its shepherd is not an untracked orphan), explicitly
+> **outside** the PRG numbering / `Activate-when` / cross-program-gate / Cosmo-Epic-harvest
+> machinery. Row schema is a pointer: `Lane · Cosmo WS · Owner · Shepherd scaffold · Health surface`.
+
+### Bug Lane — `active` (standing) — stood up 2026-06-20
+
+- **Lane:** continuous random-bug intake — unrelated one-off defects, no shared theme. Distinct
+  from PRG-18 Flow Remediation (bounded post-cutover mop-up) and PRG-06/WS-18 (identity cutover).
+- **Cosmo WS:** **Bug Lane** — `3858bce9-1f7c-8083-905b-d94bca4a4325` (per-WI state lives here).
+- **Model:** **standard Quartet shepherd** — the *only* difference from a PRG lane is the absence of
+  a PRG row. Full **bidirectional** orchestrator channel (`_wip/bug-lane/_state/{inbox,outbox}.jsonl`);
+  orchestrator stays in the loop. The operator may also instruct the shepherd directly in-session;
+  the shepherd mirrors everything to the outbox so the orchestrator has the full picture and feeds
+  back what's relevant.
+- **Shepherd scaffold:** `_wip/bug-lane/execution-tracker.md` (entry-point) + the cross-lane
+  `_wip/identity-foundation/shepherd-protocol.md`.
+- **Monitoring:** orchestrator-owned outbox monitor (re-arm on session restart; silence ≠ health).
+- **Open operator actions:** launch the agent; confirm the autonomous reviewer polls WS "Bug Lane"
+  (Gate-2 close). Specific WI direction is given to the shepherd after standup (operator + orchestrator).
+
+---
+
 ## Emerging — clear-out workstreams from the audit triage (firm @ Phase M)
 
 > **Firm from committed Phase M** (`docs/audit/2026-05-29-full-audit/M-triage-closure.md`,

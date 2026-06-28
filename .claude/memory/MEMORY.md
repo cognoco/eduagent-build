@@ -10,10 +10,8 @@
 - **Quartet mechanics extracted (2026-06-20)** → `_wip/umbrella-program/quartet-learning-tracker.md` (PRG-05 productization input; 5 drained memories deleted, residual-bearing ones retained below).
 
 - **Cosmo WI finalization drained (2026-06-20)** → `_wip/umbrella-program/cosmo-finalization-guide.md` (3 memories merged: shepherd-finalization + execute-complete-finalize + reviewer-reads-objective). Covers: `complete` vs `replace_content`, parser-clean completion-summary, `Fixed In`, re-finalize after a bounce, closure-verification reads OBJECTIVE/NAME, append-parse deadlock → operator force-close.
-- [feedback_cosmo_refine_requires_code_inspection.md](feedback_cosmo_refine_requires_code_inspection.md) — Cosmo refinement must inspect current affected code/docs before `--to-ready`; do not promote from fields/DoR mechanics alone.
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
 - [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons moved to quartet-learning-tracker §E9): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
-- [feedback_never_auto_pick_wi_301.md](feedback_never_auto_pick_wi_301.md) — WI-301 (owner-elevation gate) HARD-EXCLUDED from any rework/reviewer-returned sweep; never claim/land/merge autonomously — its gate defaults ON and breaks owner-switching without the Clerk `fva` template (user-ruled 2026-06-21).
 
 ## Identity Foundation (re-platform)
 
@@ -63,7 +61,6 @@
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
 - [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
-- [feedback_flow_testing_from_main.md](feedback_flow_testing_from_main.md) — Flow testing/status evidence must run from `main` unless the user explicitly names another branch; use a clean `origin/main` worktree if needed.
 
 ## Android SDK & Build
 
@@ -126,6 +123,7 @@
 - [feedback_prepush_bail_masks_failures.md](feedback_prepush_bail_masks_failures.md) — Pre-push `--bail` + a leading flake masks real fails; verify affected set WITHOUT --bail before any SKIP_PRE_PUSH. tsc/integration miss stale mock `toHaveBeenCalledWith` arg-count.
 - [feedback_forward_ratchets_not_in_prepush.md](feedback_forward_ratchets_not_in_prepush.md) — Forward-only git-diff ratchets (GC1 jest.mock, i18n-jsx, no-clinical-copy, decision-adr) aren't run by local pre-push/jest; run `check-change-class.sh --run` (or the ratchet) before claiming CI-clean. 3rd occurrence (809/586/811).
 - [feedback_commit_skill_bare_push_worktree.md](feedback_commit_skill_bare_push_worktree.md) — Forked /commit bare `git push` in a worktree tracking origin/new-llm FF'd the shared branch directly, bypassing the PR/review gate. Rule: explicit refspec `HEAD:<wi-branch>`, never bare, in worktrees tracking a shared integration branch. ACTION: harden commit/worktree-setup skills.
+- [feedback_applier_fabricates_citations.md](feedback_applier_fabricates_citations.md) — Appliers fabricate gc1-allow twin citations + convenience-mock seedable seams; mandatory shepherd conformance-review (git-ls-files twin verify + seed-real db.query) before cherry-pick — appliers not trusted to self-cite/self-classify. (WI-867 2/2 appliers, 2026-06-21.)
 
 ## User Profile
 
