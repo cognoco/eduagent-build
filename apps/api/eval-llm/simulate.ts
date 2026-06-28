@@ -7,9 +7,10 @@
 // SYNTHETIC pre-screen that COMPLEMENTS RR-2 (it does NOT discharge RR-2's
 // real-staging-transcript dependency) and feeds the mastery-bar half of RR-6.
 //
-// PRODUCTION GRADER-ON pipeline: the TUTOR is production-routed (gpt-oss-120b in
-// stg) and only drives the conversation; the measured component is the GRADER
-// (the production-routed grading model), which owns the mastery evaluation. NOTE:
+// PRODUCTION GRADER-ON pipeline: the TUTOR is pinned to gpt-oss-120b (MENTOR_MODEL,
+// via OpenRouter — the harness router can't reach the production gpt-oss host) and
+// only drives the conversation; the measured component is the GRADER (the
+// production-routed grading model), which owns the mastery evaluation. NOTE:
 // every sim scenario is a minor, and the router's under-18 gate resolves before
 // the capability:'judge' branch, so the resolved grader is the age-appropriate
 // approved model (possibly the same family as the tutor), NOT necessarily the
@@ -26,9 +27,12 @@
 //     simulation-baseline.json + check the judge slug is current. No LLM call.
 //
 //   doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-//     --learner-model openai/gpt-4o --runs 3 --max-live-calls 189 --check-baseline
-//     Live grid: production tutor + production judge grade a distinct learner;
-//     enforce the over-credit ceiling + drift vs the committed baseline.
+//     --learner-model meta-llama/llama-3.3-70b-instruct --runs 3 \
+//     --max-live-calls 189 --check-baseline
+//     Live grid: gpt-oss tutor + production judge grade a distinct learner;
+//     enforce the over-credit ceiling + drift vs the committed baseline. The
+//     learner must be a non-gpt family (the stg minor judge is gpt-4o-mini —
+//     openai/gpt-4o collides and the two-model guard hard-fails).
 //
 // Prerequisites for a live run:
 //   - OPENROUTER_API_KEY in the resolved Doppler config (-c stg). The learner
@@ -59,6 +63,7 @@ import {
 } from './runner/llm-bootstrap';
 import {
   assertTwoModelGuard,
+  MENTOR_MODEL,
   resolveJudgeSlugProbe,
   resolveProductionGraderModel,
   runSimulatedRound,
@@ -401,13 +406,14 @@ async function main(): Promise<void> {
 
   // Provider pin + grader-candidate override BEFORE bootstrap. The override
   // pins the GRADER candidate (defaultGraderTurn → runHarnessLlm honors it);
-  // the tutor is always production-routed (routeAndCall, ignores the override).
+  // the tutor is pinned to MENTOR_MODEL via callOpenRouterModel directly, so it
+  // ignores the grader override (but a --provider host pin DOES apply to it).
   setOpenRouterProviderPin(args.provider ? [args.provider] : null);
   setOpenRouterModelOverride(args.graderModel ?? null);
   bootstrapLlmProviders();
 
   console.log(
-    `Running ${grid.length} simulated round(s): learner=${args.learnerModel}, tutor=production-routing, grader=${args.graderModel ?? 'production-routing'}\n`,
+    `Running ${grid.length} simulated round(s): learner=${args.learnerModel}, tutor=${MENTOR_MODEL}, grader=${args.graderModel ?? 'production-routing'}\n`,
   );
 
   const results = await runRounds(grid, args);
@@ -465,7 +471,7 @@ async function main(): Promise<void> {
     }
     const baseline = toBaseline(metrics, {
       learnerModel: args.learnerModel,
-      mentorModel: 'production-routing',
+      mentorModel: MENTOR_MODEL,
       graderModel: args.graderModel ?? resolveProductionGraderModel(repProfile),
       updatedAt: new Date().toISOString(),
       provenance: 'update-baseline',

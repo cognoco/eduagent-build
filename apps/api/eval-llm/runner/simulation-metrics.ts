@@ -174,7 +174,8 @@ export interface SimulationBaseline {
    *  → the per-PR gate stays red until a real baseline is seeded (T12). */
   provenance: 'update-baseline';
   learnerModel: string;
-  /** The tutor routing label (`production-routing` for the committed gate). */
+  /** The pinned tutor model slug (`MENTOR_MODEL`, e.g. `openai/gpt-oss-120b`) —
+   *  provenance only; the conversation driver is not the measured component. */
   mentorModel: string;
   /** The resolved `capability:'judge'` slug at seed time. The per-PR
    *  `--validate-baseline` judge-drift check reds when this ≠ the live judge,

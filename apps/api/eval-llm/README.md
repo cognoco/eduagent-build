@@ -162,8 +162,11 @@ single-turn). One LLM plays the **learner** in character from a hidden
 competence brief. Each learner answer is then **graded by the production judge**
 (`buildChallengeRoundGraderPrompt` → rung 1, `capability:'judge'`) — the
 component production actually runs when `CHALLENGE_ROUND_GRADER_ENABLED` is on
-(the V2 default). A separate **tutor** turn (`buildSystemPrompt`,
-production-routed) only produces the next question. The pure state machine
+(the V2 default). A separate **tutor** turn (`buildSystemPrompt`, pinned to
+`MENTOR_MODEL` = `openai/gpt-oss-120b` via the OpenRouter candidate path —
+the harness router can't reach the production gpt-oss host, and under stg
+production routing would resolve a minor's tutor to Gemini/gpt-4o, never
+gpt-oss) only produces the next question. The pure state machine
 (`transitionChallengeState`) and the pure mastery gate (`decideMasteryAndReview`)
 run in-memory. The driver compares the gate's outcome to each scenario's
 ground-truth `expectedOutcome` to compute over-/under-credit and the grader's
@@ -181,12 +184,16 @@ pnpm --filter @eduagent/api eval:llm:sim -- --list
 
 # Live grid: a DISTINCT learner is graded by the production judge (default) or
 # by an explicit grader candidate. Learner and grader must differ (see guard).
+# The learner must be a valid OpenRouter slug AND a different family from the
+# resolved grader — under stg the minor judge is gpt-4o-mini, so `openai/gpt-4o`
+# COLLIDES (guard hard-fails); use a non-gpt learner like llama-3.3-70b.
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --runs 2 --max-live-calls 30
+  --learner-model meta-llama/llama-3.3-70b-instruct --runs 2 --max-live-calls 30
 
-# Pin an explicit grader candidate instead of production routing:
+# Pin an explicit grader candidate instead of production routing (any valid
+# OpenRouter slug; must differ from the learner family):
 doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
-  --learner-model openai/gpt-4o --grader-model anthropic/claude-3.5-sonnet \
+  --learner-model meta-llama/llama-3.3-70b-instruct --grader-model deepseek/deepseek-chat \
   --runs 2 --max-live-calls 30
 ```
 
@@ -295,12 +302,13 @@ The guard refuses to run when:
   (Soft termination on that `[]` differs from production — see the disclosed
   empty-grader divergence above.)
 - **`OPENROUTER_API_KEY` must be in the resolved Doppler config (`-c stg`)** for
-  any live run — the learner *always* calls OpenRouter, and bootstrap treats the
-  key as optional (it only fails at call time otherwise).
+  any live run — the learner *and the tutor* (`MENTOR_MODEL`) always call
+  OpenRouter, and bootstrap treats the key as optional (it only fails at call
+  time otherwise).
 - **`--provider` is a GLOBAL OpenRouter host pin** — it affects *every*
-  OpenRouter call this run, including an OpenRouter grader candidate. Only use it
-  when the grader is production-routed or both deliberately share the pinned
-  host.
+  OpenRouter call this run, including the tutor and an OpenRouter grader
+  candidate. Only use it when the grader is production-routed or all OpenRouter
+  calls deliberately share the pinned host.
 - **Language:** v1 learner answers are in plain English regardless of the
   profile's conversation language — a deliberate simplification for the
   synthetic pre-screen; language-faithful calibration comes from real-staging

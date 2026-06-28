@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-27T22:31:28.847Z",
+  "provenance": "update-baseline",
+  "learnerModel": "meta-llama/llama-3.3-70b-instruct",
+  "mentorModel": "openai/gpt-oss-120b",
+  "graderModel": "gpt-4o-mini",
+  "scenarioCount": 20,
+  "rates": {
+    "outcome": {
+      "verified": 0.25,
+      "partial": 0.75,
+      "reteach": 0,
+      "invalid": 0
+    },
+    "masteryVerified": 0.25,
+    "underCredit": 0.15,
+    "signalEmissionByMentor": {
+      "production-routing": 0.7
+    }
+  }
+}

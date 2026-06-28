@@ -23,12 +23,13 @@ import { parseEnvelope } from '../../src/services/llm/envelope';
 import { extractFirstJsonObject } from '../../src/services/llm';
 import {
   getModelConfigForTest,
-  routeAndCall,
+  withSafetyPreamble,
 } from '../../src/services/llm/router';
 import type { ChatMessage } from '../../src/services/llm/types';
 import type { ChallengeSimScenario } from '../fixtures/challenge-personas';
 import type { EvalProfile } from '../fixtures/profiles';
 import { runHarnessLlm } from './llm-client';
+import { callOpenRouterModel } from './llm-bootstrap';
 import {
   runLearnerTurn,
   type LearnerHistoryEntry,
@@ -46,8 +47,9 @@ import {
 //      component: its emission rate is the RR-12 gpt-oss-drop indicator, and its
 //      verdicts feed the mastery gate.
 //   2. answered by the TUTOR (`buildSystemPrompt` with graderEnabled:true →
-//      production routing) which just produces the next question. The tutor is
-//      NOT the candidate under test and is NEVER routed to the grader candidate.
+//      pinned to MENTOR_MODEL (gpt-oss) via OpenRouter) which just produces the
+//      next question. The tutor is NOT the candidate under test and is NEVER
+//      routed to the grader candidate.
 //
 // Why grader-ON, not the legacy inline-tutor signal: with the grader flag on,
 // the tutor emits NO `challenge_round_evaluation` — a separate judge call owns
@@ -73,6 +75,22 @@ import {
 
 /** The tutor turn runs at rung 3, mirroring flows/challenge-round-mastery.ts. */
 const TUTOR_RUNG = 3 as const;
+
+/**
+ * The conversation-driver tutor model. Pinned to the production gpt-oss host
+ * model (the V2 under-18 mentor of record — docs/registers/llm-models/master.md)
+ * and reached via the OpenRouter candidate path (`callOpenRouterModel`), NOT
+ * production routing: the harness router only registers gemini/openai/anthropic
+ * configs (runner/llm-bootstrap.ts), and under the stg flag state
+ * (LLM_ROUTING_V2 off, GEMINI_API_KEY present) `routeAndCall` would resolve a
+ * minor's tutor to Gemini — never gpt-oss. Pinning the slug makes the driver
+ * faithful to the V2 cutover target. The tutor is NOT the measured component
+ * (the grader is), so OpenRouter-served gpt-oss is REPRESENTATIVE, not bit-exact
+ * to the Cerebras production host; pin a host with `--provider` for sensitivity.
+ * Must stay in lockstep with the seed run + weekly gate (both pin this same
+ * model) — `mentorModel` in the baseline records it for provenance.
+ */
+export const MENTOR_MODEL = 'openai/gpt-oss-120b';
 
 /** The grader judge runs at rung 1 — same as GRADER_RUNG in challenge-round/grader.ts. */
 const GRADER_RUNG = 1 as const;
@@ -304,9 +322,15 @@ function buildMentorContext(params: {
 }
 
 /**
- * Tutor turn — produces the next question. Routes through PRODUCTION routing
- * (routeAndCall), never the grader candidate, so a `--grader-model` candidate
- * cannot contaminate the conversation driver. Not the measured component.
+ * Tutor turn — produces the next question. Pinned to MENTOR_MODEL (the
+ * production gpt-oss host model) via the OpenRouter candidate path so the
+ * conversation driver is faithful to the V2 cutover target, NOT to whatever the
+ * harness router would resolve under the current flag state (Gemini/gpt-4o under
+ * stg — see MENTOR_MODEL). It is never the grader candidate, so a
+ * `--grader-model` candidate cannot contaminate the driver. Not the measured
+ * component. The production safety + personalization preamble is replicated here
+ * (`withSafetyPreamble`, which `routeAndCall` would otherwise prepend) so the
+ * pinned model sees the same prompt production's tutor would.
  */
 async function defaultTutorTurn(
   ctx: ExchangeContext,
@@ -314,22 +338,19 @@ async function defaultTutorTurn(
 ): Promise<string> {
   const sourceEvidence = buildExchangeSourceEvidence(ctx, learnerAnswer);
   const system = buildSystemPrompt({ ...ctx, sourceEvidence });
-  const result = await routeAndCall(
+  const messages = withSafetyPreamble(
     [
       { role: 'system', content: system },
       { role: 'user', content: learnerAnswer },
     ] satisfies ChatMessage[],
-    TUTOR_RUNG,
-    {
-      flow: 'eval-harness',
-      llmTier: ctx.llmTier,
-      ageBracket: resolveAgeBracket(ctx.birthYear),
-      responseFormat: 'json',
-      conversationLanguage: ctx.conversationLanguage,
-      sessionId: `eval-sim-${ctx.sessionId}`,
-    },
+    resolveAgeBracket(ctx.birthYear),
+    { conversationLanguage: ctx.conversationLanguage },
   );
-  const parsed = parseEnvelope(result.response, 'exchange.session');
+  const raw = await callOpenRouterModel(messages, MENTOR_MODEL, {
+    responseFormat: 'json',
+    reasoningEffort: 'low',
+  });
+  const parsed = parseEnvelope(raw, 'exchange.session');
   return parsed.ok ? parsed.envelope.reply : FALLBACK_FOLLOWUP;
 }
 
@@ -457,8 +478,8 @@ export async function runSimulatedRound(
     turnIndex += 1;
 
     // 4. TUTOR produces the next question — only while the round continues.
-    //    Production-routed; failure to parse falls back so the loop is never
-    //    stranded (does NOT affect signalEmitted — the tutor is not the signal).
+    //    Pinned to gpt-oss (MENTOR_MODEL); failure to parse falls back so the
+    //    loop is never stranded (does NOT affect signalEmitted — not the signal).
     if (state?.state === 'active' && turnIndex < MAX_CHALLENGE_QUESTIONS) {
       const ctx = buildMentorContext({
         scenario,
