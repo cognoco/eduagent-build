@@ -98,7 +98,10 @@ const FIXTURES: Array<Scenario<AppHelpV2Input>> = [
     scenarioId: 'memory-to-journal',
     input: {
       question: 'Where can I see what you remember about me?',
-      mustInclude: ['Mentor memory'],
+      // In-app destination chip is "Memory" inside the Journal tab
+      // (journal.sections.memory). "Mentor memory" is the screen title, not the
+      // nav label — assert the real Journal → Memory route.
+      mustInclude: ['Journal', 'Memory'],
       mustExclude: [],
     },
   },
