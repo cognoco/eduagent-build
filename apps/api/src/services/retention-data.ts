@@ -34,6 +34,7 @@ import {
 import { MIN_EXCHANGES_FOR_TOPIC_COMPLETION } from '@eduagent/schemas';
 import { recordPracticeActivityEvent } from './practice-activity-events';
 import { safeWrite } from './safe-non-core';
+import { extractFirstJsonObject } from './llm';
 import {
   recordRetrievalEvent,
   type RecallGrade,
@@ -205,10 +206,10 @@ export const recallGradeJsonSchema = z
 function parseRecallGradeJson(
   raw: string,
 ): z.infer<typeof recallGradeJsonSchema> | null {
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) return null;
+  const jsonText = extractFirstJsonObject(raw);
+  if (jsonText === null) return null;
   try {
-    const parsed = recallGradeJsonSchema.safeParse(JSON.parse(match[0]));
+    const parsed = recallGradeJsonSchema.safeParse(JSON.parse(jsonText));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
