@@ -58,7 +58,8 @@ import {
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
-import type { ExchangeContext } from '../exchange-types';
+import type { ExchangeContext, ReviewCallback } from '../exchange-types';
+import { getReviewCallbackContext } from '../review-callback';
 import {
   evaluateEscalation,
   getRetentionAwareStartingRung,
@@ -1831,6 +1832,7 @@ export async function prepareExchangeContext(
     semanticMemoryRetrievalEnabled?: boolean;
     challengeRoundRuntimeEnabled?: boolean;
     challengeRoundGraderEnabled?: boolean;
+    reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
     identityV2Enabled?: boolean;
   },
@@ -2724,6 +2726,42 @@ export async function prepareExchangeContext(
       ) || undefined
     : undefined;
 
+  // RR-1 + RR-13: warm review-callback opener material. Populated only when the
+  // flag is on AND this is a review-mode first turn on a known topic. A read
+  // failure must not break the turn — fall back to the legacy REVIEW copy by
+  // leaving reviewCallback undefined, and surface the failure (not silent).
+  const reviewCallbackOpenerEnabled =
+    options?.reviewCallbackOpenerEnabled === true;
+  const effectiveModeValue = (
+    session.metadata as Record<string, unknown> | null
+  )?.effectiveMode as string | undefined;
+  let reviewCallback: ReviewCallback | undefined;
+  if (
+    reviewCallbackOpenerEnabled &&
+    (effectiveModeValue === 'review' || effectiveModeValue === 'practice') &&
+    session.exchangeCount === 0 &&
+    session.topicId &&
+    topic?.topicTitle
+  ) {
+    try {
+      reviewCallback = await getReviewCallbackContext(
+        db,
+        profileId,
+        session.topicId,
+        topic.topicTitle,
+      );
+    } catch (err) {
+      logger.warn('[session-exchange] review-callback context read failed', {
+        event: 'review_callback.context_failed',
+        sessionId,
+        profileId,
+        topicId: session.topicId,
+        err,
+      });
+      reviewCallback = undefined;
+    }
+  }
+
   // 6. Build ExchangeContext
   // For interleaved sessions: use the topic list, clear single-topic fields
   const context: ExchangeContext = {
@@ -2815,6 +2853,7 @@ export async function prepareExchangeContext(
     graderEnabled: options?.challengeRoundGraderEnabled === true,
     challengeRound,
     currentUserMessageEventId: options?.currentUserMessageEventId,
+    reviewCallback,
   };
 
   return { session, context, effectiveRung, hintCount, lastAiResponseAt };
@@ -3215,6 +3254,7 @@ export async function processMessage(
     // Call sites read `c.env.CHALLENGE_ROUND_GRADER_ENABLED` and pass the
     // result of `isChallengeRoundGraderEnabled(value)` here.
     challengeRoundGraderEnabled?: boolean;
+    reviewCallbackOpenerEnabled?: boolean;
     identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
@@ -3493,6 +3533,7 @@ export async function streamMessage(
     challengeRoundRuntimeEnabled?: boolean;
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     challengeRoundGraderEnabled?: boolean;
+    reviewCallbackOpenerEnabled?: boolean;
     identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
