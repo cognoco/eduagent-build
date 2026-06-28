@@ -63,7 +63,7 @@ module.exports = {
     '**/apps/api/eval-llm/**/*.test.ts',
   ],
   // Integration tests share a real Neon database and must run serially.
-  // They live in jest.integration.config.cjs → `api:test-integration` target.
+  // They live in jest.integration.config.cjs → `api:integration-api` target.
   testPathIgnorePatterns: [
     ...dropWorktreeGuards([
       '/node_modules/',
