@@ -133,6 +133,15 @@ The orchestrator↔shepherd channel is `working/lanes/<lane>/_state/{inbox,outbo
   session-start / post-compact / post-resume — never blind-re-arm. See `clacks/monitor-hygiene.md`.
 
 ## Orient on resume (first actions)
+
+> **🔴 MANDATORY RE-READ on every compaction / resume — protocol, not just state.** A state-only
+> handover (anchor + channel tail) guarantees the resumed session reinvents the machinery — the
+> *how* lives in the protocols, not the anchor. Re-read, in order: (1) this
+> `orchestrator-protocol.md`, (2) `working/program/program-roster.md`, (3) `planning-rules.md`,
+> (4) the anchor + Cosmo state + channel tail, (5) `roles/{shepherd,executor/*,reviewer}-protocol.md`
+> + the kickoff templates **when standing up a lane**. A compaction handover must carry this list at
+> its top; do not resume off state alone.
+
 1. **Read the program working docs** — `working/program/program-roster.md` (roster + cross-stream
    spine), the dashboard, `planning-rules.md`, any program backlog, and the latest checkpoint.
 2. **Take in the current initiative handoff** (the live thread); read its cited working artifacts

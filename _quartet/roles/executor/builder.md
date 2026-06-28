@@ -19,6 +19,12 @@ Cosmo, the lane's `execution-tracker.md`, and the lane plan.
 implementation*: fetch the WI + artifacts, then `claim --claimant <your-id>`. Never start
 unclaimed.
 
+**GATE-0 — Premise verify (before any fix).** For any directed "fix this live error" WI, first
+confirm the premise **reproduces on current `origin/main`** — trace each cited read up to its entry
+point and check no caller-level flag/branch already routes elsewhere. **If the fix already exists,
+STOP and report** — do not fabricate a no-op change to satisfy the brief. Build only once the defect
+is reproduced.
+
 **Phase 1 — Worktree.** Create `.worktrees/WI-NN` (branch `WI-NN` from `origin/main`) via the
 repo's **worktree-setup skill** — not an editor "enter worktree" command, not manual
 `git worktree add`. The skill runs the repo's install + env-sync steps. All work happens in this
@@ -34,6 +40,10 @@ enforces this in dispatch briefs.
 untracked or deleted before PR) *before touching code*. Plan style is **parameterized by work
 type** (repo Planning Discipline rule):
 - **Greenfield logic** → TDD decomposition: tests first, red → green → refactor.
+- **`Type=Bug`** → plan a **durable red-green-revert regression guard up front**: a persistent test
+  that is **RED pre-fix, GREEN post-fix**, with that evidence cited. The review gate bounces a
+  `Type=Bug` shipped without one even when symptoms/AC pass — so declare the guard in the plan, not
+  as an afterthought. (Hygiene / documentation WIs don't hit this.)
 - **Migration / refactor / audit / ops** → design-doc + acceptance-criteria checklist, with a
   concrete verification step per item. No TDD theater.
 - Migrations that drop anything need a `## Rollback` section per repo schema-safety rules.
@@ -89,5 +99,10 @@ cites the landed commit. **Never self-close** — review/close is a separate gat
   granting any per-PR gate exception are **shepherd-only** acts; a review-check exception is
   **operator-only**. On a red/blocked check, the executor diagnoses it verbatim and reports — it
   does not act on its own diagnosis.
+- **Completeness sweep — fix every surface, not the first.** When the AC names N variant surfaces,
+  sweep **all** of them plus every sibling call site of the guard you touched (the "3+ sibling
+  locations" drift class). A verification that scopes only to the path you reasoned about misses a
+  different consumer that drops the same guard — the failure mode a separate reviewer exists to
+  catch. Either sweep all current sites in this PR or log a tracked deferred-sweep (ID + owner).
 - Secrets via the repo's secret manager only; never ad-hoc env edits.
 - No `eslint-disable` / suppression to get green; fix the root cause.

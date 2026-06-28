@@ -43,6 +43,10 @@ bug.
   bounces. One does not substitute for the other.
 - **Silence is unverified.** At any finalize / close / decision boundary, **direct-read the Cosmo
   Stage** rather than trust a monitor's quiet. A quiet monitor is "unknown," not "nothing changed."
+  This also covers the **differ baseline blind spot**: a freshly-armed differ baselines on its first
+  read, so a transition that *already happened* (or lands within its first poll) never fires an
+  event. After any finalize / Stage-write, **re-read the verdict once explicitly**; keep the monitor
+  for *subsequent* changes only.
 - **The orchestrator runs a durable central backstop** — a standing Cosmo-Stage / reviewer-transition
   watcher across the program — so a single dead lane watcher can't drop a verdict on the floor.
 
