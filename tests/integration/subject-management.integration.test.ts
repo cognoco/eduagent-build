@@ -109,6 +109,9 @@ const subjectLlmFixture = registerLlmProviderFixture({
   chatResponse: SUBJECT_LLM_RESPONSE,
 });
 
+// Subject route integration tests exercise real route/service code; install the
+// external Inngest HTTP boundary once and clear captured calls in tests that
+// assert dispatches.
 beforeAll(() => {
   mockInngestEvents();
 });
@@ -848,6 +851,63 @@ describe('Integration: POST /v1/subjects/:id/retry-curriculum', () => {
     ).resolves.toMatchObject({
       failedAt: null,
       failedReason: null,
+    });
+  });
+
+  it('does not retry or clear another profile subject curriculum', async () => {
+    const ownerProfileId = await createOwnerProfile();
+    const otherProfileId = await createOwnerProfile(
+      {
+        userId: OTHER_SUBJECT_AUTH_USER_ID,
+        email: OTHER_SUBJECT_AUTH_EMAIL,
+      },
+      'Other Integration Learner',
+    );
+    const subject = await seedSubject(ownerProfileId, 'Private Mathematics');
+    const db = getIntegrationDb();
+    const failedAt = new Date('2026-06-20T12:00:00Z');
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: subject.id,
+        title: 'Private Retry Evidence Book',
+        sortOrder: 0,
+        topicsGenerated: false,
+        failedAt,
+        failedReason: 'generation_error',
+      })
+      .returning({ id: curriculumBooks.id });
+
+    if (!book) {
+      throw new Error('Insert into curriculumBooks did not return a row');
+    }
+
+    clearFetchCalls();
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}/retry-curriculum`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          {
+            sub: OTHER_SUBJECT_AUTH_USER_ID,
+            email: OTHER_SUBJECT_AUTH_EMAIL,
+          },
+          otherProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect([403, 404]).toContain(res.status);
+    expect(getCapturedInngestEvents()).toEqual([]);
+    await expect(
+      db.query.curriculumBooks.findFirst({
+        where: eq(curriculumBooks.id, book.id),
+      }),
+    ).resolves.toMatchObject({
+      failedAt,
+      failedReason: 'generation_error',
     });
   });
 });
