@@ -514,7 +514,7 @@ function buildReviewCallbackOpenerGuidance(cb: ReviewCallback): string {
         base +
         ` Last time, ${title} clicked for them — frame this as checking whether it stuck (e.g. "Last time you had ${title} down — let's see if it stuck").${gap}` +
         (cb.lastLearnerMessage
-          ? ` For your private grounding only — do NOT quote it or attribute exact words — their last message on this topic was: <last_message>${escapeXml(cb.lastLearnerMessage)}</last_message>.`
+          ? ` For your private grounding only — do NOT quote it or attribute exact words — their last message on this topic was: <last_message>${sanitizeXmlValue(cb.lastLearnerMessage, 500)}</last_message>.`
           : '')
       );
     case 'wobbled':
