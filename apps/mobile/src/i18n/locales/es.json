@@ -756,6 +756,11 @@
         "withNameSubject": "Hola, {{name}}. Estás aquí para practicar {{subject}}. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
         "withName": "Hola, {{name}}. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?",
         "generic": "Hola. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Hola de nuevo, {{name}}. ¿Listo para retomar {{subject}}? Pregúntame lo que quieras. ¿Por dónde seguimos?",
+        "withName": "Hola de nuevo, {{name}}. ¿En qué te gustaría trabajar hoy?",
+        "generic": "Hola de nuevo. ¿En qué te gustaría trabajar hoy?"
       }
     },
     "filingFailed": {
@@ -786,20 +791,6 @@
       "writeNote": "Escribir una nota",
       "saveFailedTitle": "No se pudo guardar la nota",
       "summaryPlaceholder": "¿Qué deberíamos recordar de esta sesión?"
-    },
-    "filingPrompt": {
-      "title": "¿Añadir a la biblioteca?",
-      "descriptionWithTopic": "¿Quieres añadir esta sesión a {{topic}} en tu biblioteca?",
-      "description": "¿Quieres añadir esta sesión a tu biblioteca?",
-      "addFailedTitle": "No se pudo añadir a la biblioteca",
-      "addFailedMessage": "Inténtalo de nuevo",
-      "adding": "Añadiendo…",
-      "yesAddLabel": "Sí, añadir a la biblioteca",
-      "yesAdd": "Sí, añadirla",
-      "noThanksLabel": "No, gracias",
-      "noThanks": "No, gracias",
-      "tryAgain": "Reintentar",
-      "skipForNow": "Omitir por ahora"
     },
     "parkingLot": {
       "title": "Parking",
@@ -967,8 +958,7 @@
     "disabledReason": {
       "offline": "Estás sin conexión. La entrada volverá cuando te reconectes.",
       "expired": "Esta sesión ha terminado.",
-      "quotaReached": "Has alcanzado tu límite de sesiones.",
-      "chooseSave": "Elige dónde guardar esta sesión."
+      "quotaReached": "Has alcanzado tu límite de sesiones."
     },
     "imageAttach": {
       "timeout": "Tu foto tardó mucho en cargarse, así que empezaré solo con el texto. Si algo no se ve bien, toca la cámara de nuevo para reintentar.",
@@ -1622,7 +1612,9 @@
       "timeoutTitle": "Sigue esperando…",
       "timeoutMessage": "Tu respuesta está tardando más de lo habitual en enviarse. Comprueba tu conexión e inténtalo de nuevo.",
       "dontRememberFirst": "No me acuerdo.",
-      "dontRememberAgain": "Sigo sin saber."
+      "dontRememberAgain": "Sigo sin saber.",
+      "gradingUnavailableTitle": "Recibí tu respuesta.",
+      "gradingUnavailableMessage": "No pude revisarla ahora mismo, pero tu respuesta está a salvo. Inténtalo de nuevo o vuelve más tarde."
     },
     "lastStudied": "Estudiado por última vez {{when}}",
     "neverStudied": "Nunca estudiado",

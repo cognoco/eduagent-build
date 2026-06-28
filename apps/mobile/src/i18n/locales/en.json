@@ -783,6 +783,11 @@
         "withNameSubject": "Hi {{name}}. You're here to work on {{subject}}. Ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. Where should we start with {{subject}}?",
         "withName": "Hi {{name}}. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?",
         "generic": "Hi. I'm your mentor — ask me anything you're learning, working on, or curious about. You've got 10 free questions a day, 100 a month. What would you like to start with?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Welcome back, {{name}}. Ready to pick up {{subject}} again? Ask me anything — where should we go next?",
+        "withName": "Welcome back, {{name}}. What would you like to work on today?",
+        "generic": "Welcome back. What would you like to work on today?"
       }
     },
     "messageBubble": {
@@ -846,20 +851,6 @@
       "writeNote": "Write a note",
       "saveFailedTitle": "Could not save note",
       "summaryPlaceholder": "What should we remember from this session?"
-    },
-    "filingPrompt": {
-      "title": "Add to library?",
-      "descriptionWithTopic": "Would you like to add this session to {{topic}} in your library?",
-      "description": "Would you like to add this session to your library?",
-      "addFailedTitle": "Could not add to library",
-      "addFailedMessage": "Please try again",
-      "adding": "Adding…",
-      "yesAddLabel": "Yes, add to library",
-      "yesAdd": "Yes, add it",
-      "noThanksLabel": "No thanks",
-      "noThanks": "No thanks",
-      "tryAgain": "Try again",
-      "skipForNow": "Skip for now"
     },
     "parkingLot": {
       "title": "Parking lot",
@@ -989,8 +980,7 @@
     "disabledReason": {
       "offline": "You're offline — input will return when you reconnect",
       "expired": "This session has ended",
-      "quotaReached": "Your session limit has been reached",
-      "chooseSave": "Choose where to save this session"
+      "quotaReached": "Your session limit has been reached"
     },
     "imageAttach": {
       "timeout": "Your photo took too long to load, so I'm starting with the text only. If something looks off, tap the camera again to retry.",
@@ -1715,7 +1705,9 @@
       "timeoutTitle": "Still waiting…",
       "timeoutMessage": "Your answer is taking longer than usual to send. Check your connection and try again.",
       "dontRememberFirst": "I don't remember.",
-      "dontRememberAgain": "Still stuck."
+      "dontRememberAgain": "Still stuck.",
+      "gradingUnavailableTitle": "Got your answer.",
+      "gradingUnavailableMessage": "I couldn't check it just now — your answer is safe. Try again, or come back to it later."
     },
     "notFoundTitle": "Topic not found",
     "notFoundMessage": "This topic could not be opened. Please go back and try again.",

@@ -756,6 +756,11 @@
         "withNameSubject": "Hi {{name}}. Du bist hier, um an {{subject}} zu arbeiten. Frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit sollen wir bei {{subject}} anfangen?",
         "withName": "Hi {{name}}. Ich bin dein Mentor – frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit möchtest du anfangen?",
         "generic": "Hi. Ich bin dein Mentor – frag mich alles, was du gerade lernst, woran du arbeitest oder was dich neugierig macht. Du hast 10 kostenlose Fragen pro Tag und 100 pro Monat. Womit möchtest du anfangen?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Willkommen zurück, {{name}}. Bereit, bei {{subject}} weiterzumachen? Frag mich alles – womit sollen wir weitermachen?",
+        "withName": "Willkommen zurück, {{name}}. Woran möchtest du heute arbeiten?",
+        "generic": "Willkommen zurück. Woran möchtest du heute arbeiten?"
       }
     },
     "filingFailed": {
@@ -786,20 +791,6 @@
       "writeNote": "Notiz schreiben",
       "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
       "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
-    },
-    "filingPrompt": {
-      "title": "Zur Bibliothek hinzufügen?",
-      "descriptionWithTopic": "Möchtest du diese Sitzung zu {{topic}} in deiner Bibliothek hinzufügen?",
-      "description": "Möchtest du diese Sitzung zu deiner Bibliothek hinzufügen?",
-      "addFailedTitle": "Konnte nicht zur Bibliothek hinzugefügt werden",
-      "addFailedMessage": "Bitte versuche es erneut",
-      "adding": "Wird hinzugefügt...",
-      "yesAddLabel": "Ja, zur Bibliothek hinzufügen",
-      "yesAdd": "Ja, hinzufügen",
-      "noThanksLabel": "Nein, danke",
-      "noThanks": "Nein, danke",
-      "tryAgain": "Erneut versuchen",
-      "skipForNow": "Jetzt überspringen"
     },
     "parkingLot": {
       "title": "Parkplatz",
@@ -967,8 +958,7 @@
     "disabledReason": {
       "offline": "Du bist offline – die Eingabe wird wiederhergestellt, wenn du dich erneut verbindest",
       "expired": "Diese Sitzung ist beendet",
-      "quotaReached": "Dein Sitzungslimit wurde erreicht",
-      "chooseSave": "Wähle, wo diese Sitzung gespeichert werden soll"
+      "quotaReached": "Dein Sitzungslimit wurde erreicht"
     },
     "imageAttach": {
       "timeout": "Dein Foto hat zu lange zum Laden gebraucht, also beginne ich nur mit dem Text. Wenn etwas nicht stimmt, tippe erneut auf die Kamera, um es noch einmal zu versuchen.",
@@ -1622,7 +1612,9 @@
       "timeoutTitle": "Noch am Warten…",
       "timeoutMessage": "Deine Antwort braucht ungewöhnlich lange. Prüfe deine Verbindung und versuche es noch einmal.",
       "dontRememberFirst": "Weiß ich nicht mehr.",
-      "dontRememberAgain": "Stecke immer noch fest."
+      "dontRememberAgain": "Stecke immer noch fest.",
+      "gradingUnavailableTitle": "Antwort erhalten.",
+      "gradingUnavailableMessage": "Ich konnte deine Antwort gerade nicht überprüfen, aber sie ist sicher. Versuch es erneut oder komm später darauf zurück."
     },
     "lastStudied": "Zuletzt gelernt {{when}}",
     "neverStudied": "Nie gelernt",

@@ -783,6 +783,11 @@
         "withNameSubject": "Olá, {{name}}. Você está aqui para praticar {{subject}}. Pode me perguntar sobre qualquer coisa que você esteja aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Por onde vamos começar com {{subject}}?",
         "withName": "Olá, {{name}}. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?",
         "generic": "Olá. Eu sou seu mentor. Pode me perguntar sobre o que estiver aprendendo, trabalhando ou que te deixe com curiosidade. Você tem 10 perguntas grátis por dia, 100 por mês. Com o que gostaria de começar?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Boas-vindas de volta, {{name}}. Pronto(a) para retomar {{subject}}? Pode perguntar qualquer coisa — para onde vamos agora?",
+        "withName": "Boas-vindas de volta, {{name}}. No que você gostaria de trabalhar hoje?",
+        "generic": "Boas-vindas de volta. No que você gostaria de trabalhar hoje?"
       }
     },
     "filingFailed": {
@@ -813,20 +818,6 @@
       "writeNote": "Escrever uma nota",
       "saveFailedTitle": "Não foi possível salvar a nota",
       "summaryPlaceholder": "O que devemos lembrar desta sessão?"
-    },
-    "filingPrompt": {
-      "title": "Adicionar à biblioteca?",
-      "descriptionWithTopic": "Gostaria de adicionar esta sessão a {{topic}} na sua biblioteca?",
-      "description": "Gostaria de adicionar esta sessão à sua biblioteca?",
-      "addFailedTitle": "Não foi possível adicionar à biblioteca",
-      "addFailedMessage": "Tente novamente",
-      "adding": "Adicionando…",
-      "yesAddLabel": "Sim, adicionar à biblioteca",
-      "yesAdd": "Sim, adicione",
-      "noThanksLabel": "Não, obrigado",
-      "noThanks": "Não, obrigado",
-      "tryAgain": "Tentar novamente",
-      "skipForNow": "Pular por agora"
     },
     "parkingLot": {
       "title": "Estacionamento",
@@ -994,8 +985,7 @@
     "disabledReason": {
       "offline": "Está offline — a entrada voltará quando se reconectar",
       "expired": "Esta sessão terminou",
-      "quotaReached": "O seu limite de sessões foi atingido",
-      "chooseSave": "Escolha onde guardar esta sessão"
+      "quotaReached": "O seu limite de sessões foi atingido"
     },
     "imageAttach": {
       "timeout": "A sua foto demorou muito tempo a carregar, por isso vou começar apenas com o texto. Se algo parecer estranho, toque na câmara novamente para tentar de novo.",
@@ -1649,7 +1639,9 @@
       "timeoutTitle": "Ainda aguardando…",
       "timeoutMessage": "A sua resposta está demorando mais que o normal para enviar. Verifique a conexão e tente novamente.",
       "dontRememberFirst": "Não me lembro.",
-      "dontRememberAgain": "Ainda não sei."
+      "dontRememberAgain": "Ainda não sei.",
+      "gradingUnavailableTitle": "Resposta recebida.",
+      "gradingUnavailableMessage": "Não consegui verificar agora, mas sua resposta está segura. Tente novamente ou volte mais tarde."
     },
     "lastStudied": "Estudado pela última vez {{when}}",
     "neverStudied": "Nunca estudado",

@@ -2192,9 +2192,7 @@ describe('SessionScreen homework flow', () => {
         );
       });
 
-      expect(testScreen.queryByTestId('filing-prompt')).toBeNull();
-      expect(testScreen.queryByTestId('filing-prompt-accept')).toBeNull();
-      expect(testScreen.queryByTestId('filing-prompt-dismiss')).toBeNull();
+      // Freeform sessions do not auto-file at exit (W2 #11 is homework-only).
       expect(fetchCallsMatching(mockFetch, '/filing')).toHaveLength(0);
       testScreen.unmount();
     }, 15000);

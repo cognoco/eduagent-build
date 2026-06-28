@@ -27,6 +27,7 @@ import {
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
+import { ReturningSessionGreeting } from '../../../components/session/ReturningSessionGreeting';
 import type { FluencyDrillEvent } from '../../../lib/sse';
 import {
   useStreamMessage,
@@ -515,8 +516,6 @@ function SessionScreenInner() {
     useState<ChallengeRoundOfferEvent | null>(null);
   const [draftedNote, setDraftedNote] =
     useState<DraftedChallengeNoteEvent | null>(null);
-  const [showFilingPrompt, setShowFilingPrompt] = useState(false);
-  const [filingDismissed, setFilingDismissed] = useState(false);
   const [quotaError, setQuotaError] = useState<QuotaExceededDetails | null>(
     null,
   );
@@ -675,8 +674,6 @@ function SessionScreenInner() {
       setChallengeRound(null);
       setChallengeOffer(null);
       setDraftedNote(null);
-      setShowFilingPrompt(false);
-      setFilingDismissed(false);
       setQuotaError(null);
       setLowConfidenceMessageId(null);
       closedSessionRef.current = null;
@@ -1162,7 +1159,6 @@ function SessionScreenInner() {
   const {
     handleInputModeChange,
     handleNextProblem,
-    navigateToSessionSummary,
     handleEndSession,
     handleQuickChip,
     handleMessageFeedback,
@@ -1185,7 +1181,7 @@ function SessionScreenInner() {
     setShowWrongSubjectChip,
     setShowTopicSwitcher,
     setShowParkingLot,
-    setShowFilingPrompt,
+    filing,
     setConsumedQuickChipMessageId,
     setMessageFeedback,
     homeworkProblemsState,
@@ -1346,7 +1342,6 @@ function SessionScreenInner() {
     activeSessionId,
     isClosing,
     isStreaming,
-    showFilingPrompt,
     modeSubtitle: modeConfig.subtitle,
     showTimer: modeConfig.showTimer,
     milestoneCount: milestonesReached.length,
@@ -1520,14 +1515,19 @@ function SessionScreenInner() {
         backBehavior={chatBackFallback ? 'replace' : undefined}
         onBackPress={handleChatBackPress}
         messages={messages}
-        firstSessionGreeting={
+        emptyStateGreeting={
           isFirstSession ? (
             <FirstSessionGreeting
               name={activeProfile?.displayName}
               subject={subjectName ?? undefined}
               interest={learnerProfile?.interests?.[0]?.label}
             />
-          ) : undefined
+          ) : (
+            <ReturningSessionGreeting
+              name={activeProfile?.displayName}
+              subject={subjectName ?? undefined}
+            />
+          )
         }
         onSend={handleSend}
         isStreaming={isStreaming}
@@ -1538,7 +1538,6 @@ function SessionScreenInner() {
           sessionExpired ||
           !!quotaError ||
           !!firstSessionWrapUp ||
-          (showFilingPrompt && !filingDismissed) ||
           // CR-6: Disable input while session close is in flight.
           isClosing
         }
@@ -1554,17 +1553,14 @@ function SessionScreenInner() {
               ? t('session.disabledReason.expired')
               : quotaError
                 ? t('session.disabledReason.quotaReached')
-                : showFilingPrompt && !filingDismissed
-                  ? t('session.disabledReason.chooseSave')
-                  : pendingClassification
-                    ? t('session.chatShell.classifyingSubject')
-                    : undefined
+                : pendingClassification
+                  ? t('session.chatShell.classifyingSubject')
+                  : undefined
         }
         verificationType={liveTranscript?.session.verificationType ?? undefined}
         inputMode={inputMode}
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
-        footerScrollSignal={`${showFilingPrompt}-${filingDismissed}`}
         inputAccessory={
           <>
             {challengeBanner}
@@ -1589,21 +1585,6 @@ function SessionScreenInner() {
               profileId={activeProfile?.id}
             />
             <SessionFooter
-              showFilingPrompt={showFilingPrompt}
-              filingDismissed={filingDismissed}
-              filing={filing}
-              activeSessionId={activeSessionId}
-              effectiveMode={effectiveMode}
-              filingTopicHint={
-                rawInput ??
-                messages
-                  .find((m) => m.role === 'user' && !m.isSystemPrompt)
-                  ?.content?.slice(0, 80) ??
-                undefined
-              }
-              setShowFilingPrompt={setShowFilingPrompt}
-              setFilingDismissed={setFilingDismissed}
-              navigateToSessionSummary={navigateToSessionSummary}
               router={router}
               homeHref={homeBackHref}
               sessionExpired={sessionExpired}

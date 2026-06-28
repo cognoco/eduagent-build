@@ -1933,16 +1933,16 @@ describe('ChatShell', () => {
   });
 
   // -----------------------------------------------------------------------
-  // firstSessionGreeting prop — empty-state branch
+  // emptyStateGreeting prop — empty-state branch
   // -----------------------------------------------------------------------
 
-  describe('firstSessionGreeting prop', () => {
+  describe('emptyStateGreeting prop', () => {
     const { Text } = require('react-native');
 
-    it('renders the greeting node (not the generic empty state) when messages is empty and firstSessionGreeting is provided', () => {
+    it('renders the greeting node (not the generic empty state) when messages is empty and emptyStateGreeting is provided', () => {
       renderChatShell({
         messages: [],
-        firstSessionGreeting: <Text testID="greet">hi</Text>,
+        emptyStateGreeting: <Text testID="greet">hi</Text>,
       });
 
       screen.getByTestId('greet');
@@ -1952,7 +1952,7 @@ describe('ChatShell', () => {
       ).toBeNull();
     });
 
-    it('renders the generic empty state when messages is empty and firstSessionGreeting is absent', () => {
+    it('renders the generic empty state when messages is empty and emptyStateGreeting is absent', () => {
       renderChatShell({ messages: [] });
 
       screen.getByText('Your conversation will appear here.');
@@ -1962,7 +1962,7 @@ describe('ChatShell', () => {
     it('chat-empty-state testID is present in both greeting and generic branches', () => {
       const { rerender } = renderChatShell({
         messages: [],
-        firstSessionGreeting: <Text testID="greet">hi</Text>,
+        emptyStateGreeting: <Text testID="greet">hi</Text>,
       });
 
       screen.getByTestId('chat-empty-state');

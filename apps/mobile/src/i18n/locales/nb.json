@@ -756,6 +756,11 @@
         "withNameSubject": "Hei {{name}}. Du er her for å jobbe med {{subject}}. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
         "withName": "Hei {{name}}. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
         "generic": "Hei. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
+      },
+      "returningSessionGreeting": {
+        "withNameSubject": "Velkommen tilbake, {{name}}. Klar for å fortsette med {{subject}}? Spør meg om hva som helst – hvor skal vi gå videre?",
+        "withName": "Velkommen tilbake, {{name}}. Hva vil du jobbe med i dag?",
+        "generic": "Velkommen tilbake. Hva vil du jobbe med i dag?"
       }
     },
     "filingFailed": {
@@ -786,20 +791,6 @@
       "writeNote": "Skriv et notat",
       "saveFailedTitle": "Kunne ikke lagre notat",
       "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
-    },
-    "filingPrompt": {
-      "title": "Legge til i biblioteket?",
-      "descriptionWithTopic": "Vil du legge til denne økten i {{topic}} i biblioteket ditt?",
-      "description": "Vil du legge til denne økten i biblioteket ditt?",
-      "addFailedTitle": "Kunne ikke legge til i biblioteket",
-      "addFailedMessage": "Prøv igjen",
-      "adding": "Legger til ...",
-      "yesAddLabel": "Ja, legg til i biblioteket",
-      "yesAdd": "Ja, legg til",
-      "noThanksLabel": "Nei takk",
-      "noThanks": "Nei takk",
-      "tryAgain": "Prøv igjen",
-      "skipForNow": "Hopp over for nå"
     },
     "parkingLot": {
       "title": "Parkeringsplass",
@@ -967,8 +958,7 @@
     "disabledReason": {
       "offline": "Du er frakoblet – inndata vil returnere når du kobler til igjen",
       "expired": "Denne økten er avsluttet",
-      "quotaReached": "Øktgrensen din er nådd",
-      "chooseSave": "Velg hvor du vil lagre denne økten"
+      "quotaReached": "Øktgrensen din er nådd"
     },
     "imageAttach": {
       "timeout": "Bildet ditt tok for lang tid å laste, så jeg starter kun med teksten. Hvis noe ser rart ut, trykk på kameraet igjen for å prøve på nytt.",
@@ -1622,7 +1612,9 @@
       "timeoutTitle": "Venter fortsatt…",
       "timeoutMessage": "Svaret ditt tar lengre tid enn vanlig å sende. Sjekk forbindelsen og prøv igjen.",
       "dontRememberFirst": "Jeg husker ikke.",
-      "dontRememberAgain": "Sitter fortsatt fast."
+      "dontRememberAgain": "Sitter fortsatt fast.",
+      "gradingUnavailableTitle": "Svaret ditt er mottatt.",
+      "gradingUnavailableMessage": "Jeg kunne ikke sjekke det akkurat nå – svaret ditt er trygt. Prøv igjen, eller kom tilbake til det senere."
     },
     "lastStudied": "Sist studert {{when}}",
     "neverStudied": "Aldri studert",

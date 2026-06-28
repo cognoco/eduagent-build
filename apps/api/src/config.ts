@@ -160,6 +160,15 @@ const envSchema = z.object({
   // See docs/plans/2026-05-18-challenge-round-targets.md "Rollout Gate".
   CHALLENGE_ROUND_RUNTIME_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Warm review-callback opener (RR-1 + RR-13 minimal thread). When 'true',
+  // session-exchange populates ExchangeContext.reviewCallback for review-mode
+  // first turns and the REVIEW prompt block emits the outcome-branched warm
+  // opener ("last time you had X down — has it stuck?") instead of the legacy
+  // "this is a review check, not a fresh lesson" transition line. Defaults to
+  // 'false' so it merges dark; flipped per-environment in Doppler after eval +
+  // staging soak. See docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md.
+  REVIEW_CALLBACK_OPENER_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Interactive routing v2 (MMT-ADR-0016 §1.5 / the gpt-oss-cerebras-build
   // spec). Default-OFF: while 'false', getModelConfig/getFallbackConfig stay
   // byte-identical to today's Gemini-default routing. Flipping to 'true' pins
@@ -190,6 +199,18 @@ const envSchema = z.object({
   // the V2/gpt-oss cutover, when the inline path stops being a usable fallback.
   // Independent of LLM_ROUTING_V2_ENABLED so it can be toggled separately.
   CHALLENGE_ROUND_GRADER_ENABLED: z.enum(['true', 'false']).default('true'),
+
+  // Review-continuity opener (plan 2026-06-27 / spec
+  // 2026-06-08-memory-task-review-continuity.md, requirements EU-1/EU-2/EU-4).
+  // Default-OFF: while 'false', exchange-prompts.ts emits the existing generic
+  // review calibration block byte-for-byte — the continuity-framed opener
+  // builder is unwired in production. The builder + harness land behind this
+  // flag (the same "infra built behind a flag" pattern as LLM_ROUTING_V2_ENABLED);
+  // the prod assembler that fills the ReviewContinuityContext from
+  // retrieval_events + the EU-2 consent gate land with the table slice, after
+  // which this flag is flipped (staging first). This flag only controls the
+  // code path.
+  REVIEW_CONTINUITY_OPENER_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // S1 mobile-shell flag; reserved at S0 so the name is final. No API code
   // reads this yet.
@@ -301,6 +322,18 @@ export function isChallengeRoundRuntimeEnabled(
 }
 
 /**
+ * Warm review-callback opener gate (RR-1 + RR-13). Threaded into session-exchange
+ * so it populates ExchangeContext.reviewCallback only for review-mode first turns.
+ * Default-closed: undefined / anything other than 'true' keeps today's legacy
+ * REVIEW transition copy. See docs/specs/2026-06-27-rr1-rr13-warm-review-callback.md.
+ */
+export function isReviewCallbackOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
+}
+
+/**
  * Interactive routing v2 gate (MMT-ADR-0016). Threaded into the router's
  * getModelConfig/getFallbackConfig. Default-closed: undefined / anything other
  * than 'true' keeps the current Gemini-default routing so a missing binding
@@ -323,6 +356,21 @@ export function isChallengeRoundGraderEnabled(
   value: string | undefined,
 ): boolean {
   return value !== 'false';
+}
+
+/**
+ * Review-continuity opener gate (plan 2026-06-27 / spec
+ * 2026-06-08-memory-task-review-continuity.md). Read at the system-prompt
+ * assembly boundary (exchange-prompts.ts) and threaded as
+ * `options.reviewContinuityContext` presence: gates whether the
+ * continuity-framed review opener replaces the generic calibration line.
+ * Default-closed: undefined / anything other than 'true' keeps the existing
+ * generic block, so a missing binding never wires the unreleased opener.
+ */
+export function isReviewContinuityOpenerEnabled(
+  value: string | undefined,
+): boolean {
+  return value === 'true';
 }
 
 /**

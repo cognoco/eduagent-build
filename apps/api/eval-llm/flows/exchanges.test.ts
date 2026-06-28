@@ -24,7 +24,7 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 20 scenario inputs for a general (non-language) profile', () => {
+    it('returns 24 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
@@ -35,7 +35,7 @@ describe('exchangesFlow', () => {
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S13-first-session-subject-turn0',
       );
-      expect(scenarios).toHaveLength(20);
+      expect(scenarios).toHaveLength(24);
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
           'S1-rung1-teach-new',
@@ -44,6 +44,10 @@ describe('exchangesFlow', () => {
           'S12-first-encounter-topic-turn3',
           'S14-returning-topic-turn0',
           'S15-review-mode-opener',
+          'S15a-review-callback-cracked',
+          'S15b-review-callback-wobbled',
+          'S15c-review-callback-long-gap',
+          'S15d-review-callback-unknown',
           'S16-app-help-notes',
           'S17-app-help-preferences',
           'S18-app-help-modes',
@@ -62,10 +66,10 @@ describe('exchangesFlow', () => {
       );
     });
 
-    it('returns 21 scenarios for a language-learning profile (includes S7 + S9 + S20-S22)', () => {
+    it('returns 25 scenarios for a language-learning profile (includes S7 + S9 + S20-S22)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(21);
+      expect(scenarios).toHaveLength(25);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency',
       );

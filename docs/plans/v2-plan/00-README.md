@@ -127,6 +127,7 @@ Latest ADRs on disk: `MMT-ADR-0021` (freeform filing threshold) and `MMT-ADR-002
 
 ## How to use this set
 
+0. **Lost / new to this? Read [`00-STATE-OF-PLAY.md`](00-STATE-OF-PLAY.md) first.** It is the fast orientation map across both entangled topics — the **library/app-shell** redesign and the **mentor-memory / "knows-me"** layer — disentangling the two version axes (nav-shell `V0/V1/V2` vs redesign phases `S0…S6`) and listing, tab-by-tab, what is built / in which shell / what is missing, with `file:line` citations. Living doc; code is ground truth.
 1. **Start with `02-flow-map.md` + `S1/S2`** — use the flow map as the coverage denominator; S0 is already built, so do not duplicate it. Every phase plan should cite the exact flow IDs it preserves, re-homes, replaces, or retires.
 2. **Do not wait for observed-cohort evidence.** Product ruled on 2026-06-14 that no S2/S3 cohort evidence data will exist; treat the old evidence gate as removed, not passed.
 3. **S4–S6 wait on the identity cutover flip** — track `WI-530` → Phase P → baseline reset → W1/W2 → **IF flip + convergence** before scheduling S4/S5 (the W1/W2 migrations exist in code, but S4/S5 gate on the flip making them live).

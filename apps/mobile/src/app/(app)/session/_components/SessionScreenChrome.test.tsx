@@ -13,7 +13,6 @@ function makeProps(
     activeSessionId: 'session-1',
     isClosing: false,
     isStreaming: false,
-    showFilingPrompt: false,
     modeSubtitle: 'Homework help',
     showTimer: false,
     milestoneCount: 0,

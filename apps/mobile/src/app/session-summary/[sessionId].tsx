@@ -664,6 +664,22 @@ export default function SessionSummaryScreen() {
         },
         level: 'info',
       });
+
+      // W2 #11: fire the recall bridge on the submit path too. It used to live
+      // only inside the skip-block in handleContinue, so a learner who SUBMITTED
+      // a reflection never reached it. Firing here (not on the exit tap) keeps
+      // the recall card part of the post-submit view and leaves the close
+      // button meaning "leave". Best-effort — never block the reflection.
+      if (isHomeworkSession && !recallQuestions) {
+        try {
+          const recall = await recallBridge.mutateAsync();
+          if (recall.questions.length > 0) {
+            setRecallQuestions(recall.questions);
+          }
+        } catch {
+          // Best effort — store/network variance must not fail the submit.
+        }
+      }
       return true;
     } catch (err) {
       // Error state surfaced by submitSummary.isError inline in JSX [SC-1].
@@ -908,6 +924,18 @@ export default function SessionSummaryScreen() {
       >
         {isFreeformSession ? (
           <SessionSummaryLibraryFilingControls sessionId={sessionId} />
+        ) : isHomeworkSession ? (
+          // W2 #11: homework now auto-files at exit. Reuse the same controls
+          // for the quiet "Added → Remove" (keep-out) opt-out. Gated on the
+          // mode-stable isHomeworkSession (survives the keep-out query
+          // invalidation); alwaysFilingCandidate bypasses the freeform
+          // exchangeCount>=5 floor so short homework still renders. The
+          // component owns every homework filing state (added / pending /
+          // kept-out / failed), so no FilingFailedBanner fallback is needed.
+          <SessionSummaryLibraryFilingControls
+            sessionId={sessionId}
+            alwaysFilingCandidate
+          />
         ) : session.data ? (
           <FilingFailedBanner session={session.data} />
         ) : null}

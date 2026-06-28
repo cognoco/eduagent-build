@@ -33,6 +33,14 @@
 //     enforce the over-credit ceiling + drift vs the committed baseline. The
 //     learner must be a non-gpt family (the stg minor judge is gpt-4o-mini —
 //     openai/gpt-4o collides and the two-model guard hard-fails).
+//   doppler run -c stg -- pnpm --filter @eduagent/api eval:llm:sim -- \
+//     --grader-model openai/gpt-oss-120b \
+//     --learner-model anthropic/claude-3.5-sonnet --runs 5
+//     Live grid: the candidate JUDGE grades a distinct learner model. Omit
+//     --max-live-calls to auto-fit the budget to the grid (no silent truncation).
+//     Use --runs >=5 for a calibration-grade N (see metrics.sufficientForCalibration).
+//     Add --check-baseline to enforce the over-credit ceiling + drift vs the
+//     committed simulation-baseline.json; --update-baseline (re)seeds it.
 //
 // Prerequisites for a live run:
 //   - OPENROUTER_API_KEY in the resolved Doppler config (-c stg). The learner
@@ -78,7 +86,6 @@ import {
   type SimulationBaseline,
 } from './runner/simulation-metrics';
 
-const DEFAULT_MAX_LIVE_CALLS = 30;
 /**
  * Upper bound on LLM calls per round: learner + grader + tutor, once per
  * question. The grader is a real LLM call per turn under the grader-ON pipeline,
@@ -106,7 +113,8 @@ interface SimCliArgs {
   provider: string | null;
   topics: string[] | 'all';
   runs: number;
-  maxLiveCalls: number;
+  /** null = auto-fit to the grid (no silent truncation). */
+  maxLiveCalls: number | null;
   list: boolean;
   allowSameFamily: boolean;
   validateBaseline: boolean;
@@ -121,7 +129,7 @@ function parseArgs(argv: string[]): SimCliArgs {
     provider: null,
     topics: 'all',
     runs: 1,
-    maxLiveCalls: DEFAULT_MAX_LIVE_CALLS,
+    maxLiveCalls: null,
     list: false,
     allowSameFamily: false,
     validateBaseline: false,
@@ -166,11 +174,13 @@ function parseArgs(argv: string[]): SimCliArgs {
         break;
       case '--max-live-calls': {
         // Keep an explicit 0 as 0 (a hard budget that runs nothing) instead of
-        // letting `|| DEFAULT` silently promote it to the default 30.
+        // letting `|| DEFAULT` silently promote it. A non-numeric value is an
+        // error rather than a silent fallback.
         const parsed = Number.parseInt(next(), 10);
-        args.maxLiveCalls = Number.isFinite(parsed)
-          ? parsed
-          : DEFAULT_MAX_LIVE_CALLS;
+        if (!Number.isFinite(parsed)) {
+          throw new Error('--max-live-calls expects an integer');
+        }
+        args.maxLiveCalls = parsed;
         break;
       }
       case '--list':
@@ -389,11 +399,15 @@ async function main(): Promise<void> {
   // the measured distribution stays representative across the scenario set.
   const fullGrid = Array.from({ length: args.runs }, () => scenarios).flat();
 
-  // The budget is a HARD cap — never force a round that would overrun it.
-  const maxRounds = Math.floor(args.maxLiveCalls / CALLS_PER_ROUND);
+  // Budget: auto-fit to the grid when --max-live-calls is omitted (the default
+  // never silently truncates). An explicit budget is a HARD cap — never force a
+  // round that would overrun it.
+  const effectiveMaxCalls =
+    args.maxLiveCalls ?? fullGrid.length * CALLS_PER_ROUND;
+  const maxRounds = Math.floor(effectiveMaxCalls / CALLS_PER_ROUND);
   if (maxRounds < 1) {
     throw new Error(
-      `--max-live-calls=${args.maxLiveCalls} is below the ~${CALLS_PER_ROUND} calls a single round needs; raise it to run at least one round.`,
+      `--max-live-calls=${effectiveMaxCalls} is below the ~${CALLS_PER_ROUND} calls a single round needs; raise it to run at least one round.`,
     );
   }
   const grid = fullGrid.slice(0, maxRounds);
@@ -441,21 +455,39 @@ async function main(): Promise<void> {
 
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const corpusDir = path.resolve(__dirname, 'corpus', ts);
-  await writeCorpus(corpusDir, results, metrics);
+  await writeCorpus(corpusDir, results, metrics, {
+    runs: args.runs,
+    gradingPath: 'production-grader',
+  });
 
+  const ci = metrics.ci;
+  const pct = (v: number): string => `${(v * 100).toFixed(1)}%`;
   console.log(
     '\n— Calibration metrics (SYNTHETIC / PROVISIONAL, RR-2 not discharged) —',
   );
-  console.log(`  rounds:              ${metrics.totalRounds}`);
+  console.log(`  rounds (N):          ${metrics.totalRounds}`);
   console.log(`  outcome rates:       ${JSON.stringify(metrics.outcomeRates)}`);
   console.log(
-    `  mastery-verified:    ${metrics.masteryVerifiedRate.toFixed(3)}`,
+    `  mastery-verified:    ${pct(metrics.masteryVerifiedRate)}  [95% CI ${pct(ci.masteryVerified.low)}–${pct(ci.masteryVerified.high)}]`,
   );
-  console.log(`  over-credit rate:    ${metrics.overCreditRate.toFixed(3)}`);
-  console.log(`  under-credit rate:   ${metrics.underCreditRate.toFixed(3)}`);
   console.log(
-    `  signal-emission:     ${JSON.stringify(metrics.signalEmissionRateByMentor)}`,
+    `  over-credit rate:    ${pct(metrics.overCreditRate)}  [95% CI ${pct(ci.overCredit.low)}–${pct(ci.overCredit.high)}]`,
   );
+  console.log(
+    `  under-credit rate:   ${pct(metrics.underCreditRate)}  [95% CI ${pct(ci.underCredit.low)}–${pct(ci.underCredit.high)}]`,
+  );
+  console.log(
+    `  signal-emission:     ${pct(metrics.signalEmissionRate)}  [95% CI ${pct(ci.signalEmission.low)}–${pct(ci.signalEmission.high)}]`,
+  );
+  console.log(
+    `  per-grader signal:   ${JSON.stringify(metrics.signalEmissionRateByGrader)}`,
+  );
+  if (!metrics.sufficientForCalibration) {
+    console.warn(
+      `\n  ⚠ INSUFFICIENT N: ${metrics.totalRounds} round(s) is a smoke run, NOT a calibration ` +
+        `basis (the CIs above are wide). Re-run with --runs >=5 for a calibration-grade corpus.`,
+    );
+  }
   console.log(`\nCorpus written to: ${corpusDir}`);
 
   // --update-baseline: persist this run's metrics as the committed baseline,

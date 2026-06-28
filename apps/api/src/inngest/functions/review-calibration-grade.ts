@@ -1,7 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import {
   createScopedRepository,
   retentionCards,
+  retrievalEvents,
   sessionEvents,
 } from '@eduagent/database';
 import { findOwnedCurriculumTopic } from '../../services/curriculum-topic-ownership';
@@ -13,14 +14,26 @@ import {
   evaluateRecallQuality,
   rowToRetentionState,
 } from '../../services/retention-data';
+import {
+  recordRetrievalEvent,
+  type RetrievalNextAction,
+  type RetrievalVerdict,
+} from '../../services/retrieval-events';
 import { canRetestTopic, processRecallResult } from '../../services/retention';
 import { stampMasteryOnVerify } from '../../services/retention-mastery';
 import {
   applyRetentionUpdate,
   syncRewardStatusFromRetention,
 } from '../../services/apply-retention-update';
+import { createLogger } from '../../services/logger';
 
+const logger = createLogger();
 const RETEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+type CalibrationGradeStepResult =
+  | { outcome: 'skip' }
+  | { outcome: 'graded'; quality: number; verdict: RetrievalVerdict }
+  | { outcome: 'fallback'; capped: boolean };
 
 function parseEventData(data: unknown): ReviewCalibrationRequestedEvent | null {
   const parsed = reviewCalibrationRequestedEventSchema.safeParse(data);
@@ -76,6 +89,12 @@ export async function handleReviewCalibrationGrade({
   // exhausts retries before finalize, the cooldown slot is consumed with the
   // SM-2 fields unchanged. Accepted — Inngest retries cover the transient
   // case, and the alternative wastes a paid LLM call on every lost claim.
+  //
+  // Grader-unavailable trade [T12/EU-7]: when the grade step returns a
+  // fallback (grader down/unparseable), the cooldown slot stays consumed and
+  // SM-2 ease/interval/reps are NOT advanced — only nextReviewAt nudges to
+  // retry on the next cron, and a back-to-back fallback is capped so the topic
+  // can't be trapped in a daily loop.
   const claimed = await step.run('claim-cooldown-slot', async () => {
     const db = getStepDatabase();
     const { updated } = await applyRetentionUpdate({
@@ -102,23 +121,24 @@ export async function handleReviewCalibrationGrade({
   }
 
   // PII egress: rehydrate the learner's calibration answer + topic title from
-  // the DB and grade in ONE step closure so the raw text stays a local
-  // variable and only the non-PII recall-quality number crosses the step
+  // the DB, grade, AND record the recall-log row in ONE step closure so the raw
+  // text (and the grader's rationale/misconception) stay local variables. Only
+  // the non-PII decision ({ outcome, quality, verdict }) crosses the step
   // boundary (Inngest memoizes step returns into its third-party state store,
-  // so the raw text must never be returned). Both reads are scoped by
-  // profileId — the message via its session_events row id (the opaque event
-  // reference), the title via the curriculum_topics → curriculum_books →
-  // subjects parent chain. A missing row (transcript purged / topic changed
-  // since dispatch) yields a null quality, skipping grading rather than
-  // guessing. [WI-620, mirrors topic-probe-extract's single-closure pattern]
-  const quality = await step.run(
-    'rehydrate-and-grade-recall-quality',
-    async (): Promise<number | null> => {
+  // so PII must never be returned). Both reads are scoped by profileId — the
+  // message via its session_events row id (opaque event reference), the title
+  // via the curriculum_topics → curriculum_books → subjects parent chain. A
+  // missing row (transcript purged / topic changed since dispatch) skips
+  // grading rather than guessing. A grader-unavailable result is recorded as a
+  // fallback_heuristic row and never advances SM-2. [WI-620 / C-3 / T12]
+  const graded = await step.run(
+    'rehydrate-grade-and-record',
+    async (): Promise<CalibrationGradeStepResult> => {
       const db = getStepDatabase();
       // Canonical single-topic ownership join (scoped by profileId) — avoids
       // re-implementing the join inline (SWEEP-topic-ownership-join ratchet).
       const topic = await findOwnedCurriculumTopic(db, { profileId, topicId });
-      if (!topic?.topicTitle) return null;
+      if (!topic?.topicTitle) return { outcome: 'skip' };
 
       // sessionEvents is a single scoped table — read it through the scoped
       // repository (profileId enforced by scopedWhere).
@@ -130,17 +150,137 @@ export async function handleReviewCalibrationGrade({
           eq(sessionEvents.eventType, 'user_message'),
         ),
       );
-      if (!learnerMessageRow?.content) return null;
+      if (!learnerMessageRow?.content) return { outcome: 'skip' };
 
-      // Both raw values are local-only and never returned from the step.
-      return evaluateRecallQuality(learnerMessageRow.content, topic.topicTitle);
+      const grade = await evaluateRecallQuality(
+        learnerMessageRow.content,
+        topic.topicTitle,
+        topic.topicDescription ?? undefined,
+      );
+
+      if (!grade.graded) {
+        // [T12 / EU-7] Was the previous attempt on this topic ALSO a grader
+        // failure? If so, cap: do not reschedule again so a flaky grader can't
+        // trap a topic in a daily re-ask loop. Read BEFORE recording this row,
+        // AND only rows strictly before this invocation's eventAt — the step is
+        // retried on crash, so an unfiltered "latest row" read could otherwise
+        // see THIS run's own just-inserted fallback row after a partial failure
+        // and wrongly cap after a single real failure.
+        // [EU-7 scoped-repo exception] Direct db.select() is intentional here
+        // and is a POLICY-SANCTIONED deviation, not an ad-hoc one. retrievalEvents
+        // is a single profile-scoped table that would normally go through
+        // createScopedRepository, but this query needs a strict time-bound
+        // lt(createdAt, eventAt) filter, orderBy(desc(createdAt)), and limit(1)
+        // *together* — clauses the scoped repo's findFirst/findMany API cannot
+        // express. profileId is pinned in the WHERE clause, so no row from another
+        // profile can be returned. This exact pattern is documented as the
+        // sanctioned alternative in AGENTS.md → "Non-Negotiable Engineering Rules"
+        // (the createScopedRepository rule, "single scoped table" time-bound case),
+        // which names this call site as the canonical example.
+        const [previous] = await db
+          .select({ gradedBy: retrievalEvents.gradedBy })
+          .from(retrievalEvents)
+          .where(
+            and(
+              eq(retrievalEvents.profileId, profileId),
+              eq(retrievalEvents.topicId, topicId),
+              lt(retrievalEvents.createdAt, eventAt),
+            ),
+          )
+          .orderBy(desc(retrievalEvents.createdAt))
+          .limit(1);
+        const capped = previous?.gradedBy === 'fallback_heuristic';
+
+        await recordRetrievalEvent(db, {
+          profileId,
+          subjectId: topic.subjectId,
+          topicId,
+          sessionId,
+          answerEventId: learnerMessageEventId,
+          promptText: topic.topicTitle,
+          learnerAnswer: learnerMessageRow.content,
+          quality: null,
+          verdict: null,
+          nextAction: 'reschedule_soon',
+          gradedBy: 'fallback_heuristic',
+        });
+        return { outcome: 'fallback', capped };
+      }
+
+      // Derive the recorded next-action from a pure SM-2 evaluation (the
+      // authoritative finalize write happens outside the step).
+      const evaluated = processRecallResult(
+        state,
+        grade.quality,
+        eventAt.toISOString(),
+      );
+      const nextAction: RetrievalNextAction =
+        evaluated.failureAction === 'redirect_to_library'
+          ? 'redirect_to_library'
+          : evaluated.passed
+            ? 'advance'
+            : 'reschedule_soon';
+
+      await recordRetrievalEvent(db, {
+        profileId,
+        subjectId: topic.subjectId,
+        topicId,
+        sessionId,
+        answerEventId: learnerMessageEventId,
+        promptText: topic.topicTitle,
+        learnerAnswer: learnerMessageRow.content,
+        quality: grade.quality,
+        verdict: grade.verdict,
+        nextAction,
+        gradedBy: 'llm',
+        rubricRationale: grade.rationale,
+        misconception: grade.misconception,
+        llmRoutingRung: grade.rung,
+      });
+
+      return {
+        outcome: 'graded',
+        quality: grade.quality,
+        verdict: grade.verdict,
+      };
     },
   );
 
-  if (quality === null) {
+  if (graded.outcome === 'skip') {
     return { skipped: 'rehydration_failed', sessionId };
   }
 
+  if (graded.outcome === 'fallback') {
+    // [T12/EU-7] Grader unavailable. Reschedule soon (unless capped by a
+    // back-to-back prior failure). SM-2 ease/interval/reps are NOT advanced —
+    // only nextReviewAt nudges, so the calibration retries on the next cron.
+    if (!graded.capped) {
+      await step.run('reschedule-after-grader-failure', async () => {
+        const db = getStepDatabase();
+        await applyRetentionUpdate({
+          db,
+          profileId,
+          cardId: card.id,
+          set: {
+            nextReviewAt: new Date(eventAt.getTime() + RETEST_COOLDOWN_MS),
+          },
+          guard: { kind: 'none' },
+          updatedAt: eventAt,
+        });
+      });
+    }
+    // [L-3] Observability: the fallback_heuristic row is the queryable record;
+    // this log line surfaces the rate for alerting.
+    logger.error('[review-calibration] recall grader unavailable', {
+      profileId,
+      topicId,
+      sessionId,
+      capped: graded.capped,
+    });
+    return { skipped: 'grader_unavailable', sessionId };
+  }
+
+  const quality = graded.quality;
   const result = processRecallResult(state, quality, eventAt.toISOString());
 
   await step.run('finalize-retention-update', async () => {
@@ -197,6 +337,7 @@ export async function handleReviewCalibrationGrade({
     sessionId,
     topicId,
     quality,
+    verdict: graded.verdict,
     passed: result.passed,
     xpChange: result.xpChange,
   };

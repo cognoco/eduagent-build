@@ -13,7 +13,7 @@ relates:
 
 # Review & Re-learn — Findings + High-Impact Learning To-Dos
 
-> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 13 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: RR-1 + RR-13 thread → RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
+> **STATUS (2026-06-27):** Since 2026-06-03: simulated learner harness (RR-2 pre-screen), grader service + judge routing (#1538), dead persistence.ts deleted (RR-14 partial). **RR-1 + RR-13 minimal thread SHIPPED flag-dark** (branch `rr1-rr13-warm-review-callback`, `REVIEW_CALLBACK_OPENER_ENABLED` default false; spec archived at `docs/_archive/specs/Done/2026-06-27-rr1-rr13-warm-review-callback.md`). RR-14 still partial — dual cooldown source + relearn bypassing startSession unresolved. 11 of 15 items not started. CHALLENGE_ROUND_RUNTIME_ENABLED still defaults false. NEXT: enable + RR-2 staging dogfood → CORRECT chain (RR-6,-7,-9,-10,-11) → RR-14 cleanup → RR-12 prod flip last.
 
 ## Purpose
 
@@ -163,7 +163,7 @@ correctness/cleanup that must precede load-bearing.
 
 ### Backbone — make review feel like one relationship (FEEL)
 
-- **RR-1 — Replace "review mode" with a warm memory-callback opener. [P0 · FEEL · M]**
+- **RR-1 — Replace "review mode" with a warm memory-callback opener. [P0 · FEEL · M] — ✅ SHIPPED flag-dark 2026-06-27 (`REVIEW_CALLBACK_OPENER_ENABLED`; spec archived under `docs/_archive/specs/Done/`).**
   - *Impact:* the single change that most directly kills the "now we switch to review mode"
     seam the north star forbids. Turns review into a continuation of the tutoring
     conversation.
@@ -193,9 +193,14 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* `config.ts:140` (`CHALLENGE_ROUND_RUNTIME_ENABLED` default `'false'`).
   - *Pre-flip gate (replaces the staging flag-flip + dogfood):* the simulated-learner harness
     (`apps/api/eval-llm/simulate.ts`, `pnpm eval:llm:sim`, plan
-    `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
-    multi-turn rounds (topic × persona × N) through the **real mentor pipeline + pure mastery gate**
-    and measures over-/under-credit against per-scenario ground truth. First live grid run
+    `docs/_archive/plans/2026-06-26-challenge-round-simulated-learner-harness.md`) drives non-scripted
+    multi-turn rounds (topic × persona × N) through the **real production grader/judge + pure mastery
+    gate** and measures over-/under-credit against per-scenario ground truth. (Post-adversarial-review
+    correction 2026-06-27: the harness grades via the production judge path
+    `runChallengeRoundGrader` — the component prod runs with `CHALLENGE_ROUND_GRADER_ENABLED` on by
+    default — **not** the tutor's inline signal; the question-asking tutor is production-routed and
+    never the candidate, and the two-model guard targets the judge slug. See the plan's
+    "Post-adversarial-review corrections" section.) First live grid run
     2026-06-27 confirmed the gpt-oss signal-drop (de-risking RR-12) and that the control wiring is
     sound. The dedicated grader judge is validated separately by the
     **`pnpm eval:llm --flow challenge-grader`** bake-off (Sonnet 4.6 fully clean, 2026-06-27), and
@@ -258,7 +263,7 @@ correctness/cleanup that must precede load-bearing.
   - *Evidence:* one `partial` of 3 blocks mastery (`evaluation.ts:169`);
     `MIN_LEXICAL_OVERLAP_NOTE_DRAFT=0.4` is a TODO-flagged guess (`caps.ts`).
   - *Mastery-bar half — pre-flip via the simulator:* the simulated-learner harness
-    (`pnpm eval:llm:sim`, plan `docs/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
+    (`pnpm eval:llm:sim`, plan `docs/_archive/plans/2026-06-26-challenge-round-simulated-learner-harness.md`)
     produces synthetic over-/under-credit rates against ground-truth scenarios — enough to set a
     **provisional** bar and decide whether "2 of 3 solid" warrants a softer outcome before the flip.
     Any bar so derived is provisional per CH-4 and re-tuned at the post-launch gate.
@@ -325,7 +330,7 @@ correctness/cleanup that must precede load-bearing.
 
 ### Continuity / memory — the backbone's missing tissue (CONTINUITY)
 
-- **RR-13 — Build the cross-session memory thread + ordered path preview. [minimal thread P1 · full preview P2 · CONTINUITY · M→L]**
+- **RR-13 — Build the cross-session memory thread + ordered path preview. [minimal thread P1 · full preview P2 · CONTINUITY · M→L] — ✅ minimal thread SHIPPED flag-dark 2026-06-27 (with RR-1, as the FEEL unit). Full path-preview (P2) still open.**
   - *Impact:* there is no "last week you cracked X — has it stuck?" anywhere, and after a
     session the learner sees only one next topic. The "here's how I'll build this with you"
     structure is unbuilt. **This is the north star's literal definition of the feature** ("feels

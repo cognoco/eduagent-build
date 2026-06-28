@@ -1782,6 +1782,22 @@ export const sessionCompleted = inngest.createFunction(
       await step.run('generate-embeddings', async () =>
         runIsolated('generate-embeddings', profileId, async () => {
           const db = getStepDatabase();
+
+          // [C6] GDPR processing gate — close the consent asymmetry with
+          // analyze-learner-profile (step 3). storeSessionEmbedding transmits
+          // transcript content to Voyage (an external processor / regulated
+          // processing act under GDPR Art. 7(3)). revokeConsent sets GDPR
+          // status to WITHDRAWN without touching the memory gate, so this step
+          // must re-check the regulatory consent itself — exactly as the
+          // profile step does — and skip before any transcript leaves Neon.
+          // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
+          const gdprAllowed = isIdentityV2EnabledInStep()
+            ? await isGdprProcessingAllowedV2(db, profileId)
+            : await isGdprProcessingAllowed(db, profileId);
+          if (!gdprAllowed) {
+            return;
+          }
+
           const voyageApiKey = getStepVoyageApiKey();
           const content = await extractSessionContent(db, sessionId, profileId);
           await storeSessionEmbedding(

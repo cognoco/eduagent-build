@@ -4,6 +4,7 @@ import {
   isProfileInDedupRollout,
   isChallengeRoundRuntimeEnabled,
   isChallengeRoundGraderEnabled,
+  isReviewContinuityOpenerEnabled,
   isManagedTierActive,
   isMaintenanceProductionEnabled,
   isTopicIntentMatcherEnabled,
@@ -42,6 +43,7 @@ describe('validateProductionKeys', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '0',
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
   });
@@ -652,6 +654,26 @@ describe('validateEnv', () => {
     // Any non-'false' value (incl. typos) stays ON — the safe direction.
     expect(isChallengeRoundGraderEnabled('yes')).toBe(true);
   });
+
+  it('REVIEW_CONTINUITY_OPENER_ENABLED defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.REVIEW_CONTINUITY_OPENER_ENABLED).toBe('false');
+    expect(
+      isReviewContinuityOpenerEnabled(env.REVIEW_CONTINUITY_OPENER_ENABLED),
+    ).toBe(false);
+  });
+
+  it('isReviewContinuityOpenerEnabled returns true only for "true" (default-closed)', () => {
+    expect(isReviewContinuityOpenerEnabled('true')).toBe(true);
+    expect(isReviewContinuityOpenerEnabled('false')).toBe(false);
+    // Default-CLOSED: a missing binding never wires the unreleased opener.
+    expect(isReviewContinuityOpenerEnabled(undefined)).toBe(false);
+    // Any non-'true' value (incl. typos) stays OFF — the safe direction.
+    expect(isReviewContinuityOpenerEnabled('yes')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -718,8 +740,10 @@ describe('validateProductionBindings', () => {
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
     CHALLENGE_ROUND_RUNTIME_ENABLED: 'false',
+    REVIEW_CALLBACK_OPENER_ENABLED: 'false',
     JUDGE_FRAMEWORK_ENABLED: 'false',
     CHALLENGE_ROUND_GRADER_ENABLED: 'false',
+    REVIEW_CONTINUITY_OPENER_ENABLED: 'false',
     ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
     ADULT_OWNER_GATE_ENABLED: 'true',
     LLM_ROUTING_V2_ENABLED: 'false',

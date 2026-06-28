@@ -21,6 +21,13 @@ type EnrichedLibrarySession = LearningSession & {
 
 interface SessionSummaryLibraryFilingControlsProps {
   sessionId: string;
+  /**
+   * Treat the session as a filing candidate regardless of exchange count.
+   * Homework auto-files at exit (W2 #11) and is routinely below the freeform
+   * `MIN_FREEFORM_LIBRARY_FILING_EXCHANGES` floor, so without this the control
+   * would early-return null for short homework sessions.
+   */
+  alwaysFilingCandidate?: boolean;
 }
 
 const MIN_FREEFORM_LIBRARY_FILING_EXCHANGES = 5;
@@ -35,6 +42,7 @@ function isAutoFileCandidate(session: EnrichedLibrarySession): boolean {
 
 export function SessionSummaryLibraryFilingControls({
   sessionId,
+  alwaysFilingCandidate = false,
 }: SessionSummaryLibraryFilingControlsProps): React.ReactElement | null {
   const { t } = useTranslation();
   const router = useRouter();
@@ -53,7 +61,8 @@ export function SessionSummaryLibraryFilingControls({
 
   if (!session) return null;
 
-  const meetsFilingThreshold = isAutoFileCandidate(session);
+  const meetsFilingThreshold =
+    alwaysFilingCandidate || isAutoFileCandidate(session);
   if (
     !meetsFilingThreshold &&
     !filing.isFiledInLibrary &&
@@ -66,7 +75,12 @@ export function SessionSummaryLibraryFilingControls({
     keepOut.isPending || add.isPending || restore.isPending || retry.isPending;
   const showPending =
     filing.filingStatus === 'filing_pending' ||
-    (filing.filingStatus == null && meetsFilingThreshold);
+    // A session that already committed a topic (markSessionFiled sets
+    // topicId/filedAt but leaves filingStatus null) is filed, not pending —
+    // don't let the null-status candidate branch mask the "Added" state.
+    (filing.filingStatus == null &&
+      meetsFilingThreshold &&
+      !filing.isFiledInLibrary);
   const showUnfiled = filing.filingStatus == null && !meetsFilingThreshold;
 
   const handleMutationFailure = (): void => {

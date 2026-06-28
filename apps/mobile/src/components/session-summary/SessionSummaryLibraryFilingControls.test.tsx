@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react-native';
+import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import {
   createRoutedMockFetch,
@@ -103,6 +103,108 @@ describe('SessionSummaryLibraryFilingControls', () => {
     const message = await screen.findByText('Could not update library filing.');
     expect(message.props.accessibilityRole).toBe('alert');
     expect(message.props.accessibilityLiveRegion).toBe('polite');
+
+    cleanup();
+  });
+
+  // W2 #11: homework auto-files at exit and is routinely 2–6 exchanges, below
+  // the freeform exchangeCount>=5 auto-file floor. `alwaysFilingCandidate`
+  // bypasses that floor so short homework still renders the controls (and its
+  // restore/keep-out branches), rather than early-returning null.
+  it('without alwaysFilingCandidate, a kept-out short session renders nothing', async () => {
+    mockFetch.setRoute('/sessions/session-short', () => ({
+      session: {
+        sessionId: 'session-short',
+        subjectId: 'subject-1',
+        topicId: null,
+        filedAt: null,
+        filingStatus: 'filing_kept_out',
+        exchangeCount: 2,
+      },
+    }));
+
+    const { cleanup } = renderScreen(
+      <SessionSummaryLibraryFilingControls sessionId="session-short" />,
+      {
+        profile: NAMED_PROFILES.soloLearner,
+        installGlobalFetch: false,
+        routedFetch: mockFetch,
+      },
+    );
+
+    // Wait for the session GET to resolve, then assert the control stayed
+    // unmounted (freeform threshold short-circuit).
+    await waitFor(() =>
+      expect(
+        mockFetch.mock.calls.some((c) =>
+          String(c[0]).includes('/sessions/session-short'),
+        ),
+      ).toBe(true),
+    );
+    expect(screen.queryByTestId('session-summary-library-filing')).toBeNull();
+
+    cleanup();
+  });
+
+  it('with alwaysFilingCandidate, a kept-out short session renders the Add (restore) CTA', async () => {
+    mockFetch.setRoute('/sessions/session-short', () => ({
+      session: {
+        sessionId: 'session-short',
+        subjectId: 'subject-1',
+        topicId: null,
+        filedAt: null,
+        filingStatus: 'filing_kept_out',
+        exchangeCount: 2,
+      },
+    }));
+
+    const { cleanup } = renderScreen(
+      <SessionSummaryLibraryFilingControls
+        sessionId="session-short"
+        alwaysFilingCandidate
+      />,
+      {
+        profile: NAMED_PROFILES.soloLearner,
+        installGlobalFetch: false,
+        routedFetch: mockFetch,
+      },
+    );
+
+    expect(
+      await screen.findByTestId('session-summary-library-add'),
+    ).toBeTruthy();
+
+    cleanup();
+  });
+
+  it('renders the Remove (keep-out) CTA for a filed short session', async () => {
+    mockFetch.setRoute('/sessions/session-filed', () => ({
+      session: {
+        sessionId: 'session-filed',
+        subjectId: 'subject-1',
+        topicId: 'topic-1',
+        filedAt: '2026-06-27T00:00:00.000Z',
+        filingStatus: null,
+        exchangeCount: 2,
+        topicTitle: 'Fractions',
+      },
+    }));
+
+    const { cleanup } = renderScreen(
+      <SessionSummaryLibraryFilingControls
+        sessionId="session-filed"
+        alwaysFilingCandidate
+      />,
+      {
+        profile: NAMED_PROFILES.soloLearner,
+        installGlobalFetch: false,
+        routedFetch: mockFetch,
+      },
+    );
+
+    expect(
+      await screen.findByTestId('session-summary-library-remove'),
+    ).toBeTruthy();
 
     cleanup();
   });

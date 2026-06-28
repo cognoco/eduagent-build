@@ -1,9 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SessionFooter } from './SessionFooter';
 
@@ -31,21 +26,6 @@ jest.mock(
 
 function createProps(overrides: Record<string, unknown> = {}) {
   return {
-    showFilingPrompt: true,
-    filingDismissed: false,
-    filing: {
-      mutateAsync: jest.fn().mockResolvedValue({
-        shelfId: 'shelf-1',
-        bookId: 'book-1',
-      }),
-      isPending: false,
-    },
-    activeSessionId: 'session-1',
-    effectiveMode: 'freeform',
-    filingTopicHint: 'fractions',
-    setShowFilingPrompt: jest.fn(),
-    setFilingDismissed: jest.fn(),
-    navigateToSessionSummary: jest.fn(),
     router: { replace: jest.fn() },
     sessionExpired: false,
     notePromptOffered: false,
@@ -71,45 +51,8 @@ describe('SessionFooter', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
-  it('shows filing prompt with accept/dismiss for freeform sessions', () => {
-    render(<SessionFooter {...(createProps() as any)} />);
-
-    screen.getByTestId('filing-prompt');
-    screen.getByTestId('filing-prompt-accept');
-    screen.getByTestId('filing-prompt-dismiss');
-  });
-
-  it('accept button calls filing mutateAsync and continues to summary with filed ids', async () => {
-    const props = createProps();
-    render(<SessionFooter {...(props as any)} />);
-
-    fireEvent.press(screen.getByTestId('filing-prompt-accept'));
-
-    await waitFor(() => {
-      expect(props.filing.mutateAsync).toHaveBeenCalledWith({
-        sessionId: 'session-1',
-        sessionMode: 'freeform',
-      });
-      expect(props.navigateToSessionSummary).toHaveBeenCalledWith(
-        'shelf-1',
-        'book-1',
-      );
-    });
-  });
-
-  it('dismiss button navigates to session summary', () => {
-    const props = createProps();
-    render(<SessionFooter {...(props as any)} />);
-
-    fireEvent.press(screen.getByTestId('filing-prompt-dismiss'));
-
-    expect(props.setFilingDismissed).toHaveBeenCalledWith(true);
-    expect(props.navigateToSessionSummary).toHaveBeenCalledTimes(1);
-  });
-
   it('note input calls createNote.mutate with topicId, content, and sessionId', () => {
     const props = createProps({
-      showFilingPrompt: false,
       notePromptOffered: true,
       showNoteInput: true,
       topicId: 'topic-1',
@@ -138,7 +81,6 @@ describe('SessionFooter', () => {
 
   it('does not offer the note prompt when the session has no topicId', () => {
     const props = createProps({
-      showFilingPrompt: false,
       notePromptOffered: true,
       topicId: undefined,
     });
@@ -160,7 +102,6 @@ describe('SessionFooter', () => {
       isPending: false,
     };
     const props = createProps({
-      showFilingPrompt: false,
       notePromptOffered: true,
       showNoteInput: true,
       setShowNoteInput,
@@ -190,7 +131,6 @@ describe('SessionFooter', () => {
 
   it('uses summary-oriented placeholder for session notes', () => {
     const props = createProps({
-      showFilingPrompt: false,
       notePromptOffered: true,
       showNoteInput: true,
       topicId: 'topic-1',
@@ -200,101 +140,5 @@ describe('SessionFooter', () => {
     expect(screen.getByTestId('note-text-input').props.placeholder).toBe(
       'What should we remember from this session?',
     );
-  });
-
-  // BUG-149: Filing failure must offer Try again as PRIMARY action and a
-  // separate Skip as secondary. Previously the only option was a single
-  // "Done" button that silently dismissed the prompt and navigated away —
-  // a transient network failure permanently lost the session-to-book link.
-  describe('BUG-149 filing-failure recovery', () => {
-    it('offers Try again primary and Skip secondary when filing fails', async () => {
-      const filing = {
-        mutateAsync: jest
-          .fn()
-          // First attempt fails
-          .mockRejectedValueOnce(new Error('network down')),
-        isPending: false,
-      };
-      const props = createProps({ filing });
-      render(<SessionFooter {...(props as any)} />);
-
-      fireEvent.press(screen.getByTestId('filing-prompt-accept'));
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalled();
-      });
-
-      const [, , buttons] = (Alert.alert as jest.Mock).mock.calls[0];
-      const labels = (buttons as Array<{ text: string }>).map((b) => b.text);
-      // Primary = retry, secondary = skip (distinct, both actionable)
-      expect(labels).toContain('Try again');
-      expect(labels).toContain('Skip for now');
-      // The old single-button "Done" path is forbidden — no auto-dismiss
-      expect(labels).not.toContain('Done');
-    });
-
-    it('Try again re-invokes filing.mutateAsync (transient failure recoverable)', async () => {
-      const filing = {
-        mutateAsync: jest
-          .fn()
-          .mockRejectedValueOnce(new Error('network down'))
-          .mockResolvedValueOnce({ shelfId: 'shelf-2', bookId: 'book-2' }),
-        isPending: false,
-      };
-      const props = createProps({ filing });
-      render(<SessionFooter {...(props as any)} />);
-
-      fireEvent.press(screen.getByTestId('filing-prompt-accept'));
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalled();
-      });
-
-      // Simulate user tapping "Try again"
-      const buttons = (Alert.alert as jest.Mock).mock.calls[0][2] as Array<{
-        text: string;
-        onPress?: () => void;
-      }>;
-      const retryBtn = buttons.find((b) => b.text === 'Try again');
-      expect(retryBtn).toBeDefined();
-      retryBtn?.onPress?.();
-
-      await waitFor(() => {
-        expect(filing.mutateAsync).toHaveBeenCalledTimes(2);
-        // On second success, navigate WITH filed ids
-        expect(props.navigateToSessionSummary).toHaveBeenCalledWith(
-          'shelf-2',
-          'book-2',
-        );
-      });
-    });
-
-    it('Skip dismisses + navigates without filed ids (only when user explicitly chooses)', async () => {
-      const filing = {
-        mutateAsync: jest.fn().mockRejectedValueOnce(new Error('still down')),
-        isPending: false,
-      };
-      const props = createProps({ filing });
-      render(<SessionFooter {...(props as any)} />);
-
-      fireEvent.press(screen.getByTestId('filing-prompt-accept'));
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalled();
-      });
-
-      // No auto-navigation before the user picks a path
-      expect(props.navigateToSessionSummary).not.toHaveBeenCalled();
-
-      const buttons = (Alert.alert as jest.Mock).mock.calls[0][2] as Array<{
-        text: string;
-        onPress?: () => void;
-      }>;
-      const skipBtn = buttons.find((b) => b.text === 'Skip for now');
-      skipBtn?.onPress?.();
-
-      expect(props.setFilingDismissed).toHaveBeenCalledWith(true);
-      expect(props.navigateToSessionSummary).toHaveBeenCalledTimes(1);
-      // Skip path navigates with no filed ids (book link is intentionally lost)
-      expect(props.navigateToSessionSummary).toHaveBeenCalledWith();
-    });
   });
 });

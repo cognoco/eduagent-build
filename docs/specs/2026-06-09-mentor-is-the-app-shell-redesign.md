@@ -466,7 +466,7 @@ These design the exact constructs §7 demolishes (Study/Family ModeSwitcher, tab
 | `plans/2026-06-09-more-off-nav-home-launched` | Practice-tab promotion | "More off-nav" — superseded by S3 avatar split |
 | `plans/2026-05-09-progress-tab-currently-working-on` | backend helper + report-card bugfixes | new card + section reorder → S2 hub |
 | `specs/2026-05-12-chat-notes-bookmarks` | Steps 1–4 (shipped) | Step 5 (Library search) → folds into Subjects/Journal |
-| `specs/2026-06-08-memory-task-review-continuity` | `retrieval_events` + relearn queue = prereq plumbing for `/now` | standalone "opener" surface → S3 |
+| `_archive/specs/Done/2026-06-08-memory-task-review-continuity` (Flow 2+3 shipped PR #1546) | `retrieval_events` + relearn queue = prereq plumbing for `/now` | standalone "opener" surface → S3 |
 | `plans/2026-05-31-product-continuity-low-hanging-fruit` | recap/mic copy items (Phase C) | proxy-coupled tasks (Phase B) park; copy layer folds into feed |
 | `specs/2026-05-18-trial-intent-save-onboarding` | intent/preview/claim mechanics | parent-landing routing (§4.2) |
 | `specs/2026-05-27-warm-chat-greeting` | greeting template (UI-only) | "auto-open into chat" framing → superseded by card-feed (§3 option A) |

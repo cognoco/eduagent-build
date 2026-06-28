@@ -3,7 +3,7 @@ title: Challenge Round Simulated-Learner Harness — Implementation Plan
 date: 2026-06-26
 profile: code
 spec: docs/specs/2026-06-03-review-relearn-findings-and-high-impact-todos.md (RR-2 / RR-6)
-status: in-progress
+status: implemented
 ---
 
 # Challenge Round Simulated-Learner Harness — Implementation Plan
@@ -311,5 +311,54 @@ export async function runSimulatedRound(args: {
 - **Determinism:** the directed `currentUserMessageEventId` per question is derived
   from `(scenarioId, questionIndex)` (fixed UUID namespace), not random — so transcripts
   are addressable and re-runnable.
-</content>
-</invoke>
+
+## Post-adversarial-review corrections (2026-06-27)
+
+Two adversarial reviews (end-user + architecture) ran against the as-built harness
+before merge. The high-value findings below were applied; the implementation differs
+from the design sketch above in these specific ways, and the sketch is retained only
+for historical context.
+
+- **B1 — measure the production JUDGE, not the tutor inline signal (the load-bearing
+  fix).** The sketch scraped the tutor's inline `challenge_round_evaluation` envelope
+  signal. But production grades Challenge Rounds via a **separate rung-1 judge**
+  (`runChallengeRoundGrader`, `capability:'judge'`) whenever
+  `CHALLENGE_ROUND_GRADER_ENABLED` is on — its **default**. The original harness
+  therefore measured a path production disables by default. Fixed: grading now routes
+  through `buildChallengeRoundGraderPrompt` + `challengeRoundGraderVerdictSchema`
+  (mirroring `grader.ts`), and the tutor is reduced to a production-routed
+  next-question producer that never grades. `SimulatedRoundResult.mentorModel` →
+  `graderModel`; metrics' `signalEmissionRateByMentor` → `…ByGrader`.
+- **Guard targets the JUDGE.** The two-model guard now compares the learner against
+  the **judge** slug (resolved via `getModelConfigForTest(1, { capability:'judge',
+  ageBracket })` for the production-routing default), not the tutor. Added a **soft**
+  same-vendor-root warning axis (`vendorRoot`, e.g. `deepseek-chat`/`deepseek-r1`)
+  that warns without throwing.
+- **Tutor can't contaminate the measurement.** The question-asking tutor is always
+  production-routed (never the candidate slug), so only the grader is the variable
+  under test — the earlier "mentor contaminates its own grading" caveat is gone.
+- **M4 — budget auto-fit, no silent truncation.** `--max-live-calls` is now an
+  optional **hard cap**; when omitted the budget auto-fits to
+  `grid × 3 × MAX_CHALLENGE_QUESTIONS`, so a run can never quietly grade only part of
+  the grid. `CALLS_PER_ROUND` accounts for learner+tutor+grader per question.
+- **M3/M6 — N-sufficiency + Wilson CIs.** `MIN_ROUNDS_FOR_CALIBRATION = 30`; corpora
+  below it are flagged `sufficientForCalibration:false`. Every headline rate ships a
+  Wilson 95% CI + denominator, and `metrics.json` is **stamped** (`n`,
+  `runsPerScenario`, `gradingPath`, `provisional:true`, INSUFFICIENT-N note) so a
+  low-N number can't be misread as calibrated.
+- **DB-free is an UPPER BOUND.** Skipping `validateEvaluationEventIds` can only *drop*
+  `solid` items, never add them — so `verified`/over-credit here is an upper bound on
+  production, not an unbiased estimate. Stamped into `metrics.json`.
+- **Flag/CLI rename:** `--mentor-model` → `--grader-model` throughout (CLI, README,
+  tests).
+- **Determinism wording corrected:** the per-question event id is a deterministic
+  **v4-*shaped*** UUID derived from `(scenarioId, questionIndex)` — it is NOT an
+  RFC-4122 v5 (SHA-1 namespace) UUID; the comment in `simulated-conversation.ts` was
+  corrected to say so.
+
+**Status:** implemented; harness suites green
+(`simulated-conversation.test.ts` 19 + `simulation-metrics.test.ts` 8 = 27 tests),
+`api:typecheck` clean. Re-challenged by a 3-reviewer adversarial pass (correctness
+/ test-quality / maintainability) on 2026-06-27 — consensus APPROVE-with-nits, no
+P0/P1; the surfaced README accuracy nits + a `parseGraderResponse` drift-guard seam
+(+6 tests) were applied in the same PR.
