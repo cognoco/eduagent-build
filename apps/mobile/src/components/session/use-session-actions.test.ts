@@ -33,7 +33,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setShowWrongSubjectChip: jest.fn(),
     setShowTopicSwitcher: jest.fn(),
     setShowParkingLot: jest.fn(),
-    setShowFilingPrompt: jest.fn(),
+    filing: { mutate: jest.fn(), mutateAsync: jest.fn(), isPending: false },
     setConsumedQuickChipMessageId: jest.fn(),
     setMessageFeedback: jest.fn(),
     homeworkProblemsState: [],
@@ -102,7 +102,7 @@ describe('useSessionActions', () => {
       summaryStatus: 'pending',
       milestonesReached: [],
     });
-    expect(opts.setShowFilingPrompt).not.toHaveBeenCalled();
+    expect(opts.filing.mutate).not.toHaveBeenCalled();
     expect(opts.router.replace).toHaveBeenCalledWith(
       expect.objectContaining({
         pathname: '/session-summary/session-1',
@@ -113,7 +113,7 @@ describe('useSessionActions', () => {
     );
   });
 
-  it('shows filing prompt for homework sessions after close', async () => {
+  it('auto-files homework sessions then navigates to the (home-bound) summary', async () => {
     const opts = createMockOpts({ effectiveMode: 'homework' });
     const { result } = renderHook(() => useSessionActions(opts as any));
 
@@ -125,10 +125,68 @@ describe('useSessionActions', () => {
       await confirmEndSession();
     });
 
-    expect(opts.setShowFilingPrompt).toHaveBeenCalledWith(true);
+    // Silent fire-and-forget auto-file (W2 #11) — no blocking filing prompt.
+    expect(opts.filing.mutate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      sessionMode: 'homework',
+    });
+    // Navigates to the summary WITHOUT deep-link params (Home-bound).
+    const replaceArg = (opts.router.replace as jest.Mock).mock.calls[0][0];
+    expect(replaceArg).toEqual(
+      expect.objectContaining({
+        pathname: '/session-summary/session-1',
+        params: expect.objectContaining({ sessionType: 'homework' }),
+      }),
+    );
+    expect(replaceArg.params).not.toHaveProperty('filedSubjectId');
+    expect(replaceArg.params).not.toHaveProperty('filedBookId');
   });
 
-  it('navigates to summary for learning sessions (no filing prompt)', async () => {
+  it('still navigates to the summary when the homework auto-file fails internally', async () => {
+    // Model React-Query's fire-and-forget mutate(): the underlying mutationFn
+    // rejects, RQ handles it internally (onError), and mutate() itself returns
+    // void synchronously without throwing. The production code does NOT await
+    // it, so navigation must proceed on the same tick regardless of failure.
+    const internalRejection = jest.fn();
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      filing: {
+        mutate: jest.fn(() => {
+          // Schedule an internally-handled rejection, exactly as RQ does — the
+          // call returns undefined; the rejection never surfaces to the caller.
+          void Promise.reject(new Error('filing failed')).catch(
+            internalRejection,
+          );
+        }),
+        mutateAsync: jest.fn(),
+        isPending: false,
+      },
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    await act(async () => {
+      await result.current.handleEndSession();
+    });
+
+    // confirmEndSession resolving (not rejecting) proves the fire-and-forget
+    // failure did not propagate out of the close handler.
+    await act(async () => {
+      await confirmEndSession();
+    });
+
+    expect(opts.filing.mutate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      sessionMode: 'homework',
+    });
+    expect(internalRejection).toHaveBeenCalled();
+    expect(opts.router.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/session-summary/session-1',
+      }),
+    );
+  });
+
+  it('navigates to summary for learning sessions (no auto-file)', async () => {
     const opts = createMockOpts({ effectiveMode: 'learning' });
     const { result } = renderHook(() => useSessionActions(opts as any));
 
@@ -140,7 +198,7 @@ describe('useSessionActions', () => {
       await confirmEndSession();
     });
 
-    expect(opts.setShowFilingPrompt).not.toHaveBeenCalled();
+    expect(opts.filing.mutate).not.toHaveBeenCalled();
     expect(opts.router.replace).toHaveBeenCalled();
   });
 

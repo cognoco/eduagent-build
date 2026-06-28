@@ -781,20 +781,6 @@
       "saveFailedTitle": "メモを保存できませんでした",
       "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
     },
-    "filingPrompt": {
-      "title": "ライブラリに追加しますか？",
-      "descriptionWithTopic": "このセッションをライブラリの{{topic}}に追加しますか？",
-      "description": "このセッションをライブラリに追加しますか？",
-      "addFailedTitle": "ライブラリに追加できませんでした",
-      "addFailedMessage": "もう一度お試しください",
-      "adding": "追加中…",
-      "yesAddLabel": "はい、ライブラリに追加します",
-      "yesAdd": "はい、追加する",
-      "noThanksLabel": "いいえ",
-      "noThanks": "いいえ",
-      "tryAgain": "再試行",
-      "skipForNow": "今はスキップ"
-    },
     "parkingLot": {
       "title": "パーキングロット",
       "description": "後で戻ってきたい質問やアイデアを書き留めましょう",
@@ -961,8 +947,7 @@
     "disabledReason": {
       "offline": "オフラインです — 再接続すると入力が再開されます",
       "expired": "このセッションは終了しました",
-      "quotaReached": "セッションの上限に達しました",
-      "chooseSave": "このセッションの保存先を選択してください"
+      "quotaReached": "セッションの上限に達しました"
     },
     "imageAttach": {
       "timeout": "写真の読み込みに時間がかかりすぎたため、テキストのみで開始します。問題がある場合は、もう一度カメラをタップして再試行してください。",

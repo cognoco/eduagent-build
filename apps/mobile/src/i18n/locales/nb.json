@@ -781,20 +781,6 @@
       "saveFailedTitle": "Kunne ikke lagre notat",
       "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
     },
-    "filingPrompt": {
-      "title": "Legge til i biblioteket?",
-      "descriptionWithTopic": "Vil du legge til denne økten i {{topic}} i biblioteket ditt?",
-      "description": "Vil du legge til denne økten i biblioteket ditt?",
-      "addFailedTitle": "Kunne ikke legge til i biblioteket",
-      "addFailedMessage": "Prøv igjen",
-      "adding": "Legger til ...",
-      "yesAddLabel": "Ja, legg til i biblioteket",
-      "yesAdd": "Ja, legg til",
-      "noThanksLabel": "Nei takk",
-      "noThanks": "Nei takk",
-      "tryAgain": "Prøv igjen",
-      "skipForNow": "Hopp over for nå"
-    },
     "parkingLot": {
       "title": "Parkeringsplass",
       "description": "Noter ned spørsmål eller ideer du vil komme tilbake til",
@@ -961,8 +947,7 @@
     "disabledReason": {
       "offline": "Du er frakoblet – inndata vil returnere når du kobler til igjen",
       "expired": "Denne økten er avsluttet",
-      "quotaReached": "Øktgrensen din er nådd",
-      "chooseSave": "Velg hvor du vil lagre denne økten"
+      "quotaReached": "Øktgrensen din er nådd"
     },
     "imageAttach": {
       "timeout": "Bildet ditt tok for lang tid å laste, så jeg starter kun med teksten. Hvis noe ser rart ut, trykk på kameraet igjen for å prøve på nytt.",

@@ -781,20 +781,6 @@
       "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
       "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
-    "filingPrompt": {
-      "title": "Zur Bibliothek hinzufügen?",
-      "descriptionWithTopic": "Möchtest du diese Sitzung zu {{topic}} in deiner Bibliothek hinzufügen?",
-      "description": "Möchtest du diese Sitzung zu deiner Bibliothek hinzufügen?",
-      "addFailedTitle": "Konnte nicht zur Bibliothek hinzugefügt werden",
-      "addFailedMessage": "Bitte versuche es erneut",
-      "adding": "Wird hinzugefügt...",
-      "yesAddLabel": "Ja, zur Bibliothek hinzufügen",
-      "yesAdd": "Ja, hinzufügen",
-      "noThanksLabel": "Nein, danke",
-      "noThanks": "Nein, danke",
-      "tryAgain": "Erneut versuchen",
-      "skipForNow": "Jetzt überspringen"
-    },
     "parkingLot": {
       "title": "Parkplatz",
       "description": "Notiere Fragen oder Ideen, auf die du zurückkommen möchtest",
@@ -961,8 +947,7 @@
     "disabledReason": {
       "offline": "Du bist offline – die Eingabe wird wiederhergestellt, wenn du dich erneut verbindest",
       "expired": "Diese Sitzung ist beendet",
-      "quotaReached": "Dein Sitzungslimit wurde erreicht",
-      "chooseSave": "Wähle, wo diese Sitzung gespeichert werden soll"
+      "quotaReached": "Dein Sitzungslimit wurde erreicht"
     },
     "imageAttach": {
       "timeout": "Dein Foto hat zu lange zum Laden gebraucht, also beginne ich nur mit dem Text. Wenn etwas nicht stimmt, tippe erneut auf die Kamera, um es noch einmal zu versuchen.",

@@ -921,6 +921,40 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
+  // W2 #11: the recall bridge was starved on the submit path — the fetch lived
+  // inside the skip-only block, so a learner who SUBMITTED a reflection never
+  // reached it. It now fires inside handleSubmit on success.
+  it('fires the recall bridge on the homework submit path (not just skip)', async () => {
+    mockParams.sessionType = 'homework';
+    mockSubmitResult = {
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I used long division to check the remainder',
+        aiFeedback: 'Nice work.',
+        status: 'submitted',
+      },
+    };
+    mockFetch.setRoute('recall-bridge', () => ({
+      questions: ['What method did you use?', 'Why does it work?'],
+      topicId: 'topic-1',
+      topicTitle: 'Algebra',
+    }));
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I used long division to check the remainder',
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('recall-bridge-questions');
+    });
+    expect(fetchCallsMatching(mockFetch, 'recall-bridge')).toHaveLength(1);
+  });
+
   it('shows inline error text when submitSummary fails [SC-1]', async () => {
     // Set up the fetch to return an error for the submit endpoint
     mockFetch.setRoute('sessions', (url: string, init?: RequestInit) => {
@@ -1789,6 +1823,55 @@ describe('SessionSummaryScreen', () => {
       expect(
         fetchCallsMatching(mockFetch, '/library-filing/keep-out'),
       ).toHaveLength(1);
+    });
+  });
+
+  // W2 #11: homework now auto-files at exit and reuses the same filing
+  // controls (gated on the mode-stable isHomeworkSession, with
+  // alwaysFilingCandidate to bypass the freeform exchange floor).
+  describe('homework Library filing controls (auto-file at exit)', () => {
+    beforeEach(() => {
+      mockParams.sessionType = 'homework';
+      mockTranscriptData = validTranscriptData as never;
+    });
+
+    it('renders Remove for an auto-filed short homework session (bypasses the freeform floor)', async () => {
+      // markSessionFiled sets topicId/filedAt but leaves filingStatus null;
+      // 2 exchanges is below the freeform exchangeCount>=5 auto-file floor.
+      mockSessionData = makeFreeformSession({
+        sessionType: 'homework',
+        topicId: '11111111-1111-1111-1111-111111111111',
+        filedAt: '2026-05-01T10:16:00.000Z',
+        filingStatus: null,
+        topicTitle: 'Long division',
+        exchangeCount: 2,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-summary-library-remove');
+      });
+    });
+
+    it('keeps the control mounted (Add to restore) for a kept-out homework session [Blocker 1 gate]', async () => {
+      // A filed-state parent gate would unmount here (topicId/filedAt null after
+      // keep-out); the mode-stable isHomeworkSession gate keeps it rendered so
+      // the learner can restore.
+      mockSessionData = makeFreeformSession({
+        sessionType: 'homework',
+        topicId: null,
+        filedAt: null,
+        filingStatus: 'filing_kept_out',
+        exchangeCount: 2,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('session-summary-library-filing');
+      });
+      screen.getByTestId('session-summary-library-add');
     });
   });
 

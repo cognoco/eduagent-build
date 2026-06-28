@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { LibraryPrompt } from './LibraryPrompt';
 import { QuestionCounter } from './QuestionCounter';
 import { NoteInput } from '../library/NoteInput';
-import type { useFiling } from '../../hooks/use-filing';
 import type { useCreateNote } from '../../hooks/use-notes';
 import { formatApiError } from '../../lib/format-api-error';
 import { platformAlert } from '../../lib/platform-alert';
@@ -12,18 +11,6 @@ import type { Href, Router } from 'expo-router';
 import type { useThemeColors } from '../../lib/theme';
 
 export interface SessionFooterProps {
-  showFilingPrompt: boolean;
-  filingDismissed: boolean;
-  filing: ReturnType<typeof useFiling>;
-  activeSessionId: string | null;
-  effectiveMode: string;
-  filingTopicHint?: string;
-  setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
-  setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: (
-    filedSubjectId?: string,
-    filedBookId?: string,
-  ) => void;
   router: Router;
   homeHref?: Href;
   sessionExpired: boolean;
@@ -41,15 +28,6 @@ export interface SessionFooterProps {
 }
 
 export function SessionFooter({
-  showFilingPrompt,
-  filingDismissed,
-  filing,
-  activeSessionId,
-  effectiveMode,
-  filingTopicHint,
-  setShowFilingPrompt,
-  setFilingDismissed,
-  navigateToSessionSummary,
   router,
   homeHref = '/(app)/home' as Href,
   sessionExpired,
@@ -68,18 +46,6 @@ export function SessionFooter({
   const { t } = useTranslation();
   return (
     <>
-      {showFilingPrompt && !filingDismissed ? (
-        <StandardFilingPrompt
-          filing={filing}
-          activeSessionId={activeSessionId}
-          effectiveMode={effectiveMode}
-          filingTopicHint={filingTopicHint}
-          setShowFilingPrompt={setShowFilingPrompt}
-          setFilingDismissed={setFilingDismissed}
-          navigateToSessionSummary={navigateToSessionSummary}
-          colors={colors}
-        />
-      ) : null}
       {sessionExpired ? (
         <View className="bg-surface rounded-card p-4 mt-2 mb-4">
           <Text className="text-body font-semibold text-text-primary mb-2">
@@ -157,126 +123,5 @@ export function SessionFooter({
       {showQuestionCount ? <QuestionCounter count={userMessageCount} /> : null}
       {showBookLink ? <LibraryPrompt /> : null}
     </>
-  );
-}
-
-function StandardFilingPrompt({
-  filing,
-  activeSessionId,
-  effectiveMode,
-  filingTopicHint,
-  setShowFilingPrompt,
-  setFilingDismissed,
-  navigateToSessionSummary,
-  colors,
-}: {
-  filing: ReturnType<typeof useFiling>;
-  activeSessionId: string | null;
-  effectiveMode: string;
-  filingTopicHint?: string;
-  setShowFilingPrompt: React.Dispatch<React.SetStateAction<boolean>>;
-  setFilingDismissed: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateToSessionSummary: (
-    filedSubjectId?: string,
-    filedBookId?: string,
-  ) => void;
-  colors: ReturnType<typeof useThemeColors>;
-}) {
-  const { t } = useTranslation();
-  return (
-    <View
-      className="px-4 py-6 bg-surface-elevated rounded-t-2xl"
-      testID="filing-prompt"
-    >
-      <Text className="text-lg font-semibold text-text-primary mb-2">
-        {t('session.filingPrompt.title')}
-      </Text>
-      <Text className="text-body-sm text-text-secondary mb-4">
-        {filingTopicHint
-          ? t('session.filingPrompt.descriptionWithTopic', {
-              topic: filingTopicHint,
-            })
-          : t('session.filingPrompt.description')}
-      </Text>
-      <View className="flex-row gap-3">
-        <Pressable
-          onPress={async () => {
-            // BUG-149: Recovery alert must offer a retry primary AND a
-            // skip secondary — a transient network failure used to
-            // permanently lose the session-to-book link because the only
-            // option was Done (which silently dismissed + navigated away).
-            // The retry handler re-invokes the same mutation; recursion is
-            // bounded by the user explicitly choosing Skip.
-            const runFiling = async (): Promise<void> => {
-              try {
-                const result = await filing.mutateAsync({
-                  sessionId: activeSessionId ?? undefined,
-                  sessionMode: effectiveMode as 'freeform' | 'homework',
-                });
-                setShowFilingPrompt(false);
-                navigateToSessionSummary(result.shelfId, result.bookId);
-              } catch {
-                platformAlert(
-                  t('session.filingPrompt.addFailedTitle'),
-                  t('session.filingPrompt.addFailedMessage'),
-                  [
-                    {
-                      text: t('session.filingPrompt.tryAgain'),
-                      onPress: () => {
-                        void runFiling();
-                      },
-                    },
-                    {
-                      text: t('session.filingPrompt.skipForNow'),
-                      style: 'cancel',
-                      onPress: () => {
-                        setFilingDismissed(true);
-                        navigateToSessionSummary();
-                      },
-                    },
-                  ],
-                );
-              }
-            };
-            await runFiling();
-          }}
-          disabled={filing.isPending}
-          className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"
-          testID="filing-prompt-accept"
-          accessibilityRole="button"
-          accessibilityLabel={
-            filing.isPending
-              ? t('session.filingPrompt.adding')
-              : t('session.filingPrompt.yesAddLabel')
-          }
-        >
-          {filing.isPending ? (
-            <ActivityIndicator
-              color={colors.textInverse}
-              accessibilityLabel={t('common.loading')}
-            />
-          ) : (
-            <Text className="text-text-inverse font-semibold">
-              {t('session.filingPrompt.yesAdd')}
-            </Text>
-          )}
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            setFilingDismissed(true);
-            navigateToSessionSummary();
-          }}
-          disabled={filing.isPending}
-          className="px-4 py-3 min-h-[44px] justify-center"
-          testID="filing-prompt-dismiss"
-          accessibilityRole="button"
-          accessibilityLabel={t('session.filingPrompt.noThanksLabel')}
-        >
-          <Text className="text-text-secondary">
-            {t('session.filingPrompt.noThanks')}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
   );
 }

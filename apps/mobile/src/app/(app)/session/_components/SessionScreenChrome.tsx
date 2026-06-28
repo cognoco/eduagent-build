@@ -11,7 +11,6 @@ export interface SessionScreenChromeProps {
   activeSessionId: string | null;
   isClosing: boolean;
   isStreaming: boolean;
-  showFilingPrompt: boolean;
   modeSubtitle: string;
   showTimer: boolean;
   milestoneCount: number;
@@ -39,7 +38,7 @@ export function SessionScreenChrome(props: SessionScreenChromeProps): {
   const endSessionButton = (
     <Pressable
       onPress={props.activeSessionId ? props.onEndSession : props.onHomeBack}
-      disabled={props.isClosing || props.isStreaming || props.showFilingPrompt}
+      disabled={props.isClosing || props.isStreaming}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
       style={{ maxWidth: 104 }}
       testID="end-session-button"
