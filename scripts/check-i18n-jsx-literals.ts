@@ -143,9 +143,6 @@ const COPY_ATTRIBUTE_PROPS = new Set([
   'usualMethod',
 ]);
 
-const COPY_PROP_SUFFIX_PATTERN =
-  /(Label|Title|Subtitle|Description|Message|Summary|Placeholder|Text|Content|Hint|Body|Reason)$/;
-
 export function classifyJsxAttributeProp(
   propName: string,
 ): AttributePropClassification {
@@ -158,10 +155,7 @@ export function classifyJsxAttributeProp(
   ) {
     return 'non-copy';
   }
-  if (
-    COPY_ATTRIBUTE_PROPS.has(propName) ||
-    COPY_PROP_SUFFIX_PATTERN.test(propName)
-  ) {
+  if (COPY_ATTRIBUTE_PROPS.has(propName)) {
     return 'copy';
   }
   return 'unknown';

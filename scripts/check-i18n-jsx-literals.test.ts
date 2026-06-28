@@ -261,14 +261,14 @@ describe('diffAgainstBaseline', () => {
 });
 
 describe('classifyJsxAttributeProp', () => {
-  it('classifies known copy props and copy-like suffixes', () => {
+  it('classifies known copy props', () => {
     expect(classifyJsxAttributeProp('label')).toBe('copy');
     expect(classifyJsxAttributeProp('title')).toBe('copy');
     expect(classifyJsxAttributeProp('message')).toBe('copy');
     expect(classifyJsxAttributeProp('accessibilityLabel')).toBe('copy');
     expect(classifyJsxAttributeProp('aria-label')).toBe('copy');
     expect(classifyJsxAttributeProp('cancelText')).toBe('copy');
-    expect(classifyJsxAttributeProp('emptyStateTitle')).toBe('copy');
+    expect(classifyJsxAttributeProp('emptyTitle')).toBe('copy');
   });
 
   it('classifies IDs, roles, styles, and references as non-copy', () => {
@@ -284,5 +284,6 @@ describe('classifyJsxAttributeProp', () => {
 
   it('classifies neutral custom props as unknown', () => {
     expect(classifyJsxAttributeProp('tone')).toBe('unknown');
+    expect(classifyJsxAttributeProp('emptyStateTitle')).toBe('unknown');
   });
 });
