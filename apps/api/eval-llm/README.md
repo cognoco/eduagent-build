@@ -47,6 +47,22 @@ pnpm eval:llm -- --flow dictation-generate --profile 06yo-fairytales
 doppler run -- pnpm eval:llm -- --live
 ```
 
+## Pre-commit snapshot evidence
+
+Prompt-touching commits need mechanical eval evidence:
+
+- If `pnpm eval:llm` changes files under `apps/api/eval-llm/snapshots/`, stage
+  those snapshot files with the prompt change.
+- If a full, unfiltered Tier-1 run produces zero tracked snapshot drift, the
+  harness writes a local receipt under Git metadata via `git rev-parse
+  --git-path eduagent/eval-llm-zero-drift-receipt.json`. The pre-commit guard
+  accepts that receipt only when the staged prompt blobs match the prompt files
+  the eval run actually evaluated and the snapshot tree is still clean.
+
+Filtered runs (`--flow`, `--profile`, `--scenarios`), live runs, and baseline
+maintenance runs do not write zero-drift receipts; use a full `pnpm eval:llm`
+run for commit evidence.
+
 ## Signal-distribution baseline (Layer 1 drift guard)
 
 The harness can detect *aggregate envelope-signal drift* — e.g. the model

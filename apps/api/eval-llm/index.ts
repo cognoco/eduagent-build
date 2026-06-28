@@ -88,6 +88,7 @@ import {
   parseCliArgs,
   runHarness,
   type RunSummary,
+  type RunOptions,
 } from './runner/runner';
 import type { FlowDefinition } from './runner/types';
 import {
@@ -103,6 +104,11 @@ import {
   setOpenRouterProviderPin,
 } from './runner/llm-bootstrap';
 import { setOpenRouterModelOverride } from './runner/llm-client';
+import {
+  removeZeroDriftReceipt,
+  writeZeroDriftReceipt,
+} from './runner/zero-drift-receipt';
+import { isPromptTouchingPath } from './runner/prompt-paths';
 
 const BASELINE_PATH = path.resolve(__dirname, 'baseline.json');
 const DEFAULT_TOLERANCE_PP = 0.05; // 5pp — one sample of noise at N≈20
@@ -119,6 +125,47 @@ async function readBaseline(): Promise<Baseline | null> {
 async function writeBaseline(baseline: Baseline): Promise<void> {
   const body = JSON.stringify(baseline, null, 2) + '\n';
   await fs.writeFile(BASELINE_PATH, body, 'utf8');
+}
+
+function shouldWriteZeroDriftReceipt(options: RunOptions): boolean {
+  return (
+    !options.live &&
+    !options.flowFilter &&
+    !options.profileFilter &&
+    !options.scenarioFilter &&
+    !options.checkBaseline &&
+    !options.updateBaseline &&
+    !options.validateBaseline
+  );
+}
+
+function clearZeroDriftReceipt(): void {
+  try {
+    removeZeroDriftReceipt(process.cwd());
+  } catch {
+    // The receipt is a local pre-commit aid. Failure to clear it is harmless
+    // because validation still fails closed against HEAD, prompt hashes, and
+    // snapshot hashes.
+  }
+}
+
+function updateZeroDriftReceipt(options: RunOptions): void {
+  if (!shouldWriteZeroDriftReceipt(options)) {
+    clearZeroDriftReceipt();
+    return;
+  }
+
+  const result = writeZeroDriftReceipt(process.cwd(), {
+    command: 'pnpm eval:llm',
+    promptPathPredicate: isPromptTouchingPath,
+  });
+  if (result.written) {
+    console.log(`Eval-LLM zero-drift receipt written: ${result.path}`);
+  } else {
+    console.log(
+      'Eval-LLM snapshots changed; stage snapshot files instead of using a zero-drift receipt.',
+    );
+  }
 }
 
 const FLOWS: FlowDefinition[] = [
@@ -163,6 +210,7 @@ async function main(): Promise<void> {
   const { options, listOnly } = parseCliArgs(argv);
 
   if (listOnly) {
+    clearZeroDriftReceipt();
     listFlows(FLOWS);
     return;
   }
@@ -174,6 +222,7 @@ async function main(): Promise<void> {
   // drift invisible. The aggregate signal-distribution comparison itself
   // still requires the key-gated, non-deterministic `--check-baseline --live`.
   if (options.validateBaseline) {
+    clearZeroDriftReceipt();
     if (options.live || options.checkBaseline || options.updateBaseline) {
       console.error(
         '--validate-baseline is a standalone deterministic check; do not combine it with --live / --check-baseline / --update-baseline.',
@@ -206,6 +255,7 @@ async function main(): Promise<void> {
   // reason — and a misspelled invocation should not burn a full matrix run
   // before erroring (CodeRabbit on PR #820).
   if ((options.updateBaseline || options.checkBaseline) && !options.live) {
+    clearZeroDriftReceipt();
     console.error(
       '--check-baseline / --update-baseline require --live (envelope metrics are only collected from live LLM responses)',
     );
@@ -218,18 +268,21 @@ async function main(): Promise<void> {
   // be written into the production-model baseline.
   if (options.openrouterModel) {
     if (!options.live) {
+      clearZeroDriftReceipt();
       console.error(
         '--openrouter-model requires --live (it only affects live LLM calls).',
       );
       process.exit(2);
     }
     if (options.updateBaseline) {
+      clearZeroDriftReceipt();
       console.error(
         '--openrouter-model cannot be combined with --update-baseline: the baseline tracks the PRODUCTION routing, not a candidate model.',
       );
       process.exit(2);
     }
   } else if (options.openrouterReasoningEffort || options.openrouterProvider) {
+    clearZeroDriftReceipt();
     console.error(
       '--openrouter-reasoning-effort / --openrouter-provider require --openrouter-model (they only shape candidate-model calls).',
     );
@@ -335,6 +388,7 @@ async function main(): Promise<void> {
   }
 
   if (summary.qualityFailures > 0) {
+    clearZeroDriftReceipt();
     console.error(
       'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
     );
@@ -347,10 +401,12 @@ async function main(): Promise<void> {
   }
 
   if (options.updateBaseline) {
+    clearZeroDriftReceipt();
     return;
   }
 
   if (options.checkBaseline) {
+    clearZeroDriftReceipt();
     const baseline = await readBaseline();
     if (!baseline) {
       console.error(
@@ -380,6 +436,8 @@ async function main(): Promise<void> {
     );
     process.exit(1);
   }
+
+  updateZeroDriftReceipt(options);
 }
 
 main().catch((err) => {

@@ -79,45 +79,10 @@ if [ -n "$SYNC_CHANGES" ]; then
   echo "$SYNC_CHANGES" | xargs git add
 fi
 
-# Eval-harness guard: prompt-touching files require an accompanying snapshot
-# diff. Without this, prompt drift ships silently (the eval harness only
-# catches it post-hoc on the next manual run). See AGENTS.md "When changing
-# LLM prompts, run the eval harness".
-#
-# Triggers on staged changes to:
-#   - apps/api/src/services/**/*-prompts.ts
-#   - apps/api/src/services/llm/**/*.ts (including providers/, excluding tests)
-#   - apps/api/src/services/dictation/generate.ts (inline prompt construction)
-# Parser/projector-only LLM infrastructure files are excluded because they do
-# not contribute to prompt snapshot output; still run pnpm eval:llm manually
-# for those changes per AGENTS.md.
-# Excluded files (response-side only, cannot change what the model generates):
-#   envelope, project-response, stream-envelope — response shaping/projection;
-#   extract-json — a pure JSON-from-text parser that runs AFTER generation.
-# Do NOT add prompt-building helpers here; this list is for files that process
-# the model's output, never its input.
-# Requires at least one staged file under apps/api/eval-llm/snapshots/.
-# Bypass with `git commit --no-verify` if the change is a pure refactor.
-PROMPT_CHANGED=$(git diff --cached --name-only --diff-filter=d \
-  | grep -E '(apps/api/src/services/.*-prompts\.ts$|apps/api/src/services/llm/.+\.ts$|apps/api/src/services/dictation/generate\.ts$)' \
-  | grep -vE '(\.test\.ts$|apps/api/src/services/llm/(envelope|project-response|stream-envelope|extract-json)\.ts$)' || true)
-if [ -n "$PROMPT_CHANGED" ]; then
-  SNAPSHOT_CHANGED=$(git diff --cached --name-only \
-    | grep -E '^apps/api/eval-llm/snapshots/' || true)
-  if [ -z "$SNAPSHOT_CHANGED" ]; then
-    echo ""
-    echo "pre-commit: prompt-touching files staged without a snapshot diff."
-    echo ""
-    echo "Files that triggered the check:"
-    echo "$PROMPT_CHANGED" | sed 's/^/  /'
-    echo ""
-    echo "Run: pnpm eval:llm   (then re-stage the snapshot files)"
-    echo ""
-    echo "If this change cannot affect generation output (pure refactor,"
-    echo "rename, comment, type-only), pass --no-verify."
-    exit 1
-  fi
-fi
+# Eval-harness guard: prompt-touching files require staged snapshot diffs or a
+# harness-written zero-drift receipt. The TypeScript guard owns the prompt-file
+# include/exclude rules so hook logic and tests cannot drift apart.
+pnpm exec tsx scripts/check-precommit-eval-snapshot-guard.ts
 
 # i18n staleness guard: when en.json is staged, every locale must already match
 # its key/variable shape. Without this the staleness check exists but never
