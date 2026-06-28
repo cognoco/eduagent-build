@@ -26,6 +26,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **mobile-routes** | `apps/mobile/src/app/**` | `test:mobile:unit` | — | `unstable_settings`; push ancestor chain |
 | **mobile-src** | `apps/mobile/src/**` (non-route, non-i18n) | `test:mobile:unit` | — | |
 | **i18n** | `apps/mobile/src/i18n/**`, `apps/mobile/src/**/*.{ts,tsx}` | `check:i18n:orphans`, `check:i18n` | — | Shared detector catches new `t()` calls outside locale files |
+| **i18n-cross-package** | `apps/mobile/src/i18n/locales/en.json` (exact) | `test:api:unit` | — | `app-help-map.test.ts` reads en.json via `readFileSync` — invisible to `nx affected`. Emits `--github-output unit=true`; the `API unit tests (cross-package en.json change — WI-886)` ci.yml step runs the suite on PRs |
 | **shared-schemas** | `packages/schemas/src/**` | `test:api:unit`, `test:mobile:unit` | `test:api:integration`, `test:integration` | Never redefine types locally |
 | **shared-database** | `packages/database/src/**` (non-schema) | `test:api:unit` | `test:api:integration` | |
 | **security-sensitive** | `**/billing/**`, `**/auth/**`, `**/clerk*` | — | `test:api:integration` | Break tests required; no silent recovery |

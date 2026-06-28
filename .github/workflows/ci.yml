@@ -340,6 +340,20 @@ jobs:
           (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
         run: pnpm exec nx run api:test:integration
 
+      # API UNIT tests for a cross-package read nx affected cannot see (WI-886).
+      # apps/api/src/services/app-help-map.test.ts reads
+      # apps/mobile/src/i18n/locales/en.json at module load via readFileSync, so
+      # an en.json-only diff affects no api project in the nx graph — the
+      # "Lint, test, typecheck, build (PR — affected only)" step above skips the
+      # api unit suite for it. The change-class router (the single routing source
+      # of truth, ci.yml:283) emits unit=true for the i18n-cross-package class;
+      # run the api unit suite directly so en.json changes are actually validated
+      # in CI, not merely flagged advisory. Command mirrors the router's FAST
+      # entry (`pnpm test:api:unit`), not an nx target, to keep them in lockstep.
+      - name: API unit tests (cross-package en.json change — WI-886)
+        if: github.event_name == 'pull_request' && steps.change-class.outputs.unit == 'true'
+        run: pnpm test:api:unit
+
       # Advisory check: flag stale counts in AGENTS.md (does not block PRs)
       - name: Validate AGENTS.md counts
         if: always()
