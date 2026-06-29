@@ -1,4 +1,4 @@
-// @inngest-admin: account-scope (accounts table is keyed by Clerk user id; no profileId exists)
+// @inngest-admin: event-profile (existingClerkUserId from event scopes the accounts query; no profileId)
 // ---------------------------------------------------------------------------
 // account-reclaim-attempt — [BUG-784]
 //
