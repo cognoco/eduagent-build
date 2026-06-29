@@ -133,6 +133,15 @@ export async function ensureV2IdentityForLegacyProfileTest(
     clerkUserId: string;
     email: string;
     isOwner?: boolean;
+    /**
+     * [WI-1145] Seed a baseline free v2 `subscription` (+ matching legacy parent)
+     * for the owner. Default true — most suites want the post-collapse billing /
+     * metering reads to resolve a row. Suites that own the full subscription
+     * lifecycle in their own seed (e.g. billing-lifecycle, whose "repair a missing
+     * subscription" case requires NO pre-existing sub) pass false and insert their
+     * own legacy+v2 pair with a shared id.
+     */
+    seedBaselineSubscription?: boolean;
   },
 ): Promise<void> {
   await db
@@ -190,6 +199,55 @@ export async function ensureV2IdentityForLegacyProfileTest(
       organizationId: input.accountId,
       roles: (input.isOwner ?? true) ? ['admin', 'learner'] : ['learner'],
     });
+  }
+
+  // [WI-1145] Seed a baseline v2 `subscription` for the owner so v2 billing/
+  // metering reads (getSubscriptionByAccountIdV2 / ensureFreeSubscriptionV2)
+  // resolve a row on the post-collapse main lane, and so
+  // setSubscriptionTierForProfile's v2 UPDATE has a row to mutate. Free/active
+  // matches the legacy default; tier-specific tests call
+  // setSubscriptionTierForProfile, which updates BOTH stores in lockstep so
+  // legacy↔v2 stay consistent.
+  if ((input.isOwner ?? true) && (input.seedBaselineSubscription ?? true)) {
+    await ensureLegacyProfileAnchorForTest(db, {
+      accountId: input.accountId,
+      profileId: input.profileId,
+      displayName: input.displayName,
+      birthYear: input.birthYear,
+      isOwner: input.isOwner ?? true,
+      email: input.email,
+      clerkUserId: input.clerkUserId,
+    });
+
+    const [existingSubscription] = await db
+      .select({ id: subscriptionTable.id })
+      .from(subscriptionTable)
+      .where(eq(subscriptionTable.organizationId, input.accountId))
+      .limit(1);
+    if (!existingSubscription) {
+      const baselineSubscriptionId = generateUUIDv7();
+      await db.insert(subscriptionTable).values({
+        id: baselineSubscriptionId,
+        organizationId: input.accountId,
+        planTier: 'free',
+        status: 'active',
+        payerPersonId: input.profileId,
+      });
+      // [WI-1145] Mirror createIdentityGraph's owner-bootstrap dual-write: give
+      // the v2 baseline sub a legacy `subscriptions` parent with the SAME id.
+      // `profile_quota_usage.subscription_id` FK-references legacy `subscriptions`
+      // on the journaled-chain test DB, so a per-profile-tier quota provision
+      // (post-collapse billing read) against the v2 sub id needs that legacy row
+      // to exist. It cascades away with the account
+      // (`subscriptions.account_id` onDelete cascade), so cleanupAccounts sweeps
+      // it for free.
+      await ensureLegacySubscriptionAnchorForTest(db, {
+        subscriptionId: baselineSubscriptionId,
+        accountId: input.accountId,
+        tier: 'free',
+        status: 'active',
+      });
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (email send only; no DB access)
 // ---------------------------------------------------------------------------
 // account-security-notification — [CRITICAL-2a]
 // Sends an out-of-band security-notification email when an account credential

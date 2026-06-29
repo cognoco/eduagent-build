@@ -4,9 +4,11 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
+import type { AllNote } from '@eduagent/schemas';
 
 import {
   createScreenWrapper,
@@ -752,6 +754,162 @@ describe('SubjectHubRoute — stuck curriculum: dispatched:0', () => {
         }),
       );
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1118 — writable topic-scoped notes (felt-knowing loop Flow 1).
+// Opening a topic surfaces the add-note input (canStudy + handler wired);
+// submitting POSTs to the topic-scoped notes endpoint with the focused topic id.
+// No new endpoint, no migration — notes stay topic-scoped (the loose/topicless
+// note bucket the WI's original AC proposed was refuted by the spec).
+//
+// Route-ordering note (see HIGH-3 block above): the mock matches by
+// `url.includes(pattern)` and `/notes` (the all-notes GET) sits earlier in Map
+// order than any `/subjects/.../topics/.../notes` POST. Override `/notes` with a
+// dispatcher so the POST returns a created note while the GET returns the list.
+// ---------------------------------------------------------------------------
+
+describe('SubjectHubRoute — writable hub notes (WI-1118)', () => {
+  // The created note is reflected on subsequent GET /notes so the
+  // invalidate→refetch chain (useCreateNote.onSuccess) actually surfaces the new
+  // note in the open topic sheet — not just a fire-and-forget POST.
+  let createdNote: AllNote | null = null;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    createdNote = null;
+    mockFetch.setRoute('/notes', (url: string, init?: RequestInit) => {
+      if (
+        url.includes(`/topics/${TOPIC_ID}/notes`) &&
+        init?.method === 'POST'
+      ) {
+        createdNote = {
+          id: 'aa0e8400-e29b-41d4-a716-446655440099',
+          topicId: TOPIC_ID,
+          topicTitle: 'Greetings',
+          bookId: BOOK_ID,
+          bookTitle: 'Spanish 1',
+          subjectId: SUBJECT_ID,
+          subjectName: 'Spanish',
+          sessionId: null,
+          content: 'mitosis has phases',
+          origin: 'self',
+          createdAt: '2026-06-29T00:00:00.000Z',
+          updatedAt: '2026-06-29T00:00:00.000Z',
+        };
+        return {
+          note: {
+            id: createdNote.id,
+            topicId: TOPIC_ID,
+            content: 'mitosis has phases',
+            origin: 'self',
+            createdAt: '2026-06-29T00:00:00.000Z',
+            updatedAt: '2026-06-29T00:00:00.000Z',
+          },
+        };
+      }
+      // GET /notes — surface the created note once it exists so the refetch the
+      // mutation triggers re-renders the open sheet with the persisted note.
+      return { notes: createdNote ? [createdNote] : [], nextCursor: null };
+    });
+  });
+
+  it('opens a topic, persists a trimmed note bound to that topic, and shows it', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    // The subject-level notes section is read-only — no add input until a topic is
+    // focused (spec: "no focused topic → no add input").
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+
+    fireEvent.press(screen.getByTestId(`subject-hub-topic-${TOPIC_ID}`));
+
+    const input = screen.getByTestId('subject-hub-notes-input');
+    fireEvent.changeText(input, '  mitosis has phases  ');
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => {
+      const calls = fetchCallsMatching(
+        mockFetch,
+        `/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/notes`,
+      );
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[0]?.init?.method).toBe('POST');
+      // The body carries the trimmed content (blank/whitespace is a no-op gate).
+      expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+        content: 'mitosis has phases',
+      });
+    });
+
+    // Input clears after a successful submit.
+    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe('');
+
+    // The note is not just POSTed — the cache invalidation refetches and the new
+    // note renders inside the focused topic sheet (end-to-end, no manual refresh).
+    await waitFor(() => {
+      const sheet = screen.getByTestId('subject-hub-topic-sheet');
+      within(sheet).getByText('mitosis has phases');
+    });
+  });
+});
+
+// A failed save must not be silent. SubjectHubNotesSection clears the draft
+// optimistically on submit, so the route-level onError alert is the ONLY signal
+// the learner's text was not persisted. Override the topic-notes POST to 500.
+describe('SubjectHubRoute — writable hub notes: save error (WI-1118)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+    mockFetch.setRoute('/notes', (url: string, init?: RequestInit) => {
+      if (
+        url.includes(`/topics/${TOPIC_ID}/notes`) &&
+        init?.method === 'POST'
+      ) {
+        return new Response(JSON.stringify({ error: 'internal error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return { notes: [], nextCursor: null };
+    });
+  });
+
+  it('surfaces a platform alert when a note save fails (no silent draft loss)', async () => {
+    const alertSpy = jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation(() => undefined);
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    fireEvent.press(screen.getByTestId(`subject-hub-topic-${TOPIC_ID}`));
+
+    const input = screen.getByTestId('subject-hub-notes-input');
+    fireEvent.changeText(input, 'mitosis has phases');
+    fireEvent(input, 'submitEditing');
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+    // Assert a non-empty title AND body — not just that alert fired — so an
+    // empty/wrong alert string can't pass green.
+    const [title, body] = alertSpy.mock.calls[0] ?? [];
+    expect(typeof title).toBe('string');
+    expect(title).toBeTruthy();
+    expect(typeof body).toBe('string');
+    expect(body).toBeTruthy();
+
+    alertSpy.mockRestore();
   });
 });
 

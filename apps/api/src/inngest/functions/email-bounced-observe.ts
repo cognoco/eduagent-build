@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging observer; no DB access)
 // ---------------------------------------------------------------------------
 // Email Bounced Observe — observable terminus for the app/email.bounced event
 // emitted by the Resend webhook handler when an email bounces or is complained

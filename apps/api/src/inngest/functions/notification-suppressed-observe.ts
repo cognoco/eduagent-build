@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging observer; no DB access)
 // ---------------------------------------------------------------------------
 // Notification Suppressed Observer — consumes app/notification.suppressed
 // events emitted by daily-reminder-send and review-due-send when the 24h

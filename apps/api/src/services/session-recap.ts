@@ -13,6 +13,7 @@ import { extractFirstJsonObject, routeAndCall } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
+import { calculateAge } from './age-utils';
 
 const logger = createLogger();
 
@@ -136,7 +137,7 @@ interface TopicSuggestion {
 }
 
 export function getAgeVoiceTierLabel(birthYear: number): string {
-  const age = new Date().getFullYear() - birthYear;
+  const age = calculateAge(birthYear);
   if (age < 14) return 'early teen (11-13): friendly, concrete, warm';
   if (age < 18) return 'teen (14-17): peer-adjacent, brief, sharp';
   if (age < 30)

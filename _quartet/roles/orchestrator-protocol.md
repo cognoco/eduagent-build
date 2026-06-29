@@ -88,6 +88,11 @@ skipped them and shipped a bespoke, role-blind kickoff.)*
 - `clacks/progress-channel-design.md` — the orchestrator↔shepherd `_state/{inbox,outbox}.jsonl`
   channel; `library/clacks-channel.md` is the channel's concrete shape.
 
+**Prerequisites (verify before step 1 — `dependencies.md`):** `NOTION_TOKEN` in env and the Work
+Items DB id (repo-root `zdx-config.yaml` → `.zdx.work-items.data_source_id`). Steps 2–3 create the
+Cosmo Workstream and slice and **cannot run** without them — if either is absent, stop and surface a
+`blocked` rather than improvising a local-only scaffold.
+
 **Activation checklist (`planning-rules.md` §2.1 made concrete — every lane, in order):**
 1. **Tracker** — `working/lanes/<lane>/execution-tracker.md` (shape: `library/execution-tracker.md`
    — charter / canon authority / slice / launch gate / change log).
@@ -98,8 +103,9 @@ skipped them and shipped a bespoke, role-blind kickoff.)*
    fallback, but author with gaps up front.)
 4. **Provision the channel** — create `working/lanes/<lane>/_state/{inbox,outbox}.jsonl` (the
    orchestrator provisions these at activation).
-5. **Shepherd kickoff** — author from `roles/kickoffs/shepherd-kickoff-template.md`; if the lane is
-   gated, make it **prime-and-hold** (orient + arm watchers, then wait on an inbox `directive`).
+5. **Shepherd kickoff** — author from `roles/kickoffs/shepherd-kickoff-template.md` (paste the `WS-N`
+   page id from step 2 — the kickoff is unusable without it); if the lane is gated, make it
+   **prime-and-hold** (orient + arm watchers, then wait on an inbox `directive`).
 6. **Reviewer kickoff** — author from `roles/kickoffs/reviewer-kickoff-template.md`, or confirm a
    live general watcher will cover the workstream.
 7. **Arm the orchestrator outbox watcher** — a Monitor on the lane's `outbox.jsonl` (sibling of

@@ -48,6 +48,7 @@ import { createLogger } from './logger';
 import { withTransientDatabaseRetry } from './transient-db-retry';
 import { generateWeeklyReportData } from './weekly-report';
 import { writeActivityMoment } from './activity-ledger';
+import { calculateAge } from './age-utils';
 
 const logger = createLogger();
 
@@ -1371,7 +1372,7 @@ export async function refreshProgressSnapshot(
         },
       });
     }
-    const age = new Date().getFullYear() - (profile?.birthYear ?? 2015);
+    const age = calculateAge(profile?.birthYear ?? 2015);
 
     let celebrationSucceeded = 0;
     let celebrationFailed = 0;

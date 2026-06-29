@@ -86,3 +86,53 @@ export const mistralResponseSchema = z.object({
 });
 
 export type MistralResponseParsed = z.infer<typeof mistralResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Anthropic (native Messages API wire format — NOT OpenAI-compatible)
+//
+// Anthropic returns a top-level `content` array of typed blocks and a
+// `stop_reason`, not `choices`. Validated at the provider trust boundary so a
+// malformed/wrong-shape body fails closed (createProviderApiError) instead of
+// surfacing as a TypeError on a later field access. [WI-481]
+// ---------------------------------------------------------------------------
+
+const anthropicContentBlockSchema = z.object({
+  type: z.string(),
+  text: z.string().optional(),
+});
+
+export const anthropicResponseSchema = z.object({
+  content: z.array(anthropicContentBlockSchema).optional(),
+  stop_reason: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => v ?? undefined),
+  error: providerErrorSchema.optional(),
+});
+
+export type AnthropicResponseParsed = z.infer<typeof anthropicResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Gemini (native generateContent wire format — NOT OpenAI-compatible)
+//
+// Gemini nests text under candidates[].content.parts[].text and signals safety
+// blocks via promptFeedback.blockReason / candidates[].finishReason. Validated
+// at the provider trust boundary for both the non-streaming body and each SSE
+// chunk. [WI-481]
+// ---------------------------------------------------------------------------
+
+const geminiPartSchema = z.object({ text: z.string().optional() });
+
+const geminiCandidateSchema = z.object({
+  content: z.object({ parts: z.array(geminiPartSchema).optional() }).optional(),
+  finishReason: z.string().optional(),
+});
+
+export const geminiResponseSchema = z.object({
+  candidates: z.array(geminiCandidateSchema).optional(),
+  promptFeedback: z.object({ blockReason: z.string().optional() }).optional(),
+  error: providerErrorSchema.optional(),
+});
+
+export type GeminiResponseParsed = z.infer<typeof geminiResponseSchema>;

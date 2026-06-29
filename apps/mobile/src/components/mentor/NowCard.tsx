@@ -1,4 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import type { NowCard as NowCardData } from '@eduagent/schemas';
 
@@ -15,6 +20,8 @@ export interface NowCardProps {
   onContinue: (card: NowCardData) => void;
   onDecline: (card: NowCardData) => void;
   onCompleted?: (card: NowCardData) => void;
+  /** Stagger delay (ms) for the entering animation; set by NowCardStack. */
+  enterDelayMs?: number;
 }
 
 const CARD_COPY_KEYS: Partial<
@@ -84,15 +91,21 @@ export function NowCard({
   onContinue,
   onDecline,
   onCompleted,
+  enterDelayMs = 0,
 }: NowCardProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const reduceMotion = useReducedMotion();
   const copy = resolveNowCardCopyKeys(card);
   const isAnchor = variant === 'anchor';
 
   return (
-    <View
+    <Animated.View
       testID={`now-card-${card.kind}`}
+      entering={
+        reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300)
+      }
+      exiting={reduceMotion ? undefined : FadeOut.duration(200)}
       className={isAnchor ? 'rounded-2xl p-4' : 'rounded-xl p-3'}
       style={{
         backgroundColor: isAnchor ? colors.primarySoft : colors.surface,
@@ -147,6 +160,6 @@ export function NowCard({
           {t('mentorHome.cards.dismissIcon')}
         </Text>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }

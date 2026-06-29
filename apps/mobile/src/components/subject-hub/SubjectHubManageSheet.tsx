@@ -77,6 +77,7 @@ export function SubjectHubManageSheet({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      accessibilityViewIsModal
     >
       <Pressable
         testID="subject-hub-manage-backdrop"

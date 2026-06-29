@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event; consent check + hard delete scoped by that profileId)
 import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import {
