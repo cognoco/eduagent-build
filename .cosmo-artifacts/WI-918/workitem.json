@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8148-b93f-fdd16f1fff4c",
+  "id": "WI-918",
+  "name": "formatRelativeDate and getRelativeDateParts diverge for 7-29 day range",
+  "description": "[FCR 2026-06-21 · L1-08b] formatRelativeDate returns raw day count for 7-29 days while getRelativeDateParts buckets into weeks; the two documented-aligned helpers diverge. Fix: align bucketing.",
+  "acceptanceCriteria": "Root cause: formatRelativeDate uses raw day-count output for 7-29 days while getRelativeDateParts already buckets 7-13 as lastWeek and 14-29 as weeks, so callers of the two documented-aligned helpers disagree for the same dates. Variants: (a) 7-13 days use the same last-week bucket semantics, (b) 14-29 days use week-count semantics, (c) under-7-day and 30+-day behavior stays consistent with the documented contract. Regression test: apps/mobile/src/lib/format-relative-date.test.ts fails without the fix and passes with it, replacing the old 14d expectation with aligned week-bucket assertions for 7, 13, 14, and 29 days.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

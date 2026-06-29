@@ -33,7 +33,7 @@
         "cwd": "."
       }
     },
-    "test-integration": {
+    "integration-api": {
       "executor": "nx:run-commands",
       "options": {
         "command": "pnpm exec jest --config apps/api/jest.integration.config.cjs --forceExit",

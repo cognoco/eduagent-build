@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81c1-abe1-c8b8b366717e",
+  "id": "WI-928",
+  "name": "Three assertion-free unmount race-condition tests (use-speech-recognition)",
+  "description": "[FCR 2026-06-21 · L4-05] three 'unmount race' tests end with '// No crash = success' and zero expect(); the mountedRef guard has no verification. Fix: assert state unchanged after post-unmount events.",
+  "acceptanceCriteria": "Root cause: three useSpeechRecognition unmount-race tests end with no meaningful expect(), so mountedRef guard regressions can pass as long as the test does not throw. Variants: slow module resolving after unmount during startListening; result event after unmount; error event after unmount. Regression test: apps/mobile/src/hooks/use-speech-recognition.test.ts asserts post-unmount events do not mutate observable state and/or listener side effects; the three cases fail when mountedRef guards are removed and pass after.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

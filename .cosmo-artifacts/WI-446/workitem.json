@@ -1,0 +1,17 @@
+{
+  "pageId": "36e8bce9-1f7c-815f-8007-cc0415a7baaa",
+  "id": "WI-446",
+  "name": "Align mobile API type-only dependency documentation",
+  "description": "Resolve the contradiction where docs/project_context.md bans apps/mobile tsconfig references to ../api while agent and architecture docs document that reference as an accepted type-only exception.",
+  "acceptanceCriteria": "docs/project_context.md, AGENTS.md, CLAUDE.md, and docs/architecture.md consistently describe the apps/mobile -> apps/api type-only AppType exception and still forbid runtime imports from @eduagent/api.",
+  "riskImpact": "",
+  "type": "Documentation",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

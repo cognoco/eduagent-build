@@ -31,7 +31,39 @@ describe('LedgerMomentCard', () => {
     ).toBeTruthy();
   });
 
-  it('fires continue on card press and decline on dismiss', () => {
+  it('falls back to generic copy for unsupported ledger moment kinds', () => {
+    const futureCard: NowCardData = {
+      ...ledgerCard,
+      templateKey: 'now.ledger_moment.future_kind',
+      params: { ledgerKind: 'future_kind', topicTitle: 'World capitals' },
+    };
+    const { getByText, queryByText } = render(
+      <LedgerMomentCard
+        card={futureCard}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    expect(getByText('A learning moment was saved.')).toBeTruthy();
+    expect(queryByText('mentorHome.ledger.future_kind.title')).toBeNull();
+  });
+
+  it('fires continue on card press', () => {
+    const onContinue = jest.fn();
+    const { getByTestId } = render(
+      <LedgerMomentCard
+        card={ledgerCard}
+        onContinue={onContinue}
+        onDecline={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(getByTestId('now-ledger-moment'));
+    expect(onContinue).toHaveBeenCalledWith(ledgerCard);
+  });
+
+  it('fires decline on dismiss without continuing the card', () => {
     const onContinue = jest.fn();
     const onDecline = jest.fn();
     const { getByTestId } = render(
@@ -42,10 +74,8 @@ describe('LedgerMomentCard', () => {
       />,
     );
 
-    fireEvent.press(getByTestId('now-ledger-moment'));
-    expect(onContinue).toHaveBeenCalledWith(ledgerCard);
-
     fireEvent.press(getByTestId('now-ledger-dismiss'));
     expect(onDecline).toHaveBeenCalledWith(ledgerCard);
+    expect(onContinue).not.toHaveBeenCalled();
   });
 });

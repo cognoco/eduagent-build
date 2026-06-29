@@ -1,0 +1,17 @@
+{
+  "pageId": "3858bce9-1f7c-8117-8c6d-d1d242a6446f",
+  "id": "WI-891",
+  "name": "Cosmo reviewer: respect advisory/continue-on-error red lanes in closure-verification",
+  "description": "The reviewer's closure-verification pulls the live check-run and fails the close on an advisory (continue-on-error) red lane, with no machine-readable allowed-red signal — it must be cited in WI prose or the close is blocked.",
+  "acceptanceCriteria": "Root cause: closure verification treats advisory/continue-on-error red check runs as close-blocking because the reviewer has no structured allowed-red policy to distinguish required lanes from advisory lanes. Variants: (1) required check red must still block close; (2) non-required continue-on-error/advisory lane red must not block when required checks are green; (3) an explicit structured allowed-red policy should replace prose-only exceptions. Regression test: add or update review closure-verification tests in the Cosmo review skill so an advisory-red check passes while a required-red check fails.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:worker-delta:WI-891",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

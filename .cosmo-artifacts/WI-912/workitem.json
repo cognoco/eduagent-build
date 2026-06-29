@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-812b-a898-e2529380bbab",
+  "id": "WI-912",
+  "name": "v2 RevenueCat handlers omit the is_family_share entitlement guard",
+  "description": "[FCR 2026-06-21 · L1-03 / dup of L11-01] v2 RC webhook handlers grant entitlement unconditionally; legacy refuses on Apple/Google family-shared purchase events via escalateAndSkipFamilyShare. Behind IDENTITY_V2_ENABLED (off in prod). Fix: port escalateAndSkipFamilyShare into v2 handlers.",
+  "acceptanceCriteria": "Root cause: the legacy RevenueCat handler aborts entitlement/credit grants when event.is_family_share is true via escalateAndSkipFamilyShare, but the identity-v2 RevenueCat handler twin never calls that guard before its grant/update paths. Variants: (a) INITIAL_PURCHASE, (b) RENEWAL, (c) PRODUCT_CHANGE, (d) NON_RENEWING_PURCHASE; family-shared events must skip entitlement/credit mutation and emit the escalation signal, while absent/false is_family_share still follows the happy path. Regression test: apps/api/src/services/billing/billing-v2/revenuecat-webhook-handler-v2.test.ts fails without the fix and passes with it, mirroring the legacy is_family_share coverage for all four v2 grant paths.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

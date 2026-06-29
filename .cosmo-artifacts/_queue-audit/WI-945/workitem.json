@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81a8-bc6f-f84a87b9fbc0",
+  "id": "WI-945",
+  "name": "Mentor-memory interest-context change reverts silently on failure",
+  "description": "[FCR 2026-06-21 · L6-04] on mutation failure the optimistic chip snaps back with no toast/alert/escalation (write-path silent recovery). Fix: surface actionable error on catch.",
+  "acceptanceCriteria": "Root cause: the mentor-memory interest context row catches onContextChange failure only to restore the previous chip state, with no toast, alert, inline error, or retry affordance. Variant: single variant, any rejected interest-context mutation after the optimistic selection. Regression test: add/update coverage around apps/mobile/src/components/mentor-memory-sections.tsx so a rejected onContextChange fails without the fix and passes only when the user receives actionable error feedback while the optimistic rollback still occurs.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

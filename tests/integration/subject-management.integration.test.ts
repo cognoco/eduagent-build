@@ -48,6 +48,8 @@ import {
   seedXpLedgerEntry,
   seedSubject,
 } from './route-fixtures';
+import { clearFetchCalls } from './fetch-interceptor';
+import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import {
   createSubjectWithStructureResponseSchema,
   deleteSubjectResponseSchema,
@@ -105,6 +107,13 @@ const SUBJECT_LLM_RESPONSE = {
 
 const subjectLlmFixture = registerLlmProviderFixture({
   chatResponse: SUBJECT_LLM_RESPONSE,
+});
+
+// Subject route integration tests exercise real route/service code; install the
+// external Inngest HTTP boundary once and clear captured calls in tests that
+// assert dispatches.
+beforeAll(() => {
+  mockInngestEvents();
 });
 
 async function createOwnerProfile(
@@ -778,6 +787,128 @@ describe('Integration: DELETE /v1/subjects/:id', () => {
         where: eq(learningSessions.id, fixture.sessionId),
       }),
     ).resolves.toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/subjects/:id/retry-curriculum
+// ---------------------------------------------------------------------------
+
+describe('Integration: POST /v1/subjects/:id/retry-curriculum', () => {
+  it('redispatches stuck curriculum through the real route and clears terminal failure state', async () => {
+    const profileId = await createOwnerProfile();
+    const subject = await seedSubject(profileId, 'Mathematics');
+    const db = getIntegrationDb();
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: subject.id,
+        title: 'Retry Evidence Book',
+        sortOrder: 0,
+        topicsGenerated: false,
+        failedAt: new Date('2026-06-20T12:00:00Z'),
+        failedReason: 'generation_error',
+      })
+      .returning({ id: curriculumBooks.id });
+
+    if (!book) {
+      throw new Error('Insert into curriculumBooks did not return a row');
+    }
+
+    clearFetchCalls();
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}/retry-curriculum`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+          profileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ dispatched: 1 });
+    expect(getCapturedInngestEvents()).toEqual([
+      expect.objectContaining({
+        name: 'app/subject.curriculum-retry-requested',
+        data: expect.objectContaining({
+          version: 1,
+          profileId,
+          subjectId: subject.id,
+          bookId: book.id,
+          timestamp: expect.any(String),
+        }),
+      }),
+    ]);
+
+    await expect(
+      db.query.curriculumBooks.findFirst({
+        where: eq(curriculumBooks.id, book.id),
+      }),
+    ).resolves.toMatchObject({
+      failedAt: null,
+      failedReason: null,
+    });
+  });
+
+  it('does not retry or clear another profile subject curriculum', async () => {
+    const ownerProfileId = await createOwnerProfile();
+    const otherProfileId = await createOwnerProfile(
+      {
+        userId: OTHER_SUBJECT_AUTH_USER_ID,
+        email: OTHER_SUBJECT_AUTH_EMAIL,
+      },
+      'Other Integration Learner',
+    );
+    const subject = await seedSubject(ownerProfileId, 'Private Mathematics');
+    const db = getIntegrationDb();
+    const failedAt = new Date('2026-06-20T12:00:00Z');
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: subject.id,
+        title: 'Private Retry Evidence Book',
+        sortOrder: 0,
+        topicsGenerated: false,
+        failedAt,
+        failedReason: 'generation_error',
+      })
+      .returning({ id: curriculumBooks.id });
+
+    if (!book) {
+      throw new Error('Insert into curriculumBooks did not return a row');
+    }
+
+    clearFetchCalls();
+
+    const res = await app.request(
+      `/v1/subjects/${subject.id}/retry-curriculum`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          {
+            sub: OTHER_SUBJECT_AUTH_USER_ID,
+            email: OTHER_SUBJECT_AUTH_EMAIL,
+          },
+          otherProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect([403, 404]).toContain(res.status);
+    expect(getCapturedInngestEvents()).toEqual([]);
+    await expect(
+      db.query.curriculumBooks.findFirst({
+        where: eq(curriculumBooks.id, book.id),
+      }),
+    ).resolves.toMatchObject({
+      failedAt,
+      failedReason: 'generation_error',
+    });
   });
 });
 

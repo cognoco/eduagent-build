@@ -297,24 +297,26 @@ English literals in JSX (e.g. `<Text>Add child</Text>`) bypass i18n entirely
 and render English to every locale. `scripts/check-i18n-jsx-literals.ts` is the
 read-side guard: a `ts-morph` AST walker that flags `JsxText` nodes and
 JSX-children `StringLiteral` / `NoSubstitutionTemplateLiteral` nodes (including
-through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) in
+through `cond ? 'a' : 'b'`, `x && 'a'`, `x ?? 'a'`, casts/parens) plus
+user-visible JSX attribute literals for known copy props (`label`,
+`accessibilityLabel`, `title`, `placeholder`, etc.) in
 `apps/mobile/src/**/*.tsx`. It is a forward-only baseline ratchet mirroring the
 `no-clinical-copy` pattern: existing literals are grandfathered in
-`scripts/i18n-jsx-literals-baseline.json` (361 entries), and only NEW literals
-fail CI (the `i18n hardcoded-JSX-literal check` step in `ci.yml`). Violations are
-keyed on `{file, kind, text}` — not line number — so reformatting never churns
-the baseline. Run `pnpm check:i18n:jsx-literals --accept` to refresh the
-baseline when you genuinely add non-translatable JSX copy (a code sample, a
-brand token) and justify it in the commit message.
-
-**Scope deliberately excludes JSX *attribute* literals** (`label="Continue"`,
-`title="Delete"`) — that surface mixes real copy with testID/style/a11y-role
-values and needs a per-prop allow/deny model scoped separately
-(`docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json`).
+`scripts/i18n-jsx-literals-baseline.json`, and only NEW literals fail CI (the
+`i18n hardcoded-JSX-literal check` step in `ci.yml`). Child/text violations are
+keyed on `{file, kind, text}`; attribute violations are keyed on
+`{file, kind, prop, text}` — never line number — so reformatting does not churn
+the baseline. The attribute scanner deliberately ignores non-copy props such as
+`testID`, style/class props, role-like values, IDs, routes, image/source paths,
+metadata, unknown custom props, and translation-key literals. Run
+`pnpm check:i18n:jsx-literals --accept` to refresh the baseline when you
+genuinely add non-translatable JSX copy (a code sample, a brand token) and
+justify it in the commit message.
 
 When adding user-visible copy, route it through `t('…')` and add the key to
 `en.json` in the same PR — the ratchet enforces this for the JsxText/child
-surface, but attribute copy still relies on review.
+surface and known copy attributes; review remains responsible for copy hidden
+behind unknown custom prop names.
 
 ### Variable-interpolation fallbacks
 
@@ -335,7 +337,7 @@ Example: instead of `t('rowSubject', { subject: subject || '…' })`, prefer
 - LLM calls go through `services/llm/router.ts` or its barrel, not direct provider SDK calls.
 - Non-core Inngest dispatches (telemetry, post-success notifications, observability events) go through `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure is captured in Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment on the line(s) immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
-- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
+- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook does NOT run the harness; it only checks for staged snapshot files when drift exists, or a harness-written zero-drift receipt when the full Tier-1 run rewrote snapshots with no tracked changes. Harness code: `apps/api/eval-llm/`.
 - Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `assessments.mastery_challenge_verified_at` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to `needs_deepening_topics` with `source = 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor (mechanism planned — `ExchangeContext.llmRoutingRung` field not yet in source), and per-tier model routing (incl. minor/Family) follows `MMT-ADR-0014` + `docs/registers/llm-models/master.md` (the prior "Family = Gemini-only" wording is superseded — Gemini is excluded under-18). The persistent Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed in Phase 0 (PR #325); today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
 
 ## Known Exceptions to Engineering Rules
@@ -362,9 +364,9 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 Local hooks are fast feedback; **CI is the authoritative gate that protects `main`**. **pre-commit** runs cheap staged-only guards (`lint-staged`, the eval-snapshot / i18n / GC1 guards, skills-sync, a secret/large-file scan) — **not** whole-tree `tsc`/tests. **pre-push** is the local type/test gate (`tsc --build` + surgical `--findRelatedTests` jest on the push delta, plus Tier-1 eval + i18n). **CI routes the slow suites by change class** — `scripts/check-change-class.sh` is the single routing source (see `docs/change-classes.md`). Verify locally while iterating, and focus on what hooks do not cover:
 
 - **Run what CI runs.** When diagnosing a CI failure or addressing review findings, run the affected projects' typecheck + lint + tests locally — the full set CI would run, not just the file named in the error — and batch fixes into one validated push. A failure that first surfaces in CI costs a ~30-minute push-fix-push round trip (Insights analysis 2026-03-27 measured 3–4 such cycles in single sessions).
-- Integration tests (`pnpm exec nx test:integration api`) are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
-- **`--no-verify`, two levels.** *Doctrine:* default is to let hooks run; a **narrow, deliberate** bypass of a local hook is acceptable **because CI backstops it** (a comment/type-only prompt change that cannot alter generation; a genuinely broken local harness via `SKIP_PRE_PUSH`) and is not a violation — but needing to bypass the same check repeatedly means the check is **mis-placed: fix the gate, don't normalise the bypass**. One platform-scoped accommodation stands: `nx affected` is broken on Windows by an upstream `@nx/expo` bug, so the documented `--no-verify` escape for large staged sets remains for human Windows devs until the upstream fix lands (MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
-- Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshots are still failing.
+- Integration tests are **routed by the CI change-class router** and run whenever the diff could affect them (api / db-schema / shared-schemas / lockfile classes). The cross-package suite is `pnpm exec nx run api:test:integration` (`tests/integration/`); the API co-located suite is `pnpm exec nx run api:integration-api` (`apps/api/src/**/*.integration.test.ts`, local wrapper `pnpm test:api:integration`). Running them locally before a commit is **advisory** — useful fast feedback for `apps/api/` or `tests/integration/` changes, but local stg-DB runs can drift; CI is the gate. The pre-commit and pre-push hooks intentionally skip `.integration.test.` files.
+- **`--no-verify`, two levels.** *Doctrine:* default is to let hooks run; a **narrow, deliberate** bypass of a local hook is acceptable **because CI backstops it** (a genuinely broken local harness via `SKIP_PRE_PUSH`, or a local-only hook defect after reporting the failure) and is not a violation — but needing to bypass the same check repeatedly means the check is **mis-placed: fix the gate, don't normalise the bypass**. Verified zero-drift prompt changes use the eval harness receipt path, not a bypass. One platform-scoped accommodation stands: `nx affected` is broken on Windows by an upstream `@nx/expo` bug, so the documented `--no-verify` escape for large staged sets remains for human Windows devs until the upstream fix lands (MMT-ADR-0019; watch-item WI-542). *Skill behavior is stricter than doctrine:* the automated commit agent never bypasses hooks autonomously — on a hook failure it stops and reports.
+- Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshot evidence is still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 
 ## Repo-Specific Guardrails

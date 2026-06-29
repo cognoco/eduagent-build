@@ -171,10 +171,11 @@ jobs:
       - name: i18n orphan-key check
         run: pnpm exec tsx scripts/check-i18n-orphan-keys.ts
 
-      # Phase 3 ratchet: block NEW hardcoded English in JSX (`<Text>Add
-      # child</Text>`, `<Text>{'Continue'}</Text>`) that bypasses t() and
-      # renders English to every locale. The orphan-key check above only sees
-      # strings already inside t(); this is the complementary read-side guard.
+      # Phase 3 ratchet: block NEW hardcoded English in JSX children and
+      # known user-copy JSX attributes (`label`, `accessibilityLabel`, etc.)
+      # that bypass t() and render English to every locale. The orphan-key
+      # check above only sees strings already inside t(); this is the
+      # complementary read-side guard.
       # Existing literals are grandfathered in scripts/i18n-jsx-literals-baseline.json.
       - name: i18n hardcoded-JSX-literal check
         run: pnpm exec tsx scripts/check-i18n-jsx-literals.ts
@@ -340,6 +341,15 @@ jobs:
           (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
         run: pnpm exec nx run api:test:integration
 
+      # Run the apps/api co-located integration suite against the same
+      # PostgreSQL service as the cross-package suite above, but in a separate
+      # later step so the two serial suites never compete for the DB.
+      - name: API co-located integration tests (apps/api/src)
+        if: >-
+          (github.event_name == 'push' && steps.changes.outputs.api == 'true') ||
+          (github.event_name == 'pull_request' && steps.change-class.outputs.integration == 'true')
+        run: pnpm exec nx run api:integration-api
+
       # API UNIT tests for a cross-package read nx affected cannot see (WI-886).
       # apps/api/src/services/app-help-map.test.ts reads
       # apps/mobile/src/i18n/locales/en.json at module load via readFileSync, so
@@ -451,16 +461,16 @@ jobs:
 
       # WI-808: the apps/api co-located integration tests
       # (apps/api/src/**/*.integration.test.ts — incl the H8 RLS-coverage suite
-      # and the WI-794 GUC drift-guard) are globbed ONLY by the dash target's
-      # config (apps/api/jest.integration.config.cjs). The colon target above
-      # globs only tests/integration/**, so before this step those suites ran in
-      # NO CI lane (ic-orch-124). This lane's DB is built via drizzle-kit migrate,
-      # so RLS policies (0066+0117) exist and the H8/WI-794 catalog guards are
-      # non-vacuous here. if: always() so it runs even though the colon step
-      # above is expected-red; allowed-red with the rest of this job.
+      # and the WI-794 GUC drift-guard) are globbed ONLY by the api:integration-api
+      # target's config (apps/api/jest.integration.config.cjs). The colon target
+      # above globs only tests/integration/**, so before this step those suites
+      # ran in NO CI lane (ic-orch-124). This lane's DB is built via drizzle-kit
+      # migrate, so RLS policies (0066+0117) exist and the H8/WI-794 catalog
+      # guards are non-vacuous here. if: always() so it runs even though the
+      # colon step above is expected-red; allowed-red with the rest of this job.
       - name: API co-located integration tests (flag-ON, apps/api/src)
         if: always()
-        run: pnpm exec nx run api:test-integration
+        run: pnpm exec nx run api:integration-api
 
   # ---------------------------------------------------------------------------
   # OTA Update: publish JS bundle to EAS Update (preview channel)

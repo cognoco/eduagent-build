@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8159-a2e4-d2b1bcb2901b",
+  "id": "WI-956",
+  "name": "RemediationCard disabled secondary omits accessibilityState disabled",
+  "description": "[FCR 2026-06-21 · L6-15] Pressable disabled during cooldown but omits accessibilityState={{disabled}} — SR users get no announced disabled state. Fix: add accessibilityState.",
+  "acceptanceCriteria": "Root cause: the cooldown-disabled RemediationCard secondary Pressable sets disabled and removes onPress but does not pass accessibilityState={disabled:true}, so assistive tech cannot announce the disabled state. Variants: cooldown active disabled state and cooldown inactive enabled state. Regression test: extend apps/mobile/src/components/progress/RemediationCard.test.tsx to assert accessibilityState.disabled is true during cooldown and absent/false when review retest is available.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

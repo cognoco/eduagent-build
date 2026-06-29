@@ -1,15 +1,15 @@
 /**
  * Unit: database-rls-coverage
  *
- * Verifies that the RLS policy manifest (PROFILE_SCOPED_TABLES and
- * OWNER_SCOPED_TABLES) is complete and consistent. This test runs without a
- * database connection and guards against omission errors in the manifest
- * itself (e.g., a new table added to the schema file but not enrolled in the
- * coverage list).
+ * Verifies that the RLS policy manifest is complete and consistent. This test
+ * runs without a database connection and guards against omission errors in the
+ * manifest itself (e.g., a new RLS-owned table added to the schema file but not
+ * enrolled in the coverage list).
  *
- * Policy predicate correctness (does the USING clause actually reference
- * profile_id?) is validated in database-rls-coverage.integration.test.ts
- * against a live Postgres instance.
+ * Policy predicate correctness is validated in
+ * database-rls-coverage.integration.test.ts against a live Postgres instance.
+ * The schema-derived omission guard is intentionally profile-column-only;
+ * post-cutover person-model RLS coverage is explicit manifest metadata.
  */
 
 import {
@@ -84,14 +84,16 @@ describe('database-rls-coverage manifest', () => {
 /**
  * Omission guard (S3-M2 closeout — hardened WI-688)
  *
- * Every profile-scoped table DERIVED from the Drizzle schema (via
- * getProfileScopedTables()) must appear in ALL_RLS_TABLES (has a policy) or
- * EXPLICITLY_EXCLUDED_TABLES (RLS enabled, policy not yet added). An
- * unregistered profile-scoped table FAILS this test — closing the vacuous-pass
- * blind spot of the previous hand-maintained KNOWN_PROFILE_TABLES list.
+ * Every profile-scoped table DERIVED from real Drizzle profile-column
+ * declarations (via getProfileScopedTables()) must appear in ALL_RLS_TABLES
+ * (has a policy) or EXPLICITLY_EXCLUDED_TABLES (RLS enabled, policy not yet
+ * added). An unregistered profile-scoped table FAILS this test — closing the
+ * vacuous-pass blind spot of the previous hand-maintained KNOWN_PROFILE_TABLES
+ * list.
  *
- * Known scanner false positives (substring-match artifacts) are filtered via
- * PROFILE_SCOPED_SCAN_EXCEPTIONS from @eduagent/database.
+ * Known scanner false positives for real non-ownership declarations are
+ * filtered via PROFILE_SCOPED_SCAN_EXCEPTIONS from @eduagent/database.
+ * Person_id tables are handled by the explicit manifest families above.
  */
 describe('database-rls-coverage omission guard (S3-M2)', () => {
   it('every profile-scoped table in the schema appears in ALL_RLS_TABLES or EXPLICITLY_EXCLUDED_TABLES', () => {

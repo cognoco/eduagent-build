@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8145-9333-c3095f58bb81",
+  "id": "WI-1007",
+  "name": "v2 Stripe subscription-deleted has the same top-up re-attribution gap",
+  "description": "[FCR 2026-06-21 · L11-04] handleSubscriptionDeletedV2 omits reattributeTopUpCreditsOnModelChange (legacy has it). Fix: add lockPreviousTierByStripeId + reattributeStripeTierChange + metric inside the v2 transaction.",
+  "acceptanceCriteria": "Root cause: handleSubscriptionDeletedV2 in stripe-webhook-handler-v2.ts:263-315 performs the subscription→free downgrade and quota pool reset inside its transaction, but omits the top-up credit re-attribution step that the legacy handler (stripe-webhook-handler.ts:494-588) includes: lockPreviousTierByStripeId (read+lock prior tier before update), reattributeStripeTierChange (calls reattributeTopUpCreditsOnModelChange / its v2 equivalent), and emitTopUpCreditsReattributedMetric (the out-of-tx metric). The v2 equivalent of reattributeTopUpCreditsOnModelChange exists as reattributeTopUpCreditsOnModelChangeV2 in billing-v2/tier-v2.ts and is already used by the RevenueCat v2 path; the Stripe-deleted v2 path was never wired to it.\n\nVariants (three, mirroring the legacy handler's three reattribution cases): (a) shared-pool→free deletion: null-profile credits must be re-attributed to the owner person; (b) per-profile→free deletion where quota model is identical: reattributeTopUpCreditsOnModelChangeV2 exits early with count=0, no action; (c) out-of-order / subscription-not-found: escalateSubscriptionNotFound fires (existing), no reattribution attempted.\n\nFix: (1) add a v2-specific lockPreviousTierByStripeIdV2 helper (or reuse a v2 subscription query) to read and lock the prior tier before the update inside the transaction; (2) call reattributeTopUpCreditsOnModelChangeV2(txDb, result.id, result.accountId, previousTier, 'free') within the transaction after the quota update; (3) emit the metric outside the transaction when reattributedCount > 0, mirroring the legacy pattern.\n\nRegression test: add a test in stripe-webhook-handler-v2.test.ts (using the gc1-allow pattern already established for subscription-core-v2 in that file) asserting: given a v2 subscription with tier='plus' (shared-pool), handleSubscriptionDeletedV2 calls reattributeTopUpCreditsOnModelChangeV2 with the correct (subscriptionId, accountId, 'plus', 'free') args. The test must fail without the fix and pass with it. A second case: tier='plus_family' (per-profile) — reattribution is called; count=0 acceptable. Run: cd apps/api && pnpm exec jest --testPathPattern stripe-webhook-handler-v2 --no-coverage.",
+  "riskImpact": "A user cancelling a paid Stripe subscription while on the v2 identity path loses their top-up credit re-attribution: credits purchased under a shared-pool tier are not moved to the owner person when the subscription downgrades to free. This is a silent data-correctness defect — users' top-up credits persist in the wrong attribution state (profileId=null for a now-per-profile account) and may not be correctly consumed. Financial impact: users retain credits but attribution is wrong, potentially causing billing reconciliation errors or credits being silently inaccessible.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

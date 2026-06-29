@@ -1,0 +1,17 @@
+{
+  "pageId": "3858bce9-1f7c-818c-9c0c-d058b54efc82",
+  "id": "WI-893",
+  "name": "Cosmo: refine.ts cannot promote a childless Work Package",
+  "description": "refine.ts wp.children/wp.brief gates fire unconditionally, so a childless WP cannot be promoted to Ready; sliced items can strand at Backlog with the wrong Altitude.",
+  "acceptanceCriteria": "Root cause: refine.ts applies Work Package child-count and brief gates whenever Altitude=WP, so an item accidentally captured or sliced as a childless WP cannot reach Ready and has no sanctioned demote-to-Item path. Variants: (1) true WP with fewer than two children must still fail WP DoR; (2) childless/accidental WP should either be demoted to Item through an approved path or receive a precise recovery instruction; (3) normal Item refinement must remain unaffected. Regression test: add or update refine DoR/refine tests for childless WP recovery and true WP child-count enforcement.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

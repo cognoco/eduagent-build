@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81e7-a2d5-de7290598c24",
+  "id": "WI-924",
+  "name": "settings routes missing Issue-901 (resolvedVia) break-tests",
+  "description": "[FCR 2026-06-21 · L4-01] settings.test.ts has zero resolvedVia tests; never covers isOwner:true + resolvedVia:'auto' escalation path for 11 assertOwnerProfile/assertNotProxyMode call sites. Fix: add break tests sending resolvedVia:'auto' asserting 403 + service not called.",
+  "acceptanceCriteria": "Root cause: settings route tests cover non-owner/proxy failures but do not cover the Issue 901 auto-resolved owner case where profileMeta is { isOwner: true, resolvedVia: auto }. Variants: all settings owner gates must reject auto-resolved owner identity, including assertOwnerProfile-only child celebration GET/PUT and assertNotProxyMode-backed settings writes. Regression test: add [BREAK][Issue 901] coverage in apps/api/src/routes/settings.test.ts, preferably table-driven over the affected call sites, asserting 403 and that the relevant service mock is not called; the tests fail if the resolvedVia guard is removed.",
+  "riskImpact": "A regression re-accepting resolvedVia:'auto' in the owner gate would go undetected for all settings owner/proxy routes.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:worker-a2:WI-924",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

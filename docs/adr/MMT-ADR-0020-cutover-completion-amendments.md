@@ -1,6 +1,6 @@
 # MMT-ADR-0020 — Cutover-completion amendments: consent-request workflow table + identity-model re-homes
 
-**Status:** Accepted · 2026-06-13 · **Scope:** Identity Foundation (application cutover — WP-CUT-A) · **Deciders:** PM (owner) + Claude · **Amends:** MMT-ADR-0011 / MMT-ADR-0015 (data-model realization) · **Builds on:** MMT-ADR-0008 (guardianship), MMT-ADR-0002 (store-delegated Payer), MMT-ADR-0014 (router / premium routing)
+**Status:** Accepted · 2026-06-29 · **Scope:** Identity Foundation (application cutover — WP-CUT-A) · **Deciders:** Architect (jjoerg) + PM · **Amends:** MMT-ADR-0011 / MMT-ADR-0015 (data-model realization) · **Builds on:** MMT-ADR-0008 (guardianship), MMT-ADR-0002 (store-delegated Payer), MMT-ADR-0014 (router / premium routing)
 
 ## Context
 
@@ -107,11 +107,16 @@ silent overwrite.
   workflow, webhook idempotency, or live preference data.
 - `consent_request` joins the RLS surface with its isolation policy shipping in
   the same migration (`charge_person_id`-anchored, mirroring
-  `consent_states_profile_isolation`) plus named service-role exceptions for the
-  public token lookup and the reminder sweeps, and a coverage-manifest
-  registration (a new `charge_person_id` predicate class in
-  `database-rls-coverage.ts`). The retain-tier is unaffected (requests die with
-  the person — no receipt obligation pre-consent).
+  `consent_states_profile_isolation`) and a coverage-manifest registration (a
+  new `charge_person_id` predicate class in `database-rls-coverage.ts`).
+  Service-role consumers (public token-lookup, reminder-sweep) reach
+  `consent_request` via the owner-role (`neondb_owner`) connection, which
+  bypasses RLS — matching today's `consent_states` posture (no named
+  service-role policy). A service-role policy exception is required only if/when
+  the `app_user` role-switch cut-over (migration 0027 Phase 2-4) lands, at which
+  point `consent_request` is swept with every other RLS table. The retain-tier
+  is unaffected (requests die with the person — no receipt obligation
+  pre-consent).
 - **Canon lockstep:** `docs/canon/identity/data-model.md` gains the §2B cutover
   amendments in the same change-set as this ADR.
 - The purpose vocabulary (`platform_use`) and lawful-basis values are finalized
