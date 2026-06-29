@@ -22,6 +22,7 @@ import {
 } from './review-continuity/opener';
 import type { ReviewContinuityContext } from './review-continuity/opener-context';
 import type { ExchangeContext, ReviewCallback } from './exchange-types';
+import { calculateAge } from './age-utils';
 
 // ---------------------------------------------------------------------------
 // Exchange prompt builders
@@ -79,7 +80,7 @@ export function getAgeVoice(birthYear: number): string {
     'Draw on analogies from work, life, and broader experience, not school or classrooms.\n' +
     'Never patronise. No emoji, no cheerleading, no "great question!" — just clear teaching.';
 
-  const age = new Date().getFullYear() - birthYear;
+  const age = calculateAge(birthYear);
   if (age < 14) return EARLY_TEEN_VOICE;
   if (age < 18) return TEEN_VOICE;
   if (age < 30) return YOUNG_ADULT_VOICE;
@@ -1284,9 +1285,7 @@ export function buildSystemPrompt(
   }
 
   const encouragementAge =
-    context.birthYear != null
-      ? new Date().getFullYear() - context.birthYear
-      : null;
+    context.birthYear != null ? calculateAge(context.birthYear) : null;
   const isEarlyTeen = encouragementAge != null && encouragementAge < 14;
 
   const encouragementBlock = isEarlyTeen
