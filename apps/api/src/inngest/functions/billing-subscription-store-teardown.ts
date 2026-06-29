@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (teardown calls Stripe + RevenueCat APIs only; no DB reads or writes)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
