@@ -26,6 +26,7 @@ import {
   profiles,
   type Database,
 } from '@eduagent/database';
+import { ensureV2IdentityForLegacyProfileTest } from '../test-utils/legacy-identity-anchors';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 
@@ -102,6 +103,18 @@ async function seedAccountAndProfile(emailIndex: 0 | 1): Promise<SeedAccount> {
       isOwner: true,
     })
     .returning();
+
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: profile!.id,
+    displayName: `Learner ${emailIndex}`,
+    birthYear: 2010,
+    clerkUserId,
+    email,
+    isOwner: true,
+    seedBaselineSubscription: false,
+  });
 
   return {
     accountId: account!.id,
@@ -184,7 +197,9 @@ describe('applyAnalysis (integration)', () => {
   it('persists interests when consent is granted and collection enabled', async () => {
     const own = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     const result = await applyAnalysis(
       db,
@@ -207,7 +222,9 @@ describe('applyAnalysis (integration)', () => {
   it('short-circuits and writes nothing when confidence is low', async () => {
     const own = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     const before = await getLearningProfile(db, own.profileId);
     expect(before).toBeDefined();
@@ -231,12 +248,17 @@ describe('applyAnalysis (integration)', () => {
     const own = await seedAccountAndProfile(0);
     const sibling = await seedAccountAndProfile(1);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
     await grantMemoryConsent(
       db,
       sibling.profileId,
       sibling.accountId,
       'granted',
+      {
+        callerPersonId: sibling.profileId,
+      },
     );
 
     await applyAnalysis(
@@ -263,7 +285,9 @@ describe('deleteAllMemory (integration)', () => {
   it('deletes the caller’s own learning_profiles row when account matches', async () => {
     const own = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     let rows = await db
       .select()
@@ -271,7 +295,9 @@ describe('deleteAllMemory (integration)', () => {
       .where(eq(learningProfiles.profileId, own.profileId));
     expect(rows).toHaveLength(1);
 
-    await deleteAllMemory(db, own.profileId, own.accountId);
+    await deleteAllMemory(db, own.profileId, own.accountId, {
+      callerPersonId: own.profileId,
+    });
 
     rows = await db
       .select()
@@ -284,12 +310,17 @@ describe('deleteAllMemory (integration)', () => {
     const own = await seedAccountAndProfile(0);
     const sibling = await seedAccountAndProfile(1);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     // Sibling tries to delete own's memory using SIBLING's accountId.
+    // [WI-867] v2 error: "Person ... not found for organization" (v1: "account")
     await expect(
-      deleteAllMemory(db, own.profileId, sibling.accountId),
-    ).rejects.toThrow(/not found for account/);
+      deleteAllMemory(db, own.profileId, sibling.accountId, {
+        callerPersonId: own.profileId,
+      }),
+    ).rejects.toThrow(/not found for organization/);
 
     // Own's row must still exist.
     const rows = await db
@@ -303,15 +334,22 @@ describe('deleteAllMemory (integration)', () => {
     const own = await seedAccountAndProfile(0);
     const sibling = await seedAccountAndProfile(1);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
     await grantMemoryConsent(
       db,
       sibling.profileId,
       sibling.accountId,
       'granted',
+      {
+        callerPersonId: sibling.profileId,
+      },
     );
 
-    await deleteAllMemory(db, own.profileId, own.accountId);
+    await deleteAllMemory(db, own.profileId, own.accountId, {
+      callerPersonId: own.profileId,
+    });
 
     const ownRows = await db
       .select()
@@ -328,7 +366,9 @@ describe('deleteAllMemory (integration)', () => {
   it('also clears the caller’s memory_facts rows in the same transaction', async () => {
     const own = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     // Seed a memory_fact row directly so we can observe the cascade.
     await db.insert(memoryFacts).values({
@@ -346,7 +386,9 @@ describe('deleteAllMemory (integration)', () => {
       .where(eq(memoryFacts.profileId, own.profileId));
     expect(factRows.length).toBeGreaterThan(0);
 
-    await deleteAllMemory(db, own.profileId, own.accountId);
+    await deleteAllMemory(db, own.profileId, own.accountId, {
+      callerPersonId: own.profileId,
+    });
 
     factRows = await db
       .select()
@@ -358,7 +400,9 @@ describe('deleteAllMemory (integration)', () => {
   it('skips ownership check when accountId is undefined (trusted server call)', async () => {
     const own = await seedAccountAndProfile(0);
     const db = createIntegrationDb();
-    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted');
+    await grantMemoryConsent(db, own.profileId, own.accountId, 'granted', {
+      callerPersonId: own.profileId,
+    });
 
     // Server-side call (e.g. from Inngest) — accountId omitted.
     await expect(

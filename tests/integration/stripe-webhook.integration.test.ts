@@ -26,7 +26,6 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
@@ -117,79 +116,62 @@ async function seedAccount(prefix: string) {
   const db = createIntegrationDb();
   const identity = nextSeed(prefix);
 
-  if (isIdentityV2Enabled()) {
-    const accountId = generateUUIDv7();
-    const personId = generateUUIDv7();
+  const accountId = generateUUIDv7();
+  const personId = generateUUIDv7();
 
-    await db.insert(organization).values({
-      id: accountId,
-      name: `Stripe webhook ${prefix}`,
-    });
-    await db.insert(person).values({
-      id: personId,
-      displayName: 'Stripe Webhook Owner',
-      birthDate: '1985-01-01',
-      residenceJurisdiction: 'US',
-    });
-    const [loginRow] = await db
-      .insert(login)
-      .values({
-        personId,
-        clerkUserId: identity.clerkUserId,
-        email: identity.email,
-      })
-      .returning({ id: login.id });
-    await db
-      .update(person)
-      .set({ loginId: loginRow!.id })
-      .where(eq(person.id, personId));
-    await db.insert(membership).values({
-      personId,
-      organizationId: accountId,
-      roles: ['admin', 'learner'],
-    });
-    await db
-      .insert(accounts)
-      .values({
-        id: accountId,
-        clerkUserId: identity.clerkUserId,
-        email: identity.email,
-      })
-      .onConflictDoNothing();
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: personId,
-      accountId,
-      displayName: 'Stripe Webhook Owner',
-      birthYear: 1985,
-      isOwner: true,
-      email: identity.email,
-      clerkUserId: identity.clerkUserId,
-    });
-
-    return {
-      db,
-      account: {
-        id: accountId,
-        clerkUserId: identity.clerkUserId,
-        email: identity.email,
-      },
-      ownerPersonId: personId,
-      ...identity,
-    };
-  }
-
-  const [account] = await db
-    .insert(accounts)
+  await db.insert(organization).values({
+    id: accountId,
+    name: `Stripe webhook ${prefix}`,
+  });
+  await db.insert(person).values({
+    id: personId,
+    displayName: 'Stripe Webhook Owner',
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'US',
+  });
+  const [loginRow] = await db
+    .insert(login)
     .values({
+      personId,
       clerkUserId: identity.clerkUserId,
       email: identity.email,
     })
-    .returning();
+    .returning({ id: login.id });
+  await db
+    .update(person)
+    .set({ loginId: loginRow!.id })
+    .where(eq(person.id, personId));
+  await db.insert(membership).values({
+    personId,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
+  await db
+    .insert(accounts)
+    .values({
+      id: accountId,
+      clerkUserId: identity.clerkUserId,
+      email: identity.email,
+    })
+    .onConflictDoNothing();
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: personId,
+    accountId,
+    displayName: 'Stripe Webhook Owner',
+    birthYear: 1985,
+    isOwner: true,
+    email: identity.email,
+    clerkUserId: identity.clerkUserId,
+  });
 
   return {
     db,
-    account: account!,
-    ownerPersonId: null,
+    account: {
+      id: accountId,
+      clerkUserId: identity.clerkUserId,
+      email: identity.email,
+    },
+    ownerPersonId: personId,
     ...identity,
   };
 }
@@ -233,20 +215,18 @@ async function seedSubscriptionForAccount(input: {
     })
     .returning();
 
-  if (isIdentityV2Enabled()) {
-    if (!input.ownerPersonId) {
-      throw new Error('ownerPersonId is required for v2 Stripe seed');
-    }
-    await input.db.insert(subscriptionV2).values({
-      id: subscriptionId,
-      organizationId: input.account.id,
-      payerPersonId: input.ownerPersonId,
-      stripeSubscriptionId,
-      planTier: tier,
-      status,
-      lastStripeEventTimestamp,
-    });
+  if (!input.ownerPersonId) {
+    throw new Error('ownerPersonId is required for v2 Stripe seed');
   }
+  await input.db.insert(subscriptionV2).values({
+    id: subscriptionId,
+    organizationId: input.account.id,
+    payerPersonId: input.ownerPersonId,
+    stripeSubscriptionId,
+    planTier: tier,
+    status,
+    lastStripeEventTimestamp,
+  });
 
   const [quotaPool] = await input.db
     .insert(quotaPools)
@@ -328,25 +308,19 @@ function buildWebhookRequest(event: Record<string, unknown>) {
 
 async function loadSubscription(accountId: string) {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const [row] = await db
-      .select()
-      .from(subscriptionV2)
-      .where(eq(subscriptionV2.organizationId, accountId))
-      .limit(1);
-    if (!row) return null;
-    return {
-      ...row,
-      accountId: row.organizationId,
-      tier: row.planTier as SubscriptionTier,
-      currentPeriodStart: row.periodStartAt,
-      currentPeriodEnd: row.periodEndAt,
-    };
-  }
-
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, accountId),
-  });
+  const [row] = await db
+    .select()
+    .from(subscriptionV2)
+    .where(eq(subscriptionV2.organizationId, accountId))
+    .limit(1);
+  if (!row) return null;
+  return {
+    ...row,
+    accountId: row.organizationId,
+    tier: row.planTier as SubscriptionTier,
+    currentPeriodStart: row.periodStartAt,
+    currentPeriodEnd: row.periodEndAt,
+  };
 }
 
 async function loadQuotaPool(subscriptionId: string) {
@@ -465,17 +439,15 @@ describe('Integration: Stripe Webhook event handling', () => {
   it('checkout.session.completed creates and activates a paid subscription', async () => {
     const { db, account, ownerPersonId, stripeSubscriptionId } =
       await seedAccount('stripe-checkout');
-    if (isIdentityV2Enabled()) {
-      await seedSubscriptionForAccount({
-        db,
-        account,
-        ownerPersonId,
-        generatedStripeSubscriptionId: stripeSubscriptionId,
-        stripeSubscriptionId: null,
-        tier: 'free',
-        status: 'active',
-      });
-    }
+    await seedSubscriptionForAccount({
+      db,
+      account,
+      ownerPersonId,
+      generatedStripeSubscriptionId: stripeSubscriptionId,
+      stripeSubscriptionId: null,
+      tier: 'free',
+      status: 'active',
+    });
 
     const event = buildStripeEvent('checkout.session.completed', {
       id: 'cs_checkout_completed',
