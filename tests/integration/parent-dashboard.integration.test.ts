@@ -32,6 +32,10 @@ import {
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import {
+  ensureV2ProfileAnchorForTest,
+  resolveAccountId,
+} from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -114,20 +118,29 @@ async function seedFamilyLink(
     .onConflictDoNothing();
 
   // [WI-1145] Seed the v2 guardianship edge + child cross-org membership
-  // unconditionally — the collapsed dashboard/profile-scope access checks resolve
-  // the parent->child relationship via v2 guardianship/membership, empty on the
-  // flag-off main lane when gated. Parent + child memberships exist (both are
-  // route-created → v2-seeded), so the lookup below resolves.
-  const parentMembership = await db.query.membership.findFirst({
-    where: eq(membership.personId, parentProfileId),
-    columns: { organizationId: true },
-  });
-
-  if (!parentMembership) {
+  // unconditionally. This file creates profiles through routes, but the
+  // flag-off main lane may only have the legacy profile rows, so repair the v2
+  // anchors and memberships here before inserting v2 relationship edges.
+  const parentAccountId = await resolveAccountId(db, parentProfileId);
+  if (!parentAccountId) {
     throw new Error(
-      `seedFamilyLink: parent membership missing for ${parentProfileId}`,
+      `seedFamilyLink: parent account missing for ${parentProfileId}`,
     );
   }
+  await ensureV2ProfileAnchorForTest(db, {
+    profileId: parentProfileId,
+    accountId: parentAccountId,
+  });
+  await ensureV2ProfileAnchorForTest(db, { profileId: childProfileId });
+
+  await db
+    .insert(membership)
+    .values({
+      personId: parentProfileId,
+      organizationId: parentAccountId,
+      roles: ['admin'],
+    })
+    .onConflictDoNothing();
 
   await db
     .insert(guardianship)
@@ -140,7 +153,7 @@ async function seedFamilyLink(
     .insert(membership)
     .values({
       personId: childProfileId,
-      organizationId: parentMembership.organizationId,
+      organizationId: parentAccountId,
       roles: ['learner'],
     })
     .onConflictDoNothing();

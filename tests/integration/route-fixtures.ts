@@ -45,7 +45,7 @@ function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
     : 'gdpr_parental_consent';
 }
 
-async function ensureV2ProfileAnchorForTest(
+export async function ensureV2ProfileAnchorForTest(
   db: Database,
   input: {
     profileId: string;
@@ -647,6 +647,11 @@ export async function seedConsentRequest(input: {
   if (!accountId) {
     throw new Error(`Account not found for consent seed: ${input.profileId}`);
   }
+
+  await ensureV2ProfileAnchorForTest(db, {
+    profileId: input.profileId,
+    accountId,
+  });
 
   if (status === 'PENDING' || status === 'PARENTAL_CONSENT_REQUESTED') {
     await db.insert(consentRequest).values({
