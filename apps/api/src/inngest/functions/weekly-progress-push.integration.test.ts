@@ -754,14 +754,14 @@ describe('weekly progress push integration', () => {
 
     const result = await executeGenerateHandler(parentProfileId);
 
-    // [WI-1153] The outer handler return is { status, parentId } — the
-    // push-step's internal { reason: 'dedup_24h' } is not propagated to the
-    // result (it stopped being surfaced when WI-998 moved dedup from the
-    // prepare step into the push step). The throttle is verified by status +
-    // the zero push call below.
+    // [BUG-699-FOLLOWUP / WI-1151] The outer handler surfaces reason when
+    // throttled so callers can distinguish a deduped no-op from a real send.
+    // 'dedup_24h' means a weekly_progress notification was already logged in
+    // the last 24h — the push step suppressed the send.
     expect(result).toEqual({
       status: 'throttled',
       parentId: parentProfileId,
+      reason: 'dedup_24h',
     });
     // No push API call should have fired.
     expect(pushApiCalls).toHaveLength(0);
