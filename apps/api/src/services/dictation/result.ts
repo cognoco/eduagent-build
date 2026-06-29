@@ -1,10 +1,15 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
-import { SubjectNotFoundError, type DictationMode } from '@eduagent/schemas';
+import {
+  SubjectNotFoundError,
+  type DictationMode,
+  type DictationResult,
+} from '@eduagent/schemas';
 import {
   createScopedRepository,
   curricula,
   curriculumTopics,
+  dictationResults,
   subjects,
 } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
@@ -28,6 +33,8 @@ export interface RecordResultInput {
   mode: DictationMode;
   reviewed: boolean;
   subjectId?: string | null;
+  // [WI-902] Source sentence texts to persist for the dictation history view.
+  sentences?: string[] | null;
 }
 
 export function deriveLegacyDictationCompletionKey(
@@ -79,6 +86,7 @@ export async function recordDictationResult(
       mistakeCount: input.mistakeCount,
       mode: input.mode,
       reviewed: input.reviewed,
+      sentences: input.sentences ?? null,
     });
     if (!inserted)
       throw new Error('Dictation result insert did not return a row');
@@ -169,6 +177,44 @@ export async function getDictationStreak(
   }
 
   return { streak, lastDate: mostRecentDate };
+}
+
+// [WI-902] Default and hard cap on how many history rows to return. The mobile
+// surface shows a recent list, not an unbounded archive, so cap the read.
+export const DICTATION_HISTORY_DEFAULT_LIMIT = 20;
+
+/**
+ * [WI-902] Returns the learner's recent dictation sessions, newest first, each
+ * carrying its persisted source `sentences` so the history surface can show the
+ * full text of past exercises. Single scoped table, ordered + limited — uses
+ * the scoped repository's `findMany(extraWhere, orderBy, limit)`, which pins
+ * `profile_id = $profileId` at the repo layer. `date` is normalized to an ISO
+ * string at the boundary (the neon-serverless driver hands DATE back as a JS
+ * `Date`), matching the streak path, so the shared `dictationResultSchema`
+ * parses cleanly.
+ */
+export async function getDictationHistory(
+  db: Database,
+  profileId: string,
+  limit: number = DICTATION_HISTORY_DEFAULT_LIMIT,
+): Promise<DictationResult[]> {
+  const repo = createScopedRepository(db, profileId);
+  const rows = await repo.dictationResults.findMany(
+    undefined,
+    desc(dictationResults.createdAt),
+    limit,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    profileId: row.profileId,
+    completionKey: row.completionKey,
+    date: toIsoDate(row.date),
+    sentenceCount: row.sentenceCount,
+    mistakeCount: row.mistakeCount,
+    mode: row.mode,
+    reviewed: row.reviewed,
+    sentences: row.sentences ?? null,
+  }));
 }
 
 /**

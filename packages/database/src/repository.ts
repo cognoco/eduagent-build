@@ -859,6 +859,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         // [CR-162] Derive from schema enum so this type stays in sync automatically.
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
+        // [WI-902] Source sentence texts; null/omitted for old clients.
+        sentences?: string[] | null;
       }) {
         // Conflict target is (profileId, completionKey): distinct dictation
         // sessions carry distinct completionKeys, so they persist as distinct
@@ -883,6 +885,12 @@ export function createScopedRepository(db: Database, profileId: string) {
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
               reviewed: values.reviewed,
+              // [WI-902] Refresh persisted sentences on a genuine retry only
+              // when the client supplied them; omit when undefined so a retry
+              // that drops the field does not clobber a previously stored set.
+              ...(values.sentences !== undefined
+                ? { sentences: values.sentences }
+                : {}),
             },
           })
           .returning();

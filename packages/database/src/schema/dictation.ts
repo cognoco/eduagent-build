@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  jsonb,
   uniqueIndex,
   integer,
   pgEnum,
@@ -34,6 +35,11 @@ export const dictationResults = pgTable(
     mistakeCount: integer('mistake_count'),
     mode: dictationModeEnum('mode').notNull(),
     reviewed: boolean('reviewed').notNull().default(false),
+    // [WI-902] Source sentence texts of the dictation exercise, so learners can
+    // review the full text of past dictations (not just aggregate counts).
+    // Nullable + no default → additive/safe; pre-existing rows and old clients
+    // that omit it read back as NULL and the UI falls back to a count summary.
+    sentences: jsonb('sentences').$type<string[]>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

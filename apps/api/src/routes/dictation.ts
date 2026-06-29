@@ -10,6 +10,7 @@ import {
   dictationReviewResultSchema,
   dictationReviewPromptCharCount,
   dictationStreakSchema,
+  dictationHistorySchema,
   DICTATION_REVIEW_MAX_PROMPT_CHARS,
   ERROR_CODES,
 } from '@eduagent/schemas';
@@ -27,6 +28,7 @@ import {
   reviewDictation,
   recordDictationResult,
   getDictationStreak,
+  getDictationHistory,
   fetchGenerateContext,
 } from '../services/dictation';
 import { getLearningProfile } from '../services/learner-profile';
@@ -195,6 +197,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         mode: input.mode,
         reviewed: input.reviewed,
         subjectId: input.subjectId ?? null,
+        sentences: input.sentences ?? null,
       });
 
       return c.json(
@@ -342,4 +345,18 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
 
     const result = await getDictationStreak(db, profileId);
     return c.json(dictationStreakSchema.parse(result));
+  })
+
+  // -------------------------------------------------------------------------
+  // GET /dictation/history
+  // Returns the learner's recent dictation sessions (newest first), each with
+  // its persisted source sentences so the history surface can show the full
+  // text of past exercises. Scoped to the caller's profile.
+  // -------------------------------------------------------------------------
+  .get('/dictation/history', async (c) => {
+    const profileId = requireProfileId(c.get('profileId'));
+    const db = c.get('db');
+
+    const entries = await getDictationHistory(db, profileId);
+    return c.json(dictationHistorySchema.parse({ entries }));
   });
