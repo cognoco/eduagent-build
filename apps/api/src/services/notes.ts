@@ -10,6 +10,7 @@ import {
 } from '@eduagent/database';
 import type { AllNote } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
+import { assertOwnedCurriculumTopic } from './curriculum-topic-ownership';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
 
@@ -263,47 +264,6 @@ export async function createNoteForSession(
 // ---------------------------------------------------------------------------
 
 /**
- * Verify the topic belongs to a book that belongs to a subject owned by
- * the profile. Single joined query prevents timing oracle and halves latency.
- * Prevents IDOR — callers cannot write/delete notes on arbitrary topics.
- */
-async function verifyTopicOwnership(
-  db: Database,
-  profileId: string,
-  subjectId: string,
-  topicId: string,
-): Promise<void> {
-  // Use scoped repo's db handle to satisfy createScopedRepository guardrail.
-  // Single query: topics ⋈ books ⋈ subjects(scoped) — verifies entire chain
-  const repo = createScopedRepository(db, profileId);
-  const [match] = await repo.db
-    .select({ id: curriculumTopics.id })
-    .from(curriculumTopics)
-    .innerJoin(
-      curriculumBooks,
-      and(
-        eq(curriculumTopics.bookId, curriculumBooks.id),
-        eq(curriculumBooks.subjectId, subjectId),
-      ),
-    )
-    .innerJoin(
-      subjects,
-      and(
-        eq(subjects.id, curriculumBooks.subjectId),
-        eq(subjects.profileId, profileId),
-      ),
-    )
-    .where(eq(curriculumTopics.id, topicId))
-    .limit(1);
-
-  if (!match) {
-    // Intentionally vague — don't reveal whether the topic exists but is
-    // unowned vs. does not exist at all (prevents enumeration)
-    throw new NotFoundError('Topic');
-  }
-}
-
-/**
  * Get the note for a specific topic+profile pair.
  * Returns null if no note exists (not an error — notes are optional).
  * Verifies subject → book → topic ownership to prevent IDOR.
@@ -319,7 +279,7 @@ export async function getNote(
   content: string;
   updatedAt: Date;
 } | null> {
-  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+  await assertOwnedCurriculumTopic(db, { profileId, topicId, subjectId });
 
   const [row] = await db
     .select({
@@ -517,7 +477,7 @@ export async function createNote(
   content: string,
   sessionId?: string,
 ): Promise<MappedNoteRow> {
-  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+  await assertOwnedCurriculumTopic(db, { profileId, topicId, subjectId });
 
   if (sessionId) {
     const [session] = await db
@@ -585,7 +545,7 @@ export async function getNotesForTopic(
   subjectId: string,
   topicId: string,
 ): Promise<NoteRow[]> {
-  await verifyTopicOwnership(db, profileId, subjectId, topicId);
+  await assertOwnedCurriculumTopic(db, { profileId, topicId, subjectId });
 
   return withTopicNotesSessionIdFallback(
     'getNotesForTopic',
