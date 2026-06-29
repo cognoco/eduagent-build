@@ -794,7 +794,9 @@
         "withNameSubject": "Witaj z powrotem, {{name}}. Chcesz wrócić do tematu {{subject}}? Pytaj o co chcesz – co robimy dalej?",
         "withName": "Witaj z powrotem, {{name}}. Nad czym chcesz dzisiaj popracować?",
         "generic": "Witaj z powrotem. Nad czym chcesz dzisiaj popracować?"
-      }
+      },
+      "voicePermissionAskMessage": "Aby używać wprowadzania głosowego, zezwól na dostęp do mikrofonu.",
+      "voicePermissionAllow": "Zezwól na mikrofon"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -4105,7 +4107,14 @@
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
     "reviewsDue": "{{count}} zaległych powtórek",
     "errorTitle": "Nie udało się wczytać tematów",
-    "errorMessage": "Spróbuj ponownie lub wróć za chwilę."
+    "errorMessage": "Spróbuj ponownie lub wróć za chwilę.",
+    "sectionActive": "Aktywne",
+    "sectionPaused": "Wstrzymane",
+    "sectionArchived": "Zarchiwizowane",
+    "bookCount_one": "{{count}} książka",
+    "bookCount_few": "{{count}} książki",
+    "bookCount_many": "{{count}} książek",
+    "bookCount_other": "{{count}} książek"
   },
   "subjectHub": {
     "loading": "Ładowanie przedmiotu...",
@@ -4146,7 +4155,9 @@
       "authorMentor": "Zapisane od mentora",
       "addNote": "Dodaj notatkę",
       "micLabel": "Dodaj notatkę głosowo",
-      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu."
+      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
+      "saveErrorTitle": "Nie można zapisać notatki",
+      "emptyTopic": "Jeszcze brak notatek. Zapisz myśl na ten temat."
     },
     "sheet": {
       "close": "Zamknij",

@@ -10,7 +10,9 @@
 //   COSMO_WATCH_DB       (required) Cosmo Work Items database id
 //   COSMO_WATCH_CONFIG   (required) path to a JSON file: Workstream[] (see type below)
 //   COSMO_WATCH_POLL_MS  (optional, default 60000)
-//   COSMO_WATCH_OUTDIR   (optional, default /tmp/cosmo-watch)
+//   COSMO_WATCH_OUTDIR   (optional, default <repo>/.cosmo-watch — durable, not /tmp. Point at
+//                         durable program state, e.g. _quartet/working/program/review-watcher-state.
+//                         gitignore it.)
 //
 // Workstream config JSON shape (array):
 //   [{ "name": "...", "slug": "...", "id": "<page-id>",
@@ -24,7 +26,8 @@ const repo = process.env.COSMO_WATCH_REPO;
 const db = process.env.COSMO_WATCH_DB;
 const configPath = process.env.COSMO_WATCH_CONFIG;
 const pollMs = Number(process.env.COSMO_WATCH_POLL_MS || 60000);
-const outDir = process.env.COSMO_WATCH_OUTDIR || '/tmp/cosmo-watch';
+// Durable by default (not /tmp, which is cleaned on reboot and loses de-dupe/log history).
+const outDir = process.env.COSMO_WATCH_OUTDIR || `${repo}/.cosmo-watch`;
 
 if (!token) throw new Error('NOTION_TOKEN missing');
 if (!repo) throw new Error('COSMO_WATCH_REPO missing');
@@ -171,6 +174,14 @@ function launchReview(
     `trigger [${ws.name}] ${id}: launching codex review agent; key=${key}; final=${out}`,
   );
 
+  // KNOWN LIMITATION (reviewer-substrate productization — not yet MVP-hardened):
+  // A reviewer must NOT mutate code, yet this spawns the review-agent with `-s danger-full-access`
+  // (full-machine write) and relies on the PROSE "Do not edit code" in promptFor() to enforce it.
+  // That contradicts the read-only-by-construction rule (agnosticity spike + executor-protocol E2:
+  // "enforce read-only structurally, not by instruction"). The target is read-only / workspace-write
+  // with any write-capable QA forced into a throwaway worktree. NOT changed blind here: the QA pass
+  // runs Doppler-wrapped tests that read $HOME config, which workspace-write would block — the
+  // downgrade needs a live-verified review run. Tracked as reviewer-substrate work.
   const proc = spawn(
     [
       'codex',

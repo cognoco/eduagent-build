@@ -15,6 +15,7 @@ import {
 } from '../../../../components/subject-hub';
 import { useSubjectHub } from '../../../../hooks/use-subject-hub';
 import { useRetryCurriculum } from '../../../../hooks/use-books';
+import { useCreateNote } from '../../../../hooks/use-notes';
 import {
   goBackOrReplace,
   pushLearningResumeTarget,
@@ -34,6 +35,34 @@ export default function SubjectHubRoute(): React.ReactElement {
   const subjectId = firstParam(params.subjectId);
   const hub = useSubjectHub(subjectId);
   const retryCurriculum = useRetryCurriculum(subjectId);
+  // Topic-scoped note authoring for the focused topic's detail sheet (felt-knowing
+  // loop Flow 1). bookId is undefined because the hub spans multiple books; the
+  // hook's onSuccess invalidates the subject-wide note caches the hub reads.
+  // Destructure `mutate` (stable across renders) so handleAddNote keeps a stable
+  // identity and doesn't re-thread a fresh onAddNote prop on every hub refetch.
+  const { mutate: createNoteMutate } = useCreateNote(subjectId, undefined);
+
+  // A failed note save must not be silent: SubjectHubNotesSection clears the draft
+  // optimistically on submit, so without the onError alert the learner's typed text
+  // would vanish with no signal. A per-call onError (rather than a watched isError
+  // effect) fires exactly once per failed save and can't re-alert on a later
+  // language switch. Classify/format at this boundary, not inside the screen.
+  const handleAddNote = useCallback(
+    (topicId: string, content: string) => {
+      createNoteMutate(
+        { topicId, content },
+        {
+          onError: (error) => {
+            platformAlert(
+              t('subjectHub.notes.saveErrorTitle'),
+              formatApiError(error),
+            );
+          },
+        },
+      );
+    },
+    [createNoteMutate, t],
+  );
 
   const goBack = useCallback(() => {
     // The Subjects tab moves to /(app)/subjects under the V2 shell; fall back to
@@ -222,6 +251,7 @@ export default function SubjectHubRoute(): React.ReactElement {
             onNextUpPress={handleNextUp}
             onStudyTopic={handleStudyTopic}
             onReviewTopic={handleReviewTopic}
+            onAddNote={handleAddNote}
           />
         </View>
       ) : null}

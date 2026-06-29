@@ -761,7 +761,9 @@
         "withNameSubject": "おかえりなさい、{{name}}さん。{{subject}}の続きを始めましょうか？何でも聞いてくださいね。次はどうしますか？",
         "withName": "おかえりなさい、{{name}}さん。今日は何を勉強しますか？",
         "generic": "おかえりなさい。今日は何を勉強しますか？"
-      }
+      },
+      "voicePermissionAskMessage": "音声入力にはマイクへのアクセスが必要です。続けるにはアクセスを許可してください。",
+      "voicePermissionAllow": "マイクを許可"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -3947,7 +3949,12 @@
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",
-    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。"
+    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。",
+    "sectionActive": "アクティブ",
+    "sectionPaused": "一時停止中",
+    "sectionArchived": "アーカイブ済み",
+    "bookCount_one": "{{count}}冊の本",
+    "bookCount_other": "{{count}}冊の本"
   },
   "subjectHub": {
     "loading": "科目を読み込み中…",
@@ -3988,7 +3995,9 @@
       "authorMentor": "メンターから保存",
       "addNote": "メモを追加",
       "micLabel": "音声でメモを追加",
-      "empty": "まだメモはありません。この教科についての考えを記録しましょう。"
+      "empty": "まだメモはありません。この教科についての考えを記録しましょう。",
+      "saveErrorTitle": "ノートを保存できませんでした",
+      "emptyTopic": "まだノートはありません。このトピックについての考えを記録しましょう。"
     },
     "sheet": {
       "close": "閉じる",

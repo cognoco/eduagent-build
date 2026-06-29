@@ -81,6 +81,8 @@ const SUBJECTS: SubjectIndexItem[] = [
   {
     subjectId: '550e8400-e29b-41d4-a716-446655440000',
     subjectName: 'Spanish',
+    status: 'active',
+    urgencyBoostUntil: null,
     mastered: 4,
     learning: 2,
     total: 9,

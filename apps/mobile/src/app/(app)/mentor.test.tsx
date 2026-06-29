@@ -50,6 +50,7 @@ jest.mock(
     useSubjectsIndex: () => ({
       subjects: Array.from({ length: mockSubjectsCount }, (_, index) => ({
         subjectId: `subject-${index}`,
+        status: 'active',
       })),
       isLoading: false,
       isError: false,
