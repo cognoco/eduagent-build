@@ -39,6 +39,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { executeDeletionV2, scheduleDeletionV2 } from './deletion-v2';
+import { scheduledDeletion } from '../../inngest/functions/account-deletion';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -191,6 +193,73 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(finRec).toBeDefined();
+    });
+
+    it('[WI-885] emits a durable store-teardown event with Stripe and RevenueCat targets before the subscription row disappears', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+      const [seededSubscription] = await db
+        .insert(subscription)
+        .values({
+          organizationId: orgId,
+          payerPersonId: ownerId,
+          planTier: 'plus',
+          status: 'active',
+          stripeCustomerId: 'cus_wi885',
+          stripeSubscriptionId: 'sub_wi885',
+          revenuecatOriginalAppUserId: 'rc_original_wi885',
+          storeProductId: 'com.mentomate.plus.monthly',
+          storePlatform: 'APP_STORE',
+        })
+        .returning({ id: subscription.id });
+
+      const { step, sendEventCalls } = createInngestStepRunner();
+      const handler = (scheduledDeletion as any).fn;
+      const result = await handler({
+        event: {
+          data: {
+            accountId: orgId,
+            identityVersion: 'v2',
+          },
+        },
+        step,
+      });
+
+      expect(result).toEqual({ status: 'deleted', accountId: orgId });
+
+      const teardownCall = sendEventCalls.find(
+        (call) => call.name === 'request-subscription-store-teardown',
+      );
+      expect(teardownCall?.payload).toEqual({
+        name: 'app/billing.subscription_store_teardown_requested',
+        data: {
+          accountId: orgId,
+          identityVersion: 'v2',
+          reason: 'whole_org_erasure',
+          requestedAt: expect.any(String),
+          subscriptions: [
+            {
+              subscriptionId: seededSubscription!.id,
+              planTier: 'plus',
+              status: 'active',
+              stripe: {
+                customerId: 'cus_wi885',
+                subscriptionId: 'sub_wi885',
+              },
+              revenueCat: {
+                originalAppUserId: 'rc_original_wi885',
+                storeProductId: 'com.mentomate.plus.monthly',
+                storePlatform: 'APP_STORE',
+              },
+            },
+          ],
+        },
+      });
+
+      const remainingSub = await db.query.subscription.findFirst({
+        where: eq(subscription.organizationId, orgId),
+        columns: { id: true },
+      });
+      expect(remainingSub).toBeUndefined();
     });
 
     // -----------------------------------------------------------------------

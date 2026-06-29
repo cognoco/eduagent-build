@@ -761,7 +761,9 @@
         "withNameSubject": "Willkommen zurück, {{name}}. Bereit, bei {{subject}} weiterzumachen? Frag mich alles – womit sollen wir weitermachen?",
         "withName": "Willkommen zurück, {{name}}. Woran möchtest du heute arbeiten?",
         "generic": "Willkommen zurück. Woran möchtest du heute arbeiten?"
-      }
+      },
+      "voicePermissionAskMessage": "Für die Spracheingabe wird Mikrofonzugriff benötigt. Erlaube den Zugriff, um fortzufahren.",
+      "voicePermissionAllow": "Mikrofon erlauben"
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",
@@ -3964,7 +3966,12 @@
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
-    "errorMessage": "Versuche es erneut oder komme gleich wieder."
+    "errorMessage": "Versuche es erneut oder komme gleich wieder.",
+    "sectionActive": "Aktiv",
+    "sectionPaused": "Pausiert",
+    "sectionArchived": "Archiviert",
+    "bookCount_one": "{{count}} Buch",
+    "bookCount_other": "{{count}} Bücher"
   },
   "subjectHub": {
     "loading": "Lade Fach ...",
@@ -4005,7 +4012,9 @@
       "authorMentor": "Vom Tutor gespeichert",
       "addNote": "Notiz hinzufügen",
       "micLabel": "Notiz per Sprache hinzufügen",
-      "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
+      "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest.",
+      "saveErrorTitle": "Konnte Notiz nicht speichern",
+      "emptyTopic": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
     },
     "sheet": {
       "close": "Schließen",

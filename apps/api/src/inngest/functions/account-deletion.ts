@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (accountId from event; all deletion DB ops scoped to that account)
 import { inngest } from '../client';
 import {
   getStepDatabase,
@@ -16,6 +17,7 @@ import {
   executeDeletionV2,
   getOrganizationOwnerClerkUserIdV2,
   getOrganizationOwnerEmailV2,
+  getSubscriptionStoreTeardownTargetsV2,
 } from '../../services/identity-v2/deletion-v2';
 import { deleteClerkUser } from '../../services/clerk-user';
 import { createLogger } from '../../services/logger';
@@ -77,7 +79,7 @@ export const scheduledDeletion = inngest.createFunction(
             surface: 'account-deletion.terminal_failure',
             accountId,
             runId: event.data.run_id ?? null,
-            hint: 'DB cascade may have completed while the Clerk login identity (email/credentials/OAuth) survives — GDPR Art 17 erasure half-completed. Inspect the Inngest run to determine which step failed and finish the erasure manually.',
+            hint: 'DB cascade may have completed while external erasure work survives (Clerk login identity and/or subscription provider teardown) — GDPR Art 17 erasure half-completed. Inspect the Inngest run to determine which step failed and finish the erasure manually.',
           },
         },
       );
@@ -170,6 +172,22 @@ export const scheduledDeletion = inngest.createFunction(
       return { status: 'cancelled' };
     }
 
+    // [WI-885] Capture store provider teardown targets BEFORE executeDeletionV2
+    // removes the subscription rows. The captured identifiers are then used
+    // after the DB erasure commits to emit a durable teardown event. This keeps
+    // provider work out of the DB transaction and avoids a lost-ID retry hole if
+    // dispatch fails after the subscription rows are gone.
+    const subscriptionStoreTeardownTargets = await step.run(
+      'capture-subscription-store-teardown-targets',
+      async () => {
+        if (!useV2) {
+          return [];
+        }
+        const db = getStepDatabase();
+        return getSubscriptionStoreTeardownTargetsV2(db, accountId);
+      },
+    );
+
     // Permanently delete all data.
     // [Fix Bug #494] executeDeletion now includes an atomic TOCTOU guard:
     // the DELETE carries the same cancellation predicate as isDeletionCancelled(),
@@ -193,6 +211,23 @@ export const scheduledDeletion = inngest.createFunction(
       // Cancellation arrived between the check-cancellation step and the
       // delete step (TOCTOU window now closed by the atomic guard).
       return { status: 'cancelled', accountId };
+    }
+
+    if (
+      deletionResult === 'deleted' &&
+      useV2 &&
+      subscriptionStoreTeardownTargets.length > 0
+    ) {
+      await step.sendEvent('request-subscription-store-teardown', {
+        name: 'app/billing.subscription_store_teardown_requested',
+        data: {
+          accountId,
+          identityVersion: 'v2',
+          reason: 'whole_org_erasure',
+          requestedAt: new Date().toISOString(),
+          subscriptions: subscriptionStoreTeardownTargets,
+        },
+      });
     }
 
     // [R1] The DB cascade is done; now erase the external Clerk login identity

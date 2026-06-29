@@ -17,6 +17,7 @@ import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { getLearningProfile } from '../learner-profile';
 import { safeWrite } from '../safe-non-core';
 import type { GenerateContext } from './generate';
+import { calculateAge } from '../age-utils';
 
 // ---------------------------------------------------------------------------
 // Dictation Result & Streak Service
@@ -236,7 +237,7 @@ export async function fetchGenerateContext(
 ): Promise<GenerateContext> {
   const repo = createScopedRepository(db, profileId);
 
-  const ageYears = new Date().getFullYear() - birthYear;
+  const ageYears = calculateAge(birthYear);
 
   const prefs = await repo.teachingPreferences.findFirst();
   const nativeLanguage = prefs?.nativeLanguage ?? 'en';

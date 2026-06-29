@@ -761,7 +761,9 @@
         "withNameSubject": "Velkommen tilbake, {{name}}. Klar for å fortsette med {{subject}}? Spør meg om hva som helst – hvor skal vi gå videre?",
         "withName": "Velkommen tilbake, {{name}}. Hva vil du jobbe med i dag?",
         "generic": "Velkommen tilbake. Hva vil du jobbe med i dag?"
-      }
+      },
+      "voicePermissionAskMessage": "Tilgang til mikrofon er nødvendig for stemmeinput. Gi tilgang for å fortsette.",
+      "voicePermissionAllow": "Tillat mikrofon"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -3964,7 +3966,12 @@
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
-    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk."
+    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk.",
+    "sectionActive": "Aktiv",
+    "sectionPaused": "Satt på pause",
+    "sectionArchived": "Arkivert",
+    "bookCount_one": "{{count}} bok",
+    "bookCount_other": "{{count}} bøker"
   },
   "subjectHub": {
     "loading": "Laster inn emne ...",
@@ -4005,7 +4012,9 @@
       "authorMentor": "Lagret fra veileder",
       "addNote": "Legg til et notat",
       "micLabel": "Legg til et notat med stemmen",
-      "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget."
+      "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget.",
+      "saveErrorTitle": "Kunne ikke lagre notat",
+      "emptyTopic": "Ingen notater ennå. Skriv ned en tanke om dette emnet."
     },
     "sheet": {
       "close": "Lukk",

@@ -51,6 +51,8 @@ export interface EnvBindings {
   supportEmail?: string;
   retentionPurgeEnabled?: string;
   clerkSecretKey?: string;
+  stripeSecretKey?: string;
+  revenueCatRestApiKey?: string;
   memoryFactsDedupEnabled?: string;
   memoryFactsDedupThreshold?: string;
   maxDedupLlmCallsPerSession?: string;
@@ -295,4 +297,24 @@ export function getStepClerkSecretKey(): string | undefined {
     warnMissingBinding('clerkSecretKey');
   }
   return bound ?? process.env['CLERK_SECRET_KEY'];
+}
+
+// [WI-885] STRIPE_SECRET_KEY is used by the subscription store teardown worker
+// to cancel Stripe subscriptions after whole-org erasure commits.
+export function getStepStripeSecretKey(): string | undefined {
+  const bound = getEnvBinding('stripeSecretKey');
+  if (bound === undefined) {
+    warnMissingBinding('stripeSecretKey');
+  }
+  return bound ?? process.env['STRIPE_SECRET_KEY'];
+}
+
+// [WI-885] RevenueCat REST API access is used by the subscription store
+// teardown worker to delete the customer/entitlement record after erasure.
+export function getStepRevenueCatRestApiKey(): string | undefined {
+  const bound = getEnvBinding('revenueCatRestApiKey');
+  if (bound === undefined) {
+    warnMissingBinding('revenueCatRestApiKey');
+  }
+  return bound ?? process.env['REVENUECAT_REST_API_KEY'];
 }

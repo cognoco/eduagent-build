@@ -157,6 +157,11 @@ async function createChildProfile(owner: {
     displayName: 'Snapshot Progress Child',
     birthYear: new Date().getFullYear() - 14,
     kind: 'child',
+    // [WI-1153] Pass the owner's profile id so the route receives X-Profile-Id
+    // (resolvedVia:'explicit-header'); without it the Issue-901 guard
+    // (services/profile.ts assertProfileCreationAllowed) rejects the
+    // auto-resolved owner identity with 403 on a fresh DB.
+    actingProfileId: owner.id,
   });
   expect(profile.isOwner).toBe(false);
   return { id: profile.id };

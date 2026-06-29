@@ -36,6 +36,19 @@ Type changes the **ceremony**, never the shared **rails**.
 - **General** — catch-all for simpler tasks incl. small non-code state mutations (verify the write).
   `…/general.md`.
 
+## Reviewer vs watcher vs review-agent — three distinct things
+Easy to conflate; the reviewer leg has three layers:
+- **Reviewer** — the *role* / standing contract: take a Work Item from `Stage=Reviewing` to a
+  disposition via `/cosmo:review` + `/cosmo:qa`. Scaffold: `roles/reviewer-protocol.md` (Brain).
+- **Watcher** — a long-running daemon that *polls* Cosmo workstreams for `Stage=Reviewing` and, on
+  each transition, spawns one review process. The detector/dispatcher, not the reviewer.
+  Tooling: `clacks/review-watcher.ts`.
+- **Review-agent** — the ephemeral per-transition process the watcher launches (this estate: a Codex
+  `exec`) that actually runs the QA + disposition. No file; created at runtime.
+
+So "the watcher launches the review-agent" = the polling daemon detects a transition and spawns a
+worker to do the review. The watcher automates by hand what `reviewer-protocol.md` describes.
+
 ## Other terms
 - **Rails** — the thin universal contract every executor honours (goal-loop, quality bar, process
   awareness, DoD, report-back boundary, Clacks-blind, tiering). `roles/executor/executor-protocol.md`.

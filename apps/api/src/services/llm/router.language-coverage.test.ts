@@ -73,7 +73,7 @@ const INTERNAL_NON_PROSE_FILES: ReadonlySet<string> = new Set([
 // line number below; CI will fail loudly because the forwarder would
 // otherwise be flagged.
 const WRAPPER_FORWARDER_SITES: ReadonlySet<string> = new Set([
-  'apps/api/src/services/quiz/generate-round.ts:93',
+  'apps/api/src/services/quiz/generate-round.ts:94',
 ]);
 
 interface CallSite {

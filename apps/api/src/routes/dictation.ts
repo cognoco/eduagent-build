@@ -36,6 +36,7 @@ import { checkAndLogRateLimit } from '../services/settings';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
 import { isIdentityV2Enabled } from '../config';
+import { calculateAge } from '../services/age-utils';
 
 const logger = createLogger();
 
@@ -286,7 +287,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
           `[dictation/review] profileMeta missing for profileId=${profileId}`,
         );
       }
-      const ageYears = new Date().getFullYear() - profileMeta.birthYear;
+      const ageYears = calculateAge(profileMeta.birthYear);
 
       // Fetch struggles best-effort — if DB fails, review proceeds without them.
       let recentStruggles: string[] = [];

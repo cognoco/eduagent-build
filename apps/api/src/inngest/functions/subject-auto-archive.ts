@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (cron; archiveInactiveSubjects scans all subjects across all profiles)
 // ---------------------------------------------------------------------------
 // Subject Auto-Archive — Story 4.4
 // Daily cron: archive subjects with no activity in the last 30 days.

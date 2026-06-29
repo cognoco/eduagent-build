@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (supportershipId from event; visibility notice scoped to that supportership)
 import {
   supportershipUnlinkedEventSchema,
   summarizeRawPayload,

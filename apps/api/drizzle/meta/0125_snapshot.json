@@ -1,5 +1,5 @@
 {
-  "id": "4e0dd919-64ca-4fda-a07b-f442b25ccb14",
+  "id": "5b70b461-1a24-4395-874f-9e60943c03fb",
   "prevId": "b94b57ca-0931-42ba-a422-fc3671531150",
   "version": "7",
   "dialect": "postgresql",
@@ -2103,12 +2103,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "sentences": {
-          "name": "sentences",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",

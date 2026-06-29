@@ -16,7 +16,7 @@
  * Mirrors the DB-setup + teardown pattern in revenuecat.integration.test.ts.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   generateUUIDv7,
   organization,
@@ -233,11 +233,22 @@ legacyDescribe('mergeAliasedSubscription (integration)', () => {
     expect(survivor?.tier).toBe('plus');
     expect(survivor?.status).toBe('active');
 
-    // Survivor quota pool reflects plus.
-    const pool = await createIntegrationDb().query.quotaPools.findFirst({
-      where: eq(quotaPools.subscriptionId, toSub.id),
-    });
-    expect(pool?.monthlyLimit).toBe(getTierConfig('plus').monthlyQuota);
+    // Survivor's enforced quota reflects plus. `plus` is a per-profile tier
+    // (subscription.ts), so metering reads the owner's profileQuotaUsage row
+    // (decrementQuota → per-profile path), NOT quotaPools.monthlyLimit — the
+    // latter is the shared-pool enforcement table and is vestigial for
+    // per-profile tiers. The alias-merge reconcile sets the owner's
+    // profileQuotaUsage to the plus owner quota. (Mirrors alias-merge-v2.)
+    const ownerQuota =
+      await createIntegrationDb().query.profileQuotaUsage.findFirst({
+        where: and(
+          eq(profileQuotaUsage.subscriptionId, toSub.id),
+          eq(profileQuotaUsage.role, 'owner'),
+        ),
+      });
+    expect(ownerQuota?.monthlyLimit).toBe(
+      getTierConfig('plus').ownerMonthlyQuota,
+    );
 
     // Survivor ends with the migrated 500 credits.
     const credits = await getTopUpCreditsRemaining(db, toSub.id);

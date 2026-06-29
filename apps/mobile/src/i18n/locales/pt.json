@@ -788,7 +788,9 @@
         "withNameSubject": "Boas-vindas de volta, {{name}}. Pronto(a) para retomar {{subject}}? Pode perguntar qualquer coisa — para onde vamos agora?",
         "withName": "Boas-vindas de volta, {{name}}. No que você gostaria de trabalhar hoje?",
         "generic": "Boas-vindas de volta. No que você gostaria de trabalhar hoje?"
-      }
+      },
+      "voicePermissionAskMessage": "É necessário acesso ao microfone para a entrada de voz. Permita o acesso para continuar.",
+      "voicePermissionAllow": "Permitir microfone"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
@@ -3964,7 +3966,12 @@
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
     "errorTitle": "Não foi possível carregar as matérias",
-    "errorMessage": "Tente novamente ou volte em um instante."
+    "errorMessage": "Tente novamente ou volte em um instante.",
+    "sectionActive": "Ativos",
+    "sectionPaused": "Pausados",
+    "sectionArchived": "Arquivados",
+    "bookCount_one": "{{count}} livro",
+    "bookCount_other": "{{count}} livros"
   },
   "subjectHub": {
     "loading": "Carregando matéria...",
@@ -4005,7 +4012,9 @@
       "authorMentor": "Salvo do tutor",
       "addNote": "Adicionar uma nota",
       "micLabel": "Adicionar nota por voz",
-      "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria."
+      "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria.",
+      "saveErrorTitle": "Não foi possível salvar a nota",
+      "emptyTopic": "Ainda não há notas. Anote um pensamento sobre este tópico."
     },
     "sheet": {
       "close": "Fechar",

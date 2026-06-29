@@ -5,7 +5,7 @@ import {
   act,
   waitFor,
 } from '@testing-library/react-native';
-import { AccessibilityInfo, AppState } from 'react-native';
+import { AccessibilityInfo, Alert, AppState, Linking } from 'react-native';
 import { ChatShell, type ChatMessage } from './ChatShell';
 
 // ---------------------------------------------------------------------------
@@ -1196,6 +1196,140 @@ describe('ChatShell', () => {
       // not gate recovery. clearTranscript MUST be called.
       expect(mockGetMicrophonePermissionStatus).toHaveBeenCalled();
       expect(mockClearTranscript).toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // [WI-1150] Mic permission error recovery — re-prompt inline before Settings
+  // -----------------------------------------------------------------------
+  describe('mic permission error recovery [WI-1150]', () => {
+    // platformAlert wraps RN Alert.alert (native path in Jest); Linking is the
+    // RN platform module. Spying on them is an external-boundary spy, not a new
+    // internal jest.mock (GC1-safe).
+    let alertSpy: jest.SpyInstance;
+    let openSettingsSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      openSettingsSpy = jest
+        .spyOn(Linking, 'openSettings')
+        .mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+      openSettingsSpy.mockRestore();
+    });
+
+    type AlertBtn = { text?: string; style?: string; onPress?: () => void };
+
+    it('re-requests permission inline (not Settings) when canAskAgain is true', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Microphone permission is required for voice input',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue({
+        granted: false,
+        canAskAgain: true,
+      });
+      mockRequestMicrophonePermission.mockResolvedValue(true);
+
+      renderChatShell({ verificationType: 'teach_back' });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(alertSpy).toHaveBeenCalled();
+      const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertBtn[] | undefined;
+      const actionButton = buttons?.find((b) => b.style !== 'cancel');
+      expect(actionButton).toBeDefined();
+
+      // ChatShell pre-warms requestMicrophonePermission on mount — clear that
+      // call so we measure only the button tap.
+      mockRequestMicrophonePermission.mockClear();
+
+      await act(async () => {
+        actionButton?.onPress?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Inline re-prompt fired; we never sent the user to Settings.
+      expect(mockRequestMicrophonePermission).toHaveBeenCalledTimes(1);
+      expect(openSettingsSpy).not.toHaveBeenCalled();
+      // Grant clears the error so the learner can retry without leaving the app.
+      expect(mockClearTranscript).toHaveBeenCalled();
+    });
+
+    it('opens Settings only when permission is permanently denied (canAskAgain false)', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Microphone permission is required for voice input',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue({
+        granted: false,
+        canAskAgain: false,
+      });
+
+      renderChatShell({ verificationType: 'teach_back' });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(alertSpy).toHaveBeenCalled();
+      const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertBtn[] | undefined;
+      const actionButton = buttons?.find((b) => b.style !== 'cancel');
+      expect(actionButton).toBeDefined();
+      // The action is the Settings button, not the inline "Allow" button — a
+      // copy/branch swap that routed blocked → inline would change this text.
+      expect(actionButton?.text).toBe('Open Settings');
+
+      mockRequestMicrophonePermission.mockClear();
+
+      await act(async () => {
+        actionButton?.onPress?.();
+        await Promise.resolve();
+      });
+
+      // Permanently denied → Settings is the only Android path; no inline re-ask.
+      expect(openSettingsSpy).toHaveBeenCalledTimes(1);
+      expect(mockRequestMicrophonePermission).not.toHaveBeenCalled();
+    });
+
+    it('shows the raw error with no recovery buttons when permission status is unavailable', async () => {
+      // Module unavailable → getMicrophonePermissionStatus resolves null →
+      // treated as a non-permission error → raw message, no buttons, no Settings.
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        error: 'Speech recognition is not available on this device',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue(null);
+
+      renderChatShell({ verificationType: 'teach_back' });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(alertSpy).toHaveBeenCalled();
+      const call = alertSpy.mock.calls.at(-1);
+      // Body is the raw STT error; no recovery buttons supplied.
+      expect(call?.[1]).toBe(
+        'Speech recognition is not available on this device',
+      );
+      expect(call?.[2]).toBeUndefined();
+      expect(openSettingsSpy).not.toHaveBeenCalled();
     });
   });
 

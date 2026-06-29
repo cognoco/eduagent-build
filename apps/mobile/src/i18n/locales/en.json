@@ -770,6 +770,8 @@
       "stepProgress": "Step {{current}} of {{total}}",
       "voicePermissionErrorTitle": "Voice input error",
       "voicePermissionErrorMessage": "Microphone access is needed for voice input. Please enable it in Settings.",
+      "voicePermissionAskMessage": "Microphone access is needed for voice input. Allow access to continue.",
+      "voicePermissionAllow": "Allow microphone",
       "voicePermissionOpenSettings": "Open Settings",
       "replyReady": "Reply ready",
       "voiceErrorTapRetry": "{{error}} — tap to retry",
@@ -3063,7 +3065,12 @@
     "errorTitle": "We could not load subjects",
     "errorMessage": "Try again, or come back in a moment.",
     "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
-    "reviewsDue": "{{count}} reviews due"
+    "reviewsDue": "{{count}} reviews due",
+    "sectionActive": "Active",
+    "sectionPaused": "Paused",
+    "sectionArchived": "Archived",
+    "bookCount_one": "{{count}} book",
+    "bookCount_other": "{{count}} books"
   },
   "subjectHub": {
     "loading": "Loading subject...",
@@ -3124,7 +3131,9 @@
       "authorMentor": "Saved from mentor",
       "addNote": "Add a note",
       "micLabel": "Add a note by voice",
-      "empty": "No notes yet. Capture a thought about this subject."
+      "empty": "No notes yet. Capture a thought about this subject.",
+      "emptyTopic": "No notes yet. Capture a thought about this topic.",
+      "saveErrorTitle": "Could not save note"
     },
     "sheet": {
       "close": "Close",

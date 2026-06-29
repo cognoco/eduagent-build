@@ -31,10 +31,17 @@ permanently into the Cosmo lifecycle.)
 
 ## The DoD you verify (the gate) — verified NOW, not trusted from the summary
 A WI is **done** only when the full Definition of Done holds against reality:
-- **Strict green PR:** every required check `SUCCESS`; the automated review actually green (a
+- **Strict green PR:** every **required** check `SUCCESS`; the automated review actually green (a
   red/absent review is not approval — diagnose it); no valid blocker/must-fix/should-fix;
-  `mergeStateStatus` CLEAN.
-- **Actually landed:** PR merged; Fixed-In / merge commit is an ancestor of the **target branch**.
+  `mergeStateStatus` CLEAN. An **advisory / continue-on-error** red lane does *not* block close —
+  `/cosmo:review` judges greenness over required checks only and honours a repo-level allowed-red
+  override (`.cosmo/allowed-red` or `allowed_red` in `zdx-config.yaml`); a **required**-red still
+  blocks.
+- **Actually landed:** for a **code** WI — PR merged; Fixed-In / merge commit is an ancestor of the
+  **target branch**. For a **no-code / Notion-only** WI (a general executor's state mutation) `Fixed
+  In` is *descriptive*, there is no PR/merge-commit, and the CI/merge-ancestor checks **do not
+  apply** — verify via AC + completion summary instead (`/cosmo:review` classifies commit-ref vs
+  descriptive `Fixed In` and skips the CI pull for the latter).
 - **AC-by-AC** coverage; `Fixed In` + completion summary + dates present.
 - Local validation green; source-artifact + **regression** evidence; cross-cutting sweep evidence.
 - For a **WP**: absorbed-provenance children Closed via the ceremony (an open child is NOT auto a
