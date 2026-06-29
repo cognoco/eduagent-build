@@ -103,7 +103,13 @@ function LearnerMentorScreen(): React.ReactElement {
   const overflow = useNowOverflow(showOverflow);
   const feed = nowFeed.data ?? nowFeed.fallbackFeed ?? undefined;
   const firstRealState = hasFirstRealState({
-    activeSubjectCount: subjectsIndex.subjects.length,
+    // Count ACTIVE subjects only. useSubjectsIndex now surfaces every status
+    // (paused/archived included) for the Subjects browse grouping, so the
+    // cold-start / homework-prompt gate must filter to active here — otherwise a
+    // user with only paused/archived subjects would skip the cold-start card.
+    activeSubjectCount: subjectsIndex.subjects.filter(
+      (subject) => subject.status === 'active',
+    ).length,
     feedCardCount: feed?.cards.length ?? 0,
   });
   const rewardReceipt = rewardReceiptFromFeed(feed);

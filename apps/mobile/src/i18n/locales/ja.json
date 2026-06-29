@@ -3949,7 +3949,12 @@
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",
-    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。"
+    "errorMessage": "再試行するか、しばらくしてからもう一度お試しください。",
+    "sectionActive": "アクティブ",
+    "sectionPaused": "一時停止中",
+    "sectionArchived": "アーカイブ済み",
+    "bookCount_one": "{{count}}冊の本",
+    "bookCount_other": "{{count}}冊の本"
   },
   "subjectHub": {
     "loading": "科目を読み込み中…",
