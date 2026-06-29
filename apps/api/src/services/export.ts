@@ -35,6 +35,25 @@ import {
 import {
   dataExportAssessmentRowSchema,
   dataExportSubscriptionRowSchema,
+  dataExportSubjectRowSchema,
+  dataExportCurriculumRowSchema,
+  dataExportCurriculumTopicRowSchema,
+  dataExportLearningSessionRowSchema,
+  dataExportSessionEventRowSchema,
+  dataExportSessionSummaryRowSchema,
+  dataExportRetentionCardRowSchema,
+  dataExportXpLedgerRowSchema,
+  dataExportStreakRowSchema,
+  dataExportNotificationPreferenceRowSchema,
+  dataExportLearningModeRowSchema,
+  dataExportTeachingPreferenceRowSchema,
+  dataExportParkingLotItemRowSchema,
+  dataExportSessionEmbeddingRowSchema,
+  dataExportQuotaPoolRowSchema,
+  dataExportTopUpCreditRowSchema,
+  dataExportNeedsDeepeningTopicRowSchema,
+  dataExportFamilyLinkRowSchema,
+  dataExportMentorActivityLedgerRowSchema,
 } from '@eduagent/schemas';
 import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
@@ -483,53 +502,85 @@ export async function generateExport(
     // they reach the export payload.  Without this, rows passed as
     // `Record<string, unknown>[]` carry raw Date values that behave
     // inconsistently across zod parse, JSON.stringify, and callers.
-    subjects: subjectRows.map(serializeDates),
-    curricula: curriculaRows.map(serializeDates),
-    curriculumTopics: curriculumTopicRows.map(serializeDates),
-    learningSessions: learningSessionRows.map(serializeDates),
+    subjects: subjectRows.map((row) =>
+      dataExportSubjectRowSchema.parse(serializeDates(row)),
+    ),
+    curricula: curriculaRows.map((row) =>
+      dataExportCurriculumRowSchema.parse(serializeDates(row)),
+    ),
+    curriculumTopics: curriculumTopicRows.map((row) =>
+      dataExportCurriculumTopicRowSchema.parse(serializeDates(row)),
+    ),
+    learningSessions: learningSessionRows.map((row) =>
+      dataExportLearningSessionRowSchema.parse(serializeDates(row)),
+    ),
     sessionEvents: sessionEventRows.map((row) => {
       const serialized = serializeDates(row as Record<string, unknown>);
       if (
         serialized['eventType'] === 'ai_response' &&
         typeof serialized['content'] === 'string'
       ) {
-        return {
+        return dataExportSessionEventRowSchema.parse({
           ...serialized,
           content: projectAiResponseContent(serialized['content'] as string, {
             silent: true,
           }),
-        };
+        });
       }
-      return serialized;
+      return dataExportSessionEventRowSchema.parse(serialized);
     }),
-    sessionSummaries: sessionSummaryRows.map(serializeDates),
-    retentionCards: retentionCardRows.map(serializeDates),
+    sessionSummaries: sessionSummaryRows.map((row) =>
+      dataExportSessionSummaryRowSchema.parse(serializeDates(row)),
+    ),
+    retentionCards: retentionCardRows.map((row) =>
+      dataExportRetentionCardRowSchema.parse(serializeDates(row)),
+    ),
     assessments: assessmentRows.map((row) =>
       dataExportAssessmentRowSchema.parse(serializeDates(row)),
     ),
-    xpLedger: xpLedgerRows.map(serializeDates),
-    streaks: streakRows.map(serializeDates),
-    notificationPreferences: notificationPrefRows.map(serializeDates),
-    learningModes: learningModeRows.map(serializeDates),
-    teachingPreferences: teachingPrefRows.map(serializeDates),
-    parkingLotItems: parkingLotRows.map(serializeDates),
+    xpLedger: xpLedgerRows.map((row) =>
+      dataExportXpLedgerRowSchema.parse(serializeDates(row)),
+    ),
+    streaks: streakRows.map((row) =>
+      dataExportStreakRowSchema.parse(serializeDates(row)),
+    ),
+    notificationPreferences: notificationPrefRows.map((row) =>
+      dataExportNotificationPreferenceRowSchema.parse(serializeDates(row)),
+    ),
+    learningModes: learningModeRows.map((row) =>
+      dataExportLearningModeRowSchema.parse(serializeDates(row)),
+    ),
+    teachingPreferences: teachingPrefRows.map((row) =>
+      dataExportTeachingPreferenceRowSchema.parse(serializeDates(row)),
+    ),
+    parkingLotItems: parkingLotRows.map((row) =>
+      dataExportParkingLotItemRowSchema.parse(serializeDates(row)),
+    ),
     sessionEmbeddings: sessionEmbeddingRows.map((row) => {
       const serialized = serializeDates(row);
       if (typeof serialized['content'] !== 'string') {
-        return serialized;
+        return dataExportSessionEmbeddingRowSchema.parse(serialized);
       }
-      return {
+      return dataExportSessionEmbeddingRowSchema.parse({
         ...serialized,
         content: projectSessionEmbeddingContent(serialized['content']),
-      };
+      });
     }),
     subscriptions: subscriptionRows.map((row) =>
       dataExportSubscriptionRowSchema.parse(serializeDates(row)),
     ),
-    quotaPools: quotaPoolRows.map(serializeDates),
-    topUpCredits: topUpCreditRows.map(serializeDates),
-    needsDeepeningTopics: needsDeepeningTopicRows.map(serializeDates),
-    familyLinks: familyLinkRows.map(serializeDates),
+    quotaPools: quotaPoolRows.map((row) =>
+      dataExportQuotaPoolRowSchema.parse(serializeDates(row)),
+    ),
+    topUpCredits: topUpCreditRows.map((row) =>
+      dataExportTopUpCreditRowSchema.parse(serializeDates(row)),
+    ),
+    needsDeepeningTopics: needsDeepeningTopicRows.map((row) =>
+      dataExportNeedsDeepeningTopicRowSchema.parse(serializeDates(row)),
+    ),
+    familyLinks: familyLinkRows.map((row) =>
+      dataExportFamilyLinkRowSchema.parse(serializeDates(row)),
+    ),
     learningProfiles: learningProfileRows.map((row) => ({
       ...row,
       consentPromptDismissedAt:
@@ -537,7 +588,9 @@ export async function generateExport(
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })) as DataExport['learningProfiles'],
-    mentorActivityLedger: mentorActivityLedgerRows.map(serializeDates),
+    mentorActivityLedger: mentorActivityLedgerRows.map((row) =>
+      dataExportMentorActivityLedgerRowSchema.parse(serializeDates(row)),
+    ),
     exportedAt: new Date().toISOString(),
   };
 }
