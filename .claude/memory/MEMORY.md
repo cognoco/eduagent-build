@@ -53,6 +53,7 @@
 - [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
+- [feedback_cosmo_done_creates_pr.md](feedback_cosmo_done_creates_pr.md) — For MentoMate Cosmo WI work, create a PR every time verified work is done; do not wait for a separate PR prompt.
 - [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
