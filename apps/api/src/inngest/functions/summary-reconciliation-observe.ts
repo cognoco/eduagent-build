@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Summary-Reconciliation Observability — observable terminus for two events
 // emitted by summary-reconciliation-cron.ts:

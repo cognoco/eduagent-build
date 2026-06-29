@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Transcript-Purge Observability — observable terminus for three events
 // emitted by transcript-purge-cron.ts:

@@ -243,6 +243,11 @@ Same pattern as staging:
 - `REVENUECAT_WEBHOOK_SECRET`
 - `ANALYTICS_HASH_KEY`
 
+`REVENUECAT_REST_API_KEY` is not boot-required, but it is operationally required
+for RevenueCat-backed GDPR store teardown. If a deleted organization has a
+RevenueCat subscription target and the key is missing, the Inngest teardown
+worker retries and then escalates instead of silently skipping provider erasure.
+
 Production also requires the `IDEMPOTENCY_KV` binding unless Doppler `prd`
 explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary prelaunch
 override. Without the binding or override, env validation returns a 500 before
@@ -608,7 +613,8 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | **API** | `API_ORIGIN` | Yes |
 | | `ANALYTICS_HASH_KEY` | Yes |
 | **Payments** | `REVENUECAT_WEBHOOK_SECRET` | Yes |
-| | `STRIPE_SECRET_KEY` | No (dormant) |
+| | `REVENUECAT_REST_API_KEY` | Required for RevenueCat GDPR store teardown |
+| | `STRIPE_SECRET_KEY` | No (dormant) — but if Stripe is ever activated, this becomes required for Stripe-backed GDPR store teardown: a deleted org carrying a Stripe subscription with the key missing makes the teardown worker retry then escalate to Sentry (never silently skip cancellation) |
 | | `STRIPE_WEBHOOK_SECRET` | No (dormant) |
 | | `STRIPE_PRICE_*` (6 keys) | No (dormant) |
 | | `STRIPE_CUSTOMER_PORTAL_URL` | No (dormant) |

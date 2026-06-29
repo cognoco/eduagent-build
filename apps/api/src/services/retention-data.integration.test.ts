@@ -476,43 +476,40 @@ describe('processRecallTest concurrent LLM serialization [WI-234]', () => {
   beforeEach(() => {
     llmFixture.clearCalls();
     llmFixture.clearChatError();
-    // Recall quality grader expects a single digit 0-5.
-    llmFixture.setChatResponse('4');
+    // [WI-1153] The recall grader parses a structured JSON object
+    // (recallGradeJsonSchema: quality 0-5 + verdict enum); a bare digit is never
+    // parseable → graded:false → throws 'recall grader unavailable'. Provide a
+    // valid solid-grade payload (quality 4 ⇒ verdict 'solid').
+    llmFixture.setChatResponse(
+      '{"quality":4,"verdict":"solid","rationale":"Accurate recall.","misconception":null}',
+    );
     _resetCircuits();
   });
 
-  // QUARANTINE WI-1153 (owner: claude:bug-lane, Executing) — confirmed-flaky, NOT a behavioral regression:
-  // this test passed on main @09:19 (CI run 28361732814) and passes in local isolation; it fails only in
-  // the full CI co-located suite from shared-stg-DB state accumulation. Root-fix + un-skip tracked in WI-1153.
-  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
-  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
-    'two concurrent recall submissions for the same fresh topic produce exactly one LLM call',
-    async () => {
-      const seed = await seedWi234ProfileTopic(db, 'concurrent');
+  it('two concurrent recall submissions for the same fresh topic produce exactly one LLM call', async () => {
+    const seed = await seedWi234ProfileTopic(db, 'concurrent');
 
-      const [resA, resB] = await Promise.all([
-        processRecallTest(db, seed.profileId, {
-          topicId: seed.topicId,
-          answer: 'mitochondria are the powerhouse of the cell',
-          attemptMode: 'standard',
-        }),
-        processRecallTest(db, seed.profileId, {
-          topicId: seed.topicId,
-          answer: 'mitochondria produce ATP',
-          attemptMode: 'standard',
-        }),
-      ]);
+    const [resA, resB] = await Promise.all([
+      processRecallTest(db, seed.profileId, {
+        topicId: seed.topicId,
+        answer: 'mitochondria are the powerhouse of the cell',
+        attemptMode: 'standard',
+      }),
+      processRecallTest(db, seed.profileId, {
+        topicId: seed.topicId,
+        answer: 'mitochondria produce ATP',
+        attemptMode: 'standard',
+      }),
+    ]);
 
-      // Exactly one LLM call — the loser must short-circuit before evaluating.
-      expect(llmFixture.chatCalls).toHaveLength(1);
+    // Exactly one LLM call — the loser must short-circuit before evaluating.
+    expect(llmFixture.chatCalls).toHaveLength(1);
 
-      // Exactly one of the two results is the cooldown branch; the other is normal.
-      const cooldownResponses = [resA, resB].filter((r) => r.cooldownActive);
-      const normalResponses = [resA, resB].filter((r) => !r.cooldownActive);
-      expect(cooldownResponses).toHaveLength(1);
-      expect(normalResponses).toHaveLength(1);
-      expect(cooldownResponses[0]!.cooldownEndsAt).toBeTruthy();
-    },
-    30_000,
-  );
+    // Exactly one of the two results is the cooldown branch; the other is normal.
+    const cooldownResponses = [resA, resB].filter((r) => r.cooldownActive);
+    const normalResponses = [resA, resB].filter((r) => !r.cooldownActive);
+    expect(cooldownResponses).toHaveLength(1);
+    expect(normalResponses).toHaveLength(1);
+    expect(cooldownResponses[0]!.cooldownEndsAt).toBeTruthy();
+  }, 30_000);
 });

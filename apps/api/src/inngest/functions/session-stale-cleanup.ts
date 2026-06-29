@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (cron; closeStaleSessions scans all sessions across all profiles)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { closeStaleSessions } from '../../services/session';

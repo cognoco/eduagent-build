@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging+Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Trial Subscription Failed — observable terminus for the
 // app/billing.trial_subscription_failed event emitted by account

@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event; all filing and library ops scoped by profileId)
 import {
   sessionAutoFileRequestedEventSchema,
   summarizeRawPayload,

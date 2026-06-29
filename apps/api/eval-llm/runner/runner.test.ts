@@ -47,6 +47,13 @@ describe('parseCliArgs', () => {
     const { options } = parseCliArgs(['--max-live-calls', 'abc']);
     expect(options.maxLiveCalls).toBeUndefined();
   });
+
+  it('parses --only-envelope-flows to a boolean flag', () => {
+    expect(
+      parseCliArgs(['--only-envelope-flows']).options.onlyEnvelopeFlows,
+    ).toBe(true);
+    expect(parseCliArgs([]).options.onlyEnvelopeFlows).toBeUndefined();
+  });
 });
 
 describe('runHarness scenario fan-out', () => {
@@ -217,5 +224,61 @@ describe('runHarness deterministic quality checks', () => {
     expect(summary.liveCallsOk).toBe(0);
     expect(summary.qualityFailures).toBe(1);
     expect(summary.snapshotsWritten).toBe(1);
+  });
+});
+
+describe('runHarness --only-envelope-flows', () => {
+  const makeSimpleFlow = (
+    id: string,
+    emitsEnvelope?: boolean,
+  ): FlowDefinition<Record<string, never>> => ({
+    id,
+    name: id,
+    sourceFile: 'test',
+    ...(emitsEnvelope ? { emitsEnvelope: true } : {}),
+    buildPromptInput: () => ({}),
+    buildPrompt: () => ({ system: `prompt for ${id}` }),
+  });
+
+  afterEach(async () => {
+    for (const id of ['env-only-flow', 'plain-only-flow']) {
+      const dir = path.resolve(__dirname, '..', 'snapshots', id);
+      try {
+        await fs.rm(dir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  });
+
+  it('runs only emitsEnvelope flows when onlyEnvelopeFlows is set', async () => {
+    const summary = await runHarness(
+      [
+        makeSimpleFlow('env-only-flow', true) as FlowDefinition,
+        makeSimpleFlow('plain-only-flow') as FlowDefinition,
+      ],
+      {
+        live: false,
+        profileFilter: new Set(['12yo-dinosaurs']),
+        onlyEnvelopeFlows: true,
+      },
+    );
+    // Only the emitsEnvelope flow is active; the plain flow is filtered out.
+    expect(summary.flowsRun).toBe(1);
+    expect(summary.snapshotsWritten).toBe(1);
+  });
+
+  it('runs all matching flows when onlyEnvelopeFlows is absent', async () => {
+    const summary = await runHarness(
+      [
+        makeSimpleFlow('env-only-flow', true) as FlowDefinition,
+        makeSimpleFlow('plain-only-flow') as FlowDefinition,
+      ],
+      {
+        live: false,
+        profileFilter: new Set(['12yo-dinosaurs']),
+      },
+    );
+    expect(summary.flowsRun).toBe(2);
   });
 });
