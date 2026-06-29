@@ -86,18 +86,19 @@ import {
   supportership,
   type Database,
 } from '@eduagent/database';
-import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
+// Producer side of the store-teardown contract: the rows mapped by
+// getSubscriptionStoreTeardownTargetsV2 ARE the per-subscription target type of
+// the `app/billing.subscription_store_teardown_requested` event. Sharing the
+// `@eduagent/schemas` type (rather than a local structural twin) makes
+// TypeScript enforce the producer→consumer shape at compile time — a field
+// drift in the Zod schema then fails the build here instead of surfacing as a
+// runtime `invalid_payload` on a GDPR erasure path.
+import type {
+  AccountDeletionStatusResponse,
+  SubscriptionStoreTeardownTarget,
+} from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
 import { captureException } from '../sentry';
-// Producer side of the store-teardown contract: the rows mapped by
-// getSubscriptionStoreTeardownTargetsV2 are dispatched as the
-// `app/billing.subscription_store_teardown_requested` event payload, so the
-// return type IS the event's per-subscription target type. Importing it (rather
-// than re-declaring a structural twin) makes TypeScript enforce the
-// producer→consumer shape at compile time — a field drift in the Zod schema
-// then fails the build here instead of as a runtime `invalid_payload` on a GDPR
-// erasure path. Type-only import: no runtime edge from services → inngest.
-import type { SubscriptionStoreTeardownTarget } from '../../inngest/events/subscription-store-teardown';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;

@@ -1,10 +1,12 @@
-import { summarizeRawPayload } from '@eduagent/schemas';
+import {
+  subscriptionStoreTeardownRequestedDataSchema,
+  summarizeRawPayload,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import {
   getStepRevenueCatRestApiKey,
   getStepStripeSecretKey,
 } from '../helpers';
-import { subscriptionStoreTeardownRequestedDataSchema } from '../events/subscription-store-teardown';
 import { teardownSubscriptionStoresForErasure } from '../../services/billing/store-teardown';
 import { createLogger } from '../../services/logger';
 import { captureException } from '../../services/sentry';

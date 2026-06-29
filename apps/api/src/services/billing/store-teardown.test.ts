@@ -1,5 +1,6 @@
 import {
   cancelStripeSubscriptionForErasure,
+  deleteRevenueCatCustomerForErasure,
   teardownSubscriptionStoresForErasure,
 } from './store-teardown';
 
@@ -75,6 +76,28 @@ describe('subscription store teardown for erasure', () => {
       stripeClient: { subscriptions: { cancel: stripeCancel } },
     });
 
+    expect(result).toEqual({ status: 'already_absent' });
+  });
+
+  it('[WI-885] treats a 404 from RevenueCat as an idempotent success (GDPR retry safety)', async () => {
+    // The teardown worker has 5 retries on a GDPR erasure path: a second
+    // attempt after the customer is already deleted must NOT escalate. 404 →
+    // already_absent is the RC-side idempotency guard, mirroring the Stripe
+    // subscription_already_canceled case above.
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 404 }));
+
+    const result = await deleteRevenueCatCustomerForErasure({
+      appUserId: 'rc_original_123',
+      revenueCatRestApiKey: 'rc_secret_123',
+      fetchImpl,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://api.revenuecat.com/v1/subscribers/rc_original_123',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
     expect(result).toEqual({ status: 'already_absent' });
   });
 });
