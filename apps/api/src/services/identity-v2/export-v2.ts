@@ -245,9 +245,33 @@ export async function generateExportV2(
         createdAt: g.createdAt,
       }),
     ),
+    // Map the v2 `subscription` row (organization-keyed, plan_tier/period_*_at)
+    // to the legacy-named export shape the schema expects (accountId/tier/
+    // currentPeriod*) before parsing — mirrors the explicit field-mapping the
+    // `account`/`familyLinks` sections above already do. organization.id ==
+    // accounts.id by the deterministic reseed. payerPersonId/storeProductId/
+    // storePlatform are not part of the DataExport contract, so they drop here.
     subscriptions: subscriptionRows.map((s) =>
       dataExportSubscriptionRowSchema.parse(
-        serializeDates(s as Record<string, unknown>),
+        serializeDates({
+          id: s.id,
+          accountId: s.organizationId,
+          stripeCustomerId: s.stripeCustomerId,
+          stripeSubscriptionId: s.stripeSubscriptionId,
+          tier: s.planTier,
+          status: s.status,
+          trialEndsAt: s.trialEndsAt,
+          currentPeriodStart: s.periodStartAt,
+          currentPeriodEnd: s.periodEndAt,
+          cancelledAt: s.cancelledAt,
+          lastStripeEventTimestamp: s.lastStripeEventTimestamp,
+          lastStripeEventId: s.lastStripeEventId,
+          revenuecatOriginalAppUserId: s.revenuecatOriginalAppUserId,
+          lastRevenuecatEventId: s.lastRevenuecatEventId,
+          lastRevenuecatEventTimestampMs: s.lastRevenuecatEventTimestampMs,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        }),
       ),
     ),
     quotaPools: quotaPoolRows.map(serializeDates),
