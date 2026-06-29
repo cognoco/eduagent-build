@@ -5,6 +5,8 @@
 **Depends on:** Nothing — can be implemented independently of RLS Phase 0-1
 **Companion spec:** `2026-04-18-progress-empty-states-highlights-design.md` (independent, parallel track)
 
+> **⚠️ Status (WI-517, 2026-06-29) — §4/§5 RLS claims reconciled.** Sections 1–3 and 6 shipped. The **§5 `parent_read_via_family` parent-access policies — the spec's central deliverable: additive SELECT policies letting a parent read a linked child's rows on ~11 child-data tables — were never implemented**; no migration contains them (verified: `grep -rl parent_read_via_family apps/api/drizzle/` returns nothing). Migration `0085` *does* ship per-table `*_profile_isolation` policies and a combined `family_links_profile_isolation` policy (one parent-OR-child policy, covering §4's `family_links` read access rather than the two split SELECT policies §4 proposed) — but **none grant a parent access to a linked child's rows**, and all of `0085` is **inert**: the app connects as `neondb_owner` (which holds `BYPASSRLS`), so no policy applies. Parent→child access is enforced today at the **application layer**: `assertParentAccess` (`apps/api/src/services/family-access.ts`) plus `createScopedRepository(profileId)` / parent-chain `WHERE profile_id = …` scoping (the AGENTS.md data-access rules). Database-level RLS is *defense-in-depth, not the primary control* (`docs/architecture.md` → "Multi-profile data isolation"), and its enforcement cutover is **parked** until the `profiles`→`person` physical rename (`MMT-ADR-0012`). The §4/§5 RLS work is therefore **withdrawn from this spec and folded into the parked enforcement plan** `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` (see its PARKED banner), which already tracks the missing parent-read policies. Treat §4/§5 below as deferred design input for that future rollout, not shipped work.
+
 ## Problem
 
 The parent dashboard (`/(app)/dashboard`, 10 API routes, 8 mobile screens) was built feature-first: every data type the child generates is exposed to the parent. This includes raw session transcripts (turn-by-turn exchanges with the AI mentor), full mentor-memory inference items, and escalation rung metadata. No privacy policy was defined before the routes were built.
@@ -203,6 +205,8 @@ Replace the current raw profile view with:
 
 ## Section 4: RLS Policy for `family_links`
 
+> **Reconciled (WI-517) — superseded, not shipped as written.** Migration `0085` ships a single combined `family_links_profile_isolation` policy (parent-OR-child read) rather than the two split SELECT policies proposed here; functionally it covers `family_links` reads. Like all of `0085` it is **inert** (the owner role bypasses RLS), and access is gated at the app layer (`assertParentAccess`). See the status banner at the top of this spec. The text below is retained as design input for the parked enforcement plan `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md`.
+
 ### Current state
 
 `family_links` has RLS enabled (migration `0027`) but zero policies. The application layer enforces access via `assertParentAccess` (checks `findFirst` where `parent_profile_id = parentId AND child_profile_id = childId`).
@@ -244,6 +248,8 @@ Replace the existing `family_access` policy in `2026-04-15-S06-rls-phase-2-4-enf
 ---
 
 ## Section 5: Parent-Access Subquery Policies (RLS Phase 2 Update)
+
+> **Withdrawn / deferred (WI-517).** The `parent_read_via_family` policies below were never migrated — see the status banner at the top of this spec. Parent dashboard reads work today because the app connects as the owner role (RLS inert) and access is gated at the app layer (`assertParentAccess` + parent-chain scoping). The candidate table list and policy template are retained as design input for the parked enforcement plan `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md`, where this work is tracked.
 
 ### Problem
 
