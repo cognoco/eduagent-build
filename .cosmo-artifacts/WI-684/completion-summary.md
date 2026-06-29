@@ -1,0 +1,7 @@
+**What was done:** Fixed WI-684 by routing migration-only diffs under `apps/api/drizzle/*.sql` to the `db-migrations` change class and adding database package RLS coverage to that class.
+
+**What changed:** `scripts/check-change-class.sh` now matches migration SQL at `apps/api/drizzle/.*\.sql` and includes `pnpm exec nx run @eduagent/database:test` in the fast validation commands for `db-migrations`. `packages/database/project.json` now declares an explicit `test` target for `@eduagent/database`. `scripts/check-change-class.test.ts` covers migration-only router flags and the explicit database test target.
+
+**Verification:** Focused router test passed with 8 tests per worker evidence. Coordinator reran `pnpm exec nx run @eduagent/database:test --skip-nx-cache`, which passed with 26 suites and 292 tests, including `src/rls-coverage.test.ts`. Coordinator also ran a direct temporary-repo proof with only `apps/api/drizzle/9999_profile_table.sql` staged; it produced `classes=db-migrations`, `integration=true`, `eval=false`, and advisory output including `pnpm exec nx run @eduagent/database:test`. Worker evidence also recorded `pnpm exec tsc --build`, commit hooks, and pre-push validation passing for commit `971ceeddd026df1958548e0d362af592e3df8872`.
+
+**Caveats / Follow-ups:** The normal scripts Jest config did not discover this script test from the `.worktrees` path on Windows because of mixed-separator path handling, so the focused worker test used an inline equivalent config. No PR was created.

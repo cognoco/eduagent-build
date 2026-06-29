@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8113-a772-f5a3b197b35e",
+  "id": "WI-1005",
+  "name": "v2 Stripe checkout missing customer↔account binding check",
+  "description": "[FCR 2026-06-21 · L11-02] handleCheckoutCompletedV2 omits the legacy getSubscriptionByStripeCustomerId binding-mismatch refusal; a tampered metadata.accountId can activate a paid tier on the wrong account with no detection. Fix: add the binding check + captureException before activation.",
+  "acceptanceCriteria": "Root cause (at time of capture): handleCheckoutCompletedV2 in apps/api/src/services/billing/billing-v2/stripe-webhook-handler-v2.ts lacked the customer-account binding check present in the v1 handler (stripe-webhook-handler.ts:686-728 via getSubscriptionByStripeCustomerId), allowing a tampered metadata.accountId to activate a paid tier on the wrong account with no detection or Sentry escalation.\n\nCurrent state: FIX ALREADY SHIPPED in PR #1343 (commit b0b434072). The binding guard is present at stripe-webhook-handler-v2.ts:396-429: calls getSubscriptionByStripeCustomerIdV2, and if the bound subscription's accountId !== the metadata accountId, fires captureException with context 'stripe.webhook.v2.checkout.completed.account_binding_mismatch' and returns without activation. Four break tests in apps/api/src/services/billing/billing-v2/stripe-webhook-handler-v2.test.ts (lines 78-247) cover: (a) refuses + escalates when customer is bound to a different account; (b) activates when customer bound to same account; (c) activates first purchase (no prior binding); (d) skips check when session.customer is null.\n\nVariants: all four covered by existing tests — different-account tamper (blocked), same-account (passes), null customer (skip guard), first purchase (no prior binding). These are the exhaustive variant set.\n\nExecutor verification task: run the binding-guard suite (pnpm exec nx run api:test --testPathPattern=stripe-webhook-handler-v2) and confirm lines 78-247 all pass. Mark the WI closed if they do.",
+  "riskImpact": "Without the guard, a Stripe checkout webhook with a tampered metadata.accountId would activate a paid subscription on the wrong account — account-takeover via billing. Fix is confirmed shipped (PR #1343). IDENTITY_V2_ENABLED is off in prod.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

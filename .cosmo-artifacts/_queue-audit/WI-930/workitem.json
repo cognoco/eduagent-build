@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81d8-b0ce-cb3d0fd6cfb8",
+  "id": "WI-930",
+  "name": "learner-profile non-owner write path test missing profileId assertion",
+  "description": "[FCR 2026-06-21 · L4-07] adult-non-owner variant uses bare toHaveBeenCalled() with no profileId check, unlike the parent-owner block. Fix: assert toHaveBeenCalledWith(...ADULT_NON_OWNER_PROFILE_ID...).",
+  "acceptanceCriteria": "Root cause: adult non-owner write-path tests in learner-profile.test.ts use bare toHaveBeenCalled(), so they do not prove the route passed ADULT_NON_OWNER_PROFILE_ID to the memory service. Variants: DELETE /v1/learner-profile/all and POST /v1/learner-profile/consent for an adult non-owner must both assert the exact profileId argument. Regression test: apps/api/src/routes/learner-profile.test.ts fails if the route calls the mocked service with an owner/active profile id and passes only when called with ADULT_NON_OWNER_PROFILE_ID.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

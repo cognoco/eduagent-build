@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8106-aa06-d66f268a42f6",
+  "id": "WI-929",
+  "name": "Integration test: consent-gated route asserts status only, no body",
+  "description": "[FCR 2026-06-21 · L4-06] only asserts res.status 200 after a CONSENTED parent requests child's learner profile; a route returning {} or wrong profile would pass. Fix: assert body.id matches childProfileId.",
+  "acceptanceCriteria": "Root cause: the consented parent-child learner-profile integration test only asserts HTTP 200, so an empty body or wrong profile body would pass. Variants: CONSENTED child request must assert response body.id equals childProfileId; PENDING/DENIED child consent failures must continue to assert 403. Regression test: tests/integration/learner-profile-child-consent.integration.test.ts fails if GET /v1/learner-profile/:childId returns 200 with the wrong profile or empty body, and passes when the body assertion is added.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

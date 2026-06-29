@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-819c-98eb-ed218bfee6d3",
+  "id": "WI-1034",
+  "name": "node-tar <7.5.16 — 7 CVEs (path traversal, symlink poisoning) [devDep]",
+  "description": "tar@7.5.2 (transitive via @expo/cli in root package.json) has path-traversal, symlink poisoning, and TOCTOU race CVEs fixed in >=7.5.16. pnpm-lock.yaml line 12367 confirms tar@7.5.2 resolves, and line 15152 shows @expo/cli uses it. The vulnerability is exploitable when extracting attacker-controlled tarballs — @expo/cli extracts packages/archives during `expo install` and dependency management. This is a devDep chain. Fix: add pnpm.overrides \"tar\": \">=7.5.16\" in root package.json and re-lock.",
+  "acceptanceCriteria": "Root cause: tar@7.5.2 pinned transitively via @expo/cli (pnpm-lock.yaml:12367 and :15152); path-traversal/symlink-poisoning/TOCTOU-race CVEs fixed >=7.5.16. Variants: (a) path traversal via malicious tarball entry with \"../\" sequences during `expo install` package extraction; (b) symlink poisoning where a tarball entry creates a symlink pointing outside the target dir; (c) TOCTOU race between stat and extract allowing write to unintended path — three distinct exploit surfaces, all triggered only when extracting attacker-controlled tarballs in @expo/cli devDep context. Fix: pnpm.overrides \"tar\": \">=7.5.16\" in root package.json. Verification: `pnpm install` succeeds; `pnpm-lock.yaml` no longer resolves tar@7.5.2; `pnpm audit` no longer flags tar advisories; `pnpm exec nx run mobile:typecheck` passes. Scanner source: package.json (root) → @expo/cli → tar@<7.5.16 (FCR 2026-06-21 L13-14). Regression test not feasible as unit test (OS-level tarball extraction); audit-clean + lockfile upgrade to >=7.5.16 + typecheck green is the verification gate.",
+  "riskImpact": "P1: path traversal and symlink poisoning during tarball extraction via @expo/cli; exploitable by attacker-controlled packages during `expo install` on developer machines or CI; devDep-only but write-to-filesystem impact.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:batch-lane-4:WI-1034",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

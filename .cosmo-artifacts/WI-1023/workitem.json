@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81bf-a3cf-cf27c6b607b0",
+  "id": "WI-1023",
+  "name": "Upgrade vitest to >=3.2.6 — arbitrary file read when UI server running (CVE-2026-47429)",
+  "description": "[FCR 2026-06-21 · L13-03] vitest@3.2.4 (pulled via @nx/react→@nx/vite) allows arbitrary file read/execute via /__vitest_api__ when the UI dev server runs (CVE-2026-47429), fixed >=3.2.6. Root cause: pnpm-lock resolves vitest to 3.2.4 with no override pinning it to the safe version. Fix: add a pnpm override `\"vitest\": \">=3.2.6\"` in the root package.json overrides block.",
+  "acceptanceCriteria": "Root cause: vitest@3.2.4 resolved transitively via @nx/react→@nx/vite; CVE-2026-47429 allows arbitrary file read/execute via /__vitest_api__ when the UI dev server is running. Behavioral variants: (a) UI dev server running — /__vitest_api__ endpoint exposed, exploitable by any network-adjacent attacker; (b) CI/headless run without UI server — endpoint not exposed, exploit not reachable. Both variants are remediated by upgrading the package. Regression verification: after adding pnpm override `\"vitest\": \">=3.2.6\"` and running `pnpm install`, confirm `pnpm ls vitest` reports no version below 3.2.6. Run `pnpm exec nx run-many -t test` — all tests must remain green. Fix is done when: (1) pnpm-lock.yaml records vitest >=3.2.6 only, (2) `pnpm audit` no longer flags CVE-2026-47429, (3) full test suite stays green.",
+  "riskImpact": "vitest@3.2.4 (CVE-2026-47429) allows arbitrary file read and potential remote code execution via the /__vitest_api__ endpoint when the Vitest UI dev server is running. Attacker with network access to the dev server can exfiltrate source files or execute arbitrary files. Blast radius: development/CI environments where the UI server runs; not the production runtime, but sensitive source and secrets on developer machines are at risk.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P0",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8151-a5f4-d6961de3981e",
+  "id": "WI-943",
+  "name": "PersonScopeStructuralSubjects has no empty state",
+  "description": "[FCR 2026-06-21 · L6-02] successful fetch with zero subjects renders only a heading + empty View. Fix: add EmptyStateCard when subjects empty.",
+  "acceptanceCriteria": "Root cause: PersonScopeStructuralSubjects maps query.data?.subjects ?? [] with no zero-length branch, so a successful empty result renders only the heading and structural-only text. Variant: single variant, successful query with subjects: [] after loading completes. Regression test: add focused coverage for apps/mobile/src/components/support/PersonScopeStructuralSubjects.tsx (or the existing subjects screen harness) that fails without the fix and passes when an empty-state card/message is rendered instead of a blank list.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

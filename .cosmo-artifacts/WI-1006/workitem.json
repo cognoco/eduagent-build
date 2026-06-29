@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-818b-b3da-c4cc717551e4",
+  "id": "WI-1006",
+  "name": "v2 Stripe subscription handler drops top-up credit re-attribution",
+  "description": "[FCR 2026-06-21 · L11-03] handleSubscriptionEventV2 never calls reattributeTopUpCreditsOnModelChange; a tier change crossing the quota-model boundary strands top-up credits with no Sentry signal (legacy fix F-124/WI-618 not ported). Fix: port lockPreviousTierByStripeId + reattributeStripeTierChange + metric.",
+  "acceptanceCriteria": "Root cause: handleSubscriptionEventV2 and handleSubscriptionDeletedV2 in apps/api/src/services/billing/billing-v2/stripe-webhook-handler-v2.ts omit the lockPreviousTierByStripeId + reattributeTopUpCreditsOnModelChangeV2 + emitTopUpCreditsReattributedMetric sequence present in their v1 counterparts (stripe-webhook-handler.ts:392-468 and :515-567). A tier change crossing the quota-model boundary (e.g. family shared-pool to plus per-profile, or vice versa) strands top-up credits at the wrong profileId with no Sentry signal. The v2 reattribution function reattributeTopUpCreditsOnModelChangeV2 exists at billing-v2/tier-v2.ts:31 and is already proven in revenuecat-v2.ts:144.\n\nVariants: (a) family (shared-pool) → free expiry via handleSubscriptionDeletedV2: top_up_credits with profileId=null not re-attributed to owner personId; (b) plus (per-profile) → family via handleSubscriptionEventV2 effectiveTier branch: credits with owner profileId not nulled to shared-pool; (c) expiry branch in handleSubscriptionEventV2 (isExpired path): same gap as (a) for event-driven expiry; (d) handleSubscriptionDeletedV2 with no credits to reattribute: no-op expected, metric must not fire.\n\nFix: add module-private lockPreviousTierByStripeIdV2 and reattributeStripeTierChangeV2 helpers inside stripe-webhook-handler-v2.ts mirroring v1 lines 204-240, using findSubscriptionByStripeIdV2__unscoped + lockSubscriptionById__unscoped from @eduagent/database and reattributeTopUpCreditsOnModelChangeV2 from ./tier-v2. Wire previousTier + lock before updateSubscriptionFromWebhookV2 inside each transaction; call reattribute in both isExpired and effectiveTier branches; emit emitTopUpCreditsReattributedMetric outside the transaction when reattributedCount > 0. Apply identical treatment to handleSubscriptionDeletedV2.\n\nRegression test: create apps/api/src/services/billing/billing-v2/stripe-webhook-handler-v2.integration.test.ts. Add '[BREAK F-124-v2] handleSubscriptionEventV2 re-attributes top-up credits' describe block with three cases mirroring stripe-webhook-handler.integration.test.ts:310-438: expiry pro→free (null credits to owner), plus→family (owner credits nulled), plus→plus-no-change (no reattribution). All three cases must fail (credits NOT reattributed) without the fix and pass (credits correctly reattributed) with it.",
+  "riskImpact": "Top-up credits purchased by a user become permanently stranded or double-counted when their Stripe tier changes across the quota-model boundary under IDENTITY_V2_ENABLED. Silent data loss with no Sentry signal. IDENTITY_V2_ENABLED is off in prod; impact is contained until v2 cutover.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

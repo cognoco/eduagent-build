@@ -1,0 +1,17 @@
+{
+  "pageId": "3848bce9-1f7c-81db-9085-c8bc65f37d04",
+  "id": "WI-876",
+  "name": "[SUBJECT-21] Add direct curriculum retry endpoint coverage evidence",
+  "description": "Track the remaining curriculum retry pass-with-issues row where source/adjacent flow checks passed but the retry endpoint lacks direct flow evidence.",
+  "acceptanceCriteria": "SUBJECT-21 has direct route or browser-equivalent deterministic coverage for the curriculum retry endpoint; adjacent-only/source-only rationale is removed or explicitly justified; master flow plan row references this item.",
+  "riskImpact": "Retry behavior is a recovery path; without direct evidence, a broken retry could be hidden by adjacent successful subject flows.",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

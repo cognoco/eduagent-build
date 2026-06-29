@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-81d1-9aa7-effae7b5869e",
+  "id": "WI-673",
+  "name": "Extend the i18n ratchet to JSX attribute literals (per-prop allow/deny model)",
+  "description": "The forward-guard for WI-624 (WP-L12-label-prop-strings)'s cross-cutting sweep, deferred per the DoD deferral rule. scripts/check-i18n-jsx-literals.ts covers JSX text-children only; attribute literals (accessibilityLabel, placeholder, title, label, native-dialog copy) have NO automated guard — WI-624 swept the existing ~175 sites across 3 PRs (#1008, #1017, PR-C), but new hardcoded attribute copy can regress silently. Build the per-prop allow/deny model scoped in docs/audit/2026-05-29-full-audit/workflow-1/proposed-baseline.json (the surface mixes real copy with testID/style/a11y-role enum values, so a blanket scan is too noisy — needs prop-name classification). Remaining unswept surface: attribute literals outside WI-624's three PR groups (auth screens excluded by its brief; dev-only/brand-fixed sites). Owner: PRG-12 shepherd (created at WI-624 complete-time as the tracked deferred-guard WI).",
+  "acceptanceCriteria": "- scripts/check-i18n-jsx-literals.ts detects new user-visible JSX attribute literals for the agreed prop allow/deny surface (including accessibilityLabel, label, title, placeholder, and actionLabel) while ignoring non-copy props such as testID, style, role-like values, and IDs.\\n- The baseline format supports attribute violations with stable keys based on file, prop name, and text/content shape, not line number, so formatting churn does not create false positives.\\n- Existing JSX child/text literal behavior remains unchanged: current baseline entries continue to pass, new child/text literals still fail, and --accept updates only the intended baseline entries.\\n- Tests cover literal attributes, expression/string-template attributes, allowed non-copy attributes, dynamic values that cannot be statically resolved, and baseline cleanup reporting.\\n- The existing CI i18n hardcoded-JSX-literal check continues to run the guard and fails on new attribute-copy violations.",
+  "riskImpact": "",
+  "type": "Enhancement",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
