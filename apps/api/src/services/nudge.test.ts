@@ -148,6 +148,12 @@ interface MakeDbOptions {
   listRows?: ReturnType<typeof makeInsertedRow>[];
   /** Rows returned by update().returning() */
   updateRows?: { id: string }[];
+  /**
+   * Controls whether isGdprProcessingAllowedV2 returns true (allowed) or false
+   * (blocked). When true (default), consentGrant is seeded as CONSENTED.
+   * When false, consentGrant is seeded as WITHDRAWN so the GDPR gate blocks.
+   */
+  consentAllowed?: boolean;
 }
 
 function makeDb({
@@ -159,6 +165,7 @@ function makeDb({
   parentAccountTimezone,
   listRows = [],
   updateRows = [],
+  consentAllowed = true,
 }: MakeDbOptions = {}): Database {
   // ── update chain ──────────────────────────────────────────────────────────
   const updateReturning = jest.fn().mockResolvedValue(updateRows);
@@ -176,21 +183,46 @@ function makeDb({
   // ── select chain (rate-limit count AND list query share the same head) ─────
   // The rate-limit count call terminates at .where(...)
   // The list query continues: .from().innerJoin().innerJoin().where().orderBy()
-  // We build a single fluent chain that handles both shapes.
+  // The v2 person/org queries: .from().where().limit(1) and
+  //   .from().innerJoin().where().limit(1)
+  // We build a single fluent chain that handles all shapes.
 
   const selectOrderBy = jest.fn().mockResolvedValue(listRows);
-  const selectWhereList = jest.fn().mockReturnValue({ orderBy: selectOrderBy });
+  // .limit(1) on a post-innerJoin where — used by the org-timezone query
+  // (db.select({timezone}).from(membership).innerJoin(org).where(...).limit(1)).
+  // Return the recipient's timezone so quiet-hours logic sees the right value.
+  const selectLimitAfterList = jest
+    .fn()
+    .mockResolvedValue(
+      accountTimezone !== null ? [{ timezone: accountTimezone }] : [],
+    );
+  const selectWhereList = jest
+    .fn()
+    .mockReturnValue({ orderBy: selectOrderBy, limit: selectLimitAfterList });
   const selectInnerJoin2 = jest
     .fn()
     .mockReturnValue({ where: selectWhereList });
   const selectInnerJoin1 = jest
     .fn()
-    .mockReturnValue({ innerJoin: selectInnerJoin2 });
+    .mockReturnValue({ innerJoin: selectInnerJoin2, where: selectWhereList });
 
-  // rate-limit .where() returns the count row directly (no further chaining)
-  const selectWhereCount = jest.fn().mockResolvedValue([{ count: nudgeCount }]);
+  // rate-limit .where() returns the count row directly (no further chaining).
+  // [WI-586] v2 also calls .where().limit(1) for person displayName lookup
+  // (db.select({displayName}).from(person).where(...).limit(1)).
+  // We make .where() return a thenable that also has .limit().
+  const fromDisplayName = fromProfile?.displayName ?? null;
+  const selectLimitAfterCount = jest
+    .fn()
+    .mockResolvedValue(
+      fromDisplayName !== null ? [{ displayName: fromDisplayName }] : [],
+    );
+  const selectWhereCount = jest.fn().mockReturnValue(
+    Object.assign(Promise.resolve([{ count: nudgeCount }]), {
+      limit: selectLimitAfterCount,
+    }),
+  );
 
-  // .from() returns an object that can serve BOTH shapes depending on what
+  // .from() returns an object that can serve ALL shapes depending on what
   // the caller chains next. For nudge.ts the rate-limit call chains .where()
   // and the list call chains .innerJoin(). We cover both by returning an
   // object with all possible next methods.
@@ -240,6 +272,17 @@ function makeDb({
     .fn()
     .mockImplementation((cb: (tx: TxShape) => Promise<unknown>) => cb(tx));
 
+  // ── GDPR-gate seams (isGdprProcessingAllowedV2) ───────────────────────────
+  // isGdprProcessingAllowedV2 reads:
+  //   1. db.query.membership.findFirst  → resolves organizationId
+  //   2. db.query.consentGrant.findFirst → current grant (max grantedAt)
+  //   3. db.query.consentRequest.findFirst → request row (prevents lazy minGrantedAt select)
+  // consentAllowed=true → grant with withdrawnAt:null → status CONSENTED → allowed
+  // consentAllowed=false → grant with withdrawnAt set → status WITHDRAWN → blocked
+  const consentGrantRow = consentAllowed
+    ? { granted: true, withdrawnAt: null, grantedAt: new Date() }
+    : { granted: true, withdrawnAt: new Date(), grantedAt: new Date() };
+
   return {
     select: selectFn,
     insert: insertFn,
@@ -248,6 +291,24 @@ function makeDb({
     query: {
       profiles: { findFirst: profilesFindFirst },
       accounts: { findFirst: accountsFindFirst },
+      membership: {
+        findFirst: jest.fn().mockResolvedValue({ organizationId: 'org-1' }),
+      },
+      consentGrant: { findFirst: jest.fn().mockResolvedValue(consentGrantRow) },
+      consentRequest: {
+        findFirst: jest.fn().mockResolvedValue({
+          status: 'requested',
+          requestedAt: new Date(),
+          createdAt: new Date(),
+        }),
+      },
+      // listUnreadNudges calls getGuardianPersonIds → db.query.guardianship.findMany.
+      // Seed one guardian (the fromProfileId) so the early-return guard passes.
+      guardianship: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ guardianPersonId: FROM_PROFILE_ID }]),
+      },
     },
   } as unknown as Database;
 }
@@ -395,8 +456,7 @@ describe('createNudge', () => {
 
   describe('consent gating', () => {
     it('[BREAK] throws ConsentRequiredError when consent status is PENDING', async () => {
-      mockGetConsentStatus.mockResolvedValue('PENDING');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -409,8 +469,7 @@ describe('createNudge', () => {
     });
 
     it('throws ConsentRequiredError when consent status is WITHDRAWN', async () => {
-      mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -423,8 +482,7 @@ describe('createNudge', () => {
     });
 
     it('throws ConsentRequiredError when consent status is PARENTAL_CONSENT_REQUESTED', async () => {
-      mockGetConsentStatus.mockResolvedValue('PARENTAL_CONSENT_REQUESTED');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -457,8 +515,7 @@ describe('createNudge', () => {
     });
 
     it('error carries the expected code CONSENT_REQUIRED', async () => {
-      mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -471,8 +528,7 @@ describe('createNudge', () => {
     });
 
     it('does not insert a nudge row when consent check fails', async () => {
-      mockGetConsentStatus.mockResolvedValue('PENDING');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -723,8 +779,7 @@ describe('createNudge', () => {
       // Both guards fail — the thrown error must be ForbiddenError (parent
       // access is checked first in the source).
       mockAssertParentAccess.mockRejectedValue(new ForbiddenError());
-      mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
-      const db = makeDb();
+      const db = makeDb({ consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -738,8 +793,7 @@ describe('createNudge', () => {
 
     it('checks consent before rate limit', async () => {
       // Both consent and rate-limit fail — consent is checked first.
-      mockGetConsentStatus.mockResolvedValue('PENDING');
-      const db = makeDb({ nudgeCount: 4 });
+      const db = makeDb({ nudgeCount: 4, consentAllowed: false });
 
       await expect(
         createNudge(db, {
@@ -873,16 +927,19 @@ describe('[WI-803] listUnreadNudges v2 dispatch', () => {
     } as unknown as import('@eduagent/database').Database;
   }
 
-  it('[WI-803] flag-off: reads familyLinks (legacy path, never touches guardianship)', async () => {
+  it('[WI-803] post-collapse: always reads guardianship (v2 path is unconditional)', async () => {
+    // Post-flag-collapse the flag-off branch is gone; listUnreadNudges always
+    // calls getGuardianPersonIds → db.query.guardianship.findMany.
     const db = makeDb({ listRows: [] });
     await listUnreadNudges(db, TO_PROFILE_ID);
     expect(
-      (db.query as { guardianship?: unknown }).guardianship,
-    ).toBeUndefined();
-    // legacy select chain was called (from + innerJoin)
-    expect((db.select as jest.Mock).mock.calls.length).toBeGreaterThanOrEqual(
-      1,
-    );
+      (db.query as unknown as { guardianship?: { findMany: jest.Mock } })
+        .guardianship,
+    ).toBeDefined();
+    expect(
+      (db.query as unknown as { guardianship: { findMany: jest.Mock } })
+        .guardianship.findMany,
+    ).toHaveBeenCalled();
   });
 
   it('[WI-803][BREAK] flag-on: returns empty when no guardians exist (post-M-DROP safe)', async () => {

@@ -129,28 +129,38 @@ jest.mock(
   }),
 );
 
-// [WI-586 flip-safety] v2 profile-scope resolver — so the profile-scope
-// middleware's owner derivation (roles.includes('admin')) does not hit the
-// unmocked DB under flag-ON.
-jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
-  () => {
-    const ownerScope = {
-      profileId: 'test-profile-id',
-      meta: {
-        birthYear: 1990,
-        location: null,
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    };
-    return {
-      findOwnerPersonScope: jest.fn().mockResolvedValue(ownerScope),
-      getPersonScope: jest.fn().mockResolvedValue(ownerScope),
-    };
+// [WI-867] profile-v2 seam — profile-scope middleware calls findOwnerPersonScope /
+// getPersonScope (db.select() join chains, unrunnable on unit mock DB).
+// Module-level refs allow per-test override (e.g. auto-file profile suites).
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'test-profile-id',
+  meta: {
+    birthYear: 1990,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
   },
+});
+const mockGetPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'test-profile-id',
+  meta: {
+    birthYear: 1990,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
+  },
+});
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
 );
 
 // ---------------------------------------------------------------------------
@@ -263,42 +273,50 @@ jest.mock('../services/billing', () => {
 // the same shapes so a metered route (evaluate-depth) authorises under flag-ON
 // without an unmocked DB. The v2 twins themselves are covered by the billing-v2
 // integration suites.
-jest.mock('../services/billing/billing-v2', () => {
-  const actual = jest.requireActual(
-    '../services/billing/billing-v2',
-  ) as typeof import('../services/billing/billing-v2');
-  return {
-    ...actual,
-    ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
-    getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
-      subscription: mockSubscription,
-      effectiveAccessTier: 'plus',
-      billingAccess: 'current',
-    }),
-    getQuotaPoolV2: jest.fn().mockResolvedValue({
-      id: 'qp-1',
-      subscriptionId: 'sub-1',
-      monthlyLimit: 500,
-      usedThisMonth: 10,
-      dailyLimit: null,
-      usedToday: 0,
-      cycleResetAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-    getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
-      id: 'pqu-1',
-      subscriptionId: 'sub-1',
-      profileId: 'test-profile-id',
-      role: 'owner',
-      monthlyLimit: 700,
-      usedThisMonth: 10,
-      dailyLimit: null,
-      usedToday: 0,
-      cycleResetAt: new Date().toISOString(),
-    }),
-  };
-});
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      // [WI-867] Post-collapse: account middleware calls ensureInitialTrialSubscriptionV2
+      // unconditionally. Continuity mock resolves cleanly.
+      // gc1-allow: ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() — unseedable;
+      // real path: apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts
+      ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+      ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscription),
+      getEffectiveAccessForSubscriptionV2: jest.fn().mockResolvedValue({
+        subscription: mockSubscription,
+        effectiveAccessTier: 'plus',
+        billingAccess: 'current',
+      }),
+      getQuotaPoolV2: jest.fn().mockResolvedValue({
+        id: 'qp-1',
+        subscriptionId: 'sub-1',
+        monthlyLimit: 500,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+      getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+        id: 'pqu-1',
+        subscriptionId: 'sub-1',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 700,
+        usedThisMonth: 10,
+        dailyLimit: null,
+        usedToday: 0,
+        cycleResetAt: new Date().toISOString(),
+      }),
+    };
+  },
+);
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -1087,38 +1105,18 @@ describe('session routes', () => {
       );
     });
 
-    // [WI-586 flip-safety] The age-bracket reader must be flag-gated: flag-OFF
-    // reads `profiles` (getProfileAgeBracket), flag-ON reads `person`
-    // (getPersonAgeBracket) since `profiles` is dropped post-#8. Breaking the
-    // route wiring (reverting to an unconditional getProfileAgeBracket) makes
-    // the flag-ON assertion fail.
-    it('flag-OFF: reads the age bracket from the legacy profiles path', async () => {
+    // [WI-867] CUT: flag-OFF path dropped — route always calls getPersonAgeBracket post-collapse.
+    // Original test: 'flag-OFF: reads the age bracket from the legacy profiles path'.
+
+    // [WI-586 flip-safety, WI-867] evaluate-depth always reads the age bracket from the
+    // v2 person path (getPersonAgeBracket) post-collapse. The flag-ON env is preserved
+    // here as a no-op to demonstrate the route works with or without the flag set.
+    // RED-FLIP: stub getPersonAgeBracket to throw and this test fails → proves the v2 path is live.
+    it('reads the age bracket from the v2 person path', async () => {
       const res = await app.request(
         `/v1/sessions/${SESSION_ID}/evaluate-depth`,
         { method: 'POST', headers: AUTH_HEADERS },
         TEST_ENV,
-      );
-
-      expect(res.status).toBe(200);
-      expect(getProfileAgeBracket).toHaveBeenCalledWith(
-        expect.anything(),
-        'test-profile-id',
-      );
-      expect(getPersonAgeBracket).not.toHaveBeenCalled();
-    });
-
-    // [WI-586 flip-safety] evaluate-depth is a METERED route, so under flag-ON the
-    // metering middleware reads the billing-v2 store twins (ensureFreeSubscriptionV2 /
-    // getQuotaPoolV2 / getEffectiveAccessForSubscriptionV2 /
-    // getOrProvisionProfileQuotaUsageV2), mocked above. With those stubbed the
-    // flag-ON request reaches the handler and the age-bracket read routes to the
-    // v2 person path. Inverting the route wiring back to an unconditional
-    // getProfileAgeBracket makes this assertion fail (the break-restore guard).
-    it('flag-ON: reads the age bracket from the v2 person path', async () => {
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/evaluate-depth`,
-        { method: 'POST', headers: AUTH_HEADERS },
-        { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' },
       );
 
       expect(res.status).toBe(200);
@@ -1437,18 +1435,20 @@ describe('session routes', () => {
       'X-Profile-Id': AUTO_FILE_PROFILE_ID,
     };
     const useAutoFileProfile = () => {
-      const profileServiceMock = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-        findOwnerProfile: jest.Mock;
-      };
-      const profile = {
-        id: AUTO_FILE_PROFILE_ID,
-        birthYear: null,
-        location: null,
-        consentStatus: 'CONSENTED',
-      };
-      profileServiceMock.getProfile.mockResolvedValueOnce(profile);
-      profileServiceMock.findOwnerProfile.mockResolvedValueOnce(profile);
+      // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (profile-v2)
+      // when X-Profile-Id header is present. Override to return AUTO_FILE_PROFILE_ID scope.
+      // RED-FLIP: remove this and auto-file tests get wrong profileId → wrong session filing.
+      mockGetPersonScope.mockResolvedValueOnce({
+        profileId: AUTO_FILE_PROFILE_ID,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      });
     };
 
     beforeEach(() => {
@@ -3332,6 +3332,20 @@ describe('session routes', () => {
         isOwner: true,
       });
 
+      // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (v2).
+      // Override to return RETRY_PROFILE_ID so filingRetryEventSchema.parse succeeds.
+      mockGetPersonScope.mockResolvedValue({
+        profileId: RETRY_PROFILE_ID,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      });
+
       // Reset getSession to the default happy-path value.
       (getSession as jest.Mock).mockReset();
       // Stub db.update chain to return one row by default (success path).
@@ -3359,6 +3373,18 @@ describe('session routes', () => {
         birthYear: null,
         location: null,
         consentStatus: 'CONSENTED',
+      });
+      // [WI-867] Restore default getPersonScope.
+      mockGetPersonScope.mockResolvedValue({
+        profileId: 'test-profile-id',
+        meta: {
+          birthYear: 1990,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
       });
     });
 

@@ -449,7 +449,10 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
     const handler = (recallNudge as any).fn;
     await handler({ step });
 
-    expect(db.builder.innerJoin).toHaveBeenCalledTimes(7);
+    // [WI-867] v2-only collapse: query now joins person×membership×organization
+    // (3) + retentionCards + curriculumTopics + curriculumBooks + curricula +
+    // subjects + notificationPreferences = 8. Pre-collapse v1 path had 7.
+    expect(db.builder.innerJoin).toHaveBeenCalledTimes(8);
   });
 
   it('fans out correctly when DB query returns eligible profiles', async () => {

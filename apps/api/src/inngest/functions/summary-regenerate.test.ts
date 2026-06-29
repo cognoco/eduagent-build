@@ -101,7 +101,18 @@ describe('summary-regenerate handlers', () => {
       .fn()
       .mockReturnValue({ where: mockSelectWhere });
     const mockSelect = jest.fn().mockReturnValue({ from: mockSelectFrom });
-    mockGetStepDatabase.mockReturnValue({ select: mockSelect });
+    mockGetStepDatabase.mockReturnValue({
+      select: mockSelect,
+      // WI-867: v2 seam — getPersonLlmContext reads db.query.person.findFirst
+      query: {
+        person: {
+          findFirst: jest.fn().mockResolvedValue({
+            birthDate: '2010-01-01',
+            conversationLanguage: 'en',
+          }),
+        },
+      },
+    });
   });
 
   it('creates a missing summary row and emits app/session.summary.generated', async () => {

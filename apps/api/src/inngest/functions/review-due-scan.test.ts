@@ -71,7 +71,10 @@ describe('reviewDueScan — find-overdue-profiles step DB path', () => {
     const handler = (reviewDueScan as any).fn;
     await handler({ step });
 
-    expect(db.builder.innerJoin).toHaveBeenCalledTimes(7);
+    // [WI-867] v2-only collapse: query now joins person×membership×organization
+    // (3) + retentionCards + curriculumTopics + curriculumBooks + curricula +
+    // subjects + notificationPreferences = 8. Pre-collapse v1 path had 7.
+    expect(db.builder.innerJoin).toHaveBeenCalledTimes(8);
   });
 
   it('maps null topTopicIds to an empty array before fan-out', async () => {
@@ -96,58 +99,28 @@ describe('reviewDueScan — find-overdue-profiles step DB path', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-777] Identity-V2 wiring guard (CUT-B2).
+// [WI-777] Identity-V2 wiring guard (CUT-B2 → [WI-867] v2-only).
 //
-// The find-overdue-profiles step branches on isIdentityV2EnabledInStep():
-//   - v2:     SELECT … FROM person  (canonical model — person × membership ×
-//             organization + consentGateSatisfiedSql; no consentStates subquery)
-//   - legacy: SELECT … FROM profiles (profiles × accounts × consentStates)
-// These tests assert the correct query root is chosen per flag, so a future
-// regression of the v2 wiring (e.g. dropping the branch) fails CI before
-// WP-FLAG removes the legacy tables. The DB module is NOT mocked here, so
-// `person` / `profiles` / `consentStates` are the real Drizzle table objects
-// the source passes to `.from(...)`.
+// [WI-867] The flag branch was removed; the find-overdue-profiles step is
+// v2-only (person × membership × organization + consentGateSatisfiedSql).
+// The flag-on assertion still verifies the correct query root. The flag-off
+// legacy-path test is dropped: the legacy branch no longer exists in source.
 // ---------------------------------------------------------------------------
 
 describe('[WI-777] reviewDueScan identity-v2 wiring', () => {
-  it('flag-on: query reads the canonical `person` model, not legacy `profiles`', async () => {
-    const prev = process.env['IDENTITY_V2_ENABLED'];
-    process.env['IDENTITY_V2_ENABLED'] = 'true';
-    try {
-      const db = buildChainableDb([]);
-      mockGetStepDatabase.mockReturnValue(db);
+  it('query reads the canonical `person` model, not legacy `profiles`', async () => {
+    const db = buildChainableDb([]);
+    mockGetStepDatabase.mockReturnValue(db);
 
-      const { step } = createInngestStepRunner();
-      const handler = (reviewDueScan as any).fn;
-      await handler({ step });
+    const { step } = createInngestStepRunner();
+    const handler = (reviewDueScan as any).fn;
+    await handler({ step });
 
-      // v2 query roots on `person`; the legacy `profiles` / `consentStates`
-      // surfaces are absent (v2 uses consentGateSatisfiedSql, not a
-      // consentStates subquery).
-      expect(db.builder.from).toHaveBeenCalledWith(person);
-      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
-      expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
-    } finally {
-      restoreFlag(prev);
-    }
-  });
-
-  it('flag-off: legacy path stays intact — query reads `profiles`, not `person`', async () => {
-    const prev = process.env['IDENTITY_V2_ENABLED'];
-    delete process.env['IDENTITY_V2_ENABLED'];
-    try {
-      const db = buildChainableDb([]);
-      mockGetStepDatabase.mockReturnValue(db);
-
-      const { step } = createInngestStepRunner();
-      const handler = (reviewDueScan as any).fn;
-      await handler({ step });
-
-      expect(db.builder.from).toHaveBeenCalledWith(profiles);
-      expect(db.builder.from).not.toHaveBeenCalledWith(person);
-    } finally {
-      restoreFlag(prev);
-    }
+    // [WI-867] v2-only: source always queries from person; profiles /
+    // consentStates surfaces are absent (consent gate via consentGateSatisfiedSql).
+    expect(db.builder.from).toHaveBeenCalledWith(person);
+    expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
+    expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
   });
 });
 

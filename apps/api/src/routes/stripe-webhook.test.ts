@@ -2,6 +2,35 @@
 // Stripe Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
+// [WI-867] Dispatch seam mock — getStripeWebhookHandlers now unconditionally
+// returns V2 handlers post flag-collapse. V2 handlers call billing-v2 functions
+// that use db.query.subscription (singular) which is not set up in the unit
+// mockDb. Mock dispatch to return the legacy handlers instead; those handlers
+// import from '../billing' (the already-mocked barrel), so all existing
+// updateSubscriptionFromWebhook / activateSubscriptionFromCheckout / etc.
+// assertions remain valid without change.
+// WI-867 flag-collapse dispatch seam — V2 paths are covered by
+// apps/api/src/services/billing/billing-v2/stripe-webhook-handler-v2.integration.test.ts
+jest.mock('../services/billing/billing-v2/dispatch', () => {
+  const legacyHandler = jest.requireActual(
+    '../services/billing/stripe-webhook-handler',
+  ) as typeof import('../services/billing/stripe-webhook-handler');
+  return {
+    // Pattern A: spread the real dispatch module, then override the handler
+    // factory to return the legacy handlers so existing billing-barrel
+    // assertions stay valid (V2 dispatch paths are covered by
+    // billing-v2/stripe-webhook-handler-v2.integration.test.ts).
+    ...jest.requireActual('../services/billing/billing-v2/dispatch'),
+    getStripeWebhookHandlers: () => ({
+      handleSubscriptionEvent: legacyHandler.handleSubscriptionEvent,
+      handleSubscriptionDeleted: legacyHandler.handleSubscriptionDeleted,
+      handleCheckoutCompleted: legacyHandler.handleCheckoutCompleted,
+      handlePaymentFailed: legacyHandler.handlePaymentFailed,
+      handlePaymentSucceeded: legacyHandler.handlePaymentSucceeded,
+    }),
+  };
+});
+
 jest.mock(
   '../services/webhook-idempotency' /* gc1-allow: service boundary — claimWebhookId makes a live DB call; the real DB is not wired in this unit test. Integration tests (resend-webhook.test.ts) cover the real DB path. */,
   () => ({

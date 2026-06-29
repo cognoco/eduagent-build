@@ -28,6 +28,7 @@ jest.mock(
 );
 
 // gc1-allow: unit-route isolation; real service covered by profile-v2.integration.test.ts
+// [WI-867] getProfileV2 and updateProfileV2 added — route now uses v2 reads/writes post-collapse.
 jest.mock('../services/identity-v2/profile-v2', () => {
   const actual = jest.requireActual(
     '../services/identity-v2/profile-v2',
@@ -36,6 +37,9 @@ jest.mock('../services/identity-v2/profile-v2', () => {
     ...actual,
     listProfilesV2: jest.fn(),
     getOwnerProfileV2: jest.fn(),
+    getProfileV2: jest.fn(),
+    updateProfileV2: jest.fn(),
+    // [WI-867] POST /v1/profiles/switch uses getPersonScope post-collapse (no-op switchProfile).
     getPersonScope: jest.fn(),
   };
 });
@@ -75,18 +79,20 @@ import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
   listProfiles,
-  createProfileWithLimitCheck,
   assertProfileCreationAllowed,
-  getProfile,
-  updateProfile,
   updateProfileAppContext,
-  switchProfile,
+  // [WI-867] createProfileWithLimitCheck / getProfile / updateProfile / switchProfile
+  // no longer called post-collapse; kept as type-only to avoid unused-import TS errors.
+  // Remove when legacy mock bindings below are dropped.
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
 import {
   listProfilesV2,
   getOwnerProfileV2,
+  getProfileV2,
+  updateProfileV2,
+  getPersonScope,
 } from '../services/identity-v2/profile-v2';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
@@ -174,18 +180,18 @@ function makeApp(overrides?: {
 }
 
 const listProfilesMock = jest.mocked(listProfiles);
-const createProfileWithLimitCheckMock = jest.mocked(
-  createProfileWithLimitCheck,
-);
+// [WI-867] assertProfileCreationAllowedMock still used by CUT-B2 tests below.
 const assertProfileCreationAllowedMock = jest.mocked(
   assertProfileCreationAllowed,
 );
-const getProfileMock = jest.mocked(getProfile);
-const updateProfileMock = jest.mocked(updateProfile);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
-const switchProfileMock = jest.mocked(switchProfile);
 const listProfilesV2Mock = jest.mocked(listProfilesV2);
 const getOwnerProfileV2Mock = jest.mocked(getOwnerProfileV2);
+// [WI-867] Route now uses v2 reads/writes for GET/PATCH /v1/profiles/:id post-collapse.
+const getProfileV2Mock = jest.mocked(getProfileV2);
+const updateProfileV2Mock = jest.mocked(updateProfileV2);
+// [WI-867] POST /v1/profiles/switch uses getPersonScope (ownership check) post-collapse.
+const getPersonScopeMock = jest.mocked(getPersonScope);
 const createChildProfileV2Mock = jest.mocked(createChildProfileV2);
 const createIdentityGraphMock = jest.mocked(createIdentityGraph);
 
@@ -202,21 +208,23 @@ beforeEach(() => {
 describe('GET /v1/profiles', () => {
   it('returns 200 with the profile list for the authenticated account', async () => {
     const profile = makeProfileRow({ id: PROFILE_ID_A });
-    listProfilesMock.mockResolvedValue([profile]);
+    // [WI-867] Post-collapse: route always calls listProfilesV2 (no flag branch).
+    listProfilesV2Mock.mockResolvedValue([profile]);
 
     const res = await makeApp().request('/v1/profiles');
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ profiles: [{ id: PROFILE_ID_A }] });
-    expect(listProfilesMock).toHaveBeenCalledWith(
+    expect(listProfilesV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       ACCOUNT_ID,
     );
   });
 
   it('returns 200 with empty array when the account has no profiles', async () => {
-    listProfilesMock.mockResolvedValue([]);
+    // [WI-867] Post-collapse: route always calls listProfilesV2.
+    listProfilesV2Mock.mockResolvedValue([]);
 
     const res = await makeApp().request('/v1/profiles');
 
@@ -277,7 +285,8 @@ describe('GET /v1/profiles', () => {
   });
 
   it('propagates service errors to 500', async () => {
-    listProfilesMock.mockRejectedValue(new Error('DB timeout'));
+    // [WI-867] Post-collapse: route calls listProfilesV2 — error from v2 fn bubbles to 500.
+    listProfilesV2Mock.mockRejectedValue(new Error('DB timeout'));
 
     const res = await makeApp().request('/v1/profiles');
 
@@ -310,19 +319,7 @@ describe('GET /v1/profiles', () => {
     expect(listProfilesMock).not.toHaveBeenCalled();
   });
 
-  // [CUT-B2] Flag-off: the legacy listProfiles path stays intact (until WP-FLAG).
-  it('[CUT-B2] reads legacy listProfiles when IDENTITY_V2_ENABLED is not set', async () => {
-    listProfilesMock.mockResolvedValue([]);
-
-    const res = await makeApp().request('/v1/profiles');
-
-    expect(res.status).toBe(200);
-    expect(listProfilesMock).toHaveBeenCalledWith(
-      expect.anything(),
-      ACCOUNT_ID,
-    );
-    expect(listProfilesV2Mock).not.toHaveBeenCalled();
-  });
+  // [WI-867] CUT: legacy listProfiles path dropped — route always calls listProfilesV2 post-collapse.
 
   // [WI-799] Guardian family list with ≥13 children must serialize to 200, not
   // 500. profileListResponseSchema.parse() enforces the v1 13+ birthYear floor;
@@ -369,9 +366,18 @@ describe('GET /v1/profiles', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /v1/profiles', () => {
-  it('returns 201 with the created profile on valid input', async () => {
-    const profile = makeProfileRow({ id: PROFILE_ID_A, displayName: 'Alex' });
-    createProfileWithLimitCheckMock.mockResolvedValue(profile);
+  // [WI-867] Post-collapse: POST /v1/profiles with account present uses the v2
+  // post-graph path. Non-child creates are idempotent replays of the owner bootstrap
+  // (getOwnerProfileV2 → 201 if owner exists, 409 if not). Child creates go through
+  // createChildProfileV2. Legacy createProfileWithLimitCheck is no longer called.
+
+  it('returns 201 with the owner profile on idempotent replay (owner already exists)', async () => {
+    const profile = makeProfileRow({
+      id: PROFILE_ID_A,
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    getOwnerProfileV2Mock.mockResolvedValue(profile);
 
     const res = await makeApp().request('/v1/profiles', {
       method: 'POST',
@@ -390,17 +396,10 @@ describe('POST /v1/profiles', () => {
     });
   });
 
-  it('allows first profile creation when no owner profile exists yet', async () => {
-    const profile = makeProfileRow({
-      id: PROFILE_ID_A,
-      displayName: 'First Owner',
-      isOwner: true,
-    });
-    createProfileWithLimitCheckMock.mockResolvedValue(profile);
-    // [BUG-407] profileMeta absent + count=0 → first-profile path, always
-    // allowed. The route delegates that decision to assertProfileCreationAllowed
-    // (mocked to resolve by default); the real count logic is covered in
-    // services/profile.test.ts.
+  it('returns 409 when account exists but has no owner (broken graph)', async () => {
+    // [WI-867] CUT: "first profile creation" (assertProfileCreationAllowed + createProfileWithLimitCheck)
+    // no longer reachable when account is present. Route returns 409 when getOwnerProfileV2 → null.
+    getOwnerProfileV2Mock.mockResolvedValue(null);
 
     const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
       method: 'POST',
@@ -412,26 +411,9 @@ describe('POST /v1/profiles', () => {
       }),
     });
 
-    expect(res.status).toBe(201);
-    // Route delegated the authorization decision to the service helper with
-    // the (absent) profileMeta it read off the context.
-    expect(assertProfileCreationAllowedMock).toHaveBeenCalledWith(
-      expect.anything(),
-      ACCOUNT_ID,
-      undefined,
-    );
-    expect(createProfileWithLimitCheckMock).toHaveBeenCalledWith(
-      expect.anything(),
-      ACCOUNT_ID,
-      expect.objectContaining({ displayName: 'First Owner' }),
-      // [OPT-C] Route now threads the kill-switch from c.env; assertion needs
-      // to accept the opts arg added by the adult-owner-gate wiring.
-      expect.objectContaining({ adultOwnerGateEnabled: expect.any(Boolean) }),
-    );
+    expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body).toMatchObject({
-      profile: { id: PROFILE_ID_A, isOwner: true },
-    });
+    expect(body).toMatchObject({ code: ERROR_CODES.CONFLICT });
   });
 
   it('returns 400 when required fields are missing', async () => {
@@ -442,7 +424,7 @@ describe('POST /v1/profiles', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+    expect(getOwnerProfileV2Mock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when birthYear is a string instead of a number', async () => {
@@ -457,82 +439,20 @@ describe('POST /v1/profiles', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+    expect(getOwnerProfileV2Mock).not.toHaveBeenCalled();
   });
 
-  it('returns 402 when the subscription profile limit is exceeded', async () => {
-    createProfileWithLimitCheckMock.mockRejectedValue(new ProfileLimitError());
+  // [WI-867] CUT: 402 (ProfileLimitError) and 400 (ProfileValidationError) from
+  // createProfileWithLimitCheck no longer reachable for non-child owner-replay path.
+  // Coverage moves to createChildProfileV2 error paths (tested in [WI-811] block below).
 
-    const res = await makeApp().request('/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        displayName: 'Alex',
-        birthYear: 2000,
-        location: 'EU',
-      }),
-    });
+  // [WI-867] CUT: 500 from createProfileWithLimitCheck no longer reachable in
+  // non-child owner-replay path. Covered by integration tests.
 
-    expect(res.status).toBe(402);
-    const body = await res.json();
-    expect(body).toMatchObject({ code: ERROR_CODES.PROFILE_LIMIT_EXCEEDED });
-  });
-
-  it('returns 400 when the service throws a ProfileValidationError', async () => {
-    createProfileWithLimitCheckMock.mockRejectedValue(
-      new ProfileValidationError(
-        'CHILD_AGE_VIOLATION',
-        'birthYear',
-        'User must be at least 13',
-      ),
-    );
-
-    // [WI-570] birthYearSchema rejects ages < 13 at the request boundary
-    // (v1 13+ floor). Use a schema-valid birthYear (age 14) and let the
-    // mocked service throw ProfileValidationError — this exercises the
-    // 400-on-service-throw branch without triggering Zod rejection.
-    const res = await makeApp().request('/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        displayName: 'Young',
-        birthYear: new Date().getFullYear() - 14,
-        location: 'EU',
-      }),
-    });
-
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body).toMatchObject({ code: ERROR_CODES.VALIDATION_ERROR });
-  });
-
-  it('propagates unexpected service errors to 500', async () => {
-    createProfileWithLimitCheckMock.mockRejectedValue(new Error('unexpected'));
-
-    const res = await makeApp().request('/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        displayName: 'Alex',
-        birthYear: 2000,
-        location: 'EU',
-      }),
-    });
-
-    expect(res.status).toBe(500);
-  });
-
-  // [CR-2026-05-19-H1] HTTP-translation test — when the service-owned gate
-  // (assertProfileCreationAllowed) throws ForbiddenError (non-owner case), the
-  // route must return 403 and never call createProfileWithLimitCheck. The
-  // allow/deny/fail-closed *decision* logic itself is unit-tested directly
-  // against the real helper in services/profile.test.ts.
-  it('[CR-2026-05-19-H1] returns 403 when assertProfileCreationAllowed throws ForbiddenError (non-owner)', async () => {
-    assertProfileCreationAllowedMock.mockRejectedValue(
-      new ForbiddenError(
-        'Only the account owner can create additional profiles.',
-      ),
-    );
+  // [WI-867] CUT: assertProfileCreationAllowed gates no longer called in v2 path.
+  // WI-811 tests below cover the v2 child-create authorization.
+  it('[WI-811] returns 403 when a non-owner attempts a non-child POST (owner-only gate)', async () => {
+    getOwnerProfileV2Mock.mockResolvedValue(null);
 
     const res = await makeApp({ isOwner: false }).request('/v1/profiles', {
       method: 'POST',
@@ -541,46 +461,14 @@ describe('POST /v1/profiles', () => {
         displayName: 'Alex',
         birthYear: 2000,
         location: 'EU',
+        kind: 'child',
       }),
     });
 
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-    // Creation service must not run when the gate rejects.
-    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
-    // Route passed the active profileMeta straight through to the gate.
-    expect(assertProfileCreationAllowedMock).toHaveBeenCalledWith(
-      expect.anything(),
-      ACCOUNT_ID,
-      expect.objectContaining({ isOwner: false }),
-    );
-  });
-
-  // [BUG-407] HTTP-translation test — fail-closed (meta absent + existing
-  // profiles) surfaces as a ForbiddenError from the gate, which the route maps
-  // to 403. The real DB-count fail-closed logic lives in services/profile.test.ts.
-  it('[BUG-407] returns 403 when assertProfileCreationAllowed throws ForbiddenError (fail-closed)', async () => {
-    assertProfileCreationAllowedMock.mockRejectedValue(
-      new ForbiddenError(
-        'Only the account owner can create additional profiles.',
-      ),
-    );
-
-    const res = await makeApp({ profileMeta: null }).request('/v1/profiles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        displayName: 'Intruder',
-        birthYear: 2000,
-        location: 'EU',
-      }),
-    });
-
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-    expect(createProfileWithLimitCheckMock).not.toHaveBeenCalled();
+    expect(createChildProfileV2Mock).not.toHaveBeenCalled();
   });
 
   // [WI-811 review / Codex P1] Owner-only authorization on the flag-on add-child
@@ -832,15 +720,16 @@ describe('POST /v1/profiles', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/profiles/:id', () => {
+  // [WI-867] Post-collapse: route uses getProfileV2 (not legacy getProfile).
   it('returns 200 with the profile when it belongs to this account', async () => {
-    getProfileMock.mockResolvedValue(makeProfileRow({ id: PROFILE_ID_A }));
+    getProfileV2Mock.mockResolvedValue(makeProfileRow({ id: PROFILE_ID_A }));
 
     const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`);
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ profile: { id: PROFILE_ID_A } });
-    expect(getProfileMock).toHaveBeenCalledWith(
+    expect(getProfileV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID_A,
       ACCOUNT_ID,
@@ -848,7 +737,7 @@ describe('GET /v1/profiles/:id', () => {
   });
 
   it('returns 404 when the profile does not exist', async () => {
-    getProfileMock.mockResolvedValue(null);
+    getProfileV2Mock.mockResolvedValue(null);
 
     const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`);
 
@@ -858,9 +747,9 @@ describe('GET /v1/profiles/:id', () => {
   });
 
   it('returns 404 when a different account tries to access this profile (ownership enforced at service layer)', async () => {
-    // getProfile is called with (db, profileId, accountId) — it returns null
+    // getProfileV2 is called with (db, profileId, accountId) — returns null
     // when the accountId does not own the profile, which the route maps to 404.
-    getProfileMock.mockResolvedValue(null);
+    getProfileV2Mock.mockResolvedValue(null);
 
     const res = await makeApp({ accountId: 'other-account-id' }).request(
       `/v1/profiles/${PROFILE_ID_A}`,
@@ -868,7 +757,7 @@ describe('GET /v1/profiles/:id', () => {
 
     expect(res.status).toBe(404);
     // The service was called with the other account's id — ownership enforced there
-    expect(getProfileMock).toHaveBeenCalledWith(
+    expect(getProfileV2Mock).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID_A,
       'other-account-id',
@@ -881,12 +770,13 @@ describe('GET /v1/profiles/:id', () => {
 // ---------------------------------------------------------------------------
 
 describe('PATCH /v1/profiles/:id', () => {
+  // [WI-867] Post-collapse: route uses updateProfileV2 (not legacy updateProfile).
   it('returns 200 with the updated profile on valid input', async () => {
     const updated = makeProfileRow({
       id: PROFILE_ID_A,
       displayName: 'Updated',
     });
-    updateProfileMock.mockResolvedValue(updated);
+    updateProfileV2Mock.mockResolvedValue(updated);
 
     const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`, {
       method: 'PATCH',
@@ -907,11 +797,11 @@ describe('PATCH /v1/profiles/:id', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 
   it('returns 404 when the profile does not exist or belongs to another account', async () => {
-    updateProfileMock.mockResolvedValue(null);
+    updateProfileV2Mock.mockResolvedValue(null);
 
     const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_B}`, {
       method: 'PATCH',
@@ -925,7 +815,7 @@ describe('PATCH /v1/profiles/:id', () => {
   });
 
   it('propagates service errors to 500', async () => {
-    updateProfileMock.mockRejectedValue(new Error('DB down'));
+    updateProfileV2Mock.mockRejectedValue(new Error('DB down'));
 
     const res = await makeApp().request(`/v1/profiles/${PROFILE_ID_A}`, {
       method: 'PATCH',
@@ -978,7 +868,7 @@ describe('PATCH /v1/profiles/:id', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     // Service must not be called — gate fires before the DB write.
-    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 
   // [BREAK][Issue 901] An auto-resolved owner (no X-Profile-Id header) is
@@ -1026,7 +916,7 @@ describe('PATCH /v1/profiles/:id', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
-    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 
   // [CR-2026-05-19-H1] Non-owner self-update must still be allowed.
@@ -1035,7 +925,7 @@ describe('PATCH /v1/profiles/:id', () => {
   // self-editing their own profile is a legitimate operation.
   it('allows a non-owner to update their own profile', async () => {
     const updated = makeProfileRow({ id: PROFILE_ID_A, displayName: 'Self' });
-    updateProfileMock.mockResolvedValue(updated);
+    updateProfileV2Mock.mockResolvedValue(updated);
 
     const appSelfUpdate = new Hono<TestEnv>();
     appSelfUpdate.use('*', async (c, next) => {
@@ -1073,7 +963,7 @@ describe('PATCH /v1/profiles/:id', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(updateProfileMock).toHaveBeenCalled();
+    expect(updateProfileV2Mock).toHaveBeenCalled();
   });
 
   // [BREAK][Issue 901] Auto-resolved owner self-edit — the closed attack vector.
@@ -1130,7 +1020,7 @@ describe('PATCH /v1/profiles/:id', () => {
     const body = await res.json();
     expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     // The update service must not be called — the gate fires before the DB write.
-    expect(updateProfileMock).not.toHaveBeenCalled();
+    expect(updateProfileV2Mock).not.toHaveBeenCalled();
   });
 });
 
@@ -1307,10 +1197,20 @@ describe('PATCH /v1/profiles/:id/app-context', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /v1/profiles/switch', () => {
+  // [WI-867] Post-collapse: switch route uses getPersonScope (v2) for ownership check.
+  // Legacy switchProfile is no longer called.
   it('returns 200 on successful switch', async () => {
-    switchProfileMock.mockResolvedValue({
+    getPersonScopeMock.mockResolvedValue({
       profileId: PROFILE_ID_A,
-      isOwner: true,
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+        resolvedVia: 'explicit-header',
+      },
     });
 
     const res = await makeApp().request('/v1/profiles/switch', {
@@ -1325,8 +1225,8 @@ describe('POST /v1/profiles/switch', () => {
   });
 
   it('returns 403 when the profile does not belong to this account', async () => {
-    // switchProfile returns null/falsy when ownership check fails
-    switchProfileMock.mockResolvedValue(null);
+    // getPersonScope returns null when the profile is not in this account's graph.
+    getPersonScopeMock.mockResolvedValue(null);
 
     const res = await makeApp().request('/v1/profiles/switch', {
       method: 'POST',
@@ -1347,7 +1247,7 @@ describe('POST /v1/profiles/switch', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(switchProfileMock).not.toHaveBeenCalled();
+    expect(getPersonScopeMock).not.toHaveBeenCalled();
   });
 
   it('returns 400 when profileId is not a valid UUID', async () => {
@@ -1358,15 +1258,22 @@ describe('POST /v1/profiles/switch', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(switchProfileMock).not.toHaveBeenCalled();
+    expect(getPersonScopeMock).not.toHaveBeenCalled();
   });
 
   it('[BREAK][WI-301] returns 403 OWNER_ELEVATION_REQUIRED when a non-owner switches to owner with stale fva', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
-      isOwner: true,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1399,9 +1306,16 @@ describe('POST /v1/profiles/switch', () => {
   it('[WI-301] returns 200 when a non-owner switches to owner with fresh fva', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
-      isOwner: true,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1432,9 +1346,16 @@ describe('POST /v1/profiles/switch', () => {
   it('[WI-301] allows an explicit owner to switch to the owner profile without fresh fva', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
-      isOwner: true,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_A,
@@ -1465,9 +1386,16 @@ describe('POST /v1/profiles/switch', () => {
   it('[WI-301] allows a non-owner to switch to another non-owner without fva', async () => {
     const childSwitchResult = {
       profileId: PROFILE_ID_B,
-      isOwner: false,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(childSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: false,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(childSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_A,
@@ -1497,9 +1425,16 @@ describe('POST /v1/profiles/switch', () => {
   it('[WI-301] fails closed when a non-owner switches to owner without fva', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
-      isOwner: true,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1531,9 +1466,16 @@ describe('POST /v1/profiles/switch', () => {
   it('[WI-301] bypasses owner elevation when OWNER_ELEVATION_GATE_ENABLED is false', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
-      isOwner: true,
-    } as Awaited<ReturnType<typeof switchProfile>> & { isOwner: boolean };
-    switchProfileMock.mockResolvedValue(ownerSwitchResult);
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,

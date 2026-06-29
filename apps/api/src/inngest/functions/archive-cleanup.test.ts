@@ -177,9 +177,10 @@ describe('archiveCleanup', () => {
   it('hard-deletes (atomically) after consent remains withdrawn and 30 days elapsed', async () => {
     await executeArchiveCleanup('profile-delete');
 
-    // [F-122] The terminal delete is the atomic helper, called with the
-    // profileId and a retention-cutoff Date.
-    expect(mockDeleteArchivedProfileIfStillEligible).toHaveBeenCalledWith(
+    // [WI-867] v2-only: source collapsed to always call deleteArchivedPersonIfStillEligibleV2
+    // (v1 deleteArchivedProfileIfStillEligible is no longer reached). Same atomic
+    // conditional-delete semantic; profile-scoped → person-scoped.
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).toHaveBeenCalledWith(
       expect.anything(),
       'profile-delete',
       expect.any(Date),

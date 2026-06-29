@@ -5,13 +5,12 @@
 // ---------------------------------------------------------------------------
 
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { getStepDatabase } from '../helpers';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   curriculumBooks,
   curriculumTopics,
   curricula,
-  profiles,
   subjects,
 } from '@eduagent/database';
 import { isPersonLive } from '../../services/identity-v2/helpers';
@@ -38,12 +37,7 @@ export const reviewDueSend = inngest.createFunction(
       const db = getStepDatabase();
 
       // [CUT-B2] Liveness dispatch (person.archived_at vs profiles.archived_at).
-      const live = isIdentityV2EnabledInStep()
-        ? await isPersonLive(db, profileId)
-        : !!(await db.query.profiles.findFirst({
-            where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-            columns: { id: true },
-          }));
+      const live = await isPersonLive(db, profileId);
       if (!live) {
         return {
           status: 'skipped' as const,

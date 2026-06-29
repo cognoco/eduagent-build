@@ -12,7 +12,6 @@ import {
   curriculumBooks,
   curriculumTopics,
   curricula,
-  profiles,
   quizMissedItems,
   createScopedRepository,
   generateUUIDv7,
@@ -151,14 +150,7 @@ export async function precomputeCoachingCard(
   // [CUT-B1 §2.5(iii)] v2 seam: birthYear from person.birth_date.
   let birthYear: number | null = null;
   try {
-    birthYear = opts?.identityV2Enabled
-      ? await getPersonBirthYear(db, profileId)
-      : ((
-          await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
-            columns: { birthYear: true },
-          })
-        )?.birthYear ?? null);
+    birthYear = await getPersonBirthYear(db, profileId);
   } catch (err) {
     silentDegrade(err, 'birthYear_lookup', { profileId });
     // Age lookup is optional — use neutral tone as fallback

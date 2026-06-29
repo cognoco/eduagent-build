@@ -5,12 +5,11 @@
 
 import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
-import { findOrCreateAccount, type Account } from '../services/account';
+import type { Account } from '../services/account';
 import { resolveVerifiedClerkEmail } from '../services/clerk-user';
 import { withTransientDatabaseRetry } from '../services/transient-db-retry';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
-import { isIdentityV2Enabled } from '../config';
 import { resolveIdentityV2 } from '../services/identity-v2/identity-resolve';
 import { ensureInitialTrialSubscriptionV2 } from '../services/billing/billing-v2';
 import type { AuthUser } from './auth';
@@ -135,56 +134,44 @@ export const accountMiddleware = createMiddleware<AccountEnv>(
       });
     }
 
-    // [CUT-B1 §2.2a] v2 seam: resolve the identity graph instead of the legacy
-    // account, and DEFER provisioning (no JIT create). When the graph exists,
-    // set the byte-identical account context as today; when it does not
-    // (pre-graph — onboarding not completed), set the graphless clerkIdentity
-    // and leave `account` unset for the pre-graph allowlist to handle.
-    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-      const resolved = await withTransientDatabaseRetry(
-        'accountMiddleware.resolveIdentityV2',
-        () => resolveIdentityV2(db, user.userId),
-        // Pure read — safe to retry on a dropped connection.
-        { idempotent: true },
-      );
-      if (resolved) {
-        c.set('account', resolved.account);
-        // [WI-774] Surface the authenticated caller's own person id for the
-        // write-authority guard. resolved.personId is the login→person binding,
-        // never request-supplied.
-        c.set('callerPersonId', resolved.personId);
-        try {
-          await withTransientDatabaseRetry(
-            'accountMiddleware.ensureInitialTrialSubscriptionV2',
-            () => ensureInitialTrialSubscriptionV2(db, resolved.account.id),
-            { idempotent: true },
-          );
-        } catch (error) {
-          logger.error('billing.v2.initial_trial_missing_repair_failed', {
-            accountId: resolved.account.id,
-            reason: error instanceof Error ? error.message : String(error),
-          });
-          captureException(error, {
-            tags: { surface: 'billing.v2.initial_trial_repair' },
-          });
-        }
-      } else {
-        c.set('clerkIdentity', {
-          clerkUserId: user.userId,
-          verifiedEmail: verifiedEmail.email,
-        });
-      }
-      return next();
-    }
-
-    const account = await withTransientDatabaseRetry(
-      'accountMiddleware.findOrCreateAccount',
-      () => findOrCreateAccount(db, user.userId, verifiedEmail.email),
-      // findOrCreateAccount uses INSERT … ON CONFLICT DO UPDATE (upsert) —
-      // safe to retry if the connection drops mid-flight.
+    // [CUT-B1 §2.2a] v2: resolve the identity graph and DEFER provisioning
+    // (no JIT create). When the graph exists, set the byte-identical account
+    // context; when it does not (pre-graph — onboarding not completed), set the
+    // graphless clerkIdentity and leave `account` unset for the pre-graph
+    // allowlist to handle.
+    const resolved = await withTransientDatabaseRetry(
+      'accountMiddleware.resolveIdentityV2',
+      () => resolveIdentityV2(db, user.userId),
+      // Pure read — safe to retry on a dropped connection.
       { idempotent: true },
     );
-    c.set('account', account);
+    if (resolved) {
+      c.set('account', resolved.account);
+      // [WI-774] Surface the authenticated caller's own person id for the
+      // write-authority guard. resolved.personId is the login→person binding,
+      // never request-supplied.
+      c.set('callerPersonId', resolved.personId);
+      try {
+        await withTransientDatabaseRetry(
+          'accountMiddleware.ensureInitialTrialSubscriptionV2',
+          () => ensureInitialTrialSubscriptionV2(db, resolved.account.id),
+          { idempotent: true },
+        );
+      } catch (error) {
+        logger.error('billing.v2.initial_trial_missing_repair_failed', {
+          accountId: resolved.account.id,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        captureException(error, {
+          tags: { surface: 'billing.v2.initial_trial_repair' },
+        });
+      }
+    } else {
+      c.set('clerkIdentity', {
+        clerkUserId: user.userId,
+        verifiedEmail: verifiedEmail.email,
+      });
+    }
     return next();
   },
 );
@@ -220,16 +207,13 @@ export const requireAccountMiddleware = createMiddleware<AccountEnv>(
     // 401 rather than letting the route handler crash with TypeError → 500.
     const account = c.get('account');
     if (!account) {
-      // [CUT-B1 §2.2a] v2 pre-graph allowlist. Under IDENTITY_V2_ENABLED a
-      // freshly-signed-up user has no graph yet (accountMiddleware set
-      // clerkIdentity instead of account). The bootstrap + a small set of
-      // status routes must be reachable pre-graph to return their documented
-      // defaults; everything else keeps today's hard 401.
-      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        const clerkIdentity = c.get('clerkIdentity');
-        if (clerkIdentity && isPreGraphAllowed(c.req.method, c.req.path)) {
-          return next();
-        }
+      // [CUT-B1 §2.2a] v2 pre-graph allowlist: a freshly-signed-up user has no
+      // graph yet (accountMiddleware set clerkIdentity instead of account). The
+      // bootstrap + a small set of status routes must be reachable pre-graph;
+      // everything else keeps the hard 401.
+      const clerkIdentity = c.get('clerkIdentity');
+      if (clerkIdentity && isPreGraphAllowed(c.req.method, c.req.path)) {
+        return next();
       }
       return c.json(
         {

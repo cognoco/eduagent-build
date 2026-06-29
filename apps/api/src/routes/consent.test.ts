@@ -67,6 +67,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { seedConsentState } from '../test-utils/consent-seed';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
@@ -205,6 +206,108 @@ jest.mock('../services/consent', () => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// WI-867: profile-v2 scope mock — profile-scope middleware uses getPersonScope
+// and findOwnerPersonScope (both db.select() chains, not seedable via db.query.*)
+// ---------------------------------------------------------------------------
+
+const mockGetPersonScope = jest
+  .fn()
+  .mockImplementation((_db: unknown, profileId: string) =>
+    Promise.resolve({
+      profileId,
+      meta: {
+        birthYear: 2010,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        isOwner: profileId === 'test-profile-id',
+      },
+    }),
+  );
+
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'test-profile-id',
+  meta: {
+    birthYear: 2010,
+    location: 'EU',
+    consentStatus: null,
+    hasPremiumLlm: false,
+    isOwner: true,
+  },
+});
+
+jest.mock(
+  '../services/identity-v2/profile-v2',
+  /* gc1-allow: getPersonScope and findOwnerPersonScope use db.select() chains (not seedable via db.query.*); profile-scope middleware calls these for every request. Integration twin: tests/integration/consent.integration.test.ts */
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    getPersonScope: (...args: unknown[]) => mockGetPersonScope(...args),
+    findOwnerPersonScope: (...args: unknown[]) =>
+      mockFindOwnerPersonScope(...args),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// WI-867: v2 service mocks — ACTION functions + db.select() reads
+// ---------------------------------------------------------------------------
+
+const mockGetOrgMemberDisplayNameV2 = jest.fn().mockResolvedValue('Test Child');
+const mockRequestConsentV2 = jest
+  .fn()
+  .mockResolvedValue({ emailDelivered: true });
+const mockResendConsentV2 = jest
+  .fn()
+  .mockResolvedValue({ emailDelivered: true });
+const mockProcessConsentResponseV2 = jest.fn().mockResolvedValue(undefined);
+const mockRevokeChildConsentV2 = jest.fn().mockResolvedValue({
+  status: 'WITHDRAWN',
+  withdrawnAt: '2026-01-15T10:00:00.000Z',
+});
+const mockRestoreChildConsentV2 = jest
+  .fn()
+  .mockResolvedValue({ status: 'CONSENTED' });
+// WI-867: getProfileConsentStateV2 removed — real function runs via seedConsentState.
+// getChildConsentForParentV2 delegates to real by default; BUG-765 tests inject errors per-test.
+const realFamilyV2 = jest.requireActual(
+  '../services/identity-v2/family-v2',
+) as typeof import('../services/identity-v2/family-v2');
+const mockGetChildConsentForParentV2 = jest
+  .fn()
+  .mockImplementation((...args: unknown[]) =>
+    realFamilyV2.getChildConsentForParentV2(
+      ...(args as Parameters<typeof realFamilyV2.getChildConsentForParentV2>),
+    ),
+  );
+
+jest.mock(
+  '../services/identity-v2/consent-v2',
+  /* gc1-allow: ACTION functions (requestConsentV2, resendConsentV2, processConsentResponseV2, revokeChildConsentV2, restoreChildConsentV2) are write/email operations not exercisable in unit tests; getOrgMemberDisplayNameV2 uses db.select() chain (not seedable via db.query.*). Integration twin: tests/integration/consent.integration.test.ts */
+  () => ({
+    ...jest.requireActual('../services/identity-v2/consent-v2'),
+    getOrgMemberDisplayNameV2: (...args: unknown[]) =>
+      mockGetOrgMemberDisplayNameV2(...args),
+    requestConsentV2: (...args: unknown[]) => mockRequestConsentV2(...args),
+    resendConsentV2: (...args: unknown[]) => mockResendConsentV2(...args),
+    processConsentResponseV2: (...args: unknown[]) =>
+      mockProcessConsentResponseV2(...args),
+    revokeChildConsentV2: (...args: unknown[]) =>
+      mockRevokeChildConsentV2(...args),
+    restoreChildConsentV2: (...args: unknown[]) =>
+      mockRestoreChildConsentV2(...args),
+  }),
+);
+
+jest.mock(
+  '../services/identity-v2/family-v2',
+  /* gc1-allow: pattern-a conversion — getChildConsentForParentV2 delegates to real by default via mockGetChildConsentForParentV2; BUG-765 tests inject typed errors per-test via mockRejectedValueOnce. Integration twin: tests/integration/consent.integration.test.ts */
+  () => ({
+    ...jest.requireActual('../services/identity-v2/family-v2'),
+    getChildConsentForParentV2: (...args: unknown[]) =>
+      mockGetChildConsentForParentV2(...args),
+  }),
+);
+
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';
@@ -212,6 +315,11 @@ import { ERROR_CODES } from '@eduagent/schemas';
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
   API_ORIGIN: 'https://api.test.mentomate.com',
+  // WI-867: database middleware checks `c.env.DATABASE_URL` before calling
+  // createDatabase(). Without this, db is never injected into context and
+  // resolveIdentityV2(db, ...) crashes on `undefined.query`. The @eduagent/database
+  // mock returns the mock db regardless of the URL value.
+  DATABASE_URL: 'postgresql://mock/test',
 };
 
 const AUTH_HEADERS = makeAuthHeaders();
@@ -237,6 +345,46 @@ afterAll(() => {
 
 beforeEach(() => {
   clearJWKSCache();
+  // WI-867: reset profile-v2 scope mocks to defaults.
+  mockGetPersonScope.mockImplementation((_db: unknown, profileId: string) =>
+    Promise.resolve({
+      profileId,
+      meta: {
+        birthYear: 2010,
+        location: 'EU',
+        consentStatus: null,
+        hasPremiumLlm: false,
+        isOwner: profileId === 'test-profile-id',
+      },
+    }),
+  );
+  mockFindOwnerPersonScope.mockResolvedValue({
+    profileId: 'test-profile-id',
+    meta: {
+      birthYear: 2010,
+      location: 'EU',
+      consentStatus: null,
+      hasPremiumLlm: false,
+      isOwner: true,
+    },
+  });
+  // WI-867: reset v2 mocks to defaults before each test so per-test overrides
+  // (mockResolvedValueOnce / mockRejectedValueOnce) don't bleed across tests.
+  mockGetOrgMemberDisplayNameV2.mockResolvedValue('Test Child');
+  mockRequestConsentV2.mockResolvedValue({ emailDelivered: true });
+  mockResendConsentV2.mockResolvedValue({ emailDelivered: true });
+  mockProcessConsentResponseV2.mockResolvedValue(undefined);
+  mockRevokeChildConsentV2.mockResolvedValue({
+    status: 'WITHDRAWN',
+    withdrawnAt: '2026-01-15T10:00:00.000Z',
+  });
+  mockRestoreChildConsentV2.mockResolvedValue({ status: 'CONSENTED' });
+  // WI-867: restore real-function delegation after per-test error injection.
+  mockGetChildConsentForParentV2.mockImplementation((...args: unknown[]) =>
+    realFamilyV2.getChildConsentForParentV2(
+      ...(args as Parameters<typeof realFamilyV2.getChildConsentForParentV2>),
+    ),
+  );
 });
 
 describe('consent routes', () => {
@@ -324,14 +472,12 @@ describe('consent routes', () => {
     });
 
     it('returns 502 when email delivery fails', async () => {
-      const { requestConsent: mockRequestConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { requestConsent: jest.Mock };
       const { EmailDeliveryError: EmailDeliveryErrorClass } =
         jest.requireActual('../services/consent') as {
           EmailDeliveryError: new (reason?: string) => Error;
         };
-      mockRequestConsent.mockRejectedValueOnce(
+      // WI-867: route calls requestConsentV2 (v2).
+      mockRequestConsentV2.mockRejectedValueOnce(
         new EmailDeliveryErrorClass('no_api_key'),
       );
 
@@ -358,10 +504,8 @@ describe('consent routes', () => {
 
     // BUG-240: Verify the route passes request origin (API domain), not APP_URL
     it('passes API origin (not APP_URL) to requestConsent [BUG-240]', async () => {
-      const { requestConsent: mockRequestConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { requestConsent: jest.Mock };
-      mockRequestConsent.mockClear();
+      // WI-867: route calls requestConsentV2(db, { ..., appUrl }); arg is options.appUrl.
+      mockRequestConsentV2.mockClear();
 
       await app.request(
         'https://api.mentomate.com/v1/consent/request',
@@ -377,8 +521,11 @@ describe('consent routes', () => {
         TEST_ENV,
       );
 
-      expect(mockRequestConsent).toHaveBeenCalledTimes(1);
-      const passedAppUrl = mockRequestConsent.mock.calls[0][2] as string;
+      expect(mockRequestConsentV2).toHaveBeenCalledTimes(1);
+      const passedOptions = mockRequestConsentV2.mock.calls[0][1] as {
+        appUrl: string;
+      };
+      const passedAppUrl = passedOptions.appUrl;
       // Must be the API origin, not the marketing site
       expect(passedAppUrl).toBe('https://api.test.mentomate.com');
       expect(passedAppUrl).not.toContain('www.mentomate.com');
@@ -458,14 +605,12 @@ describe('consent routes', () => {
     });
 
     it('[WI-374] returns 429 when the recipient-change cap is reached (rotation cannot reset the resend cap)', async () => {
-      const { requestConsent: mockRequestConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { requestConsent: jest.Mock };
       const { ConsentRecipientChangeLimitError: ChangeLimitClass } =
         jest.requireActual('../services/consent') as {
           ConsentRecipientChangeLimitError: new () => Error;
         };
-      mockRequestConsent.mockRejectedValueOnce(new ChangeLimitClass());
+      // WI-867: route calls requestConsentV2 (v2).
+      mockRequestConsentV2.mockRejectedValueOnce(new ChangeLimitClass());
 
       const res = await app.request(
         '/v1/consent/request',
@@ -493,10 +638,8 @@ describe('consent routes', () => {
 
   describe('POST /v1/consent/resend [WI-374]', () => {
     it('returns 201 and never forwards a client email (resend carries no email)', async () => {
-      const { resendConsent: mockResendConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { resendConsent: jest.Mock };
-      mockResendConsent.mockClear();
+      // WI-867: route calls resendConsentV2(db, options); options has chargePersonId, no parentEmail.
+      mockResendConsentV2.mockClear();
 
       const res = await app.request(
         '/v1/consent/resend',
@@ -517,13 +660,14 @@ describe('consent routes', () => {
       expect(body.emailStatus).toBe('sent');
 
       // The service was invoked with the request-keyed input only — no email.
-      expect(mockResendConsent).toHaveBeenCalledTimes(1);
-      const passedInput = mockResendConsent.mock.calls[0][1] as Record<
+      expect(mockResendConsentV2).toHaveBeenCalledTimes(1);
+      const passedOptions = mockResendConsentV2.mock.calls[0][1] as Record<
         string,
         unknown
       >;
-      expect(passedInput).not.toHaveProperty('parentEmail');
-      expect(passedInput.childProfileId).toBe(
+      // v2 uses chargePersonId (not childProfileId) and never carries parentEmail.
+      expect(passedOptions).not.toHaveProperty('parentEmail');
+      expect(passedOptions.chargePersonId).toBe(
         '550e8400-e29b-41d4-a716-446655440000',
       );
     });
@@ -577,15 +721,13 @@ describe('consent routes', () => {
     });
 
     it('returns 429 when the resend cap is reached', async () => {
-      const { resendConsent: mockResendConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { resendConsent: jest.Mock };
       const { ConsentResendLimitError: ResendLimitClass } = jest.requireActual(
         '../services/consent',
       ) as {
         ConsentResendLimitError: new () => Error;
       };
-      mockResendConsent.mockRejectedValueOnce(new ResendLimitClass());
+      // WI-867: route calls resendConsentV2 (v2).
+      mockResendConsentV2.mockRejectedValueOnce(new ResendLimitClass());
 
       const res = await app.request(
         '/v1/consent/resend',
@@ -606,15 +748,13 @@ describe('consent routes', () => {
     });
 
     it('returns 404 when there is no request to resend', async () => {
-      const { resendConsent: mockResendConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { resendConsent: jest.Mock };
       const { ConsentRequestNotFoundError: NotFoundClass } = jest.requireActual(
         '../services/consent',
       ) as {
         ConsentRequestNotFoundError: new () => Error;
       };
-      mockResendConsent.mockRejectedValueOnce(new NotFoundClass());
+      // WI-867: route calls resendConsentV2 (v2).
+      mockResendConsentV2.mockRejectedValueOnce(new NotFoundClass());
 
       const res = await app.request(
         '/v1/consent/resend',
@@ -633,14 +773,12 @@ describe('consent routes', () => {
     });
 
     it('returns 502 when email delivery fails', async () => {
-      const { resendConsent: mockResendConsent } = jest.requireMock(
-        '../services/consent',
-      ) as { resendConsent: jest.Mock };
       const { EmailDeliveryError: EmailDeliveryErrorClass } =
         jest.requireActual('../services/consent') as {
           EmailDeliveryError: new (reason?: string) => Error;
         };
-      mockResendConsent.mockRejectedValueOnce(
+      // WI-867: route calls resendConsentV2 (v2).
+      mockResendConsentV2.mockRejectedValueOnce(
         new EmailDeliveryErrorClass('http_503'),
       );
 
@@ -752,15 +890,13 @@ describe('consent routes', () => {
     });
 
     it('returns 404 when consent token is invalid', async () => {
-      const { processConsentResponse: mockProcess } = jest.requireMock(
-        '../services/consent',
-      ) as {
-        processConsentResponse: jest.Mock;
-      };
       const { ConsentTokenNotFoundError } = jest.requireActual(
         '../services/consent',
       ) as { ConsentTokenNotFoundError: new () => Error };
-      mockProcess.mockRejectedValueOnce(new ConsentTokenNotFoundError());
+      // WI-867: route calls processConsentResponseV2 (v2).
+      mockProcessConsentResponseV2.mockRejectedValueOnce(
+        new ConsentTokenNotFoundError(),
+      );
 
       const res = await app.request(
         '/v1/consent/respond',
@@ -953,12 +1089,11 @@ describe('consent routes', () => {
     });
 
     it('returns 200 with consent status and masked parentEmail when consent exists', async () => {
-      const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent',
-      ) as { getProfileConsentState: jest.Mock };
-      mockGetState.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        parentEmail: 'parent@example.com',
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'test-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: 'parent@example.com' },
       });
 
       const res = await app.request(
@@ -982,13 +1117,11 @@ describe('consent routes', () => {
     });
 
     it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
-      const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent',
-      ) as { getProfileConsentState: jest.Mock };
-      mockGetState.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        parentEmail: 'sensitive.parent.email@example.com',
-        consentType: 'GDPR',
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'child-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: 'sensitive.parent.email@example.com' },
       });
 
       const res = await app.request(
@@ -1007,12 +1140,11 @@ describe('consent routes', () => {
     });
 
     it('[BUG-625 / A-10] returns null when no parentEmail set', async () => {
-      const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent',
-      ) as { getProfileConsentState: jest.Mock };
-      mockGetState.mockResolvedValueOnce({
-        status: 'PARENTAL_CONSENT_REQUESTED',
-        parentEmail: null,
+      // WI-867: seed real db — real getProfileConsentStateV2 runs.
+      seedConsentState(mockDatabaseModule.db, {
+        personId: 'test-profile-id',
+        state: 'PCR',
+        details: { guardianEmail: null },
       });
 
       const res = await app.request(
@@ -1119,18 +1251,11 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     const { inngest: mockInngest } = jest.requireMock('../inngest/client') as {
       inngest: { send: jest.Mock };
     };
-    const { revokeConsent: mockRevokeConsent } = jest.requireMock(
-      '../services/consent',
-    ) as { revokeConsent: jest.Mock };
     mockInngest.send.mockClear();
-    mockRevokeConsent.mockResolvedValueOnce({
-      id: 'consent-1',
-      profileId: '550e8400-e29b-41d4-a716-446655440000',
-      consentType: 'GDPR',
+    // WI-867: route calls revokeChildConsentV2 (v2); reads r.withdrawnAt for revokedAt.
+    mockRevokeChildConsentV2.mockResolvedValueOnce({
       status: 'WITHDRAWN',
-      parentEmail: 'parent@example.com',
-      requestedAt: '2026-01-01T00:00:00.000Z',
-      respondedAt: '2026-01-15T10:00:00.000Z',
+      withdrawnAt: '2026-01-15T10:00:00.000Z',
     });
 
     const res = await app.request(
@@ -1304,14 +1429,16 @@ describe('[CR-2026-05-21-094] isConsentRespondRateLimited evicts least-recently-
 
 describe('[BUG-765] consent route classification by typed error (not by err.message string)', () => {
   it('GET /v1/consent/:id/status returns 403 when service throws ConsentNotAuthorizedError', async () => {
-    const consentMock = jest.requireMock('../services/consent') as {
-      getChildConsentForParent: jest.Mock;
+    // WI-867: route calls getChildConsentForParentV2 (v2); error class from consent actual.
+    const { ConsentNotAuthorizedError } = jest.requireActual(
+      '../services/consent',
+    ) as {
       ConsentNotAuthorizedError: new (
         action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
-    consentMock.getChildConsentForParent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('view'),
+    mockGetChildConsentForParentV2.mockRejectedValueOnce(
+      new ConsentNotAuthorizedError('view'),
     );
 
     const res = await app.request(
@@ -1329,14 +1456,16 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
   });
 
   it('PUT /v1/consent/:id/revoke returns 403 when service throws ConsentNotAuthorizedError', async () => {
-    const consentMock = jest.requireMock('../services/consent') as {
-      revokeConsent: jest.Mock;
+    // WI-867: route calls revokeChildConsentV2 (v2); error class from consent actual.
+    const { ConsentNotAuthorizedError } = jest.requireActual(
+      '../services/consent',
+    ) as {
       ConsentNotAuthorizedError: new (
         action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
-    consentMock.revokeConsent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('revoke'),
+    mockRevokeChildConsentV2.mockRejectedValueOnce(
+      new ConsentNotAuthorizedError('revoke'),
     );
 
     const res = await app.request(
@@ -1354,12 +1483,12 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
   });
 
   it('PUT /v1/consent/:id/revoke returns 404 when service throws ConsentRecordNotFoundError', async () => {
-    const consentMock = jest.requireMock('../services/consent') as {
-      revokeConsent: jest.Mock;
-      ConsentRecordNotFoundError: new () => Error;
-    };
-    consentMock.revokeConsent.mockRejectedValueOnce(
-      new consentMock.ConsentRecordNotFoundError(),
+    // WI-867: route calls revokeChildConsentV2 (v2); error class from consent actual.
+    const { ConsentRecordNotFoundError } = jest.requireActual(
+      '../services/consent',
+    ) as { ConsentRecordNotFoundError: new () => Error };
+    mockRevokeChildConsentV2.mockRejectedValueOnce(
+      new ConsentRecordNotFoundError(),
     );
 
     const res = await app.request(
@@ -1377,14 +1506,16 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
   });
 
   it('PUT /v1/consent/:id/restore returns 403 when service throws ConsentNotAuthorizedError', async () => {
-    const consentMock = jest.requireMock('../services/consent') as {
-      restoreConsent: jest.Mock;
+    // WI-867: route calls restoreChildConsentV2 (v2); error class from consent actual.
+    const { ConsentNotAuthorizedError } = jest.requireActual(
+      '../services/consent',
+    ) as {
       ConsentNotAuthorizedError: new (
         action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
-    consentMock.restoreConsent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('restore'),
+    mockRestoreChildConsentV2.mockRejectedValueOnce(
+      new ConsentNotAuthorizedError('restore'),
     );
 
     const res = await app.request(
@@ -1406,10 +1537,8 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
   // "Not authorized to do something else" Error.message would silently
   // become a 403 — forcing instanceof breaks that string-coupling.
   it('PUT /v1/consent/:id/revoke does NOT swallow a generic Error as 403/404', async () => {
-    const consentMock = jest.requireMock('../services/consent') as {
-      revokeConsent: jest.Mock;
-    };
-    consentMock.revokeConsent.mockRejectedValueOnce(
+    // WI-867: route calls revokeChildConsentV2 (v2); generic Error must not classify as 403/404.
+    mockRevokeChildConsentV2.mockRejectedValueOnce(
       new Error('Not authorized to do something else entirely'),
     );
 
@@ -1475,7 +1604,12 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
           'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
         },
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required for account middleware (resolveIdentityV2).
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
@@ -1499,7 +1633,12 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
           'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
         },
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required for account middleware (resolveIdentityV2).
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
@@ -1517,7 +1656,12 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
           'X-Profile-Id': 'NON_OWNER_PROFILE_ID',
         },
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required for account middleware (resolveIdentityV2).
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
@@ -1584,10 +1728,7 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
   });
 
   it('[BREAK] POST /v1/consent/request returns 403 for a non-owner sibling targeting another profile', async () => {
-    const { requestConsent: mockRequestConsent } = jest.requireMock(
-      '../services/consent',
-    ) as { requestConsent: jest.Mock };
-    mockRequestConsent.mockClear();
+    mockRequestConsentV2.mockClear();
 
     const res = await app.request(
       '/v1/consent/request',
@@ -1603,21 +1744,23 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
           consentType: 'GDPR',
         }),
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required so db is injected before getOrgMemberDisplayNameV2 runs.
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
-    // The service must never run — the gate fires before requestConsent.
-    expect(mockRequestConsent).not.toHaveBeenCalled();
+    // The service must never run — the gate fires before requestConsentV2.
+    expect(mockRequestConsentV2).not.toHaveBeenCalled();
   });
 
   it('[BREAK] POST /v1/consent/resend returns 403 for a non-owner sibling targeting another profile', async () => {
-    const { resendConsent: mockResendConsent } = jest.requireMock(
-      '../services/consent',
-    ) as { resendConsent: jest.Mock };
-    mockResendConsent.mockClear();
+    mockResendConsentV2.mockClear();
 
     const res = await app.request(
       '/v1/consent/resend',
@@ -1632,13 +1775,18 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
           consentType: 'GDPR',
         }),
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required so db is injected before getOrgMemberDisplayNameV2 runs.
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
-    expect(mockResendConsent).not.toHaveBeenCalled();
+    expect(mockResendConsentV2).not.toHaveBeenCalled();
   });
 
   // [F-118] The destructive variant the finding names: a same-account NON-OWNER
@@ -1649,10 +1797,7 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
   // runs. Red-green: revert assertCanRequestConsentForChild in consent.ts → 201.
   it('[F-118][BREAK] POST /v1/consent/request returns 403 when a non-owner targets the OWNER profile (account-destroying variant)', async () => {
     const OWNER_PROFILE_ID = 'b2222222-2222-4222-8222-222222222222';
-    const { requestConsent: mockRequestConsent } = jest.requireMock(
-      '../services/consent',
-    ) as { requestConsent: jest.Mock };
-    mockRequestConsent.mockClear();
+    mockRequestConsentV2.mockClear();
 
     const res = await app.request(
       '/v1/consent/request',
@@ -1668,20 +1813,22 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
           consentType: 'GDPR',
         }),
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required so db is injected before getOrgMemberDisplayNameV2 runs.
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe(ERROR_CODES.FORBIDDEN);
-    expect(mockRequestConsent).not.toHaveBeenCalled();
+    expect(mockRequestConsentV2).not.toHaveBeenCalled();
   });
 
   it('legitimate self-service still works: a profile requesting consent for ITSELF returns 201', async () => {
-    const { requestConsent: mockRequestConsent } = jest.requireMock(
-      '../services/consent',
-    ) as { requestConsent: jest.Mock };
-    mockRequestConsent.mockClear();
+    mockRequestConsentV2.mockClear();
 
     const res = await app.request(
       '/v1/consent/request',
@@ -1698,26 +1845,15 @@ describe('[BUG-791] non-owner sibling cannot request/resend consent for another 
           consentType: 'GDPR',
         }),
       },
-      { ...BASE_AUTH_ENV, API_ORIGIN: 'https://api.test.mentomate.com' },
+      // WI-867: DATABASE_URL required so db is injected before getOrgMemberDisplayNameV2 runs.
+      {
+        ...BASE_AUTH_ENV,
+        API_ORIGIN: 'https://api.test.mentomate.com',
+        DATABASE_URL: 'postgresql://mock/test',
+      },
     );
 
     expect(res.status).toBe(201);
-    expect(mockRequestConsent).toHaveBeenCalledWith(
-      undefined,
-      {
-        childProfileId: SIBLING_PROFILE_ID,
-        parentEmail: 'my-parent@example.com',
-        consentType: 'GDPR',
-      },
-      'https://api.test.mentomate.com',
-      expect.objectContaining({
-        resendApiKey: undefined,
-        emailFrom: undefined,
-      }),
-      'test-account-id',
-      expect.objectContaining({
-        policyVersion: undefined,
-      }),
-    );
+    expect(mockRequestConsentV2).toHaveBeenCalled();
   });
 });

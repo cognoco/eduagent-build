@@ -117,44 +117,30 @@ async function loadProfileFamilyMeta(
   row: typeof profiles.$inferSelect,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<{ linkCreatedAt: Date | null; hasFamilyLinks: boolean }> {
-  if (opts?.identityV2Enabled) {
-    // [WI-803] v2 path: guardianship table — safe post-M-DROP.
-    // Owner (guardian): has family links iff they hold active charge edges;
-    //   linkCreatedAt is null for owners (matches legacy + profile-v2.ts:413).
-    // Non-owner (charge): has family links iff they have an active guardian edge;
-    //   linkCreatedAt = that edge's grantedAt (legacy parity with
-    //   family_links.createdAt; mirrors the WI-771 mapping in profile-v2.ts:413).
-    if (row.isOwner) {
-      const charges = await getChargePersonIds(db, row.id);
-      return { linkCreatedAt: null, hasFamilyLinks: charges.length > 0 };
-    } else {
-      // A charge has at most one active edge (partial unique idx); first wins.
-      const edge = await db.query.guardianship.findFirst({
-        where: and(
-          eq(guardianship.chargePersonId, row.id),
-          isNull(guardianship.revokedAt),
-        ),
-        columns: { grantedAt: true },
-        orderBy: [asc(guardianship.grantedAt)],
-      });
-      return {
-        linkCreatedAt: edge?.grantedAt ?? null,
-        hasFamilyLinks: edge != null,
-      };
-    }
+  // [WI-803] v2 path: guardianship table — safe post-M-DROP.
+  // Owner (guardian): has family links iff they hold active charge edges;
+  //   linkCreatedAt is null for owners (matches legacy + profile-v2.ts:413).
+  // Non-owner (charge): has family links iff they have an active guardian edge;
+  //   linkCreatedAt = that edge's grantedAt (legacy parity with
+  //   family_links.createdAt; mirrors the WI-771 mapping in profile-v2.ts:413).
+  if (row.isOwner) {
+    const charges = await getChargePersonIds(db, row.id);
+    return { linkCreatedAt: null, hasFamilyLinks: charges.length > 0 };
+  } else {
+    // A charge has at most one active edge (partial unique idx); first wins.
+    const edge = await db.query.guardianship.findFirst({
+      where: and(
+        eq(guardianship.chargePersonId, row.id),
+        isNull(guardianship.revokedAt),
+      ),
+      columns: { grantedAt: true },
+      orderBy: [asc(guardianship.grantedAt)],
+    });
+    return {
+      linkCreatedAt: edge?.grantedAt ?? null,
+      hasFamilyLinks: edge != null,
+    };
   }
-
-  // Legacy path — byte-identical to pre-WI-803.
-  const link = await db.query.familyLinks.findFirst({
-    where: row.isOwner
-      ? eq(familyLinks.parentProfileId, row.id)
-      : eq(familyLinks.childProfileId, row.id),
-  });
-
-  return {
-    linkCreatedAt: row.isOwner ? null : (link?.createdAt ?? null),
-    hasFamilyLinks: !!link,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -677,120 +663,33 @@ export async function updateProfileAppContext(
   defaultAppContext: AppContext,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<Profile | null> {
-  if (opts?.identityV2Enabled) {
-    // [WI-586] v2 path: read/write person + membership; no profiles/family_links touch.
-    // accountId maps to organizationId in v2.
-    const organizationId = accountId;
-    const [existingPerson, existingMembership] = await Promise.all([
-      db.query.person.findFirst({
-        where: and(eq(person.id, profileId), isNull(person.archivedAt)),
-        columns: { id: true, birthDate: true },
-      }),
-      db.query.membership.findFirst({
-        where: and(
-          eq(membership.personId, profileId),
-          eq(membership.organizationId, organizationId),
-        ),
-        columns: { roles: true },
-      }),
-    ]);
-    if (!existingPerson || !existingMembership) return null;
-
-    const isOwner = existingMembership.roles.includes('admin');
-    const birthYear = Number(existingPerson.birthDate.slice(0, 4));
-
-    if (defaultAppContext === 'family') {
-      const charges = await getChargePersonIds(db, profileId);
-      if (
-        !isOwner ||
-        computeAgeBracket(birthYear) !== 'adult' ||
-        charges.length === 0
-      ) {
-        throw new ForbiddenError(
-          'Family mode is only available to adult owner profiles with family links.',
-          'FAMILY_CONTEXT_NOT_ALLOWED',
-        );
-      }
-    }
-
-    const updated = await db
-      .update(person)
-      .set({ defaultAppContext, updatedAt: new Date() })
-      .where(and(eq(person.id, profileId), isNull(person.archivedAt)))
-      .returning();
-    if (!updated[0]) return null;
-
-    // Resolve family meta and consent in parallel.
-    // owner/guardian → hasFamilyLinks if any active charge; linkCreatedAt null
-    // non-owner/charge → hasFamilyLinks if active guardian edge; linkCreatedAt = edge.grantedAt
-    const [consentStatus, chargeIds, guardianEdge] = await Promise.all([
-      resolveLatestConsentStatusAnyBasis(
-        db,
-        profileId,
-        organizationId,
-        DEFAULT_CONSENT_PURPOSE,
+  // [WI-586] v2 path: read/write person + membership; no profiles/family_links touch.
+  // accountId maps to organizationId in v2.
+  const organizationId = accountId;
+  const [existingPerson, existingMembership] = await Promise.all([
+    db.query.person.findFirst({
+      where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+      columns: { id: true, birthDate: true },
+    }),
+    db.query.membership.findFirst({
+      where: and(
+        eq(membership.personId, profileId),
+        eq(membership.organizationId, organizationId),
       ),
-      isOwner
-        ? getChargePersonIds(db, profileId)
-        : Promise.resolve([] as string[]),
-      !isOwner
-        ? db.query.guardianship.findFirst({
-            where: and(
-              eq(guardianship.chargePersonId, profileId),
-              isNull(guardianship.revokedAt),
-            ),
-            columns: { grantedAt: true },
-          })
-        : Promise.resolve(undefined),
-    ]);
+      columns: { roles: true },
+    }),
+  ]);
+  if (!existingPerson || !existingMembership) return null;
 
-    const hasFamilyLinks = isOwner
-      ? chargeIds.length > 0
-      : guardianEdge != null;
-    const linkCreatedAt =
-      !isOwner && guardianEdge ? guardianEdge.grantedAt.toISOString() : null;
-
-    const p = updated[0];
-    return {
-      id: p.id,
-      accountId: organizationId,
-      displayName: p.displayName,
-      avatarUrl: p.avatarUrl ?? null,
-      birthYear: Number(p.birthDate.slice(0, 4)),
-      location: jurisdictionToLocation(p.residenceJurisdiction),
-      isOwner,
-      hasPremiumLlm: false,
-      defaultAppContext:
-        (p.defaultAppContext as Profile['defaultAppContext']) ?? null,
-      hasFamilyLinks,
-      conversationLanguage:
-        p.conversationLanguage as Profile['conversationLanguage'],
-      pronouns: p.pronouns ?? null,
-      consentStatus,
-      linkCreatedAt,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    };
-  }
-
-  // Legacy path — byte-identical to pre-WI-586.
-  const existing = await db.query.profiles.findFirst({
-    where: and(
-      eq(profiles.id, profileId),
-      eq(profiles.accountId, accountId),
-      isNull(profiles.archivedAt),
-    ),
-  });
-  if (!existing) return null;
+  const isOwner = existingMembership.roles.includes('admin');
+  const birthYear = Number(existingPerson.birthDate.slice(0, 4));
 
   if (defaultAppContext === 'family') {
-    const familyLink = await db.query.familyLinks.findFirst({
-      where: eq(familyLinks.parentProfileId, profileId),
-    });
+    const charges = await getChargePersonIds(db, profileId);
     if (
-      existing.isOwner !== true ||
-      computeAgeBracket(existing.birthYear) !== 'adult' ||
-      familyLink == null
+      !isOwner ||
+      computeAgeBracket(birthYear) !== 'adult' ||
+      charges.length === 0
     ) {
       throw new ForbiddenError(
         'Family mode is only available to adult owner profiles with family links.',
@@ -799,24 +698,62 @@ export async function updateProfileAppContext(
     }
   }
 
-  const rows = await db
-    .update(profiles)
-    .set({
-      defaultAppContext,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(profiles.id, profileId),
-        eq(profiles.accountId, accountId),
-        isNull(profiles.archivedAt),
-      ),
-    )
+  const updated = await db
+    .update(person)
+    .set({ defaultAppContext, updatedAt: new Date() })
+    .where(and(eq(person.id, profileId), isNull(person.archivedAt)))
     .returning();
-  if (!rows[0]) return null;
-  const status = await getConsentStatus(db, rows[0].id);
-  const familyMeta = await loadProfileFamilyMeta(db, rows[0]);
-  return mapProfileRow(rows[0], status, familyMeta);
+  if (!updated[0]) return null;
+
+  // Resolve family meta and consent in parallel.
+  // owner/guardian → hasFamilyLinks if any active charge; linkCreatedAt null
+  // non-owner/charge → hasFamilyLinks if active guardian edge; linkCreatedAt = edge.grantedAt
+  const [consentStatus, chargeIds, guardianEdge] = await Promise.all([
+    resolveLatestConsentStatusAnyBasis(
+      db,
+      profileId,
+      organizationId,
+      DEFAULT_CONSENT_PURPOSE,
+    ),
+    isOwner
+      ? getChargePersonIds(db, profileId)
+      : Promise.resolve([] as string[]),
+    !isOwner
+      ? db.query.guardianship.findFirst({
+          where: and(
+            eq(guardianship.chargePersonId, profileId),
+            isNull(guardianship.revokedAt),
+          ),
+          columns: { grantedAt: true },
+        })
+      : Promise.resolve(undefined),
+  ]);
+
+  const hasFamilyLinks = isOwner ? chargeIds.length > 0 : guardianEdge != null;
+  const linkCreatedAt =
+    !isOwner && guardianEdge ? guardianEdge.grantedAt.toISOString() : null;
+
+  const p = updated[0];
+  return {
+    id: p.id,
+    accountId: organizationId,
+    displayName: p.displayName,
+    avatarUrl: p.avatarUrl ?? null,
+    birthYear: Number(p.birthDate.slice(0, 4)),
+    location: jurisdictionToLocation(p.residenceJurisdiction),
+    isOwner,
+    hasPremiumLlm: false,
+    defaultAppContext:
+      (p.defaultAppContext as Profile['defaultAppContext']) ?? null,
+    hasFamilyLinks,
+    conversationLanguage:
+      p.conversationLanguage as Profile['conversationLanguage'],
+    pronouns: p.pronouns ?? null,
+    consentStatus,
+    linkCreatedAt,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  };
 }
 
 /**
