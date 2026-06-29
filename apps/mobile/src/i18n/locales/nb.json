@@ -384,7 +384,7 @@
         "celebrationStreak": "{{name}} er i skikkelig siget denne uken – den streaken er i ferd med å bli en vane.",
         "celebrationTopics": "Stor uke for {{name}} – mye nytt terreng er dekket.",
         "worksFor": "Hva som fungerer for {{name}}",
-        "mentorRead": "Veileders syn på {{name}}",
+        "mentorRead": "Mentors syn på {{name}}",
         "impatientAdvice": "Korte starter og raske mestringsopplevelser kan hjelpe {{name}} å holde ut."
       },
       "learnTogether": {
@@ -574,7 +574,7 @@
       "noteSaveErrorTitle": "Kunne ikke lagre notatet"
     },
     "mentorMemory": {
-      "title": "Hva mentoren min vet",
+      "title": "Hva mentoren din vet om deg.",
       "subtitle": "Gjennomgå, rediger eller legg til hva mentoren din husker.",
       "loadError": "Vi kunne ikke laste mentorens minne akkurat nå",
       "loadTimeout": {
@@ -754,8 +754,8 @@
       "firstSessionGreeting": {
         "withNameSubjectInterest": "Hei {{name}}. Du er her for å jobbe med {{subject}} — og siden du er interessert i {{interest}}, skal jeg finne eksempler som er relevante for deg. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
         "withNameSubject": "Hei {{name}}. Du er her for å jobbe med {{subject}}. Spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hvor skal vi begynne med {{subject}}?",
-        "withName": "Hei {{name}}. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
-        "generic": "Hei. Jeg er veilederen din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
+        "withName": "Hei {{name}}. Jeg er mentoren din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?",
+        "generic": "Hei. Jeg er mentoren din — spør meg om alt du lærer, jobber med eller er nysgjerrig på. Du har 10 gratis spørsmål om dagen, 100 i måneden. Hva vil du begynne med?"
       },
       "returningSessionGreeting": {
         "withNameSubject": "Velkommen tilbake, {{name}}. Klar for å fortsette med {{subject}}? Spør meg om hva som helst – hvor skal vi gå videre?",
@@ -966,18 +966,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "Fortell veilederen",
-        "description": "Legg til noe viktig som veilederen bør huske om dette barnet.",
-        "descriptionWithName": "Legg til noe viktig som veilederen bør huske om {{childName}}.",
+        "title": "Fortell mentoren",
+        "description": "Legg til noe viktig som mentoren bør huske om dette barnet.",
+        "descriptionWithName": "Legg til noe viktig som mentoren bør huske om {{childName}}.",
         "placeholder": "De lærer best med korte eksempler og sliter fortsatt med brøk."
       },
       "adult": {
-        "title": "Legg til et notat til veilederen din",
-        "description": "Legg til noe du vil at veilederen din skal huske til fremtidige økter.",
+        "title": "Legg til et notat til mentoren din",
+        "description": "Legg til noe du vil at mentoren din skal huske til fremtidige økter.",
         "placeholder": "Eksempler hjelper meg virkelig med å forstå brøk."
       },
       "teen": {
-        "title": "Fortell veilederen din noe",
+        "title": "Fortell mentoren din noe",
         "description": "Legg til hva som hjelper deg med å lære, hva du liker, eller hva som fortsatt føles vanskelig.",
         "placeholder": "Eksempler hjelper meg virkelig med å forstå brøk."
       }
@@ -1400,9 +1400,9 @@
     "noteSignal": {
       "verified": "Verifisert",
       "verifiedAccessibilityLabel": "Verifisert – ordene dine holdt mål",
-      "tutorAddition": "Veilederen har mer om dette emnet",
-      "showTutorAdditionAccessibilityLabel": "Vis hva veilederen la til",
-      "hideTutorAdditionAccessibilityLabel": "Skjul det veilederen la til"
+      "mentorAddition": "Mentoren har mer om dette emnet.",
+      "showMentorAdditionAccessibilityLabel": "Vis hva mentoren la til.",
+      "hideMentorAdditionAccessibilityLabel": "Skjul det mentoren la til."
     },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"
@@ -2359,7 +2359,7 @@
       "stepOf": "Steg {{current}} av {{total}}"
     },
     "mentorBirth": {
-      "ready": "Veilederen din er klar."
+      "ready": "Mentoren din er klar."
     },
     "saveWizard": {
       "startLesson": "Start leksjon",
@@ -2804,8 +2804,8 @@
     "childrenLabel": "Familie",
     "recaps": "Sammendrag",
     "recapsLabel": "Sammendrag",
-    "mentor": "Veileder",
-    "mentorLabel": "Veileder",
+    "mentor": "Mentor",
+    "mentorLabel": "Mentor",
     "subjects": "Fag",
     "subjectsLabel": "Fag",
     "journal": "Journal",
@@ -2942,7 +2942,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "Hva veilederen din vet om deg.",
+      "title": "Hva mentoren din vet om deg.",
       "subtitle": "Trykk for å se eller endre."
     },
     "notificationPrimer": {
@@ -3400,7 +3400,7 @@
   "welcomeIntro": {
     "chooser": {
       "question": "Hva fører deg hit?",
-      "learnerCta": "Lær med en veileder",
+      "learnerCta": "Lær med en mentor",
       "learnerHint": "Din personlige mentor til en brøkdel av prisen.",
       "parentCta": "Stopp leksekranglingen",
       "parentHint": "Få kveldene dine tilbake."
@@ -3606,7 +3606,7 @@
     "hub": {
       "sessionsSubtitle": "Samtaler du hadde",
       "notesSubtitle": "Ting du skrev ned",
-      "bookmarksSubtitle": "Veiledersvar du lagret",
+      "bookmarksSubtitle": "Mentorsvar du lagret",
       "countLoading": "Laster inn",
       "countUnavailable": "Utilgjengelig"
     },
@@ -3627,9 +3627,9 @@
     "birthDateLabel": "Fødselsdato",
     "parentBirthDateLabel": "Din fødselsdato",
     "childBirthDateLabel": "Barnets fødselsdato",
-    "birthDateHint": "Slik at veilederen din snakker til deg på riktig måte. Aldersgrensen er {{age}} år.",
+    "birthDateHint": "Slik at mentoren din snakker til deg på riktig måte. Aldersgrensen er {{age}} år.",
     "parentBirthDateHint": "Dette er for den voksne som setter opp kontoen. Du kan legge til barnet ditt etterpå. Aldersgrensen er {{age}} år.",
-    "childBirthDateHint": "Slik at barnets veileder snakker til dem på riktig måte. Aldersgrensen er {{age}} år.",
+    "childBirthDateHint": "Slik at barnets mentor snakker til dem på riktig måte. Aldersgrensen er {{age}} år.",
     "webDateFormatHint": "Skriv inn fødselsdatoen din som ÅÅÅÅ-MM-DD.",
     "childWebDateFormatHint": "Skriv inn barnets fødselsdato som ÅÅÅÅ-MM-DD.",
     "selectDob": "Velg fødselsdato",
@@ -3660,12 +3660,12 @@
     "a11yRetry": "Prøv modusbytte på nytt"
   },
   "memoryConsent": {
-    "defaultTitle": "Hjelp veilederen med å lære om {{name}}",
-    "defaultTitleNoName": "Hjelp veilederen med å lære om barnet ditt",
-    "defaultDescription": "Dette lar veilederen huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
+    "defaultTitle": "Hjelp mentoren med å lære om {{name}}",
+    "defaultTitleNoName": "Hjelp mentoren med å lære om barnet ditt",
+    "defaultDescription": "Dette lar mentoren huske hva slags forklaringer som fungerer, hva som fortsatt er vanskelig, og hvilke eksempler som føles relevante.",
     "grant": "Ja, aktiver",
-    "a11yEnable": "Aktiver veilederhukommelse",
-    "a11ySkip": "Hopp over veilederminne"
+    "a11yEnable": "Aktiver mentorhukommelse",
+    "a11ySkip": "Hopp over mentorminne"
   },
   "saveWizard": {
     "title": "Flott, la oss lagre dette og komme i gang.",
@@ -3870,7 +3870,7 @@
       "more": "{{count}} flere alternativer"
     },
     "bar": {
-      "unavailable": "Veilederen er frakoblet et øyeblikk. Du kan fortsatt skrive.",
+      "unavailable": "Mentoren er frakoblet et øyeblikk. Du kan fortsatt skrive.",
       "cameraLabel": "Kamera",
       "placeholder": "Spør, lim inn eller beskriv hva du vil lære.",
       "micLabel": "Mikrofon",
@@ -3985,7 +3985,7 @@
     "notes": {
       "heading": "Notater",
       "authorSelf": "Mine notater",
-      "authorMentor": "Lagret fra veileder",
+      "authorMentor": "Lagret fra mentor",
       "addNote": "Legg til et notat",
       "micLabel": "Legg til et notat med stemmen",
       "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget."
@@ -4064,16 +4064,16 @@
       "error": "Kunne ikke laste inn rapportene dine."
     },
     "memory": {
-      "title": "Kontroller for veilederens minne",
-      "body": "Se gjennom, rediger, skjul, eksporter eller slett det veilederen din husker fra hele minneskjermen.",
+      "title": "Kontroller for mentorens minne",
+      "body": "Se gjennom, rediger, skjul, eksporter eller slett det mentoren din husker fra hele minneskjermen.",
       "open": "Åpne minnekontroller"
     },
     "notes": {
       "error": "Kunne ikke laste inn notatene dine.",
       "searchPlaceholder": "Søk i notater",
       "searchEmpty": "Ingen notater samsvarer med søket.",
-      "empty": "Notater du lagrer og svar fra veileder som du bokmerker, vil vises her.",
-      "authorshipMentor": "Fra veileder",
+      "empty": "Notater du lagrer og svar fra mentor som du bokmerker, vil vises her.",
+      "authorshipMentor": "Fra mentor",
       "authorshipMine": "Mitt notat",
       "filterAll": "Alle",
       "filterMine": "Mine notater",
@@ -4126,7 +4126,7 @@
       "confidenceLow": "Tidlig signal"
     },
     "sourceBadge": {
-      "learner": "Du fortalte veilederen din",
+      "learner": "Du fortalte mentoren din",
       "parent": "Lagt til av forelder"
     },
     "remove": "Fjern"

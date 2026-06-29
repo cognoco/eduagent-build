@@ -409,7 +409,7 @@
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Dispensar recomendação",
-      "a11yLoadingCard": "Carregando cartão do tutor",
+      "a11yLoadingCard": "Carregando cartão do mentor",
       "thisMorning": "ESTA MANHÃ",
       "thisAfternoon": "ESTA TARDE",
       "tonight": "ESTA NOITE"
@@ -601,7 +601,7 @@
       "noteSaveErrorTitle": "Não foi possível salvar a nota"
     },
     "mentorMemory": {
-      "title": "O que Meu Mentor Sabe",
+      "title": "O que o seu mentor sabe sobre você.",
       "subtitle": "Revise, edite ou adicione o que seu mentor se lembra.",
       "loadError": "Não foi possível carregar a memória do seu mentor agora",
       "loadTimeout": {
@@ -993,18 +993,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "Diga ao Tutor",
-        "description": "Adicione algo importante para o tutor se lembrar sobre esta criança.",
-        "descriptionWithName": "Adicione algo importante para o tutor se lembrar sobre {{childName}}.",
+        "title": "Diga ao Mentor",
+        "description": "Adicione algo importante para o mentor se lembrar sobre esta criança.",
+        "descriptionWithName": "Adicione algo importante para o mentor se lembrar sobre {{childName}}.",
         "placeholder": "Eles dão-se melhor com exemplos curtos e ainda têm dificuldades com frações."
       },
       "adult": {
-        "title": "Adicionar uma Nota para o seu Tutor",
-        "description": "Adicione algo que queira que o seu tutor se lembre para sessões futuras.",
+        "title": "Adicionar uma Nota para o seu Mentor",
+        "description": "Adicione algo que queira que o seu mentor se lembre para sessões futuras.",
         "placeholder": "Exemplos ajudam-me mesmo a entender frações."
       },
       "teen": {
-        "title": "Diga Algo ao seu Tutor",
+        "title": "Diga Algo ao seu Mentor",
         "description": "Adicione o que o ajuda a aprender, o que gosta ou o que ainda acha difícil.",
         "placeholder": "Exemplos ajudam-me mesmo a entender frações."
       }
@@ -1427,9 +1427,9 @@
     "noteSignal": {
       "verified": "Verificado",
       "verifiedAccessibilityLabel": "Verificado - as suas palavras foram confirmadas",
-      "tutorAddition": "O tutor tem mais sobre este tópico",
-      "showTutorAdditionAccessibilityLabel": "Mostrar o que o tutor adicionou",
-      "hideTutorAdditionAccessibilityLabel": "Ocultar o que o tutor adicionou"
+      "mentorAddition": "O mentor tem mais sobre este tópico.",
+      "showMentorAdditionAccessibilityLabel": "Mostrar o que o mentor adicionou.",
+      "hideMentorAdditionAccessibilityLabel": "Ocultar o que o mentor adicionou."
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador salvo: {{title}}"
@@ -2386,7 +2386,7 @@
       "stepOf": "Passo {{current}} de {{total}}"
     },
     "mentorBirth": {
-      "ready": "O seu tutor está pronto."
+      "ready": "O seu mentor está pronto."
     },
     "saveWizard": {
       "startLesson": "Começar lição",
@@ -2969,7 +2969,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "O que o seu tutor sabe sobre você.",
+      "title": "O que o seu mentor sabe sobre você.",
       "subtitle": "Toque para rever ou alterar."
     },
     "notificationPrimer": {
@@ -3606,7 +3606,7 @@
     "hub": {
       "sessionsSubtitle": "Conversas que você teve",
       "notesSubtitle": "Coisas que você anotou",
-      "bookmarksSubtitle": "Respostas do tutor que você salvou",
+      "bookmarksSubtitle": "Respostas do mentor que você salvou",
       "countLoading": "A carregar",
       "countUnavailable": "Indisponível"
     },
@@ -3627,9 +3627,9 @@
     "birthDateLabel": "Data de nascimento",
     "parentBirthDateLabel": "Sua data de nascimento",
     "childBirthDateLabel": "Data de nascimento da criança",
-    "birthDateHint": "Para que seu tutor fale com você da maneira certa. A idade mínima é {{age}} anos.",
+    "birthDateHint": "Para que seu mentor fale com você da maneira certa. A idade mínima é {{age}} anos.",
     "parentBirthDateHint": "Isto é para o adulto que está configurando a conta. Você pode adicionar seu/sua filho(a) em seguida. A idade mínima é {{age}} anos.",
-    "childBirthDateHint": "Para que o tutor do seu/sua filho(a) fale com ele(a) da maneira certa. A idade mínima é {{age}} anos.",
+    "childBirthDateHint": "Para que o mentor do seu/sua filho(a) fale com ele(a) da maneira certa. A idade mínima é {{age}} anos.",
     "webDateFormatHint": "Insira sua data de nascimento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Insira a data de nascimento do seu/sua filho(a) como AAAA-MM-DD.",
     "selectDob": "Selecione a data de nascimento",
@@ -3660,12 +3660,12 @@
     "a11yRetry": "Tentar trocar modo"
   },
   "memoryConsent": {
-    "defaultTitle": "Ajude o tutor a aprender sobre {{name}}",
-    "defaultTitleNoName": "Ajude o tutor a aprender sobre seu/sua filho(a)",
-    "defaultDescription": "Isso permite que o tutor se lembre de quais tipos de explicações funcionam, o que ainda é difícil e quais exemplos parecem relevantes.",
+    "defaultTitle": "Ajude o mentor a aprender sobre {{name}}",
+    "defaultTitleNoName": "Ajude o mentor a aprender sobre seu/sua filho(a)",
+    "defaultDescription": "Isso permite que o mentor se lembre de quais tipos de explicações funcionam, o que ainda é difícil e quais exemplos parecem relevantes.",
     "grant": "Sim, ativar",
-    "a11yEnable": "Ativar memória do tutor",
-    "a11ySkip": "Pular memória do tutor"
+    "a11yEnable": "Ativar memória do mentor",
+    "a11ySkip": "Pular memória do mentor"
   },
   "saveWizard": {
     "title": "Ótimo, vamos guardar isto e começar.",
@@ -3870,7 +3870,7 @@
       "more": "{{count}} mais opções"
     },
     "bar": {
-      "unavailable": "O tutor está offline por um momento. Você ainda pode digitar.",
+      "unavailable": "O mentor está offline por um momento. Você ainda pode digitar.",
       "cameraLabel": "Câmera",
       "placeholder": "Pergunte, cole ou descreva o que você quer aprender.",
       "micLabel": "Microfone",
@@ -3985,7 +3985,7 @@
     "notes": {
       "heading": "Notas",
       "authorSelf": "Minhas notas",
-      "authorMentor": "Salvo do tutor",
+      "authorMentor": "Salvo do mentor",
       "addNote": "Adicionar uma nota",
       "micLabel": "Adicionar nota por voz",
       "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria."
@@ -4064,16 +4064,16 @@
       "error": "Não foi possível carregar seus relatórios."
     },
     "memory": {
-      "title": "Controles de memória do tutor",
-      "body": "Revise, edite, oculte, exporte ou limpe o que seu tutor lembra na tela de memória completa.",
+      "title": "Controles de memória do mentor",
+      "body": "Revise, edite, oculte, exporte ou limpe o que seu mentor lembra na tela de memória completa.",
       "open": "Abrir controles de memória"
     },
     "notes": {
       "error": "Não foi possível carregar as suas notas.",
       "searchPlaceholder": "Pesquisar notas",
       "searchEmpty": "Nenhuma nota corresponde a essa pesquisa.",
-      "empty": "As notas que guardar e as respostas do tutor que marcar aparecerão aqui.",
-      "authorshipMentor": "Do tutor",
+      "empty": "As notas que guardar e as respostas do mentor que marcar aparecerão aqui.",
+      "authorshipMentor": "Do mentor",
       "authorshipMine": "Minha nota",
       "filterAll": "Tudo",
       "filterMine": "Minhas anotações",
@@ -4126,7 +4126,7 @@
       "confidenceLow": "Sinal precoce"
     },
     "sourceBadge": {
-      "learner": "Você disse ao seu tutor",
+      "learner": "Você disse ao seu mentor",
       "parent": "Adicionado pelos pais"
     },
     "remove": "Remover"
