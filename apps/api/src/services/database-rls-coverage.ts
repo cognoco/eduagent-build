@@ -99,6 +99,12 @@ export const PROFILE_SCOPED_TABLES: readonly string[] = [
   // Drizzle schema omits .enableRLS() by repo convention (RLS DDL lives in the
   // migration SQL); the WI-688 schema scanner still derives it from profile_id.
   'retrieval_events',
+  // Added migration 0125 (WI-1104): concepts_profile_isolation and
+  // concept_mastery_profile_isolation policies. RLS was already ENABLED in
+  // migrations 0107/0113; this migration adds the USING + WITH CHECK predicates
+  // that were deferred pending CONCEPT_CAPTURE_ENABLED flip.
+  'concepts',
+  'concept_mastery',
 ] as const;
 
 /**
@@ -153,12 +159,6 @@ export const EXPLICITLY_EXCLUDED_TABLES: readonly string[] = [
   'top_up_credits',
   'usage_events',
   'challenge_round_cooldowns',
-  // WI-1104: RLS enabled (migrations 0107/0113), no USING policy yet — both
-  // carry per-learner data (profile_id NOT NULL) and a live read route already
-  // targets them. Add isolation policy + move to PROFILE_SCOPED before the
-  // CONCEPT_CAPTURE_ENABLED flip. Exposed by the WI-688 schema scanner.
-  'concepts',
-  'concept_mastery',
 ] as const;
 
 /**
