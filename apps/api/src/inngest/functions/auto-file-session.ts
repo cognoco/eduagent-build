@@ -1,9 +1,14 @@
-import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
 import {
   sessionAutoFileRequestedEventSchema,
   summarizeRawPayload,
 } from '@eduagent/schemas';
+
+import { inngest } from '../client';
+import {
+  closeStepDatabases,
+  getStepDatabase,
+  runWithStepDatabaseScope,
+} from '../helpers';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -252,29 +257,35 @@ export const autoFileSession = inngest.createFunction(
         return { status: 'skipped', reason: 'invalid_payload' };
       }
 
-      const db = getStepDatabase();
-      await markSessionAutoFilingFailed(
-        db,
-        parsed.data.profileId,
-        parsed.data.sessionId,
-      );
-      logger.error('auto_file_session.terminal_failure', {
-        profileId: parsed.data.profileId,
-        sessionId: parsed.data.sessionId,
-        dispatchId: parsed.data.dispatchId,
-        reason: 'handler_retries_exhausted',
-        errorName: error instanceof Error ? error.name : typeof error,
-      });
-      captureException(error, {
-        profileId: parsed.data.profileId,
-        extra: {
-          site: 'autoFileSession.onFailure',
-          sessionId: parsed.data.sessionId,
-          dispatchId: parsed.data.dispatchId,
-        },
-      });
+      return runWithStepDatabaseScope(async () => {
+        try {
+          const db = getStepDatabase();
+          await markSessionAutoFilingFailed(
+            db,
+            parsed.data.profileId,
+            parsed.data.sessionId,
+          );
+          logger.error('auto_file_session.terminal_failure', {
+            profileId: parsed.data.profileId,
+            sessionId: parsed.data.sessionId,
+            dispatchId: parsed.data.dispatchId,
+            reason: 'handler_retries_exhausted',
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
+          captureException(error, {
+            profileId: parsed.data.profileId,
+            extra: {
+              site: 'autoFileSession.onFailure',
+              sessionId: parsed.data.sessionId,
+              dispatchId: parsed.data.dispatchId,
+            },
+          });
 
-      return { status: 'failed', sessionId: parsed.data.sessionId };
+          return { status: 'failed', sessionId: parsed.data.sessionId };
+        } finally {
+          await closeStepDatabases();
+        }
+      });
     },
   },
   { event: 'app/session.auto_file_requested' },
