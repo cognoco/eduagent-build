@@ -18,7 +18,8 @@ the dark. Quarantine gives it a tracked middle state:
   work to fix — not a silent skip that rots.
 
 Scope: the **PR-gating** test surface — **Jest** (`nx run-many -t test` +
-`api:test:integration`, all configs) and **Playwright web e2e** (`e2e-web.yml`).
+`api:test:integration`, `api:integration-api`, all configs) and
+**Playwright web e2e** (`e2e-web.yml`).
 Maestro mobile e2e (`e2e-ci.yml`) is nightly/non-gating, so it is covered
 opportunistically but is not the point. **LLM eval passes are out of scope** —
 they are not part of the `main` gate, and their nondeterminism is threshold-

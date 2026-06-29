@@ -11,6 +11,7 @@ import {
 import type { AllNote } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
 import { createLogger } from './logger';
+import { paginateRows } from './pagination';
 import { captureException } from './sentry';
 
 const MAX_NOTES_PER_TOPIC = 50;
@@ -462,8 +463,7 @@ export async function listAllNotes(
     () => selectAllNoteRows(db, conditions, limit, false),
   );
 
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const { page, nextCursor } = paginateRows(rows, limit);
 
   return {
     notes: page.map((row) => ({
@@ -471,7 +471,7 @@ export async function listAllNotes(
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     })),
-    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    nextCursor,
   };
 }
 

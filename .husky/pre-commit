@@ -84,6 +84,13 @@ fi
 # include/exclude rules so hook logic and tests cannot drift apart.
 pnpm exec tsx scripts/check-precommit-eval-snapshot-guard.ts
 
+# ADR provenance guard: cheap staged-file half. The commit subject half runs in
+# .husky/commit-msg where the message is available.
+STAGED_ADRS=$(git diff --cached --name-only --diff-filter=A -- 'docs/adr/MMT-ADR-*.md')
+if [ -n "$STAGED_ADRS" ]; then
+  pnpm exec tsx scripts/check-adr-provenance.ts --staged --skip-subject-check || exit 1
+fi
+
 # i18n staleness guard: when en.json is staged, every locale must already match
 # its key/variable shape. Without this the staleness check exists but never
 # runs in CI/husky, so missing-key drift ships silently. Skip when only

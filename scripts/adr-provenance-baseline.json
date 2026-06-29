@@ -1,0 +1,27 @@
+[
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0001-own-identity-tenancy-graph-clerk-auth-only.md",
+    "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0002-payer-capacity-store-delegated.md",
+    "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0004-mobile-iap-revenuecat-stripe-dormant.md",
+    "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0005-book-mastery-atomic-conditional-update.md",
+    "reason": "grandfathered pre-guard Accepted ADR"
+  },
+  {
+    "kind": "accepted_missing_arch_signoff",
+    "file": "docs/adr/MMT-ADR-0006-ocr-on-device-primary-server-fallback-interface.md",
+    "reason": "grandfathered pre-guard Accepted ADR"
+  }
+]

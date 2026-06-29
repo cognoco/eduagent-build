@@ -6,6 +6,15 @@
 #   "(parent)" route group no longer exists (dashboard.tsx is a Redirect stub).
 # Hard tapOn calls in PHASE 5 (lines 234, 246, 262) will crash — not just optional assertions.
 #
+# Chrome equivalent (QA-02 reconciliation, WI-857):
+#   apps/mobile/e2e-web/flows/mentor-audit/registry-smoke.spec.ts
+#   (--project=mentor-audit-registry-smoke) is the authoritative post-auth smoke
+#   for browser surfaces. QA-02 closure gated on:
+#     WI-878 — BRIDGE-04 entry surface failures in mentor-audit smoke
+#     WI-879 — registry/consent readiness drift against current Mentor/Family shells
+# This file is preserved pending M1-COMPREHENSIVE rewrite. Do not delete until a
+# native-Maestro equivalent of registry-smoke.spec.ts exists.
+#
 # Post-Auth Comprehensive E2E — dev-client variant
 # Signs in with seeded test user, then tests all major post-auth screens.
 # Prerequisite: API running at localhost:8787 with learning-active seed data.

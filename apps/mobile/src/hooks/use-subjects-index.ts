@@ -3,6 +3,7 @@ import type {
   CurriculumBook,
   GetAllProfileBooksResponse,
   Subject,
+  SubjectStatus,
 } from '@eduagent/schemas';
 
 import { useAllBooks } from './use-all-books';
@@ -15,6 +16,8 @@ import { useSubjects } from './use-subjects';
 export interface SubjectIndexItem {
   subjectId: string;
   subjectName: string;
+  status: SubjectStatus;
+  urgencyBoostUntil: string | null;
   mastered: number;
   learning: number;
   total: number;
@@ -40,36 +43,38 @@ export function buildSubjectsIndex({
     progressSubjects.map((subject) => [subject.subjectId, subject]),
   );
 
-  return subjects
-    .filter((subject) => subject.status === 'active')
-    .map((subject) => {
-      const books = booksBySubject.get(subject.id) ?? [];
-      const progress = progressBySubject.get(subject.id);
-      const fallbackTotal = books.reduce(
-        (sum, book) => sum + (book.topicCount ?? 0),
-        0,
-      );
-      const fallbackMastered = books.reduce(
-        (sum, book) => sum + (book.masteredTopicCount ?? 0),
-        0,
-      );
-      const fallbackCompleted = books.reduce(
-        (sum, book) => sum + (book.completedTopicCount ?? 0),
-        0,
-      );
+  // All statuses pass through (active/paused/archived) — the consumer groups by
+  // status. The legacy active-only filter hid paused/archived subjects entirely.
+  return subjects.map((subject) => {
+    const books = booksBySubject.get(subject.id) ?? [];
+    const progress = progressBySubject.get(subject.id);
+    const fallbackTotal = books.reduce(
+      (sum, book) => sum + (book.topicCount ?? 0),
+      0,
+    );
+    const fallbackMastered = books.reduce(
+      (sum, book) => sum + (book.masteredTopicCount ?? 0),
+      0,
+    );
+    const fallbackCompleted = books.reduce(
+      (sum, book) => sum + (book.completedTopicCount ?? 0),
+      0,
+    );
 
-      return {
-        subjectId: subject.id,
-        subjectName: subject.name,
-        mastered: progress?.topicsMastered ?? fallbackMastered,
-        learning:
-          progress?.topicsLearning ??
-          Math.max(0, fallbackCompleted - fallbackMastered),
-        total: progress?.topicsTotal ?? fallbackTotal,
-        dueReviews: books.filter((book) => book.status === 'REVIEW_DUE').length,
-        books,
-      };
-    });
+    return {
+      subjectId: subject.id,
+      subjectName: subject.name,
+      status: subject.status,
+      urgencyBoostUntil: subject.urgencyBoostUntil ?? null,
+      mastered: progress?.topicsMastered ?? fallbackMastered,
+      learning:
+        progress?.topicsLearning ??
+        Math.max(0, fallbackCompleted - fallbackMastered),
+      total: progress?.topicsTotal ?? fallbackTotal,
+      dueReviews: books.filter((book) => book.status === 'REVIEW_DUE').length,
+      books,
+    };
+  });
 }
 
 export function useSubjectsIndex(): {
