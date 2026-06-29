@@ -105,21 +105,28 @@ async function loadDeletionState(accountId: string): Promise<{
   deletionCancelledAt: Date | null;
 } | null> {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    return (
-      (await db.query.organization.findFirst({
-        where: eq(organization.id, accountId),
-        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-      })) ?? null
-    );
-  }
-
-  return (
-    (await db.query.accounts.findFirst({
-      where: eq(accounts.id, accountId),
-      columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-    })) ?? null
-  );
+  // [WI-1145] Store-agnostic read across BOTH the v2 `organization` and legacy
+  // `accounts` rows (was flag-gated). The deletion flag is OFF in two distinct
+  // states the harness must serve: pre-WI-867-collapse the route writes legacy
+  // `accounts`, post-collapse it writes v2 `organization` via scheduleDeletionV2.
+  // The flag can't distinguish them (off in both) — only the code version can,
+  // which the test can't see. Coalescing each field from whichever store carries
+  // it is the one assertion that stays green across all three states.
+  const orgRow = await db.query.organization.findFirst({
+    where: eq(organization.id, accountId),
+    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+  });
+  const acctRow = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+  });
+  if (!orgRow && !acctRow) return null;
+  return {
+    deletionScheduledAt:
+      orgRow?.deletionScheduledAt ?? acctRow?.deletionScheduledAt ?? null,
+    deletionCancelledAt:
+      orgRow?.deletionCancelledAt ?? acctRow?.deletionCancelledAt ?? null,
+  };
 }
 
 beforeAll(() => {
@@ -157,16 +164,15 @@ async function createOwnerProfileRecord(): Promise<{
   }
 
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const membershipRow = await db.query.membership.findFirst({
-      where: eq(membership.personId, profileId),
-      columns: { organizationId: true },
-    });
-    if (!membershipRow) {
-      throw new Error(
-        `Membership row missing after create for person: ${profileId}`,
-      );
-    }
+  // [WI-1145] v2-first (membership; person.id == profile.id) then legacy `profiles`
+  // fallback. The create route is v2-unconditional post-WI-867 collapse, so the
+  // former isIdentityV2Enabled() gate left the post-collapse flag-off lane reading
+  // empty legacy `profiles`; resolve whichever store the route wrote.
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, profileId),
+    columns: { organizationId: true },
+  });
+  if (membershipRow) {
     return { profileId, accountId: membershipRow.organizationId };
   }
 
@@ -176,7 +182,9 @@ async function createOwnerProfileRecord(): Promise<{
   });
 
   if (!row) {
-    throw new Error(`Profile row missing after create: ${profileId}`);
+    throw new Error(
+      `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
+    );
   }
 
   return { profileId, accountId: row.accountId };

@@ -13,6 +13,8 @@
 import { and, eq } from 'drizzle-orm';
 import {
   accounts,
+  login,
+  membership,
   subjects,
   curricula,
   curriculumBooks,
@@ -23,6 +25,7 @@ import {
   sessionEvents,
   sessionSummaries,
   subscriptions,
+  subscription as subscriptionV2,
 } from '@eduagent/database';
 import type { SessionType } from '@eduagent/schemas';
 
@@ -88,10 +91,27 @@ async function createOwnerProfile(): Promise<string> {
   return body.profile.id as string;
 }
 
-async function loadAccount() {
+async function loadAccount(): Promise<{ id: string } | undefined> {
   const db = createIntegrationDb();
+  // [WI-1145] Resolve the owner's org/account v2-first — the create route writes
+  // login/membership unconditionally post-WI-867 collapse (legacy `accounts` empty
+  // on the flag-off main lane). Fall back to legacy `accounts` pre-collapse. Only
+  // `.id` is consumed downstream.
+  const loginRow = await db.query.login.findFirst({
+    where: eq(login.clerkUserId, AUTH_USER_ID),
+    columns: { personId: true },
+  });
+  if (loginRow) {
+    const membershipRow = await db.query.membership.findFirst({
+      where: eq(membership.personId, loginRow.personId),
+      columns: { organizationId: true },
+    });
+    if (membershipRow) return { id: membershipRow.organizationId };
+  }
+
   return db.query.accounts.findFirst({
     where: eq(accounts.clerkUserId, AUTH_USER_ID),
+    columns: { id: true },
   });
 }
 
@@ -226,9 +246,21 @@ async function loadSubscriptionAndQuota(profileId: string) {
   const account = await loadAccount();
   expect(account).not.toBeNull();
 
-  const subscription = await db.query.subscriptions.findFirst({
+  // [WI-1145] Resolve the subscription v2-first — the owner bootstrap writes
+  // subscription-v2 unconditionally post-WI-867 collapse (legacy `subscriptions`
+  // empty on the flag-off main lane). Only `.id` is consumed downstream.
+  const legacySub = await db.query.subscriptions.findFirst({
     where: eq(subscriptions.accountId, account!.id),
+    columns: { id: true },
   });
+  const [v2Sub] = legacySub
+    ? []
+    : await db
+        .select({ id: subscriptionV2.id })
+        .from(subscriptionV2)
+        .where(eq(subscriptionV2.organizationId, account!.id))
+        .limit(1);
+  const subscription = legacySub ?? v2Sub;
   expect(subscription).not.toBeNull();
 
   const profileQuota = await db.query.profileQuotaUsage.findFirst({
