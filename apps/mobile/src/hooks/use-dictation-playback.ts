@@ -77,8 +77,34 @@ function normalizeLanguageTag(language: string): string {
   return language.trim().toLowerCase().replace(/_/g, '-');
 }
 
+// [WI-1149] Some Android TTS engines report a voice's language as a 3-letter
+// ISO 639-2/3 code (e.g. "eng", "deu") rather than the ISO 639-1 base ("en",
+// "de") the rest of the app uses. Map the codes for our conversation-language
+// set back to their 2-letter base so a device that reports "eng" still matches
+// a target of "en". Unmapped codes fall through unchanged. Note: "nor" is the
+// generic ISO 639-2 Norwegian code and is mapped to Bokmål ("nb") — the app's
+// Norwegian; Nynorsk is "nno"/"nn" and is not in the conversation set, so it is
+// deliberately not mapped here.
+const ISO_639_2_TO_1: Record<string, string> = {
+  ces: 'cs',
+  cze: 'cs',
+  deu: 'de',
+  ger: 'de',
+  eng: 'en',
+  spa: 'es',
+  fra: 'fr',
+  fre: 'fr',
+  ita: 'it',
+  jpn: 'ja',
+  nor: 'nb',
+  nob: 'nb',
+  pol: 'pl',
+  por: 'pt',
+};
+
 function getBaseLanguage(language: string): string {
-  return normalizeLanguageTag(language).split('-')[0] ?? '';
+  const base = normalizeLanguageTag(language).split('-')[0] ?? '';
+  return ISO_639_2_TO_1[base] ?? base;
 }
 
 function voiceMatchesLanguage(
@@ -182,16 +208,33 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
 
     return (async () => {
       let voices: Speech.Voice[] = [];
+      let enumerationFailed = false;
       try {
         voices = await Speech.getAvailableVoicesAsync();
       } catch {
         voices = [];
+        enumerationFailed = true;
+      }
+
+      checkedVoiceLanguageRef.current = targetLanguage;
+
+      // [WI-1149] Graceful degradation. Many Android TTS engines return an
+      // empty voice list (or throw) even when the system voice speaks fine —
+      // the engine simply doesn't enumerate voices across the JS bridge.
+      // WI-908's gate wrongly read that as "no voice" and blocked playback
+      // that would have succeeded. When we cannot enumerate ANY voices, assume
+      // the device's default TTS can speak the language and let Speech.speak()
+      // attempt it; the speakChunk `onError` path already resets state if it
+      // genuinely cannot. A genuine "voices exist but none match the target
+      // language" case (non-empty list) still falls through to `unavailable`.
+      if (enumerationFailed || voices.length === 0) {
+        setVoiceAvailabilityState('available');
+        return true;
       }
 
       const hasMatchingVoice = voices.some((voice) =>
         voiceMatchesLanguage(voice.language, targetLanguage),
       );
-      checkedVoiceLanguageRef.current = targetLanguage;
 
       if (hasMatchingVoice) {
         setVoiceAvailabilityState('available');
@@ -338,6 +381,13 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     clearPauseTimer();
     setCurrentIndex(0);
     chunkIndexRef.current = 0;
+    // [WI-1149] Force a fresh voice check on each user-initiated play. The
+    // graceful-degradation path caches `available` when the engine couldn't
+    // enumerate voices yet; clearing the cache key here ensures a later play
+    // re-checks (the engine may have since bound and can now report a genuine
+    // no-match) rather than reusing the optimistic result. The per-chunk cache
+    // within a single playback session is unaffected — it is re-seeded below.
+    checkedVoiceLanguageRef.current = null;
     const beginCountdown = () => {
       setState('countdown');
       pauseTimerRef.current = setTimeout(() => {
