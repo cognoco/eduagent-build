@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging observer; no DB access)
 // ---------------------------------------------------------------------------
 // Exchange Empty-Reply Fallback — observable terminus for the
 // app/exchange.empty_reply_fallback event emitted by streamInterviewExchange

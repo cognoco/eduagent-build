@@ -18,6 +18,7 @@ import {
 //   --scenarios core|full|source-grounding|personalization|homework-source|book-suggestions|<csv>
 //                             restrict scenarios for enumerated flows
 //   --max-live-calls N     hard cap on live LLM calls (default 20)
+//   --only-envelope-flows  run only flows with emitsEnvelope:true (baseline set)
 //   --list                 list registered flows and fixtures and exit
 // ---------------------------------------------------------------------------
 
@@ -36,6 +37,14 @@ export interface RunOptions {
    * skip reason so tier-2 runs don't surprise with large bills. Default = 20.
    */
   maxLiveCalls?: number;
+  /**
+   * Restrict the run to flows with `emitsEnvelope: true` — the exact set the
+   * baseline regression guard tracks. Lets CI's `--check-baseline` live run
+   * cover exactly the envelope-emitting flows without hardcoding a flow list
+   * that rots when a new envelope flow is added (WI-560). Composes with
+   * `--flow` (intersection).
+   */
+  onlyEnvelopeFlows?: boolean;
   /**
    * Candidate-model gate: route every live call to this OpenRouter model slug
    * (verbatim passthrough, e.g. "mistralai/mistral-small-2603") instead of the
@@ -188,6 +197,8 @@ export function parseCliArgs(argv: string[]): {
       options.updateBaseline = true;
     } else if (arg === '--validate-baseline') {
       options.validateBaseline = true;
+    } else if (arg === '--only-envelope-flows') {
+      options.onlyEnvelopeFlows = true;
     } else if (arg === '--baseline-tolerance') {
       const next = argv[++i];
       const parsed = next ? Number.parseFloat(next) : NaN;
@@ -238,7 +249,9 @@ export async function runHarness(
   const samplesByFlow = new Map<string, SampleMetrics[]>();
 
   const activeFlows = flows.filter(
-    (f) => !options.flowFilter || options.flowFilter.has(f.id),
+    (f) =>
+      (!options.flowFilter || options.flowFilter.has(f.id)) &&
+      (!options.onlyEnvelopeFlows || f.emitsEnvelope === true),
   );
   const activeProfiles = PROFILES.filter(
     (p) => !options.profileFilter || options.profileFilter.has(p.id),

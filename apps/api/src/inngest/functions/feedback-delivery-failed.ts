@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event; feedback retry scoped by profileId)
 // ---------------------------------------------------------------------------
 // feedback-delivery-failed — retry failed feedback email deliveries
 // [A-24] The POST /feedback route dispatches app/feedback.delivery_failed

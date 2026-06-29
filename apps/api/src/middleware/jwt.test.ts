@@ -148,6 +148,30 @@ describe('decodeJWTPayload', () => {
   it('throws when token has more than 3 segments', () => {
     expect(() => decodeJWTPayload('a.b.c.d')).toThrow('expected 3 segments');
   });
+
+  // [WI-481] Parse-don't-cast break tests. The payload bytes are attacker-
+  // controlled; the schema must reject a non-object payload and type-confused
+  // standard claims instead of returning them via an unchecked cast.
+  it('[WI-481] throws "malformed payload" when the payload is not a JSON object', () => {
+    // A base64url JSON string (not an object) — `JSON.parse(...) as JWTPayload`
+    // previously returned the raw string; the schema now fails closed.
+    const payloadB64 = btoa('"just-a-string"')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const token = `${toBase64Url({ alg: 'RS256' })}.${payloadB64}.sig`;
+
+    expect(() => decodeJWTPayload(token)).toThrow('malformed payload');
+  });
+
+  it('[WI-481] throws "malformed payload" when exp is not a number (type confusion)', () => {
+    const token = buildUnsignedFakeToken(
+      { alg: 'RS256' },
+      { sub: 'user-1', exp: 'not-a-number' },
+    );
+
+    expect(() => decodeJWTPayload(token)).toThrow('malformed payload');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -246,6 +270,23 @@ describe('fetchJWKS', () => {
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ message: 'service unavailable' }), // no keys array
+    }) as unknown as typeof fetch;
+
+    const error = await fetchJWKS(JWKS_URL).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/JWKS/i);
+  });
+
+  // [WI-481] Security break test: per-JWK shape validation. A `keys` array that
+  // contains a non-object entry previously passed the shallow `Array.isArray`
+  // check, was cached, and then TypeError'd in `.find(k => k.kid)` — surfacing
+  // as a 401 (token error) instead of a 503 (infra error). The schema now
+  // rejects it with a JWKS-classified message. Revert jwksSchema → the shallow
+  // check accepts `[null]` and this test fails (no throw / wrong error class).
+  it('[WI-481] rejects a JWKS whose keys array contains a non-object entry', async () => {
+    globalThis.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ keys: [null] }),
     }) as unknown as typeof fetch;
 
     const error = await fetchJWKS(JWKS_URL).catch((e: unknown) => e);

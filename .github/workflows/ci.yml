@@ -216,6 +216,13 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:i18n
 
+      # [WI-1075] Every Inngest function must carry an @inngest-admin access
+      # classification on its first line so operators can safely re-run or
+      # cancel functions without corrupting profile-owned data. This guard
+      # keeps the annotation coverage complete as new functions are added.
+      - name: Inngest @inngest-admin annotation guard (WI-1075)
+        run: pnpm exec tsx scripts/check-inngest-admin.ts
+
       # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
       # must use the structured `signals` envelope (services/llm/envelope.ts),
       # not free-text marker tokens. See AGENTS.md → "LLM Response Envelope".

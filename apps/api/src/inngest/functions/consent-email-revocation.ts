@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (chargePersonId from event; 7-day grace → hard delete scoped to that person)
 /**
  * Email-parent consent revocation — 7-day grace → hard-delete.
  *
