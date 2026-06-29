@@ -247,9 +247,24 @@ function isOwnerRole(role: ActiveProfileRole | null): boolean {
   return role === 'owner';
 }
 
-export function resolveNavigationContract(
+interface NavigationShapeResolution {
+  shape: NavigationShape;
+  effectiveAppContext: NavigationAppContext;
+  reason: NavigationDiagnostic['reason'];
+  visibleTabs: ReadonlySet<TabKey>;
+  linkedChildIds: string[];
+  familyCapable: boolean;
+  ownerRole: boolean;
+  addChildOwnerRole: boolean;
+  subscriptionReady: boolean;
+  familyHubEligible: boolean;
+  legacyV0ModeNavActive: boolean;
+  legacyV0FamilyCapable: boolean;
+}
+
+export function resolveShape(
   context: ProfileContext,
-): NavigationContract {
+): NavigationShapeResolution {
   const linkedChildIds = getLinkedChildIds(
     context.activeProfile,
     context.profiles,
@@ -319,6 +334,37 @@ export function resolveNavigationContract(
     visibleTabs = FAMILY_TABS;
   }
 
+  return {
+    shape,
+    effectiveAppContext,
+    reason,
+    visibleTabs,
+    linkedChildIds,
+    familyCapable,
+    ownerRole,
+    addChildOwnerRole,
+    subscriptionReady,
+    familyHubEligible,
+    legacyV0ModeNavActive,
+    legacyV0FamilyCapable,
+  };
+}
+
+export function resolveGates(
+  context: ProfileContext,
+  resolution: NavigationShapeResolution,
+): NavigationGates {
+  const {
+    shape,
+    familyCapable,
+    ownerRole,
+    addChildOwnerRole,
+    subscriptionReady,
+    familyHubEligible,
+    legacyV0ModeNavActive,
+    legacyV0FamilyCapable,
+    linkedChildIds,
+  } = resolution;
   const familyShape = shape === 'family';
   const isV1 = context.flags.MODE_NAV_V1_ENABLED === true;
   const ownerNotProxy = ownerRole && !context.isParentProxy;
@@ -361,7 +407,7 @@ export function resolveNavigationContract(
       ? familyShape && !context.isParentProxy
       : showLegacyModeFamilyHome || showLegacyFlagsOffFamilyHome;
 
-  const gates: NavigationGates = {
+  return {
     sessionIsOwner: ownerRole && !context.isParentProxy,
     showFamilyHome,
     showLearningActions: !context.isParentProxy,
@@ -378,8 +424,12 @@ export function resolveNavigationContract(
     showLearnThisToo: learnThisTooGate,
     progressScope: familyShape ? 'children' : 'self',
   };
+}
 
-  const home: NavigationContract['home'] = showFamilyHome
+export function resolveHome(
+  gates: Pick<NavigationGates, 'showFamilyHome'>,
+): NavigationContract['home'] {
+  return gates.showFamilyHome
     ? {
         screen: 'FamilyHome',
         titleKey: 'tabs.children',
@@ -390,8 +440,19 @@ export function resolveNavigationContract(
         titleKey: 'tabs.myLearning',
         iconName: 'School',
       };
+}
 
-  const canEnter = (route: RouteKey, params?: RouteParams): boolean => {
+export function resolveCanEnter(
+  context: ProfileContext,
+  resolution: NavigationShapeResolution,
+  gates: NavigationGates,
+): NavigationContract['canEnter'] {
+  const familyShape = resolution.shape === 'family';
+  const linkedChildIds = resolution.linkedChildIds;
+  const ownerRole = resolution.ownerRole;
+  const visibleTabs = resolution.visibleTabs;
+
+  return (route: RouteKey, params?: RouteParams): boolean => {
     if (!context.activeProfile) return route === 'home';
     if (context.isParentProxy) {
       return route === 'home' || route === 'library' || route === 'progress';
@@ -439,8 +500,20 @@ export function resolveNavigationContract(
 
     return false;
   };
+}
 
-  const isSurfaced = (route: RouteKey, params?: RouteParams): boolean => {
+export function resolveIsSurfaced(
+  context: ProfileContext,
+  resolution: NavigationShapeResolution,
+  gates: NavigationGates,
+  canEnter: NavigationContract['canEnter'],
+): NavigationContract['isSurfaced'] {
+  const familyShape = resolution.shape === 'family';
+  const linkedChildIds = resolution.linkedChildIds;
+  const ownerRole = resolution.ownerRole;
+  const visibleTabs = resolution.visibleTabs;
+
+  return (route: RouteKey, params?: RouteParams): boolean => {
     if (!canEnter(route, params)) return false;
 
     if (LEARNING_ROUTES.has(route)) {
@@ -475,40 +548,63 @@ export function resolveNavigationContract(
 
     return false;
   };
+}
 
+export function resolveChrome(
+  context: ProfileContext,
+  resolution: NavigationShapeResolution,
+): NavigationContract['chrome'] {
   const showModeSwitcher =
     !context.isParentProxy &&
-    ((context.flags.MODE_NAV_V1_ENABLED && familyCapable) ||
-      (legacyV0ModeNavActive && legacyV0FamilyCapable));
+    ((context.flags.MODE_NAV_V1_ENABLED && resolution.familyCapable) ||
+      (resolution.legacyV0ModeNavActive && resolution.legacyV0FamilyCapable));
 
   return {
-    shape,
-    effectiveAppContext,
-    isFamilyCapable: familyCapable,
+    modeSwitcher: showModeSwitcher ? 'global-header' : 'hidden',
+    proxyBanner:
+      context.isParentProxy && context.activeProfile ? 'required' : 'hidden',
+  };
+}
+
+export function resolveNavigationContract(
+  context: ProfileContext,
+): NavigationContract {
+  const shapeResolution = resolveShape(context);
+  const gates = resolveGates(context, shapeResolution);
+  const home = resolveHome(gates);
+  const chrome = resolveChrome(context, shapeResolution);
+  const canEnter = resolveCanEnter(context, shapeResolution, gates);
+  const isSurfaced = resolveIsSurfaced(
+    context,
+    shapeResolution,
+    gates,
+    canEnter,
+  );
+
+  return {
+    shape: shapeResolution.shape,
+    effectiveAppContext: shapeResolution.effectiveAppContext,
+    isFamilyCapable: shapeResolution.familyCapable,
     isParentProxy: context.isParentProxy,
-    visibleTabs,
+    visibleTabs: shapeResolution.visibleTabs,
     home,
-    chrome: {
-      modeSwitcher: showModeSwitcher ? 'global-header' : 'hidden',
-      proxyBanner:
-        context.isParentProxy && context.activeProfile ? 'required' : 'hidden',
-    },
+    chrome,
     gates,
     canEnter,
     isSurfaced,
     queryScope: {
-      appContext: effectiveAppContext,
+      appContext: shapeResolution.effectiveAppContext,
       profileId: context.activeProfile?.id ?? null,
     },
     diagnostic: {
       activeProfileId: context.activeProfile?.id ?? null,
-      effectiveAppContext,
-      isFamilyCapable: familyCapable,
+      effectiveAppContext: shapeResolution.effectiveAppContext,
+      isFamilyCapable: shapeResolution.familyCapable,
       isParentProxy: context.isParentProxy,
-      linkedChildIds,
-      reason,
+      linkedChildIds: shapeResolution.linkedChildIds,
+      reason: shapeResolution.reason,
       role: context.role,
-      shape,
+      shape: shapeResolution.shape,
     },
   };
 }

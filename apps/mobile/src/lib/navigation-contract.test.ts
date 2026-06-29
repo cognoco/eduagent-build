@@ -10,7 +10,13 @@ import {
 } from './legacy-navigation-contract';
 import {
   isFamilyHubEligible,
+  resolveCanEnter,
+  resolveChrome,
+  resolveGates,
+  resolveHome,
+  resolveIsSurfaced,
   resolveNavigationContract,
+  resolveShape,
   type NavigationContract,
   type ProfileContext,
   type RouteKey,
@@ -431,6 +437,50 @@ describe('isFamilyHubEligible', () => {
     });
 
     expect(isFamilyHubEligible(context)).toBe(true);
+  });
+});
+
+describe('resolveNavigationContract helper decomposition', () => {
+  it('exposes pure helper results that match the thin orchestrator', () => {
+    const context = makeContext({
+      activeProfile: familyAdult,
+      appContext: 'family',
+      profiles: [familyAdult, child],
+      subscription: { status: 'ready', tier: 'family' },
+    });
+
+    const shape = resolveShape(context);
+    const gates = resolveGates(context, shape);
+    const home = resolveHome(gates);
+    const chrome = resolveChrome(context, shape);
+    const canEnter = resolveCanEnter(context, shape, gates);
+    const isSurfaced = resolveIsSurfaced(context, shape, gates, canEnter);
+    const contract = resolveNavigationContract(context);
+
+    expect(shape.shape).toBe(contract.shape);
+    expect(shape.effectiveAppContext).toBe(contract.effectiveAppContext);
+    expect(shape.familyCapable).toBe(contract.isFamilyCapable);
+    expect(shape.linkedChildIds).toEqual(contract.diagnostic.linkedChildIds);
+    expect(shape.reason).toBe(contract.diagnostic.reason);
+    expect([...shape.visibleTabs].sort()).toEqual(sortedTabs(contract));
+    expect(gates).toEqual(contract.gates);
+    expect(home).toEqual(contract.home);
+    expect(chrome).toEqual(contract.chrome);
+
+    for (const route of [
+      'child/[profileId]',
+      'child/[profileId]/curriculum',
+      'library',
+      'recaps',
+      'session',
+      'subscription',
+    ] as const) {
+      const params = route.startsWith('child/') ? linkedChildParams : undefined;
+      expect(canEnter(route, params)).toBe(contract.canEnter(route, params));
+      expect(isSurfaced(route, params)).toBe(
+        contract.isSurfaced(route, params),
+      );
+    }
   });
 });
 

@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-8190-a4cb-c98ab57a4465",
+  "id": "WI-705",
+  "name": "Modernize the ASSUMP-F14 RLS-coverage unit test for the post-cutover person_id model",
+  "description": "The static RLS-coverage unit test (packages/database/src/rls-coverage.test.ts, [ASSUMP-F14]) has two limitations surfaced during WI-689 (CUT-A). (1) BRITTLE SCAN: it flags a pgTable block if the raw text between one pgTable( and the next contains the literal token `profile_id`, including in comments — its own header claims it matches the `profileId: uuid('profile_id')` COLUMN pattern, but the implementation (line ~79) is a bare `/profile_id/.test(tableBlock)`. This already required 3 documented RLS_EXCEPTIONS workarounds (accounts, topic_connections, curriculum_topics) and produced a fresh false positive on subscription_payers when consent_request's comment landed in its scan window (fixed in CUT-A by rewording the comment). Tighten the scan to the actual column-declaration pattern so comment tokens cannot trip it. (2) SCOPE GAP vs the new model: the test scans only for `profile_id`, but the ratified identity model uses `person_id`/`*_person_id` columns. As CUT-B re-points and introduces person_id-keyed tables, this unit test will not catch a missing ENABLE ROW LEVEL SECURITY on them. Note the manifest-driven integration test (database-rls-coverage.integration.test.ts, via meta.predicateColumn incl. charge_person_id) DOES cover the manifest tables — assess whether the unit-test scanner should be extended to person_id discovery or whether the integration/manifest path makes the unit scanner redundant. Not a blocker; relevant before/while CUT-B lands person_id tables.",
+  "acceptanceCriteria": "Scanner matches the column-declaration pattern (not bare comment tokens) so the RLS_EXCEPTIONS false-positive class is eliminated or reduced; person_id-keyed table coverage is either added to the unit scanner or explicitly delegated to the manifest/integration test with a documented rationale; existing real profile_id tables remain covered (the >=15-table sanity check still passes); no suppression-style exceptions added for real gaps.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

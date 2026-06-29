@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8145-afef-f84a353b136b",
+  "id": "WI-972",
+  "name": "app/session.completed Inngest event has no schema at dispatch or consumption",
+  "description": "[FCR 2026-06-21 · L8-01] the highest-stakes event (XP, streaks, SM-2, embeddings, memory, summary) has no Zod schema and is not validated at either consumer; 8 `as` casts silently coerce malformed/stale payloads. Fix: add sessionCompletedEventSchema + safeParse at both consumers.",
+  "acceptanceCriteria": "Root cause: no sessionCompletedEventSchema exists anywhere in the codebase; apps/api/src/inngest/functions/session-completed.ts makes 8 raw event.data.* casts (lines 405, 412, 463, 625, 651, 1738 and others) with zero entry validation; the stale-cron dispatch path (session-stale-cleanup.ts:40–65) sends a divergent payload (missing mode, escalationRungs, exchangeCount, qualityRating) that is also unvalidated at consumption. packages/schemas/src/inngest-events.ts contains schemas for downstream events but not the trigger event itself.\n\nVariants — by risk: (a) qualityRating (session-completed.ts:625) — highest: a non-numeric or out-of-range value silently corrupts SM-2 scheduling for all session concepts, no Sentry emit; (b) exchangeCount (line 463) — streak credit silently skipped when field missing/wrong; (c) reason (line 1738) — controls isUnattended flag, wrong value causes unattended sessions to earn or skip streak credit incorrectly; (d) mode (lines 412, 651) — gates filing-wait and downstream routing branch; (e) stale-cron path (session-stale-cleanup.ts) — omits 4 fields the primary path sends; schema must model both shapes (primary + auto_closed variant). Secondary consumer progress-summary.ts uses conservative if-guards and is lower risk.\n\nFix: define sessionCompletedEventSchema in packages/schemas/src/inngest-events.ts modelling both dispatch shapes; add safeParse + NonRetriableError at the top of session-completed.ts and progress-summary.ts before any destructuring; update both dispatch sites (session-filing-dispatch.ts:111–131 and session-stale-cleanup.ts:40–65) to satisfy the schema.\n\nRegression test: in apps/api/src/inngest/functions/session-completed.test.ts, fire a session.completed event with qualityRating as a string ('bad') and exchangeCount as null; assert the function throws NonRetriableError and does NOT write to assessments or update streaks. Must fail without the fix (silent coerce) and pass with it (safeParse + NonRetriableError). Run: `pnpm exec nx run api:test --testPathPattern=session-completed`.",
+  "riskImpact": "Post-session pipeline silently processes truncated/malformed payloads (e.g. missing exchangeCount → streaks skipped) with no NonRetriableError.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

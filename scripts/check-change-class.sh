@@ -81,6 +81,7 @@ filter_files() {
 #   eval=<bool>          matrix demands the LLM eval harness (Tier 1)
 #   unit=<bool>          matrix demands the API unit suite for a cross-package
 #                        read that nx affected cannot see (i18n-cross-package)
+#   docs_only=<bool>     PR diff is limited to docs/editor metadata paths
 # Fail-open invariant: if no diff base resolves, the router cannot prove a
 # slow suite unaffected, so it demands them ALL — never silently skips.
 emit_github_output() {
@@ -93,11 +94,19 @@ emit_github_output() {
       echo "integration=true"
       echo "eval=true"
       echo "unit=true"
+      echo "docs_only=false"
     } >> "$out"
     return 0
   fi
-  local classes integration=false eval_needed=false unit=false entry cmd
+  local classes integration=false eval_needed=false unit=false docs_only=true entry cmd f
   classes=$(join_unique_classes | tr ' ' ',')
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    case "$f" in
+      *.md|docs/*|_wip/*|.claude/*|.vscode/*|.idea/*) ;;
+      *) docs_only=false; break ;;
+    esac
+  done <<< "$FILES"
   # unit: the API unit suite must run for a cross-package read nx affected can't
   # see — currently only the i18n-cross-package class (en.json → app-help-map
   # readFileSync). Class-scoped on purpose: ordinary api changes already get
@@ -129,6 +138,7 @@ emit_github_output() {
     echo "integration=${integration}"
     echo "eval=${eval_needed}"
     echo "unit=${unit}"
+    echo "docs_only=${docs_only}"
   } >> "$out"
 }
 
@@ -157,7 +167,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --branch          Check all changes vs main (or vs origin/\$BASE_REF if set)"
       echo "  --run             Execute identified validation commands"
       echo "  --fast            With --run: skip slow commands"
-      echo "  --github-output   Also emit router flags (classes, integration, eval)"
+      echo "  --github-output   Also emit router flags (classes, integration, eval, docs_only)"
       echo "                    to \$GITHUB_OUTPUT for CI step gating (WI-452)"
       echo "  -h, --help        Show this help"
       exit 0
@@ -226,7 +236,7 @@ if hit '^packages/database/src/schema/'; then
   CLASSES+=("db-schema")
   add_cmd fast  "pnpm db:push:dev"          "Push schema to dev DB"
   add_cmd fast  "pnpm db:generate:dev"       "Generate migration SQL"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "db-schema: Never run db:push against staging/production"
 fi
 
@@ -235,7 +245,7 @@ if hit '^apps/api/drizzle/.*\.sql$'; then
   CLASSES+=("db-migrations")
   add_cmd fast  "pnpm db:migrate:dev"        "Apply migration to dev DB"
   add_cmd fast  "pnpm exec nx run @eduagent/database:test" "Database package tests (RLS coverage)"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "db-migrations: Apply migration BEFORE deploying code that reads new columns"
   note "db-migrations: Include Rollback section if dropping columns/tables/types"
 fi
@@ -250,7 +260,7 @@ if [[ -n "$PROMPT_HITS" ]]; then
   add_cmd fast  "pnpm eval:llm"              "Snapshot prompts (Tier 1 — no LLM call)"
   add_cmd slow  "pnpm eval:llm --live"       "Real LLM validation (Tier 2)"
   add_cmd slow  "pnpm test:llm:enduser"      "Live end-user LLM quality gate"
-  note "llm-prompts: Pre-commit requires eval snapshot files staged with prompt changes"
+  note "llm-prompts: Pre-commit requires staged eval snapshots when drift exists, or a full-run zero-drift receipt"
 fi
 
 # ── LLM Commercial Routing ───────────────────────────────────────────────
@@ -270,7 +280,7 @@ fi
 # ── Inngest Functions ────────────────────────────────────────────────────
 if hit '^apps/api/src/inngest/'; then
   CLASSES+=("inngest")
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests (async flows)"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests (async flows)"
   note "inngest: Verify Inngest dashboard sync after deploy (/v1/inngest)"
 fi
 
@@ -278,14 +288,14 @@ fi
 if hit '^apps/api/src/routes/'; then
   CLASSES+=("api-routes")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
 fi
 
 # ── API Middleware ────────────────────────────────────────────────────────
 if hit '^apps/api/src/middleware/'; then
   CLASSES+=("api-middleware")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "api-middleware: Auth/billing middleware changes need break tests"
 fi
 
@@ -334,7 +344,7 @@ if hit '^packages/schemas/src/'; then
   CLASSES+=("shared-schemas")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests (schema consumer)"
   add_cmd fast  "pnpm test:mobile:unit"      "Mobile unit tests (schema consumer)"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   add_cmd slow  "pnpm test:integration"      "Cross-package integration tests"
   note "shared-schemas: @eduagent/schemas is the shared contract — never redefine types locally"
 fi
@@ -345,7 +355,7 @@ fi
 # transitive dependency behavior that only integration tests observe.
 if hit '^pnpm-lock\.yaml$'; then
   CLASSES+=("dependencies")
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests (dependency change)"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests (dependency change)"
 fi
 
 # ── Shared Database (non-schema) ─────────────────────────────────────────
@@ -353,13 +363,13 @@ DB_NON_SCHEMA=$(filter_files '^packages/database/src/' | grep -vE '^packages/dat
 if [[ -n "$DB_NON_SCHEMA" ]]; then
   CLASSES+=("shared-database")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
 fi
 
 # ── Billing / Auth (security-sensitive) ──────────────────────────────────
 if hit '(/billing/|/subscription/|/auth/|middleware/clerk)'; then
   CLASSES+=("security-sensitive")
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
   note "security-sensitive: CRITICAL/HIGH fixes need a break test (red-green regression)"
   note "security-sensitive: Silent catch-and-recover without metric/event is banned"
 fi
@@ -422,7 +432,7 @@ if hit '^packages/test-utils/src/'; then
   CLASSES+=("test-infra")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests (test helper consumer)"
   add_cmd fast  "pnpm test:mobile:unit"      "Mobile unit tests (test helper consumer)"
-  add_cmd slow  "pnpm test:api:integration"  "API integration tests"
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-818e-b608-f7cb3a517099",
+  "id": "WI-1026",
+  "name": "Upgrade drizzle-orm to >=0.45.2 — SQL injection (CVE-2026-39356)",
+  "description": "[FCR 2026-06-21 · L13-06] drizzle-orm@0.39.3 improperly escapes SQL identifiers (CVE-2026-39356), fixed >=0.45.2; any dynamic column/table name from user input is an injection point. Fix: upgrade in api + packages/database; audit dynamic-identifier call sites.",
+  "acceptanceCriteria": "Root cause: apps/api/package.json and packages/database/package.json both declare drizzle-orm@^0.39.3 (resolved: 0.39.3); CVE-2026-39356 (SQL identifier injection via improper escaping) is fixed in >=0.45.2, but ^0.39.3 does not satisfy that. Behavioral variants: (a) any API route that passes a user-controlled column name to a drizzle query (e.g. dynamic order-by, sort-field, or column-select expressions) is a direct injection point; (b) dynamic table names via db.select().from(table) where table resolves from user input — same vector. Fix: upgrade drizzle-orm to >=0.45.2 in both apps/api/package.json and packages/database/package.json; run pnpm install; audit dynamic-identifier call sites in apps/api/src and packages/database/src for any user-controlled identifier usage and verify each is sanitised or replaced with a static column reference. Verification: (1) pnpm audit --audit-level=high shows no advisory for CVE-2026-39356; (2) pnpm exec nx run api:typecheck and pnpm exec nx run api:test both pass; (3) any dynamic-identifier site identified in the audit is either removed or wrapped in a server-side allowlist.",
+  "riskImpact": "CVE-2026-39356: drizzle-orm<0.45.2 improperly escapes SQL identifiers; any dynamic column or table name derived from user input reaches the DB as a raw identifier, enabling SQL injection. API and database package both pinned to vulnerable range.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8169-a1a3-fb4061f921b5",
+  "id": "WI-947",
+  "name": "Child-detail screen renders 'Loading…' as the child's name",
+  "description": "[FCR 2026-06-21 · L6-06] no top-level loading branch; childName falls back to t('common.loading') so 'Loading…' renders as the child's H2 name. Fix: add explicit loading branch before main return.",
+  "acceptanceCriteria": "Root cause: the child detail screen computes childName as child?.displayName ?? ownedProfile?.displayName ?? t(common.loading) before an explicit top-level loading branch, letting the main H2 render Loading as if it were the child name. Variants: (1) child detail/dashboard data still loading and no owned profile displayName; (2) dashboard fallback still loading for the requested child. Regression test: apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx fails without the fix and passes when loading renders a loader/skeleton state, never an H2/name field containing common.loading.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

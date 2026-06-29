@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81bb-bc4f-c47eefd91929",
+  "id": "WI-927",
+  "name": "Assertion-free test: CelestialCelebration animated path",
+  "description": "[FCR 2026-06-21 · L4-04] empty test body; comment admits onComplete 'may still be called' under the runOnJS mock. Fix: redesign mock so the assertion can be made, or delete with TODO citing the mock limitation.",
+  "acceptanceCriteria": "Root cause: the CelestialCelebration animated-path test has an empty assertion body because the current Reanimated/runOnJS mock may invoke onComplete immediately, so the test gives false confidence. Variants: reduced-motion path remains covered; animated path either redesigns the mock so onComplete can be asserted, or removes the assertion-free test with a TODO citing the mock limitation. Regression test: apps/mobile/src/components/common/celebrations/CelestialCelebration.test.tsx no longer contains an assertion-free animated-path test and fails before the chosen correction, passes after.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "claude:fleet:WI-927",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

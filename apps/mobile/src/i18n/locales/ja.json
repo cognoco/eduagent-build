@@ -761,7 +761,9 @@
         "withNameSubject": "おかえりなさい、{{name}}さん。{{subject}}の続きを始めましょうか？何でも聞いてくださいね。次はどうしますか？",
         "withName": "おかえりなさい、{{name}}さん。今日は何を勉強しますか？",
         "generic": "おかえりなさい。今日は何を勉強しますか？"
-      }
+      },
+      "voicePermissionAskMessage": "音声入力にはマイクへのアクセスが必要です。続けるにはアクセスを許可してください。",
+      "voicePermissionAllow": "マイクを許可"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -3988,7 +3990,9 @@
       "authorMentor": "チューターから保存",
       "addNote": "メモを追加",
       "micLabel": "音声でメモを追加",
-      "empty": "まだメモはありません。この教科についての考えを記録しましょう。"
+      "empty": "まだメモはありません。この教科についての考えを記録しましょう。",
+      "saveErrorTitle": "ノートを保存できませんでした",
+      "emptyTopic": "まだノートはありません。このトピックについての考えを記録しましょう。"
     },
     "sheet": {
       "close": "閉じる",

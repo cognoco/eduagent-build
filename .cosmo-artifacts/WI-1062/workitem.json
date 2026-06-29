@@ -1,0 +1,17 @@
+{
+  "pageId": "3888bce9-1f7c-8137-98bf-f4e6fd6ab0da",
+  "id": "WI-1062",
+  "name": "Complete query-key registry adoption (cross-account cache-leak class)",
+  "description": "The typed query-key registry (`apps/mobile/src/lib/query-keys.ts`) covers progress, dashboard, sessions, recaps, retention, library, vocabulary, resumeNudge, bookSessions, topicSessions, and subjectSessions domains. Subscription, usage, revenuecat, profiles, settings, and several other domains still use inline string-literal keys that are not profile-scoped (e.g. `['subscription', activeProfile?.id]` inline in `use-subscription.ts:80/121/167` rather than via a factory). When a user switches accounts on a shared device, TanStack Query can serve a prior account's stale subscription/usage/profile data because invalidation must hit the literal string exactly — and scattered inline literals are easy to miss, recreating the cross-account cache-leak class that WI-280 (Closed) fixed for session data. This WI completes the registry adoption for the remaining domains.",
+  "acceptanceCriteria": "**Root cause / current state:** Inline `queryKey:` literals in: `use-subscription.ts` (lines 80, 121, 167, 227, 230, 234 — subscription/usage/subscription-family/subscription-status); `use-revenuecat.ts` (5 sites — revenuecat/customerInfo/offerings); `use-profiles.ts` (6 sites — profiles); `use-settings.ts` (1 site — settings); `use-onboarding-dimensions.ts` (2 sites). WI-294 (Closed) addressed raw RQ keys surfacing in Sentry; WI-280 (Closed) fixed the round-detail cache; this is the remaining completeness sweep. Distinct from both — those were one-time fixes; this is the adoption that closes the class.\n\n**Approach:** (1) Extend `query-keys.ts` with factory functions for the remaining domains: `subscription`, `usage`, `subscriptionFamily`, `subscriptionStatus`, `revenuecat.customerInfo`, `revenuecat.offerings`, `profiles.list`, `profiles.active`, `settings`, `onboarding`. All factories must include `profileId` (or equivalent scoping param) as the last key segment to prevent cross-account leaks. (2) Update the inline sites in the affected hooks to use the factories. (3) Update invalidation call sites (e.g. `useRemoveFamilyProfile.onSuccess`) to use the same factories. (4) Extend `query-keys.test.ts` with a test for each new factory asserting the key shape includes a scoping segment.\n\n**Scope (grep):** `rg \"queryKey:\\s*\\['\" apps/mobile/src/hooks/ --include='*.ts'` — 51 files with inline keys; focus on the ~8 files above that are NOT already using registry factories. Enumerate all remaining inline sites before writing.\n\n**Verification:** `pnpm exec nx run mobile:test -- --testPathPattern=use-subscription --no-coverage` + `use-revenuecat` + `use-profiles` green. `query-keys.test.ts` covers new factories. Typecheck clean.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:volta:WI-1062",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

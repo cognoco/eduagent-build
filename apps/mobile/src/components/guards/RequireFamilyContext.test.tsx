@@ -245,11 +245,22 @@ describe('RequireFamilyContext [PARENT-03]', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Kill switch — feature flag off bypasses the guard
+  // Contract-owned flags-off behavior — no raw feature-flag bypass
   // -------------------------------------------------------------------------
 
-  it('renders children without any guard when both mode navigation flags are off', () => {
+  it('blocks non-family users when both mode navigation flags are off', () => {
     renderGuard(soloAdult, [soloAdult], /* featureFlagEnabled */ false);
+
+    expect(screen.queryByTestId('child-sentinel')).toBeNull();
+    expect(screen.getByTestId('family-route-blocked')).toBeTruthy();
+  });
+
+  it('preserves flags-off legacy guardian access through the contract', () => {
+    renderGuard(
+      adultOwner,
+      [adultOwner, childProfile],
+      /* featureFlagEnabled */ false,
+    );
 
     expect(screen.getByTestId('child-sentinel')).toBeTruthy();
     expect(screen.queryByTestId('family-route-blocked')).toBeNull();

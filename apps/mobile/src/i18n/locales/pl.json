@@ -794,7 +794,9 @@
         "withNameSubject": "Witaj z powrotem, {{name}}. Chcesz wrócić do tematu {{subject}}? Pytaj o co chcesz – co robimy dalej?",
         "withName": "Witaj z powrotem, {{name}}. Nad czym chcesz dzisiaj popracować?",
         "generic": "Witaj z powrotem. Nad czym chcesz dzisiaj popracować?"
-      }
+      },
+      "voicePermissionAskMessage": "Aby używać wprowadzania głosowego, zezwól na dostęp do mikrofonu.",
+      "voicePermissionAllow": "Zezwól na mikrofon"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",
@@ -4146,7 +4148,9 @@
       "authorMentor": "Zapisane od tutora",
       "addNote": "Dodaj notatkę",
       "micLabel": "Dodaj notatkę głosowo",
-      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu."
+      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
+      "saveErrorTitle": "Nie można zapisać notatki",
+      "emptyTopic": "Jeszcze brak notatek. Zapisz myśl na ten temat."
     },
     "sheet": {
       "close": "Zamknij",

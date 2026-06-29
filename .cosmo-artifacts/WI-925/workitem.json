@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8111-9e83-fb662084d6c3",
+  "id": "WI-925",
+  "name": "onboarding routes missing Issue-901 (resolvedVia) break-tests",
+  "description": "[FCR 2026-06-21 · L4-02] onboarding.test.ts has zero resolvedVia tests; only tests isOwner:false, never isOwner:true + resolvedVia:'auto' for assertOwnerProfile/assertOwnerAndParentAccess. Fix: add [BREAK][Issue 901] tests with resolvedVia:'auto' asserting 403.",
+  "acceptanceCriteria": "Root cause: onboarding tests cover isOwner:false and proxy-mode failures, but not the Issue 901 auto-resolved owner case where profileMeta is { isOwner: true, resolvedVia: auto }. Variants: self language assertOwnerProfile, parent-child language/pronouns/interests assertOwnerAndParentAccess, and self pronouns/interests assertNotProxyMode paths must reject auto-resolved owner identity. Regression test: add [BREAK][Issue 901] cases in apps/api/src/routes/onboarding.test.ts asserting 403 and no service call for resolvedVia:auto; tests fail if the resolvedVia requirement is removed.",
+  "riskImpact": "Regression in the resolvedVia leg would silently allow auto-resolved owner sessions to manage child onboarding/language.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

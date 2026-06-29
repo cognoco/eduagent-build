@@ -250,8 +250,13 @@ record. The two never merge.**
 - **Scope:** `consent_request` is charge-scoped — RLS policy
   `consent_request_charge_isolation` on `charge_person_id` (mirrors
   `consent_states_profile_isolation`; `person.id = profiles.id`, so the
-  `app.current_profile_id` GUC carries over). Service-role exceptions (public
-  token lookup, reminder sweeps) match today's `consent_states` posture.
+  `app.current_profile_id` GUC carries over). Service-role consumers (public
+  token-lookup, reminder-sweep) reach `consent_request` via the owner-role
+  (`neondb_owner`) connection, which bypasses RLS — matching today's
+  `consent_states` posture (no named service-role policy). A service-role policy
+  exception is required only if/when the `app_user` role-switch cut-over
+  (migration 0027 Phase 2-4) lands, at which point `consent_request` is swept
+  with every other RLS table.
 
 ### 2B.2 `subscription` store-correlation / idempotency columns (additive)
 

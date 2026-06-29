@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81a3-9110-dacc4e23ac91",
+  "id": "WI-980",
+  "name": "language-progress passes subjectId path param to service with no UUID validation",
+  "description": "[FCR 2026-06-21 · L8-09] getCurrentLanguageProgress(db, profileId, c.req.param('subjectId')) — route has no zValidator, unlike sibling routes. Fix: zValidator('param', {subjectId: uuid}).",
+  "acceptanceCriteria": "Root cause: GET /subjects/:subjectId/cefr-progress (apps/api/src/routes/language-progress.ts:26) passes c.req.param('subjectId') directly to getCurrentLanguageProgress with no zValidator middleware, unlike sibling routes that validate path params with zValidator('param', ...).\n\nVariants: single variant — the :subjectId path parameter is the only unvalidated ID in this route; a non-UUID string (e.g. 'abc') reaches the service unchecked.\n\nFix: add zValidator('param', z.object({ subjectId: z.string().uuid() })) before the async handler and read via c.req.valid('param').subjectId.\n\nRegression test: in apps/api/src/routes/language-progress.integration.test.ts (or a new unit test in language-progress.test.ts), add a test that calls GET /v1/subjects/not-a-uuid/cefr-progress and expects HTTP 400. Without the fix the route passes the invalid ID to the service; with the fix it returns 400 before calling getCurrentLanguageProgress. Run: cd apps/api && pnpm exec jest --testPathPattern=routes/language-progress --no-coverage.",
+  "riskImpact": "Non-UUID flows into a DB query; diverges from every sibling route.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
