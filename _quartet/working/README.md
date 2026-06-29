@@ -25,6 +25,11 @@ live program tracking at extraction time. **They are NOT the operational source*
 remain in their original `_wip/` location and continue to move until the cutover relocates them.
 Treat the files here as a seed for the relocated operational home, not as current truth.
 
+**Starting a NEW program?** Do **not** copy or augment the snapshot content here. Copy the blank
+`*.template.md` / `*.template.html` files in `program/`, strip the `.template` suffix, and synthesize
+fresh from the Library schemas (`../library/`). The snapshot roster/dashboard belong to the *prior*
+program and must not bleed into a new one's working state.
+
 `lanes/` is intentionally **empty** — live lane working state (each lane's tracker + `_state/`
 channels) is not bulk-copied here; it stays in its operational `_wip/<lane>/` home until cutover.
 The structure above shows where a lane's working state lands once instantiated from the Library.

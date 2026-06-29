@@ -55,6 +55,15 @@ recreate the program's operational self — scaffold a roster, a dashboard, and 
 (`library/` shapes → `working/lanes/<lane>/`). The Working state is regenerated from the Library;
 nothing in `_quartet/` depends on any one program's live content.
 
+**First run, concretely:**
+1. Read `dependencies.md` first — confirm the hard prerequisites (`NOTION_TOKEN`, the Work Items DB
+   id). If they're absent, stop there; the Cosmo steps cannot run.
+2. For a **new** program, copy the blank templates under `working/program/`
+   (`*.template.md` / `*.template.html`), strip the `.template` suffix, and swap the `«placeholders»`.
+   **Do not** reuse the snapshot `program-roster.md` / `dashboard.html` beside them — those are a
+   prior program's content (see `working/README.md`).
+3. Then follow the orchestrator protocol's activation checklist per lane.
+
 ## Paths
 All cross-references in this folder are relative to the `_quartet/` root (e.g.
 `roles/shepherd-protocol.md`). When `_quartet/` is checked out under a repo, prefix accordingly.
