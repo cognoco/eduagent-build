@@ -40,8 +40,9 @@ let mockReviewIsPending = false;
 let mockRecordIsPending = false;
 
 jest.mock(
-  '../../../hooks/use-dictation-api' /* gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests */,
+  '../../../hooks/use-dictation-api' /* gc1-allow: wraps api-client fetch boundary — hooks call Hono RPC, no server available in JSDOM */,
   () => ({
+    ...jest.requireActual('../../../hooks/use-dictation-api'),
     useReviewDictation: () => ({
       mutateAsync: mockReviewMutateAsync,
       isPending: mockReviewIsPending,

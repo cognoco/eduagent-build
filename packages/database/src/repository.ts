@@ -836,11 +836,9 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     dictationResults: {
-      async findMany(extraWhere?: SQL, orderBy?: SQL, limit?: number) {
+      async findMany(extraWhere?: SQL) {
         return db.query.dictationResults.findMany({
           where: scopedWhere(dictationResults, extraWhere),
-          ...(orderBy ? { orderBy } : {}),
-          ...(limit ? { limit } : {}),
         });
       },
       async listRecentDistinctDates(limit: number) {

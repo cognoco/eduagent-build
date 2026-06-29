@@ -187,24 +187,25 @@ export const DICTATION_HISTORY_DEFAULT_LIMIT = 20;
 /**
  * [WI-902] Returns the learner's recent dictation sessions, newest first, each
  * carrying its persisted source `sentences` so the history surface can show the
- * full text of past exercises. Single scoped table, ordered + limited — uses
- * the scoped repository's `findMany(extraWhere, orderBy, limit)`, which pins
- * `profile_id = $profileId` at the repo layer. `date` is normalized to an ISO
- * string at the boundary (the neon-serverless driver hands DATE back as a JS
- * `Date`), matching the streak path, so the shared `dictationResultSchema`
- * parses cleanly.
+ * full text of past exercises. Uses `db.select()` directly (the sanctioned
+ * pattern for ordered + limited single-table reads per AGENTS.md) rather than
+ * the scoped repository, which cannot express ordering + limit. `profileId` is
+ * pinned in the WHERE clause, equivalent to the scoped repo's isolation
+ * guarantee. `date` is normalized to an ISO string at the boundary (the
+ * neon-serverless driver returns DATE columns as JS `Date` objects), matching
+ * the streak path so the shared `dictationResultSchema` parses cleanly.
  */
 export async function getDictationHistory(
   db: Database,
   profileId: string,
   limit: number = DICTATION_HISTORY_DEFAULT_LIMIT,
 ): Promise<DictationResult[]> {
-  const repo = createScopedRepository(db, profileId);
-  const rows = await repo.dictationResults.findMany(
-    undefined,
-    desc(dictationResults.createdAt),
-    limit,
-  );
+  const rows = await db
+    .select()
+    .from(dictationResults)
+    .where(eq(dictationResults.profileId, profileId))
+    .orderBy(desc(dictationResults.createdAt))
+    .limit(limit);
   return rows.map((row) => ({
     id: row.id,
     profileId: row.profileId,
