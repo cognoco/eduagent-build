@@ -30,7 +30,6 @@ export async function parseJson<T>(
   schema: ZodType<T>,
   context?: string,
 ): Promise<T> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const raw: unknown = await res.json();
   const result = schema.safeParse(raw);
   if (!result.success) {
