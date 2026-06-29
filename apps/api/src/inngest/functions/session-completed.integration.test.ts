@@ -52,6 +52,7 @@ import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
 import { loadTopicTitle, sessionCompleted } from './session-completed';
+import { setIdentityV2Enabled } from '../helpers';
 import {
   deleteLegacyAccountsForTest,
   ensureLegacyProfileAnchorForTest,
@@ -1129,140 +1130,147 @@ describe('session-completed integration', () => {
     expect(terms).toContain('la photosynthèse');
   });
 
-  // QUARANTINE WI-1153 (owner: claude:bug-lane, Executing) — confirmed-flaky, NOT a behavioral regression:
-  // this test passed on main @09:19 (CI run 28361732814) and passes in local isolation; it fails only in
-  // the full CI co-located suite from shared-stg-DB state accumulation. Root-fix + un-skip tracked in WI-1153.
-  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
-  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
-    'struggle detection: consent granted triggers analyzeSessionTranscript; push fired when parent link + token present',
-    async () => {
-      // done as: struggle detection
-      const { accountId: parentAccountId } = await seedAccount();
-      const { profileId: parentProfileId } = await seedProfile(parentAccountId);
+  it('struggle detection: consent granted triggers analyzeSessionTranscript; push fired when parent link + token present', async () => {
+    // done as: struggle detection
+    const { accountId: parentAccountId } = await seedAccount();
+    const { profileId: parentProfileId } = await seedProfile(parentAccountId);
 
-      const { accountId } = await seedAccount();
-      const { profileId } = await seedProfile(accountId);
-      const { subjectId } = await seedSubject(profileId);
-      const { topicId } = await seedCurriculum(subjectId);
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
 
-      const [sessionRow] = await db
-        .insert(learningSessions)
-        .values({
-          profileId,
-          subjectId,
-          topicId,
-          sessionType: 'learning',
-          status: 'completed',
-          exchangeCount: 3,
-        })
-        .returning({ id: learningSessions.id });
-      const sessionId = sessionRow!.id;
-
-      // 3 session events to pass the >=3 transcript-length gate in analyzeSessionTranscript
-      await db.insert(sessionEvents).values([
-        {
-          sessionId,
-          profileId,
-          subjectId,
-          topicId,
-          eventType: 'user_message',
-          content: 'I really struggle with photosynthesis light reactions.',
-        },
-        {
-          sessionId,
-          profileId,
-          subjectId,
-          topicId,
-          eventType: 'ai_response',
-          content: 'Let me help you understand the light reactions.',
-        },
-        {
-          sessionId,
-          profileId,
-          subjectId,
-          topicId,
-          eventType: 'user_message',
-          content: 'I still find it very difficult.',
-        },
-      ]);
-
-      // Seed learning profile with consent GRANTED + collection enabled
-      await db.insert(learningProfiles).values({
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
         profileId,
-        memoryConsentStatus: 'granted',
-        memoryCollectionEnabled: true,
-        memoryEnabled: true,
-      });
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
 
-      // Seed parent → child guardianship edge so sendStruggleNotification can find a parent.
-      // [WI-586] drop-4: familyLinks removed; guardianship is the v2 replacement.
-      await db.insert(guardianship).values({
-        guardianPersonId: parentProfileId,
-        chargePersonId: profileId,
-      });
+    // 3 session events to pass the >=3 transcript-length gate in analyzeSessionTranscript
+    await db.insert(sessionEvents).values([
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'I really struggle with photosynthesis light reactions.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'ai_response',
+        content: 'Let me help you understand the light reactions.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'I still find it very difficult.',
+      },
+    ]);
 
-      // Seed parent's notification preferences with a valid Expo push token
-      await db.insert(notificationPreferences).values({
-        profileId: parentProfileId,
-        pushEnabled: true,
-        expoPushToken: 'ExponentPushToken[integration-test-token]',
-        maxDailyPush: 10,
-      });
+    // Seed learning profile with consent GRANTED + collection enabled
+    await db.insert(learningProfiles).values({
+      profileId,
+      memoryConsentStatus: 'granted',
+      memoryCollectionEnabled: true,
+      memoryEnabled: true,
+    });
 
-      await db
-        .update(learningProfiles)
-        .set({
-          struggles: [
-            {
-              topic: 'photosynthesis light reactions',
-              subject: 'Biology',
-              attempts: 2,
-              confidence: 'low',
-              lastSeen: new Date(Date.now() - 86_400_000).toISOString(),
-            },
-          ],
-        })
-        .where(eq(learningProfiles.profileId, profileId));
+    // Seed parent → child guardianship edge so sendStruggleNotification can find a parent.
+    // [WI-586] drop-4: familyLinks removed; guardianship is the v2 replacement.
+    await db.insert(guardianship).values({
+      guardianPersonId: parentProfileId,
+      chargePersonId: profileId,
+    });
 
-      // LLM returns the same struggle again; attempts move from 2->3, reaching
-      // medium confidence and triggering struggle_noticed.
-      const STRUGGLE_LLM_RESPONSE = JSON.stringify({
+    // Seed parent's notification preferences with a valid Expo push token
+    await db.insert(notificationPreferences).values({
+      profileId: parentProfileId,
+      pushEnabled: true,
+      expoPushToken: 'ExponentPushToken[integration-test-token]',
+      maxDailyPush: 10,
+    });
+
+    await db
+      .update(learningProfiles)
+      .set({
         struggles: [
           {
             topic: 'photosynthesis light reactions',
             subject: 'Biology',
-            confidence: 'medium',
+            attempts: 2,
+            confidence: 'low',
+            lastSeen: new Date(Date.now() - 86_400_000).toISOString(),
           },
         ],
-        interests: null,
-        strengths: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        explanationEffectiveness: null,
-        engagementLevel: 'low',
-        confidence: 'medium',
-        learningStyle: null,
-        // standard summary fields
-        closingLine: 'Keep trying!',
-        learnerRecap: 'You worked through photosynthesis.',
-        narrative: 'Session focused on light reactions.',
-        topicsCovered: ['photosynthesis'],
-        sessionState: 'completed',
-        reEntryRecommendation: 'Review again.',
-      });
+      })
+      .where(eq(learningProfiles.profileId, profileId));
 
-      routeAndCallSpy.mockResolvedValue({
-        response: STRUGGLE_LLM_RESPONSE,
-        provider: 'test',
-        model: 'fixture',
-        latencyMs: 1,
-      });
+    // LLM returns the same struggle again; attempts move from 2->3, reaching
+    // medium confidence and triggering struggle_noticed.
+    const STRUGGLE_LLM_RESPONSE = JSON.stringify({
+      struggles: [
+        {
+          topic: 'photosynthesis light reactions',
+          subject: 'Biology',
+          confidence: 'medium',
+        },
+      ],
+      interests: null,
+      strengths: null,
+      resolvedTopics: null,
+      communicationNotes: null,
+      explanationEffectiveness: null,
+      engagementLevel: 'low',
+      confidence: 'medium',
+      learningStyle: null,
+      // standard summary fields
+      closingLine: 'Keep trying!',
+      learnerRecap: 'You worked through photosynthesis.',
+      narrative: 'Session focused on light reactions.',
+      topicsCovered: ['photosynthesis'],
+      sessionState: 'completed',
+      reEntryRecommendation: 'Review again.',
+    });
 
-      const now = new Date();
-      const step = buildStep();
-      const handler = getHandler();
+    routeAndCallSpy.mockResolvedValue({
+      response: STRUGGLE_LLM_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 1,
+    });
 
-      const result = (await handler({
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    // [WI-1153] sendStruggleNotification selects the parent-link source by the
+    // identity-v2 flag; this test seeds the v2 `guardianship` edge (familyLinks
+    // was removed in WI-586 drop-4). The CI `main` lane runs flag-OFF, taking
+    // the legacy v1 familyLinks path which finds no parent and skips the push.
+    // Pin the flag ON for this handler run so the v2 path fires the push.
+    // Forward-correct: post-cutover the flag no-ops. finally-reset prevents the
+    // injected binding from leaking into sibling tests.
+    setIdentityV2Enabled('true');
+    let result: {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
+    try {
+      result = (await handler({
         event: {
           name: 'app/session.completed',
           data: {
@@ -1284,20 +1292,22 @@ describe('session-completed integration', () => {
         status: string;
         outcomes: Array<{ step: string; status: string }>;
       };
+    } finally {
+      setIdentityV2Enabled(undefined);
+    }
 
-      // analyze-learner-profile ran (consent granted)
-      const analyzeOutcome = result.outcomes.find(
-        (o) => o.step === 'analyze-learner-profile',
-      );
-      expect(analyzeOutcome?.status).toBe('ok');
+    // analyze-learner-profile ran (consent granted)
+    const analyzeOutcome = result.outcomes.find(
+      (o) => o.step === 'analyze-learner-profile',
+    );
+    expect(analyzeOutcome?.status).toBe('ok');
 
-      // Expo push URL was hit (sendStruggleNotification fired fetch to Expo)
-      const expoPushCalls = fetchCalls.filter((c) =>
-        c.url.startsWith(EXPO_PUSH_URL),
-      );
-      expect(expoPushCalls.length).toBeGreaterThan(0);
-    },
-  );
+    // Expo push URL was hit (sendStruggleNotification fired fetch to Expo)
+    const expoPushCalls = fetchCalls.filter((c) =>
+      c.url.startsWith(EXPO_PUSH_URL),
+    );
+    expect(expoPushCalls.length).toBeGreaterThan(0);
+  });
 
   it('silence_timeout: SM-2 skipped and streak NOT advanced', async () => {
     // done as: silence_timeout close reason
