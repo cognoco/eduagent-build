@@ -208,9 +208,8 @@ afterAll(async () => {
 
 legacyDescribe('mergeAliasedSubscription (integration)', () => {
   // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
-  // eslint callee alias: avoids no-restricted-syntax on it.skip direct call
-  const quarantine = it.skip;
-  quarantine(
+  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
+  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     '[BUG-783] migrates the paid tier + top-up credits onto the surviving free identity',
     async () => {
       const from = await seedAccount('from', `${PREFIX}-from`);

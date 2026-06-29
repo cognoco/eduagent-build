@@ -482,9 +482,8 @@ describe('processRecallTest concurrent LLM serialization [WI-234]', () => {
   });
 
   // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
-  // eslint callee alias: avoids no-restricted-syntax on it.skip direct call
-  const quarantine = it.skip;
-  quarantine(
+  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
+  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     'two concurrent recall submissions for the same fresh topic produce exactly one LLM call',
     async () => {
       const seed = await seedWi234ProfileTopic(db, 'concurrent');

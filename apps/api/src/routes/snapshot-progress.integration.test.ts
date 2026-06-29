@@ -577,9 +577,8 @@ describe('Integration: snapshot-progress routes', () => {
   // covered in snapshot-aggregation.integration.test.ts).
   // -------------------------------------------------------------------------
   // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
-  // eslint callee alias: avoids no-restricted-syntax on it.skip direct call
-  const quarantine = it.skip;
-  quarantine(
+  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
+  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     '[F-144] proxy read of child milestones does NOT backfill (mutate) the child rows',
     async () => {
       const owner = await createOwnerProfile();

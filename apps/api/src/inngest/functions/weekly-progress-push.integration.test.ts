@@ -704,9 +704,8 @@ describe('weekly progress push integration', () => {
   // entry must cause the generate handler to skip the push while leaving the
   // report row intact.
   // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
-  // eslint callee alias: avoids no-restricted-syntax on it.skip direct call
-  const quarantine = it.skip;
-  quarantine(
+  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
+  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     '[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h',
     async () => {
       const { profileId: parentProfileId } = await seedProfile({

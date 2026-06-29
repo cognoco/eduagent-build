@@ -1130,9 +1130,8 @@ describe('session-completed integration', () => {
   });
 
   // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
-  // eslint callee alias: avoids no-restricted-syntax on it.skip direct call
-  const quarantineStruggleDetection = it.skip;
-  quarantineStruggleDetection(
+  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
+  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     'struggle detection: consent granted triggers analyzeSessionTranscript; push fired when parent link + token present',
     async () => {
       // done as: struggle detection
