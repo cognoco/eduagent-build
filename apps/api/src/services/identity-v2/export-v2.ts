@@ -40,7 +40,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import { dataExportSubscriptionRowSchema } from '@eduagent/schemas';
-import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
+import type {
+  ConsentStatus,
+  DataExport,
+  DataExportSubscriptionRow,
+  Profile,
+} from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
 import {
   resolveLatestConsentStatusAnyBasis,
@@ -245,14 +250,37 @@ export async function generateExportV2(
         createdAt: g.createdAt,
       }),
     ),
-    subscriptions: subscriptionRows.map((s) =>
-      dataExportSubscriptionRowSchema.parse(
-        serializeDates(s as Record<string, unknown>),
-      ),
-    ),
+    subscriptions: subscriptionRows.map(toLegacySubscriptionExportRow),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),
   };
+}
+
+function toLegacySubscriptionExportRow(
+  row: typeof subscription.$inferSelect,
+): DataExportSubscriptionRow {
+  return dataExportSubscriptionRowSchema.parse(
+    serializeDates({
+      id: row.id,
+      accountId: row.organizationId,
+      stripeCustomerId: row.stripeCustomerId ?? null,
+      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
+      tier: row.planTier,
+      status: row.status,
+      trialEndsAt: row.trialEndsAt ?? null,
+      currentPeriodStart: row.periodStartAt ?? null,
+      currentPeriodEnd: row.periodEndAt ?? null,
+      cancelledAt: row.cancelledAt ?? null,
+      lastStripeEventTimestamp: row.lastStripeEventTimestamp ?? null,
+      lastStripeEventId: row.lastStripeEventId ?? null,
+      revenuecatOriginalAppUserId: row.revenuecatOriginalAppUserId ?? null,
+      lastRevenuecatEventId: row.lastRevenuecatEventId ?? null,
+      lastRevenuecatEventTimestampMs:
+        row.lastRevenuecatEventTimestampMs ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
