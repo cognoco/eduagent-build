@@ -11,15 +11,18 @@ export interface LedgerMomentCardProps {
   onDecline: (card: NowCardData) => void;
 }
 
+const SUPPORTED_LEDGER_COPY_KEYS: Partial<Record<string, TranslateKey>> = {
+  session_filed: 'mentorHome.ledger.session_filed.title',
+};
+
 function ledgerCopyKey(card: NowCardData): TranslateKey {
   const ledgerKind =
     typeof card.params['ledgerKind'] === 'string'
       ? card.params['ledgerKind']
       : card.templateKey.replace('now.ledger_moment.', '');
-  if (!ledgerKind || ledgerKind === card.templateKey) {
-    return 'mentorHome.ledger.generic.title';
-  }
-  return `mentorHome.ledger.${ledgerKind}.title` as TranslateKey;
+  return (
+    SUPPORTED_LEDGER_COPY_KEYS[ledgerKind] ?? 'mentorHome.ledger.generic.title'
+  );
 }
 
 export function LedgerMomentCard({

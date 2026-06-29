@@ -151,6 +151,7 @@ describe('NowCardStack', () => {
     );
 
     expect(getByTestId('now-card-slot-module-0')).toBeTruthy();
+    expect(getByTestId('now-ledger-moment')).toBeTruthy();
   });
 
   it('[WI-1020] outer stack has list role, slot Views have listitem role, empty-state Pressable does not', () => {
