@@ -114,6 +114,17 @@ export const accountReclaimAttempt = inngest.createFunction(
 
           if (!result.sent) {
             if (result.reason === 'no_api_key') {
+              captureException(
+                new Error(
+                  'account-reclaim-attempt: RESEND_API_KEY not configured',
+                ),
+                {
+                  extra: {
+                    surface: 'account-reclaim-attempt.no_api_key',
+                    accountId: account.id,
+                  },
+                },
+              );
               logger.warn(
                 '[account-reclaim-attempt] RESEND_API_KEY not configured — email not sent',
                 { accountId: account.id },
