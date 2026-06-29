@@ -4,6 +4,13 @@ set -e
 # Conventional-commit format check
 pnpm exec commitlint --edit "$1"
 
+# ADR provenance guard: commit-subject half. Complements the pre-commit staged
+# file check by blocking feat(...) commits that add ADR files.
+STAGED_ADRS=$(git diff --cached --name-only --diff-filter=A -- 'docs/adr/MMT-ADR-*.md')
+if [ -n "$STAGED_ADRS" ]; then
+  pnpm exec tsx scripts/check-adr-provenance.ts --staged --commit-msg-file "$1" || exit 1
+fi
+
 # Sweep-audit guard: when a commit message claims a sweep (extends to all
 # remaining sites, fixes the same bug everywhere, etc.), require a
 # `Sweep audit:` block with the grep query and result list. Catches the

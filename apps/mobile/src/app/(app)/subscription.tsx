@@ -12,7 +12,7 @@ import {
 import { platformAlert } from '../../lib/platform-alert';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import type {
   PurchasesPackage,
   PurchasesOffering,
@@ -168,6 +168,17 @@ function SubscriptionContent(): React.ReactElement | null {
   // suppress a late "Restored!"/"confirmed" alert that would confuse the user.
   const restoreCancelledRef = useRef(false);
   const topUpCancelledRef = useRef(false);
+
+  // WI-1065: Reset cancellation refs on every screen focus so a prior
+  // "Check later" from a previous visit cannot suppress the next poll's alert.
+  // Tab navigation keeps the component mounted across navigations — refs
+  // persist across blur/focus unless cleared here.
+  useFocusEffect(
+    useCallback(() => {
+      restoreCancelledRef.current = false;
+      topUpCancelledRef.current = false;
+    }, []),
+  );
 
   // Post-purchase polling state — shows visible feedback while the webhook
   // confirms the new subscription tier (PR-FIX-07)

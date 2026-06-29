@@ -23,6 +23,7 @@ import {
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import {
+  resolveAccountId,
   seedDirectChildProfileForTest,
   seedFamilyLinkForTest,
 } from './route-fixtures';
@@ -65,16 +66,16 @@ async function createChildProfileDirect(
   birthYear: number,
 ): Promise<string> {
   const db = createIntegrationDb();
-  // Look up accountId from the parent profile
-  const [parent] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, parentProfileId));
-  if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
+  // [WI-1145] Resolve the parent's org/account v2-first (membership) then legacy
+  // `profiles` — the parent is route-created, which writes v2 unconditionally
+  // post-WI-867 collapse (legacy `profiles` empty on the flag-off main lane).
+  const accountId = await resolveAccountId(db, parentProfileId);
+  if (!accountId)
+    throw new Error(`Parent profile ${parentProfileId} not found`);
 
   const child = await seedDirectChildProfileForTest({
     parentProfileId,
-    accountId: parent.accountId,
+    accountId,
     displayName,
     birthYear,
   });
@@ -93,6 +94,10 @@ async function createFamilyLink(
 
 async function readConversationLanguage(profileId: string): Promise<string> {
   const db = createIntegrationDb();
+  // [WI-1145] The PATCH /onboarding/language route is flag-honoring (dispatches to
+  // the v2 `person` writer on flag-on, the legacy `profiles` writer on flag-off —
+  // onboarding.ts), and the create route dual-writes both stores, so read the store
+  // the PATCH actually wrote: v2 `person` on flag-on, legacy `profiles` on flag-off.
   if (isIdentityV2Enabled()) {
     const [profile] = await db
       .select({ conversationLanguage: person.conversationLanguage })
@@ -110,6 +115,8 @@ async function readConversationLanguage(profileId: string): Promise<string> {
 
 async function readPronouns(profileId: string): Promise<string | null> {
   const db = createIntegrationDb();
+  // [WI-1145] Flag-honoring read mirror of the PATCH /onboarding/pronouns writer
+  // (v2 `person` on flag-on, legacy `profiles` on flag-off — onboarding.ts).
   if (isIdentityV2Enabled()) {
     const [profile] = await db
       .select({ pronouns: person.pronouns })

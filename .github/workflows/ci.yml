@@ -65,9 +65,19 @@ jobs:
         run: |
           git fetch origin "${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
+      # Docs/editor-metadata-only PRs still need the required `main` check to
+      # report, but they do not need the heavyweight code validation below.
+      - name: Detect scope (docs-only PR bypass)
+        id: scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash scripts/check-change-class.sh --branch --github-output
+
       # Detect which areas of the codebase changed (used to skip integration tests
       # when only mobile/non-API files changed)
       - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+        if: steps.scope.outputs.docs_only != 'true'
         id: changes
         with:
           filters: |
@@ -80,22 +90,26 @@ jobs:
 
       # Setup pnpm (version read from packageManager field in package.json)
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           standalone: true
 
       # Cache node_modules
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           node-version: 22
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.docs_only != 'true'
 
       # Restore the Nx local computation cache across CI runs. Replaces the
       # Nx Cloud remote cache (disconnected in IID-792) so unchanged projects
       # still skip lint/test/typecheck/build. `nx affected` and the task graph
       # work without the cloud — only the shared cache needed replacing.
       - name: Cache Nx local cache
+        if: steps.scope.outputs.docs_only != 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .nx/cache
@@ -105,12 +119,14 @@ jobs:
 
       # Enable pgvector extension before schema push (embeddings table uses vector type)
       - name: Enable pgvector extension
+        if: steps.scope.outputs.docs_only != 'true'
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       # Run migration SQL against CI postgres — this validates committed SQL files end-to-end.
       # CFG-12: replaced db:push with db:migrate so that broken migration SQL is caught in CI,
       # not silently skipped. db:push only diffs schema; migrate runs the actual SQL files.
       - name: Apply database migrations
+        if: steps.scope.outputs.docs_only != 'true'
         working-directory: packages/database
         run: pnpm exec drizzle-kit migrate
 
@@ -127,6 +143,7 @@ jobs:
       # nets removed — never delete a net before the fix is proven (D5 sequencing). Tracked by
       # the harness-hygiene activity; first proof rides WI-388's real-PR adoption.
       - name: Clean stale TypeScript build artifacts
+        if: steps.scope.outputs.docs_only != 'true'
         run: |
           find . -name '*.tsbuildinfo' -not -path '*/node_modules/*' -delete
           rm -rf apps/mobile/dist apps/api/dist
@@ -149,6 +166,7 @@ jobs:
       # burndown; until then the step reports so newly-introduced CVEs are
       # noticed in the log without blocking unrelated work.
       - name: pnpm audit (High+, advisory)
+        if: steps.scope.outputs.docs_only != 'true'
         continue-on-error: true
         run: pnpm audit --audit-level=high
 
@@ -156,6 +174,7 @@ jobs:
       # script can silently read secrets from the CI environment. Catches
       # supply-chain attacks via malicious postinstall hooks before they ship.
       - name: Verify postinstall safety
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run verify:postinstall-safety
 
       # Forbid mobile-only deps in root package.json. Root + apps/mobile both
@@ -163,12 +182,14 @@ jobs:
       # peer-dep contexts that silently break NativeWind className styling on
       # native bundles. See .claude/memory/feedback_nativewind_root_pkg_split.md.
       - name: Root package.json — no mobile-only deps
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:root-deps
 
       # Fail fast on missing/typo'd t('key') calls — i18next renders unknown
       # keys as the literal key string at runtime, which typecheck and most
       # tests don't catch.
       - name: i18n orphan-key check
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec tsx scripts/check-i18n-orphan-keys.ts
 
       # Phase 3 ratchet: block NEW hardcoded English in JSX children and
@@ -178,11 +199,13 @@ jobs:
       # complementary read-side guard.
       # Existing literals are grandfathered in scripts/i18n-jsx-literals-baseline.json.
       - name: i18n hardcoded-JSX-literal check
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec tsx scripts/check-i18n-jsx-literals.ts
 
       # Liveness guard for scripts/i18n-keep.ts: every KEEP_PATTERNS reason
       # must cite a real file:line so stale allow-list entries are caught.
       - name: i18n keep-list rot check
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec tsx scripts/check-i18n-keep-rot.ts
 
       # Fail fast on stale translation files — Husky only runs check:i18n when
@@ -190,6 +213,7 @@ jobs:
       # across multiple commits (or omits it from staging) can let locale
       # drift land. CI is the backstop.
       - name: i18n staleness check
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:i18n
 
       # [WI-1075] Every Inngest function must carry an @inngest-admin access
@@ -203,6 +227,7 @@ jobs:
       # must use the structured `signals` envelope (services/llm/envelope.ts),
       # not free-text marker tokens. See AGENTS.md → "LLM Response Envelope".
       - name: Prompt marker-token check
+        if: steps.scope.outputs.docs_only != 'true'
         run: bash scripts/check-prompt-markers.sh
 
       # [G11 / WI-452] No-clinical-copy ratchet previously ran ONLY in the
@@ -210,6 +235,7 @@ jobs:
       # committer that skips Husky. CI is the backstop. Baseline ratchet:
       # existing offenses are grandfathered, only NEW ones fail.
       - name: No-clinical-copy ratchet (G11)
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:no-clinical-copy
 
       # [Gemini-retirement Phase A / T-A1] Forward-only ratchet: block NEW
@@ -219,6 +245,7 @@ jobs:
       # {file,token} pairs fail. Phase B shrinks the baseline as the legacy
       # path is deleted.
       - name: No-Gemini-runtime ratchet (Phase A)
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:no-gemini-runtime
 
       # [G11 / WI-452] Test-only-exports ratchet (D-TTL-6: *ForTesting/__test*
@@ -228,6 +255,7 @@ jobs:
       # the red check name the violation class. (The bundle still includes it;
       # the ~seconds of overlap buys a legible failure surface.)
       - name: Test-only-exports ratchet (G11)
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec jest --config scripts/jest.config.cjs scripts/check-test-only-exports.test.ts --no-coverage
 
       # GC1 ratchet (Tier 1): block PRs that add NEW relative-path jest.mock()
@@ -237,7 +265,7 @@ jobs:
       # pre-commit hook in `.husky/pre-commit` uses, so rules can't drift.
       # See AGENTS.md → "Code Quality Guards" → "No new internal jest.mock()".
       - name: GC1 — no new internal jest.mock
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: pnpm exec tsx scripts/check-gc1-pattern-a.ts
@@ -250,18 +278,20 @@ jobs:
       # Deleted / Renamed existing migration .sql fail — adding a new migration
       # is always fine. Same diff-vs-base shape as the GC1 step above.
       - name: Migration immutability guard (BUG-886)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: pnpm exec tsx scripts/check-migration-immutability.ts
 
       - name: GitHub workflow supply-chain check
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:github-workflow-security
 
       # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
       # does not pick these up — they live outside any project — so we run
       # them directly through ts-jest via scripts/jest.config.cjs.
       - name: scripts/* tests
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
       # Optional advisory: detect .claude/skills/ entries whose .agents/skills/
@@ -269,6 +299,7 @@ jobs:
       # keeps this non-blocking — the step surfaces orphans visibly in CI without
       # gating unrelated PRs. Promote to required once the path has proven stable.
       - name: sync-skills orphan check (advisory)
+        if: steps.scope.outputs.docs_only != 'true'
         continue-on-error: true
         run: node scripts/sync-skills.mjs --report-orphans
 
@@ -280,6 +311,7 @@ jobs:
       # lock the concrete-vs-placeholder behaviour. Lives under apps/api/scripts/,
       # so the scripts/ jest config above does not see it.
       - name: apps/api/scripts node:test guards (KV-binding verifier)
+        if: steps.scope.outputs.docs_only != 'true'
         run: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs
 
       # WI-795: regression guard for the db:push stg/prod guard
@@ -290,6 +322,7 @@ jobs:
       # the wiring of predb:push + -c dev in package.json scripts.
       # Lives under packages/database/scripts/ so Jest's testMatch doesn't see it.
       - name: packages/database/scripts node:test guards (db:push guard)
+        if: steps.scope.outputs.docs_only != 'true'
         run: node --test packages/database/scripts/check-db-push-target.test.mjs
 
       # WI-536: validate the flaky-test quarantine registry. Deterministic, so
@@ -298,6 +331,7 @@ jobs:
       # silently). The quarantined tests themselves run in the non-gating
       # quarantine-report.yml lane, never here.
       - name: Quarantine registry valid (WI-536)
+        if: steps.scope.outputs.docs_only != 'true'
         run: node tools/quarantine/validate.cjs
 
       # [BUG-246 → WI-452] Change-class ROUTER: walks the PR diff, prints the
@@ -312,7 +346,7 @@ jobs:
       # emits integration=true/eval=true rather than skipping suites.
       - name: Change-class router (WI-452)
         id: change-class
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -323,7 +357,7 @@ jobs:
       # Push to main: full validation across all projects.
       # Mobile build excluded in both — requires EAS CLI, handled by mobile-ci.yml.
       - name: Lint, test, typecheck, build (PR — affected only)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
         env:
           NX_BASE: origin/${{ github.base_ref }}
         run: |

@@ -19,7 +19,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
+import { membership, profiles } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -59,11 +59,26 @@ async function createOwnerProfile(): Promise<string> {
   const body = await res.json();
   const profileId = body.profile.id as string;
   const db = createIntegrationDb();
-  const row = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { accountId: true },
+  // [WI-1145] The create route is v2-unconditional post-WI-867 collapse — it writes
+  // organization/person/login/membership (person.id == profile.id), not legacy
+  // `profiles`. Verify the created owner via membership first, fall back to legacy
+  // `profiles` for the pre-collapse flag-off path, so this guard holds across the
+  // flag/collapse transition.
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, profileId),
+    columns: { personId: true },
   });
-  if (!row) throw new Error(`Profile row missing after create: ${profileId}`);
+  if (!membershipRow) {
+    const row = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+      columns: { accountId: true },
+    });
+    if (!row) {
+      throw new Error(
+        `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
+      );
+    }
+  }
   return profileId;
 }
 

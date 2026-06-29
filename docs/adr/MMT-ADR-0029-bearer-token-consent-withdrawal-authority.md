@@ -1,4 +1,4 @@
-# MMT-ADR-0027 — Bearer-token authority for edge-less consent withdrawal
+# MMT-ADR-0029 — Bearer-token authority for edge-less consent withdrawal
 
 **Status:** Accepted (2026-06-26) — *Architecture sign-off by jjoerg; drafted by Claude from the P0 spec as the architecture-vetting step, NOT a plan-launder (`MMT-ADR-0000` §II.6 rule 1). Pre-live: editable in place per the §II.2 override.* · **Class:** Architecture / Security · **Scope:** Compliance / consent — the email-consenting parent (live identity-v2 machine) · **Deciders:** Architect (jjoerg) + Claude
 **Builds on / deviates from:** `MMT-ADR-0001` (own the graph; Clerk for auth only), `MMT-ADR-0008` (guardianship is a global edge; the authority check lives in exactly one edge-derived resolver) · **Source spec:** `docs/specs/2026-06-26-p0-email-consent-withdrawal-design.md`
