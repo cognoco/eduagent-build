@@ -94,6 +94,21 @@ export function SubjectsBrowse({
               ) : null}
             </Pressable>
           ))}
+          {/* Add-subject affordance on the populated path: without it a learner
+              with ≥1 subject has no way to start a second one without going back
+              through onboarding (WI-1119). Same testID/handler as the empty
+              state — only one branch renders per state, so it is never a dup. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('subjectsBrowse.createSubject')}
+            className="min-h-[48px] justify-center rounded-card border border-border bg-surface px-4"
+            onPress={onCreateSubject}
+            testID="subjects-browse-create"
+          >
+            <Text className="text-center text-body font-semibold text-primary">
+              {t('subjectsBrowse.createSubject')}
+            </Text>
+          </Pressable>
         </View>
       )}
     </ScrollView>

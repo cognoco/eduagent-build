@@ -4025,6 +4025,13 @@
       "title": "Velg din første bok",
       "message": "Velg en bok for å begynne å studere dette emnet.",
       "cta": "Se bøker"
+    },
+    "manage": {
+      "open": "Administrer",
+      "accessibilityLabel": "Administrer emne",
+      "title": "Administrer emne",
+      "description": "Sett dette emnet på pause for å skjule det fra aktiv læring, eller arkiver det til du gjenoppretter det.",
+      "close": "Lukk"
     }
   },
   "journal": {

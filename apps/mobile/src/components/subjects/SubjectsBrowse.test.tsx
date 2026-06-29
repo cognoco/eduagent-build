@@ -87,6 +87,24 @@ describe('SubjectsBrowse', () => {
     screen.getByText('Algebra');
   });
 
+  it('shows an add-subject affordance on the populated path and calls onCreateSubject', () => {
+    const onCreateSubject = jest.fn();
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={onCreateSubject}
+      />,
+    );
+
+    // Populated list still renders the rows...
+    screen.getByText('Spanish');
+    // ...AND the add-subject button is present (regression: WI-1119).
+    fireEvent.press(screen.getByTestId('subjects-browse-create'));
+
+    expect(onCreateSubject).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a create-subject affordance for an empty list', () => {
     const onCreateSubject = jest.fn();
     render(
