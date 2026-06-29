@@ -1,4 +1,3 @@
-// @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
