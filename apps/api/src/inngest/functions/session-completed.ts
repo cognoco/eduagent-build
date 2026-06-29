@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (all DB writes scoped by event.data.profileId; topic verified via subjects.profileId join chain)
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
 import {

@@ -476,10 +476,12 @@ describe('processRecallTest concurrent LLM serialization [WI-234]', () => {
   beforeEach(() => {
     llmFixture.clearCalls();
     llmFixture.clearChatError();
-    // Recall quality grader parses a JSON object (recallGradeJsonSchema), not a
-    // bare digit; quality 4 + 'solid' is a consistent grade (solid needs >= 3).
+    // [WI-1153] The recall grader parses a structured JSON object
+    // (recallGradeJsonSchema: quality 0-5 + verdict enum); a bare digit is never
+    // parseable → graded:false → throws 'recall grader unavailable'. Provide a
+    // valid solid-grade payload (quality 4 ⇒ verdict 'solid').
     llmFixture.setChatResponse(
-      JSON.stringify({ quality: 4, verdict: 'solid' }),
+      '{"quality":4,"verdict":"solid","rationale":"Accurate recall.","misconception":null}',
     );
     _resetCircuits();
   });

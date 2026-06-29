@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (reconciles two RevenueCat subscriber identities; no single profile scope)
 // ---------------------------------------------------------------------------
 // Billing Alias Merge — consumes app/billing.alias_received [BUG-783 / BUG-449]
 //

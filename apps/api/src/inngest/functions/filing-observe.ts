@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Filing Observability — observable terminus for two events emitted by
 // filing-timed-out-observe.ts and filing-completed-observe.ts:

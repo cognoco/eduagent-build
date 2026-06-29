@@ -892,6 +892,38 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
     expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
     expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
+
+  // [WI-481] Silent-recovery escalation: when generateBookTopics fails, the
+  // flow still completes via buildFallbackBookTopics (learner keeps moving),
+  // but the failure must ALSO reach Sentry so a generation outage is queryable
+  // rather than invisible behind a fallback. Revert the captureException call
+  // in session-crud.ts → this assertion fails while the flow still passes.
+  it('[WI-481] escalates to captureException when generateBookTopics fails, then falls back', async () => {
+    const captureExceptionSpy = jest
+      .spyOn(sentryModule, 'captureException')
+      .mockImplementation(() => undefined);
+    generateBookTopicsSpy.mockRejectedValue(new Error('generation boom'));
+
+    // Must not throw — the fallback keeps the session flow alive.
+    await startFirstCurriculumSession(
+      makeDb(),
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false },
+    );
+
+    expect(captureExceptionSpy).toHaveBeenCalled();
+    const [, context] = captureExceptionSpy.mock.calls[0] as [
+      unknown,
+      { extra?: { context?: string } },
+    ];
+    expect(context?.extra?.context).toBe(
+      'session.focused_book_topic_generation',
+    );
+
+    captureExceptionSpy.mockRestore();
+  });
 });
 
 // ---------------------------------------------------------------------------

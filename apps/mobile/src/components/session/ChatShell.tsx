@@ -611,45 +611,98 @@ export function ChatShell({
   // the speech-recognition hook as the authoritative signal rather than
   // string-matching the error message (which silently breaks if the hook's
   // canonical wording changes and false-matches unrelated errors that happen
-  // to contain the word "permission"). String matching remains as a strict
-  // last-resort fallback for the case where the permission lookup itself
-  // throws or the module is unavailable.
+  // to contain the word "permission"). getMicrophonePermissionStatus() contains
+  // its own errors and returns null when the speech module is unavailable, so
+  // when it yields null we leave isPermissionError=false and surface the raw
+  // STT error — there is no string-matching fallback.
   useEffect(() => {
     if (!sttError) return;
     let cancelled = false;
     void (async () => {
       let isPermissionError = false;
+      // [WI-1150] Whether the OS will still show the system permission dialog.
+      // Defaults to false so an unavailable permission lookup routes to the
+      // (safe) Settings fallback rather than a re-prompt that can never appear.
+      let canAskAgain = false;
       try {
         const permissionStatus = await getMicrophonePermissionStatus();
         if (permissionStatus) {
           // Structured classification: hook is in error AND OS reports
           // permission is not granted ⇒ permission-denied error.
           isPermissionError = !permissionStatus.granted;
+          canAskAgain = permissionStatus.canAskAgain;
         }
       } catch {
-        /* fall through to the last-resort fallback below */
+        /* defensive: getMicrophonePermissionStatus contains its own errors and
+           returns null rather than throwing, so this is effectively unreachable;
+           if it ever does throw, isPermissionError stays false → raw-error alert. */
       }
       if (cancelled) return;
+
+      // Non-permission STT error: surface the raw message, no recovery buttons.
+      if (!isPermissionError) {
+        platformAlert(
+          t('session.chatShell.voicePermissionErrorTitle'),
+          sttError,
+        );
+        return;
+      }
+
+      // [WI-1150] Permission denied. If the OS will still show the system
+      // dialog (canAskAgain), re-request inline — one tap, never leaving the
+      // app — instead of routing to the Android App-info Settings page where
+      // the user has to hunt for the Microphone toggle and navigate back. Only
+      // when permission is permanently denied (canAskAgain === false) do we
+      // fall back to Settings, the only remaining Android path. Mirrors the
+      // canAskAgain-aware pattern already used by homework/camera.tsx.
+      if (canAskAgain) {
+        platformAlert(
+          t('session.chatShell.voicePermissionErrorTitle'),
+          t('session.chatShell.voicePermissionAskMessage'),
+          [
+            { text: t('common.cancel'), style: 'cancel' },
+            {
+              text: t('session.chatShell.voicePermissionAllow'),
+              onPress: () => {
+                void (async () => {
+                  const granted = await requestMicrophonePermission();
+                  // On grant, drop the error so the learner can retry voice
+                  // input immediately without leaving the conversation. If the
+                  // component unmounts while the system dialog is open, this
+                  // clearTranscript() lands after unmount; the hook's setters are
+                  // a no-op then under React 18 (state updates on unmounted
+                  // components are dropped without warning), so no guard needed.
+                  if (granted) clearTranscript();
+                })();
+              },
+            },
+          ],
+        );
+        return;
+      }
+
       platformAlert(
         t('session.chatShell.voicePermissionErrorTitle'),
-        isPermissionError
-          ? t('session.chatShell.voicePermissionErrorMessage')
-          : sttError,
-        isPermissionError
-          ? [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('session.chatShell.voicePermissionOpenSettings'),
-                onPress: () => Linking.openSettings(),
-              },
-            ]
-          : undefined,
+        t('session.chatShell.voicePermissionErrorMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('session.chatShell.voicePermissionOpenSettings'),
+            onPress: () => Linking.openSettings(),
+          },
+        ],
       );
     })();
     return () => {
       cancelled = true;
     };
-  }, [sttError, getMicrophonePermissionStatus]);
+  }, [
+    sttError,
+    getMicrophonePermissionStatus,
+    requestMicrophonePermission,
+    clearTranscript,
+    t,
+  ]);
 
   // Voice transcript preview actions
   const handleVoiceSend = useCallback(() => {

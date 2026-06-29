@@ -19,7 +19,7 @@ Read these, then run the review loop accordingly:
 2. The repo AGENTS.md (Cosmo rules) + RTK guidance.
 
 Load the Cosmo skills: cosmo:work-items, cosmo:work-lifecycle, cosmo:review, cosmo:qa, notion-patterns, cli:modern-cli-tooling.
-Cosmo Work Items DB: «WORK-ITEMS-DB-ID».
+Cosmo Work Items DB: «WORK-ITEMS-DB-ID» (from repo-root zdx-config.yaml → .zdx.work-items.data_source_id; see _quartet/dependencies.md).
 
 Run the loop for THIS workstream ONLY (poll ~60s by Workstream relation; de-dupe by transition key; /cosmo:review for real + /cosmo:qa; disposition done/rework/human). Keep logs/outputs isolated; do not modify or stop any other watcher.
 

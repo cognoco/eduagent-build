@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 
@@ -33,17 +33,6 @@ export default function SubjectsScreen(): React.ReactElement {
     return <PersonScopeStructuralSubjects scope={activeScope} />;
   }
 
-  if (subjectsIndex.isLoading) {
-    return (
-      <View
-        className="flex-1 items-center justify-center bg-background"
-        testID="subjects-screen"
-      >
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
-    );
-  }
-
   if (subjectsIndex.isError) {
     return (
       <View className="flex-1 bg-background p-5" testID="subjects-screen">
@@ -66,6 +55,7 @@ export default function SubjectsScreen(): React.ReactElement {
     <View className="flex-1 bg-background" testID="subjects-screen">
       <SubjectsBrowse
         subjects={subjectsIndex.subjects}
+        isLoading={subjectsIndex.isLoading}
         onOpenSubject={(subjectId) =>
           router.push({
             pathname: '/(app)/subject-hub/[subjectId]',

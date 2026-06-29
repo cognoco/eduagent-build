@@ -31,11 +31,7 @@ import {
   xpLedger,
 } from '@eduagent/database';
 
-import {
-  cleanupAccounts,
-  createIntegrationDb,
-  isIdentityV2Enabled,
-} from './helpers';
+import { cleanupAccounts, createIntegrationDb } from './helpers';
 import {
   clearFetchCalls,
   getFetchCalls,
@@ -151,17 +147,19 @@ async function seedScenario(options?: {
     })
     .returning();
 
-  if (isIdentityV2Enabled()) {
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId: account!.id,
-      profileId: profile!.id,
-      displayName: 'Integration Learner',
-      birthYear: 2000,
-      clerkUserId,
-      email,
-      isOwner: true,
-    });
-  }
+  // [WI-1145] Seed the v2 identity graph unconditionally alongside legacy — the
+  // session-completed pipeline resolves the profile via v2 (person) and aborts with
+  // "Profile not found" when v2 is empty on the post-collapse flag-off main lane.
+  // Same ids as legacy (person.id == profile.id, organization.id == account.id).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: profile!.id,
+    displayName: 'Integration Learner',
+    birthYear: 2000,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
 
   const [subject] = await db
     .insert(subjects)

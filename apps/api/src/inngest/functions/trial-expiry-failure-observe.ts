@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Trial Expiry Failure Observe — observable terminus for the
 // app/billing.trial_expiry_failed event emitted by trial-expiry.ts when a

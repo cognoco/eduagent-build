@@ -570,3 +570,50 @@ export const sessionCompletedEventSchema = z.object({
   timestamp: isoDateField.optional(),
 });
 export type SessionCompletedEvent = z.infer<typeof sessionCompletedEventSchema>;
+
+// ---------------------------------------------------------------------------
+// app/billing.subscription_store_teardown_requested — store-provider teardown
+// after a v2 whole-org GDPR erasure (WI-885).
+//
+// Dispatched by the scheduled-deletion workflow AFTER the DB erasure commits,
+// carrying the Stripe/RevenueCat identifiers pre-read before the subscription
+// rows were deleted. The consumer (billing-subscription-store-teardown) cancels
+// the Stripe subscription and deletes the RevenueCat customer. The per-target
+// schema lives here (not in apps/api) so the producer (the deletion-v2 service
+// that maps DB rows) and the consumer (the inngest function that safeParses the
+// payload) share ONE source of truth — without a services → inngest import and
+// matching the convention that all event payloads live in @eduagent/schemas.
+//
+// PII egress: opaque provider identifiers + tier/status scalars only; no names
+// or transcript content. planTier/status are loose strings (not the billing
+// enums) because the payload only forwards them for observability — the teardown
+// worker keys solely on the Stripe/RevenueCat identifiers.
+// ---------------------------------------------------------------------------
+export const subscriptionStoreTeardownTargetSchema = z.object({
+  subscriptionId: z.string().min(1),
+  planTier: z.string().min(1),
+  status: z.string().min(1),
+  stripe: z.object({
+    customerId: z.string().min(1).nullable(),
+    subscriptionId: z.string().min(1).nullable(),
+  }),
+  revenueCat: z.object({
+    originalAppUserId: z.string().min(1).nullable(),
+    storeProductId: z.string().min(1).nullable(),
+    storePlatform: z.string().min(1).nullable(),
+  }),
+});
+export type SubscriptionStoreTeardownTarget = z.infer<
+  typeof subscriptionStoreTeardownTargetSchema
+>;
+
+export const subscriptionStoreTeardownRequestedDataSchema = z.object({
+  accountId: z.string().min(1),
+  identityVersion: z.literal('v2'),
+  reason: z.literal('whole_org_erasure'),
+  requestedAt: z.string().min(1),
+  subscriptions: z.array(subscriptionStoreTeardownTargetSchema).min(1),
+});
+export type SubscriptionStoreTeardownRequestedData = z.infer<
+  typeof subscriptionStoreTeardownRequestedDataSchema
+>;

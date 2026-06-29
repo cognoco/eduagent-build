@@ -54,6 +54,7 @@
     "check:i18n:orphans": "tsx scripts/check-i18n-orphan-keys.ts",
     "check:i18n:jsx-literals": "tsx scripts/check-i18n-jsx-literals.ts",
     "check:no-clinical-copy": "tsx scripts/check-no-clinical-copy.ts",
+    "check:adr-provenance": "tsx scripts/check-adr-provenance.ts",
     "check:decision-adr-link": "tsx scripts/check-decision-adr-link.ts",
     "check:migration-immutability": "tsx scripts/check-migration-immutability.ts",
     "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts"

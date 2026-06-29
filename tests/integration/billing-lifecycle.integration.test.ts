@@ -115,17 +115,30 @@ async function seedAccount() {
     isOwner: true,
   });
 
-  if (isIdentityV2Enabled()) {
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId: account!.id,
-      profileId,
-      displayName: 'Billing Owner',
-      birthYear: 1990,
-      clerkUserId: AUTH_USER_ID,
-      email: AUTH_EMAIL,
-      isOwner: true,
-    });
-  }
+  // [WI-1145] Seed the v2 identity graph unconditionally — the collapsed account
+  // middleware resolves the owner via v2 (login/membership) post-WI-867 collapse and
+  // returns 401 when v2 identity is absent on the flag-off main lane. Same ids as
+  // legacy (person.id == profile.id, organization.id == account.id). The v2
+  // subscription seed below is ALSO unconditional: WI-867 collapsed billing
+  // GET /v1/subscription to `getSubscriptionByAccountIdV2` (v2-only read, no
+  // per-call flag dispatch), so on the post-collapse flag-off main lane the
+  // route reads the v2 `subscription` table and quota-provisions against the v2
+  // sub id (== legacy sub id) — the legacy `subscriptions` seed alone leaves the
+  // v2 read empty and the FK on `profile_quota_usage` unsatisfiable.
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId,
+    displayName: 'Billing Owner',
+    birthYear: 1990,
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
+    isOwner: true,
+    // [WI-1145] This suite owns the subscription lifecycle in seedSubscription
+    // (and the "repair a missing subscription" case needs NO pre-existing sub),
+    // so opt out of the anchor's baseline free sub — seedSubscription inserts the
+    // legacy+v2 pair with a shared id when a test needs one.
+    seedBaselineSubscription: false,
+  });
 
   // Return the seeded owner profileId so callers can supply X-Profile-Id, the
   // explicit-header resolution the owner-only billing gates now require (the
@@ -164,7 +177,14 @@ async function seedSubscription(
     })
     .returning();
 
-  if (isIdentityV2Enabled()) {
+  // [WI-1145] Seed the v2 subscription UNCONDITIONALLY (was gated on
+  // isIdentityV2Enabled()), with the SAME id as the legacy row. Billing GET
+  // /v1/subscription reads v2-only post-WI-867 collapse, then quota-provisions
+  // against the read sub id — which FK-references legacy `subscriptions`, so the
+  // shared id keeps that FK satisfiable. seedAccount opts out of the anchor
+  // baseline sub, so this pair is the only subscription for the org. Pre-collapse
+  // the legacy read ignores the v2 row, so it is inert and safe there.
+  {
     const [ownerProfile] = await db
       .select({ id: profiles.id })
       .from(profiles)
@@ -439,7 +459,22 @@ describe('Integration: billing lifecycle routes', () => {
     expect(subscription!.tier).toBe('plus');
     expect(subscription!.status).toBe('trial');
     expect(subscription!.trialEndsAt).not.toBeNull();
-    expect(subscription!.stripeCustomerId).toBe('cus_checkout');
+    // [WI-1145] The collapsed checkout writes stripeCustomerId to the store it
+    // targets — v2 `subscription` post-WI-867, legacy `subscriptions` pre-collapse
+    // (the legacy parent ensureLegacySubscriptionParent writes carries tier/status
+    // but NOT the stripe customer). Flag is off in both, so assert it landed in
+    // EITHER store rather than reading one fixed store.
+    const checkoutDb = createIntegrationDb();
+    const v2Checkout = await checkoutDb.query.subscription.findFirst({
+      where: eq(subscriptionV2.organizationId, account.id),
+    });
+    const legacyCheckout = await checkoutDb.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, account.id),
+    });
+    expect(
+      v2Checkout?.stripeCustomerId === 'cus_checkout' ||
+        legacyCheckout?.stripeCustomerId === 'cus_checkout',
+    ).toBe(true);
 
     const quotaPool = await loadQuotaPool(subscription!.id);
     expect(quotaPool).not.toBeUndefined();
@@ -474,9 +509,25 @@ describe('Integration: billing lifecycle routes', () => {
       new Date(STRIPE_CURRENT_PERIOD_END * 1000).toISOString(),
     );
 
-    const updated = await loadSubscription(account.id);
-    expect(updated!.cancelledAt).not.toBeNull();
-    expect(updated!.stripeSubscriptionId).toBe('sub_cancel');
+    // [WI-1145] The collapsed cancel writes cancelledAt + stripeSubscriptionId to
+    // the store it targets — v2 `subscription` post-WI-867, legacy `subscriptions`
+    // pre-collapse. Flag is off in both, so assert the cancel mutation landed in
+    // EITHER store rather than reading one fixed store (loadSubscription's
+    // flag-off legacy read would miss the v2-side mutation post-collapse).
+    const cancelDb = createIntegrationDb();
+    const v2Cancel = await cancelDb.query.subscription.findFirst({
+      where: eq(subscriptionV2.organizationId, account.id),
+    });
+    const legacyCancel = await cancelDb.query.subscriptions.findFirst({
+      where: eq(subscriptions.accountId, account.id),
+    });
+    expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
+      true,
+    );
+    expect(
+      v2Cancel?.stripeSubscriptionId === 'sub_cancel' ||
+        legacyCancel?.stripeSubscriptionId === 'sub_cancel',
+    ).toBe(true);
 
     const quotaPool = await loadQuotaPool(seeded.subscription.id);
     expect(quotaPool).not.toBeUndefined();

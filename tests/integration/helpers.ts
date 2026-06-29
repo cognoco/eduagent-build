@@ -92,14 +92,18 @@ export async function cleanupAccounts(input: {
 }): Promise<void> {
   const db = createIntegrationDb();
 
-  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP
-  // applied), so the legacy `accounts` table does not exist. Flag-ON the
-  // identity graph is person/organization/login/membership/guardianship.
-  // Resolve the seeded owner via `login` (same email/clerkUserId keys), expand
-  // to ALL persons in their organizations (children have no login row), then
-  // tear the graph down in FK-safe order: guardianship edges (onDelete RESTRICT
-  // on person) first, then person (cascades login/membership), then the org.
-  if (isIdentityV2Enabled()) {
+  // [WI-1145] Clean the v2 identity graph UNCONDITIONALLY (was gated on
+  // isIdentityV2Enabled()). Post-WI-867 collapse the create route writes v2
+  // (login/person/membership/organization) regardless of the flag, so a flag-gated
+  // teardown left v2 rows behind on the post-collapse flag-off main lane and the
+  // next create 409'd on the login.clerk_user_id / organization unique keys. This
+  // pass resolves the seeded owner via `login` (same email/clerkUserId keys),
+  // expands to ALL persons in their orgs (children have no login row), tears the
+  // graph down in FK-safe order (guardianship → consent → subscription → person →
+  // org), and also sweeps legacy `accounts` (tableExists-guarded). It no-ops when
+  // the login lookup finds nothing (pre-collapse flag-off seeds only legacy), so it
+  // is safe across every flag/DB state.
+  {
     const ownerPersonIds = new Set<string>();
     const orgIds = new Set<string>();
 
@@ -247,26 +251,4 @@ export async function cleanupAccounts(input: {
     }
     return;
   }
-
-  const accountIds = new Set<string>();
-
-  if (input.emails && input.emails.length > 0) {
-    const rows = await db.query.accounts.findMany({
-      where: inArray(accounts.email, input.emails),
-    });
-    rows.forEach((row) => accountIds.add(row.id));
-  }
-
-  if (input.clerkUserIds && input.clerkUserIds.length > 0) {
-    const rows = await db.query.accounts.findMany({
-      where: inArray(accounts.clerkUserId, input.clerkUserIds),
-    });
-    rows.forEach((row) => accountIds.add(row.id));
-  }
-
-  if (accountIds.size === 0) {
-    return;
-  }
-
-  await db.delete(accounts).where(inArray(accounts.id, [...accountIds]));
 }

@@ -261,6 +261,11 @@ async function seedWeeklyPushPrefs(profileId: string): Promise<void> {
   await db.insert(notificationPreferences).values({
     profileId,
     weeklyProgressPush: true,
+    // [WI-1153] Push-only prefs: email defaults to true, and the weekly EMAIL
+    // channel is intentionally NOT gated by the 24h push-dedup, so leaving it on
+    // makes a push-dedup assertion see status:'completed' (email fired). Pin it
+    // off so this helper models a push-only user.
+    weeklyProgressEmail: false,
     pushEnabled: true,
     maxDailyPush: 3,
     expoPushToken: 'ExponentPushToken[integration]',
@@ -749,9 +754,13 @@ describe('weekly progress push integration', () => {
 
     const result = await executeGenerateHandler(parentProfileId);
 
+    // [WI-1153] The outer handler return is { status, parentId } — the
+    // push-step's internal { reason: 'dedup_24h' } is not propagated to the
+    // result (it stopped being surfaced when WI-998 moved dedup from the
+    // prepare step into the push step). The throttle is verified by status +
+    // the zero push call below.
     expect(result).toEqual({
       status: 'throttled',
-      reason: 'dedup_24h',
       parentId: parentProfileId,
     });
     // No push API call should have fired.
