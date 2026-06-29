@@ -29,8 +29,10 @@ import type {
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
+  closeResultSchema,
   homeworkSessionMetadataSchema,
   learningSessionSchema,
+  messageResultSchema,
   parkingLotAddResponseSchema,
   parkingLotItemSchema,
   recallBridgeResultSchema,
@@ -208,26 +210,6 @@ interface SubmitSummaryResult {
 
 const sessionStartResultSchema = z.object({ session: learningSessionSchema });
 
-// MessageResult has no canonical schema in @eduagent/schemas.
-const messageResultSchema = z.object({
-  response: z.string(),
-  escalationRung: z.number(),
-  isUnderstandingCheck: z.boolean(),
-  exchangeCount: z.number(),
-  expectedResponseMinutes: z.number(),
-  aiEventId: z.string().optional(),
-});
-
-// CloseResult has no canonical schema in @eduagent/schemas.
-const closeResultSchema = z.object({
-  message: z.string(),
-  sessionId: z.string(),
-  wallClockSeconds: z.number(),
-  summaryStatus: z
-    .enum(['pending', 'submitted', 'accepted', 'skipped', 'auto_closed'])
-    .optional(),
-});
-
 const homeworkStateSyncResponseSchema = z.object({
   metadata: homeworkSessionMetadataSchema,
 });
@@ -281,7 +263,11 @@ export function useStartSession(subjectId: string): UseMutationResult<
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, sessionStartResultSchema, 'POST /subjects/:subjectId/sessions');
+      return parseJson(
+        res,
+        sessionStartResultSchema,
+        'POST /subjects/:subjectId/sessions',
+      );
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -320,7 +306,11 @@ export function useStartFirstCurriculumSession(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, sessionStartResultSchema, 'POST /subjects/:subjectId/sessions/first-curriculum');
+      return parseJson(
+        res,
+        sessionStartResultSchema,
+        'POST /subjects/:subjectId/sessions/first-curriculum',
+      );
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -342,7 +332,11 @@ export function useSetSessionInputMode(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, sessionStartResultSchema, 'POST /sessions/:sessionId/input-mode');
+      return parseJson(
+        res,
+        sessionStartResultSchema,
+        'POST /sessions/:sessionId/input-mode',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -377,7 +371,11 @@ export function useClearContinuationDepth(
         param: { sessionId },
       });
       await assertOk(res);
-      return parseJson(res, sessionStartResultSchema, 'PATCH /sessions/:sessionId/clear-continuation-depth');
+      return parseJson(
+        res,
+        sessionStartResultSchema,
+        'PATCH /sessions/:sessionId/clear-continuation-depth',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -406,7 +404,11 @@ export function useSyncHomeworkState(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, homeworkStateSyncResponseSchema, 'POST /sessions/:sessionId/homework-state');
+      return parseJson(
+        res,
+        homeworkStateSyncResponseSchema,
+        'POST /sessions/:sessionId/homework-state',
+      );
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -426,7 +428,11 @@ export function useSendMessage(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, messageResultSchema, 'POST /sessions/:sessionId/messages');
+      return parseJson(
+        res,
+        messageResultSchema,
+        'POST /sessions/:sessionId/messages',
+      );
     },
   });
 }
@@ -455,7 +461,11 @@ export function useCloseSession(sessionId: string): UseMutationResult<
         json: input as Record<string, unknown>,
       });
       await assertOk(res);
-      return parseJson(res, closeResultSchema, 'POST /sessions/:sessionId/close');
+      return parseJson(
+        res,
+        closeResultSchema,
+        'POST /sessions/:sessionId/close',
+      );
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -684,7 +694,11 @@ export function useSessionTranscript(
           { init: { signal } },
         );
         await assertOk(res);
-        return parseJson(res, transcriptResponseSchema, 'GET /sessions/:sessionId/transcript');
+        return parseJson(
+          res,
+          transcriptResponseSchema,
+          'GET /sessions/:sessionId/transcript',
+        );
       } finally {
         cleanup();
       }
@@ -716,7 +730,11 @@ export function useSession(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await parseJson(res, sessionStartResultSchema, 'GET /sessions/:sessionId');
+        const data = await parseJson(
+          res,
+          sessionStartResultSchema,
+          'GET /sessions/:sessionId',
+        );
         return data.session;
       } finally {
         cleanup();
@@ -747,7 +765,11 @@ export function useRecordSystemPrompt(
         json: intent,
       });
       await assertOk(res);
-      return parseJson(res, z.object({ ok: z.boolean() }), 'POST /sessions/:sessionId/system-prompt');
+      return parseJson(
+        res,
+        z.object({ ok: z.boolean() }),
+        'POST /sessions/:sessionId/system-prompt',
+      );
     },
   });
 }
@@ -764,7 +786,11 @@ export function useRecordSessionEvent(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, z.object({ ok: z.boolean() }), 'POST /sessions/:sessionId/events');
+      return parseJson(
+        res,
+        z.object({ ok: z.boolean() }),
+        'POST /sessions/:sessionId/events',
+      );
     },
   });
 }
@@ -781,7 +807,11 @@ export function useFlagSessionContent(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, z.object({ message: z.string() }), 'POST /sessions/:sessionId/flag');
+      return parseJson(
+        res,
+        z.object({ message: z.string() }),
+        'POST /sessions/:sessionId/flag',
+      );
     },
   });
 }
@@ -802,7 +832,11 @@ export function useParkingLot(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await parseJson(res, z.object({ items: z.array(parkingLotItemSchema) }), 'GET /sessions/:sessionId/parking-lot');
+        const data = await parseJson(
+          res,
+          z.object({ items: z.array(parkingLotItemSchema) }),
+          'GET /sessions/:sessionId/parking-lot',
+        );
         return data.items;
       } finally {
         cleanup();
@@ -833,7 +867,11 @@ export function useTopicParkingLot(
           'parking-lot'
         ].$get({ param: { subjectId, topicId } }, { init: { signal } });
         await assertOk(res);
-        const data = await parseJson(res, z.object({ items: z.array(parkingLotItemSchema) }), 'GET /subjects/:subjectId/topics/:topicId/parking-lot');
+        const data = await parseJson(
+          res,
+          z.object({ items: z.array(parkingLotItemSchema) }),
+          'GET /subjects/:subjectId/topics/:topicId/parking-lot',
+        );
         return data.items;
       } finally {
         cleanup();
@@ -857,7 +895,11 @@ export function useAddParkingLotItem(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, parkingLotAddResponseSchema, 'POST /sessions/:sessionId/parking-lot');
+      return parseJson(
+        res,
+        parkingLotAddResponseSchema,
+        'POST /sessions/:sessionId/parking-lot',
+      );
     },
     onSuccess: () => {
       // [BUG-165] Scope invalidation to the active profile so a mutation on
@@ -891,7 +933,11 @@ export function useSessionSummary(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await parseJson(res, sessionSummaryGetResponseSchema, 'GET /sessions/:sessionId/summary');
+        const data = await parseJson(
+          res,
+          sessionSummaryGetResponseSchema,
+          'GET /sessions/:sessionId/summary',
+        );
         return data.summary;
       } finally {
         cleanup();
@@ -918,7 +964,11 @@ export function useSubmitSummary(
         json: input,
       });
       await assertOk(res);
-      return parseJson(res, submitSummaryResultSchema, 'POST /sessions/:sessionId/summary');
+      return parseJson(
+        res,
+        submitSummaryResultSchema,
+        'POST /sessions/:sessionId/summary',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -946,7 +996,11 @@ export function useSkipSummary(
         param: { sessionId },
       });
       await assertOk(res);
-      return parseJson(res, skipSummaryResponseSchema, 'POST /sessions/:sessionId/summary/skip');
+      return parseJson(
+        res,
+        skipSummaryResponseSchema,
+        'POST /sessions/:sessionId/summary/skip',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -972,7 +1026,11 @@ export function useRecallBridge(
         param: { sessionId },
       });
       await assertOk(res);
-      return parseJson(res, recallBridgeResultSchema, 'POST /sessions/:sessionId/recall-bridge');
+      return parseJson(
+        res,
+        recallBridgeResultSchema,
+        'POST /sessions/:sessionId/recall-bridge',
+      );
     },
   });
 }

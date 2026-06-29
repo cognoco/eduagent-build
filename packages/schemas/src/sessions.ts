@@ -707,3 +707,25 @@ export const maybeReplayResponseSchema = z.object({
   latestExchangeId: z.string().nullable(),
 });
 export type MaybeReplayResponse = z.infer<typeof maybeReplayResponseSchema>;
+
+// MessageResult — POST /sessions/:sessionId/messages → 200
+// Response shape after sending a learner message (non-streaming path).
+export const messageResultSchema = z.object({
+  response: z.string(),
+  escalationRung: z.number(),
+  isUnderstandingCheck: z.boolean(),
+  exchangeCount: z.number(),
+  expectedResponseMinutes: z.number(),
+  aiEventId: z.string().optional(),
+});
+export type MessageResult = z.infer<typeof messageResultSchema>;
+
+// CloseResult — POST /sessions/:sessionId/close → 200
+// Response shape after closing a learning session.
+export const closeResultSchema = z.object({
+  message: z.string(),
+  sessionId: z.string(),
+  wallClockSeconds: z.number(),
+  summaryStatus: summaryStatusSchema,
+});
+export type CloseResult = z.infer<typeof closeResultSchema>;
