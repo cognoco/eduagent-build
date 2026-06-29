@@ -670,4 +670,39 @@ describe('Gemini Provider', () => {
       }).rejects.toThrow('blocked by content safety filters');
     });
   });
+
+  // [WI-481] Trust-boundary validation of the raw Gemini response body. A
+  // null/malformed/wrong-shape 2xx body must throw a TYPED provider error
+  // ("Gemini API ..."), never a raw TypeError from undefined field access.
+  describe('[WI-481] malformed response body', () => {
+    it('throws a typed provider error (not TypeError) when JSON body is null', async () => {
+      fetchSpy.mockResolvedValue(mockFetchResponse(null));
+
+      let caughtError: unknown;
+      try {
+        await provider.chat(
+          [{ role: 'user', content: 'Hello' }],
+          DEFAULT_CONFIG,
+        );
+      } catch (err) {
+        caughtError = err;
+      }
+
+      expect(caughtError).toBeInstanceOf(Error);
+      expect((caughtError as Error).message).toContain('Gemini API');
+      expect(caughtError).not.toBeInstanceOf(TypeError);
+    });
+
+    it('throws a typed provider error when a candidate part has a non-string text', async () => {
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse({
+          candidates: [{ content: { parts: [{ text: 5 }] } }],
+        }),
+      );
+
+      await expect(
+        provider.chat([{ role: 'user', content: 'Hello' }], DEFAULT_CONFIG),
+      ).rejects.toThrow('Gemini API');
+    });
+  });
 });

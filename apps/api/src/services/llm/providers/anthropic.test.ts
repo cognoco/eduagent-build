@@ -262,3 +262,56 @@ describe('createAnthropicProvider — HTTP status preservation', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-481] Trust-boundary validation of the raw Anthropic response body.
+// A null/malformed/wrong-shape 2xx body must throw a TYPED provider error
+// (createProviderApiError → "Anthropic API ..."), never a raw TypeError from
+// undefined field access. Mirrors openai.test.ts [WI-984].
+// ---------------------------------------------------------------------------
+
+describe('[WI-481] createAnthropicProvider — malformed response body', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('throws a typed provider error (not TypeError) when JSON body is null', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(null),
+      text: () => Promise.resolve('null'),
+    } as unknown as Response);
+
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
+    let caughtError: unknown;
+    try {
+      await provider.chat(messages, baseConfig);
+    } catch (err) {
+      caughtError = err;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect((caughtError as Error).message).toContain('Anthropic API');
+    expect(caughtError).not.toBeInstanceOf(TypeError);
+  });
+
+  it('throws a typed provider error when content blocks are the wrong shape', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      // `type` must be a string per the wire schema; a number is a wrong shape.
+      json: () => Promise.resolve({ content: [{ type: 123 }] }),
+      text: () => Promise.resolve('{"content":[{"type":123}]}'),
+    } as unknown as Response);
+
+    const provider = createAnthropicProvider('test-api-key');
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Hello' }];
+
+    await expect(provider.chat(messages, baseConfig)).rejects.toThrow(
+      'Anthropic API',
+    );
+  });
+});
