@@ -884,9 +884,13 @@ export function createScopedRepository(db: Database, profileId: string) {
               mistakeCount: values.mistakeCount,
               reviewed: values.reviewed,
               // [WI-902] Refresh persisted sentences on a genuine retry only
-              // when the client supplied them; omit when undefined so a retry
-              // that drops the field does not clobber a previously stored set.
-              ...(values.sentences !== undefined
+              // when the client supplied a non-null value; omit when null or
+              // undefined so a retry that omits or explicitly clears the field
+              // does not clobber a previously stored set. Note: the route and
+              // service coerce absent sentences to null before reaching here,
+              // so the guard must use != null (loose equality) rather than
+              // !== undefined to catch both forms.
+              ...(values.sentences != null
                 ? { sentences: values.sentences }
                 : {}),
             },
