@@ -1420,3 +1420,120 @@ All 7 real flag-collapse breaks GREEN+STAGED (125 files). Newly greened this ses
 **GATE (c) running**: read-only Explore reviewer (abe8dfaf8538b067b) diffing ~12 auth/denial both-touched source files merged-vs-base for dropped denial/ownership/consent paths. Verdict pending. HOLD per ic-257 — no flatten/PR until gate (c) clears.
 
 Channel: outbox last=`prg06ic-328` (milestone reported), inbox last=`ic-orch-257`.
+
+---
+## STATUS 2026-06-29c — FLATTEN-BASELINE + PR #1591 SUBMITTED
+
+WI-867 LANDED to PR. Sequence completed this window:
+- **Gate (c)**: 15/16 auth/denial files clean; 1 anomaly (`session-completed.ts` storeSessionEmbedding GDPR gate `[C6]/[CUT-B1 §2.5(i)]`) root-caused as **main-beyond-base leak** (in `8b33ece0`, neither merge parent) from a prior conflict resolution → REMOVED + orphaned `isGdprProcessingAllowed` import dropped (kept `isIdentityV2EnabledInStep` — 4 value-param sites). Advisor + orchestrator (ic-259) blessed. `merge-tree` sweep of all 38 manual resolutions → no other beyond-base leaks.
+- **Index-drift fix (important)**: at flatten time the index had drifted from the gate-b-tested worktree for 5 files — 3 test files + `dashboard.ts` (orphan-import cleanup) held green-fixes only in worktree; `eas.json` had a STRAY non-WI-867 `EXPO_PUBLIC_ENABLE_MODE_NAV_V2` removal (worktree-only). Reverted eas.json, staged the 4 legit files. **Next re-derive: verify `git diff` empty before flatten.**
+- **Flatten**: `reset --soft` refused mid-merge → removed merge-state files (MERGE_HEAD/MSG/MODE/AUTO_MERGE) from worktree gitdir (tree hash unchanged), then linear commit **`b2f04bf2c`** (parent=`0e3885977`). lint-staged eslint --fix ran (formatter-only). Gate (b) re-validated on committed tree: 5 env false-reds / 400 passed.
+- **Push**: `force-with-lease=WI-867:713ad46ef HEAD:WI-867` (lease held), SKIP_PRE_PUSH (WI-906). origin/WI-867 = `b2f04bf2c`.
+- **PR #1591** open: WI-867→main — https://github.com/cognoco/eduagent-build/pull/1591
+
+REMAINING for WI-867: monitor PR #1591 CI → on green, `/cosmo:execute complete` (do NOT self-close; close via /cosmo:review+/cosmo:qa later). The 5 env false-reds should be GREEN in CI (node 22.16.0).
+
+NEW QUEUED: **WI-1141** (Dev: flip `IDENTITY_V2_ENABLED=true` in Doppler dev for dev↔prod parity; WS-18, operator-authorized, REVERSIBLE) — handed via ic-260, LOWER priority than WI-867, pick up now (PR-submitted = the boundary). AC: smoke dev flag-on FIRST (dev has person=1350/login=1128) → set in Doppler dev → env:sync → verify identity reads hit person not profiles → claim+complete. CAUTION: Doppler dev is SHARED infra, smoke before flip. NOT the table deletion (that's WI-1140, blocked on 868).
+
+Channel: outbox last=`prg06ic-330`, inbox last=`ic-orch-260`.
+
+---
+## STATUS 2026-06-29d — MERGE HAZARD FIXED, re-pushed 0b2fe1a, CI re-running
+
+First CI on b2f04bf2c FAILED (API Quality Gate + main + Flag-ON integration). Root cause = TWO real tsc errors that **SKIP_PRE_PUSH masked** (pre-push tsc would have caught both):
+1. **session-completed.ts merge hazard** (orchestrator ic-261 caught it on the simulated MERGE commit): I removed main's `[C6]` storeSessionEmbedding GDPR gate-block AND its legacy `isGdprProcessingAllowed` import. main (post-base) ADDED that gate; the 3-way re-adds main's block (calls legacy) but honors my import deletion → dangling ref → tsc red on merge. **FIX (Option B):** restored main's gate-block + legacy import VERBATIM from origin/main `025edc3fb` → region is a merge no-op; correct boundary-left state (gate #2 = new main flag read, not WI-867's to collapse). My gate-c miss: deleting an import whose consumer lives in main-beyond-base.
+2. **profiles.test.ts:1205** mock omitted `ProfileMeta.resolvedVia` (real `getPersonScope` bakes `resolvedVia:'explicit-header'` per Issue-901). Fixed the mock.
+
+**GATE (merge-preview) — strengthened past the minimal ask:** `nx run api:typecheck` GREEN on (a) branch head AND (b) the ACTUAL merged tree (merged origin/main 025edc3fb into branch in-place, full typecheck = success, then `reset --hard` back to flatten). No dangling refs, no other semantic merge hazards. session-completed.test 110/110, profiles.test green.
+
+Amended → linear flatten **`0b2fe1a`**, `force-with-lease=WI-867:b2f04bf2c` (held), re-pushed. PR #1591 CI re-running; monitor `bneytfbyt` armed.
+
+**ROOT LESSON:** SKIP_PRE_PUSH (cited WI-906 for jest node-26 false-reds) ALSO skips pre-push **tsc**, which catches real type errors. RULE: run `nx run api:typecheck` manually before any SKIP_PRE_PUSH push, AND run a merged-tree typecheck (merge origin/main in-place → tsc → reset back) before declaring a stale-base PR mergeable.
+
+origin/main advanced 8b33ece0 → 025edc3fb during this. Base still ancestor; flatten base stays 0e3885977.
+
+NEXT: CI green → `/cosmo:execute complete` WI-867. WI-1141 fetched (preconditions+repo-guard OK, MentoMate→cognoco/eduagent-build) but NOT claimed; resume after CI green.
+Channel: outbox last=`prg06ic-331`, inbox last=`ic-orch-261`.
+
+---
+## STATUS 2026-06-29e — CI round-2: GC1 fixed, A-vs-B settled (stayed B), Flag-ON = pre-existing advisory
+
+CI on 0b2fe1a: typecheck fix landed (API Quality Gate GREEN). 2 failures: **'main'=GC1 (REQUIRED)** + **'Flag-ON integration'=ADVISORY**.
+
+**A-vs-B DECISION — stayed B** (orchestrator recommended A; advisor leaned A). Ran the discriminator (`git log 0e3885977..origin/main` for export handler / billing-v2 assembly / failing test / integration seed) = main touched NONE in its 30 commits. So Option A (rebase) fixes NEITHER remaining failure: GC1 = my real new mocks (replay identically); Flag-ON = main's untouched code. Per advisor's rule (fails-on-merged-tree → fix directly), B is correct. Surfaced the conflict to orchestrator (prg06ic-332).
+
+**GC1 (only REQUIRED blocker) — FIXED:** 3 new internal jest.mock in migrated test files. identity-resolve (language-progress) → **Pattern A** (spread requireActual). revenuecat-webhook + stripe-webhook (billing-v2/dispatch) → **`// gc1-allow` comment-line between `jest.mock(` and the specifier**. KEY GOTCHAs: (a) inline `/* gc1-allow */` on the specifier line is NOT honored by CI-mode `check-gc1-pattern-a.ts` (only the comment-line-between-paren-and-specifier or single-line-MOCK_LINE forms are); (b) prettier rewraps long single-line jest.mock → multiline, defeating inline fixes — use the comment-line form (prettier-stable) or Pattern A. Verified: CI-mode check-gc1 GREEN + api:typecheck GREEN + 3 suites 167/167.
+
+**Flag-ON integration = PRE-EXISTING ADVISORY** (not a blocker, not my regression): `fail` on ALL 5 recent merged PRs (#1588/1584/1582/1580/1576); NOT in required checks (required = main, Playwright web smoke, API Quality Gate, Merge completeness); systemic (20+ integration suites fail flag-on — integration seed harness doesn't populate v2 tables). Candidate follow-up WI (integration seed v2-readiness).
+
+Pushed **2cc56b959** (force-with-lease=WI-867:0b2fe1a held). CI re-running; monitor `b6jpyeg3y` armed.
+
+**ROOT LESSON #2:** forward-only ratchets (GC1, i18n-jsx, no-clinical-copy, decision-adr) aren't in pre-push/jest. Before any push touching test files: run `check-gc1-pattern-a.ts` (GITHUB_BASE_REF=main) + api:typecheck locally. (3rd reinforcement of feedback_forward_ratchets_not_in_prepush.)
+
+NEXT: CI green on required → `/cosmo:execute complete` WI-867. WI-1141 claimed (Executing), smoke pending CI-green.
+Channel: outbox last=`prg06ic-332`, inbox last=`ic-orch-262`.
+
+---
+## STATUS 2026-06-29f — PIVOTED TO A (rebase onto current main); base changed
+
+CI round-3 on 2cc56b959: all REQUIRED green EXCEPT **'Merge completeness check'** (WI-680 merge-invariant, REQUIRED). 1 violation: `_wip/umbrella-program/single-wi-executor-protocol.md` differs main-vs-merge but feature didn't touch it. Root cause: **NOT a real drop** — main edited that doc (1 line) AFTER GitHub computed the PR's synthetic merge, so the check compared a stale merge-ref vs fresh origin/main = phantom drop. A TIMING RACE vs main moving 3×/session (025edc3fb→672fd82ea this session).
+
+**DECISION: pivoted to Option A (rebase).** Unlike GC1/Flag-ON (which A doesn't fix), the merge-invariant IS stale-base and A fixes it. Merge-preview was rc=0 clean, so A = clean bounded replay: `git rebase --onto origin/main 0e3885977 HEAD` → **0 conflicts**. New HEAD **`5edfd9176`** (parent = current origin/main `672fd82ea`). merge-base now = current main → merge-invariant trivially holds + race window collapses 30→~0 commits. All prior fixes travel with the replay (gate#2 restore, GC1 Pattern A ×3, profiles.test resolvedVia).
+
+**BASE CHANGED: 0e3885977 → current main (672fd82ea).** Supersedes the banked "base stays 0e3885977" plan — necessary to clear the merge-invariant. Re-validated: api:typecheck GREEN + GC1 CI-mode GREEN. force-with-lease=WI-867:005c5e9ca held, pushed 5edfd9176. CI re-running (monitor `br12vk0p2`). If main races again pre-CI, rebase again (now cheap).
+
+**WI-1145 captured** (Bug/P2, MentoMate): "Integration seed harness does not populate identity-v2 tables → flag-on integration suites systemically red" — the pre-existing advisory Flag-ON failure. DoR gaps (regression-test mention, variants) noted as advisory comment.
+
+NEXT: CI green on required → `/cosmo:execute complete` WI-867. WI-1141 claimed (Executing), smoke pending CI-green.
+Channel: outbox last=`prg06ic-333`, inbox last=`ic-orch-263`.
+
+---
+## STATUS 2026-06-29g — MERGE-ON-GREEN armed (orchestrator ic-264)
+
+Orchestrator BLESSED the A-pivot + base-change + re-verified the GDPR gate on 5edfd9176. DIRECTIVE: **the instant CI br12vk0p2 goes all-required-green → MERGE PR #1591 IMMEDIATELY** (main churns from other sessions — moved 4× this session: …→672fd82ea→452cb5aa).
+
+KEY ENABLER: branch protection **strict=false** (no up-to-date-with-main requirement) → green required checks let me merge REGARDLESS of main's position. NO forced-rebase livelock from strictness. Required checks = main, Playwright web smoke, API Quality Gate, Merge completeness check. PR state: MERGEABLE / BLOCKED (checks pending). Merge methods allowed: merge, squash, rebase.
+
+THE GATE that re-introduces race = the **merge-invariant check** (compares synthetic-merge vs fresh origin/main). On THIS run (5edfd9176 parent 672fd82ea vs origin/main 452cb5aa): if main's 672→452 commits drift a file → merge-invariant reds a **4TH time** → per ic-264 **STOP rebasing (livelock), ESCALATE to orchestrator** (they'll quiesce main 10-min OR relax WI-680 to tolerate non-overlapping main movement). Do NOT re-rebase a 4th time.
+
+ON CI GREEN: `gh pr merge 1591` (squash or merge — 1 clean flatten commit). THEN `/cosmo:execute complete` WI-867 → WI-1141 (claimed, Executing). WI-1145 (Flag-ON seed Bug/P2) captured.
+Channel: outbox last=`prg06ic-333`, inbox last=`ic-orch-264`. Monitor: `br12vk0p2`.
+
+## Block 30 — 2026-06-29 ~09:50Z — MERGE BLOCKED, escalated (prg06ic-334)
+
+WI-867 PR #1591 @5edfd9176: required **"main"** check RED on its **API integration tests** step (33 suites/208 tests). NOT livelock, NOT advisory — merge-invariant PASSED.
+
+**Root cause (primary-source):** required "main" integration job runs `api:test:integration` with `IDENTITY_V2_ENABLED` UNSET (off); only advisory "Flag-ON integration" lane sets it true (ci.yml:423). origin/main: "main"=green (flag-off→legacy seed works), flag-ON lane=red. Our collapse makes v2 reads unconditional → required main integration now behaves flag-ON → hits the **WI-1145 seed gap** (tests/integration seeds legacy tables only, not person/login/membership/subscription-v2).
+
+**Distribution (all 208 bucketed):** 216 `createProfileViaRoute … not found in DB` + 20 `Profile row missing` + 22 `validateGuardianshipEdgeV2` Forbidden + 500/401/403/404 + 2 TypeErrors (pronouns/conversationLanguage off undefined profile) = 100% downstream of empty-v2-read. **No fourth signature** → collapse itself is correct; only the seed harness is the gap.
+
+**WI-1145 is now a HARD BLOCKER** for WI-867 (and WI-868). No green-without-1145 path that isn't a cheat. Escalated decision A (1145 own PR first, RECOMMENDED) vs B (fold into 867). **Holding — not merging, not rebasing.** Awaiting ic-orch-265.
+
+git: HEAD=5edfd9176 (clean), branch wi-867-rederive, origin/WI-867=5edfd9176. Live channel = MAIN checkout (~/nexus/_dev/eduagent-build/_wip/identity-cutover/_state/), NOT worktree copy (frozen at ic-orch-251). Last in=ic-orch-264, last out=prg06ic-334.
+
+## Block 31 — 2026-06-29 ~10:55Z — WI-1145 investigation COMPLETE; gate/scope reconcile sent (prg06ic-337)
+
+**WI-1145 lifecycle:** Captured→triaged(Bug/P2/Assisted)→refined(Ready, full AC)→claimed(Executing). Worktree `.worktrees/WI-1145` off origin/main (PRE-collapse). WI-867 left ALL harness files untouched → clean ownership, zero rebase conflict.
+
+**MECHANISM (primary-source, settled):**
+- `origin/WI-867` POST /v1/profiles: REMOVED `if(isIdentityV2Enabled)` wrapper + DELETED legacy else-writer → route is UNCONDITIONALLY v2 (always `createIdentityGraph`). Middleware account.ts/profile-scope.ts collapsed v2-only. Escalation premise HOLDS.
+- Harness `tests/integration/helpers.ts:16 isIdentityV2Enabled()` = stale env-gate (`process.env==='true'`). Its v2-seed branches are gated on this dead flag + incomplete (missing login/subscription-v2 in direct-insert helpers).
+- Product helpers config.ts:402 / inngest/helpers.ts:129 HONOR the flag (NOT collapsed to true).
+
+**TWO DISTINCT FAILURE SETS (key finding):**
+1. **POST-COLLAPSE flag-OFF MAIN lane (PR#1591, 208 fails)** = 867's REQUIRED gate. Harness reads legacy `profiles`, product wrote v2 → not-found / guardianship-Forbidden. ← WI-1145 dual-seed+dual-read FIXES THIS. THE BINDING TARGET.
+2. **Flag-ON advisory lane (origin/main, job 84018387810)** = MIXED, mostly NOT identity-v2 seed: dominant ~20× `session-completed Invalid event payload` (`mode`=null/expected string, `exchangeCount`=null/expected number — LEARNING-SESSION fields, flag-on-specific) + env noise (Inngest 401 event-key, no-openai-provider). dual-seed will NOT green this lane → orchestrator's "flag-on green = done" gate (ic-266) is UNACHIEVABLE by 1145; chasing it = scope creep.
+
+**RECONCILE (prg06ic-337, awaiting ruling):** revise binding gate to POST-COLLAPSE MAIN green (verify on throwaway 867+1145 combined branch, flag-off, 4 buckets, + 867 rebase-CI). Capture flag-on session-payload + env failures as separate WI. Implementation of in-scope dual-seed proceeds regardless.
+
+**IMPLEMENTATION PLAN (in-scope, correct under any ruling):**
+- `tests/integration/route-fixtures.ts`:
+  - `createProfileViaRoute` post-create READ → robust: try membership(v2) first, fall back to profiles(legacy). [fixes 208 — route wrote v2]
+  - `seedDirectChildProfileForTest` / `seedFamilyLinkForTest` / `setProfileConsentStatusForTest`: drop `if(isIdentityV2Enabled())` gate → seed v2 UNCONDITIONALLY alongside legacy.
+  - `setSubscriptionTierForProfile`: also upsert v2 `subscription` (organizationId, plan_tier, status, payer_person_id) + robust accountId resolve.
+- `apps/api/src/test-utils/legacy-identity-anchors.ts` `ensureV2IdentityForLegacyProfileTest`: add v2 `subscription` insert (planTier 'free'/given, status, payerPersonId=owner personId).
+- GUARD (orchestrator ic-266): keep legacy↔v2 seeds CONSISTENT (same id mapping person.id==profile.id, org.id==account.id; matching field values) — avoid trading not-found for value-mismatch.
+
+**VERIFICATION:** no docker; stg DATABASE_URL available but shared/risky. Plan: throwaway (867+1145) combined branch, run flag-OFF representative suites (streaks/language-progress/account-security/family-bridge-gdpr) against stg → 208-signature clears. CI is authoritative gate.
+
+git: WI-1145 worktree branch=WI-1145 @origin/main tip. WI-867 parked 5edfd9176. Last in=ic-orch-266, last out=prg06ic-337.
