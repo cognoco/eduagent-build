@@ -79,6 +79,10 @@ ENVIRONMENT = "development"
 #   STRIPE_PRICE_PRO_YEARLY         Stripe Price ID for Pro yearly
 #   STRIPE_CUSTOMER_PORTAL_URL      Stripe Customer Portal URL
 #
+# --- Payments (RevenueCat) ---
+#   REVENUECAT_WEBHOOK_SECRET RevenueCat webhook authentication secret
+#   REVENUECAT_REST_API_KEY   RevenueCat REST API key for GDPR store teardown
+#
 # --- Email (Resend) ---
 #   RESEND_API_KEY            Resend transactional email API key
 #   RESEND_WEBHOOK_SECRET     Resend webhook signing secret
