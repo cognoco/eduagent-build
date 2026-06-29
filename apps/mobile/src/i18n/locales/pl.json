@@ -1323,6 +1323,8 @@
       "modeSurprise": "Dyktando-niespodzianka",
       "scoreLabel": "{{correct}} z {{total}} poprawnie",
       "sentenceCountLabel_one": "{{count}} zdanie",
+      "sentenceCountLabel_few": "{{count}} zdania",
+      "sentenceCountLabel_many": "{{count}} zdań",
       "sentenceCountLabel_other": "{{count}} zdań",
       "sentencesHeading": "Przećwiczone zdania",
       "noSentences": "Tekst tego dyktanda nie został zapisany."
