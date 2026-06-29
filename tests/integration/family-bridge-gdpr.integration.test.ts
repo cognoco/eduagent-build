@@ -6,11 +6,13 @@ import {
   curriculumBooks,
   curriculumTopics,
   familyLinks,
+  guardianship,
   profiles,
   subjects,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { cloneTopicFromChild } from '../../apps/api/src/services/family-bridge';
 
 const EMAIL = 'family-bridge-gdpr@integration.test';
@@ -49,6 +51,34 @@ async function seedFamilyBridgeTopic() {
   await db.insert(familyLinks).values({
     parentProfileId: adult.id,
     childProfileId: child.id,
+  });
+
+  // [WI-1145] Seed the v2 identity graph + guardianship edge unconditionally —
+  // cloneTopicFromChild's active-edge guard reads `guardianship` (throwing
+  // ForbiddenError on no edge) regardless of the carved flag, so the legacy-only
+  // seed fails on the post-collapse flag-off main lane. Same ids as legacy
+  // (person.id == profile.id, organization.id == account.id).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account.id,
+    profileId: adult.id,
+    displayName: 'Parent',
+    birthYear: 1985,
+    clerkUserId: CLERK_USER_ID,
+    email: EMAIL,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account.id,
+    profileId: child.id,
+    displayName: 'Ada',
+    birthYear: 2013,
+    clerkUserId: `${CLERK_USER_ID}-child`,
+    email: `child-${EMAIL}`,
+    isOwner: false,
+  });
+  await db.insert(guardianship).values({
+    guardianPersonId: adult.id,
+    chargePersonId: child.id,
   });
 
   const [subject] = await db
