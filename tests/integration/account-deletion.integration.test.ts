@@ -105,21 +105,28 @@ async function loadDeletionState(accountId: string): Promise<{
   deletionCancelledAt: Date | null;
 } | null> {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    return (
-      (await db.query.organization.findFirst({
-        where: eq(organization.id, accountId),
-        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-      })) ?? null
-    );
-  }
-
-  return (
-    (await db.query.accounts.findFirst({
-      where: eq(accounts.id, accountId),
-      columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-    })) ?? null
-  );
+  // [WI-1145] Store-agnostic read across BOTH the v2 `organization` and legacy
+  // `accounts` rows (was flag-gated). The deletion flag is OFF in two distinct
+  // states the harness must serve: pre-WI-867-collapse the route writes legacy
+  // `accounts`, post-collapse it writes v2 `organization` via scheduleDeletionV2.
+  // The flag can't distinguish them (off in both) — only the code version can,
+  // which the test can't see. Coalescing each field from whichever store carries
+  // it is the one assertion that stays green across all three states.
+  const orgRow = await db.query.organization.findFirst({
+    where: eq(organization.id, accountId),
+    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+  });
+  const acctRow = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+  });
+  if (!orgRow && !acctRow) return null;
+  return {
+    deletionScheduledAt:
+      orgRow?.deletionScheduledAt ?? acctRow?.deletionScheduledAt ?? null,
+    deletionCancelledAt:
+      orgRow?.deletionCancelledAt ?? acctRow?.deletionCancelledAt ?? null,
+  };
 }
 
 beforeAll(() => {

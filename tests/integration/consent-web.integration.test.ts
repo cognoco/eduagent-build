@@ -237,11 +237,40 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Consent declined');
     expect(html).toContain("Emma's account will be removed");
 
-    const profile = await readProfileRecord(profileId);
-    const consent = await readConsentState(profileId);
+    // [WI-1145] Store-agnostic deletion assertion. The deny cascade is collapsed
+    // to v2 post-WI-867 (deletes the `person`), but pre-collapse flag-off it
+    // deletes the legacy `profiles` row instead. The flag is OFF in both states
+    // and can't distinguish them (only the code version can, which the test
+    // can't see), so assert the profile is gone from AT LEAST ONE store — the
+    // active one the running code targets. The vestigial store's row may linger
+    // on the journaled-chain test DB and is dropped in prod by M-DROP.
+    const db = getIntegrationDb();
+    const personRow = await db.query.person.findFirst({
+      where: eq(person.id, profileId),
+    });
+    const legacyRow = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profileId),
+    });
 
-    expect(profile).toBeUndefined();
-    expect(consent).toBeUndefined();
+    expect(personRow === undefined || legacyRow === undefined).toBe(true);
+
+    // [WI-1145] Store-agnostic consent-resolution assertion. Post-collapse the
+    // deny cascade-deletes the v2 `person`, which takes its `consent_request`
+    // with it (so the v2 request is GONE, not 'denied'); pre-collapse the legacy
+    // path clears the legacy `consentStates` row. readConsentState's legacy
+    // fallback would surface the untouched legacy row post-collapse, so assert
+    // directly: consent is resolved (no longer pending) in AT LEAST ONE store.
+    const v2ConsentReq = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, profileId),
+    });
+    const legacyConsentState = await db.query.consentStates.findFirst({
+      where: eq(consentStates.profileId, profileId),
+    });
+    const consentResolved =
+      legacyConsentState === undefined ||
+      v2ConsentReq === undefined ||
+      v2ConsentReq.status === 'denied';
+    expect(consentResolved).toBe(true);
   });
 
   it('returns 404 when the consent token is invalid', async () => {

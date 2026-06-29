@@ -19,6 +19,7 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
+  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import {
@@ -93,38 +94,42 @@ async function createFamilyLink(
 
 async function readConversationLanguage(profileId: string): Promise<string> {
   const db = createIntegrationDb();
-  // [WI-1145] v2-first: the PATCH /onboarding/language route writes
-  // person.conversation_language unconditionally post-WI-867 collapse; fall back to
-  // legacy profiles for the pre-collapse flag-off path.
-  const [v2] = await db
-    .select({ conversationLanguage: person.conversationLanguage })
-    .from(person)
-    .where(eq(person.id, profileId));
-  if (v2) return v2.conversationLanguage;
+  // [WI-1145] The PATCH /onboarding/language route is flag-honoring (dispatches to
+  // the v2 `person` writer on flag-on, the legacy `profiles` writer on flag-off —
+  // onboarding.ts), and the create route dual-writes both stores, so read the store
+  // the PATCH actually wrote: v2 `person` on flag-on, legacy `profiles` on flag-off.
+  if (isIdentityV2Enabled()) {
+    const [profile] = await db
+      .select({ conversationLanguage: person.conversationLanguage })
+      .from(person)
+      .where(eq(person.id, profileId));
+    return profile!.conversationLanguage;
+  }
 
-  const [legacy] = await db
+  const [profile] = await db
     .select({ conversationLanguage: profiles.conversationLanguage })
     .from(profiles)
     .where(eq(profiles.id, profileId));
-  return legacy!.conversationLanguage;
+  return profile!.conversationLanguage;
 }
 
 async function readPronouns(profileId: string): Promise<string | null> {
   const db = createIntegrationDb();
-  // [WI-1145] v2-first: the PATCH /onboarding/pronouns route writes person.pronouns
-  // unconditionally post-WI-867 collapse; fall back to legacy profiles for the
-  // pre-collapse flag-off path.
-  const [v2] = await db
-    .select({ pronouns: person.pronouns })
-    .from(person)
-    .where(eq(person.id, profileId));
-  if (v2) return v2.pronouns;
+  // [WI-1145] Flag-honoring read mirror of the PATCH /onboarding/pronouns writer
+  // (v2 `person` on flag-on, legacy `profiles` on flag-off — onboarding.ts).
+  if (isIdentityV2Enabled()) {
+    const [profile] = await db
+      .select({ pronouns: person.pronouns })
+      .from(person)
+      .where(eq(person.id, profileId));
+    return profile!.pronouns;
+  }
 
-  const [legacy] = await db
+  const [profile] = await db
     .select({ pronouns: profiles.pronouns })
     .from(profiles)
     .where(eq(profiles.id, profileId));
-  return legacy!.pronouns;
+  return profile!.pronouns;
 }
 
 beforeEach(async () => {
