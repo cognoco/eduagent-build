@@ -3990,7 +3990,9 @@
       "authorMentor": "Vom Tutor gespeichert",
       "addNote": "Notiz hinzufügen",
       "micLabel": "Notiz per Sprache hinzufügen",
-      "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
+      "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest.",
+      "saveErrorTitle": "Konnte Notiz nicht speichern",
+      "emptyTopic": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest."
     },
     "sheet": {
       "close": "Schließen",

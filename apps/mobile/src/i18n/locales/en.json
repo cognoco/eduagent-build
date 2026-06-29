@@ -3109,7 +3109,9 @@
       "authorMentor": "Saved from mentor",
       "addNote": "Add a note",
       "micLabel": "Add a note by voice",
-      "empty": "No notes yet. Capture a thought about this subject."
+      "empty": "No notes yet. Capture a thought about this subject.",
+      "emptyTopic": "No notes yet. Capture a thought about this topic.",
+      "saveErrorTitle": "Could not save note"
     },
     "sheet": {
       "close": "Close",

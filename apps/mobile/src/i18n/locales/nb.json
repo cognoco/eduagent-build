@@ -3990,7 +3990,9 @@
       "authorMentor": "Lagret fra veileder",
       "addNote": "Legg til et notat",
       "micLabel": "Legg til et notat med stemmen",
-      "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget."
+      "empty": "Ingen notater ennå. Skriv ned en tanke om dette faget.",
+      "saveErrorTitle": "Kunne ikke lagre notat",
+      "emptyTopic": "Ingen notater ennå. Skriv ned en tanke om dette emnet."
     },
     "sheet": {
       "close": "Lukk",
