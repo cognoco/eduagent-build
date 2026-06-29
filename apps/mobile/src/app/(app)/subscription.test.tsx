@@ -25,6 +25,10 @@ const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 
+// Captures the useFocusEffect callback so tests can simulate screen focus.
+// Must be declared before jest.mock factory so the factory closure captures it.
+let capturedFocusEffect: (() => void) | null = null;
+
 // Resolves t('common.ok') → 'OK' (from en.json) so existing assertions on the
 // rendered button label keep matching after the alert sweep.
 jest.mock(
@@ -41,6 +45,9 @@ jest.mock(
       replace: mockReplace,
       canGoBack: jest.fn(() => true),
     }),
+    useFocusEffect: (cb: () => void) => {
+      capturedFocusEffect = cb;
+    },
   }),
 );
 
@@ -403,6 +410,7 @@ const SubscriptionScreen = require('./subscription').default;
 describe('SubscriptionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedFocusEffect = null;
     // Reset RevenueCat hook state
     mockOfferings = null;
     mockOfferingsLoading = false;
@@ -2419,6 +2427,88 @@ describe('SubscriptionScreen', () => {
           screen.queryByTestId(`remove-family-member-${v1ChildProfileId}`),
         ).toBeNull();
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // WI-1065: purchase-cancellation ref reset on screen focus
+  //
+  // Scenario: user taps "Check later" during restore polling → sets
+  // restoreCancelledRef.current=true. The poll loop is still running.
+  // When the screen regains focus, useFocusEffect resets the ref to false.
+  // When the poll loop subsequently completes it checks the ref and fires the
+  // success alert (instead of silently suppressing it).
+  //
+  // Red path (without fix): capturedFocusEffect is null, the ref stays true,
+  // the poll completes but the alert is suppressed.
+  // Green path (with fix): capturedFocusEffect resets the ref, alert fires.
+  // -------------------------------------------------------------------------
+
+  describe('WI-1065: purchase-cancellation ref resets on screen focus', () => {
+    it('resets restoreCancelledRef on focus so the still-running poll fires the success alert', async () => {
+      jest.useFakeTimers();
+      mockOfferings = makeMockOfferings([makeMockPackage()]);
+      mockMutateAsyncRestore.mockResolvedValue(undefined);
+      // Poll will confirm on first probe (tier = plus).
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: makeSubscription({ tier: 'plus' }),
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      // Wait for initial render to settle.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Start restore — mutateAsync resolves, poll loop begins.
+      fireEvent.press(screen.getByTestId('restore-purchases-button'));
+
+      // Let mutateAsync resolution propagate.
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Poll spinner visible; press "Check later" BEFORE advancing timers so the
+      // poll loop is still blocked in its first sleep interval.
+      // This sets restoreCancelledRef.current = true.
+      await waitFor(() => {
+        screen.getByTestId('restore-polling-cancel');
+      });
+      fireEvent.press(screen.getByTestId('restore-polling-cancel'));
+
+      // Clear the "Check later" alert to count only the subsequent restore alert.
+      jest.spyOn(Alert, 'alert').mockClear();
+
+      // Simulate screen regaining focus — fires useFocusEffect, resets ref.
+      act(() => {
+        capturedFocusEffect?.();
+      });
+
+      // Advance past the poll interval — the still-running loop resolves.
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      // With fix: ref was reset on focus → success alert fires.
+      // Without fix: ref is still true → alert suppressed → test fails here.
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          'Restored',
+          'Your subscription has been restored.',
+          undefined,
+          undefined,
+        );
+      });
+
+      jest.useRealTimers();
     });
   });
 });
