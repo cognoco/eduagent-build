@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (accountId from event; all deletion DB ops scoped to that account)
 import { inngest } from '../client';
 import {
   getStepDatabase,

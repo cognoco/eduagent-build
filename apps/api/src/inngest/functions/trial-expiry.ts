@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (cron; scans all accounts for trial expiry across all profiles)
 // ---------------------------------------------------------------------------
 // Trial Expiry Check — Sprint 9 Phase 2 / Story 5.2
 // Daily cron: expire trials → extended soft landing → free tier, send warnings.

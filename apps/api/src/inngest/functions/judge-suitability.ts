@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (createScopedRepository(db, profileId); sessionEvents scoped by profileId)
 // ---------------------------------------------------------------------------
 // Post-display suitability judge (MMT-ADR-0016 §2/§7 phase 4).
 //

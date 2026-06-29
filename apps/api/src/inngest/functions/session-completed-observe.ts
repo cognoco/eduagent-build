@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Session-Completed Observability — observable terminus for three events
 // emitted by session-completed.ts (and summary-regenerate.ts for the
