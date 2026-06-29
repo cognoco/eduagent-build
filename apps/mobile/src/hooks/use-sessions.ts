@@ -19,6 +19,8 @@ import type {
   SessionMetadata,
   SessionAnalyticsEventInput,
   SessionSummary,
+  SkipSummaryResponse,
+  SummaryStatus,
   TranscriptResponse,
   SessionType,
   RecallBridgeResult,
@@ -27,11 +29,22 @@ import type {
   ChallengeRoundSessionState,
 } from '@eduagent/schemas';
 import {
+  homeworkSessionMetadataSchema,
+  learningSessionSchema,
+  parkingLotAddResponseSchema,
+  parkingLotItemSchema,
+  recallBridgeResultSchema,
+  sessionSummarySchema,
+  skipSummaryResponseSchema,
+} from '@eduagent/schemas';
+import { z } from 'zod';
+import {
   useApiClient,
   getProxyMode,
   withIdempotencyKey,
   type IdempotencyReplayBody,
 } from '../lib/api-client';
+import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { useAppContext } from '../lib/app-context';
 import { FEATURE_FLAGS } from '../lib/feature-flags';
@@ -180,21 +193,62 @@ interface SubmitSummaryResult {
     sessionId: string;
     content: string;
     aiFeedback: string | null;
-    status: 'accepted' | 'submitted';
-    baseXp: number | null;
-    reflectionBonusXp: number | null;
+    status: SummaryStatus;
+    baseXp?: number | null;
+    reflectionBonusXp?: number | null;
   };
 }
 
-interface SkipSummaryResult {
-  summary: {
-    id: string;
-    sessionId: string;
-    content: string;
-    aiFeedback: string | null;
-    status: 'skipped' | 'submitted' | 'accepted';
-  };
-}
+// ---------------------------------------------------------------------------
+// Inline boundary-validation schemas for response types not yet in
+// @eduagent/schemas. NOT exported as types (which would duplicate the local
+// interface definitions above). Used only by parseJson calls below.
+// [WI-1059]
+// ---------------------------------------------------------------------------
+
+const sessionStartResultSchema = z.object({ session: learningSessionSchema });
+
+// MessageResult has no canonical schema in @eduagent/schemas.
+const messageResultSchema = z.object({
+  response: z.string(),
+  escalationRung: z.number(),
+  isUnderstandingCheck: z.boolean(),
+  exchangeCount: z.number(),
+  expectedResponseMinutes: z.number(),
+  aiEventId: z.string().optional(),
+});
+
+// CloseResult has no canonical schema in @eduagent/schemas.
+const closeResultSchema = z.object({
+  message: z.string(),
+  sessionId: z.string(),
+  wallClockSeconds: z.number(),
+  summaryStatus: z
+    .enum(['pending', 'submitted', 'accepted', 'skipped', 'auto_closed'])
+    .optional(),
+});
+
+const homeworkStateSyncResponseSchema = z.object({
+  metadata: homeworkSessionMetadataSchema,
+});
+
+const sessionSummaryGetResponseSchema = z.object({
+  summary: sessionSummarySchema.nullable(),
+});
+
+// SubmitSummaryResult uses a pick of sessionSummarySchema — compose from the
+// canonical schema rather than reinventing the shape.
+const submitSummaryResultSchema = z.object({
+  summary: sessionSummarySchema.pick({
+    id: true,
+    sessionId: true,
+    content: true,
+    aiFeedback: true,
+    status: true,
+    baseXp: true,
+    reflectionBonusXp: true,
+  }),
+});
 
 export function useStartSession(subjectId: string): UseMutationResult<
   SessionStartResult,
@@ -227,7 +281,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as SessionStartResult;
+      return parseJson(res, sessionStartResultSchema, 'POST /subjects/:subjectId/sessions');
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -266,7 +320,7 @@ export function useStartFirstCurriculumSession(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as SessionStartResult;
+      return parseJson(res, sessionStartResultSchema, 'POST /subjects/:subjectId/sessions/first-curriculum');
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -288,7 +342,7 @@ export function useSetSessionInputMode(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as SessionStartResult;
+      return parseJson(res, sessionStartResultSchema, 'POST /sessions/:sessionId/input-mode');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -323,7 +377,7 @@ export function useClearContinuationDepth(
         param: { sessionId },
       });
       await assertOk(res);
-      return (await res.json()) as SessionStartResult;
+      return parseJson(res, sessionStartResultSchema, 'PATCH /sessions/:sessionId/clear-continuation-depth');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -352,7 +406,7 @@ export function useSyncHomeworkState(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { metadata: HomeworkSessionMetadata };
+      return parseJson(res, homeworkStateSyncResponseSchema, 'POST /sessions/:sessionId/homework-state');
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -372,7 +426,7 @@ export function useSendMessage(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as MessageResult;
+      return parseJson(res, messageResultSchema, 'POST /sessions/:sessionId/messages');
     },
   });
 }
@@ -401,7 +455,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
         json: input as Record<string, unknown>,
       });
       await assertOk(res);
-      return (await res.json()) as unknown as CloseResult;
+      return parseJson(res, closeResultSchema, 'POST /sessions/:sessionId/close');
     },
     onSuccess: () => {
       invalidateSessionDerivedQueries(queryClient);
@@ -630,8 +684,7 @@ export function useSessionTranscript(
           { init: { signal } },
         );
         await assertOk(res);
-        const raw = await res.json();
-        return transcriptResponseSchema.parse(raw);
+        return parseJson(res, transcriptResponseSchema, 'GET /sessions/:sessionId/transcript');
       } finally {
         cleanup();
       }
@@ -663,7 +716,7 @@ export function useSession(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { session: LearningSession };
+        const data = await parseJson(res, sessionStartResultSchema, 'GET /sessions/:sessionId');
         return data.session;
       } finally {
         cleanup();
@@ -694,7 +747,7 @@ export function useRecordSystemPrompt(
         json: intent,
       });
       await assertOk(res);
-      return (await res.json()) as { ok: boolean };
+      return parseJson(res, z.object({ ok: z.boolean() }), 'POST /sessions/:sessionId/system-prompt');
     },
   });
 }
@@ -711,7 +764,7 @@ export function useRecordSessionEvent(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { ok: boolean };
+      return parseJson(res, z.object({ ok: z.boolean() }), 'POST /sessions/:sessionId/events');
     },
   });
 }
@@ -728,7 +781,7 @@ export function useFlagSessionContent(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { message: string };
+      return parseJson(res, z.object({ message: z.string() }), 'POST /sessions/:sessionId/flag');
     },
   });
 }
@@ -749,7 +802,7 @@ export function useParkingLot(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = (await res.json()) as { items: ParkingLotItem[] };
+        const data = await parseJson(res, z.object({ items: z.array(parkingLotItemSchema) }), 'GET /sessions/:sessionId/parking-lot');
         return data.items;
       } finally {
         cleanup();
@@ -780,7 +833,7 @@ export function useTopicParkingLot(
           'parking-lot'
         ].$get({ param: { subjectId, topicId } }, { init: { signal } });
         await assertOk(res);
-        const data = (await res.json()) as { items: ParkingLotItem[] };
+        const data = await parseJson(res, z.object({ items: z.array(parkingLotItemSchema) }), 'GET /subjects/:subjectId/topics/:topicId/parking-lot');
         return data.items;
       } finally {
         cleanup();
@@ -804,7 +857,7 @@ export function useAddParkingLotItem(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as { item: ParkingLotItem };
+      return parseJson(res, parkingLotAddResponseSchema, 'POST /sessions/:sessionId/parking-lot');
     },
     onSuccess: () => {
       // [BUG-165] Scope invalidation to the active profile so a mutation on
@@ -838,7 +891,7 @@ export function useSessionSummary(
           { init: { signal } },
         );
         await assertOk(res);
-        const data = await res.json();
+        const data = await parseJson(res, sessionSummaryGetResponseSchema, 'GET /sessions/:sessionId/summary');
         return data.summary;
       } finally {
         cleanup();
@@ -865,7 +918,7 @@ export function useSubmitSummary(
         json: input,
       });
       await assertOk(res);
-      return (await res.json()) as SubmitSummaryResult;
+      return parseJson(res, submitSummaryResultSchema, 'POST /sessions/:sessionId/summary');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -882,7 +935,7 @@ export function useSubmitSummary(
 
 export function useSkipSummary(
   sessionId: string,
-): UseMutationResult<SkipSummaryResult, Error, void> {
+): UseMutationResult<SkipSummaryResponse, Error, void> {
   const client = useApiClient();
   const queryClient = useQueryClient();
   const { profileId } = useSessionNavigationScope();
@@ -893,7 +946,7 @@ export function useSkipSummary(
         param: { sessionId },
       });
       await assertOk(res);
-      return (await res.json()) as SkipSummaryResult;
+      return parseJson(res, skipSummaryResponseSchema, 'POST /sessions/:sessionId/summary/skip');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -919,7 +972,7 @@ export function useRecallBridge(
         param: { sessionId },
       });
       await assertOk(res);
-      return (await res.json()) as RecallBridgeResult;
+      return parseJson(res, recallBridgeResultSchema, 'POST /sessions/:sessionId/recall-bridge');
     },
   });
 }

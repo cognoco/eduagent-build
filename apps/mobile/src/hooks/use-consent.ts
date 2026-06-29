@@ -11,10 +11,17 @@ import type {
   ConsentRequestResult,
   ConsentStatus,
 } from '@eduagent/schemas';
+import {
+  consentRequestResultSchema,
+  myConsentStatusSchema,
+  childConsentStatusSchema,
+  consentActionResultSchema,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 
 export function useRequestConsent(): UseMutationResult<
   ConsentRequestResult,
@@ -30,7 +37,7 @@ export function useRequestConsent(): UseMutationResult<
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as ConsentRequestResult;
+      return parseJson(res, consentRequestResultSchema, 'POST /consent/request');
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -65,7 +72,7 @@ export function useResendConsent(): UseMutationResult<
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.resend.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as ConsentRequestResult;
+      return parseJson(res, consentRequestResultSchema, 'POST /consent/resend');
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -106,7 +113,7 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as ConsentStatusData;
+        return parseJson(res, myConsentStatusSchema, 'GET /consent/my-status');
       } finally {
         cleanup();
       }
@@ -174,7 +181,7 @@ export function useChildConsentStatus(
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as ChildConsentData;
+        return parseJson(res, childConsentStatusSchema, 'GET /consent/:childProfileId/status');
       } finally {
         cleanup();
       }
@@ -207,7 +214,7 @@ export function useRevokeConsent(
         param: { childProfileId },
       });
       await assertOk(res);
-      return (await res.json()) as RevokeConsentResult;
+      return parseJson(res, consentActionResultSchema, 'PUT /consent/:childProfileId/revoke');
     },
     onSuccess: async () => {
       // Consent changes affect all child-related data

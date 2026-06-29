@@ -349,6 +349,28 @@ export function classifyOrphanError(
 }
 
 /**
+ * [WI-1059 / UX Resilience Rules] Thrown at the mobile API client boundary
+ * when `parseJson` receives a response whose body does not match the expected
+ * zod schema. Distinct from `SchemaDriftError` (server-side DB row fault) and
+ * from `UpstreamError` (HTTP 5xx status). Carries the zod issue list so
+ * callers can log structured debug context without string-matching.
+ *
+ * Screens must never `instanceof ApiResponseShapeError` to branch display
+ * logic — this is a developer/infra signal, not a user-actionable condition.
+ */
+export class ApiResponseShapeError extends Error {
+  readonly errorCode = 'API_RESPONSE_SHAPE_ERROR' as const;
+  readonly schemaIssues: unknown;
+
+  constructor(context: string, schemaIssues: unknown) {
+    super(`API response did not match expected schema: ${context}`);
+    this.name = 'ApiResponseShapeError';
+    this.schemaIssues = schemaIssues;
+    Object.setPrototypeOf(this, ApiResponseShapeError.prototype);
+  }
+}
+
+/**
  * [SC-06 / UX Resilience Rules] Client-transport error classes.
  *
  * These represent failure modes that occur BEFORE or OUTSIDE an HTTP response:
@@ -439,6 +461,8 @@ export const ERROR_CODES = {
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
   // [SC-06] Client-transport error: fetch rejected before any HTTP response.
   NETWORK_ERROR: 'NETWORK_ERROR',
+  // [WI-1059] Client boundary: API response body did not match expected schema.
+  API_RESPONSE_SHAPE_ERROR: 'API_RESPONSE_SHAPE_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
