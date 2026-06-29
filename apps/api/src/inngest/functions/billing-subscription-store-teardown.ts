@@ -1,4 +1,4 @@
-// @inngest-admin: event-profile (accountId from event; cancels Stripe/RevenueCat subscriptions scoped to that account)
+// @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
