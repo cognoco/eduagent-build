@@ -23,6 +23,7 @@ import {
   streaks,
   subjects,
   subscriptions,
+  subscription as subscriptionV2,
   teachingPreferences,
   topicNotes,
   vocabulary,
@@ -33,7 +34,7 @@ import {
   buildAuthHeaders as buildSignedAuthHeaders,
   type TestJWTClaims,
 } from './test-keys';
-import { createIntegrationDb, isIdentityV2Enabled } from './helpers';
+import { createIntegrationDb } from './helpers';
 
 const TEST_CONSENT_PURPOSE = 'platform_use';
 
@@ -147,21 +148,19 @@ export async function createProfileViaRoute(input: {
   // never re-introducing accountId into the wire response.
   const db = createIntegrationDb();
 
-  // [WI-586] Flag-ON the create route builds only the v2 identity graph
-  // (organization/person/login/membership) — NO legacy `profiles`/`accounts`
-  // row exists, and the close-gate DB has those tables dropped. The legacy
-  // accountId is `organization.id` by the reseed (identity-resolve.ts), so
-  // resolve it via membership for the created person (person.id == profile.id).
-  if (isIdentityV2Enabled()) {
-    const membershipRow = await db.query.membership.findFirst({
-      where: eq(membership.personId, apiProfile.id),
-      columns: { organizationId: true },
-    });
-    if (!membershipRow) {
-      throw new Error(
-        `createProfileViaRoute: membership for person ${apiProfile.id} not found in DB after create`,
-      );
-    }
+  // [WI-1145] Resolve accountId robustly across the flag/collapse transition.
+  // The create route is v2-unconditional post-WI-867-collapse (always builds the
+  // identity graph: organization/person/login/membership, account_id ==
+  // organization.id by the reseed); pre-collapse flag-off it writes only legacy
+  // `profiles`/`accounts`. Read the v2 store first (membership for the created
+  // person — person.id == profile.id), then fall back to legacy `profiles`, so
+  // this fixture resolves the created owner regardless of which store the
+  // product wrote — and stays correct after 867 rebases on top of this change.
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, apiProfile.id),
+    columns: { organizationId: true },
+  });
+  if (membershipRow) {
     return { ...apiProfile, accountId: membershipRow.organizationId };
   }
 
@@ -171,7 +170,7 @@ export async function createProfileViaRoute(input: {
   });
   if (!row) {
     throw new Error(
-      `createProfileViaRoute: profile ${apiProfile.id} not found in DB after create`,
+      `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) or legacy (profiles) store after create`,
     );
   }
   return { ...apiProfile, accountId: row.accountId };
@@ -201,26 +200,30 @@ export async function seedDirectChildProfileForTest(input: {
     })
     .onConflictDoNothing();
 
-  if (isIdentityV2Enabled()) {
-    await db
-      .insert(person)
-      .values({
-        id: childId,
-        displayName: input.displayName,
-        birthDate: `${input.birthYear}-01-01`,
-        residenceJurisdiction: location,
-      })
-      .onConflictDoNothing();
+  // [WI-1145] Dual-seed the v2 graph UNCONDITIONALLY alongside legacy. The
+  // product reads v2 unconditionally post-WI-867-collapse, and the flag-on lane
+  // reads v2 pre-collapse, so a flag-gated v2 seed leaves the v2 store empty on
+  // the post-collapse main lane → not-found. Keep the legacy and v2 rows
+  // consistent for the same logical child (same id, displayName, birthDate,
+  // residence) so a reader of either store resolves the same entity.
+  await db
+    .insert(person)
+    .values({
+      id: childId,
+      displayName: input.displayName,
+      birthDate: `${input.birthYear}-01-01`,
+      residenceJurisdiction: location,
+    })
+    .onConflictDoNothing();
 
-    await db
-      .insert(membership)
-      .values({
-        personId: childId,
-        organizationId: input.accountId,
-        roles: ['learner'],
-      })
-      .onConflictDoNothing();
-  }
+  await db
+    .insert(membership)
+    .values({
+      personId: childId,
+      organizationId: input.accountId,
+      roles: ['learner'],
+    })
+    .onConflictDoNothing();
 
   return { id: childId, accountId: input.accountId, isOwner: false };
 }
@@ -238,15 +241,16 @@ export async function seedFamilyLinkForTest(input: {
     })
     .onConflictDoNothing();
 
-  if (isIdentityV2Enabled()) {
-    await db
-      .insert(guardianship)
-      .values({
-        guardianPersonId: input.parentProfileId,
-        chargePersonId: input.childProfileId,
-      })
-      .onConflictDoNothing();
-  }
+  // [WI-1145] Dual-seed the v2 guardianship edge unconditionally — the product's
+  // validateGuardianshipEdgeV2 reads it on the post-collapse main lane (flag-off),
+  // where a flag-gated seed would leave it empty → ForbiddenError.
+  await db
+    .insert(guardianship)
+    .values({
+      guardianPersonId: input.parentProfileId,
+      chargePersonId: input.childProfileId,
+    })
+    .onConflictDoNothing();
 }
 
 export async function setProfileConsentStatusForTest(input: {
@@ -277,8 +281,10 @@ export async function setProfileConsentStatusForTest(input: {
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
-  if (!isIdentityV2Enabled()) return;
-
+  // [WI-1145] Seed the v2 consent rows unconditionally alongside legacy
+  // consentStates — the product resolves consent via consent_request/grant on
+  // the post-collapse main lane (flag-off), so a flag-gated seed leaves the v2
+  // consent state empty and consent-dependent reads diverge from the legacy row.
   const basis = consentTypeToBasis(consentType);
   await db
     .delete(consentRequest)
@@ -349,47 +355,45 @@ export async function setSubscriptionTierForProfile(
 ): Promise<void> {
   const db = createIntegrationDb();
 
-  // [WI-586 drop-4 reshape] The legacy `subscriptions` table is RETAINED (its
-  // drop + the quota-FK repoint are WI-805). So flag-ON we still update the
-  // legacy `subscriptions` row — but resolve its account_id via membership
-  // (account_id == organization.id by the reseed), since the legacy `profiles`
-  // table that previously carried account_id is dropped in the close-gate DB.
-  if (isIdentityV2Enabled()) {
-    const membershipRow = await db.query.membership.findFirst({
-      where: eq(membership.personId, profileId),
-      columns: { organizationId: true },
-    });
-    if (!membershipRow) {
-      throw new Error(`Membership not found for tier seed: ${profileId}`);
-    }
-    await db
-      .update(subscriptions)
-      .set({
-        tier,
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(subscriptions.accountId, membershipRow.organizationId));
-    return;
-  }
-
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { accountId: true },
-  });
-
-  if (!profile) {
-    throw new Error(`Profile not found for tier seed: ${profileId}`);
+  // [WI-1145] Resolve the org/account robustly (membership first — account_id ==
+  // organization.id by the reseed; then legacy profiles), then update BOTH the
+  // legacy `subscriptions` row and the v2 `subscription` row so the product
+  // resolves the same tier whichever store it reads (the route's
+  // createIdentityGraph seeds both rows with the same id at owner bootstrap).
+  const accountId = await resolveAccountId(db, profileId);
+  if (!accountId) {
+    throw new Error(`Account not found for tier seed: ${profileId}`);
   }
 
   await db
     .update(subscriptions)
-    .set({
-      tier,
-      status,
-      updatedAt: new Date(),
-    })
-    .where(eq(subscriptions.accountId, profile.accountId));
+    .set({ tier, status, updatedAt: new Date() })
+    .where(eq(subscriptions.accountId, accountId));
+
+  await db
+    .update(subscriptionV2)
+    .set({ planTier: tier, status, updatedAt: new Date() })
+    .where(eq(subscriptionV2.organizationId, accountId));
+}
+
+// [WI-1145] Shared account/organization resolver for the seed helpers. The
+// legacy `profiles.account_id` and the v2 `membership.organization_id` are the
+// same id by the reseed invariant; read whichever store is populated (v2 first)
+// so a helper resolves correctly pre- and post-WI-867-collapse.
+async function resolveAccountId(
+  db: Database,
+  profileId: string,
+): Promise<string | undefined> {
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, profileId),
+    columns: { organizationId: true },
+  });
+  if (membershipRow) return membershipRow.organizationId;
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { accountId: true },
+  });
+  return profile?.accountId;
 }
 
 export async function seedSubject(
@@ -584,20 +588,18 @@ export async function seedConsentRequest(input: {
     expiresAt,
   });
 
-  if (!isIdentityV2Enabled()) return;
-
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, input.profileId),
-    columns: { accountId: true },
-  });
-  if (!profile) {
-    throw new Error(`Profile ${input.profileId} not found for consent seed`);
+  // [WI-1145] Seed the v2 consent rows unconditionally; resolve org via the
+  // shared membership-first resolver (legacy `profiles` may be empty for a
+  // route-created person post-collapse).
+  const accountId = await resolveAccountId(db, input.profileId);
+  if (!accountId) {
+    throw new Error(`Account not found for consent seed: ${input.profileId}`);
   }
 
   if (status === 'PENDING' || status === 'PARENTAL_CONSENT_REQUESTED') {
     await db.insert(consentRequest).values({
       chargePersonId: input.profileId,
-      organizationId: profile.accountId,
+      organizationId: accountId,
       purpose: TEST_CONSENT_PURPOSE,
       requestedBasis: consentTypeToBasis(consentType),
       guardianEmail: parentEmail,
@@ -612,7 +614,7 @@ export async function seedConsentRequest(input: {
 
   await setProfileConsentStatusForTest({
     profileId: input.profileId,
-    accountId: profile.accountId,
+    accountId,
     status,
     consentType,
     parentEmail,

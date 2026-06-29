@@ -191,6 +191,29 @@ export async function ensureV2IdentityForLegacyProfileTest(
       roles: (input.isOwner ?? true) ? ['admin', 'learner'] : ['learner'],
     });
   }
+
+  // [WI-1145] Seed a baseline v2 `subscription` for the owner so v2 billing/
+  // metering reads (getSubscriptionByAccountIdV2 / ensureFreeSubscriptionV2)
+  // resolve a row on the post-collapse main lane, and so
+  // setSubscriptionTierForProfile's v2 UPDATE has a row to mutate. Free/active
+  // matches the legacy default; tier-specific tests call
+  // setSubscriptionTierForProfile, which updates BOTH stores in lockstep so
+  // legacy↔v2 stay consistent.
+  if (input.isOwner ?? true) {
+    const [existingSubscription] = await db
+      .select({ id: subscriptionTable.id })
+      .from(subscriptionTable)
+      .where(eq(subscriptionTable.organizationId, input.accountId))
+      .limit(1);
+    if (!existingSubscription) {
+      await db.insert(subscriptionTable).values({
+        organizationId: input.accountId,
+        planTier: 'free',
+        status: 'active',
+        payerPersonId: input.profileId,
+      });
+    }
+  }
 }
 
 export async function deleteV2IdentitiesForTest(
