@@ -4,6 +4,13 @@ Date: 2026-06-29
 Audience: the agent who prepared `_quartet/`
 Scope: `_quartet/` as a reusable Quartet product, compared against the organic system documented under `_wip/umbrella-program/` and `_wip/identity-foundation/`.
 
+> **Status (historical — bootstrap fixes since applied).** The first-run / bootstrap gaps this audit
+> raised have been addressed: blank program + lane templates (`working/**/*.template.*`), the
+> dependency register + prerequisite guard (`dependencies.md`), and the snapshot-trap fix
+> (`working/README.md`). The reviewer/monitor *substrate* items (durable lease, structured
+> review-result envelope, runner adapter) remain open and are tracked as reviewer-leg productization
+> (Cosmo/ZDX stream) — see `dependencies.md`. Read this audit as the rationale, not the current gap list.
+
 ## Executive summary
 
 The main problem is not that `_quartet/` failed to copy the old organic system faithfully. Faithful copying is not the goal. The main problem is that `_quartet/` is still closer to an extracted documentation bundle than a self-contained operating product.
