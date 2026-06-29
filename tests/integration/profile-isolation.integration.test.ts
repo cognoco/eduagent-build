@@ -26,10 +26,10 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
 import { seedCurriculum } from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
+import { resolveAccountId } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
 
@@ -103,25 +103,25 @@ async function seedSubject(
  */
 async function seedFamilySubscription(profileId: string) {
   const db = createIntegrationDb();
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { accountId: true },
-  });
-  if (!profile) throw new Error('Profile not found for subscription seed');
+  // [WI-1145] Resolve the org/account v2-first (membership) then legacy profiles —
+  // the owner is route-created (v2-unconditional post-WI-867 collapse; legacy
+  // profiles empty on the flag-off main lane).
+  const accountId = await resolveAccountId(db, profileId);
+  if (!accountId) throw new Error('Profile not found for subscription seed');
 
   // Account creation auto-provisions a 'plus' trial subscription,
   // so we UPDATE the existing row to 'family' tier instead of inserting.
   await db
     .update(subscriptions)
     .set({ tier: 'family', status: 'active' })
-    .where(eq(subscriptions.accountId, profile.accountId));
+    .where(eq(subscriptions.accountId, accountId));
 
-  if (isIdentityV2Enabled()) {
-    await db
-      .update(subscriptionV2)
-      .set({ planTier: 'family', status: 'active', updatedAt: new Date() })
-      .where(eq(subscriptionV2.organizationId, profile.accountId));
-  }
+  // [WI-1145] Update the v2 subscription unconditionally (dual-store consistency) —
+  // the product reads subscription-v2 unconditionally post-collapse.
+  await db
+    .update(subscriptionV2)
+    .set({ planTier: 'family', status: 'active', updatedAt: new Date() })
+    .where(eq(subscriptionV2.organizationId, accountId));
 }
 
 async function listSubjectsForUser(input: {
