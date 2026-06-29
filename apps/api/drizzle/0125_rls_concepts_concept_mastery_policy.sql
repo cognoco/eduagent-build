@@ -14,18 +14,18 @@
 -- No data is lost — policies are metadata-only. DISABLE ROW LEVEL SECURITY is
 -- NOT included here; RLS was enabled by prior migrations and must remain enabled.
 
-DO $ BEGIN
+DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'concepts' AND policyname = 'concepts_profile_isolation') THEN
     CREATE POLICY "concepts_profile_isolation" ON "concepts"
       USING ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid)
       WITH CHECK ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
   END IF;
-END $;
+END $$;
 
-DO $ BEGIN
+DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'concept_mastery' AND policyname = 'concept_mastery_profile_isolation') THEN
     CREATE POLICY "concept_mastery_profile_isolation" ON "concept_mastery"
       USING ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid)
       WITH CHECK ("profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid);
   END IF;
-END $;
+END $$;
