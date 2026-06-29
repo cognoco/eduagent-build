@@ -761,7 +761,9 @@
         "withNameSubject": "Hola de nuevo, {{name}}. ¿Listo para retomar {{subject}}? Pregúntame lo que quieras. ¿Por dónde seguimos?",
         "withName": "Hola de nuevo, {{name}}. ¿En qué te gustaría trabajar hoy?",
         "generic": "Hola de nuevo. ¿En qué te gustaría trabajar hoy?"
-      }
+      },
+      "voicePermissionAskMessage": "Se necesita acceso al micrófono para la entrada de voz. Permite el acceso para continuar.",
+      "voicePermissionAllow": "Permitir micrófono"
     },
     "filingFailed": {
       "retryInProgress": "Ya hay un reintento en curso.",
