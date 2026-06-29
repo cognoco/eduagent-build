@@ -3,6 +3,8 @@
  * Uses the Web Crypto API exclusively — no Node.js-only APIs.
  */
 
+import { z } from 'zod';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -38,6 +40,55 @@ export interface JWKS {
 }
 
 // ---------------------------------------------------------------------------
+// [WI-481] Trust-boundary schemas for attacker-controlled (JWT) and external
+// (JWKS) bytes.
+//
+// `decodeJWTHeader`/`decodeJWTPayload` previously `JSON.parse(...) as T` the
+// base64url segments of a caller-supplied token, and `fetchJWKS` cast the
+// upstream JWKS body to `JWKS` after only checking that `keys` is an array.
+// These schemas validate the SHAPE at the boundary. Standard claims are kept
+// optional + correctly typed (+ passthrough) so presence-semantics are
+// unchanged — a missing `sub`/`alg` still flows to the existing downstream
+// rejection (auth.ts clerkJWTClaimsSchema / resolveAlg). The new rejections are
+// limited to non-object / wrong-typed values (e.g. a numeric `exp`, a null JWK
+// entry) that would otherwise fail deep in crypto or mis-classify as a 401.
+// JWT/JWKS shapes are api-internal; like auth.ts's clerkJWTClaimsSchema they
+// live here rather than in @eduagent/schemas.
+
+const jwtHeaderSchema = z
+  .object({
+    alg: z.string().optional(),
+    typ: z.string().optional(),
+    kid: z.string().optional(),
+  })
+  .passthrough();
+
+const jwtPayloadSchema = z
+  .object({
+    sub: z.string().optional(),
+    iss: z.string().optional(),
+    aud: z.union([z.string(), z.array(z.string())]).optional(),
+    exp: z.number().optional(),
+    iat: z.number().optional(),
+    nbf: z.number().optional(),
+    email: z.string().optional(),
+  })
+  .passthrough();
+
+const jwkSchema = z
+  .object({
+    kty: z.string().optional(),
+    kid: z.string().optional(),
+    use: z.string().optional(),
+    alg: z.string().optional(),
+    n: z.string().optional(),
+    e: z.string().optional(),
+  })
+  .passthrough();
+
+const jwksSchema = z.object({ keys: z.array(jwkSchema) });
+
+// ---------------------------------------------------------------------------
 // Base64-URL helpers (no Buffer — Workers-safe)
 // ---------------------------------------------------------------------------
 
@@ -66,7 +117,14 @@ export function decodeJWTHeader(token: string): JWTHeader {
   if (!headerB64) {
     throw new Error('Invalid JWT: missing header segment');
   }
-  return JSON.parse(base64UrlDecode(headerB64)) as JWTHeader;
+  // [WI-481] Parse, don't cast: the header bytes are attacker-controlled.
+  const parsed = jwtHeaderSchema.safeParse(
+    JSON.parse(base64UrlDecode(headerB64)),
+  );
+  if (!parsed.success) {
+    throw new Error('Invalid JWT: malformed header');
+  }
+  return parsed.data as JWTHeader;
 }
 
 export function decodeJWTPayload(token: string): JWTPayload {
@@ -78,7 +136,16 @@ export function decodeJWTPayload(token: string): JWTPayload {
   if (!payloadB64) {
     throw new Error('Invalid JWT: missing payload segment');
   }
-  return JSON.parse(base64UrlDecode(payloadB64)) as JWTPayload;
+  // [WI-481] Parse, don't cast: the payload bytes are attacker-controlled. The
+  // schema also type-checks the numeric claims (exp/iat/nbf) that verifyJWT
+  // compares against the clock, closing a type-confusion gap.
+  const parsed = jwtPayloadSchema.safeParse(
+    JSON.parse(base64UrlDecode(payloadB64)),
+  );
+  if (!parsed.success) {
+    throw new Error('Invalid JWT: malformed payload');
+  }
+  return parsed.data as JWTPayload;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,12 +201,12 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
     throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
   }
 
-  const body = (await res.json()) as unknown;
-  if (
-    !body ||
-    typeof body !== 'object' ||
-    !Array.isArray((body as Record<string, unknown>)['keys'])
-  ) {
+  // [WI-481] Parse the upstream JWKS at the trust boundary. The schema also
+  // rejects non-object key entries (a null/string element would previously pass
+  // the shallow `keys`-array check, then TypeError in `.find(k => k.kid)` and
+  // mis-classify as a 401 instead of a 503).
+  const parsed = jwksSchema.safeParse(await res.json());
+  if (!parsed.success) {
     // Error message deliberately contains 'JWKS' so auth.ts classifies this as
     // an infra failure (→ 503 + Retry-After) rather than a token error (→ 401).
     // Do NOT cache an invalid response.
@@ -147,7 +214,7 @@ export async function fetchJWKS(url: string): Promise<JWKS> {
       'JWKS response missing keys array — upstream returned a malformed 200',
     );
   }
-  const jwks = body as JWKS;
+  const jwks = parsed.data as JWKS;
   jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: now });
   return jwks;
 }
@@ -174,17 +241,14 @@ async function fetchJWKSForced(url: string): Promise<JWKS> {
     if (!res.ok) {
       throw new Error(`Failed to fetch JWKS: ${res.status} ${res.statusText}`);
     }
-    const body = (await res.json()) as unknown;
-    if (
-      !body ||
-      typeof body !== 'object' ||
-      !Array.isArray((body as Record<string, unknown>)['keys'])
-    ) {
+    // [WI-481] Parse the upstream JWKS at the trust boundary (see fetchJWKS).
+    const parsed = jwksSchema.safeParse(await res.json());
+    if (!parsed.success) {
       throw new Error(
         'JWKS response missing keys array — upstream returned a malformed 200',
       );
     }
-    const jwks = body as JWKS;
+    const jwks = parsed.data as JWKS;
     jwksCacheByUrl.set(url, { keys: jwks.keys, fetchedAt: Date.now() });
     // Arm the cooldown ONLY on a successful re-fetch: a still-missing kid after
     // a fresh, valid JWKS is genuinely absent, so suppressing further forced

@@ -42,6 +42,7 @@ import { type AgeBracket, type Interest } from './config';
 import { createLogger } from '../logger';
 import { extractFirstJsonObject } from '../llm/extract-json';
 import { buildCapitalsPrompt as _buildCapitalsPrompt } from './quiz-prompts';
+import { calculateAge } from '../age-utils';
 
 // Re-export prompt builders for backward compatibility
 // (eval harness imports buildCapitalsPrompt from this module)
@@ -430,7 +431,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     libraryItems,
   });
   const ageBracket: AgeBracket = computeAgeBracket(birthYear);
-  const ageYears = new Date().getFullYear() - birthYear;
+  const ageYears = calculateAge(birthYear);
 
   // Fetch the learner's profile to source personalization signals (P0.1 + P1.2).
   // Use caller-supplied interests when pre-fetched to avoid an extra round-trip.

@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (personId from event; graduation contracts scoped to that person)
 import {
   personGraduatedEventSchema,
   summarizeRawPayload,

@@ -26,6 +26,7 @@ import {
 import { captureException } from './sentry';
 import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
 import { getPersonBirthYear } from './identity-v2/helpers';
+import { calculateAge } from './age-utils';
 
 // ---------------------------------------------------------------------------
 // silentDegrade — structured escalation for optional priority branches
@@ -55,11 +56,6 @@ const COLD_START_SESSION_THRESHOLD = 5;
 // ---------------------------------------------------------------------------
 // FR165.4: Age-adaptive coaching card copy helpers
 // ---------------------------------------------------------------------------
-
-function getLearnerAge(birthYear: number | null): number | null {
-  if (!birthYear) return null;
-  return new Date().getFullYear() - birthYear;
-}
 
 function reviewDueCopy(
   count: number,
@@ -167,7 +163,7 @@ export async function precomputeCoachingCard(
     silentDegrade(err, 'birthYear_lookup', { profileId });
     // Age lookup is optional — use neutral tone as fallback
   }
-  const learnerAge = getLearnerAge(birthYear);
+  const learnerAge = birthYear ? calculateAge(birthYear) : null;
 
   // Fetch retention cards (scoped to profile)
   const repo = createScopedRepository(db, profileId);

@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging observer; no DB access)
 // ---------------------------------------------------------------------------
 // Payment Failed Observe — observable terminus for the app/payment.failed
 // event emitted by Stripe and RevenueCat webhook handlers when a subscription

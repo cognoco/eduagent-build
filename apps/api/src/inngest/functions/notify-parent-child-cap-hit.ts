@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (childProfileId + subscriptionId from event; cap notification scoped to those)
 import {
   billingProfileQuotaExhaustedEventSchema,
   type BillingProfileQuotaExhaustedEvent,

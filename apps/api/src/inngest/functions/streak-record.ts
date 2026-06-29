@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event; recordSessionActivity scoped by profileId)
 import { NonRetriableError } from 'inngest';
 import { streakRecordEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';

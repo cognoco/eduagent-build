@@ -157,6 +157,11 @@ async function createChildProfile(owner: {
     displayName: 'Snapshot Progress Child',
     birthYear: new Date().getFullYear() - 14,
     kind: 'child',
+    // [WI-1153] Pass the owner's profile id so the route receives X-Profile-Id
+    // (resolvedVia:'explicit-header'); without it the Issue-901 guard
+    // (services/profile.ts assertProfileCreationAllowed) rejects the
+    // auto-resolved owner identity with 403 on a fresh DB.
+    actingProfileId: owner.id,
   });
   expect(profile.isOwner).toBe(false);
   return { id: profile.id };
@@ -576,34 +581,27 @@ describe('Integration: snapshot-progress routes', () => {
   // end-to-end wiring test for that mapping (the service-level suppression is
   // covered in snapshot-aggregation.integration.test.ts).
   // -------------------------------------------------------------------------
-  // QUARANTINE WI-1153 (owner: claude:bug-lane, Executing) — confirmed-flaky, NOT a behavioral regression:
-  // this F-144 proxy-read test passed on main @09:19 (CI run 28361732814) and passes in local isolation; it
-  // fails only in the full CI co-located suite from shared-stg-DB state accumulation. Un-skip tracked in WI-1153.
-  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
-  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
-    '[F-144] proxy read of child milestones does NOT backfill (mutate) the child rows',
-    async () => {
-      const owner = await createOwnerProfile();
-      const { id: childId } = await createChildProfile(owner);
+  it('[F-144] proxy read of child milestones does NOT backfill (mutate) the child rows', async () => {
+    const owner = await createOwnerProfile();
+    const { id: childId } = await createChildProfile(owner);
 
-      // Child is behind on milestones: 5 sessions, zero milestone rows.
-      await seedSnapshotWithSessions(childId, 5);
-      expect(await countMilestones(childId)).toBe(0);
+    // Child is behind on milestones: 5 sessions, zero milestone rows.
+    await seedSnapshotWithSessions(childId, 5);
+    expect(await countMilestones(childId)).toBe(0);
 
-      // Owner proxies into the child via X-Profile-Id (resolves isOwner=false).
-      const res = await app.request(
-        '/v1/progress/milestones',
-        { method: 'GET', headers: await authHeaders(childId) },
-        TEST_ENV,
-      );
+    // Owner proxies into the child via X-Profile-Id (resolves isOwner=false).
+    const res = await app.request(
+      '/v1/progress/milestones',
+      { method: 'GET', headers: await authHeaders(childId) },
+      TEST_ENV,
+    );
 
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as { milestones: unknown[] };
-      expect(Array.isArray(body.milestones)).toBe(true);
-      // The read succeeded but no backfill write fired — child rows untouched.
-      expect(await countMilestones(childId)).toBe(0);
-    },
-  );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { milestones: unknown[] };
+    expect(Array.isArray(body.milestones)).toBe(true);
+    // The read succeeded but no backfill write fired — child rows untouched.
+    expect(await countMilestones(childId)).toBe(0);
+  });
 
   it('[F-144] self (owner) read DOES backfill — suppression is proxy-scoped, not a blanket disable', async () => {
     const { id: ownerId } = await createOwnerProfile();
