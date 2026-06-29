@@ -157,6 +157,10 @@ describe('SubjectHub', () => {
     screen.getByText('subjectHub.notes.heading');
     screen.getByTestId('subject-hub-notes-empty');
     expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+    // The subject-level mount keeps the default subject-context empty copy (the
+    // topic-context override is only passed by TopicDetailSheet).
+    screen.getByText('subjectHub.notes.empty');
+    expect(screen.queryByText('subjectHub.notes.emptyTopic')).toBeNull();
   });
 
   it('opens topic details as sheet state rather than route state', () => {

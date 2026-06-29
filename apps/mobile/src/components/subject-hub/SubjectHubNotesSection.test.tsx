@@ -53,6 +53,22 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByTestId('subject-hub-notes-tabs')).toBeNull();
   });
 
+  it('defaults to the subject-context empty copy, and uses the caller override when given', () => {
+    const { rerender } = render(<SubjectHubNotesSection notes={[]} />);
+    // No override → the default subject-level key.
+    screen.getByText('subjectHub.notes.empty');
+
+    // A caller (the topic-sheet mount) can override the empty copy for its context.
+    rerender(
+      <SubjectHubNotesSection
+        notes={[]}
+        emptyMessage="No notes yet. Capture a thought about this topic."
+      />,
+    );
+    screen.getByText('No notes yet. Capture a thought about this topic.');
+    expect(screen.queryByText('subjectHub.notes.empty')).toBeNull();
+  });
+
   it('disables the empty-state add action until the draft has text', () => {
     const onAddNote = jest.fn();
     render(<SubjectHubNotesSection notes={[]} onAddNote={onAddNote} />);

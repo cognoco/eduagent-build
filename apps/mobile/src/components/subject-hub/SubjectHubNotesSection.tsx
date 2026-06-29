@@ -25,6 +25,10 @@ interface SubjectHubNotesSectionProps {
   canStudy?: boolean;
   onAddNote?: (content: string) => void;
   onNoteVoice?: (request: SubjectHubNotesVoiceRequest) => void;
+  // Empty-state copy, resolved by the caller so it can match the mount context:
+  // the subject-level mount keeps the default ("…about this subject"); the
+  // topic-sheet mount passes the topic-context string ("…about this topic").
+  emptyMessage?: string;
 }
 
 // The add affordance (input + empty-state add button) is shown only when the
@@ -52,6 +56,7 @@ export function SubjectHubNotesSection({
   canStudy = true,
   onAddNote,
   onNoteVoice,
+  emptyMessage,
 }: SubjectHubNotesSectionProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -139,7 +144,7 @@ export function SubjectHubNotesSection({
       {isEmpty ? (
         <View testID="subject-hub-notes-empty" className="mt-4 items-center">
           <Text className="text-center text-body-sm text-text-secondary">
-            {t('subjectHub.notes.empty')}
+            {emptyMessage ?? t('subjectHub.notes.empty')}
           </Text>
           {canAddNote ? (
             <Pressable

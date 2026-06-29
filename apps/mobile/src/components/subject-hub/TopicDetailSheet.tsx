@@ -111,6 +111,7 @@ export function TopicDetailSheet({
             <SubjectHubNotesSection
               notes={notes}
               canStudy={canStudy}
+              emptyMessage={t('subjectHub.notes.emptyTopic')}
               onAddNote={
                 onAddNote
                   ? (content) => onAddNote(topic.topic.id, content)

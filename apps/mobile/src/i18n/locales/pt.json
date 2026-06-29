@@ -3989,7 +3989,8 @@
       "addNote": "Adicionar uma nota",
       "micLabel": "Adicionar nota por voz",
       "empty": "Ainda não há notas. Anote uma ideia sobre esta matéria.",
-      "saveErrorTitle": "Não foi possível salvar a nota"
+      "saveErrorTitle": "Não foi possível salvar a nota",
+      "emptyTopic": "Ainda não há notas. Anote um pensamento sobre este tópico."
     },
     "sheet": {
       "close": "Fechar",

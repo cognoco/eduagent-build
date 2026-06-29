@@ -3989,7 +3989,8 @@
       "addNote": "Añadir una nota",
       "micLabel": "Añadir una nota por voz",
       "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura.",
-      "saveErrorTitle": "No se pudo guardar la nota"
+      "saveErrorTitle": "No se pudo guardar la nota",
+      "emptyTopic": "Aún no hay notas. Escribe algo sobre este tema."
     },
     "sheet": {
       "close": "Cerrar",
