@@ -18,8 +18,11 @@
 //     the named model via OpenRouter instead of production routing. Restore
 //     snapshots afterwards: git checkout -- apps/api/eval-llm/snapshots
 //
-//   doppler run -- pnpm eval:llm -- --live --check-baseline
+//   doppler run -- pnpm eval:llm -- --live --check-baseline --only-envelope-flows
 //     Compare envelope signal metrics against baseline.json; exit 1 on drift.
+//     --only-envelope-flows scopes the run to the emitsEnvelope flow set (the
+//     weekly drift gate in eval-live.yml) so it covers exactly the baselined
+//     flows without a hardcoded, rot-prone flow list (WI-560).
 //   doppler run -- pnpm eval:llm -- --live --update-baseline
 //     Overwrite baseline.json with the current run's metrics (commit after).
 //   pnpm eval:llm -- --validate-baseline

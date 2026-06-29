@@ -42,7 +42,17 @@ jobs:
       github.event_name != 'pull_request' ||
       github.event.label.name == 'run-live-evals'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Sized for the real run, not the old fail-fast one: Tier-2 envelope matrix
+    # (~242 live calls) + mastery-sim (189 calls) + setup ≈ 431 calls total.
+    # The previous 30 only ever held because the budget-starved drift check
+    # failed within the first ~20 calls; with a real budget (WI-560) the job
+    # runs to completion. 120 is an interim cap with headroom for OpenRouter
+    # queue spikes (~30-60s/call) since no full run has been measured yet —
+    # re-tune from the observed P90 of the first workflow_dispatch run.
+    # NOTE: the 300 --max-live-calls budget below assumes the current envelope
+    # scenario counts (Σ baseline n = 242); a large scenario-matrix growth
+    # needs both numbers revisited.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -92,7 +102,7 @@ jobs:
       - name: Tier-2 live evals + signal-drift check
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
-        run: doppler run -- pnpm eval:llm -- --live --check-baseline
+        run: doppler run -- pnpm eval:llm -- --live --check-baseline --only-envelope-flows --max-live-calls 300
 
       # Mastery-SIMULATION gate (over-credit ceiling + drift). Tutor pinned to
       # gpt-oss-120b (MENTOR_MODEL, via OpenRouter) + production judge (the
