@@ -38,7 +38,8 @@ export interface EmailPayload {
     | 'feedback'
     | 'weekly_progress'
     | 'monthly_progress'
-    | 'security_notification';
+    | 'security_notification'
+    | 'account_reclaim';
 }
 
 export interface EmailOptions {
@@ -278,5 +279,21 @@ export function formatSecurityNotificationEmail(
     subject,
     body: `${lead}\n\n${supportLine}`,
     type: 'security_notification',
+  };
+}
+
+export function formatAccountReclaimAttemptEmail(
+  to: string,
+  supportEmail: string,
+): EmailPayload {
+  return {
+    to,
+    subject: 'MentoMate account recovery',
+    body:
+      'Someone tried to sign in to MentoMate using this email address from a ' +
+      'different login identity. We blocked the sign-in to protect your account.\n\n' +
+      `If this was you and you need help recovering access, contact ${supportEmail}. ` +
+      'Support will verify ownership before making any account changes.',
+    type: 'account_reclaim',
   };
 }
