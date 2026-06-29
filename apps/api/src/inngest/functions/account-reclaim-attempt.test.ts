@@ -9,11 +9,11 @@
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
-import { accounts } from '@eduagent/database';
 
 const mockInngestTransport = createInngestTransportCapture();
 jest.mock(
-  '../client' /* gc1-allow: Inngest framework boundary — handler registration surface */,
+  // gc1-allow: Inngest framework boundary — real client cannot register in unit tests
+  '../client',
   () => {
     const actual = jest.requireActual(
       '../client',
@@ -32,7 +32,8 @@ const mockDb = {
 };
 
 jest.mock(
-  '../helpers' /* gc1-allow: Inngest env/db boundary — avoid real DATABASE_URL in unit tests */,
+  // gc1-allow: Inngest helpers boundary — real DATABASE_URL not available in unit tests
+  '../helpers',
   () => {
     const actual = jest.requireActual(
       '../helpers',
@@ -215,6 +216,18 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it('throws to trigger Inngest retry when Resend returns a non-ok response', async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValue(
+        new Response('Internal Server Error', { status: 500 }),
+      );
+
+    await expect(executeHandler(reclaimEvent())).rejects.toThrow(
+      /account-reclaim-attempt send failed/,
+    );
+  });
+
   it('formatter keeps the recovery path manual and fail-closed', () => {
     const payload = formatAccountReclaimAttemptEmail(
       'owner@example.com',
@@ -228,5 +241,3 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
     expect(payload.body).not.toMatch(/click here/i);
   });
 });
-
-void accounts;
