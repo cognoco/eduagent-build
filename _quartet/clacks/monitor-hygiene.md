@@ -24,6 +24,10 @@ monitor:
 The manifest is the source of truth for *intent*; the live `/tasks` list is the source of truth
 for *actuality*. Hygiene = keeping them in agreement.
 
+**Where it lives:** `working/program/monitor-manifest.json` for the orchestrator's program-wide
+watchers; `working/lanes/<lane>/_state/monitor-manifest.json` for a shepherd's lane watchers. One
+manifest per role-instance, beside the working state it tracks.
+
 ## The reconcile ritual
 Run at **session-start**, **post-compaction**, **post-resume**, and **on suspicion** (prolonged
 silence where you'd expect signal). Diff actual (`/tasks`) against the manifest, then:

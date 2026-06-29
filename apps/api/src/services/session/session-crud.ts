@@ -76,6 +76,7 @@ import { routeAndCall, extractFirstJsonObject } from '../llm';
 import type { ChatMessage } from '../llm';
 import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
+import { paginateRows } from '../pagination';
 import { addBreadcrumb, captureException } from '../sentry';
 import type { TimedEvent } from './session-context-builders';
 import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
@@ -2228,12 +2229,11 @@ export async function listProfileSessions(
     limit + 1,
     desc(learningSessions.id),
   );
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const { page, nextCursor } = paginateRows(rows, limit);
 
   return {
     sessions: await hydrateChildSessions(db, profileId, page),
-    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    nextCursor,
   };
 }
 

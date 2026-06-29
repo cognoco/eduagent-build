@@ -254,6 +254,28 @@ describe('check-change-class.sh', () => {
     const flags = runRouter(repo);
     expect(flags.integration).toBe('false');
     expect(flags.eval).toBe('false');
+    expect(flags.docs_only).toBe('false');
+  });
+
+  it('emits docs_only=true for docs and editor metadata changes', () => {
+    mkdirSync(join(repo, 'docs'), { recursive: true });
+    mkdirSync(join(repo, '_wip'), { recursive: true });
+    mkdirSync(join(repo, '.claude'), { recursive: true });
+    mkdirSync(join(repo, '.vscode'), { recursive: true });
+    mkdirSync(join(repo, '.idea'), { recursive: true });
+    writeFileSync(join(repo, 'README.md'), '# Hello\n');
+    writeFileSync(join(repo, 'docs', 'guide.md'), '# Guide\n');
+    writeFileSync(join(repo, '_wip', 'note.md'), '# Note\n');
+    writeFileSync(join(repo, '.claude', 'settings.json'), '{}\n');
+    writeFileSync(join(repo, '.vscode', 'settings.json'), '{}\n');
+    writeFileSync(join(repo, '.idea', 'workspace.xml'), '<xml />\n');
+    git(repo, ['add', '.']);
+
+    const flags = runRouter(repo);
+    expect(flags.integration).toBe('false');
+    expect(flags.eval).toBe('false');
+    expect(flags.unit).toBe('false');
+    expect(flags.docs_only).toBe('true');
   });
 
   it('fails OPEN (all flags true) when no diff base resolves', () => {
@@ -281,6 +303,7 @@ describe('check-change-class.sh', () => {
       expect(flags.integration).toBe('true');
       expect(flags.eval).toBe('true');
       expect(flags.unit).toBe('true');
+      expect(flags.docs_only).toBe('false');
     } finally {
       removeTempRepo(orphan);
     }

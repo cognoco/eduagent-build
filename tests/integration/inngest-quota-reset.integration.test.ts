@@ -49,6 +49,7 @@ async function seedAccount(clerkUserId: string, email: string) {
       clerkUserId,
       email,
       isOwner: true,
+      seedBaselineSubscription: false,
     });
   }
 

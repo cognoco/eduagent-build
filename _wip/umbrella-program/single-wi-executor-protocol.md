@@ -13,7 +13,7 @@
 > **What it is.** A derivative of the Quartet `executor-protocol.md` (Builder) +
 > `shepherd-protocol.md` (review loop + merge gate), collapsed to a single item with no
 > orchestrator and no Clacks above you. Process only — the *what* of your WI lives in its
-> Cosmo page. It will be reconciled into the shared `_quartet/` system at cutover. The single item is agent's pick, but it shall be a high priority, high risk item that needs full attention and should not be parallelized.
+> Cosmo page. It will be reconciled into the shared `_quartet/` system at cutover. The single item is agent's pick, but it shall be a high priority, high risk item that needs full attention and should not be parallelized. Dont stop for questions, you have full autonomy, do what you believe is the best. 
 >
 > **Precedence:** Cosmo lifecycle rules (AGENTS.md + the `cosmo` skills) > this protocol > habits.
 

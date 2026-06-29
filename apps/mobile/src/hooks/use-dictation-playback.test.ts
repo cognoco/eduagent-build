@@ -279,6 +279,92 @@ describe('useDictationPlayback', () => {
     expect(result.current.state).toBe('countdown');
   });
 
+  it('[WI-1149] plays when the device returns an empty voice list (graceful degradation)', async () => {
+    // Many Android TTS engines return [] from getAvailableVoicesAsync even when
+    // the system voice speaks fine. WI-908 wrongly blocked playback here.
+    mockGetAvailableVoicesAsync.mockResolvedValue([]);
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    expect(result.current.state).toBe('countdown');
+    expect(result.current.voiceAvailability).toBe('available');
+
+    act(() => {
+      jest.advanceTimersByTime(4000); // past the countdown
+    });
+
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  it('[WI-1149] plays when voice enumeration throws', async () => {
+    mockGetAvailableVoicesAsync.mockRejectedValue(
+      new Error('TTS engine not bound'),
+    );
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    expect(result.current.state).toBe('countdown');
+    expect(result.current.voiceAvailability).toBe('available');
+
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(mockSpeak).toHaveBeenCalled();
+  });
+
+  it('[WI-1149] matches a device voice reported with a 3-letter ISO 639-2 tag (eng → en)', async () => {
+    mockGetAvailableVoicesAsync.mockResolvedValue([
+      {
+        identifier: 'eng-voice',
+        name: 'English',
+        quality: Speech.VoiceQuality.Default,
+        language: 'eng',
+      },
+    ]);
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: TEST_SENTENCES,
+        pace: 'slow',
+        punctuationReadAloud: false,
+        language: 'en',
+      }),
+    );
+
+    await startPlayback(result);
+    expect(result.current.state).toBe('countdown');
+    expect(result.current.voiceAvailability).toBe('available');
+
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
   it('pauses and resumes', async () => {
     const { result } = renderHook(() =>
       useDictationPlayback({

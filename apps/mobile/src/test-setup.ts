@@ -87,6 +87,7 @@ jest.mock('react-native-reanimated', () => {
     },
     FadeIn: chainable,
     FadeInUp: chainable,
+    FadeOut: chainable,
     FadeOutDown: chainable,
     useAnimatedStyle: () => ({}),
     useAnimatedProps: () => ({}),
