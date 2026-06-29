@@ -49,6 +49,11 @@ async function seedAccount(clerkUserId: string, email: string) {
       clerkUserId,
       email,
       isOwner: true,
+      // [WI-1145] This suite seeds its own legacy+v2 subscription pair (shared id)
+      // via seedSubscriptionWithQuota. The baseline anchor would occupy the legacy
+      // `subscriptions.account_id_unique` slot first → the suite's own legacy-sub
+      // insert collides (duplicate key). Opt out so the suite owns the sub.
+      seedBaselineSubscription: false,
     });
   }
 

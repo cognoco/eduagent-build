@@ -98,6 +98,14 @@ async function seedSurvivorIdentity(suffix: string, clerkUserId: string) {
     displayName: `AliasMergeV2 ${suffix}`,
     birthYear: 1990,
     isOwner: true,
+    // [WI-1145] This suite creates its own subscription via createSubscriptionV2
+    // (seedSubscriptionV2), which itself dual-writes the legacy `subscriptions`
+    // parent. The baseline anchor would occupy the legacy
+    // `subscriptions.account_id_unique` slot, so createSubscriptionV2's twin-write
+    // would conflict-and-skip and the quota_pools FK (→ legacy subscriptions on
+    // the journaled-chain CI DB) would fail. Opt out so the real-creation path
+    // owns the sub.
+    seedBaselineSubscription: false,
   });
 
   // createSubscriptionV2 dual-writes a legacy `subscriptions` parent row
