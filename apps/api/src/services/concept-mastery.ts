@@ -1,17 +1,13 @@
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
+import { type ConceptMasterySignal } from '@eduagent/schemas';
+
 import {
   conceptMastery,
   concepts,
   needsDeepeningTopics,
   type Database,
 } from '@eduagent/database';
-
-export interface ConceptMasterySignal {
-  verified: boolean;
-  hasMentorAddition: boolean;
-  mentorAdditions: string[];
-}
 
 function emptySignal(): ConceptMasterySignal {
   return {
