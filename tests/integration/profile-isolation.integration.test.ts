@@ -12,8 +12,9 @@
  * 5. Fabricated profile IDs are rejected
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
+  concepts,
   profiles,
   subjects,
   subscription as subscriptionV2,
@@ -26,6 +27,7 @@ import {
   createIntegrationDb,
   isIdentityV2Enabled,
 } from './helpers';
+import { seedCurriculum } from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -295,5 +297,120 @@ describe('Integration: Profile Isolation (P0-006)', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
+  });
+});
+
+/**
+ * WI-1104: DB-level RLS enforcement for the concepts table.
+ *
+ * Uses FORCE ROW LEVEL SECURITY inside rolling-back transactions so the test
+ * is role-independent — the neondb_owner role normally bypasses RLS, but FORCE
+ * re-enables enforcement even for the table owner.  Each transaction rolls back
+ * atomically, undoing the FORCE and any inserted rows, leaving no residue.
+ *
+ * CONCEPT_CAPTURE_ENABLED is false so no live traffic targets these tables;
+ * the tests validate the policy predicate before the flag is flipped true.
+ */
+describe('concepts RLS policy enforcement (WI-1104)', () => {
+  it('USING: row written under profile A not visible under profile B GUC (FORCE ROW LEVEL SECURITY)', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Learner A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'Learner B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'rls-using-test-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'rls-using-test-topic' }],
+    });
+
+    let assertionsRan = false;
+    try {
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`ALTER TABLE concepts FORCE ROW LEVEL SECURITY`);
+
+        // Insert under profile A's GUC.
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileA.id}, true)`,
+        );
+        await tx.insert(concepts).values({
+          profileId: profileA.id,
+          subjectId: subject.id,
+          topicId: topicIds[0]!,
+          label: 'rls-using-test',
+          normalizedLabel: 'rls-using-test',
+        });
+
+        // Sanity: profile A can read its own row (guards against false pass).
+        const own = await tx
+          .select({ id: concepts.id })
+          .from(concepts)
+          .where(eq(concepts.profileId, profileA.id));
+        expect(own).toHaveLength(1);
+
+        // Cross-profile: profile B's GUC must not see profile A's row.
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        const leaked = await tx
+          .select({ id: concepts.id })
+          .from(concepts)
+          .where(eq(concepts.profileId, profileA.id));
+        expect(leaked).toHaveLength(0);
+
+        assertionsRan = true;
+        throw new Error('test-rollback'); // atomically undoes FORCE + inserted rows
+      });
+    } catch (e: unknown) {
+      if (!(e instanceof Error && e.message === 'test-rollback')) throw e;
+    }
+
+    expect(assertionsRan).toBe(true);
+  });
+
+  it('WITH CHECK: cross-profile concept insert rejected under FORCE ROW LEVEL SECURITY', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Target A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'Attacker B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'rls-check-test-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'rls-check-test-topic' }],
+    });
+
+    // profile B's GUC + profileId = profile A → WITH CHECK rejects.
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.execute(sql`ALTER TABLE concepts FORCE ROW LEVEL SECURITY`);
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        await tx.insert(concepts).values({
+          profileId: profileA.id,
+          subjectId: subject.id,
+          topicId: topicIds[0]!,
+          label: 'cross-profile-attempt',
+          normalizedLabel: 'cross-profile-attempt',
+        });
+      }),
+    ).rejects.toThrow();
   });
 });
