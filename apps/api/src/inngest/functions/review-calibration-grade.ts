@@ -1,3 +1,4 @@
+// @inngest-admin: parent-chain (createScopedRepository(db, profileId); curriculumTopics→books→subjects.profileId chain)
 import { and, desc, eq, lt } from 'drizzle-orm';
 import {
   createScopedRepository,

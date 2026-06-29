@@ -545,6 +545,18 @@ async function materializeFocusedBookTopics(
       bookId,
       error: error instanceof Error ? error.message : String(error),
     });
+    // [WI-481] Escalate the silent recovery: the fallback keeps the learner
+    // moving, but a structured-warn alone makes a sustained generation outage
+    // invisible to Sentry. Emit captureException so the fallback rate is
+    // queryable and a regression in generateBookTopics surfaces in alerting.
+    captureException(error, {
+      profileId,
+      extra: {
+        context: 'session.focused_book_topic_generation',
+        subjectId,
+        bookId,
+      },
+    });
     result = buildFallbackBookTopics(book.title, book.description ?? '');
   }
 

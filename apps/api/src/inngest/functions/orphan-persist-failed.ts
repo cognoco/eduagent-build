@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (Sentry capture only; no DB access)
 import { orphanPersistFailedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
@@ -25,5 +26,5 @@ export const orphanPersistFailed = inngest.createFunction(
       },
     });
     return { recorded: true };
-  }
+  },
 );

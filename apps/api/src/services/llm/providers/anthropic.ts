@@ -11,6 +11,7 @@ import {
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { createLogger } from '../../logger';
 import { createProviderApiError, createProviderHttpError } from './errors';
+import { anthropicResponseSchema } from '@eduagent/schemas';
 
 const logger = createLogger();
 
@@ -47,17 +48,6 @@ interface AnthropicRequest {
   system?: string;
   messages: AnthropicMessage[];
   stream?: boolean;
-}
-
-interface AnthropicResponseBlock {
-  type: 'text';
-  text: string;
-}
-
-interface AnthropicResponse {
-  content?: AnthropicResponseBlock[];
-  stop_reason?: string;
-  error?: { type: string; message: string };
 }
 
 export function toAnthropicContent(
@@ -171,7 +161,16 @@ export function createAnthropicProvider(apiKey: string): LLMProvider {
         );
       }
 
-      const data = (await res.json()) as AnthropicResponse;
+      // [WI-481] Validate the raw provider body at the trust boundary instead
+      // of casting — a null/malformed/wrong-shape 2xx body now fails closed as
+      // a typed provider error rather than a TypeError on a later field access.
+      const parsed = anthropicResponseSchema.safeParse(await res.json());
+      if (!parsed.success) {
+        throw createProviderApiError('Anthropic API', {
+          type: 'invalid_response_shape',
+        });
+      }
+      const data = parsed.data;
 
       if (data.error) {
         // [FCR-2026-05-23-L11.F11] Keep only the structured type/code tokens for

@@ -148,8 +148,9 @@ type Bindings = {
   INNGEST_SIGNING_KEY?: string;
   INNGEST_EVENT_KEY?: string;
 
-  // RevenueCat — IAP webhook
+  // RevenueCat — IAP webhook and REST API access
   REVENUECAT_WEBHOOK_SECRET?: string;
+  REVENUECAT_REST_API_KEY?: string;
 
   // Observability
   SENTRY_DSN?: string;
