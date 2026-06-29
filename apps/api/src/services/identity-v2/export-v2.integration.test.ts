@@ -428,10 +428,12 @@ describeIfDb('generateExportV2 familyLinks field mapping [WI-1097]', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-1097] quotaPools and topUpCredits schema-parse coverage — runs on ANY
-// DB with the v2 billing tables (post-0117 FK repoint). Verifies that
-// generateExportV2 correctly serializes and parses quota pool and top-up
-// credit rows through the new strict schemas.
+// [WI-1097] quotaPools and topUpCredits schema-parse coverage — gated on the
+// post-0117 DB (IDENTITY_POST_DROP=1) where quota_pools.subscription_id FK
+// was repointed from legacy `subscriptions` to v2 `subscription`. In the
+// standard CI DB (Flag-ON lane) the FK still references the old table, so
+// inserts against the v2 `subscription` row violate the constraint. This
+// suite skips automatically in that lane and runs in the post-drop lane.
 //
 // Red-green-revert: revert export-v2.ts to the pre-WI-1097 mapping:
 //   quotaPools: quotaPoolRows.map(serializeDates),
@@ -442,7 +444,7 @@ describeIfDb('generateExportV2 familyLinks field mapping [WI-1097]', () => {
 //   call enforces the contract at runtime. This test confirms the parse path
 //   runs without throwing for valid rows.
 // ---------------------------------------------------------------------------
-describeIfDb(
+describeIfPostDrop(
   'generateExportV2 quotaPools and topUpCredits schema parse [WI-1097]',
   () => {
     let db: Database;
