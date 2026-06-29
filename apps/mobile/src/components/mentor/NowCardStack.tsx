@@ -1,5 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
-import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useReducedMotion,
+} from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import type {
   NowCard as NowCardData,
@@ -47,12 +51,15 @@ function renderCard(
 ) {
   if (card.kind === 'ledger_moment') {
     // LedgerMomentCard has no internal animation, so apply the stagger entering
-    // animation via a wrapper shell here to keep module cards uniform (AC#2).
+    // (and matching exit) via a wrapper shell so module cards animate uniformly
+    // — without this a dismissed ledger card would vanish abruptly while a
+    // sibling NowCard fades out.
     return (
       <Animated.View
         entering={
           reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300)
         }
+        exiting={reduceMotion ? undefined : FadeOut.duration(200)}
       >
         <LedgerMomentCard
           card={card}
