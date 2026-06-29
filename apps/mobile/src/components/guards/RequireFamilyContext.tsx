@@ -3,7 +3,6 @@ import { useState, type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { LEARNER_HOME_HREF } from '../../lib/navigation';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { type RouteKey, type RouteParams } from '../../lib/navigation-contract';
@@ -14,11 +13,10 @@ import { useEnterFamilyMode } from '../../lib/use-mode-switch';
 // It must NOT silently call setMode() or navigate the user — mode mutations
 // require explicit user intent (pressing the CTA below).
 //
-// PR 4 migration: deep-route guards run through the navigation contract.
-// V1 ON: gate via contract.canEnter(route, params) when a route is provided,
-//        falling back to contract.shape === 'family' for non-route consumers.
-// V1 OFF / V0 ON: gate via contract.effectiveAppContext === 'family' so the
-//        legacy 5-tab production fallback keeps working.
+// Deep-route guards run through the navigation contract.
+// Route consumers use contract.canEnter(route, params). Non-route consumers use
+// the resolved family shape, with legacy V0 context preserved via contract
+// state instead of raw feature flags.
 
 export function RequireFamilyContext({
   children,
@@ -36,18 +34,13 @@ export function RequireFamilyContext({
   const [switchFailed, setSwitchFailed] = useState(false);
   const { t } = useTranslation();
 
-  if (
-    !FEATURE_FLAGS.MODE_NAV_V0_ENABLED &&
-    !FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-  ) {
-    return children;
-  }
-
-  const canRender = FEATURE_FLAGS.MODE_NAV_V1_ENABLED
-    ? route
-      ? contract.canEnter(route, params)
-      : contract.shape === 'family'
-    : contract.effectiveAppContext === 'family';
+  const legacyFamilyContextActive =
+    contract.shape !== 'family' &&
+    (contract.effectiveAppContext === 'family' ||
+      contract.gates.showFamilyHome);
+  const canRender = route
+    ? contract.canEnter(route, params) || legacyFamilyContextActive
+    : contract.shape === 'family' || legacyFamilyContextActive;
 
   if (canRender && !switchingToFamily) {
     return children;
