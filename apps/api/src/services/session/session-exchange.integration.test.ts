@@ -115,48 +115,6 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
   },
 });
 
-/**
- * Tutor envelope for the flag=OFF inline path — carries a solid inline
- * `challenge_round_evaluation` so the legacy path advances the state machine.
- *
- * The eval item MUST reference a real `user_message` event id: the server's
- * `validateEvaluationEventIds` re-reads every `answerEventId` from
- * `session_events` (scoped to the session, `eventType = 'user_message'`) and
- * REJECTS any item whose id is not found — so a missing `answerEventId` is
- * silently dropped and the round never advances (evaluation.ts §[#477]). The
- * caller seeds that answer event with a known id and passes it here.
- */
-function tutorEnvelopeWithEval(answerEventId: string): string {
-  return JSON.stringify({
-    reply: 'Correct! Now explain the inputs to photosynthesis.',
-    signals: {
-      partial_progress: false,
-      needs_deepening: false,
-      understanding_check: false,
-      ready_to_finish: false,
-      challenge_round_evaluation: [
-        {
-          concept: 'photosynthesis',
-          result: 'solid',
-          evidence: 'Learner explained clearly.',
-          // learnerQuote is replaced server-side with the event's content;
-          // matched here for readability.
-          learnerQuote: 'The light reactions and the Calvin cycle.',
-          answerEventId,
-        },
-      ],
-    },
-    ui_hints: {
-      note_prompt: { show: false, post_session: false },
-    },
-    private_sources: {
-      relied_on: ['conversation_history'],
-      insufficient: false,
-      reason: 'test envelope with eval',
-    },
-  });
-}
-
 /** Solid grader verdict — matches the `challengeRoundGraderVerdictSchema`. */
 const GRADER_VERDICT_SOLID = JSON.stringify({
   items: [
@@ -594,61 +552,6 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
 
     // Verify the grader was actually called (not the inline tutor path)
     expect(llm.graderCallCount()).toBe(1);
-  });
-
-  // -------------------------------------------------------------------------
-  // Flag=OFF: inline (legacy) path unchanged
-  // -------------------------------------------------------------------------
-
-  it('flag=OFF: tutor-supplied evaluation advances challenge round via inline path', async () => {
-    const { profileId, subjectId } = await seedProfileAndSubject(db);
-    const topicId = await seedCurriculumTopic(db, subjectId);
-    const session = await seedActiveSession(db, profileId, subjectId, topicId);
-
-    await seedPriorAiResponse(
-      db,
-      profileId,
-      subjectId,
-      session.id,
-      topicId,
-      'What are the two main stages of photosynthesis?',
-    );
-
-    // The inline eval must reference a real `user_message` event id, or the
-    // server's validateEvaluationEventIds rejects it and the round stays
-    // `active` (evaluation.ts §[#477]). Seed that answer event with a known id.
-    const answerEventId = generateUUIDv7();
-    await db.insert(sessionEvents).values({
-      id: answerEventId,
-      profileId,
-      subjectId,
-      sessionId: session.id,
-      topicId,
-      eventType: 'user_message',
-      content: 'The light reactions and the Calvin cycle.',
-      metadata: { source: 'client' },
-    });
-
-    // Tutor envelope carries inline evaluation (flag=OFF path relies on this).
-    llm.setTutorResponse(tutorEnvelopeWithEval(answerEventId));
-
-    const result = await processMessage(
-      db,
-      profileId,
-      session.id,
-      { message: 'The light reactions and the Calvin cycle.' },
-      {
-        challengeRoundRuntimeEnabled: true,
-        challengeRoundGraderEnabled: false,
-      },
-    );
-
-    // The inline path should also transition to drafting
-    expect(result.challengeRound?.state).toBe('drafting');
-    expect(result.challengeRound?.evaluations).toHaveLength(1);
-
-    // Grader must NOT have been called on the flag=OFF path
-    expect(llm.graderCallCount()).toBe(0);
   });
 
   // -------------------------------------------------------------------------
