@@ -850,6 +850,7 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       // delivered but the log step exhausted retries, breaking the 24h dedup gate
       // on replay. [BUG-842]
       let emailSent = false;
+      let emailReason: string | undefined;
       if (prepared.shouldSendEmail && prepared.hasParentEmail) {
         const emailResult = await step.run(
           'send-weekly-progress-email',
@@ -932,6 +933,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             if (childSummaries.length === 0) {
               return { sent: false, reason: 'no_activity' as const };
             }
+            // [BUG-699-FOLLOWUP] Mirror the push channel's 24h dedup gate (see
+            // the send-weekly-progress-push step above). The notificationLog
+            // `weekly_progress` slot is shared across channels — a parent
+            // receives at most one weekly-progress notification per 24h
+            // regardless of push/email. The push step runs first; if it sent,
+            // its log makes this count > 0 and the email is suppressed (push
+            // preferred). If push was skipped/failed (no log written), the email
+            // still goes out as the fallback channel. Reading inside this step
+            // (not the prepare step) keeps the gate retry-safe: an email-step
+            // retry re-reads the log written by its own first attempt and skips
+            // the re-send, matching the [WI-998] rationale on the push side.
+            const recentEmailCount = await getRecentNotificationCount(
+              db,
+              parentId,
+              'weekly_progress',
+              24,
+            );
+            if (recentEmailCount > 0) {
+              return { sent: false, reason: 'dedup_24h' as const };
+            }
             const emailPayload = formatWeeklyProgressEmail(
               parentEmail,
               childSummaries,
@@ -963,15 +984,29 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           },
         );
         emailSent = emailResult.sent;
+        if (!emailResult.sent && 'reason' in emailResult) {
+          emailReason = emailResult.reason;
+        }
       } else if (prepared.shouldSendEmail) {
         // Expected: OAuth-only accounts or Clerk not exposing email field.
         // emailSent flag in the return value already provides observability.
       }
 
-      return {
-        status: pushResult?.sent || emailSent ? 'completed' : 'throttled',
-        parentId,
-      };
+      const status =
+        pushResult?.sent || emailSent
+          ? ('completed' as const)
+          : ('throttled' as const);
+      if (status === 'throttled') {
+        // [BUG-699-FOLLOWUP] Surface WHY we throttled (e.g. 'dedup_24h' when a
+        // weekly_progress notification was already logged in the last 24h) so
+        // callers and telemetry can distinguish a deduped no-op from a real send.
+        const reason =
+          (pushResult && 'reason' in pushResult
+            ? pushResult.reason
+            : undefined) ?? emailReason;
+        return { status, parentId, reason };
+      }
+      return { status, parentId };
     } catch (error) {
       captureException(error, {
         extra: { parentId, context: 'weekly-progress-push-generate' },

@@ -250,6 +250,13 @@ legacyDescribe('mergeAliasedSubscription (integration)', () => {
       getTierConfig('plus').ownerMonthlyQuota,
     );
 
+    // [BUG-783 / WI-1151] updateQuotaPoolLimit is called when upgradeSurvivor=true;
+    // the pool must reflect the survivor's new tier quota, not the pre-merge free limit.
+    const pool = await createIntegrationDb().query.quotaPools.findFirst({
+      where: eq(quotaPools.subscriptionId, toSub.id),
+    });
+    expect(pool?.monthlyLimit).toBe(getTierConfig('plus').monthlyQuota);
+
     // Survivor ends with the migrated 500 credits.
     const credits = await getTopUpCreditsRemaining(db, toSub.id);
     expect(credits).toBe(500);
