@@ -15,6 +15,7 @@ import {
   membership,
   needsDeepeningTopics,
   notificationPreferences,
+  organization,
   parkingLotItems,
   person,
   profiles,
@@ -42,6 +43,51 @@ function consentTypeToBasis(consentType: 'GDPR' | 'COPPA') {
   return consentType === 'COPPA'
     ? 'coppa_parental_consent'
     : 'gdpr_parental_consent';
+}
+
+async function ensureV2ProfileAnchorForTest(
+  db: Database,
+  input: {
+    profileId: string;
+    accountId?: string;
+    displayName?: string;
+    birthYear?: number;
+    location?: 'EU' | 'US' | 'OTHER' | null;
+  },
+): Promise<{ accountId?: string }> {
+  const legacyProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, input.profileId),
+    columns: {
+      accountId: true,
+      displayName: true,
+      birthYear: true,
+      location: true,
+    },
+  });
+  const accountId = input.accountId ?? legacyProfile?.accountId;
+
+  if (accountId) {
+    await db
+      .insert(organization)
+      .values({
+        id: accountId,
+        name: `Test org ${accountId.slice(0, 8)}`,
+      })
+      .onConflictDoNothing();
+  }
+
+  await db
+    .insert(person)
+    .values({
+      id: input.profileId,
+      displayName:
+        input.displayName ?? legacyProfile?.displayName ?? 'Test Learner',
+      birthDate: `${input.birthYear ?? legacyProfile?.birthYear ?? 2005}-01-01`,
+      residenceJurisdiction: input.location ?? legacyProfile?.location ?? 'EU',
+    })
+    .onConflictDoNothing();
+
+  return { accountId };
 }
 
 type AppLike = {
@@ -206,15 +252,13 @@ export async function seedDirectChildProfileForTest(input: {
   // the post-collapse main lane → not-found. Keep the legacy and v2 rows
   // consistent for the same logical child (same id, displayName, birthDate,
   // residence) so a reader of either store resolves the same entity.
-  await db
-    .insert(person)
-    .values({
-      id: childId,
-      displayName: input.displayName,
-      birthDate: `${input.birthYear}-01-01`,
-      residenceJurisdiction: location,
-    })
-    .onConflictDoNothing();
+  await ensureV2ProfileAnchorForTest(db, {
+    profileId: childId,
+    accountId: input.accountId,
+    displayName: input.displayName,
+    birthYear: input.birthYear,
+    location,
+  });
 
   await db
     .insert(membership)
@@ -233,6 +277,9 @@ export async function seedFamilyLinkForTest(input: {
   childProfileId: string;
 }): Promise<void> {
   const db = createIntegrationDb();
+  await ensureV2ProfileAnchorForTest(db, { profileId: input.parentProfileId });
+  await ensureV2ProfileAnchorForTest(db, { profileId: input.childProfileId });
+
   await db
     .insert(familyLinks)
     .values({
@@ -286,6 +333,11 @@ export async function setProfileConsentStatusForTest(input: {
   // the post-collapse main lane (flag-off), so a flag-gated seed leaves the v2
   // consent state empty and consent-dependent reads diverge from the legacy row.
   const basis = consentTypeToBasis(consentType);
+  await ensureV2ProfileAnchorForTest(db, {
+    profileId: input.profileId,
+    accountId: input.accountId,
+  });
+
   await db
     .delete(consentRequest)
     .where(
