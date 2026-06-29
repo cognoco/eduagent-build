@@ -61,13 +61,17 @@ async function createProfileWithConsentToken(token: string) {
 
 async function readConsentState(profileId: string) {
   const db = getIntegrationDb();
-  // [WI-1145] v2-first: consent resolves via consent_request on the post-WI-867
-  // flag-off main lane (seedConsentRequest dual-writes both stores); fall back to
-  // legacy consentStates for the pre-collapse flag-off path.
   const request = await db.query.consentRequest.findFirst({
     where: eq(consentRequest.chargePersonId, profileId),
   });
-  if (request) {
+  const legacyState = await db.query.consentStates.findFirst({
+    where: eq(consentStates.profileId, profileId),
+  });
+
+  // [WI-1145] Store-agnostic read: this fixture dual-writes a pending request,
+  // but the flag-off route may still resolve legacy consentStates. Prefer a
+  // resolved v2 request, then a resolved legacy row, then pending v2, then legacy.
+  if (request?.status === 'approved' || request?.status === 'denied') {
     return {
       status:
         request.status === 'approved'
@@ -79,9 +83,22 @@ async function readConsentState(profileId: string) {
     };
   }
 
-  return db.query.consentStates.findFirst({
-    where: eq(consentStates.profileId, profileId),
-  });
+  if (
+    legacyState &&
+    legacyState.status !== 'PENDING' &&
+    legacyState.status !== 'PARENTAL_CONSENT_REQUESTED'
+  ) {
+    return legacyState;
+  }
+
+  if (request) {
+    return {
+      status: 'PARENTAL_CONSENT_REQUESTED',
+      respondedAt: request.respondedAt,
+    };
+  }
+
+  return legacyState;
 }
 
 async function readProfileRecord(profileId: string) {

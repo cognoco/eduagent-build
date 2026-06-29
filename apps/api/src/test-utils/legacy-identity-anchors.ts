@@ -209,6 +209,16 @@ export async function ensureV2IdentityForLegacyProfileTest(
   // setSubscriptionTierForProfile, which updates BOTH stores in lockstep so
   // legacy↔v2 stay consistent.
   if ((input.isOwner ?? true) && (input.seedBaselineSubscription ?? true)) {
+    await ensureLegacyProfileAnchorForTest(db, {
+      accountId: input.accountId,
+      profileId: input.profileId,
+      displayName: input.displayName,
+      birthYear: input.birthYear,
+      isOwner: input.isOwner ?? true,
+      email: input.email,
+      clerkUserId: input.clerkUserId,
+    });
+
     const [existingSubscription] = await db
       .select({ id: subscriptionTable.id })
       .from(subscriptionTable)
