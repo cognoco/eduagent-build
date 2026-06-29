@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Ask Classification Observability — observable terminus for the three
 // app/ask.classification_{skipped,completed,failed} events emitted by

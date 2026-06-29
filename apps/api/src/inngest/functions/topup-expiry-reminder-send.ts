@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (push notification send; no DB access in handler)
 // ---------------------------------------------------------------------------
 // Top-Up Expiry Reminder Send — BUG-638 [J-2]
 // ---------------------------------------------------------------------------

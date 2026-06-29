@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (accountId from event; notification send + DB lookup scoped to that account)
 // ---------------------------------------------------------------------------
 // Trial Notification Send — per-trial fan-out receiver for the trial-expiry
 // cron's warning (Step 3) and soft-landing (Step 4) notifications.

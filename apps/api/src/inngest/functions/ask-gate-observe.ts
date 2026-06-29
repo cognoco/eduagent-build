@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging/Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Ask Gate Observe — observable terminus for the app/ask.gate_decision and
 // app/ask.gate_timeout events emitted by the session depth-evaluation endpoint

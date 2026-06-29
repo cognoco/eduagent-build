@@ -76,8 +76,9 @@ const envSchema = z.object({
   // operator needs to trigger one-shot backfills.
   MAINTENANCE_SECRET: z.string().min(1).optional(),
 
-  // RevenueCat — webhook authentication
+  // RevenueCat — webhook authentication plus REST API access for GDPR store teardown
   REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
+  REVENUECAT_REST_API_KEY: z.string().min(1).optional(),
 
   // Inngest — webhook signing key (validates inbound calls from Inngest Cloud
   // to /v1/inngest) and event ingestion key (outbound inngest.send()). Both
