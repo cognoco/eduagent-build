@@ -21,6 +21,7 @@ import {
   assertParentAccess,
   assertCanManageOwnConsent,
   assertOwnerAndParentAccess,
+  assertOwnerProfile,
 } from './family-access';
 import { ForbiddenError } from '../errors';
 
@@ -367,6 +368,44 @@ describe('assertOwnerAndParentAccess', () => {
       assertOwnerAndParentAccess(ctx, db, PARENT_ID, CHILD_ID),
     ).rejects.toThrow(
       'Only the account owner can perform administrative actions on child profiles.',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assertOwnerProfile - [Issue 901 / WI-1058]
+//
+// Owner-only routes funnel through this helper. A headerless request can be
+// auto-resolved to the account owner profile (`isOwner:true`,
+// `resolvedVia:'auto'`), so the guard must require an explicitly selected
+// profile and not just `isOwner === true`.
+// ---------------------------------------------------------------------------
+
+describe('assertOwnerProfile', () => {
+  function ctxWithMeta(meta: {
+    isOwner?: boolean;
+    resolvedVia?: 'auto' | 'explicit-header';
+  }): Context {
+    return {
+      get: (key: string) => (key === 'profileMeta' ? meta : undefined),
+    } as unknown as Context;
+  }
+
+  it('allows an explicitly selected owner profile', () => {
+    const ctx = ctxWithMeta({ isOwner: true, resolvedVia: 'explicit-header' });
+
+    expect(() => assertOwnerProfile(ctx)).not.toThrow();
+  });
+
+  // [BREAK / WI-1058] Without the resolvedVia clause in assertOwnerProfile,
+  // this auto-resolved owner would pass because isOwner is true. That reopens
+  // owner-only routes to callers that omit X-Profile-Id.
+  it('[BREAK] throws for an auto-resolved owner profile', () => {
+    const ctx = ctxWithMeta({ isOwner: true, resolvedVia: 'auto' });
+
+    expect(() => assertOwnerProfile(ctx)).toThrow(ForbiddenError);
+    expect(() => assertOwnerProfile(ctx, 'Owner-only surface.')).toThrow(
+      'Owner-only surface.',
     );
   });
 });
