@@ -89,6 +89,15 @@ import {
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../../errors';
 import { captureException } from '../sentry';
+// Producer side of the store-teardown contract: the rows mapped by
+// getSubscriptionStoreTeardownTargetsV2 are dispatched as the
+// `app/billing.subscription_store_teardown_requested` event payload, so the
+// return type IS the event's per-subscription target type. Importing it (rather
+// than re-declaring a structural twin) makes TypeScript enforce the
+// producer→consumer shape at compile time — a field drift in the Zod schema
+// then fails the build here instead of as a runtime `invalid_payload` on a GDPR
+// erasure path. Type-only import: no runtime edge from services → inngest.
+import type { SubscriptionStoreTeardownTarget } from '../../inngest/events/subscription-store-teardown';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -117,21 +126,6 @@ export type DeletionReason =
   | 'user_initiated'
   | 'guardian_initiated'
   | 'abandonment';
-
-export type SubscriptionStoreTeardownTargetV2 = {
-  subscriptionId: string;
-  planTier: string;
-  status: string;
-  stripe: {
-    customerId: string | null;
-    subscriptionId: string | null;
-  };
-  revenueCat: {
-    originalAppUserId: string | null;
-    storeProductId: string | null;
-    storePlatform: string | null;
-  };
-};
 
 // ---------------------------------------------------------------------------
 // Schedule / cancel / status — v2 of the legacy accounts-stamp surface, keyed on
@@ -949,7 +943,7 @@ async function readOrgSubscriptionsTx(
 export async function getSubscriptionStoreTeardownTargetsV2(
   db: Database,
   organizationId: string,
-): Promise<SubscriptionStoreTeardownTargetV2[]> {
+): Promise<SubscriptionStoreTeardownTarget[]> {
   const rows = await db.query.subscription.findMany({
     where: eq(subscription.organizationId, organizationId),
     columns: {

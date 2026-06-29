@@ -154,6 +154,11 @@ export async function deleteRevenueCatCustomerForErasure({
   }
 
   if (!res.ok) {
+    // Capture the response body — RevenueCat returns a structured error
+    // ({code, message}) that is the difference between a triageable GDPR
+    // teardown failure and an opaque status code. Single `.text()` read; the
+    // stream has not been consumed (404 returned above, ok path below).
+    const body = await res.text().catch(() => '<unreadable response body>');
     const err = new Error(
       `[store-teardown] RevenueCat customer delete failed with status ${res.status}`,
     );
@@ -162,6 +167,7 @@ export async function deleteRevenueCatCustomerForErasure({
         surface: 'billing.store_teardown.revenuecat',
         reason: `http_${res.status}`,
         appUserId,
+        body,
       },
     });
     throw err;

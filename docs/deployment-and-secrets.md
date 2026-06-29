@@ -614,7 +614,7 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | | `ANALYTICS_HASH_KEY` | Yes |
 | **Payments** | `REVENUECAT_WEBHOOK_SECRET` | Yes |
 | | `REVENUECAT_REST_API_KEY` | Required for RevenueCat GDPR store teardown |
-| | `STRIPE_SECRET_KEY` | No (dormant) |
+| | `STRIPE_SECRET_KEY` | No (dormant) — but if Stripe is ever activated, this becomes required for Stripe-backed GDPR store teardown: a deleted org carrying a Stripe subscription with the key missing makes the teardown worker retry then escalate to Sentry (never silently skip cancellation) |
 | | `STRIPE_WEBHOOK_SECRET` | No (dormant) |
 | | `STRIPE_PRICE_*` (6 keys) | No (dormant) |
 | | `STRIPE_CUSTOMER_PORTAL_URL` | No (dormant) |
