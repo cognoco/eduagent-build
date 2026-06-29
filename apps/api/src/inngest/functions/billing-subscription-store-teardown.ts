@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (accountId from event; subscription-store teardown scoped to that account; calls Stripe + RevenueCat, no direct DB access)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
