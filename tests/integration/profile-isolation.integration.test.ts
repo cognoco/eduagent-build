@@ -303,16 +303,20 @@ describe('Integration: Profile Isolation (P0-006)', () => {
 /**
  * WI-1104: DB-level RLS enforcement for the concepts table.
  *
- * Uses FORCE ROW LEVEL SECURITY inside rolling-back transactions so the test
- * is role-independent — the neondb_owner role normally bypasses RLS, but FORCE
- * re-enables enforcement even for the table owner.  Each transaction rolls back
- * atomically, undoing the FORCE and any inserted rows, leaving no residue.
+ * PostgreSQL superusers bypass row-level security even with FORCE ROW LEVEL
+ * SECURITY, so the integration test DB's owner role cannot observe RLS effects
+ * directly.  The workaround: each test creates a temporary non-superuser role
+ * with minimal grants, switches to it with SET LOCAL ROLE (superusers may set
+ * role to any role), and performs the RLS-gated operation.  Non-superuser roles
+ * are subject to ENABLE ROW LEVEL SECURITY without needing FORCE.  Each
+ * transaction rolls back atomically, dropping the ephemeral role and any
+ * inserted rows.
  *
  * CONCEPT_CAPTURE_ENABLED is false so no live traffic targets these tables;
  * the tests validate the policy predicate before the flag is flipped true.
  */
 describe('concepts RLS policy enforcement (WI-1104)', () => {
-  it('USING: row written under profile A not visible under profile B GUC (FORCE ROW LEVEL SECURITY)', async () => {
+  it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {
     const profileA = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,
@@ -331,16 +335,13 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'rls-using-test-topic' }],
     });
+    // Unique role name avoids cross-test collisions on concurrent runs.
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     let assertionsRan = false;
     try {
       await db.transaction(async (tx) => {
-        await tx.execute(sql`ALTER TABLE concepts FORCE ROW LEVEL SECURITY`);
-
-        // Insert under profile A's GUC.
-        await tx.execute(
-          sql`SELECT set_config('app.current_profile_id', ${profileA.id}, true)`,
-        );
+        // Seed as superuser (bypasses RLS — simulates server-side insert).
         await tx.insert(concepts).values({
           profileId: profileA.id,
           subjectId: subject.id,
@@ -349,7 +350,20 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
           normalizedLabel: 'rls-using-test',
         });
 
-        // Sanity: profile A can read its own row (guards against false pass).
+        // Create a temporary non-superuser role to observe RLS.
+        // PostgreSQL DDL is transactional: this role is dropped on rollback.
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(sql.raw(`GRANT SELECT ON concepts TO ${testRole}`));
+
+        // Switch to the non-owner role; RLS is now enforced by ENABLE ROW
+        // LEVEL SECURITY (set in migration 0107) without needing FORCE.
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+
+        // Sanity: own profile sees its row (guards against a false pass where
+        // the table is simply empty for both profiles).
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileA.id}, true)`,
+        );
         const own = await tx
           .select({ id: concepts.id })
           .from(concepts)
@@ -367,7 +381,7 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
         expect(leaked).toHaveLength(0);
 
         assertionsRan = true;
-        throw new Error('test-rollback'); // atomically undoes FORCE + inserted rows
+        throw new Error('test-rollback'); // drops role + rows atomically
       });
     } catch (e: unknown) {
       if (!(e instanceof Error && e.message === 'test-rollback')) throw e;
@@ -376,7 +390,7 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
     expect(assertionsRan).toBe(true);
   });
 
-  it('WITH CHECK: cross-profile concept insert rejected under FORCE ROW LEVEL SECURITY', async () => {
+  it('WITH CHECK: cross-profile concept insert rejected (non-owner role)', async () => {
     const profileA = await createProfile({
       userId: PRIMARY_USER_ID,
       email: PRIMARY_EMAIL,
@@ -395,11 +409,14 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
       subjectId: subject.id,
       topics: [{ title: 'rls-check-test-topic' }],
     });
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     // profile B's GUC + profileId = profile A → WITH CHECK rejects.
     await expect(
       db.transaction(async (tx) => {
-        await tx.execute(sql`ALTER TABLE concepts FORCE ROW LEVEL SECURITY`);
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(sql.raw(`GRANT INSERT ON concepts TO ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
         await tx.execute(
           sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
         );
