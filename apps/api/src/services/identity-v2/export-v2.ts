@@ -40,12 +40,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { dataExportSubscriptionRowSchema } from '@eduagent/schemas';
-import type {
-  ConsentStatus,
-  DataExport,
-  DataExportSubscriptionRow,
-  Profile,
-} from '@eduagent/schemas';
+import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
 import {
   resolveLatestConsentStatusAnyBasis,
@@ -250,37 +245,38 @@ export async function generateExportV2(
         createdAt: g.createdAt,
       }),
     ),
-    subscriptions: subscriptionRows.map(toLegacySubscriptionExportRow),
+    // Map the v2 `subscription` row (organization-keyed, plan_tier/period_*_at)
+    // to the legacy-named export shape the schema expects (accountId/tier/
+    // currentPeriod*) before parsing — mirrors the explicit field-mapping the
+    // `account`/`familyLinks` sections above already do. organization.id ==
+    // accounts.id by the deterministic reseed. payerPersonId/storeProductId/
+    // storePlatform are not part of the DataExport contract, so they drop here.
+    subscriptions: subscriptionRows.map((s) =>
+      dataExportSubscriptionRowSchema.parse(
+        serializeDates({
+          id: s.id,
+          accountId: s.organizationId,
+          stripeCustomerId: s.stripeCustomerId,
+          stripeSubscriptionId: s.stripeSubscriptionId,
+          tier: s.planTier,
+          status: s.status,
+          trialEndsAt: s.trialEndsAt,
+          currentPeriodStart: s.periodStartAt,
+          currentPeriodEnd: s.periodEndAt,
+          cancelledAt: s.cancelledAt,
+          lastStripeEventTimestamp: s.lastStripeEventTimestamp,
+          lastStripeEventId: s.lastStripeEventId,
+          revenuecatOriginalAppUserId: s.revenuecatOriginalAppUserId,
+          lastRevenuecatEventId: s.lastRevenuecatEventId,
+          lastRevenuecatEventTimestampMs: s.lastRevenuecatEventTimestampMs,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        }),
+      ),
+    ),
     quotaPools: quotaPoolRows.map(serializeDates),
     topUpCredits: topUpCreditRows.map(serializeDates),
   };
-}
-
-function toLegacySubscriptionExportRow(
-  row: typeof subscription.$inferSelect,
-): DataExportSubscriptionRow {
-  return dataExportSubscriptionRowSchema.parse(
-    serializeDates({
-      id: row.id,
-      accountId: row.organizationId,
-      stripeCustomerId: row.stripeCustomerId ?? null,
-      stripeSubscriptionId: row.stripeSubscriptionId ?? null,
-      tier: row.planTier,
-      status: row.status,
-      trialEndsAt: row.trialEndsAt ?? null,
-      currentPeriodStart: row.periodStartAt ?? null,
-      currentPeriodEnd: row.periodEndAt ?? null,
-      cancelledAt: row.cancelledAt ?? null,
-      lastStripeEventTimestamp: row.lastStripeEventTimestamp ?? null,
-      lastStripeEventId: row.lastStripeEventId ?? null,
-      revenuecatOriginalAppUserId: row.revenuecatOriginalAppUserId ?? null,
-      lastRevenuecatEventId: row.lastRevenuecatEventId ?? null,
-      lastRevenuecatEventTimestampMs:
-        row.lastRevenuecatEventTimestampMs ?? null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    }),
-  );
 }
 
 // ---------------------------------------------------------------------------
