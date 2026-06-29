@@ -11,6 +11,7 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
@@ -50,6 +51,55 @@ jest.mock('../services/profile', () => {
     }),
   };
 });
+
+// [WI-867] After the IDENTITY_V2_ENABLED flag collapse, the account +
+// profile-scope middleware run the v2 path unconditionally. Continuity mocks
+// so these unit tests don't hit the unmocked DB; real paths covered by the
+// identity-v2 integration suites.
+jest.mock('../services/identity-v2/identity-resolve', () => ({
+  ...jest.requireActual('../services/identity-v2/identity-resolve'),
+  resolveIdentityV2: jest.fn().mockResolvedValue({
+    account: {
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    personId: 'person-test-id',
+    organizationId: 'test-account-id',
+    isOwner: true,
+    roles: ['admin'],
+  }),
+}));
+
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() paths the unit mock DB cannot satisfy; real path covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+const mockFindOwnerPersonScope = jest
+  .fn()
+  .mockResolvedValue(
+    personScope({ profileId: 'a0000000-0000-4000-a000-000000000001' }),
+  );
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(
+    personScope({ profileId: 'a0000000-0000-4000-a000-000000000001' }),
+  );
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by apps/api/src/services/identity-v2/profile-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...args: unknown[]) =>
+      mockFindOwnerPersonScope(...args),
+    getPersonScope: (...args: unknown[]) => mockGetPersonScope(...args),
+  }),
+);
 
 const mockGetCurrentLanguageProgress = jest.fn();
 

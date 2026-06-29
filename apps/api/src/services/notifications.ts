@@ -6,14 +6,7 @@
 
 import { eq } from 'drizzle-orm';
 import type { NotificationPayload } from '@eduagent/schemas';
-import {
-  familyLinks,
-  profiles,
-  consentStates,
-  person,
-  consentRequest,
-  type Database,
-} from '@eduagent/database';
+import { person, consentRequest, type Database } from '@eduagent/database';
 import {
   getPushToken,
   getDailyNotificationCount,
@@ -21,7 +14,6 @@ import {
   checkAndLogRateLimitInternal,
   isPushEnabled,
 } from './settings';
-import { isGdprProcessingAllowed } from './consent';
 import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import { getGuardianPersonIds } from './identity-v2/guardianship';
 import { createLogger } from './logger';
@@ -425,37 +417,20 @@ export async function notifyParentToSubscribe(
     return { sent: false, rateLimited: true, reason: 'rate_limited' };
   }
 
-  // 2. Find parent via familyLinks (legacy) or guardianship (v2)
-  let parentProfileId: string | undefined;
-  if (opts?.identityV2Enabled) {
-    const guardianIds = await getGuardianPersonIds(db, childProfileId);
-    parentProfileId = guardianIds[0];
-  } else {
-    const link = await db.query.familyLinks.findFirst({
-      where: eq(familyLinks.childProfileId, childProfileId),
-    });
-    parentProfileId = link?.parentProfileId;
-  }
+  // 2. Find parent via guardianship (v2)
+  const guardianIds = await getGuardianPersonIds(db, childProfileId);
+  const parentProfileId = guardianIds[0];
   if (!parentProfileId) {
     return { sent: false, rateLimited: false, reason: 'no_parent_link' };
   }
 
   // 3. Get child display name
-  let childName: string;
-  if (opts?.identityV2Enabled) {
-    // [WI-586] v2 path: read displayName from person (profiles dropped).
-    const childPerson = await db.query.person.findFirst({
-      where: eq(person.id, childProfileId),
-      columns: { displayName: true },
-    });
-    childName = childPerson?.displayName ?? 'Your child';
-  } else {
-    const childProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-      columns: { displayName: true },
-    });
-    childName = childProfile?.displayName ?? 'Your child';
-  }
+  // [WI-586] v2 path: read displayName from person (profiles dropped).
+  const childPerson = await db.query.person.findFirst({
+    where: eq(person.id, childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childPerson?.displayName ?? 'Your child';
 
   // 4. Send push notification to parent
   // [WI-369] No options needed — push preference is enforced by default.
@@ -466,21 +441,13 @@ export async function notifyParentToSubscribe(
     type: 'subscribe_request',
   });
 
-  // 5. Send email to parent (via consent state parentEmail / v2 guardianEmail)
-  let parentEmail: string | undefined;
-  if (opts?.identityV2Enabled) {
-    // [WI-586] v2 path: guardianEmail lives on consentRequest, not consent_states.
-    const req = await db.query.consentRequest.findFirst({
-      where: eq(consentRequest.chargePersonId, childProfileId),
-      columns: { guardianEmail: true },
-    });
-    parentEmail = req?.guardianEmail ?? undefined;
-  } else {
-    const consentState = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, childProfileId),
-    });
-    parentEmail = consentState?.parentEmail ?? undefined;
-  }
+  // 5. Send email to parent (v2: guardianEmail lives on consentRequest)
+  // [WI-586] v2 path: guardianEmail lives on consentRequest, not consent_states.
+  const req = await db.query.consentRequest.findFirst({
+    where: eq(consentRequest.chargePersonId, childProfileId),
+    columns: { guardianEmail: true },
+  });
+  const parentEmail = req?.guardianEmail ?? undefined;
 
   if (parentEmail) {
     await sendEmail(
@@ -553,25 +520,15 @@ export async function sendStruggleNotification(
   notification: StruggleNotification,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<NotificationResult> {
-  let parentProfileId: string | undefined;
-  if (opts?.identityV2Enabled) {
-    const guardianIds = await getGuardianPersonIds(db, childProfileId);
-    parentProfileId = guardianIds[0];
-  } else {
-    const link = await db.query.familyLinks.findFirst({
-      where: eq(familyLinks.childProfileId, childProfileId),
-    });
-    parentProfileId = link?.parentProfileId;
-  }
+  const guardianIds = await getGuardianPersonIds(db, childProfileId);
+  const parentProfileId = guardianIds[0];
   if (!parentProfileId) {
     return { sent: false, reason: 'no_parent_link' };
   }
 
   // Privacy gate: only send when the child's GDPR consent permits processing.
   // [WI-586] v2 path: isGdprProcessingAllowedV2 reads consent_grant (not consent_states).
-  const gdprAllowed = opts?.identityV2Enabled
-    ? await isGdprProcessingAllowedV2(db, childProfileId)
-    : await isGdprProcessingAllowed(db, childProfileId);
+  const gdprAllowed = await isGdprProcessingAllowedV2(db, childProfileId);
   if (!gdprAllowed) {
     logger.info('Struggle notification suppressed by consent', {
       event: 'notification.struggle.consent_blocked',
@@ -621,20 +578,11 @@ export async function sendStruggleNotification(
   }
 
   // [WI-586] v2 path: read displayName from person (profiles dropped).
-  let childName: string | null;
-  if (opts?.identityV2Enabled) {
-    const childPerson = await db.query.person.findFirst({
-      where: eq(person.id, childProfileId),
-      columns: { displayName: true },
-    });
-    childName = childPerson?.displayName ?? null;
-  } else {
-    const childProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-      columns: { displayName: true },
-    });
-    childName = childProfile?.displayName ?? null;
-  }
+  const childPerson = await db.query.person.findFirst({
+    where: eq(person.id, childProfileId),
+    columns: { displayName: true },
+  });
+  const childName = childPerson?.displayName ?? null;
 
   const copy = formatStruggleNotificationCopy(
     notification.type,

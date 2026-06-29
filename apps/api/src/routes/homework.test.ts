@@ -165,12 +165,84 @@ jest.mock('../services/billing', () => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// [WI-867] profile-v2 continuity mock
+// ---------------------------------------------------------------------------
+
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(personScope());
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — findOwnerPersonScope/getPersonScope use db.select() join chains (persons→memberships→org) that return [] on the Proxy unit-mock; real path covered by apps/api/src/services/identity-v2/profile-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// [WI-867] billing-v2 continuity mock (metering middleware: POST /ocr is metered)
+// ---------------------------------------------------------------------------
+
+const mockSubscriptionRowHomework = {
+  id: 'test-subscription-id',
+  accountId: 'test-account-id',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  tier: 'free' as const,
+  status: 'active' as const,
+  trialEndsAt: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  lastStripeEventId: null,
+  revenuecatOriginalAppUserId: null,
+  lastRevenuecatEventId: null,
+  lastRevenuecatEventTimestampMs: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureFreeSubscriptionV2/ensureInitialTrialSubscriptionV2 use db.execute()/db.transaction(); getOrProvisionProfileQuotaUsageV2 uses db.insert(...).returning() (returns [] on mock → undefined → throws); real paths covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: jest
+      .fn()
+      .mockResolvedValue(mockSubscriptionRowHomework),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+    getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+      id: 'pqu-v2-1',
+      subscriptionId: 'test-subscription-id',
+      profileId: 'test-profile-id',
+      role: 'owner',
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+    }),
+  }),
+);
+jest.mock(
+  '../services/billing/billing-v2/metering-v2' /* gc1-allow: continuity — isPersonUnderSubscriptionV2 uses db.select().innerJoin() (person→membership→subscription) that returns [] on Proxy unit-mock; real path covered by apps/api/src/services/billing/billing-v2/metering-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2/metering-v2'),
+    isPersonUnderSubscriptionV2: jest.fn().mockResolvedValue(true),
+  }),
+);
+
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { captureException } from '../services/sentry';
 import { OCR_CONSTRAINTS } from '@eduagent/schemas';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test', // [WI-867] required for databaseMiddleware to create db
+};
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
@@ -641,6 +713,9 @@ describe('homework routes', () => {
     });
 
     it('returns 403 when profile cannot be resolved for OCR [CR-1B.5]', async () => {
+      // [WI-867] v2: findOwnerPersonScope must return null to simulate no profile
+      // resolved. assertNotProxyMode() fires first (profileMeta absent → 403).
+      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
       // findOwnerProfile returns null (default mock), so without X-Profile-Id
       // no profile is resolved. Since /v1/ocr is now a metered LLM route
       // [WI-155 / WI-77 allowlist sweep], assertNotProxyMode() in the metering

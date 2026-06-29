@@ -9,6 +9,7 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 const mockFindFamilyLink = jest.fn().mockResolvedValue({
@@ -29,6 +30,10 @@ const consentStatesQuery = {
 mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   get(target, prop, receiver) {
     if (prop === 'familyLinks') return familyLinksQuery;
+    // [WI-867] Post-collapse: assertParentAccess → validateGuardianChargeRelationshipV2
+    // → isGuardianOf reads db.query.guardianship (v2 edge table). Wire to the same
+    // mockFindFamilyLink so existing tests work unchanged.
+    if (prop === 'guardianship') return familyLinksQuery;
     if (prop === 'consentStates') return consentStatesQuery;
     return Reflect.get(target, prop, receiver);
   },
@@ -80,6 +85,25 @@ jest.mock('../services/profile', () => {
     getProfile: (...args: unknown[]) => mockGetProfile(...args),
   };
 });
+
+// [WI-867] Post-collapse, profile-scope middleware resolves the caller via the
+// v2 `findOwnerPersonScope` (auto-resolve) / `getPersonScope` (X-Profile-Id)
+// seam, which uses db.select() join chains the unit mock DB can't satisfy.
+// Continuity mock — the v2 rename of the legacy `findOwnerProfile`/`getProfile`
+// mocks above. Owner by default; the non-owner suite overrides getPersonScope.
+// Mirror the legacy defaults: findOwnerProfile defaulted to null (no
+// auto-resolve owner → routes 400 on missing X-Profile-Id); getProfile
+// defaulted to the owner profile.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
@@ -180,6 +204,9 @@ describe('dashboard routes', () => {
     // queues), then restore the default.
     mockFindConsentState.mockReset();
     mockFindConsentState.mockResolvedValue(undefined);
+    // [WI-867] Restore the profile-scope v2 seam defaults after clearAllMocks.
+    mockFindOwnerPersonScope.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue(personScope());
   });
 
   // -------------------------------------------------------------------------
@@ -878,6 +905,15 @@ describe('dashboard routes', () => {
         hasPremiumLlm: false,
         conversationLanguage: 'en',
       });
+      // [WI-867] v2: profile-scope resolves X-Profile-Id via getPersonScope —
+      // return the same non-owner profile so the isOwner gate fires.
+      mockGetPersonScope.mockResolvedValue(
+        personScope({
+          profileId: NON_OWNER_PROFILE_ID,
+          birthYear: 2012,
+          isOwner: false,
+        }),
+      );
       // Family link exists — IDOR check would pass, but isOwner gate must fire first.
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: NON_OWNER_PROFILE_ID,
@@ -1001,15 +1037,8 @@ describe('dashboard routes', () => {
     // still surfaces as 403 from this same route (mockGetProfile is reset
     // to isOwner:true above in the beforeEach, so this test overrides it).
     it('[BREAK] non-owner still gets 403 from snapshot route (assertOwnerProfile placement guard)', async () => {
-      mockGetProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2012,
-        location: null,
-        consentStatus: 'CONSENTED',
-        isOwner: false,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-      });
+      // [WI-867] v2: isOwner comes from getPersonScope (profile-v2), not getProfile.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/topics/${TOPIC_ID}/snapshot`,

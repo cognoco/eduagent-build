@@ -12,17 +12,12 @@ import {
   learningProfiles,
   memoryFacts,
   person,
-  profiles,
   vectorToDriver,
 } from '@eduagent/database';
 import { and, asc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 
 import { inngest } from '../client';
-import {
-  getStepDatabase,
-  getStepVoyageApiKey,
-  isIdentityV2EnabledInStep,
-} from '../helpers';
+import { getStepDatabase, getStepVoyageApiKey } from '../helpers';
 import { createLogger } from '../../services/logger';
 import { embedFactText } from '../../services/memory/embed-fact';
 import { generateEmbedding } from '../../services/embeddings';
@@ -131,32 +126,17 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
           if (distinctProfileIds.length > 0) {
             // [CUT-B1 §2.5(iv)] v2 seam: liveness joins `person` (person.id =
             // profiles.id, archived_at on both); legacy joins `profiles`.
-            const eligibleRows = isIdentityV2EnabledInStep()
-              ? await db
-                  .select({ profileId: learningProfiles.profileId })
-                  .from(learningProfiles)
-                  .innerJoin(person, eq(person.id, learningProfiles.profileId))
-                  .where(
-                    and(
-                      inArray(learningProfiles.profileId, distinctProfileIds),
-                      eq(learningProfiles.memoryConsentStatus, 'granted'),
-                      isNull(person.archivedAt),
-                    ),
-                  )
-              : await db
-                  .select({ profileId: learningProfiles.profileId })
-                  .from(learningProfiles)
-                  .innerJoin(
-                    profiles,
-                    eq(profiles.id, learningProfiles.profileId),
-                  )
-                  .where(
-                    and(
-                      inArray(learningProfiles.profileId, distinctProfileIds),
-                      eq(learningProfiles.memoryConsentStatus, 'granted'),
-                      isNull(profiles.archivedAt),
-                    ),
-                  );
+            const eligibleRows = await db
+              .select({ profileId: learningProfiles.profileId })
+              .from(learningProfiles)
+              .innerJoin(person, eq(person.id, learningProfiles.profileId))
+              .where(
+                and(
+                  inArray(learningProfiles.profileId, distinctProfileIds),
+                  eq(learningProfiles.memoryConsentStatus, 'granted'),
+                  isNull(person.archivedAt),
+                ),
+              );
             eligibleProfileIds = new Set(eligibleRows.map((r) => r.profileId));
           }
 

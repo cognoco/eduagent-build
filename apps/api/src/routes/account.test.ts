@@ -75,6 +75,11 @@ const mockUpdateAccountEmailFromClerk = jest.fn().mockResolvedValue({
   updatedAt: new Date().toISOString(),
 });
 
+// [WI-867] v2 email update — route now calls updateLoginEmailFromClerk (identity-v2/account-v2).
+const mockUpdateLoginEmailFromClerk = jest.fn().mockResolvedValue({
+  email: 'new@example.com',
+});
+
 jest.mock('../services/account', () => {
   const actual = jest.requireActual(
     '../services/account',
@@ -198,47 +203,95 @@ jest.mock(
   }),
 );
 
+// [WI-867] billing-v2 seam — account middleware calls ensureInitialTrialSubscriptionV2
+// unconditionally post-collapse. Continuity mock resolves cleanly.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() paths the unit mock DB cannot satisfy; real path covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+// [WI-867] account-v2 seam — updateLoginEmailFromClerk makes a Clerk API call.
+jest.mock(
+  '../services/identity-v2/account-v2' /* gc1-allow: continuity — updateLoginEmailFromClerk calls Clerk Backend API (external boundary); real path covered by apps/api/src/services/identity-v2/account-v2.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/account-v2'),
+    updateLoginEmailFromClerk: (...args: unknown[]) =>
+      mockUpdateLoginEmailFromClerk(...args),
+  }),
+);
+
 // [CUT-B2] v2 profile-scope resolver — returns the owner profile-meta so
 // profile-scope middleware findOwnerPersonScope does not hit the unmocked DB.
+// [WI-867] Module-level refs so post-collapse v2-default scenario tests (non-owner,
+// account-disappears) can override per-test.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
+  profileId: 'a0000000-0000-4000-a000-000000000001',
+  meta: {
+    birthYear: 1990,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
+  },
+});
+// [Issue 901] Resolve the explicit owner X-Profile-Id to the owner scope so
+// v2 owner-gated route tests exercise the verified explicit-header path.
+const mockGetPersonScope = jest
+  .fn()
+  .mockImplementation((_db, profileId, organizationId) => {
+    if (
+      profileId === 'a0000000-0000-4000-a000-000000000001' &&
+      organizationId === 'test-account-id'
+    ) {
+      return Promise.resolve({
+        profileId: 'a0000000-0000-4000-a000-000000000001',
+        meta: {
+          birthYear: 1990,
+          location: null,
+          consentStatus: null,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      });
+    }
+    return Promise.resolve(null);
+  });
 jest.mock(
   '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
   () => ({
-    findOwnerPersonScope: jest.fn().mockResolvedValue({
-      profileId: 'a0000000-0000-4000-a000-000000000001',
-      meta: {
-        birthYear: 1990,
-        location: null,
-        consentStatus: null,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-        isOwner: true,
-      },
-    }),
-    // [Issue 901] Resolve the explicit owner X-Profile-Id to the owner scope so
-    // v2 owner-gated route tests exercise the verified explicit-header path.
-    getPersonScope: jest
-      .fn()
-      .mockImplementation((_db, profileId, organizationId) => {
-        if (
-          profileId === 'a0000000-0000-4000-a000-000000000001' &&
-          organizationId === 'test-account-id'
-        ) {
-          return Promise.resolve({
-            profileId: 'a0000000-0000-4000-a000-000000000001',
-            meta: {
-              birthYear: 1990,
-              location: null,
-              consentStatus: null,
-              hasPremiumLlm: false,
-              conversationLanguage: 'en',
-              isOwner: true,
-            },
-          });
-        }
-        return Promise.resolve(null);
-      }),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
   }),
 );
+
+// [WI-867] jest.clearAllMocks() wipes the module-ref mock implementations above;
+// call this in every beforeEach that clears, so the post-collapse v2-default
+// profile-scope resolution keeps resolving the owner.
+const OWNER_SCOPE = {
+  profileId: 'a0000000-0000-4000-a000-000000000001',
+  meta: {
+    birthYear: 1990,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+    conversationLanguage: 'en',
+    isOwner: true,
+  },
+};
+const restoreProfileScopeMocks = () => {
+  mockFindOwnerPersonScope.mockResolvedValue(OWNER_SCOPE);
+  mockGetPersonScope.mockImplementation((_db, profileId, organizationId) =>
+    profileId === 'a0000000-0000-4000-a000-000000000001' &&
+    organizationId === 'test-account-id'
+      ? Promise.resolve(OWNER_SCOPE)
+      : Promise.resolve(null),
+  );
+};
 
 // [CUT-B2] v2 twins — mocked so route unit tests can assert dispatch without
 // a real DB. External-DB tests live in integration suites.
@@ -281,7 +334,6 @@ import { inngest } from '../inngest/client';
 import { captureException, captureMessage } from '../services/sentry';
 import {
   cancelDeletion,
-  getProfileIdsForAccount,
   getDeletionStatus,
   scheduleDeletion,
 } from '../services/deletion';
@@ -346,7 +398,7 @@ describe('account routes', () => {
     });
 
     it('returns 404 when the authenticated account disappears before status lookup', async () => {
-      (getDeletionStatus as jest.Mock).mockRejectedValueOnce(
+      (getDeletionStatusV2 as jest.Mock).mockRejectedValueOnce(
         new NotFoundError('Account'),
       );
 
@@ -381,6 +433,7 @@ describe('account routes', () => {
   describe('POST /v1/account/delete', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      restoreProfileScopeMocks();
     });
 
     it('returns 200 with deletion schedule', async () => {
@@ -420,7 +473,7 @@ describe('account routes', () => {
       expect(body).toMatchObject({
         code: ERROR_CODES.SERVICE_UNAVAILABLE,
       });
-      expect(cancelDeletion).toHaveBeenCalledWith(
+      expect(cancelDeletionV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-account-id',
       );
@@ -437,7 +490,7 @@ describe('account routes', () => {
       const dispatchError = new Error('Inngest unavailable');
       const rollbackError = new Error('rollback unavailable');
       (inngest.send as jest.Mock).mockRejectedValueOnce(dispatchError);
-      (cancelDeletion as jest.Mock).mockRejectedValueOnce(rollbackError);
+      (cancelDeletionV2 as jest.Mock).mockRejectedValueOnce(rollbackError);
 
       const res = await app.request(
         '/v1/account/delete',
@@ -472,7 +525,9 @@ describe('account routes', () => {
 
     it('[WI-84 review] rolls back and returns 503 if profile lookup fails after scheduling', async () => {
       const lookupError = new Error('profile lookup unavailable');
-      (getProfileIdsForAccount as jest.Mock).mockRejectedValueOnce(lookupError);
+      (getPersonIdsForOrganizationV2 as jest.Mock).mockRejectedValueOnce(
+        lookupError,
+      );
 
       const res = await app.request(
         '/v1/account/delete',
@@ -489,7 +544,7 @@ describe('account routes', () => {
       expect(body).toMatchObject({
         code: ERROR_CODES.SERVICE_UNAVAILABLE,
       });
-      expect(cancelDeletion).toHaveBeenCalledWith(
+      expect(cancelDeletionV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-account-id',
       );
@@ -504,7 +559,7 @@ describe('account routes', () => {
     });
 
     it('[WI-84 review] dispatches an idempotent deletion event when deletion was already scheduled', async () => {
-      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+      (scheduleDeletionV2 as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
         scheduledNow: false,
       });
@@ -529,16 +584,17 @@ describe('account routes', () => {
         name: 'app/account.deletion-scheduled',
         data: expect.objectContaining({
           accountId: 'test-account-id',
-          profileIds: ['profile-1'],
-          // [CUT-B2] mode pinned at schedule time — legacy path stamps 'v1'.
-          identityVersion: 'v1',
+          // [WI-867] Post-collapse: route stamps v2 unconditionally; profileIds
+          // come from getPersonIdsForOrganizationV2.
+          profileIds: ['person-1'],
+          identityVersion: 'v2',
           timestamp: expect.any(String),
         }),
       });
     });
 
     it('[orphan-schedule] surfaces orphan-recovery telemetry when re-dispatching for an already-scheduled deletion', async () => {
-      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+      (scheduleDeletionV2 as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
         scheduledNow: false,
       });
@@ -570,7 +626,8 @@ describe('account routes', () => {
           extra: expect.objectContaining({
             surface: 'account.deletion.orphan_recovered',
             accountId: 'test-account-id',
-            identityVersion: 'v1',
+            // [WI-867] Post-collapse: route stamps v2 unconditionally.
+            identityVersion: 'v2',
           }),
         }),
       );
@@ -591,7 +648,7 @@ describe('account routes', () => {
     });
 
     it('[orphan-schedule] still returns 200 when the orphan-recovery telemetry throws', async () => {
-      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+      (scheduleDeletionV2 as jest.Mock).mockResolvedValueOnce({
         gracePeriodEnds: '2026-02-24T00:00:00.000Z',
         scheduledNow: false,
       });
@@ -662,7 +719,9 @@ describe('account routes', () => {
     // respond 409 CONFLICT, not 200. Before the fix, cancelDeletion returned
     // void so the route always returned 200 regardless.
     it('[BUG-412] returns 409 when there is no active deletion to cancel', async () => {
-      (cancelDeletion as jest.Mock).mockResolvedValueOnce('no_active_deletion');
+      (cancelDeletionV2 as jest.Mock).mockResolvedValueOnce(
+        'no_active_deletion',
+      );
 
       const res = await app.request(
         '/v1/account/cancel-deletion',
@@ -712,13 +771,10 @@ describe('account routes', () => {
   describe('PATCH /v1/account/email', () => {
     beforeEach(() => {
       jest.clearAllMocks();
-      mockUpdateAccountEmailFromClerk.mockResolvedValue({
-        id: 'test-account-id',
-        clerkUserId: 'user_test',
+      restoreProfileScopeMocks();
+      // [WI-867] Post-collapse: route calls updateLoginEmailFromClerk (identity-v2/account-v2).
+      mockUpdateLoginEmailFromClerk.mockResolvedValue({
         email: 'new@example.com',
-        timezone: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       });
     });
 
@@ -737,13 +793,15 @@ describe('account routes', () => {
       await expect(res.json()).resolves.toEqual({
         email: 'new@example.com',
       });
-      expect(mockUpdateAccountEmailFromClerk).toHaveBeenCalledWith(
+      // [WI-867] Post-collapse: route calls updateLoginEmailFromClerk with organizationId added.
+      expect(mockUpdateLoginEmailFromClerk).toHaveBeenCalledWith(
         expect.anything(),
-        {
+        expect.objectContaining({
           clerkSecretKey: 'sk_test',
           clerkUserId: 'user_test',
           requestedEmail: 'new@example.com',
-        },
+          organizationId: 'test-account-id',
+        }),
       );
     });
 
@@ -766,7 +824,8 @@ describe('account routes', () => {
       const { ConflictError } = jest.requireActual('@eduagent/schemas') as {
         ConflictError: new (message: string) => Error;
       };
-      mockUpdateAccountEmailFromClerk.mockRejectedValueOnce(
+      // [WI-867] Post-collapse: route calls updateLoginEmailFromClerk (identity-v2/account-v2).
+      mockUpdateLoginEmailFromClerk.mockRejectedValueOnce(
         new ConflictError('An account with this email already exists.'),
       );
 
@@ -899,6 +958,24 @@ describe('account routes', () => {
         hasPremiumLlm: false,
         conversationLanguage: 'en',
       });
+      // [WI-867] Post-collapse the v2 explicit-header path resolves scope via
+      // getPersonScope; return the non-owner scope so assertOwnerProfile (not a
+      // missing-scope 4xx) is what produces the 403.
+      mockGetPersonScope.mockResolvedValue({
+        profileId: NON_OWNER_PROFILE_ID,
+        meta: {
+          birthYear: 2012,
+          location: null,
+          consentStatus: null,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: false,
+        },
+      });
+    });
+
+    afterEach(() => {
+      restoreProfileScopeMocks();
     });
 
     const nonOwnerHeaders = makeAuthHeaders({
@@ -1057,6 +1134,7 @@ describe('account routes', () => {
     // header) is covered by the account-deletion integration negative test.
     beforeEach(() => {
       jest.clearAllMocks();
+      restoreProfileScopeMocks();
       mockUpdateAccountEmailFromClerk.mockClear();
       // Reproduce the EXACT attack: findOwnerProfile DOES succeed and returns
       // the OWNER (isOwner:true) — the no-header auto-resolve path. The prior
@@ -1192,6 +1270,7 @@ describe('account routes', () => {
   describe('[CUT-B2] v2 dispatch: deletion + export routes route to v2 twins', () => {
     beforeEach(() => {
       jest.clearAllMocks();
+      restoreProfileScopeMocks();
     });
 
     it('[CUT-B2] GET /v1/account/deletion-status calls getDeletionStatusV2 when flag on', async () => {

@@ -259,7 +259,9 @@ describe('quotaReset', () => {
       setIdentityV2Enabled(undefined);
     });
 
-    it('flag-off → legacy resetExpiredQuotaCycles (joins the dropped subscriptions table)', async () => {
+    // [WI-867] IDENTITY_V2_ENABLED collapsed to v2-always; the legacy branch
+    // is dead. Both flag states now route to resetExpiredQuotaCyclesV2.
+    it('flag-off → resetExpiredQuotaCyclesV2 (flag collapsed, legacy branch removed)', async () => {
       setIdentityV2Enabled('false');
       const legacy = jest
         .spyOn(billing, 'resetExpiredQuotaCycles')
@@ -270,9 +272,9 @@ describe('quotaReset', () => {
 
       const { result } = await executeSteps();
 
-      expect(legacy).toHaveBeenCalledTimes(1);
-      expect(v2).not.toHaveBeenCalled();
-      expect(result.monthlyResetCount).toBe(3);
+      expect(v2).toHaveBeenCalledTimes(1);
+      expect(legacy).not.toHaveBeenCalled();
+      expect(result.monthlyResetCount).toBe(99);
     });
 
     it('flag-on → resetExpiredQuotaCyclesV2 (joins the v2 subscription table, survives M-DROP)', async () => {

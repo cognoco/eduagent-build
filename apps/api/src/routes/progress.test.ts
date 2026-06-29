@@ -46,23 +46,23 @@ jest.mock('../services/account', () => {
   };
 });
 
-jest.mock('../services/profile', () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue(null),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: 2008,
-      location: null,
-      consentStatus: 'CONSENTED',
-      hasPremiumLlm: false,
-      isOwner: true,
-    }),
-  };
-});
+// WI-867 flag-collapse: profile-scope middleware now calls findOwnerPersonScope /
+// getPersonScope from identity-v2/profile-v2 (db.select() join chains,
+// unrunnable on unit mock DB). services/profile seam removed.
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 2008 }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Progress service mocks
@@ -192,6 +192,17 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
+// [WI-867] billing-v2 seam — account middleware calls ensureInitialTrialSubscriptionV2
+// unconditionally post-collapse; errors are caught but trigger captureException, which
+// breaks tests asserting "does NOT capture to Sentry". Continuity mock resolves cleanly.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() paths the unit mock DB cannot satisfy; real path covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -208,7 +219,12 @@ import * as sentryService from '../services/sentry';
 // the module.
 const mockCaptureException = jest.spyOn(sentryService, 'captureException');
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+// WI-867: DATABASE_URL required so databaseMiddleware sets db on context;
+// resolveIdentityV2 (now unconditional) reads db.query.login.
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';

@@ -66,7 +66,6 @@ import { createPendingSessionSummary } from '../summaries';
 import { deleteTopicIfSafe, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
-import { getProfileAge } from '../profile';
 import { getPersonAge } from '../identity-v2/helpers';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
@@ -527,9 +526,7 @@ async function materializeFocusedBookTopics(
     throw new NotFoundError('Book');
   }
 
-  const learnerAge = opts.identityV2Enabled
-    ? await getPersonAge(db, profileId)
-    : await getProfileAge(db, profileId);
+  const learnerAge = await getPersonAge(db, profileId);
   let result: BookTopicGenerationResult;
   try {
     result = await withTimeout(

@@ -34,6 +34,7 @@ const mockDecrementQuota = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetEffectiveAccessForSubscription = jest.fn();
+const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
@@ -53,6 +54,28 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       mockGetTopUpCreditsRemaining(...args),
   };
 });
+
+// WI-867: After IDENTITY_V2_ENABLED flag collapse, metering.ts imports
+// ensureFreeSubscriptionV2 / getEffectiveAccessForSubscriptionV2 /
+// getOrProvisionProfileQuotaUsageV2 / getQuotaPoolV2 directly from
+// ../services/billing/billing-v2 (bypassing the legacy ../services/billing
+// mock above). Wire them to the same V1 spies so the refund-on-throw scenarios
+// keep their quota state injection — otherwise the real v2 impls run and hit
+// findSubscriptionByOrganizationId__unscoped on the unit mock DB.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: ensureFreeSubscriptionV2 uses db.transaction/FOR UPDATE/inserts (unrunnable on unit mock DB); getEffectiveAccessForSubscriptionV2/getOrProvisionProfileQuotaUsageV2/getQuotaPoolV2 are wired to V1 spies for per-test state injection; no integration twin exists (rg billing-v2 src/**\/*.integration.test.ts → 0 hits for these fns, 2026-06-21) */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: (...args: unknown[]) =>
+      mockEnsureFreeSubscription(...args),
+    getEffectiveAccessForSubscriptionV2: (...args: unknown[]) =>
+      mockGetEffectiveAccessForSubscription(...args),
+    getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
+      mockGetOrProvisionProfileQuotaUsage(...args),
+    getQuotaPoolV2: (...args: unknown[]) => mockGetQuotaPool(...args),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';

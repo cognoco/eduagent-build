@@ -7,6 +7,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import { createRouteMeteringFixture } from '../test-utils/route-metering-fixture';
@@ -54,6 +55,77 @@ jest.mock('../services/profile', () => {
     }),
   };
 });
+
+// [WI-867] Post-collapse, profile-scope middleware resolves the caller via the
+// v2 `findOwnerPersonScope` / `getPersonScope` seam (db.select() join chain
+// unrunnable on the unit mock DB). Continuity mock.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — findOwnerPersonScope/getPersonScope use db.select() join chains (persons→memberships→org) that return [] on the Proxy unit-mock; real path covered by apps/api/src/services/identity-v2/profile-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
+// [WI-867] verifyPersonOwnershipV2 (called by settings.ts verifyProfileOwnership →
+// checkAndLogRateLimit in the review route) uses db.select() join chains.
+// Mocked to resolve silently (ownership assumed for unit tests).
+jest.mock(
+  '../services/identity-v2/ownership-v2' /* gc1-allow: continuity — verifyPersonOwnershipV2 uses db.select().from(membership).where().limit(1) (single-table db.select returns [] on Proxy unit-mock); verifyPersonIsOrgAdminV2 same shape; real path covered by apps/api/src/services/identity-v2/ownership-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/ownership-v2'),
+    verifyPersonOwnershipV2: jest.fn().mockResolvedValue(undefined),
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
+// [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
+// on LLM routes (generate/prepare-homework/review); accountMiddleware calls
+// ensureInitialTrialSubscriptionV2. Both use db.execute()/db.transaction()
+// paths the unit mock DB cannot satisfy. Continuity mock.
+const mockSubscriptionRowDictation = {
+  id: 'test-subscription-id',
+  accountId: 'test-account-id',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  tier: 'free' as const,
+  status: 'active' as const,
+  trialEndsAt: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  lastStripeEventId: null,
+  revenuecatOriginalAppUserId: null,
+  lastRevenuecatEventId: null,
+  lastRevenuecatEventTimestampMs: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureFreeSubscriptionV2/ensureInitialTrialSubscriptionV2 use db.execute()/db.transaction(); real paths covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: jest
+      .fn()
+      .mockResolvedValue(mockSubscriptionRowDictation),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+// [WI-867] metering.ts imports isPersonUnderSubscriptionV2 directly from the
+// sub-module (not the barrel). verifyProfileOwnsSubscription → isPersonUnderSubscriptionV2
+// uses a db.select() join chain unrunnable on mock DB. Mocked true so decrementQuota
+// proceeds to the fixture-intercepted db.update(quotaPools) path.
+jest.mock(
+  '../services/billing/billing-v2/metering-v2' /* gc1-allow: continuity — isPersonUnderSubscriptionV2 uses db.select().innerJoin() (person→membership→subscription) that returns [] on Proxy unit-mock; real path covered by apps/api/src/services/billing/billing-v2/metering-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2/metering-v2'),
+    isPersonUnderSubscriptionV2: jest.fn().mockResolvedValue(true),
+  }),
+);
 
 // Mock the dictation services — they are the internal boundary
 jest.mock('../services/dictation', () => {
@@ -197,7 +269,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
     );
 
     expect(prepareHomework).toHaveBeenCalledWith('Test sentence.', {
-      conversationLanguage: undefined,
+      conversationLanguage: 'en', // [WI-867] v2 personScope default
     });
   });
 
@@ -309,6 +381,7 @@ describe('POST /v1/dictation/generate', () => {
       recentTopics: ['Nature'],
       nativeLanguage: 'en',
       ageYears: 10,
+      conversationLanguage: 'en', // [WI-867] v2 personScope default
     };
     (fetchGenerateContext as jest.Mock).mockResolvedValueOnce(mockCtx);
     (generateDictation as jest.Mock).mockResolvedValueOnce({

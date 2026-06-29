@@ -8,9 +8,71 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 
-import { createDatabaseModuleMock } from '../test-utils/database-module';
+import {
+  createDatabaseModuleMock,
+  createTransactionalMockDb,
+} from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+// WI-867 (ic-240): seed the SEEDABLE v2 billing reads so the metering middleware
+// runs the REAL getEffectiveAccessForSubscriptionV2 (db.query.subscription.findFirst)
+// and getOrProvisionProfileQuotaUsageV2 (db.query.profileQuotaUsage.findFirst).
+// Rows are DB-shaped (v2 column names, Date/null timestamps — the real fns call
+// .toISOString() on them). The profileQuotaUsage row matches the free-owner tier
+// limits (monthly 100 / daily 10) so getOrProvisionProfileQuotaUsageV2 returns it
+// on the read path and never fires the .update()/insert provision path. id matches
+// the subscription returned by the (kept-mocked, unseedable-write) ensureFreeSubscriptionV2.
+const seededRetentionDb = createTransactionalMockDb({
+  query: {
+    subscription: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'test-subscription-id',
+        organizationId: 'test-account-id',
+        planTier: 'free',
+        status: 'active',
+        payerPersonId: 'test-profile-id',
+        storeProductId: null,
+        storePlatform: null,
+        periodStartAt: null,
+        periodEndAt: null,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        lastStripeEventId: null,
+        lastStripeEventTimestamp: null,
+        revenuecatOriginalAppUserId: null,
+        lastRevenuecatEventId: null,
+        lastRevenuecatEventTimestampMs: null,
+        trialEndsAt: null,
+        cancelledAt: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    profileQuotaUsage: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'pqu-v2-1',
+        subscriptionId: 'test-subscription-id',
+        profileId: 'test-profile-id',
+        role: 'owner',
+        monthlyLimit: 100,
+        usedThisMonth: 10,
+        dailyLimit: 10,
+        usedToday: 0,
+        cycleResetAt: new Date('2026-02-01T00:00:00.000Z'),
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
+});
+
+// WI-867: includeActual required so resolveIdentityV2 (now unconditional) can
+// import Drizzle table schemas (login.clerkUserId etc.) from @eduagent/database.
+const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
+  db: seededRetentionDb,
+});
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
@@ -33,21 +95,21 @@ jest.mock('../services/account', () => {
   };
 });
 
-jest.mock('../services/profile', () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue(null),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: null,
-      location: null,
-      consentStatus: 'CONSENTED',
-    }),
-  };
-});
+// WI-867 flag-collapse: profile-scope middleware now calls findOwnerPersonScope /
+// getPersonScope from identity-v2/profile-v2 (db.select() join chains,
+// unrunnable on unit mock DB). services/profile seam removed.
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 jest.mock('../services/retention-data', () => {
   const actual = jest.requireActual(
@@ -133,6 +195,45 @@ jest.mock('../services/billing', () => {
   };
 });
 
+// [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
+// unconditionally post-collapse; account middleware calls ensureInitialTrialSubscriptionV2.
+// Both use db.execute()/db.transaction() paths the unit mock DB cannot satisfy.
+const mockSubscriptionRowRetention = {
+  id: 'test-subscription-id',
+  accountId: 'test-account-id',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  tier: 'free' as const,
+  status: 'active' as const,
+  trialEndsAt: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  lastStripeEventId: null,
+  revenuecatOriginalAppUserId: null,
+  lastRevenuecatEventId: null,
+  lastRevenuecatEventTimestampMs: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+// WI-867 (ic-240): only the genuinely UNSEEDABLE writes are mocked here.
+// ensureFreeSubscriptionV2 / ensureInitialTrialSubscriptionV2 use
+// db.execute()/db.transaction() insert paths the unit mock DB cannot satisfy.
+// getEffectiveAccessForSubscriptionV2 + getOrProvisionProfileQuotaUsageV2 are
+// SEEDABLE reads — they run REAL against the seeded db.query.subscription /
+// db.query.profileQuotaUsage rows above (no override).
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureFreeSubscriptionV2/ensureInitialTrialSubscriptionV2 use db.execute()/db.transaction() insert paths the unit mock DB cannot satisfy; real paths covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: jest
+      .fn()
+      .mockResolvedValue(mockSubscriptionRowRetention),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
+
 import { Hono } from 'hono';
 import { app } from '../index';
 import { retentionRoutes } from './retention';
@@ -151,7 +252,12 @@ import {
 import { NotFoundError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+// WI-867: DATABASE_URL required so databaseMiddleware sets db on context;
+// resolveIdentityV2 (now unconditional) reads db.query.login.
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
