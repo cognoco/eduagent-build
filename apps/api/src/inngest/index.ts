@@ -115,6 +115,7 @@ import {
 import { needsDeepeningExpirePending } from './functions/needs-deepening-expire-pending';
 import { notifyParentChildCapHit } from './functions/notify-parent-child-cap-hit';
 import { accountSecurityNotification } from './functions/account-security-notification';
+import { accountReclaimAttempt } from './functions/account-reclaim-attempt';
 import { supportershipRevocation } from './functions/supportership-revocation';
 import { graduationNarration } from './functions/graduation-narration';
 
@@ -204,6 +205,7 @@ export {
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  accountReclaimAttempt,
   supportershipRevocation,
   graduationNarration,
 };
@@ -295,6 +297,7 @@ export const functions = [
   needsDeepeningExpirePending,
   notifyParentChildCapHit,
   accountSecurityNotification,
+  accountReclaimAttempt,
   supportershipRevocation,
   graduationNarration,
 ];
