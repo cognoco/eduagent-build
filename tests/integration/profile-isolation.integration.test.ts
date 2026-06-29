@@ -12,8 +12,10 @@
  * 5. Fabricated profile IDs are rejected
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
+  conceptMastery,
+  concepts,
   profiles,
   subjects,
   subscription as subscriptionV2,
@@ -26,6 +28,7 @@ import {
   createIntegrationDb,
   isIdentityV2Enabled,
 } from './helpers';
+import { seedCurriculum } from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -295,5 +298,292 @@ describe('Integration: Profile Isolation (P0-006)', () => {
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.code).toBe('FORBIDDEN');
+  });
+});
+
+/**
+ * WI-1104: DB-level RLS enforcement for the concepts table.
+ *
+ * PostgreSQL superusers bypass row-level security even with FORCE ROW LEVEL
+ * SECURITY, so the integration test DB's owner role cannot observe RLS effects
+ * directly.  The workaround: each test creates a temporary non-superuser role
+ * with minimal grants, switches to it with SET LOCAL ROLE (superusers may set
+ * role to any role), and performs the RLS-gated operation.  Non-superuser roles
+ * are subject to ENABLE ROW LEVEL SECURITY without needing FORCE.  Each
+ * transaction rolls back atomically, dropping the ephemeral role and any
+ * inserted rows.
+ *
+ * CONCEPT_CAPTURE_ENABLED is false so no live traffic targets these tables;
+ * the tests validate the policy predicate before the flag is flipped true.
+ */
+describe('concepts RLS policy enforcement (WI-1104)', () => {
+  it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Learner A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'Learner B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'rls-using-test-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'rls-using-test-topic' }],
+    });
+    // Unique role name avoids cross-test collisions on concurrent runs.
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    let assertionsRan = false;
+    try {
+      await db.transaction(async (tx) => {
+        // Seed as superuser (bypasses RLS — simulates server-side insert).
+        await tx.insert(concepts).values({
+          profileId: profileA.id,
+          subjectId: subject.id,
+          topicId: topicIds[0]!,
+          label: 'rls-using-test',
+          normalizedLabel: 'rls-using-test',
+        });
+
+        // Create a temporary non-superuser role to observe RLS.
+        // PostgreSQL DDL is transactional: this role is dropped on rollback.
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(sql.raw(`GRANT SELECT ON concepts TO ${testRole}`));
+
+        // Switch to the non-owner role; RLS is now enforced by ENABLE ROW
+        // LEVEL SECURITY (set in migration 0107) without needing FORCE.
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+
+        // Sanity: own profile sees its row (guards against a false pass where
+        // the table is simply empty for both profiles).
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileA.id}, true)`,
+        );
+        const own = await tx
+          .select({ id: concepts.id })
+          .from(concepts)
+          .where(eq(concepts.profileId, profileA.id));
+        expect(own).toHaveLength(1);
+
+        // Cross-profile: profile B's GUC must not see profile A's row.
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        const leaked = await tx
+          .select({ id: concepts.id })
+          .from(concepts)
+          .where(eq(concepts.profileId, profileA.id));
+        expect(leaked).toHaveLength(0);
+
+        assertionsRan = true;
+        throw new Error('test-rollback'); // drops role + rows atomically
+      });
+    } catch (e: unknown) {
+      if (!(e instanceof Error && e.message === 'test-rollback')) throw e;
+    }
+
+    expect(assertionsRan).toBe(true);
+  });
+
+  it('WITH CHECK: cross-profile concept insert rejected (non-owner role)', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'Target A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'Attacker B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'rls-check-test-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'rls-check-test-topic' }],
+    });
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // profile B's GUC + profileId = profile A → WITH CHECK rejects.
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(sql.raw(`GRANT INSERT ON concepts TO ${testRole}`));
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        await tx.insert(concepts).values({
+          profileId: profileA.id,
+          subjectId: subject.id,
+          topicId: topicIds[0]!,
+          label: 'cross-profile-attempt',
+          normalizedLabel: 'cross-profile-attempt',
+        });
+      }),
+      // Drizzle wraps the PostgreSQL error as "Failed query: <SQL>" with the
+      // original PG error in `.cause`. The PG RLS WITH CHECK violation sets
+      // cause.code = '42501' (SQLSTATE insufficient_privilege). Asserting the
+      // cause code pins this to the specific RLS rejection, not just any throw.
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: '42501' }),
+    });
+  });
+});
+
+/**
+ * WI-1104: DB-level RLS enforcement for the concept_mastery table.
+ *
+ * Mirrors the concepts block above. concept_mastery references concepts.id
+ * (FK), so a valid concept row is seeded as superuser before switching role.
+ */
+describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
+  it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'CM Learner A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'CM Learner B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'cm-rls-using-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'cm-rls-using-topic' }],
+    });
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    let assertionsRan = false;
+    try {
+      await db.transaction(async (tx) => {
+        // Seed concept + mastery as superuser (bypasses RLS).
+        const [concept] = await tx
+          .insert(concepts)
+          .values({
+            profileId: profileA.id,
+            subjectId: subject.id,
+            topicId: topicIds[0]!,
+            label: 'cm-rls-using',
+            normalizedLabel: 'cm-rls-using',
+          })
+          .returning({ id: concepts.id });
+        await tx.insert(conceptMastery).values({
+          conceptId: concept!.id,
+          profileId: profileA.id,
+          status: 'solid',
+          lastEvaluatedAt: new Date(),
+        });
+
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(
+          sql.raw(`GRANT SELECT ON concept_mastery TO ${testRole}`),
+        );
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+
+        // Sanity: own profile sees its row.
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileA.id}, true)`,
+        );
+        const own = await tx
+          .select({ id: conceptMastery.id })
+          .from(conceptMastery)
+          .where(eq(conceptMastery.profileId, profileA.id));
+        expect(own).toHaveLength(1);
+
+        // Cross-profile: profile B's GUC must not see profile A's row.
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        const leaked = await tx
+          .select({ id: conceptMastery.id })
+          .from(conceptMastery)
+          .where(eq(conceptMastery.profileId, profileA.id));
+        expect(leaked).toHaveLength(0);
+
+        assertionsRan = true;
+        throw new Error('test-rollback');
+      });
+    } catch (e: unknown) {
+      if (!(e instanceof Error && e.message === 'test-rollback')) throw e;
+    }
+
+    expect(assertionsRan).toBe(true);
+  });
+
+  it('WITH CHECK: cross-profile concept_mastery insert rejected (non-owner role)', async () => {
+    const profileA = await createProfile({
+      userId: PRIMARY_USER_ID,
+      email: PRIMARY_EMAIL,
+      displayName: 'CM Target A',
+      birthYear: 2000,
+    });
+    const profileB = await createProfile({
+      userId: SECONDARY_USER_ID,
+      email: SECONDARY_EMAIL,
+      displayName: 'CM Attacker B',
+      birthYear: 2001,
+    });
+    const db = createIntegrationDb();
+    const subject = await seedSubject(profileA.id, 'cm-rls-check-subject');
+    const { topicIds } = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'cm-rls-check-topic' }],
+    });
+    const testRole = `rls_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    // Seed parent concept as superuser (bypasses RLS); need a valid concept FK.
+    const [concept] = await db
+      .insert(concepts)
+      .values({
+        profileId: profileA.id,
+        subjectId: subject.id,
+        topicId: topicIds[0]!,
+        label: 'cm-rls-check',
+        normalizedLabel: 'cm-rls-check',
+      })
+      .returning({ id: concepts.id });
+
+    // profileB's GUC + profileId = profileA → WITH CHECK rejects.
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.execute(sql.raw(`CREATE ROLE ${testRole} NOLOGIN`));
+        await tx.execute(
+          sql.raw(`GRANT INSERT ON concept_mastery TO ${testRole}`),
+        );
+        await tx.execute(sql.raw(`SET LOCAL ROLE ${testRole}`));
+        await tx.execute(
+          sql`SELECT set_config('app.current_profile_id', ${profileB.id}, true)`,
+        );
+        await tx.insert(conceptMastery).values({
+          conceptId: concept!.id,
+          profileId: profileA.id,
+          status: 'solid',
+          lastEvaluatedAt: new Date(),
+        });
+      }),
+      // Drizzle wraps the PostgreSQL error as "Failed query: <SQL>" with the
+      // original PG error in `.cause`. The PG RLS WITH CHECK violation sets
+      // cause.code = '42501' (SQLSTATE insufficient_privilege). Asserting the
+      // cause code pins this to the specific RLS rejection, not just any throw.
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: '42501' }),
+    });
+
+    // Clean up the seeded concept (not inside the rolled-back transaction).
+    await db.delete(concepts).where(eq(concepts.id, concept!.id));
   });
 });
