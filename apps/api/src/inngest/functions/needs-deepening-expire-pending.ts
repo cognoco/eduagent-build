@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (cron; expirePendingDeepeningRows scans all profiles)
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { expirePendingDeepeningRows } from '../../services/needs-deepening/promotion';
