@@ -1029,7 +1029,11 @@ describe('weekly progress generate practice summary', () => {
 
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(result).toEqual({ status: 'throttled', parentId: PARENT_ID });
+    expect(result).toEqual({
+      status: 'throttled',
+      parentId: PARENT_ID,
+      reason: 'profile_archived',
+    });
   });
 
   it('[WI-86] skips weekly push and email when a child is archived after preparation', async () => {
@@ -1060,7 +1064,11 @@ describe('weekly progress generate practice summary', () => {
 
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(result).toEqual({ status: 'throttled', parentId: PARENT_ID });
+    expect(result).toEqual({
+      status: 'throttled',
+      parentId: PARENT_ID,
+      reason: 'profile_archived',
+    });
   });
 
   it('[WI-86] ignores archived children that did not render into the prepared digest', async () => {

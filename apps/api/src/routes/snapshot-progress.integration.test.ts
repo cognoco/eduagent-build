@@ -157,6 +157,8 @@ async function createChildProfile(owner: {
     displayName: 'Snapshot Progress Child',
     birthYear: new Date().getFullYear() - 14,
     kind: 'child',
+    // Issue-901 guard: child creates require X-Profile-Id (owner acting).
+    actingProfileId: owner.id,
   });
   expect(profile.isOwner).toBe(false);
   return { id: profile.id };

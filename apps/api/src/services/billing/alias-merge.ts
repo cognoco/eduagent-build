@@ -50,6 +50,7 @@ import { claimWebhookId } from '../webhook-idempotency';
 import {
   getSubscriptionByAccountId,
   updateSubscriptionAndQuotaFromRevenuecatWebhook,
+  updateQuotaPoolLimit,
   getTopUpCreditsRemaining,
   purchaseTopUpCredits,
 } from '../billing';
@@ -258,6 +259,7 @@ export async function mergeAliasedSubscription(
     //     id so its internal dedup keys off the alias merge, not the original
     //     purchase event.
     if (decision.upgradeSurvivor) {
+      const survivorQuota = extractTierQuota(decision.survivorTier);
       await updateSubscriptionAndQuotaFromRevenuecatWebhook(
         txDb,
         survivor.accountId,
@@ -268,7 +270,19 @@ export async function mergeAliasedSubscription(
           currentPeriodEnd: decision.survivorPeriodEnd,
           trialEndsAt: decision.survivorTrialEndsAt,
         },
-        extractTierQuota(decision.survivorTier),
+        survivorQuota,
+      );
+      // reconcileQuotaStateForSubscription (inside the call above) provisions
+      // per-PROFILE usage rows but does NOT sync quota_pools.monthly_limit for
+      // per-profile tiers (plus/pro), so without this the survivor's pool keeps
+      // the pre-merge tier's limit (e.g. free 100 instead of plus 700). Sync it
+      // to match the direct-purchase path's invariant (quota_pools.monthly_limit
+      // == tier quota for every tier). [BUG-783]
+      await updateQuotaPoolLimit(
+        txDb,
+        survivor.id,
+        survivorQuota.monthlyQuota,
+        survivorQuota.dailyLimit,
       );
       changed = true;
     }

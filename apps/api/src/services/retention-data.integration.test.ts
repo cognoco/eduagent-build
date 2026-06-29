@@ -476,8 +476,11 @@ describe('processRecallTest concurrent LLM serialization [WI-234]', () => {
   beforeEach(() => {
     llmFixture.clearCalls();
     llmFixture.clearChatError();
-    // Recall quality grader expects a single digit 0-5.
-    llmFixture.setChatResponse('4');
+    // Recall quality grader parses a JSON object (recallGradeJsonSchema), not a
+    // bare digit; quality 4 + 'solid' is a consistent grade (solid needs >= 3).
+    llmFixture.setChatResponse(
+      JSON.stringify({ quality: 4, verdict: 'solid' }),
+    );
     _resetCircuits();
   });
 

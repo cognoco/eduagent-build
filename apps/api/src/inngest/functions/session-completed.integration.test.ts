@@ -20,11 +20,15 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  // [WI-586] drop-4: accounts/profiles/familyLinks removed; seeding via v2 tables.
+  // [WI-586] drop-4: primary seeding is via v2 tables (person/login/guardianship)
+  // with legacy anchors ensured for flag-off readers. familyLinks is still the
+  // legacy (IDENTITY_V2_ENABLED=false) parent→child edge read by
+  // sendStruggleNotification, so it is seeded where the legacy path is exercised.
   createDatabase,
   curriculumBooks,
   curriculumTopics,
   curricula,
+  familyLinks,
   generateUUIDv7,
   guardianship,
   learningSessions,
@@ -453,7 +457,6 @@ describe('session-completed integration', () => {
           verificationType: null,
           sessionType: 'learning',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -583,13 +586,15 @@ describe('session-completed integration', () => {
           sessionId,
           subjectId,
           topicId: null, // freeform — no topicId at event time
-          exchangeCount: null, // not provided — triggers re-read-session
+          // exchangeCount omitted — schema is .optional() (not .nullable()), and
+          // the consumer's `exchangeCount == null` guard (session-completed.ts:485)
+          // treats an absent field as "not provided" and triggers re-read-session.
+          // Passing an explicit `null` fails sessionCompletedEventSchema.
           summaryStatus: 'pending',
           timestamp: now.toISOString(),
           verificationType: null,
           sessionType: 'learning',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -698,7 +703,6 @@ describe('session-completed integration', () => {
           verificationType: null,
           sessionType: 'homework',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -901,8 +905,6 @@ describe('session-completed integration', () => {
           timestamp: now.toISOString(),
           verificationType: 'evaluate',
           sessionType: 'learning',
-          qualityRating: null,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -995,8 +997,6 @@ describe('session-completed integration', () => {
           timestamp: now.toISOString(),
           verificationType: 'teach_back',
           sessionType: 'learning',
-          qualityRating: null,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -1107,7 +1107,6 @@ describe('session-completed integration', () => {
           verificationType: null,
           sessionType: 'learning',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -1197,8 +1196,18 @@ describe('session-completed integration', () => {
       memoryEnabled: true,
     });
 
-    // Seed parent → child guardianship edge so sendStruggleNotification can find a parent.
-    // [WI-586] drop-4: familyLinks removed; guardianship is the v2 replacement.
+    // Seed the parent → child edge in BOTH shapes so sendStruggleNotification
+    // resolves the parent regardless of IDENTITY_V2_ENABLED: guardianship is the
+    // v2 edge (flag-on), familyLinks is the legacy edge (flag-off, which the
+    // required api:integration-api gate runs). This test seeds legacy consent
+    // (learningProfiles.memoryConsentStatus), so it exercises the flag-off path
+    // — without the familyLinks edge the legacy lookup returns no_parent_link
+    // and no push fires. Mirrors the dual-seed in weekly-progress-push's
+    // seedFamilyLink helper.
+    await db.insert(familyLinks).values({
+      parentProfileId,
+      childProfileId: profileId,
+    });
     await db.insert(guardianship).values({
       guardianPersonId: parentProfileId,
       chargePersonId: profileId,
@@ -1279,7 +1288,6 @@ describe('session-completed integration', () => {
           verificationType: null,
           sessionType: 'learning',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
@@ -1342,8 +1350,6 @@ describe('session-completed integration', () => {
           timestamp: now.toISOString(),
           verificationType: null,
           sessionType: 'learning',
-          qualityRating: null, // silence_timeout — no quality signal
-          mode: null,
           reason: 'silence_timeout', // UNATTENDED_REASONS → skip SM-2 + streak
         },
       },
@@ -1432,7 +1438,6 @@ describe('session-completed integration', () => {
             verificationType: null,
             sessionType: 'learning',
             qualityRating: 4,
-            mode: null,
             reason: 'user_ended',
           },
         },
@@ -1502,7 +1507,6 @@ describe('session-completed integration', () => {
           verificationType: null,
           sessionType: 'learning',
           qualityRating: 4,
-          mode: null,
           reason: 'user_ended',
         },
       },
