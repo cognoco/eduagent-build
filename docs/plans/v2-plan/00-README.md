@@ -86,11 +86,11 @@ Latest ADRs on disk: `MMT-ADR-0021` (freeform filing threshold) and `MMT-ADR-002
 |---|---|---|---|---|
 | `MMT-ADR-0021` | Freeform filing threshold (5 exchanges; no freeform Challenge or notes) | — | S0 adjacent | **Exists** (`docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md`) |
 | `MMT-ADR-0022` | Activity ledger as narration/moments substrate (template-first; load-bearing for GDPR timers) | #4 | S0 (T10) | **Exists** (`docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`) |
-| `MMT-ADR-0023` | One-shell / scope-chip model supersedes the mode/proxy/tab-shape matrix | #1 | S4 (T13) | Planned |
+| `MMT-ADR-0024` | One-shell / scope-chip model supersedes the mode/proxy/tab-shape matrix | #1 | S4 (T13) | Exists (`docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md`) |
 | `MMT-ADR-0027` | Supporter visibility contract (non-reportable class, render-equivalence, appeal, artifact wall, safety exception) | #2 | S5 (T12) | Planned |
 | `MMT-ADR-0028` | Managed/credentialized as visibility-tier carrier + graduation (reconcile with identity canon, don't duplicate) | #3 | S5 (T12) | Planned |
 
-*(Renumber history: 0020/0021 were the original branch allocations; renumbered to 0021/0022 on 2026-06-12 when merging new-llm → the collision with main's `MMT-ADR-0019` (OS-agnostic) resolved and 0020 yielded to the identity-foundation cutover-plan consent-request ADR. Downstream planned ADRs shift: scope-chip 0021→0023, supporter-visibility 0022→0024→0027, managed-tier 0023→0025→0028. The second renumber (→0027/→0028) resolved collisions with `MMT-ADR-0024-scope-chip-supersedes-nav-contract.md` and `MMT-ADR-0025-owner-context-elevation-reverification.md` which had been filed at those numbers independently.)*
+*(Renumber history: 0020/0021 were the original branch allocations; renumbered to 0021/0022 on 2026-06-12 when merging new-llm → the collision with main's `MMT-ADR-0019` (OS-agnostic) resolved and 0020 yielded to the identity-foundation cutover-plan consent-request ADR. Downstream planned ADRs shift: scope-chip 0021→0023→0024, supporter-visibility 0022→0024→0027, managed-tier 0023→0025→0028. The second renumber (→0027/→0028) resolved collisions with `MMT-ADR-0024-scope-chip-supersedes-nav-contract.md` and `MMT-ADR-0025-owner-context-elevation-reverification.md` which had been filed at those numbers independently.)*
 
 ---
 
