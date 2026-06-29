@@ -20,6 +20,7 @@ module.exports = {
         success: 'var(--color-success)',
         warning: 'var(--color-warning)',
         danger: 'var(--color-danger)',
+        'danger-soft': 'var(--color-danger-soft)',
         info: 'var(--color-info)',
         border: 'var(--color-border)',
         muted: 'var(--color-muted)',
@@ -49,6 +50,12 @@ module.exports = {
         'practice-chip-bg': 'var(--color-practice-chip-bg)',
         reward: 'var(--color-reward)',
         'reward-soft': 'var(--color-reward-soft)',
+        'proxy-preview-background': 'var(--color-proxy-preview-background)',
+        'proxy-preview-border': 'var(--color-proxy-preview-border)',
+        'proxy-preview-scene-background':
+          'var(--color-proxy-preview-scene-background)',
+        'proxy-preview-tab-background':
+          'var(--color-proxy-preview-tab-background)',
         'highlight-bg': 'var(--color-highlight-bg)',
         'highlight-fg': 'var(--color-highlight-fg)',
       },
