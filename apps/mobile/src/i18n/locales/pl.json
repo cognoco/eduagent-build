@@ -4112,6 +4112,8 @@
     "sectionPaused": "Wstrzymane",
     "sectionArchived": "Zarchiwizowane",
     "bookCount_one": "{{count}} książka",
+    "bookCount_few": "{{count}} książki",
+    "bookCount_many": "{{count}} książek",
     "bookCount_other": "{{count}} książek"
   },
   "subjectHub": {
