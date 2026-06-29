@@ -430,11 +430,12 @@ describe('concepts RLS policy enforcement (WI-1104)', () => {
         });
       }),
       // Drizzle wraps the PostgreSQL error as "Failed query: <SQL>" with the
-      // original PG error in `.cause`; the RLS rejection string lives there, not
-      // in the top-level message.  `.toThrow()` asserts SOME error was thrown;
-      // the test setup makes FK, permission, and unique-constraint failures
-      // impossible at this point, so any throw here is the WITH CHECK rejection.
-    ).rejects.toThrow();
+      // original PG error in `.cause`. The PG RLS WITH CHECK violation sets
+      // cause.code = '42501' (SQLSTATE insufficient_privilege). Asserting the
+      // cause code pins this to the specific RLS rejection, not just any throw.
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: '42501' }),
+    });
   });
 });
 
@@ -575,10 +576,12 @@ describe('concept_mastery RLS policy enforcement (WI-1104)', () => {
         });
       }),
       // Drizzle wraps the PostgreSQL error as "Failed query: <SQL>" with the
-      // original PG error in `.cause`; see the concepts WITH CHECK test for the
-      // same limitation note.  The test setup makes all other failure modes
-      // (FK, permission, unique constraint) impossible at this point.
-    ).rejects.toThrow();
+      // original PG error in `.cause`. The PG RLS WITH CHECK violation sets
+      // cause.code = '42501' (SQLSTATE insufficient_privilege). Asserting the
+      // cause code pins this to the specific RLS rejection, not just any throw.
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({ code: '42501' }),
+    });
 
     // Clean up the seeded concept (not inside the rolled-back transaction).
     await db.delete(concepts).where(eq(concepts.id, concept!.id));
