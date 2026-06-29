@@ -66,6 +66,31 @@ describe('NowCard', () => {
     expect(onDecline).toHaveBeenCalledWith(value);
   });
 
+  it('renders with a stagger delay and stays interactive under reduced motion', () => {
+    const reanimated = require('react-native-reanimated');
+    const spy = jest
+      .spyOn(reanimated, 'useReducedMotion')
+      .mockReturnValue(true);
+    try {
+      const onContinue = jest.fn();
+      const value = card();
+      const { getByTestId } = render(
+        <NowCard
+          card={value}
+          enterDelayMs={50}
+          onContinue={onContinue}
+          onDecline={jest.fn()}
+        />,
+      );
+
+      expect(getByTestId('now-card-unfinished_session')).toBeTruthy();
+      fireEvent.press(getByTestId('now-card-continue'));
+      expect(onContinue).toHaveBeenCalledWith(value);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('renders arc state only when explicitly supplied', () => {
     const { queryByTestId } = render(
       <NowCard card={card()} onContinue={jest.fn()} onDecline={jest.fn()} />,

@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import type {
   NowCard as NowCardData,
@@ -41,14 +42,24 @@ function renderCard(
   onDecline: (card: NowCardData) => void,
   arcState?: NowCardArcState,
   onCompleted?: (card: NowCardData) => void,
+  enterDelayMs = 0,
+  reduceMotion = false,
 ) {
   if (card.kind === 'ledger_moment') {
+    // LedgerMomentCard has no internal animation, so apply the stagger entering
+    // animation via a wrapper shell here to keep module cards uniform (AC#2).
     return (
-      <LedgerMomentCard
-        card={card}
-        onContinue={onContinue}
-        onDecline={onDecline}
-      />
+      <Animated.View
+        entering={
+          reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300)
+        }
+      >
+        <LedgerMomentCard
+          card={card}
+          onContinue={onContinue}
+          onDecline={onDecline}
+        />
+      </Animated.View>
     );
   }
   return (
@@ -59,6 +70,7 @@ function renderCard(
       onContinue={onContinue}
       onDecline={onDecline}
       onCompleted={onCompleted}
+      enterDelayMs={enterDelayMs}
     />
   );
 }
@@ -74,6 +86,7 @@ export function NowCardStack({
   onShowOverflow,
 }: NowCardStackProps) {
   const { t } = useTranslation();
+  const reduceMotion = useReducedMotion();
   const cards = feed.cards
     .filter(isActionableCard)
     .filter((card) => !dismissedKeys.has(getNowCardDismissKey(card)))
@@ -92,7 +105,7 @@ export function NowCardStack({
   return (
     <View testID="now-card-stack" accessibilityRole="list" className="gap-3">
       {anchor ? (
-        <View testID="now-card-slot-anchor">
+        <View testID="now-card-slot-anchor" key={getNowCardDismissKey(anchor)}>
           {renderCard(
             anchor,
             'anchor',
@@ -100,6 +113,8 @@ export function NowCardStack({
             onDecline,
             getArcState?.(anchor) ?? anchorArcState,
             onCompleted,
+            0,
+            reduceMotion,
           )}
         </View>
       ) : null}
@@ -115,6 +130,8 @@ export function NowCardStack({
             onDecline,
             getArcState?.(card),
             onCompleted,
+            (index + 1) * 50,
+            reduceMotion,
           )}
         </View>
       ))}
