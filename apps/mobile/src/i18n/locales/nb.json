@@ -1176,7 +1176,9 @@
       "surpriseMe": "Overrask meg",
       "surpriseMeSubtitle": "Øv med et nytt diktat",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "Tidligere diktater",
+      "viewPastDictationsSubtitle": "Se tilbake på det du har øvd på"
     },
     "complete": {
       "noSessionTitle": "Ingen diktat å fullføre",
@@ -1262,6 +1264,21 @@
       "preparing": "Forbereder ...",
       "takingLonger": "Dette tar lengre tid enn vanlig – du kan avbryte og prøve igjen.",
       "cancelPreparing": "Avbryt forberedelse av diktat"
+    },
+    "history": {
+      "title": "Tidligere diktater",
+      "back": "Gå tilbake",
+      "loading": "Laster inn diktatene dine …",
+      "errorTitle": "Kunne ikke laste inn diktatene dine",
+      "retry": "Prøv igjen",
+      "empty": "Ingen diktater ennå. Fullfør en, så dukker den opp her.",
+      "modeHomework": "Fra teksten din",
+      "modeSurprise": "Overraskelsesdiktat",
+      "scoreLabel": "{{correct}} av {{total}} riktige",
+      "sentenceCountLabel_one": "{{count}} setning",
+      "sentenceCountLabel_other": "{{count}} setninger",
+      "sentencesHeading": "Det du øvde på",
+      "noSentences": "Teksten for denne diktaten ble ikke lagret."
     }
   },
   "library": {

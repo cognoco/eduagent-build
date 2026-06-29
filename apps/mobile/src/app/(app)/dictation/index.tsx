@@ -222,6 +222,12 @@ export default function DictationChoiceScreen(): React.ReactElement {
             onPress={() => void handleSurpriseMe()}
             testID="dictation-surprise"
           />
+          <IntentCard
+            title={t('dictation.index.viewPastDictations')}
+            subtitle={t('dictation.index.viewPastDictationsSubtitle')}
+            onPress={() => router.push('/(app)/dictation/history' as Href)}
+            testID="dictation-history-link"
+          />
         </View>
       )}
     </ScrollView>

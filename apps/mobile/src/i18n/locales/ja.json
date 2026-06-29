@@ -1176,7 +1176,9 @@
       "surpriseMe": "おまかせ",
       "surpriseMeSubtitle": "新しいディクテーションで練習",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "過去のディクテーション",
+      "viewPastDictationsSubtitle": "練習した内容を振り返りましょう"
     },
     "complete": {
       "noSessionTitle": "完了するディクテーションがありません",
@@ -1262,6 +1264,21 @@
       "preparing": "準備中...",
       "takingLonger": "通常より時間がかかっています — キャンセルして再試行できます。",
       "cancelPreparing": "ディクテーションの準備をキャンセル"
+    },
+    "history": {
+      "title": "過去のディクテーション",
+      "back": "戻る",
+      "loading": "ディクテーションを読み込み中…",
+      "errorTitle": "ディクテーションを読み込めませんでした",
+      "retry": "再試行",
+      "empty": "まだディクテーションがありません。完了すると、ここに表示されます。",
+      "modeHomework": "自分のテキストから",
+      "modeSurprise": "おまかせディクテーション",
+      "scoreLabel": "{{total}}問中{{correct}}問正解",
+      "sentenceCountLabel_one": "{{count}}文",
+      "sentenceCountLabel_other": "{{count}}文",
+      "sentencesHeading": "練習した内容",
+      "noSentences": "このディクテーションのテキストは保存されませんでした。"
     }
   },
   "library": {

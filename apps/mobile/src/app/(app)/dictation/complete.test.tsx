@@ -210,6 +210,8 @@ describe('DictationCompleteScreen', () => {
         completionKey: COMPLETION_KEY,
         reviewed: false,
         sentenceCount: 1, // defaultSession has 1 sentence
+        // [WI-902] Source sentence texts are persisted for the history view.
+        sentences: ['The quick brown fox.'],
       }),
     );
   });

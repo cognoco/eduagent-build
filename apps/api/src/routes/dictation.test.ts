@@ -382,6 +382,8 @@ describe('POST /v1/dictation/result', () => {
       mistakeCount: 2,
       mode: 'homework',
       reviewed: false,
+      // [WI-902] Persisted source sentences are part of the row contract now.
+      sentences: ['The cat sat.', 'The dog ran.'],
       createdAt: new Date().toISOString(),
     });
 
@@ -397,6 +399,7 @@ describe('POST /v1/dictation/result', () => {
           mistakeCount: 2,
           mode: 'homework',
           reviewed: false,
+          sentences: ['The cat sat.', 'The dog ran.'],
         }),
       },
       TEST_ENV,
@@ -404,7 +407,10 @@ describe('POST /v1/dictation/result', () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.result).toEqual(expect.objectContaining({}));
+    // [WI-902] Persisted sentences round-trip through the response.
+    expect(body.result).toEqual(
+      expect.objectContaining({ sentences: ['The cat sat.', 'The dog ran.'] }),
+    );
     expect(recordDictationResult).toHaveBeenCalledWith(
       mockDatabaseModule.db, // exact scoped db handle — guards against wrong-db injection
       'test-profile-id',
@@ -413,6 +419,8 @@ describe('POST /v1/dictation/result', () => {
         localDate: TODAY,
         sentenceCount: 5,
         mode: 'homework',
+        // [WI-902] Route forwards the source sentences to the service.
+        sentences: ['The cat sat.', 'The dog ran.'],
       }),
     );
   });
@@ -446,6 +454,8 @@ describe('POST /v1/dictation/result', () => {
       mistakeCount: null,
       mode: 'homework',
       reviewed: false,
+      // [WI-902] Old client omits sentences → row carries null.
+      sentences: null,
       createdAt: new Date().toISOString(),
     });
 

@@ -1176,7 +1176,9 @@
       "surpriseMe": "Überrasche mich",
       "surpriseMeSubtitle": "Übe mit einem neuen Diktat",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "Vergangene Diktate",
+      "viewPastDictationsSubtitle": "Sieh dir an, was du geübt hast"
     },
     "complete": {
       "noSessionTitle": "Kein Diktat zum Beenden",
@@ -1262,6 +1264,21 @@
       "preparing": "Wird vorbereitet...",
       "takingLonger": "Das dauert länger als üblich – du kannst abbrechen und es erneut versuchen.",
       "cancelPreparing": "Diktatvorbereitung abbrechen"
+    },
+    "history": {
+      "title": "Vergangene Diktate",
+      "back": "Zurück",
+      "loading": "Deine Diktate werden geladen …",
+      "errorTitle": "Deine Diktate konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "empty": "Noch keine Diktate. Schließe eins ab und es wird hier angezeigt.",
+      "modeHomework": "Aus deinem Text",
+      "modeSurprise": "Überraschungsdiktat",
+      "scoreLabel": "{{correct}} von {{total}} richtig",
+      "sentenceCountLabel_one": "{{count}} Satz",
+      "sentenceCountLabel_other": "{{count}} Sätze",
+      "sentencesHeading": "Was du geübt hast",
+      "noSentences": "Der Text für dieses Diktat wurde nicht gespeichert."
     }
   },
   "library": {

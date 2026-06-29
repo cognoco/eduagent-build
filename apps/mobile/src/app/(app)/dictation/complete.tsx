@@ -307,6 +307,9 @@ export default function DictationCompleteScreen(): React.ReactElement {
         mistakeCount: null,
         mode,
         reviewed: false,
+        // [WI-902] Persist the source sentence texts so this session shows its
+        // full text in the dictation history, not just a count.
+        sentences: sentences.map((s) => s.text),
       });
     } catch (err) {
       // [ASSUMP-F11] If mutateAsync threw, nothing was saved server-side.

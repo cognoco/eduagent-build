@@ -1203,7 +1203,9 @@
       "surpriseMe": "Surpreenda-me",
       "surpriseMeSubtitle": "Pratique com um novo ditado",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "Ditados anteriores",
+      "viewPastDictationsSubtitle": "Relembra o que praticaste"
     },
     "complete": {
       "noSessionTitle": "Nenhum ditado para terminar",
@@ -1289,6 +1291,21 @@
       "preparing": "Preparando...",
       "takingLonger": "Isso está demorando mais que o normal — você pode cancelar e tentar novamente.",
       "cancelPreparing": "Cancelar preparação do ditado"
+    },
+    "history": {
+      "title": "Ditados anteriores",
+      "back": "Voltar",
+      "loading": "A carregar os teus ditados…",
+      "errorTitle": "Não foi possível carregar os teus ditados",
+      "retry": "Tentar novamente",
+      "empty": "Ainda não há ditados. Conclui um e ele aparecerá aqui.",
+      "modeHomework": "Do teu texto",
+      "modeSurprise": "Ditado surpresa",
+      "scoreLabel": "{{correct}} de {{total}} corretos",
+      "sentenceCountLabel_one": "{{count}} frase",
+      "sentenceCountLabel_other": "{{count}} frases",
+      "sentencesHeading": "O que praticaste",
+      "noSentences": "O texto deste ditado não foi guardado."
     }
   },
   "library": {
