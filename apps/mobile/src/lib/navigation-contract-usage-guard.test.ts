@@ -779,4 +779,30 @@ describe('navigation-contract terminal usage ratchet', () => {
 
     expect(missingFiles).toEqual([]);
   });
+
+  it('keeps WI-1092 flag-leakage sites behind the navigation contract', () => {
+    const leakageSites = [
+      {
+        file: 'apps/mobile/src/components/guards/RequireFamilyContext.tsx',
+        banned: ['FEATURE_FLAGS', 'MODE_NAV_V0_ENABLED', 'MODE_NAV_V1_ENABLED'],
+      },
+      {
+        file: 'apps/mobile/src/app/(app)/child/[profileId]/curriculum.tsx',
+        banned: ['MODE_NAV_V1_ENABLED'],
+      },
+      {
+        file: 'apps/mobile/src/app/(app)/library.tsx',
+        banned: ['isGuardianProfile'],
+      },
+    ];
+
+    const offenders = leakageSites.flatMap(({ file, banned }) => {
+      const source = readFileSync(resolve(repoRoot(), file), 'utf-8');
+      return banned
+        .filter((snippet) => source.includes(snippet))
+        .map((snippet) => `${file}: ${snippet}`);
+    });
+
+    expect(offenders).toEqual([]);
+  });
 });

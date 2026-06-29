@@ -1,0 +1,17 @@
+{
+  "pageId": "37e8bce9-1f7c-816d-9adc-c945f5466bf1",
+  "id": "WI-706",
+  "name": "Docs-only PRs are permanently BLOCKED: required 'main' check never reports for non-code changes",
+  "description": "Branch protection on `main` requires the status check named `main` (the lint/test/typecheck/build job). For docs-only PRs the change-class router (scripts/check-change-class.sh) correctly skips that heavy job, so the `main` context is NEVER reported — not pass, not pending, simply absent. GitHub then holds the PR in mergeStateStatus=BLOCKED forever (waiting for a status that will never arrive), even though every check that DID run is green and conversations are resolved. Observed on WI-690 PR #1095 (docs-only canon edit): all real checks green (Playwright/E2E Web, API Quality Gate, Merge completeness, CodeRabbit), claude review correctly skipped, but BLOCKED on the missing `main` context. It had to be admin-merged (operator-approved 2026-06-13). This will recur for EVERY docs-only PR (canon, ADRs, _wip plans, READMEs). Canonical fix per AGENTS.md PR protocol: add a small PR-only job that REPORTS the required `main` status context as success when the heavy `main` job is skipped (a status-reporter/no-op shim keyed to the change-class decision), so branch protection is satisfied without running the full build; keep deploy/build jobs guarded by `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` so PRs still cannot deploy. Alternative considered: drop `main` from required contexts for docs paths (path-filtered branch protection) — rejected because GitHub branch protection is not path-aware and removing the required check weakens the code-PR gate. Net: the required-check set and the change-class router must agree on what reports for docs-only PRs.",
+  "acceptanceCriteria": "A docs-only PR (touching only docs/**, *.md, _wip/**) reaches mergeStateStatus=CLEAN/UNSTABLE (mergeable without --admin) with the required `main` context reported success via the skip-shim; a code PR still runs and requires the full `main` job; deploy/build steps remain guarded against pull_request events; verified by opening a docs-only test PR and confirming it is mergeable without admin override.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

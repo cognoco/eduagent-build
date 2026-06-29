@@ -1,0 +1,22 @@
+# Worker Charlie Checkpoint
+
+- Timestamp: 2026-06-21 20:02 Europe/Oslo
+- Current WI: WI-652 — IDEMPOTENCY_KV namespace never provisioned / BUG-12 deploy blocker
+- Worktree: C:\Dev\Projects\Products\Apps\eduagent-build\.worktrees\WI-652
+- Branch: WI-652
+- Cosmo readback: Stage=Executing; State=Active; ClaimedBy=codex:worker-charlie:WI-652; ClaimWorkspace=cognoco/eduagent-build@WI-652
+- Changed files in worktree: none
+- Uncommitted worktree paths: none; git status --short is clean
+- Artifact written: C:\Dev\Projects\Products\Apps\eduagent-build\.cosmo-artifacts\WI-652\completion-summary.md
+- Decision: stale / non-reproducing. No implementation, no commit, no push, no Cosmo complete.
+- Validation status:
+  - PASS: node --test apps/api/scripts/verify-wrangler-kv-binding.test.mjs (9/9)
+  - PASS: pnpm exec jest --config apps/api/jest.config.cjs --runTestsByPath apps/api/src/wrangler-config.test.ts --runInBand --verbose --no-coverage (11/11)
+  - PASS: dummy render rehearsal substituted all placeholders and verify-wrangler-kv-binding passed for staging and production IDEMPOTENCY_KV
+  - PASS: GitHub Actions secret names present for CF_ACCOUNT_ID plus SUBSCRIPTION/COACHING/IDEMPOTENCY KV DEV/STG/PRD render variables
+  - PASS: Doppler has CF_KV_IDEMPOTENCY_ID_DEV/STG/PRD present with valid 32-hex shape
+  - PASS: Cloudflare KV namespace API lists the dev/stg/prd IDEMPOTENCY_KV namespace IDs from synced env
+  - PASS: node apps/api/scripts/render-wrangler-kv.mjs --check apps/api/wrangler.toml
+  - PASS: deploy.yml order is render before verify before migrate before deploy
+- Caveat: local .env.development.local alone lacks the render script's subscription/coaching variable names, so a faithful local all-placeholder render using only that file fails before idempotency verification. GitHub Actions has the complete render secret-name set present, and deploy.yml uses GitHub secrets.
+- Next command needed: coordinator review / stale disposition for WI-652; do not run Cosmo complete from this worker.

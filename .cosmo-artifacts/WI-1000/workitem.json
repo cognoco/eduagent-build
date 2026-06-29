@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8117-ae12-fd9c71c4a3b9",
+  "id": "WI-1000",
+  "name": "requestSelfUnlink revokes edge + contract + audit + notice non-atomically",
+  "description": "[FCR 2026-06-21 · L10-02] four dependent writes, no transaction; partial failure leaves revokedAt set but contract still 'accepted' (supporter retains visibility post-revocation) or revocation with no notice. Fix: wrap all four in db.transaction().",
+  "acceptanceCriteria": "Root cause: requestSelfUnlink() in apps/api/src/services/supportership-revocation.ts performs four sequential bare db writes (db.update supportership.revokedAt:49-52, db.update supportVisibilityContracts.status:55-58, writeVisibilityAuditEvent:64-73, createVisibilityNotice:74-85) with no wrapping db.transaction(), so a crash after write 1 leaves revokedAt stamped but the contract still 'accepted' — supporter retains visibility post-revocation.\n\nVariants: (a) crash after edge update only — revokedAt set, contract remains 'accepted', visibility queries that check contract status alone see the supporter as still active; (b) crash after contract update — consistent DB state, audit event missing (compliance gap); (c) crash after audit write — consistent DB state, supporter gets no in-app notice; (d) ghost-edge path (WI-999 partial failure, no contract row) — contract update skipped entirely, but if notice write also fails, revokedAt is left set with nothing else changed.\n\nFix: wrap all four writes in db.transaction(async (tx) => { ... }) using tx throughout, following the pattern in apps/api/src/services/identity-v2/deletion-v2.ts. Note: createVisibilityNotice may itself do a DB insert — confirm it accepts a tx argument or extract the insert into the transaction block.\n\nRegression test: add to apps/api/src/services/linking-ceremony.integration.test.ts (or create supportership-revocation.integration.test.ts). Test 'requestSelfUnlink rolls back on contract-update failure' injects a DB error after the supportership update; asserts supportership.revokedAt is null after the throw. Test 'requestSelfUnlink rolls back on notice-write failure' asserts both revokedAt is null and contract.status remains accepted. Both tests must fail without the transaction and pass with it.",
+  "riskImpact": "Supporter retains live data-visibility access after the supportee revokes the link; a crash mid-revocation silently leaves the supporter able to view the supportee's progress and learning data. Data-privacy breach for minor learners.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

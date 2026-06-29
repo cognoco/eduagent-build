@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81d8-909b-fd2e15c90ed0",
+  "id": "WI-1048",
+  "name": "Native prod builds (mobile-ci.yml) don't inject EXPO_PUBLIC_ keys (no fail-fast)",
+  "description": "[FCR 2026-06-21 · L14-05] build-preview/build-manual jobs have no env block for EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY/REVENUECAT/ANALYTICS_HASH, unlike the OTA job in ci.yml; missing EAS secrets ship empty values with no check. Fix: add the same env block + non-empty verification.",
+  "acceptanceCriteria": "Root cause: build-preview and build-manual jobs in .github/workflows/mobile-ci.yml have no env: block, so EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY, EXPO_PUBLIC_REVENUECAT_API_KEY_IOS, EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID, and EXPO_PUBLIC_ANALYTICS_HASH_KEY_V1 are absent from the build environment. These keys are excluded from eas.json via EAS_JSON_DENYLIST (verified: none of these keys appear in apps/mobile/eas.json) so EAS does not supply them. The OTA job in ci.yml correctly injects them via an env: block (ci.yml:505-529). A native build without these keys embeds empty strings, silently disabling: auth (Clerk key missing), IAP (RevenueCat keys missing), and analytics HMAC boundary. Variants: (a) build-preview runs on main push â€” native APK has empty CLERK/REVENUECAT/ANALYTICS keys; (b) build-manual runs via workflow_dispatch â€” same empty keys regardless of build profile; (c) production build profile triggered manually â€” production app ships with empty secrets. Fix: add an env: block to both build-preview and build-manual jobs in mobile-ci.yml, mirroring the OTA job env block (ci.yml:505-529) with appropriate GitHub secrets per profile. Add a non-empty verification step before the eas build step (e.g. if [ -z \"$EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY\" ]; then echo 'ERROR: secret empty'; exit 1; fi). Regression test: CI actionlint or a new YAML check asserts the env: block is present in both jobs; or a build smoke test verifies EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is non-empty in the produced bundle. The test fails without the env: block and passes with it. Done: native builds produced by build-preview and build-manual embed non-empty Clerk, RevenueCat, and analytics keys.\n\n--- Dedup: absorbs WI-1047 RevenueCat build-injection + fail-fast (2026-06-24) ---\nWI-1047 (Related) is the RevenueCat-scoped subset of this build-injection/fail-fast gap. Folded-in scope:\n- eas.json: add a comment block on the production build profile noting EXPO_PUBLIC_REVENUECAT_API_KEY_IOS/ANDROID are injected from EAS Environment Variables (eas env:create per docs/deployment-and-secrets.md) and are intentionally absent from the committed file.\n- Harden configureRevenueCat(): when Platform.OS is ios/android AND !__DEV__ AND apiKey is empty, call Sentry.captureException with a structured message instead of a silent console.error (today IAP is silently disabled in prod with no gate).\n- Regression test apps/mobile/src/lib/revenuecat.test.ts: Platform.OS='ios', __DEV__=false, empty key -> asserts the Sentry capture/throw; fails without the guard.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:turing:WI-1048",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

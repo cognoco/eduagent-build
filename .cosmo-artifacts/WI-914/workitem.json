@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-810c-b524-dd1ac1b73ea9",
+  "id": "WI-914",
+  "name": "extractFirstJsonArray fence handling weaker than its object sibling",
+  "description": "[FCR 2026-06-21 · L1-05] array extractor uses unanchored first-match fence with no parse-validated fallback, unlike extractFirstJsonObject; a non-array fenced block before the real array is mis-extracted. Fix: mirror the object extractor's anchored-fence + parse-validated fallback.",
+  "acceptanceCriteria": "Root cause: extractFirstJsonArray uses the first markdown fence it sees and then scans only that body, unlike extractFirstJsonObject's anchored-wrapper handling plus parse-validated fallback over later candidates. Variants: (a) response is exactly a fenced JSON array, (b) a non-array fenced block appears before the real array, (c) unfenced prose precedes the first valid array; all should return the first parse-valid array and ignore invalid/non-array candidates. Regression test: apps/api/src/services/llm/extract-json.test.ts fails without the fix and passes with it, covering the three array extraction variants and preserving existing object extractor behavior.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

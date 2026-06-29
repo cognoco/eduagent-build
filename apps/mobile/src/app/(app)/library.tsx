@@ -33,7 +33,7 @@ import {
   useLibraryRetention,
   type LibraryRetentionTopic,
 } from '../../hooks/use-library-context';
-import { isGuardianProfile, useProfile } from '../../lib/profile';
+import { useProfile } from '../../lib/profile';
 import { useNavigationContract } from '../../hooks/use-navigation-contract';
 import { formatApiError } from '../../lib/format-api-error';
 import {
@@ -164,9 +164,9 @@ function LibraryScreenContent({
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { colorScheme } = useTheme();
-  const { activeProfile, profiles } = useProfile();
+  const { activeProfile } = useProfile();
   const canWrite = !navigationContract.isParentProxy;
-  const isGuardian = isGuardianProfile(activeProfile, profiles);
+  const isGuardian = navigationContract.gates.showFamilyHome;
   const activeProfileRole = useActiveProfileRole();
   const proxyChildProfileId =
     activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;

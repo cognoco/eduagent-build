@@ -1,0 +1,17 @@
+{
+  "pageId": "3888bce9-1f7c-810a-9970-eadb5a6a15da",
+  "id": "WI-1083",
+  "name": "Centralize date/time formatting and add invalid-date guards",
+  "description": "apps/mobile/src/lib/format-datetime.ts and format-relative-date.ts provide Hermes-safe, locale-aware date formatting with NaN guards. 32 raw toLocaleDateString/toLocaleTimeString call sites in screen and component files bypass these helpers entirely — they receive no NaN guard and ignore i18n.language, so they render in the device locale rather than the user's selected app locale. Complements WI-918 (relative-date divergence) and WI-921 (validateLocalDate NaN) which addressed specific symptoms; this is the systemic consolidation.",
+  "acceptanceCriteria": "**Current state (root cause):** `apps/mobile/src/lib/format-datetime.ts` has `formatMediumDateTime` (Hermes-safe, NaN guard, i18n-locale-aware). `format-relative-date.ts` has `formatRelativeDate`. 32 raw `.toLocaleDateString(undefined, ...)` calls pass `undefined` locale (device locale, not app locale) with no NaN guard. Example sites: `apps/mobile/src/app/(app)/child/[profileId]/index.tsx:80`, `reports.tsx:35,54,59`, `session/[sessionId].tsx:37`, `subjects/[subjectId].tsx:51`, `topic/[topicId].tsx:36`.\n\n**Target:** Add `formatShortDate(iso: string, locale?: string): string` to `format-datetime.ts` — same NaN guard as `formatMediumDateTime`, uses `{ dateStyle: 'medium' }`, accepts `i18n.language` from caller. Sweep all 32 raw call sites: replace `new Date(iso).toLocaleDateString(undefined, {...})` with `formatShortDate(iso, i18n.language)`.\n\n**Approach:** Run `rg 'toLocaleDateString|toLocaleTimeString' apps/mobile/src --glob=\"*.ts\" --glob=\"*.tsx\"` for the full list. For each site: (1) replace call, (2) remove local `formatJoinedDate`/`formatSessionDate`/`formatDate` wrapper functions that become no-ops (they were reinventing the helper). Remove the dead wrappers to avoid orphaned code.\n\n**Verification:** `pnpm exec nx run mobile:test` green before and after. `format-datetime.test.ts` must include a test that passes `\"not-a-date\"` and gets a non-crashing fallback. Run `rg 'toLocaleDateString' apps/mobile/src --glob=\"*.ts\" --glob=\"*.tsx\" | grep -v test` — should reach 0 or only guarded fallback sites.\n\n**Sibling WIs:** Complements WI-918 (relative-date divergence) and WI-921 (validateLocalDate NaN guard). Both addressed specific symptoms already; this item does the sweep.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:confucius:WI-1083",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

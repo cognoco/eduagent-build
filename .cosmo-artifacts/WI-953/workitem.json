@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81da-ac8f-eede7a9614bf",
+  "id": "WI-953",
+  "name": "RecentSessionsList error secondary action pushes deeper into child stack",
+  "description": "[FCR 2026-06-21 · L6-12] parent-viewing-child error secondary pushes deeper into the curriculum stack instead of a clean back/home escape. Fix: offer back/home.",
+  "acceptanceCriteria": "Root cause: for non-active child profiles, RecentSessionsList builds errorEscapeAction from emptyAction, so the error secondary action pushes to the child curriculum stack instead of giving an escape route. Variants: active-profile error should go home; parent-viewing-child error should back/home rather than push deeper. Regression test: extend apps/mobile/src/components/progress/RecentSessionsList.test.tsx to cover both error secondary-action variants.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

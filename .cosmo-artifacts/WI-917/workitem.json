@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81e9-9832-f646c40c8d9f",
+  "id": "WI-917",
+  "name": "math-format superscript/subscript regex captures only one digit",
+  "description": "[FCR 2026-06-21 · L1-08a] result.replace(/\\^(\\d)/g,...) captures one digit so 10^23 renders 10-squared-3 (same for subscripts). Fix: use \\d+.",
+  "acceptanceCriteria": "Root cause: apps/mobile/src/lib/math-format.ts handles braced exponent/subscript groups with multi-character captures, but the unbraced digit regexes use /(\\d)/, so x^23 becomes x squared plus literal 3 and a_12 becomes a subscript-one plus literal 2. Variants: (a) unbraced multi-digit superscripts, (b) unbraced multi-digit subscripts, (c) existing single-digit and braced exponent/subscript behavior remains unchanged. Regression test: apps/mobile/src/lib/math-format.test.ts fails without the fix and passes with it, adding x^23 and a_12 expectations alongside the existing braced cases.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

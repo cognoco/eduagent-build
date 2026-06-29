@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8101-8c56-cc92bb39dbf9",
+  "id": "WI-1004",
+  "name": "v2 RC webhook: is_family_share guard absent from all handlers",
+  "description": "[FCR 2026-06-21 · L11-01] v2 RC handlers (initial/renewal/product-change/non-renewing/uncancellation) skip escalateAndSkipFamilyShare; a family-share event under the v2 flag grants paid entitlement N times with no Sentry escalation. Behind IDENTITY_V2_ENABLED (off in prod). Fix: port the guard into each v2 handler before grant.",
+  "acceptanceCriteria": "Root cause (at time of capture): v2 RevenueCat handlers (handleInitialPurchaseV2, handleRenewalV2, handleProductChangeV2, handleNonRenewingPurchaseV2) in apps/api/src/services/billing/billing-v2/revenuecat-webhook-handler-v2.ts lacked the isFamilyShareBlocked guard present in their v1 counterparts, allowing family-share events to grant paid entitlement with no Sentry escalation under IDENTITY_V2_ENABLED.\n\nCurrent state: FIX ALREADY SHIPPED in PR #1335 (commit decaa9d17). isFamilyShareBlocked is defined at revenuecat-webhook-handler-v2.ts:92-110 and called at the top of all four v2 handlers before any DB access (lines 147, 200, 560, 607). Unit tests covering all four v2 handlers exist in apps/api/src/services/billing/billing-v2/revenuecat-webhook-handler-v2.test.ts (Issue 836 suite, lines 74-178) using a throwingDb Proxy to assert no DB access occurs on family-share events.\n\nVariants covered: (a) initial purchase with is_family_share=true; (b) renewal with is_family_share=true; (c) product change with is_family_share=true; (d) non-renewing purchase with is_family_share=true. All four blocked + escalated in v2; uncancellation is not an entitlement-granting path and does not require the guard.\n\nExecutor verification task: run the Issue 836 suite (pnpm exec nx run api:test --testPathPattern=revenuecat-webhook-handler-v2) and confirm all four family-share guard tests pass. Mark the WI closed if they do.",
+  "riskImpact": "Without the guard, a family-share RC event under IDENTITY_V2_ENABLED would grant paid entitlement to a family-plan sub-member N times with no Sentry signal. Fix is confirmed shipped (PR #1335). IDENTITY_V2_ENABLED is off in prod, limiting blast radius.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

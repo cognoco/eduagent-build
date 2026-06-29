@@ -1,0 +1,30 @@
+# Worker B2 checkpoint
+
+- Current item: WI-944 (SubjectHub conflates true-empty subjects with filtered-empty search results)
+- Status: fetched and claimed in Cosmo as `codex:worker-b2:WI-944`
+- Artifact dir: `.cosmo-artifacts/WI-944`
+- Worktree setup: complete at `.worktrees/WI-944`; branch `WI-944` from `origin/main`
+- Claim readback after re-claim from worktree:
+  - Stage: `Executing`
+  - State: `Active`
+  - Claimed By: `codex:worker-b2:WI-944`
+  - Claim Workspace: `cognoco/eduagent-build@WI-944`
+  - Claim Machine: `ramtop`
+  - Claimed At: `2026-06-21T23:10:00+02:00`
+  - Started: `2026-06-21T23:10:00+02:00`
+- Current worktree git status: setup-generated `apps/mobile/eas.json` drift restored; implementation edits are in `SubjectHub`, its route, its test, and locale JSON files.
+- Red/green work:
+  - Red: `pnpm exec jest src/components/subject-hub/SubjectHub.test.tsx --runInBand --no-coverage` failed because `subjectHub.empty.heading` was absent and the true-empty screen still rendered `subjectHub.search.noResults`.
+  - Green: the same focused test passed after branching true-empty from filtered-empty and wiring the CTA.
+- Verification:
+  - `pnpm exec jest src/components/subject-hub/SubjectHub.test.tsx --runInBand --no-coverage`: passed, 7 tests / 1 suite.
+  - `pnpm exec nx lint mobile`: passed.
+  - `pnpm exec nx run mobile:typecheck`: passed.
+  - `pnpm check:i18n`: passed.
+  - `pnpm check:i18n:orphans`: passed.
+  - `pnpm check:i18n:jsx-literals`: passed, 12 grandfathered / 0 new.
+  - Pre-push validation: passed, 10 files checked; related Jest passed, 11 tests / 2 suites.
+- Commit: `16f01d612 fix(mobile): split SubjectHub empty states [WI-944]`
+- Push: `origin HEAD:WI-944` succeeded.
+- Completion summary: `.cosmo-artifacts/WI-944/completion-summary.md`
+- Next step: coordinator review; intentionally stopped before Cosmo complete.

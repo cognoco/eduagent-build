@@ -1,0 +1,17 @@
+{
+  "pageId": "37c8bce9-1f7c-81a5-aa44-d09f66c9bbb0",
+  "id": "WI-652",
+  "name": "IDEMPOTENCY_KV namespace never provisioned (BUG-12) now hard-blocks ALL staging/production deploys",
+  "description": "The WI-84 durability hardening added scripts/verify-wrangler-kv-binding.mjs as a deploy.yml gate that hard-requires a concrete IDEMPOTENCY_KV binding in wrangler.toml per environment, with no override flag. But the IDEMPOTENCY_KV Cloudflare namespace was never created (long-standing BUG-12 TODO; binding deliberately commented out in apps/api/wrangler.toml L121-130). Result: every deploy.yml run fails at 'Verify Cloudflare KV bindings before migrations' and BOTH the DB migrate step and the Worker deploy are skipped - the staging Worker cannot ship at all. Discovered 2026-06-11 during the WI-585 reseed (which routed its staging migrate locally via doppler stg drizzle-kit migrate as a sanctioned workaround for the DB half; the Worker-deploy half remains fully blocked). Fix per the wrangler.toml TODO: create the IDEMPOTENCY_KV namespace(s) in the Zwizzly Cloudflare account, add the bindings for base/staging/production (following the BUG-721 placeholder + render-script + secrets pattern), and re-run a deploy end-to-end. Note the ALLOW_MISSING_IDEMPOTENCY_KV prelaunch override exists for production runtime traffic but NOT for the CI verify gate - decide whether the gate should honor it pre-launch.",
+  "acceptanceCriteria": "Root cause: the IDEMPOTENCY_KV Cloudflare namespace was never provisioned, while scripts/verify-wrangler-kv-binding.mjs hard-requires a concrete binding before deploy.yml can migrate or deploy the Worker. Variants to cover: (a) staging and production IDEMPOTENCY_KV namespaces exist and are bound through the placeholder/render/secrets path, (b) deploy.yml completes render, KV verify, migrate, Worker deploy, and smoke for staging, (c) the prelaunch override decision is explicit: the CI verify gate either honors ALLOW_MISSING_IDEMPOTENCY_KV or intentionally refuses it. Regression coverage: add/update a test or fixture for verify-wrangler-kv-binding that fails when IDEMPOTENCY_KV is missing and covers the chosen override behavior; verify with the staging deploy or equivalent render+KV-verify run.",
+  "riskImpact": "P1 because every staging and production deploy is hard-blocked before both database migration and Worker deployment, so fixes cannot ship through the normal release path until IDEMPOTENCY_KV provisioning/render verification is resolved.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "codex:worker-charlie:WI-652",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

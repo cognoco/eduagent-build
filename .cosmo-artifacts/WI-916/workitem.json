@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8116-8617-eaae1de20ec8",
+  "id": "WI-916",
+  "name": "getOverallProgress picks non-deterministic curriculum for multi-curriculum subjects",
+  "description": "[FCR 2026-06-21 · L1-07] no ORDER BY; new Map keeps last row per subjectId while the resume path orders desc(version) keeps first, so overview can compute against a different curriculum version. Fix: order desc(curricula.version) and keep first per subject.",
+  "acceptanceCriteria": "Root cause: getOverallProgress loads curricula for all subjects without ordering, then builds a Map that keeps the last row per subjectId; when a subject has multiple curriculum versions this can choose a different version than the resume path, which orders by desc(curricula.version) and keeps the first. Variants: (a) one curriculum per subject remains unchanged, (b) multiple versions for a subject choose the latest version deterministically, (c) the overview and resume-target paths agree on curriculum selection. Regression test: apps/api/src/services/progress.test.ts fails without the fix and passes with it, seeding multiple curricula for one subject and asserting latest-version selection.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

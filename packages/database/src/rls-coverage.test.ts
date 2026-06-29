@@ -1,13 +1,14 @@
 /**
- * [ASSUMP-F14] Static analysis test: every table that has a `profile_id`
- * column must have `ENABLE ROW LEVEL SECURITY` in a migration file.
+ * [ASSUMP-F14] Static analysis test: every table that declares a profile-like
+ * ownership column must have `ENABLE ROW LEVEL SECURITY` in a migration file.
  *
  * This test prevents the exact pattern that caused F14 — new profile-scoped
  * tables are added in one migration, RLS enablement lives in another, and
  * nobody remembers to update the second.
  *
  * How it works:
- * 1. Scan schema/*.ts for `pgTable('table_name', { ... profileId: uuid('profile_id') ... })`
+ * 1. Scan schema/*.ts for real column declarations such as
+ *    `profileId: uuid('profile_id')`, not comment text.
  * 2. Scan drizzle/*.sql for `ENABLE ROW LEVEL SECURITY` on each table
  * 3. Assert every table from step 1 appears in step 2
  *
