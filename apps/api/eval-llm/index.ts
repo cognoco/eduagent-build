@@ -93,12 +93,11 @@ import {
 import type { FlowDefinition } from './runner/types';
 import {
   buildBaseline,
-  compareAgainstBaseline,
-  formatDriftReport,
   parseBaseline,
   validateBaselineStructure,
   type Baseline,
 } from './runner/metrics';
+import { evaluateGates } from './runner/gates';
 import {
   bootstrapLlmProviders,
   setOpenRouterProviderPin,
@@ -387,54 +386,38 @@ async function main(): Promise<void> {
     console.log(`Baseline updated → ${BASELINE_PATH}`);
   }
 
-  if (summary.qualityFailures > 0) {
+  // [WI-1148] Single post-run gate. The --check-baseline drift comparison must
+  // run even when scenario-quality failures occurred — a quality failure (which
+  // is routine across ~262 non-deterministic live calls) must never MASK drift,
+  // which was the bug: the old quality `process.exit(1)` sat BEFORE this block,
+  // so the weekly eval-live.yml drift gate was unreachable. evaluateGates owns
+  // the ordering and the combined exit; here we only clear the receipt, print,
+  // and exit. Quality failures still fail the run — they just no longer hide
+  // drift, and both reasons are named in the failure message.
+  if (
+    options.updateBaseline ||
+    options.checkBaseline ||
+    summary.qualityFailures > 0
+  ) {
     clearZeroDriftReceipt();
-    console.error(
-      'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
-    );
-    if (options.updateBaseline) {
-      console.error(
-        'NOTE: baseline.json WAS written (signal distributions include the failed samples). Triage the quality failures above before committing it.',
-      );
-    }
-    process.exit(1);
   }
 
-  if (options.updateBaseline) {
-    clearZeroDriftReceipt();
+  const gate = await evaluateGates(summary, options, {
+    readBaseline,
+    baselinePath: BASELINE_PATH,
+    tolerancePp: options.baselineTolerancePp ?? DEFAULT_TOLERANCE_PP,
+  });
+  for (const m of gate.messages) {
+    if (m.level === 'error') console.error(m.text);
+    else console.log(m.text);
+  }
+  if (gate.exitCode !== 0) {
+    process.exit(gate.exitCode);
+  }
+  if (options.updateBaseline || options.checkBaseline) {
+    // Both gate modes have fully reported; no zero-drift receipt is written for
+    // them (receipts are reserved for clean tier-1 runs).
     return;
-  }
-
-  if (options.checkBaseline) {
-    clearZeroDriftReceipt();
-    const baseline = await readBaseline();
-    if (!baseline) {
-      console.error(
-        `No baseline found at ${BASELINE_PATH} — run with --update-baseline first to seed it.`,
-      );
-      process.exit(2);
-    }
-
-    const tolerance = options.baselineTolerancePp ?? DEFAULT_TOLERANCE_PP;
-    const drifts = compareAgainstBaseline(
-      summary.envelopeMetrics,
-      baseline,
-      tolerance,
-    );
-    if (drifts.length === 0) {
-      console.log(
-        `Baseline check passed (tolerance: ${(tolerance * 100).toFixed(1)}pp).`,
-      );
-      return;
-    }
-    console.error(formatDriftReport(drifts));
-    console.error('');
-    console.error(
-      `Baseline tolerance: ${(tolerance * 100).toFixed(
-        1,
-      )}pp. Inspect the drift above, then run with --update-baseline if the shift is intentional.`,
-    );
-    process.exit(1);
   }
 
   updateZeroDriftReceipt(options);

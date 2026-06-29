@@ -10,6 +10,7 @@ import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
 import { isUniqueViolation } from './db-errors';
 import { projectAiResponseContent } from './llm/project-response';
+import { paginateRows } from './pagination';
 
 function mapBookmarkRow(row: {
   id: string;
@@ -183,8 +184,7 @@ export async function listBookmarks(
     .orderBy(desc(bookmarks.id))
     .limit(limit + 1);
 
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const { page, nextCursor } = paginateRows(rows, limit);
 
   // Keyset pagination: rows are ordered desc(bookmarks.id), so the last
   // element in the page holds the *smallest* id we've emitted so far. The
@@ -192,7 +192,7 @@ export async function listBookmarks(
   // bookmarks — the cursor is an exclusive upper bound, not an offset.
   return {
     bookmarks: page.map(mapBookmarkRow),
-    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    nextCursor,
   };
 }
 

@@ -10,6 +10,7 @@ import type {
   ReportPracticeActivityType,
 } from '@eduagent/schemas';
 import { findOwnedCurriculumTopics } from './curriculum-topic-ownership';
+import { paginateRows } from './pagination';
 
 export interface ListPracticeActivityHistoryOptions {
   cursor?: string;
@@ -77,8 +78,7 @@ export async function listPracticeActivityHistory(
     .orderBy(desc(practiceActivityEvents.id))
     .limit(limit + 1);
 
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  const { page, nextCursor } = paginateRows(rows, limit);
 
   const topicIds = [
     ...new Set(
@@ -108,6 +108,6 @@ export async function listPracticeActivityHistory(
 
   return {
     items,
-    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+    nextCursor,
   };
 }

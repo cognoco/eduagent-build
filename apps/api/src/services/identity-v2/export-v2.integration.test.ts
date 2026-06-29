@@ -194,8 +194,119 @@ describeIfPostDrop('generateExportV2 (integration)', () => {
     // (e) [WI-805] billing surfaces from the v2 `subscription`, not the dropped
     // legacy `subscriptions` table.
     expect(result.subscriptions).toHaveLength(1);
-    expect(
-      (result.subscriptions[0] as { organizationId?: string }).organizationId,
-    ).toBe(org!.id);
+    // (f) [WI-1161] the v2 row is mapped to the legacy export shape BEFORE
+    // dataExportSubscriptionRowSchema.parse — organizationId→accountId,
+    // planTier→tier, periodStartAt/EndAt→currentPeriodStart/End. Red-green-revert:
+    // revert export-v2.ts back to parsing the RAW v2 row (serializeDates(s)) and
+    // the schema .parse() ZodErrors (required accountId/tier undefined) →
+    // generateExportV2 throws → this assertion is never reached (suite red).
+    // Restore the map → the legacy-named fields are present → GREEN.
+    expect((result.subscriptions[0] as { accountId?: string }).accountId).toBe(
+      org!.id,
+    );
+    expect((result.subscriptions[0] as { tier?: string }).tier).toBe('free');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1161] generateExportV2 subscription field-mapping — runs on ANY DB with
+// the v2 tables (NOT post-drop-gated), so it executes in the standard CI
+// integration lane (the post-drop suite above is operator-rehearsal only and
+// is skipped in CI). It seeds the minimal v2 graph (no `subjects` row, so the
+// pre-drop journaled-chain `subjects.profileId → profiles.id` FK is irrelevant)
+// and asserts generateExportV2 maps the v2 `subscription` row to the legacy
+// export shape before dataExportSubscriptionRowSchema.parse.
+//
+// Red-green-revert: revert export-v2.ts to parse the RAW v2 row
+// (serializeDates(s)) → the schema .parse() ZodErrors (accountId/tier undefined)
+// → generateExportV2 throws → this test FAILS. Restore the map → GREEN.
+const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+
+describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
+  let db: Database;
+  const personIds: string[] = [];
+  const orgIds: string[] = [];
+
+  beforeAll(() => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    for (const oid of orgIds) {
+      await db.delete(subscription).where(eq(subscription.organizationId, oid));
+    }
+    for (const pid of personIds) {
+      await db.delete(login).where(eq(login.personId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of orgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+    personIds.length = 0;
+    orgIds.length = 0;
+  });
+
+  it('maps the v2 subscription row to the legacy export shape (accountId/tier/currentPeriod*) before schema parse', async () => {
+    const [org] = await db
+      .insert(organization)
+      .values({ name: 'Export V2 Mapping Org' })
+      .returning();
+    orgIds.push(org!.id);
+
+    const [owner] = await db
+      .insert(person)
+      .values({
+        displayName: 'Owner',
+        birthDate: '1980-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(owner!.id);
+    await db.insert(membership).values({
+      personId: owner!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
+    await db.insert(login).values({
+      personId: owner!.id,
+      clerkUserId: `export-v2-map-clerk-${owner!.id}`,
+      email: `export-v2-map-${owner!.id}@integration.test`,
+    });
+
+    const periodStart = new Date('2026-01-01T00:00:00.000Z');
+    const periodEnd = new Date('2026-02-01T00:00:00.000Z');
+    await db.insert(subscription).values({
+      organizationId: org!.id,
+      planTier: 'plus',
+      status: 'active',
+      payerPersonId: owner!.id,
+      periodStartAt: periodStart,
+      periodEndAt: periodEnd,
+      stripeCustomerId: `cus_export_${owner!.id}`,
+    });
+
+    // Pre-fix this throws (ZodError: accountId/tier undefined) — the await rejects.
+    const result = await generateExportV2(db, org!.id);
+
+    expect(result.subscriptions).toHaveLength(1);
+    const row = result.subscriptions[0] as {
+      accountId?: string;
+      tier?: string;
+      currentPeriodStart?: string | null;
+      currentPeriodEnd?: string | null;
+      stripeCustomerId?: string | null;
+      organizationId?: string;
+      planTier?: string;
+    };
+    // Mapped legacy-named fields present and sourced from the v2 row:
+    expect(row.accountId).toBe(org!.id);
+    expect(row.tier).toBe('plus');
+    expect(row.currentPeriodStart).toBe(periodStart.toISOString());
+    expect(row.currentPeriodEnd).toBe(periodEnd.toISOString());
+    expect(row.stripeCustomerId).toBe(`cus_export_${owner!.id}`);
+    // Raw v2 field names are stripped by the schema parse (not leaked):
+    expect(row.organizationId).toBeUndefined();
+    expect(row.planTier).toBeUndefined();
   });
 });

@@ -15,9 +15,6 @@
  * No internal mocks — real DB via doppler run -c dev DATABASE_URL.
  */
 
-import { eq } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
-
 import {
   buildIntegrationEnv,
   cleanupAccounts,
@@ -26,6 +23,7 @@ import {
 import {
   buildAuthHeaders,
   createProfileViaRoute,
+  resolveAccountId,
   seedDirectChildProfileForTest,
   seedFamilyLinkForTest,
   setProfileConsentStatusForTest,
@@ -47,15 +45,15 @@ async function createChildProfileDirect(
   birthYear: number,
 ): Promise<string> {
   const db = createIntegrationDb();
-  const [parent] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, parentProfileId));
-  if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
+  // [WI-1145] Resolve the parent's org/account v2-first (membership) then legacy
+  // profiles — the parent is route-created (v2-unconditional post-WI-867 collapse).
+  const accountId = await resolveAccountId(db, parentProfileId);
+  if (!accountId)
+    throw new Error(`Parent profile ${parentProfileId} not found`);
 
   const child = await seedDirectChildProfileForTest({
     parentProfileId,
-    accountId: parent.accountId,
+    accountId,
     displayName,
     birthYear,
   });
@@ -74,15 +72,15 @@ async function setChildConsentStatus(
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN',
 ): Promise<void> {
   const db = createIntegrationDb();
-  const [child] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, childProfileId));
-  if (!child) throw new Error(`Child profile ${childProfileId} not found`);
+  // [WI-1145] Resolve the child's org/account v2-first (membership; the child is
+  // seeded via seedDirectChildProfileForTest which dual-seeds membership) then
+  // legacy profiles.
+  const accountId = await resolveAccountId(db, childProfileId);
+  if (!accountId) throw new Error(`Child profile ${childProfileId} not found`);
 
   await setProfileConsentStatusForTest({
     profileId: childProfileId,
-    accountId: child.accountId,
+    accountId,
     status,
     parentEmail: PARENT_USER.email,
   });
