@@ -794,7 +794,9 @@
         "withNameSubject": "Witaj z powrotem, {{name}}. Chcesz wrócić do tematu {{subject}}? Pytaj o co chcesz – co robimy dalej?",
         "withName": "Witaj z powrotem, {{name}}. Nad czym chcesz dzisiaj popracować?",
         "generic": "Witaj z powrotem. Nad czym chcesz dzisiaj popracować?"
-      }
+      },
+      "voicePermissionAskMessage": "Aby używać wprowadzania głosowego, zezwól na dostęp do mikrofonu.",
+      "voicePermissionAllow": "Zezwól na mikrofon"
     },
     "filingFailed": {
       "retryInProgress": "Ponowna próba jest już w toku.",

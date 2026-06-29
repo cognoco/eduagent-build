@@ -788,7 +788,9 @@
         "withNameSubject": "Boas-vindas de volta, {{name}}. Pronto(a) para retomar {{subject}}? Pode perguntar qualquer coisa — para onde vamos agora?",
         "withName": "Boas-vindas de volta, {{name}}. No que você gostaria de trabalhar hoje?",
         "generic": "Boas-vindas de volta. No que você gostaria de trabalhar hoje?"
-      }
+      },
+      "voicePermissionAskMessage": "É necessário acesso ao microfone para a entrada de voz. Permita o acesso para continuar.",
+      "voicePermissionAllow": "Permitir microfone"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
