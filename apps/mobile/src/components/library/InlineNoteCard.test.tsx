@@ -86,8 +86,8 @@ describe('InlineNoteCard', () => {
         {...baseProps}
         conceptSignal={{
           verified: true,
-          hasTutorAddition: false,
-          tutorAdditions: [],
+          hasMentorAddition: false,
+          mentorAdditions: [],
         }}
       />,
     );
@@ -101,8 +101,8 @@ describe('InlineNoteCard', () => {
         {...baseProps}
         conceptSignal={{
           verified: false,
-          hasTutorAddition: true,
-          tutorAdditions: ['Use the discriminant before choosing a method.'],
+          hasMentorAddition: true,
+          mentorAdditions: ['Use the discriminant before choosing a method.'],
         }}
       />,
     );
