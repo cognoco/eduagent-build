@@ -366,7 +366,8 @@ function parseArgs(argv: string[]): Args {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--accept') args.accept = true;
+    if (arg === '--') continue;
+    else if (arg === '--accept') args.accept = true;
     else if (arg === '--staged') args.staged = true;
     else if (arg === '--skip-subject-check') args.skipSubjectCheck = true;
     else if (arg === '--base') args.base = argv[++i];
