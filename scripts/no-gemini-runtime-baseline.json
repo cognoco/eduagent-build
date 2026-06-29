@@ -212,6 +212,10 @@
     "token": "gemini-2.5"
   },
   {
+    "file": "apps/api/src/services/session/session-exchange-router.test.ts",
+    "token": "gemini_only"
+  },
+  {
     "file": "apps/api/src/services/session/session-exchange-router.ts",
     "token": "gemini_only"
   },

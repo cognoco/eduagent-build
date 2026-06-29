@@ -29,6 +29,7 @@ import { eq, and } from 'drizzle-orm';
 import {
   accounts,
   familyLinks,
+  guardianship,
   profiles,
   subjects,
   curricula,
@@ -39,6 +40,7 @@ import {
   retentionCards,
   sessionSummaries,
 } from '@eduagent/database';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
@@ -152,6 +154,20 @@ async function seedScenario(options?: {
       isOwner: true,
     })
     .returning();
+
+  // [WI-1145] Seed the v2 identity graph unconditionally — the session-completed
+  // pipeline resolves the profile via v2 (person) and aborts "Profile not found"
+  // when v2 is empty on the post-collapse flag-off main lane. Same ids as legacy
+  // (person.id == profile.id, organization.id == account.id).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: profile!.id,
+    displayName: 'STAB Pipeline Learner',
+    birthYear: 2000,
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
+    isOwner: true,
+  });
 
   const [subject] = await db
     .insert(subjects)
@@ -289,6 +305,23 @@ async function seedParentLink(childProfileId: string) {
   await db.insert(familyLinks).values({
     parentProfileId: profile!.id,
     childProfileId,
+  });
+
+  // [WI-1145] Seed the parent's v2 identity + guardianship edge to the child
+  // unconditionally — the pipeline's parent/guardian reads resolve via v2 on the
+  // post-collapse flag-off main lane (child person seeded by seedScenario).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: profile!.id,
+    displayName: 'STAB Pipeline Parent',
+    birthYear: 1985,
+    clerkUserId: PARENT_AUTH_USER_ID,
+    email: PARENT_AUTH_EMAIL,
+    isOwner: true,
+  });
+  await db.insert(guardianship).values({
+    guardianPersonId: profile!.id,
+    chargePersonId: childProfileId,
   });
 
   return profile!.id;
