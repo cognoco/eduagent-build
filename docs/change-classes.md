@@ -10,6 +10,11 @@ scripts/check-change-class.sh --staged     # check staged files only
 scripts/check-change-class.sh --branch     # check all changes vs main
 ```
 
+Naming note: `test:api:integration` is the local wrapper for the
+`apps/api/src/**/*.integration.test.ts` co-located API suite
+(`nx run api:integration-api`). `test:integration` / `api:test:integration`
+is the cross-package suite under `tests/integration/`.
+
 ## Quick Reference
 
 | Class | File Pattern | Fast | Slow | Notes |

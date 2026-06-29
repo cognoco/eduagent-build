@@ -11,7 +11,7 @@
     "build": "nx run-many -t build",
     "test": "C:/Tools/doppler/doppler.exe run -- nx run-many -t test",
     "test:api:unit": "jest --config apps/api/jest.config.cjs --runInBand",
-    "test:api:integration": "C:/Tools/doppler/doppler.exe run -- jest --config apps/api/jest.config.cjs --no-coverage --runInBand",
+    "test:api:integration": "C:/Tools/doppler/doppler.exe run -- pnpm exec nx run api:integration-api",
     "test:mobile:unit": "jest --config apps/mobile/jest.config.cjs --runInBand --forceExit",
     "test:coverage": "nx run-many -t test --coverage",
     "test:llm:enduser": "C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec tsx scripts/enduser-session-pass.ts",

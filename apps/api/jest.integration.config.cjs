@@ -4,7 +4,7 @@ const { join } = require('path');
 // to prevent concurrent worker connections from exhausting the Neon WebSocket
 // pool and causing FK violations between test suites.
 //
-// Run via: pnpm exec nx run api:test-integration
+// Run via: pnpm exec nx run api:integration-api
 // (equivalent to: pnpm exec jest --config apps/api/jest.integration.config.cjs)
 
 module.exports = {
@@ -12,7 +12,10 @@ module.exports = {
   rootDir: '../..',
   testEnvironment: 'node',
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
+    '^.+\\.ts$': [
+      'ts-jest',
+      { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' },
+    ],
   },
   setupFilesAfterEnv: [join(__dirname, '../../tests/integration/api-setup.ts')],
   passWithNoTests: true,
@@ -30,13 +33,13 @@ module.exports = {
     '[/\\\\]\\.tmp',
   ],
   moduleFileExtensions: ['ts', 'js'],
-  testMatch: [
-    '**/apps/api/src/**/*.integration.test.ts',
-  ],
+  testMatch: ['**/apps/api/src/**/*.integration.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/.worktrees/',
     '<rootDir>/.tmp/',
     '[/\\\\]\\.tmp',
+    // WI-536 flaky-test quarantine (see tools/quarantine/).
+    ...require('../../tools/quarantine/registry.cjs').jestIgnorePatterns(),
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',
   maxWorkers: 1,
