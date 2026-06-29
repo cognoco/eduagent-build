@@ -9,17 +9,19 @@ and amendments are historical; read it for structure, not content.
 pointers → wave-specific context → an "amendments" block (lessons the protocol didn't yet carry) →
 report-back boundaries. The brief *points*; it does not re-derive process.
 
-> **Mapping to this folder:** where the prompt below cites
-> `_wip/identity-foundation/executor-protocol.md`, the current home is the builder type doc
-> `roles/executor/builder.md` (plus the shared layer `roles/executor/executor-protocol.md`). The
-> `_wip/...` paths are the historical originals.
+> **Sourcing + genericization.** This is a real instance from the **eduagent-build** dogfood. Two
+> mechanical edits were applied so the folder stays portable: the repo root is abstracted to
+> `<repo root>`, and the prompt's original lane `executor-protocol` citation is mapped to its current
+> home — the builder type doc `roles/executor/builder.md` (plus the shared layer
+> `roles/executor/executor-protocol.md`). Otherwise the prompt is as-dispatched; read it for the
+> brief *shape*, not the content.
 
 ---
 
-You are the executor for Cosmo Work Item **WI-578 (WP-W3-pii-step-state)** — remove minor-PII from memoized Inngest step returns (findings F-075/085/086/087/088/089) — in repo /Users/vetinari/nexus/_dev/eduagent-build (MentoMate monorepo). This is the LAST W3 unit.
+You are the executor for Cosmo Work Item **WI-578 (WP-W3-pii-step-state)** — remove minor-PII from memoized Inngest step returns (findings F-075/085/086/087/088/089) — in repo `<repo root>` (the monorepo). This is the LAST W3 unit.
 
 **Process scaffold (read both BEFORE anything else):**
-1. `_wip/identity-foundation/executor-protocol.md` — follow phases 0–7 exactly. *(Now: `roles/executor/builder.md`.)*
+1. `roles/executor/builder.md` — follow phases 0–7 exactly. *(The verbatim prompt cited the lane's then-current `executor-protocol`; mapped here to its current home + shared layer `roles/executor/executor-protocol.md`.)*
 2. The repo's AGENTS.md Cosmo operating rules.
 
 **Substance sources (read in this order):**
