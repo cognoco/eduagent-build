@@ -703,7 +703,9 @@ describe('weekly progress push integration', () => {
   // parent twice. Priming notificationLog with a recent `weekly_progress`
   // entry must cause the generate handler to skip the push while leaving the
   // report row intact.
-  // QUARANTINE WI-1153: shared-stg-DB accumulation flake; un-skip on fix
+  // QUARANTINE WI-1153 (owner: claude:bug-lane, Executing) — confirmed-flaky, NOT a behavioral regression:
+  // this test passed on main @09:19 (CI run 28361732814) and passes in local isolation; it fails only in
+  // the full CI co-located suite from shared-stg-DB state accumulation. Root-fix + un-skip tracked in WI-1153.
   // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
   (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
     '[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h',
