@@ -19,10 +19,10 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import {
+  resolveAccountId,
   seedDirectChildProfileForTest,
   seedFamilyLinkForTest,
 } from './route-fixtures';
@@ -65,16 +65,16 @@ async function createChildProfileDirect(
   birthYear: number,
 ): Promise<string> {
   const db = createIntegrationDb();
-  // Look up accountId from the parent profile
-  const [parent] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, parentProfileId));
-  if (!parent) throw new Error(`Parent profile ${parentProfileId} not found`);
+  // [WI-1145] Resolve the parent's org/account v2-first (membership) then legacy
+  // `profiles` — the parent is route-created, which writes v2 unconditionally
+  // post-WI-867 collapse (legacy `profiles` empty on the flag-off main lane).
+  const accountId = await resolveAccountId(db, parentProfileId);
+  if (!accountId)
+    throw new Error(`Parent profile ${parentProfileId} not found`);
 
   const child = await seedDirectChildProfileForTest({
     parentProfileId,
-    accountId: parent.accountId,
+    accountId,
     displayName,
     birthYear,
   });
@@ -93,36 +93,38 @@ async function createFamilyLink(
 
 async function readConversationLanguage(profileId: string): Promise<string> {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const [profile] = await db
-      .select({ conversationLanguage: person.conversationLanguage })
-      .from(person)
-      .where(eq(person.id, profileId));
-    return profile!.conversationLanguage;
-  }
+  // [WI-1145] v2-first: the PATCH /onboarding/language route writes
+  // person.conversation_language unconditionally post-WI-867 collapse; fall back to
+  // legacy profiles for the pre-collapse flag-off path.
+  const [v2] = await db
+    .select({ conversationLanguage: person.conversationLanguage })
+    .from(person)
+    .where(eq(person.id, profileId));
+  if (v2) return v2.conversationLanguage;
 
-  const [profile] = await db
+  const [legacy] = await db
     .select({ conversationLanguage: profiles.conversationLanguage })
     .from(profiles)
     .where(eq(profiles.id, profileId));
-  return profile!.conversationLanguage;
+  return legacy!.conversationLanguage;
 }
 
 async function readPronouns(profileId: string): Promise<string | null> {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const [profile] = await db
-      .select({ pronouns: person.pronouns })
-      .from(person)
-      .where(eq(person.id, profileId));
-    return profile!.pronouns;
-  }
+  // [WI-1145] v2-first: the PATCH /onboarding/pronouns route writes person.pronouns
+  // unconditionally post-WI-867 collapse; fall back to legacy profiles for the
+  // pre-collapse flag-off path.
+  const [v2] = await db
+    .select({ pronouns: person.pronouns })
+    .from(person)
+    .where(eq(person.id, profileId));
+  if (v2) return v2.pronouns;
 
-  const [profile] = await db
+  const [legacy] = await db
     .select({ pronouns: profiles.pronouns })
     .from(profiles)
     .where(eq(profiles.id, profileId));
-  return profile!.pronouns;
+  return legacy!.pronouns;
 }
 
 beforeEach(async () => {

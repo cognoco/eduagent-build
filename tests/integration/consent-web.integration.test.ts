@@ -13,11 +13,7 @@ import {
   profiles,
 } from '@eduagent/database';
 
-import {
-  buildIntegrationEnv,
-  cleanupAccounts,
-  isIdentityV2Enabled,
-} from './helpers';
+import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   createProfileViaRoute,
   getIntegrationDb,
@@ -65,11 +61,13 @@ async function createProfileWithConsentToken(token: string) {
 
 async function readConsentState(profileId: string) {
   const db = getIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const request = await db.query.consentRequest.findFirst({
-      where: eq(consentRequest.chargePersonId, profileId),
-    });
-    if (!request) return undefined;
+  // [WI-1145] v2-first: consent resolves via consent_request on the post-WI-867
+  // flag-off main lane (seedConsentRequest dual-writes both stores); fall back to
+  // legacy consentStates for the pre-collapse flag-off path.
+  const request = await db.query.consentRequest.findFirst({
+    where: eq(consentRequest.chargePersonId, profileId),
+  });
+  if (request) {
     return {
       status:
         request.status === 'approved'
@@ -88,9 +86,13 @@ async function readConsentState(profileId: string) {
 
 async function readProfileRecord(profileId: string) {
   const db = getIntegrationDb();
-  return isIdentityV2Enabled()
-    ? db.query.person.findFirst({ where: eq(person.id, profileId) })
-    : db.query.profiles.findFirst({ where: eq(profiles.id, profileId) });
+  // [WI-1145] v2-first: the route writes person unconditionally post-WI-867
+  // collapse; fall back to legacy profiles for the pre-collapse flag-off path.
+  const p = await db.query.person.findFirst({
+    where: eq(person.id, profileId),
+  });
+  if (p) return p;
+  return db.query.profiles.findFirst({ where: eq(profiles.id, profileId) });
 }
 
 beforeEach(async () => {

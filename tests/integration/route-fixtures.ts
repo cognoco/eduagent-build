@@ -380,7 +380,7 @@ export async function setSubscriptionTierForProfile(
 // legacy `profiles.account_id` and the v2 `membership.organization_id` are the
 // same id by the reseed invariant; read whichever store is populated (v2 first)
 // so a helper resolves correctly pre- and post-WI-867-collapse.
-async function resolveAccountId(
+export async function resolveAccountId(
   db: Database,
   profileId: string,
 ): Promise<string | undefined> {

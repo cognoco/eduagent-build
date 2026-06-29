@@ -157,16 +157,15 @@ async function createOwnerProfileRecord(): Promise<{
   }
 
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
-    const membershipRow = await db.query.membership.findFirst({
-      where: eq(membership.personId, profileId),
-      columns: { organizationId: true },
-    });
-    if (!membershipRow) {
-      throw new Error(
-        `Membership row missing after create for person: ${profileId}`,
-      );
-    }
+  // [WI-1145] v2-first (membership; person.id == profile.id) then legacy `profiles`
+  // fallback. The create route is v2-unconditional post-WI-867 collapse, so the
+  // former isIdentityV2Enabled() gate left the post-collapse flag-off lane reading
+  // empty legacy `profiles`; resolve whichever store the route wrote.
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, profileId),
+    columns: { organizationId: true },
+  });
+  if (membershipRow) {
     return { profileId, accountId: membershipRow.organizationId };
   }
 
@@ -176,7 +175,9 @@ async function createOwnerProfileRecord(): Promise<{
   });
 
   if (!row) {
-    throw new Error(`Profile row missing after create: ${profileId}`);
+    throw new Error(
+      `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,
+    );
   }
 
   return { profileId, accountId: row.accountId };

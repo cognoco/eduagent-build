@@ -115,17 +115,22 @@ async function seedAccount() {
     isOwner: true,
   });
 
-  if (isIdentityV2Enabled()) {
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId: account!.id,
-      profileId,
-      displayName: 'Billing Owner',
-      birthYear: 1990,
-      clerkUserId: AUTH_USER_ID,
-      email: AUTH_EMAIL,
-      isOwner: true,
-    });
-  }
+  // [WI-1145] Seed the v2 identity graph unconditionally — the collapsed account
+  // middleware resolves the owner via v2 (login/membership) post-WI-867 collapse and
+  // returns 401 when v2 identity is absent on the flag-off main lane. Same ids as
+  // legacy (person.id == profile.id, organization.id == account.id). The v2
+  // subscription seed + read below stay flag-gated: the billing-v2 subscription
+  // path is the WI-1102 carve (still flag-honoring), so on flag-off the product
+  // reads/writes legacy `subscriptions` and the assertion must read the same store.
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId,
+    displayName: 'Billing Owner',
+    birthYear: 1990,
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
+    isOwner: true,
+  });
 
   // Return the seeded owner profileId so callers can supply X-Profile-Id, the
   // explicit-header resolution the owner-only billing gates now require (the
