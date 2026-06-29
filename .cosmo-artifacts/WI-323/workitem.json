@@ -1,0 +1,17 @@
+{
+  "pageId": "3678bce9-1f7c-811a-9a88-e6290dc125b7",
+  "id": "WI-323",
+  "name": "GC1 mock guard misses multiline jest.mock calls",
+  "description": "The GC1 guard previously used only a single-line regex (MOCK_LINE) and missed jest.mock( calls where the specifier was on a subsequent line. This left multiline internal mocks undetected, bypassing the ratchet silently.",
+  "acceptanceCriteria": "Root cause: scripts/check-gc1-pattern-a.ts — prior to commit 15f388414 the guard used only MOCK_LINE (single-line regex) and had no MOCK_OPEN / SPECIFIER_LINE path. Multiline jest.mock( calls with the specifier on a separate line were invisible to the scanner. Fix shipped in PR #1117 [F-156] (commit 15f388414): added MOCK_OPEN regex at :38 and SPECIFIER_LINE at :40, plus a 15-line look-ahead loop at :142-169 that accumulates the span and detects the specifier. Tests added in scripts/check-gc1-pattern-a.test.ts lines 119-131 ('detects a multiline internal mock') and lines 147-162 ('with comment+blank lines before specifier') — these are the regression tests. Verification: run 'pnpm exec jest --config scripts/jest.config.cjs scripts/check-gc1-pattern-a.test.ts --no-coverage' — all multiline cases must pass. Single behavioral variant: the multiline detection is now covered. NOTE: this fix has already shipped. This WI should be verified closed — run the test suite and transition to Done if all cases pass.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Brief\nThe detector only applies MOCK_LINE to each added diff line independently, so a new internal mock written as a multiline call such as jest.mock(\\n  './services/foo',\\n  () => ({ ... })\\n) has no single added line matching the regex and is not checked for Pattern A or gc1-allow. This weakens the CI/pre-commit ratchet and can allow broad internal mocks to land despite the stated guard. Prettier will collapse simple cases, but long or commented call expressions can remain multiline.\nRecommended remediation\nParse staged/HEAD test files with the TypeScript AST and inspect jest.mock/jest.doMock call expressions whose start line was added, or assemble multiline added hunks before matching.\nDeepSec finding\nFinding ID: DS-234\nScan run: 20260516050543-3902c61be7bd5834 (2026-05-16, deepsec process / gpt-5.5)\nFile: scripts/check-gc1-pattern-a.ts — lines 35, 89, 103, 105\nVulnerability class: other-guard-bypass\nSeverity: BUG · Confidence: medium\nNotes\nCaptured from the DeepSec scan artefact .deepsec/data/eduagent-build/reports/report.json. Part of bundle WI-76 (WP-ACL). Acceptance Criteria and Execution Path are set during triage/refinement."
+}

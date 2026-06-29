@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-812b-aab9-e3703e490cc0",
+  "id": "WI-946",
+  "name": "NudgeBanner mark-all-read failure swallowed; banner re-nags with no recovery",
+  "description": "[FCR 2026-06-21 · L6-05] fire-and-forget mutate with no onError; on failure modal closes but nudges stay unread and banner reappears. Fix: add onError toast/keep-open-with-retry.",
+  "acceptanceCriteria": "Root cause: NudgeBanner.closeModal closes the modal and calls markAllRead.mutate() fire-and-forget, with no onError path; a failed mutation leaves nudges unread so the banner reappears without explanation or recovery. Variant: single variant, dismiss/mark-all-read mutation failure. Regression test: apps/mobile/src/components/nudge/NudgeBanner.test.tsx mocks a failed mark-all-read mutation and fails without the fix; it passes only when the UI keeps/reopens a recoverable state or surfaces an actionable error/retry instead of silently closing.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

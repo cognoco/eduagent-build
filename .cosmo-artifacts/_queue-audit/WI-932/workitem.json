@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8115-a0ad-f632a24f5f56",
+  "id": "WI-932",
+  "name": "profile-scope test uses fragile double-invocation try/catch for status",
+  "description": "[FCR 2026-06-21 · L4-09] function invoked twice (toThrow then try/catch) to check .status; brittle if throw type changes. Fix: expect(()=>...).toThrow(expect.objectContaining({status:400})).",
+  "acceptanceCriteria": "Root cause: the profile-scope negative tests invoke the helper once for toThrow and a second time inside try/catch to inspect status, so assertion behavior is brittle if the throw type, status, or side effects change.\nVariants:\n- requireProfileId(undefined) must throw an HTTPException with status 400.\n- requireAccount(undefined) must throw an HTTPException with status 401 and the account-required message.\nRegression: update apps/api/src/middleware/profile-scope.test.ts so each negative-path test captures/asserts the thrown HTTPException status from a single invocation and fails if the wrong status/type is thrown; existing success-path tests stay green.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

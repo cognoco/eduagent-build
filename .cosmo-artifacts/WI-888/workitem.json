@@ -1,0 +1,17 @@
+{
+  "pageId": "3858bce9-1f7c-8140-b05c-d1e540949c52",
+  "id": "WI-888",
+  "name": "Cosmo: make completion-summary parser + cosmo:qa claim-extractor robust to prose tokens",
+  "description": "complete's dod parser rejects '## Title' headers (needs 'Title:' colon form) and cosmo:qa extracts claims from the whole page body, so bare repo paths, hex UUIDs, test counts, and /route tokens in prose trip false QA failures.",
+  "acceptanceCriteria": "Root cause: review DoD summary parsing accepts only colon-form lifecycle section labels, while cosmo:qa scans the whole page body for code-ish claims, so ordinary prose tokens can false-bounce. Variants: (1) completion summaries using ## What was done / What changed / Verification / Caveats headings; (2) whole-body prose containing bare file paths, hex-like IDs or SHAs, test-count text, or /route tokens. Regression coverage: add/update skills/review/dod.test.ts for header parsing and skills/qa/claims.test.ts for scoped or ignored prose-token extraction; each test fails without the fix and passes with it.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Reviewing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": "Completion Summary — 2026-06-21\n**What was done:** Fixed WI-888 in the editable `zdx-marketplace` source checkout, not the installed plugin cache.\n**What changed:** The Cosmo review DoD parser now accepts markdown lifecycle section headings without trailing colons, and the Cosmo QA claim extractor now scopes summary-derived claims to the latest Completion Summary so older page prose does not become stale commit, file, or test evidence. Updated `plugins/cosmo/skills/review/dod.ts`, `plugins/cosmo/skills/review/dod.test.ts`, `plugins/cosmo/skills/qa/claims.ts`, and `plugins/cosmo/skills/qa/claims.test.ts`. Bumped Cosmo plugin metadata to version 0.6.2 in `.claude-plugin/marketplace.json`, `plugins/cosmo/.claude-plugin/plugin.json`, and `plugins/cosmo/.codex-plugin/plugin.json`.\n**Verification:** Red-focused regression run failed before the implementation on the new WI-888 parser and QA tests. After the fix, `C:\\Tools\\bun\\bun.exe test plugins/cosmo/skills/review/dod.test.ts plugins/cosmo/skills/qa/claims.test.ts` passed. Broader Cosmo verification with `C:\\Tools\\bun\\bun.exe test plugins/cosmo` passed. `claude plugin validate plugins/cosmo` passed.\n**Caveats / Follow-ups:** Marketplace `main` has an unrelated untracked `.codex-marketplace-install.json` outside the WI-888 worktree; it was not touched."
+}

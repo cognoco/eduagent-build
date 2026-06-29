@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81d7-80f4-e00dbca70693",
+  "id": "WI-951",
+  "name": "Onboarding pronouns Skip fires mutate with no onError/Sentry",
+  "description": "[FCR 2026-06-21 · L6-10] mutate({pronouns:null}) after router.replace with no catch — can silently fail. Fix: add catch with Sentry capture.",
+  "acceptanceCriteria": "Root cause: handleSkip navigates forward and then calls updatePronouns.mutate({ pronouns: null }) without an error callback or Sentry capture, so a failed best-effort clear after navigation is silent. Variants: single known path is the onboarding/settings pronouns Skip action; Continue already has explicit onError UI. Regression test: add/extend apps/mobile/src/app/(app)/onboarding/pronouns.test.tsx to make updatePronouns.mutate invoke onError on Skip and assert the failure is captured/logged without blocking navigation.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

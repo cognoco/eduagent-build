@@ -53,6 +53,7 @@
 - [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
+- [feedback_cosmo_done_creates_pr.md](feedback_cosmo_done_creates_pr.md) — For MentoMate Cosmo WI work, create a PR every time verified work is done; do not wait for a separate PR prompt.
 - [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
@@ -119,7 +120,6 @@
 - [feedback_verify_directive_premise_before_build.md](feedback_verify_directive_premise_before_build.md) — A directed "fix this live prod error" can rest on a grep of the legacy helper that missed the CALLER-level flag branch; verify caller reachability by primary source before building, and don't fabricate a no-op if the fix already exists. (WI-779 ic-180/181 2026-06-18.)
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_e2e_cascade_root_cause.md](feedback_e2e_cascade_root_cause.md) — 20+ same-day Notion bugs with "Cascading X" in Found In = ONE infra bug. Fix upstream, don't close N individually.
-- [feedback_nx_reset_before_commit.md](feedback_nx_reset_before_commit.md) — NX cache causes phantom `@nx/enforce-module-boundaries` errors. Run `pnpm exec nx reset` to clear.
 - [feedback_prepush_bail_masks_failures.md](feedback_prepush_bail_masks_failures.md) — Pre-push `--bail` + a leading flake masks real fails; verify affected set WITHOUT --bail before any SKIP_PRE_PUSH. tsc/integration miss stale mock `toHaveBeenCalledWith` arg-count.
 - [feedback_forward_ratchets_not_in_prepush.md](feedback_forward_ratchets_not_in_prepush.md) — Forward-only git-diff ratchets (GC1 jest.mock, i18n-jsx, no-clinical-copy, decision-adr) aren't run by local pre-push/jest; run `check-change-class.sh --run` (or the ratchet) before claiming CI-clean. 3rd occurrence (809/586/811).
 - [feedback_commit_skill_bare_push_worktree.md](feedback_commit_skill_bare_push_worktree.md) — Forked /commit bare `git push` in a worktree tracking origin/new-llm FF'd the shared branch directly, bypassing the PR/review gate. Rule: explicit refspec `HEAD:<wi-branch>`, never bare, in worktrees tracking a shared integration branch. ACTION: harden commit/worktree-setup skills.

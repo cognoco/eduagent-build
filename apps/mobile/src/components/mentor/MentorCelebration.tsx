@@ -1,5 +1,13 @@
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 
 import type { TranslateKey } from '../../i18n';
@@ -18,13 +26,36 @@ export function MentorCelebration({
   onMarkSeen,
 }: MentorCelebrationProps) {
   const { t } = useTranslation();
+  const reduceMotion = useReducedMotion();
   const alreadySeen = seenEventIds.has(eventId);
+
+  // First-render burst: scale up with a spring overshoot while fading in.
+  // Initialise to the rest state when reduced motion is active so the surface
+  // is shown instantly with no animation.
+  const scale = useSharedValue(reduceMotion ? 1 : 0.8);
+  const opacity = useSharedValue(reduceMotion ? 1 : 0);
 
   useEffect(() => {
     if (!alreadySeen) {
       onMarkSeen?.(eventId);
     }
   }, [alreadySeen, eventId, onMarkSeen]);
+
+  useEffect(() => {
+    if (alreadySeen || reduceMotion) {
+      return;
+    }
+    opacity.value = withTiming(1, { duration: 220 });
+    scale.value = withSequence(
+      withSpring(1.08, { damping: 6, stiffness: 220 }),
+      withTiming(1, { duration: 140 }),
+    );
+  }, [alreadySeen, opacity, reduceMotion, scale]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
 
   if (alreadySeen) {
     return (
@@ -35,11 +66,12 @@ export function MentorCelebration({
   }
 
   return (
-    <View
+    <Animated.View
       testID="mentor-celebration"
+      style={animatedStyle}
       className="rounded-xl border border-accent bg-surface p-3"
     >
       <Text className="font-semibold text-text-primary">{t(messageKey)}</Text>
-    </View>
+    </Animated.View>
   );
 }

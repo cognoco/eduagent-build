@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-815d-ae04-e07c16c38c06",
+  "id": "WI-923",
+  "name": "Inngest subject config read by id without profileId filter",
+  "description": "[FCR 2026-06-21 · L3-01] update-vocabulary-retention reads subjects by id alone (no eq(subjects.profileId)), unlike sibling reads in the same file; config-only and same-profile-derived today, latent leak if expanded. Fix: add eq(subjects.profileId, profileId) to the WHERE.",
+  "acceptanceCriteria": "Root cause: update-vocabulary-retention in apps/api/src/inngest/functions/session-completed.ts reads subjects with where eq(subjects.id, subjectId) only, even though profileId is available and sibling reads are profile-scoped. Variants: owned subjectId continues to process; missing subjectId continues to skip; subjectId not owned by event.profileId must skip and perform no retention update. Regression test: extend apps/api/src/inngest/functions/session-completed.test.ts update-vocabulary-retention coverage so the subject lookup includes profileId or a foreign subjectId fixture fails before the scoped WHERE and passes after.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

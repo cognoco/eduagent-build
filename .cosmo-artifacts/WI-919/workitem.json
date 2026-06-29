@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-81b4-b9fa-f6df224c8d25",
+  "id": "WI-919",
+  "name": "use-api-reachability clears fetch timeout only on success, not on rejection",
+  "description": "[FCR 2026-06-21 · L1-08c] clearTimeout(timeout) only on success; a rejected fetch leaves the timer to fire controller.abort() on a settled controller. Fix: clear timeout in finally.",
+  "acceptanceCriteria": "Root cause: useApiReachability creates a health-check timeout but clears it only after a successful fetch; if fetch rejects, the timer remains live and later aborts an already-settled controller. Variants: (a) successful fetch clears the timeout, (b) rejected fetch clears the timeout before updating unreachable state, (c) genuine timeout/abort behavior still marks the API unreachable without leaking a timer. Regression test: apps/mobile/src/hooks/use-api-reachability.test.ts fails without the fix and passes with it, spying on clearTimeout or fake timers for success and rejection paths while preserving the existing abort/unmount coverage.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

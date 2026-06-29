@@ -1,0 +1,17 @@
+{
+  "pageId": "3868bce9-1f7c-8128-aef7-d3797b1bc148",
+  "id": "WI-933",
+  "name": "Integration tests assert toBeDefined() on UUID fields (no format check)",
+  "description": "[FCR 2026-06-21 · L4-10] toBeDefined() passes for '' / 0 / null; a partial-failure null id would pass. Fix: toMatch UUID regex for createdIds.",
+  "acceptanceCriteria": "Root cause: the family-bridge integration test checks createdIds with toBeDefined only, so empty strings, nulls, or non-UUID values could slip through without proving the clone returned usable IDs.\nVariants:\n- createdIds.topicId is present and UUID-shaped.\n- createdIds.subjectId is present and UUID-shaped.\n- createdIds.bookId is present and UUID-shaped.\nRegression: strengthen tests/integration/family-bridge.integration.test.ts so the clone-created IDs match a UUID regex and the test fails for empty, null, or malformed IDs while still passing for a valid cloned curriculum chain.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
