@@ -49,17 +49,7 @@ function ManageAction({
   );
 }
 
-/**
- * In-context subject management for the SubjectHub (WI-1119). Mirrors Library's
- * archive-first action set for a SINGLE subject: pause/archive an active subject,
- * resume/archive a paused one, restore an archived one. Delete is intentionally
- * NOT offered here — it stays behind Library's scope-confirm flow so the
- * irreversible step is never one tap from an in-use subject (archive-first).
- *
- * Proxy gating lives at the route (the manage entry is not rendered for a
- * supporter-proxy scope), so this sheet is only ever mounted for a scope that
- * may write.
- */
+/** In-context subject management for the SubjectHub (WI-1119): pause/archive/restore a single subject. Delete stays in Library's scope-confirm flow (archive-first). Proxy gating at the route level. */
 export function SubjectHubManageSheet({
   visible,
   subjectName,
