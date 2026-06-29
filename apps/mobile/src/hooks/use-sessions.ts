@@ -10,17 +10,20 @@ import { useAuth } from '@clerk/clerk-expo';
 import { transcriptResponseSchema } from '@eduagent/schemas';
 import type {
   CelebrationReason,
+  CloseResult,
   ContentFlagInput,
   HomeworkSessionMetadata,
   InputMode,
   LearningSession,
+  MessageResult,
   ParkingLotItem,
   SessionMessageInput,
   SessionMetadata,
   SessionAnalyticsEventInput,
+  SessionStartResult,
   SessionSummary,
   SkipSummaryResponse,
-  SummaryStatus,
+  SubmitSummaryResult,
   TranscriptResponse,
   SessionType,
   RecallBridgeResult,
@@ -30,14 +33,15 @@ import type {
 } from '@eduagent/schemas';
 import {
   closeResultSchema,
-  homeworkSessionMetadataSchema,
-  learningSessionSchema,
+  homeworkStateSyncResponseSchema,
   messageResultSchema,
   parkingLotAddResponseSchema,
   parkingLotItemSchema,
   recallBridgeResultSchema,
-  sessionSummarySchema,
+  sessionStartResultSchema,
+  sessionSummaryGetResponseSchema,
   skipSummaryResponseSchema,
+  submitSummaryResultSchema,
 } from '@eduagent/schemas';
 import { z } from 'zod';
 import {
@@ -115,32 +119,6 @@ export function computeFilingRefetchInterval(
   return filingStatus === 'filing_pending' ? 15_000 : false;
 }
 
-// API-route-specific response wrappers (not in schemas)
-interface SessionStartResult {
-  session: LearningSession;
-}
-
-interface MessageResult {
-  response: string;
-  escalationRung: number;
-  isUnderstandingCheck: boolean;
-  exchangeCount: number;
-  expectedResponseMinutes: number;
-  aiEventId?: string;
-}
-
-interface CloseResult {
-  message: string;
-  sessionId: string;
-  wallClockSeconds: number;
-  summaryStatus?:
-    | 'pending'
-    | 'submitted'
-    | 'accepted'
-    | 'skipped'
-    | 'auto_closed';
-}
-
 type StreamMessageDoneResult = {
   exchangeCount: number;
   escalationRung: number;
@@ -188,49 +166,6 @@ function isRetryablePreStreamError(error: unknown): boolean {
     error.name === 'AbortError'
   );
 }
-
-interface SubmitSummaryResult {
-  summary: {
-    id: string;
-    sessionId: string;
-    content: string;
-    aiFeedback: string | null;
-    status: SummaryStatus;
-    baseXp?: number | null;
-    reflectionBonusXp?: number | null;
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Inline boundary-validation schemas for response types not yet in
-// @eduagent/schemas. NOT exported as types (which would duplicate the local
-// interface definitions above). Used only by parseJson calls below.
-// [WI-1059]
-// ---------------------------------------------------------------------------
-
-const sessionStartResultSchema = z.object({ session: learningSessionSchema });
-
-const homeworkStateSyncResponseSchema = z.object({
-  metadata: homeworkSessionMetadataSchema,
-});
-
-const sessionSummaryGetResponseSchema = z.object({
-  summary: sessionSummarySchema.nullable(),
-});
-
-// SubmitSummaryResult uses a pick of sessionSummarySchema — compose from the
-// canonical schema rather than reinventing the shape.
-const submitSummaryResultSchema = z.object({
-  summary: sessionSummarySchema.pick({
-    id: true,
-    sessionId: true,
-    content: true,
-    aiFeedback: true,
-    status: true,
-    baseXp: true,
-    reflectionBonusXp: true,
-  }),
-});
 
 export function useStartSession(subjectId: string): UseMutationResult<
   SessionStartResult,
