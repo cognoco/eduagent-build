@@ -10,9 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { createHash } from 'crypto';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { accounts } from '@eduagent/database';
 import { inngest } from '../client';
 import {
   closeStepDatabases,
@@ -26,6 +24,7 @@ import {
   formatAccountReclaimAttemptEmail,
   sendEmail,
 } from '../../services/notifications';
+import { findAccountByClerkId } from '../../services/account';
 import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
@@ -82,9 +81,7 @@ export const accountReclaimAttempt = inngest.createFunction(
 
         const account = await step.run('lookup-existing-account', async () => {
           const db = getStepDatabase();
-          return db.query.accounts.findFirst({
-            where: eq(accounts.clerkUserId, data.existingClerkUserId),
-          });
+          return findAccountByClerkId(db, data.existingClerkUserId);
         });
 
         if (!account) {
