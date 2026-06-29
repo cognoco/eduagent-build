@@ -31,8 +31,11 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
+import {
+  ensureV2ProfileAnchorForTest,
+  resolveAccountId,
+} from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -114,34 +117,46 @@ async function seedFamilyLink(
     .values({ parentProfileId, childProfileId })
     .onConflictDoNothing();
 
-  if (isIdentityV2Enabled()) {
-    const parentMembership = await db.query.membership.findFirst({
-      where: eq(membership.personId, parentProfileId),
-      columns: { organizationId: true },
-    });
-
-    if (!parentMembership) {
-      throw new Error(
-        `seedFamilyLink: parent membership missing for ${parentProfileId}`,
-      );
-    }
-
-    await db
-      .insert(guardianship)
-      .values({
-        guardianPersonId: parentProfileId,
-        chargePersonId: childProfileId,
-      })
-      .onConflictDoNothing();
-    await db
-      .insert(membership)
-      .values({
-        personId: childProfileId,
-        organizationId: parentMembership.organizationId,
-        roles: ['learner'],
-      })
-      .onConflictDoNothing();
+  // [WI-1145] Seed the v2 guardianship edge + child cross-org membership
+  // unconditionally. This file creates profiles through routes, but the
+  // flag-off main lane may only have the legacy profile rows, so repair the v2
+  // anchors and memberships here before inserting v2 relationship edges.
+  const parentAccountId = await resolveAccountId(db, parentProfileId);
+  if (!parentAccountId) {
+    throw new Error(
+      `seedFamilyLink: parent account missing for ${parentProfileId}`,
+    );
   }
+  await ensureV2ProfileAnchorForTest(db, {
+    profileId: parentProfileId,
+    accountId: parentAccountId,
+  });
+  await ensureV2ProfileAnchorForTest(db, { profileId: childProfileId });
+
+  await db
+    .insert(membership)
+    .values({
+      personId: parentProfileId,
+      organizationId: parentAccountId,
+      roles: ['admin'],
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(guardianship)
+    .values({
+      guardianPersonId: parentProfileId,
+      chargePersonId: childProfileId,
+    })
+    .onConflictDoNothing();
+  await db
+    .insert(membership)
+    .values({
+      personId: childProfileId,
+      organizationId: parentAccountId,
+      roles: ['learner'],
+    })
+    .onConflictDoNothing();
 }
 
 async function seedSession(
@@ -717,38 +732,40 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     });
 
-    if (isIdentityV2Enabled()) {
-      const childMemberships = await db.query.membership.findMany({
-        where: eq(membership.personId, childProfileId),
-        columns: { organizationId: true },
-      });
-      const organizationIds = [
-        ...new Set(childMemberships.map((row) => row.organizationId)),
-      ];
+    // [WI-1145] Seed the v2 consentGrant (withdrawn) unconditionally alongside the
+    // legacy consentStates above — the collapsed dashboard consent read resolves via
+    // consent_grant on the flag-off main lane, empty when gated. Child membership
+    // exists (route-created + cross-org membership seeded in seedFamilyLink).
+    const childMemberships = await db.query.membership.findMany({
+      where: eq(membership.personId, childProfileId),
+      columns: { organizationId: true },
+    });
+    const organizationIds = [
+      ...new Set(childMemberships.map((row) => row.organizationId)),
+    ];
 
-      if (organizationIds.length === 0) {
-        throw new Error(
-          `withdrawn consent fixture: child membership missing for ${childProfileId}`,
-        );
-      }
-
-      await db
-        .delete(consentGrant)
-        .where(eq(consentGrant.chargePersonId, childProfileId));
-      const withdrawnAt = new Date();
-      const grantedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      await db.insert(consentGrant).values(
-        organizationIds.map((organizationId) => ({
-          chargePersonId: childProfileId,
-          organizationId,
-          purpose: 'platform_use',
-          lawfulBasis: 'gdpr_parental_consent',
-          granted: true,
-          grantedAt,
-          withdrawnAt,
-        })),
+    if (organizationIds.length === 0) {
+      throw new Error(
+        `withdrawn consent fixture: child membership missing for ${childProfileId}`,
       );
     }
+
+    await db
+      .delete(consentGrant)
+      .where(eq(consentGrant.chargePersonId, childProfileId));
+    const withdrawnAt = new Date();
+    const grantedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db.insert(consentGrant).values(
+      organizationIds.map((organizationId) => ({
+        chargePersonId: childProfileId,
+        organizationId,
+        purpose: 'platform_use',
+        lawfulBasis: 'gdpr_parental_consent',
+        granted: true,
+        grantedAt,
+        withdrawnAt,
+      })),
+    );
 
     const res = await app.request(
       `/v1/dashboard/children/${childProfileId}/progress-summary`,

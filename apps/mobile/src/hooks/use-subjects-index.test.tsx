@@ -6,7 +6,12 @@ import type { OverallProgressResponse } from './use-progress';
 const SUBJECT_A = '550e8400-e29b-41d4-a716-446655440000';
 const SUBJECT_B = '660e8400-e29b-41d4-a716-446655440001';
 
-function subject(id: string, name: string, status = 'active'): Subject {
+function subject(
+  id: string,
+  name: string,
+  status = 'active',
+  urgencyBoostUntil: string | null = null,
+): Subject {
   return {
     id,
     profileId: '770e8400-e29b-41d4-a716-446655440002',
@@ -14,6 +19,7 @@ function subject(id: string, name: string, status = 'active'): Subject {
     status: status as Subject['status'],
     curriculumStatus: 'ready',
     pedagogyMode: 'socratic',
+    urgencyBoostUntil,
     createdAt: '2026-06-01T00:00:00.000Z',
     updatedAt: '2026-06-01T00:00:00.000Z',
   };
@@ -60,13 +66,15 @@ function progress(
   };
 }
 
+const SUBJECT_C = '990e8400-e29b-41d4-a716-446655440005';
+
 describe('buildSubjectsIndex', () => {
-  it('keeps the full active subject list and derives concrete progress', () => {
+  it('passes every status through (not active-only) and maps status + urgencyBoostUntil', () => {
     const result = buildSubjectsIndex({
       subjects: [
-        subject(SUBJECT_A, 'Spanish'),
-        subject(SUBJECT_B, 'Algebra'),
-        subject('990e8400-e29b-41d4-a716-446655440005', 'Archived', 'archived'),
+        subject(SUBJECT_A, 'Spanish', 'active', '2999-01-01T00:00:00.000Z'),
+        subject(SUBJECT_B, 'Algebra', 'paused'),
+        subject(SUBJECT_C, 'Archived', 'archived'),
       ],
       librarySubjects: [
         {
@@ -89,12 +97,15 @@ describe('buildSubjectsIndex', () => {
       ],
     });
 
+    // All three statuses pass through — the legacy active-only filter is gone.
     expect(
       result.map((item: { subjectName: string }) => item.subjectName),
-    ).toEqual(['Spanish', 'Algebra']);
+    ).toEqual(['Spanish', 'Algebra', 'Archived']);
     expect(result[0]).toEqual(
       expect.objectContaining({
         subjectId: SUBJECT_A,
+        status: 'active',
+        urgencyBoostUntil: '2999-01-01T00:00:00.000Z',
         mastered: 2,
         learning: 3,
         total: 6,
@@ -104,11 +115,16 @@ describe('buildSubjectsIndex', () => {
     expect(result[1]).toEqual(
       expect.objectContaining({
         subjectId: SUBJECT_B,
+        status: 'paused',
+        urgencyBoostUntil: null,
         mastered: 1,
         learning: 1,
         total: 5,
         dueReviews: 0,
       }),
+    );
+    expect(result[2]).toEqual(
+      expect.objectContaining({ subjectId: SUBJECT_C, status: 'archived' }),
     );
   });
 });

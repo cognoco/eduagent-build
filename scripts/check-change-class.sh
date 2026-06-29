@@ -81,6 +81,7 @@ filter_files() {
 #   eval=<bool>          matrix demands the LLM eval harness (Tier 1)
 #   unit=<bool>          matrix demands the API unit suite for a cross-package
 #                        read that nx affected cannot see (i18n-cross-package)
+#   docs_only=<bool>     PR diff is limited to docs/editor metadata paths
 # Fail-open invariant: if no diff base resolves, the router cannot prove a
 # slow suite unaffected, so it demands them ALL — never silently skips.
 emit_github_output() {
@@ -93,11 +94,19 @@ emit_github_output() {
       echo "integration=true"
       echo "eval=true"
       echo "unit=true"
+      echo "docs_only=false"
     } >> "$out"
     return 0
   fi
-  local classes integration=false eval_needed=false unit=false entry cmd
+  local classes integration=false eval_needed=false unit=false docs_only=true entry cmd f
   classes=$(join_unique_classes | tr ' ' ',')
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    case "$f" in
+      *.md|docs/*|_wip/*|.claude/*|.vscode/*|.idea/*) ;;
+      *) docs_only=false; break ;;
+    esac
+  done <<< "$FILES"
   # unit: the API unit suite must run for a cross-package read nx affected can't
   # see — currently only the i18n-cross-package class (en.json → app-help-map
   # readFileSync). Class-scoped on purpose: ordinary api changes already get
@@ -129,6 +138,7 @@ emit_github_output() {
     echo "integration=${integration}"
     echo "eval=${eval_needed}"
     echo "unit=${unit}"
+    echo "docs_only=${docs_only}"
   } >> "$out"
 }
 
@@ -157,7 +167,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --branch          Check all changes vs main (or vs origin/\$BASE_REF if set)"
       echo "  --run             Execute identified validation commands"
       echo "  --fast            With --run: skip slow commands"
-      echo "  --github-output   Also emit router flags (classes, integration, eval)"
+      echo "  --github-output   Also emit router flags (classes, integration, eval, docs_only)"
       echo "                    to \$GITHUB_OUTPUT for CI step gating (WI-452)"
       echo "  -h, --help        Show this help"
       exit 0

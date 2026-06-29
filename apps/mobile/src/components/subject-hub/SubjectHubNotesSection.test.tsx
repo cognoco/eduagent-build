@@ -53,6 +53,22 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByTestId('subject-hub-notes-tabs')).toBeNull();
   });
 
+  it('defaults to the subject-context empty copy, and uses the caller override when given', () => {
+    const { rerender } = render(<SubjectHubNotesSection notes={[]} />);
+    // No override → the default subject-level key.
+    screen.getByText('subjectHub.notes.empty');
+
+    // A caller (the topic-sheet mount) can override the empty copy for its context.
+    rerender(
+      <SubjectHubNotesSection
+        notes={[]}
+        emptyMessage="No notes yet. Capture a thought about this topic."
+      />,
+    );
+    screen.getByText('No notes yet. Capture a thought about this topic.');
+    expect(screen.queryByText('subjectHub.notes.empty')).toBeNull();
+  });
+
   it('disables the empty-state add action until the draft has text', () => {
     const onAddNote = jest.fn();
     render(<SubjectHubNotesSection notes={[]} onAddNote={onAddNote} />);
@@ -106,6 +122,23 @@ describe('SubjectHubNotesSection', () => {
       analyzesTone: false,
       analyzesEmotion: false,
     });
+  });
+
+  it('renders the add input but NOT the mic when onAddNote is wired without onNoteVoice', () => {
+    // The hub wires note authoring without a voice handler (transcription is not
+    // wired in the hub). The text input must render, but the mic must be gated out
+    // rather than shown as a dead button that does nothing on press.
+    render(
+      <SubjectHubNotesSection
+        notes={[selfNote]}
+        canStudy
+        onAddNote={jest.fn()}
+      />,
+    );
+
+    screen.getByTestId('subject-hub-notes-add-row');
+    screen.getByTestId('subject-hub-notes-input');
+    expect(screen.queryByTestId('notes-mic')).toBeNull();
   });
 
   it('omits the add input, mic, and empty-add when canStudy but no persistence handler is wired', () => {

@@ -1,0 +1,12 @@
+{
+  "_comment": "TEMPLATE — copy to monitor-manifest.json, fill `monitors`. The durable record of the watcher set this role EXPECTS running; reconcile it against the live /tasks list at session-start / post-compact / post-resume (clacks/monitor-hygiene.md). Orchestrator: this lives at working/program/. Shepherd: same shape at working/lanes/<lane>/_state/monitor-manifest.json.",
+  "role": "«orchestrator | shepherd»",
+  "monitors": [
+    {
+      "target": "«what it watches — e.g. lane outbox.jsonl, or the workstream's Cosmo Stage»",
+      "purpose": "«why — e.g. catch rulings; catch review verdicts»",
+      "command": "«the canonical command/spec that arms it»",
+      "task-id": "«live task/session id once armed — refresh on reconcile»"
+    }
+  ]
+}

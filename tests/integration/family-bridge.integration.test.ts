@@ -44,122 +44,80 @@ const UUID_REGEX =
 async function seedFamily() {
   const db = createIntegrationDb();
 
-  // [WI-586] Flag-ON the close-gate DB is committed-migrations-only (M-DROP):
-  // legacy accounts/profiles/family_links are gone. Seed the v2 graph with the
-  // reseed alignment organization.id == accountId, person.id == profileId, and
-  // express the parent->child relationship via guardianship (not family_links).
-  if (isIdentityV2Enabled()) {
-    const accountId = generateUUIDv7();
-    const adultId = generateUUIDv7();
-    const childId = generateUUIDv7();
-    await db
-      .insert(organization)
-      .values({ id: accountId, name: `Family org ${accountId.slice(0, 8)}` });
-    await db.insert(person).values([
-      {
-        id: adultId,
-        displayName: 'Parent',
-        birthDate: '1985-01-01',
-        residenceJurisdiction: 'US',
-      },
-      {
-        id: childId,
-        displayName: 'Ada',
-        birthDate: '2013-01-01',
-        residenceJurisdiction: 'US',
-      },
-    ]);
-    await db.insert(login).values({
-      personId: adultId,
-      clerkUserId: CLERK_USER_ID,
-      email: EMAIL,
-    });
-    await db.insert(membership).values([
-      { personId: adultId, organizationId: accountId, roles: ['admin'] },
-      { personId: childId, organizationId: accountId, roles: ['learner'] },
-    ]);
-    await db.insert(guardianship).values({
-      guardianPersonId: adultId,
-      chargePersonId: childId,
-    });
-    // [WI-808] Dual-write: subjects.profile_id and profiles.account_id still FK
-    // to profiles and accounts respectively (M-DROP/M-REPOINT not yet committed).
-    // Insert stub accounts + profiles rows so seedLearningTree's subjects insert
-    // and the profiles FK chain are satisfied.
-    await db.insert(accounts).values({
-      id: accountId,
-      clerkUserId: CLERK_USER_ID,
-      email: EMAIL,
-    });
-    await db.insert(profiles).values([
-      {
-        id: adultId,
-        accountId,
-        displayName: 'Parent',
-        birthYear: 1985,
-        isOwner: true,
-      },
-      {
-        id: childId,
-        accountId,
-        displayName: 'Ada',
-        birthYear: 2013,
-        isOwner: false,
-      },
-    ]);
-
-    const account = { id: accountId, clerkUserId: CLERK_USER_ID, email: EMAIL };
-    const adult = { id: adultId, accountId, displayName: 'Parent' };
-    const child = { id: childId, accountId, displayName: 'Ada' };
-
-    const childLearning = await seedLearningTree(db, {
-      profileId: child.id,
-      subjectName: 'Mathematics',
-      bookTitle: 'Numbers That Matter',
-      topicTitle: 'Fractions',
-      topicDescription: 'Child version of fractions.',
-    });
-
-    return { db, account, adult, child, childLearning };
-  }
-
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: CLERK_USER_ID,
-      email: EMAIL,
-    })
-    .returning();
-
-  if (!account) throw new Error('Account seed failed');
-
-  const [adult] = await db
-    .insert(profiles)
-    .values({
-      accountId: account.id,
+  // [WI-1145] Seed the v2 graph + legacy stubs UNCONDITIONALLY with reseed-aligned
+  // ids (organization.id == accountId, person.id == profileId). cloneTopicFromChild's
+  // active-edge guard reads `guardianship` regardless of the carved SERVICE_OPTS
+  // flag, while getChildTopicSnapshotForParent honors SERVICE_OPTS and reads
+  // `family_links` on the flag-off path — so seed BOTH the guardianship edge AND
+  // family_links to cover both guards across the flag/collapse transition.
+  const accountId = generateUUIDv7();
+  const adultId = generateUUIDv7();
+  const childId = generateUUIDv7();
+  await db
+    .insert(organization)
+    .values({ id: accountId, name: `Family org ${accountId.slice(0, 8)}` });
+  await db.insert(person).values([
+    {
+      id: adultId,
+      displayName: 'Parent',
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'US',
+    },
+    {
+      id: childId,
+      displayName: 'Ada',
+      birthDate: '2013-01-01',
+      residenceJurisdiction: 'US',
+    },
+  ]);
+  await db.insert(login).values({
+    personId: adultId,
+    clerkUserId: CLERK_USER_ID,
+    email: EMAIL,
+  });
+  await db.insert(membership).values([
+    { personId: adultId, organizationId: accountId, roles: ['admin'] },
+    { personId: childId, organizationId: accountId, roles: ['learner'] },
+  ]);
+  await db.insert(guardianship).values({
+    guardianPersonId: adultId,
+    chargePersonId: childId,
+  });
+  // [WI-808] Dual-write: subjects.profile_id and profiles.account_id still FK to
+  // profiles and accounts respectively. Insert stub accounts + profiles rows so
+  // seedLearningTree's subjects insert and the profiles FK chain are satisfied,
+  // and family_links so the flag-off SERVICE_OPTS parent-access guard resolves.
+  await db.insert(accounts).values({
+    id: accountId,
+    clerkUserId: CLERK_USER_ID,
+    email: EMAIL,
+  });
+  await db.insert(profiles).values([
+    {
+      id: adultId,
+      accountId,
       displayName: 'Parent',
       birthYear: 1985,
       isOwner: true,
       conversationLanguage: 'en',
-    })
-    .returning();
-  const [child] = await db
-    .insert(profiles)
-    .values({
-      accountId: account.id,
+    },
+    {
+      id: childId,
+      accountId,
       displayName: 'Ada',
       birthYear: 2013,
       isOwner: false,
       conversationLanguage: 'en',
-    })
-    .returning();
-
-  if (!adult || !child) throw new Error('Profile seed failed');
-
+    },
+  ]);
   await db.insert(familyLinks).values({
-    parentProfileId: adult.id,
-    childProfileId: child.id,
+    parentProfileId: adultId,
+    childProfileId: childId,
   });
+
+  const account = { id: accountId, clerkUserId: CLERK_USER_ID, email: EMAIL };
+  const adult = { id: adultId, accountId, displayName: 'Parent' };
+  const child = { id: childId, accountId, displayName: 'Ada' };
 
   const childLearning = await seedLearningTree(db, {
     profileId: child.id,
@@ -169,13 +127,7 @@ async function seedFamily() {
     topicDescription: 'Child version of fractions.',
   });
 
-  return {
-    db,
-    account,
-    adult,
-    child,
-    childLearning,
-  };
+  return { db, account, adult, child, childLearning };
 }
 
 async function seedLearningTree(
