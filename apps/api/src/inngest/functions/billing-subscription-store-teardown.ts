@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (accountId from event; subscription store teardown ops scoped to that account)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,
