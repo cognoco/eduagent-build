@@ -26,13 +26,13 @@ export function NoteDisplay({
   const { t } = useTranslation();
   const [additionsExpanded, setAdditionsExpanded] = useState(false);
   const lines = content.split('\n');
-  const tutorAdditions = conceptSignal?.tutorAdditions ?? [];
-  const hasTutorAdditions =
-    conceptSignal?.hasTutorAddition === true && tutorAdditions.length > 0;
+  const mentorAdditions = conceptSignal?.mentorAdditions ?? [];
+  const hasMentorAdditions =
+    conceptSignal?.hasMentorAddition === true && mentorAdditions.length > 0;
 
   return (
     <View className="bg-surface rounded-lg p-3">
-      {(conceptSignal?.verified === true || hasTutorAdditions) && (
+      {(conceptSignal?.verified === true || hasMentorAdditions) && (
         <View className="mb-2 flex-row flex-wrap items-center gap-2">
           {conceptSignal?.verified === true && (
             <View
@@ -54,15 +54,15 @@ export function NoteDisplay({
               </Text>
             </View>
           )}
-          {hasTutorAdditions && (
+          {hasMentorAdditions && (
             <Pressable
-              testID="note-tutor-addition-toggle"
+              testID="note-mentor-addition-toggle"
               onPress={() => setAdditionsExpanded((value) => !value)}
               accessibilityRole="button"
               accessibilityLabel={t(
                 additionsExpanded
-                  ? 'library.noteSignal.hideTutorAdditionAccessibilityLabel'
-                  : 'library.noteSignal.showTutorAdditionAccessibilityLabel',
+                  ? 'library.noteSignal.hideMentorAdditionAccessibilityLabel'
+                  : 'library.noteSignal.showMentorAdditionAccessibilityLabel',
               )}
               className="flex-row items-center gap-1"
             >
@@ -74,16 +74,16 @@ export function NoteDisplay({
                 importantForAccessibility="no-hide-descendants"
               />
               <Text className="text-caption text-text-secondary">
-                {t('library.noteSignal.tutorAddition')}
+                {t('library.noteSignal.mentorAddition')}
               </Text>
             </Pressable>
           )}
         </View>
       )}
 
-      {hasTutorAdditions && additionsExpanded && (
-        <View testID="note-tutor-additions" className="mb-2 gap-1">
-          {tutorAdditions.map((addition) => (
+      {hasMentorAdditions && additionsExpanded && (
+        <View testID="note-mentor-additions" className="mb-2 gap-1">
+          {mentorAdditions.map((addition) => (
             <Text key={addition} className="text-body-sm text-text-secondary">
               {addition}
             </Text>
