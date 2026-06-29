@@ -214,6 +214,23 @@ let mockSessionSummaryData: {
   status: 'pending' | 'submitted' | 'accepted' | 'skipped' | 'auto_closed';
   purgedAt?: string | null;
 } | null = null;
+
+// Base summary fixture with all fields required by sessionSummaryGetResponseSchema.
+// parseJson now validates responses against the full schema, so partial objects are
+// rejected. Tests that supply learnerRecap stop polling; tests that override it with
+// null exercise the "still loading" / timeout rail.
+const BASE_MOCK_SUMMARY = {
+  id: '880e8400-e29b-41d4-a716-446655440000',
+  sessionId: '660e8400-e29b-41d4-a716-446655440000',
+  content: '',
+  aiFeedback: null as string | null,
+  status: 'pending' as const,
+  closingLine: null as string | null,
+  learnerRecap: 'mock-recap',
+  nextTopicId: null as string | null,
+  nextTopicTitle: null as string | null,
+  nextTopicReason: null as string | null,
+};
 let mockTotalSessions = 0;
 let mockRecentlyResolvedTopics: string[] = [];
 let mockTopicSuggestionsData: Array<{
@@ -291,18 +308,16 @@ const mockFetch = createRoutedMockFetch({
       );
     }
     // GET /sessions/:id/summary → persisted summary lookup.
-    // Always include learnerRecap in the response so refetchInterval returns
-    // false and stops polling. Without it, useSessionSummary polls every 2s
-    // with the synchronous notifyManager, creating continuous re-renders that
-    // overwhelm React 19 and trigger its infinite-update guard.
-    // For null: return status-less object (isAlreadyPersisted stays false,
-    // so the input form renders as expected).
+    // Always include learnerRecap so refetchInterval → false and polling stops.
+    // Returns a full schema-valid SessionSummary (parseJson validates against
+    // sessionSummaryGetResponseSchema since WI-1059; partial objects are rejected).
+    // status:'pending' keeps isAlreadyPersisted=false so the input form renders.
     if (url.includes('/summary')) {
       if (mockSessionSummaryData === null) {
-        return { summary: { learnerRecap: 'mock-recap' } };
+        return { summary: { ...BASE_MOCK_SUMMARY } };
       }
       return {
-        summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+        summary: { ...BASE_MOCK_SUMMARY, ...mockSessionSummaryData },
       };
     }
     // GET /sessions/:id (session entity)
@@ -427,7 +442,7 @@ describe('SessionSummaryScreen', () => {
     mockSubmitResult = null;
     mockSkipResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: '',
         aiFeedback: null,
@@ -484,10 +499,10 @@ describe('SessionSummaryScreen', () => {
       }
       if (url.includes('/summary')) {
         if (mockSessionSummaryData === null) {
-          return { summary: { learnerRecap: 'mock-recap' } };
+          return { summary: { ...BASE_MOCK_SUMMARY } };
         }
         return {
-          summary: { ...mockSessionSummaryData, learnerRecap: 'mock-recap' },
+          summary: { ...BASE_MOCK_SUMMARY, ...mockSessionSummaryData },
         };
       }
       if (url.includes('/library-filing/keep-out')) {
@@ -733,7 +748,7 @@ describe('SessionSummaryScreen', () => {
   it('submits summary and shows AI feedback', async () => {
     mockSubmitResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and how to solve them',
         aiFeedback: 'Good summary. You captured the key concepts well.',
@@ -759,7 +774,7 @@ describe('SessionSummaryScreen', () => {
   it('shows Continue button after submission', async () => {
     mockSubmitResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and factoring methods',
         aiFeedback: 'Well done.',
@@ -789,7 +804,7 @@ describe('SessionSummaryScreen', () => {
     mockCanGoBack.mockReturnValue(true);
     mockSubmitResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I learned about quadratic equations and factoring methods',
         aiFeedback: 'Well done.',
@@ -820,7 +835,7 @@ describe('SessionSummaryScreen', () => {
   it('triggers the rating prompt hook before leaving a recall summary', async () => {
     mockSubmitResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I explained how factoring helps solve quadratic equations',
         aiFeedback: 'Well done.',
@@ -878,7 +893,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.sessionType = 'homework';
     mockFetch.setRoute('recall-bridge', () => ({
       questions: ['What method did you use?', 'Why does it work?'],
-      topicId: 'topic-1',
+      topicId: '990e8400-e29b-41d4-a716-446655440001',
       topicTitle: 'Algebra',
     }));
 
@@ -908,7 +923,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.sessionType = 'learning';
     mockFetch.setRoute('recall-bridge', () => ({
       questions: ['Should not appear'],
-      topicId: 'topic-1',
+      topicId: '990e8400-e29b-41d4-a716-446655440001',
       topicTitle: 'Algebra',
     }));
 
@@ -928,7 +943,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.sessionType = 'homework';
     mockSubmitResult = {
       summary: {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'I used long division to check the remainder',
         aiFeedback: 'Nice work.',
@@ -937,7 +952,7 @@ describe('SessionSummaryScreen', () => {
     };
     mockFetch.setRoute('recall-bridge', () => ({
       questions: ['What method did you use?', 'Why does it work?'],
-      topicId: 'topic-1',
+      topicId: '990e8400-e29b-41d4-a716-446655440001',
       topicTitle: 'Algebra',
     }));
 
@@ -965,7 +980,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: { learnerRecap: 'mock-recap' } };
+        return { summary: { ...BASE_MOCK_SUMMARY } };
       }
       return { session: null };
     });
@@ -1002,7 +1017,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: { learnerRecap: 'mock-recap' } };
+        return { summary: { ...BASE_MOCK_SUMMARY } };
       }
       return { session: null };
     });
@@ -1032,7 +1047,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: { learnerRecap: 'mock-recap' } };
+        return { summary: { ...BASE_MOCK_SUMMARY } };
       }
       return { session: null };
     });
@@ -1098,7 +1113,7 @@ describe('SessionSummaryScreen', () => {
     it('prompt chips are not shown after submission', async () => {
       mockSubmitResult = {
         summary: {
-          id: 'summary-1',
+          id: '880e8400-e29b-41d4-a716-446655440001',
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
           content: 'I learned about equations and how to solve them today',
           aiFeedback: 'Great job!',
@@ -1222,7 +1237,7 @@ describe('SessionSummaryScreen', () => {
   describe('revisiting a session with an already-persisted summary [BUG-449]', () => {
     it('renders saved content + AI feedback (not the empty input) when status is submitted', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content:
           'African landscapes vary hugely — from the Sahara to savannah to rainforest.',
@@ -1248,7 +1263,7 @@ describe('SessionSummaryScreen', () => {
 
     it('renders saved content when status is accepted (post-pipeline)', async () => {
       mockSessionSummaryData = {
-        id: 'summary-2',
+        id: '880e8400-e29b-41d4-a716-446655440002',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content:
           'I learned about the Atlas Mountains and the Great Rift Valley.',
@@ -1269,7 +1284,7 @@ describe('SessionSummaryScreen', () => {
 
     it('renders read-only skipped-state (no input, no skip) when status is skipped', async () => {
       mockSessionSummaryData = {
-        id: 'summary-3',
+        id: '880e8400-e29b-41d4-a716-446655440003',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: '',
         aiFeedback: null,
@@ -1288,7 +1303,7 @@ describe('SessionSummaryScreen', () => {
 
     it('Continue does NOT call skipSummary when summary is already submitted', async () => {
       mockSessionSummaryData = {
-        id: 'summary-4',
+        id: '880e8400-e29b-41d4-a716-446655440004',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Previously saved reflection text that must not be skipped.',
         aiFeedback: 'Good reflection.',
@@ -1310,7 +1325,7 @@ describe('SessionSummaryScreen', () => {
 
     it('Close (X) does NOT call skipSummary when summary is already submitted', async () => {
       mockSessionSummaryData = {
-        id: 'summary-5',
+        id: '880e8400-e29b-41d4-a716-446655440005',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Existing summary content — close must be a no-op for skip.',
         aiFeedback: 'Helpful reflection.',
@@ -1332,7 +1347,7 @@ describe('SessionSummaryScreen', () => {
 
     it('prefers router.back() over replace when canGoBack() is true on revisit continue', async () => {
       mockSessionSummaryData = {
-        id: 'summary-6',
+        id: '880e8400-e29b-41d4-a716-446655440006',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Previously written summary content, revisited from the book.',
         aiFeedback: 'Nice work.',
@@ -1473,7 +1488,7 @@ describe('SessionSummaryScreen', () => {
     it('"Submit now" in the confirm dialog submits the summary instead of skipping', async () => {
       mockSubmitResult = {
         summary: {
-          id: 'summary-1',
+          id: '880e8400-e29b-41d4-a716-446655440001',
           sessionId: '660e8400-e29b-41d4-a716-446655440000',
           content: 'Some partial reflection text that is long enough',
           aiFeedback: 'Great reflection.',
@@ -1522,7 +1537,7 @@ describe('SessionSummaryScreen', () => {
 
     it('rehydrated draft on a previously-skipped session shows the resubmit banner, not the read-only message', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: '',
         aiFeedback: null,
@@ -1549,7 +1564,7 @@ describe('SessionSummaryScreen', () => {
 
     it('clears the stale draft when the session is already submitted server-side', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Already submitted on the server.',
         aiFeedback: 'Nice.',
@@ -2061,7 +2076,7 @@ describe('SessionSummaryScreen', () => {
   describe('purged-transcript badge', () => {
     it('shows the archived notice when purgedAt is set on the session summary', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Previously submitted summary.',
         aiFeedback: 'Good work.',
@@ -2088,7 +2103,7 @@ describe('SessionSummaryScreen', () => {
 
     it('shows the "View full transcript" button when purgedAt is null', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Previously submitted summary.',
         aiFeedback: 'Good work.',
@@ -2121,7 +2136,7 @@ describe('SessionSummaryScreen', () => {
 
     it('hides both badge and transcript button in parent-proxy mode', async () => {
       mockSessionSummaryData = {
-        id: 'summary-1',
+        id: '880e8400-e29b-41d4-a716-446655440001',
         sessionId: '660e8400-e29b-41d4-a716-446655440000',
         content: 'Previously submitted summary.',
         aiFeedback: null,
@@ -2166,7 +2181,7 @@ describe('SessionSummaryScreen', () => {
           }
           if (url.includes('/summary')) {
             summaryCallCount += 1;
-            return { summary: { learnerRecap: null } };
+            return { summary: { ...BASE_MOCK_SUMMARY, learnerRecap: null } };
           }
           return { session: mockSessionData };
         });
@@ -2233,7 +2248,7 @@ describe('SessionSummaryScreen', () => {
           }
           if (url.includes('/summary')) {
             summaryCallCount += 1;
-            return { summary: { learnerRecap: null } };
+            return { summary: { ...BASE_MOCK_SUMMARY, learnerRecap: null } };
           }
           return { session: mockSessionData };
         });

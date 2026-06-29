@@ -121,6 +121,15 @@ function setRoutes(
   mockFetch.setRoute('/onboarding/child-001/interests/context', () => ({
     success: true,
   }));
+
+  // /consent/:childProfileId/status → useChildConsentStatus
+  // Must be registered so parseJson can validate against childConsentStatusSchema.
+  // All nullable: no consent collected in this test scenario.
+  mockFetch.setRoute('/consent/child-001/status', () => ({
+    consentStatus: null,
+    respondedAt: null,
+    consentType: null,
+  }));
 }
 
 function renderWithGuardian() {
