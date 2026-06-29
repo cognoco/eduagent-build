@@ -1,0 +1,20 @@
+{
+  "_note": "WS-18 Identity Cutover shepherd lane watchers. Source of truth for INTENT; /tasks is actuality. Reconcile at session-start/post-compaction/post-resume/on-suspicion (clacks/monitor-hygiene.md). Never blind re-arm.",
+  "lane": "identity-cutover",
+  "role": "shepherd",
+  "armed": "2026-06-29",
+  "monitors": [
+    {
+      "target": "_state/inbox.jsonl (Clacks inbox)",
+      "purpose": "wake on orchestrator rulings/answers/directives while holding",
+      "command": "tail -n 0 -F .../inbox.jsonl | jq --unbuffered -rc '...'",
+      "task-id": "bpvn1kgam"
+    },
+    {
+      "target": "WS-18 Cosmo Workstream Stage field",
+      "purpose": "catch reviewer verdicts (Closed vs rework->Executing); separate reviewer session does NOT notify us",
+      "command": "node _state/cosmo-ws18-monitor.mjs",
+      "task-id": "bo0oqwp5b"
+    }
+  ]
+}

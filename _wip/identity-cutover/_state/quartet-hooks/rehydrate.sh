@@ -39,10 +39,11 @@ echo "Rehydrate from the DURABLE substrate BEFORE acting; do NOT rely on the aut
 echo ""
 if [ "$role" = "orchestrator" ]; then
   echo "0. 🔴 RE-READ THESE FIRST (mandatory — the anchor narrative is NOT a substitute for the protocol):"
-  echo "   a. _wip/umbrella-program/orchestrator-protocol.md — your role + the 8-step Lane-activation ceremony + channel-router rules (governs HOW you act)."
+  echo "   a. _quartet/roles/orchestrator-protocol.md — your role + the 8-step Lane-activation ceremony + channel-router rules (governs HOW you act)."
   echo "   b. _wip/umbrella-program/program-roster.md — PRG-NN Initiative rows + numbering bands + activation queue + cross-program gates."
-  echo "   c. _wip/umbrella-program/planning-reference.md — canonical planning rules."
+  echo "   c. _quartet/planning-rules.md — canonical planning rules."
   echo "   (Skipping these is the documented 2026-06-18 drift: hand-rolling a lane instead of running the defined ceremony.)"
+  echo "   ⚠ Working-state root for THIS program = _wip/ — live roster at _wip/umbrella-program/program-roster.md (b above); channels + anchor under _wip/identity-cutover/_state/. The _quartet/ protocols describe the SHAPE; read the LIVE instances at these _wip/ paths, never _quartet/working/."
   echo ""
 fi
 if [ -n "$doc" ] && [ -f "$doc" ]; then
@@ -61,5 +62,5 @@ if [ -f "$outbox" ]; then
   tail -n 3 "$outbox" 2>/dev/null | cut -c1-200 | sed 's/^/   /'
 fi
 echo ""
-echo "Then: self-assess rehydration fidelity (clean vs degraded?) and report it as the Approach-D experiment data point. Resume monitoring posture; surface only the agreed signals."
+echo "Then: self-assess rehydration fidelity (clean vs degraded?) and report it as the Approach-D experiment data point. Reconcile your monitors against the manifest (_quartet/clacks/monitor-hygiene.md) before trusting any watcher's silence; resume monitoring posture; surface only the agreed signals."
 exit 0

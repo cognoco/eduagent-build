@@ -1,0 +1,17 @@
+{
+  "pageId": "38e8bce9-1f7c-81a3-a9f1-d00db4fd2e69",
+  "id": "WI-1165",
+  "name": "Harden Inngest failure cleanup: tighten safe-non-core empty-catch guard + scope onFailure getStepDatabase writes",
+  "description": "",
+  "acceptanceCriteria": "",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "builder-WI-1165 (vetinari/ramtop)",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

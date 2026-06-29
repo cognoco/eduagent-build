@@ -1,0 +1,18 @@
+{
+  "role": "bug-lane-shepherd",
+  "updated": "2026-06-29",
+  "monitors": [
+    {
+      "target": "_wip/bug-lane/_state/inbox.jsonl",
+      "purpose": "catch orchestrator rulings/relays (incl. the WS-18 #1647 main-green signal that unparks WI-1153)",
+      "command": "tail -n 0 -F _wip/bug-lane/_state/inbox.jsonl",
+      "task-id": "b6ka5dno6"
+    },
+    {
+      "target": "Cosmo Stage/State — Bug Lane WS 3858bce9-1f7c-8083-905b-d94bca4a4325",
+      "purpose": "catch WI verdicts (reviewer bounce Executing<-Reviewing, graduation ->Closed); blind to Clacks",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 3858bce9-1f7c-8083-905b-d94bca4a4325 120",
+      "task-id": "bp2wuk9nz"
+    }
+  ]
+}
