@@ -1,3 +1,4 @@
+// @inngest-admin: no-db (logging+Sentry observer; no DB access)
 // ---------------------------------------------------------------------------
 // Challenge Round Finalize Failed — observable terminus for the
 // app/challenge-round.finalize.failed event emitted by session-exchange.ts

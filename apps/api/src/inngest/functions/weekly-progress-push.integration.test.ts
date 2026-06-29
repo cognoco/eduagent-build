@@ -261,6 +261,11 @@ async function seedWeeklyPushPrefs(profileId: string): Promise<void> {
   await db.insert(notificationPreferences).values({
     profileId,
     weeklyProgressPush: true,
+    // [WI-1153] Push-only prefs: email defaults to true, and the weekly EMAIL
+    // channel is intentionally NOT gated by the 24h push-dedup, so leaving it on
+    // makes a push-dedup assertion see status:'completed' (email fired). Pin it
+    // off so this helper models a push-only user.
+    weeklyProgressEmail: false,
     pushEnabled: true,
     maxDailyPush: 3,
     expoPushToken: 'ExponentPushToken[integration]',
@@ -703,75 +708,72 @@ describe('weekly progress push integration', () => {
   // parent twice. Priming notificationLog with a recent `weekly_progress`
   // entry must cause the generate handler to skip the push while leaving the
   // report row intact.
-  // QUARANTINE WI-1153 (owner: claude:bug-lane, Executing) — confirmed-flaky, NOT a behavioral regression:
-  // this test passed on main @09:19 (CI run 28361732814) and passes in local isolation; it fails only in
-  // the full CI co-located suite from shared-stg-DB state accumulation. Root-fix + un-skip tracked in WI-1153.
-  // G7 sanctions a conditional callee for quarantine; default-skip, runtime un-skip via UNQUARANTINE_WI_1153=1
-  (process.env['UNQUARANTINE_WI_1153'] !== '1' ? it.skip : it)(
-    '[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h',
-    async () => {
-      const { profileId: parentProfileId } = await seedProfile({
-        displayName: 'Parent',
-        timezone: 'UTC',
-      });
-      const { profileId: childProfileId } = await seedProfile({
-        displayName: 'Emma',
-        timezone: 'UTC',
-      });
-      await seedFamilyLink(parentProfileId, childProfileId);
-      await seedWeeklyPushPrefs(parentProfileId);
+  it('[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Parent',
+      timezone: 'UTC',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Emma',
+      timezone: 'UTC',
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedWeeklyPushPrefs(parentProfileId);
 
-      const today = new Date();
-      const latestSnapshotDate = isoDate(today);
-      const previousSnapshotDate = isoDate(
-        subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
-      );
+    const today = new Date();
+    const latestSnapshotDate = isoDate(today);
+    const previousSnapshotDate = isoDate(
+      subtractDays(new Date(`${latestSnapshotDate}T00:00:00.000Z`), 7),
+    );
 
-      await seedSnapshot({
-        profileId: childProfileId,
-        snapshotDate: previousSnapshotDate,
-        metrics: buildProgressMetrics({
-          totalSessions: 1,
-          topicsMastered: 1,
-          vocabularyTotal: 5,
-        }),
-      });
-      await seedSnapshot({
-        profileId: childProfileId,
-        snapshotDate: latestSnapshotDate,
-        metrics: buildProgressMetrics({
-          totalSessions: 4,
-          topicsMastered: 6,
-          vocabularyTotal: 12,
-        }),
-      });
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: previousSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 1,
+        topicsMastered: 1,
+        vocabularyTotal: 5,
+      }),
+    });
+    await seedSnapshot({
+      profileId: childProfileId,
+      snapshotDate: latestSnapshotDate,
+      metrics: buildProgressMetrics({
+        totalSessions: 4,
+        topicsMastered: 6,
+        vocabularyTotal: 12,
+      }),
+    });
 
-      // Prime notificationLog with a fresh weekly_progress entry for the parent.
-      await db.insert(notificationLog).values({
-        profileId: parentProfileId,
-        type: 'weekly_progress',
-        ticketId: null,
-      });
+    // Prime notificationLog with a fresh weekly_progress entry for the parent.
+    await db.insert(notificationLog).values({
+      profileId: parentProfileId,
+      type: 'weekly_progress',
+      ticketId: null,
+    });
 
-      const result = await executeGenerateHandler(parentProfileId);
+    const result = await executeGenerateHandler(parentProfileId);
 
-      expect(result).toEqual({
-        status: 'throttled',
-        reason: 'dedup_24h',
-        parentId: parentProfileId,
-      });
-      // No push API call should have fired.
-      expect(pushApiCalls).toHaveLength(0);
-      // Report row IS still persisted — dedup gates the push only.
-      const storedReports = await db.query.weeklyReports.findMany({
-        where: and(
-          eq(weeklyReports.profileId, parentProfileId),
-          eq(weeklyReports.childProfileId, childProfileId),
-        ),
-      });
-      expect(storedReports).toHaveLength(1);
-    },
-  );
+    // [WI-1153] The outer handler return is { status, parentId } — the
+    // push-step's internal { reason: 'dedup_24h' } is not propagated to the
+    // result (it stopped being surfaced when WI-998 moved dedup from the
+    // prepare step into the push step). The throttle is verified by status +
+    // the zero push call below.
+    expect(result).toEqual({
+      status: 'throttled',
+      parentId: parentProfileId,
+    });
+    // No push API call should have fired.
+    expect(pushApiCalls).toHaveLength(0);
+    // Report row IS still persisted — dedup gates the push only.
+    const storedReports = await db.query.weeklyReports.findMany({
+      where: and(
+        eq(weeklyReports.profileId, parentProfileId),
+        eq(weeklyReports.childProfileId, childProfileId),
+      ),
+    });
+    expect(storedReports).toHaveLength(1);
+  });
 
   it('[BUG-699-FOLLOWUP] logs email-only weekly sends so the 24h dedup gate can see them', async () => {
     const { profileId: parentProfileId } = await seedProfile({

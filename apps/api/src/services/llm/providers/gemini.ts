@@ -11,6 +11,10 @@ import {
 import { normalizeStopReason, type StopReason } from '../stop-reason';
 import { SafetyFilterError } from '../../../errors';
 import { createProviderApiError, createProviderHttpError } from './errors';
+import {
+  geminiResponseSchema,
+  type GeminiResponseParsed,
+} from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // Gemini Provider — MMT-ADR-0017, MMT-ADR-0014
@@ -79,16 +83,6 @@ interface GeminiRequest {
     responseMimeType?: 'application/json';
   };
   safetySettings: GeminiSafetySetting[];
-}
-
-/** Gemini API response shape */
-interface GeminiResponse {
-  candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
-    finishReason?: string;
-  }>;
-  promptFeedback?: { blockReason?: string };
-  error?: { message: string; code: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +160,7 @@ function toGeminiRequest(
   return request;
 }
 
-function extractFinishReason(data: GeminiResponse): string | undefined {
+function extractFinishReason(data: GeminiResponseParsed): string | undefined {
   return data.candidates?.[0]?.finishReason;
 }
 
@@ -191,7 +185,7 @@ function isTerminalBlockReason(reason: string | undefined): boolean {
   return reason !== undefined && TERMINAL_BLOCK_REASONS.has(reason);
 }
 
-function extractResponseText(data: GeminiResponse): string {
+function extractResponseText(data: GeminiResponseParsed): string {
   // Prompt-level content block — the entire input was rejected
   if (isTerminalBlockReason(data.promptFeedback?.blockReason)) {
     throw new SafetyFilterError(
@@ -253,7 +247,16 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
         );
       }
 
-      const data = (await res.json()) as GeminiResponse;
+      // [WI-481] Validate the raw provider body at the trust boundary instead
+      // of casting — a null/malformed/wrong-shape 2xx body fails closed as a
+      // typed provider error rather than a TypeError on a later field access.
+      const parsed = geminiResponseSchema.safeParse(await res.json());
+      if (!parsed.success) {
+        throw createProviderApiError('Gemini API', {
+          type: 'invalid_response_shape',
+        });
+      }
+      const data = parsed.data;
       const content = extractResponseText(data);
       return {
         content,
@@ -310,7 +313,14 @@ export function createGeminiProvider(apiKey: string): LLMProvider {
               if (!jsonStr || jsonStr === '[DONE]') continue;
 
               try {
-                const chunk = JSON.parse(jsonStr) as GeminiResponse;
+                // [WI-481] Validate each SSE chunk at the trust boundary; a
+                // well-formed-JSON-but-wrong-shape chunk is skipped like any
+                // other malformed chunk rather than read via an unchecked cast.
+                const parsedChunk = geminiResponseSchema.safeParse(
+                  JSON.parse(jsonStr),
+                );
+                if (!parsedChunk.success) continue;
+                const chunk = parsedChunk.data;
 
                 // Content block during streaming — [H1] all terminal block
                 // reasons, not just SAFETY (see TERMINAL_BLOCK_REASONS above).

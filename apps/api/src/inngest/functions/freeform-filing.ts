@@ -1,3 +1,4 @@
+// @inngest-admin: event-profile (profileId from event; createScopedRepository(db, profileId) enforced)
 import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';

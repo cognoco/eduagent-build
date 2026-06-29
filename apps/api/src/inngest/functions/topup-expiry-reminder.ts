@@ -1,3 +1,4 @@
+// @inngest-admin: cross-profile (cron; findExpiringTopUpCredits scans all credits across all profiles)
 // ---------------------------------------------------------------------------
 // Top-Up Expiry Reminder — Story 5.3
 // Daily cron: sends reminders for top-up credits approaching expiry.
@@ -23,7 +24,7 @@ const REMINDER_MONTHS_BEFORE_EXPIRY = [6, 4, 2, 0] as const;
  */
 function getExpiryWindowForMilestone(
   now: Date,
-  monthsBeforeExpiry: number
+  monthsBeforeExpiry: number,
 ): { rangeStart: Date; rangeEnd: Date } | null {
   if (!Number.isFinite(now.getTime())) return null;
 
@@ -89,7 +90,7 @@ export const topupExpiryReminder = inngest.createFunction(
               monthsUntilExpiry: months,
               timestamp: nowIso,
             },
-          }))
+          })),
         );
 
         totalReminders += credits.length;
@@ -101,5 +102,5 @@ export const topupExpiryReminder = inngest.createFunction(
       totalReminders,
       timestamp: nowIso,
     };
-  }
+  },
 );
