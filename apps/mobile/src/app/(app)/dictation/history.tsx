@@ -133,7 +133,7 @@ export default function DictationHistoryScreen(): React.ReactElement {
           }}
           testID="dictation-history-error"
         />
-      ) : data.length === 0 ? (
+      ) : data == null || data.length === 0 ? (
         <Text
           className="text-body text-text-secondary text-center mt-8"
           testID="dictation-history-empty"
