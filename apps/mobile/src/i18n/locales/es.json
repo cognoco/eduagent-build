@@ -3949,7 +3949,12 @@
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",
-    "errorMessage": "Inténtalo de nuevo o vuelve en un momento."
+    "errorMessage": "Inténtalo de nuevo o vuelve en un momento.",
+    "sectionActive": "Activo",
+    "sectionPaused": "En pausa",
+    "sectionArchived": "Archivado",
+    "bookCount_one": "{{count}} libro",
+    "bookCount_other": "{{count}} libros"
   },
   "subjectHub": {
     "loading": "Cargando tema...",

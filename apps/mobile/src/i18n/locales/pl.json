@@ -4107,7 +4107,12 @@
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
     "reviewsDue": "{{count}} zaległych powtórek",
     "errorTitle": "Nie udało się wczytać tematów",
-    "errorMessage": "Spróbuj ponownie lub wróć za chwilę."
+    "errorMessage": "Spróbuj ponownie lub wróć za chwilę.",
+    "sectionActive": "Aktywne",
+    "sectionPaused": "Wstrzymane",
+    "sectionArchived": "Zarchiwizowane",
+    "bookCount_one": "{{count}} książka",
+    "bookCount_other": "{{count}} książek"
   },
   "subjectHub": {
     "loading": "Ładowanie przedmiotu...",

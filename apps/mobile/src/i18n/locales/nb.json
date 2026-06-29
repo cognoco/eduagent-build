@@ -3949,7 +3949,12 @@
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
-    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk."
+    "errorMessage": "Prøv igjen, eller kom tilbake om et øyeblikk.",
+    "sectionActive": "Aktiv",
+    "sectionPaused": "Satt på pause",
+    "sectionArchived": "Arkivert",
+    "bookCount_one": "{{count}} bok",
+    "bookCount_other": "{{count}} bøker"
   },
   "subjectHub": {
     "loading": "Laster inn emne ...",

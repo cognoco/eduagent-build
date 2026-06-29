@@ -3949,7 +3949,12 @@
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
-    "errorMessage": "Versuche es erneut oder komme gleich wieder."
+    "errorMessage": "Versuche es erneut oder komme gleich wieder.",
+    "sectionActive": "Aktiv",
+    "sectionPaused": "Pausiert",
+    "sectionArchived": "Archiviert",
+    "bookCount_one": "{{count}} Buch",
+    "bookCount_other": "{{count}} Bücher"
   },
   "subjectHub": {
     "loading": "Lade Fach ...",
