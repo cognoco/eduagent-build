@@ -14,10 +14,13 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  ...jest.requireActual('../../../lib/theme'),
-  useThemeColors: () => ({ textPrimary: '#fff', primary: '#2563eb' }),
-}));
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: useThemeColors reads React context + dark-mode native API; cannot resolve in JSDOM */,
+  () => ({
+    ...jest.requireActual('../../../lib/theme'),
+    useThemeColors: () => ({ textPrimary: '#fff', primary: '#2563eb' }),
+  }),
+);
 
 const mockGoBackOrReplace = jest.fn();
 jest.mock(
