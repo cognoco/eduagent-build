@@ -59,10 +59,30 @@ This orient forced the hook with a synthetic SessionStart. The live PRG-06 sessi
 PRE-repoint `_wip/` Brain paths. So Wave 1 is **armed + dry-run + synthetic-orient verified**, but its
 first GENUINE exercise is the next real PRG-06 orchestrator resume.
 
+### F5 — Commit-flow broad-stages in a shared tree with concurrent sessions (operational hazard)
+While committing this very findings file, the commit skill staged **every dirty path in the working
+tree** (29 files), not just the one requested — because this checkout is shared with a live PRG-06
+session that had ~28 uncommitted in-flight files sitting in it (channel `_state/*.jsonl`, the
+working-tree-only `rehydrate.sh` hook, anchor, WI artifacts). That committed another session's work
+and the never-commit hook before it was caught + undone (`reset --mixed`, then explicit single-file
+add).
+- **Why it matters for the Quartet:** the Quartet's whole model is multiple concurrent role-sessions
+  sharing substrate. A commit flow that stages by "what's dirty" instead of "what THIS session
+  authored" is structurally unsafe here — own-work scope cannot be inferred from the index alone when
+  N sessions share one tree.
+- **Mechanism note:** `_state/` channel files + `rehydrate.sh` are working-tree-only by design (the
+  06-28 channel-clobber incident is the precedent). They must never be staged by anyone.
+- **Candidate fix (needs ruling):** either (a) the Quartet's commit guidance mandates explicit
+  pathspec staging (never `add -A`/dirty-sweep) for any session operating in a shared tree, or
+  (b) `_state/` + the hook dir get gitignored (operator previously ruled NO on gitignoring `_state/`,
+  06-28 — so (a) is the live path), or (c) sessions work in per-session worktrees so the shared-tree
+  staging ambiguity never arises.
+
 **Net.** Approach-D Wave 1 holds: Brain + live Working state produce one coherent picture; the hook's
 channel-tail covers anchor lag. F1 is not a cutover bug — it's the inherent working-state seam,
 currently closed only by the hook. Deciding its durable home is the real Wave-1 → Wave-2 graduation
-question.
+question. F5 is a separate, sharper operational hazard surfaced by the same session: shared-tree
+commit scope.
 
 > Full session friction log (scratch, ephemeral): the orchestrator's
 > `scratchpad/quartet-dogfood-friction-log.md` from this run.
