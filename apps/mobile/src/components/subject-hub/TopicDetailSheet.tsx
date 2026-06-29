@@ -3,6 +3,7 @@ import { BottomSheet } from '../common/BottomSheet';
 import { useTranslation } from 'react-i18next';
 
 import type { TranslateKey } from '../../i18n';
+import { SubjectHubNotesSection } from './SubjectHubNotesSection';
 import type {
   HubTopic,
   HubTopicState,
@@ -17,6 +18,10 @@ interface TopicDetailSheetProps {
   onStudyTopic?: (topicId: string) => void;
   onReviewTopic?: (topicId: string) => void;
   onSeeFullTopic?: (topicId: string) => void;
+  // Topic-scoped note authoring (felt-knowing loop Flow 1). When wired, the notes
+  // section renders writable, bound to THIS focused topic; the subject-level mount
+  // never wires it (no focused topic to bind to). `content` is the trimmed draft.
+  onAddNote?: (topicId: string, content: string) => void;
 }
 
 const STATE_KEY: Record<HubTopicState, TranslateKey> = {
@@ -36,6 +41,7 @@ export function TopicDetailSheet({
   onStudyTopic,
   onReviewTopic,
   onSeeFullTopic,
+  onAddNote,
 }: TopicDetailSheetProps): React.ReactElement | null {
   const { t } = useTranslation();
   if (!topic) return null;
@@ -97,25 +103,20 @@ export function TopicDetailSheet({
             {t('subjectHub.sheet.masteryLine', { state: masteryLabel })}
           </Text>
 
-          {notes.length > 0 ? (
-            <View className="mt-5">
-              <Text className="text-caption font-semibold uppercase text-text-secondary">
-                {t('subjectHub.notes.heading')}
-              </Text>
-              {notes.map((note) => (
-                <View
-                  key={note.id}
-                  className="mt-2 rounded-card bg-surface p-3"
-                >
-                  <Text className="text-caption font-semibold text-text-secondary">
-                    {note.authorLabel}
-                  </Text>
-                  <Text className="mt-1 text-body-sm text-text-primary">
-                    {note.content}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          {/* Topic-scoped notes. Writable when `onAddNote` is wired (bound to this
+              focused topic); read-only otherwise (e.g. masked supporter, canStudy
+              false). The shared section owns the add input, empty state, and the
+              trimmed/no-op submit gate. */}
+          {canStudy || notes.length > 0 ? (
+            <SubjectHubNotesSection
+              notes={notes}
+              canStudy={canStudy}
+              onAddNote={
+                onAddNote
+                  ? (content) => onAddNote(topic.topic.id, content)
+                  : undefined
+              }
+            />
           ) : null}
 
           {canStudy ? (

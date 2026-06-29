@@ -27,12 +27,17 @@ interface SubjectHubNotesSectionProps {
   onNoteVoice?: (request: SubjectHubNotesVoiceRequest) => void;
 }
 
-// The add affordance (input + mic + empty-state add button) is shown only when
-// the learner can study AND a persistence handler is actually wired. Subject-hub
-// note persistence is deferred (notes are topic-scoped via useCreateNote; the hub
-// is not topic-scoped), so production renders the notes section read-only. Showing
+// The add affordance (input + empty-state add button) is shown only when the
+// learner can study AND a persistence handler (`onAddNote`) is actually wired.
+// Notes are topic-scoped (persisted via `useCreateNote`), so authoring is wired
+// only where a focused topic exists: the `TopicDetailSheet` passes `onAddNote`
+// bound to the open topic, while the subject-level mount in `SubjectHub` passes
+// none — there is no single topic to bind to, so it stays read-only (felt-knowing
+// loop spec, Flow 1 / Failure Modes: "no focused topic → no add input"). Showing
 // an add input with no handler would silently discard what the user typed — a
 // dead-end worse than no input at all. See PR #1316 / claude-review MUST_FIX.
+// The transcription mic renders only when an `onNoteVoice` handler is wired; with
+// no handler it would be a dead button, so it is gated out rather than shown inert.
 
 const NOTE_ORIGINS: NoteOrigin[] = ['self', 'mentor'];
 
@@ -103,28 +108,31 @@ export function SubjectHubNotesSection({
           {/* The pressable carries testID `notes-mic`; the reused
               VoiceRecordButton supplies the transcription-only mic visual.
               The inner button's own onPress is a no-op so the request fires
-              exactly once, from the notes-mic pressable. */}
-          <Pressable
-            testID="notes-mic"
-            accessibilityRole="button"
-            accessibilityLabel={t('subjectHub.notes.micLabel')}
-            className="ms-2"
-            onPress={() =>
-              onNoteVoice?.({
-                kind: 'transcription',
-                source: 'subject-hub-notes',
-                analyzesTone: false,
-                analyzesEmotion: false,
-              })
-            }
-          >
-            <View pointerEvents="none">
-              <VoiceRecordButton
-                isListening={false}
-                onPress={() => undefined}
-              />
-            </View>
-          </Pressable>
+              exactly once, from the notes-mic pressable. Rendered only when an
+              `onNoteVoice` handler is wired — otherwise the mic would do nothing. */}
+          {onNoteVoice ? (
+            <Pressable
+              testID="notes-mic"
+              accessibilityRole="button"
+              accessibilityLabel={t('subjectHub.notes.micLabel')}
+              className="ms-2"
+              onPress={() =>
+                onNoteVoice({
+                  kind: 'transcription',
+                  source: 'subject-hub-notes',
+                  analyzesTone: false,
+                  analyzesEmotion: false,
+                })
+              }
+            >
+              <View pointerEvents="none">
+                <VoiceRecordButton
+                  isListening={false}
+                  onPress={() => undefined}
+                />
+              </View>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 

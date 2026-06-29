@@ -4146,7 +4146,8 @@
       "authorMentor": "Zapisane od tutora",
       "addNote": "Dodaj notatkę",
       "micLabel": "Dodaj notatkę głosowo",
-      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu."
+      "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
+      "saveErrorTitle": "Nie można zapisać notatki"
     },
     "sheet": {
       "close": "Zamknij",

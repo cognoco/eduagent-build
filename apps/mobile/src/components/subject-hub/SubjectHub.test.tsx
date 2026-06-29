@@ -175,6 +175,47 @@ describe('SubjectHub', () => {
     screen.getByText('Cell division description');
   });
 
+  it('threads onAddNote to the focused topic sheet and binds the note to that topic (WI-1118)', () => {
+    const onAddNote = jest.fn();
+    render(
+      <SubjectHub
+        data={baseData}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={jest.fn()}
+        onAddNote={onAddNote}
+      />,
+    );
+
+    // The subject-level notes section stays read-only — no add input there (no
+    // focused topic to bind to). Authoring is reachable only after opening a topic.
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('subject-hub-topic-topic-1'));
+
+    const input = screen.getByTestId('subject-hub-notes-input');
+    fireEvent.changeText(input, 'mitosis has phases');
+    fireEvent(input, 'submitEditing');
+
+    expect(onAddNote).toHaveBeenCalledWith('topic-1', 'mitosis has phases');
+  });
+
+  it('keeps the topic sheet notes read-only when no onAddNote is wired', () => {
+    render(
+      <SubjectHub
+        data={baseData}
+        onNextUpPress={jest.fn()}
+        onStudyTopic={jest.fn()}
+        onReviewTopic={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('subject-hub-topic-topic-1'));
+
+    screen.getByTestId('subject-hub-topic-sheet');
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+  });
+
   it('does not read persona, ownership, or navigation contract state', () => {
     const sourcePath = path.join(__dirname, 'SubjectHub.tsx');
     const source = fs.readFileSync(sourcePath, 'utf8');

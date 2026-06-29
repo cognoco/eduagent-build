@@ -108,6 +108,23 @@ describe('SubjectHubNotesSection', () => {
     });
   });
 
+  it('renders the add input but NOT the mic when onAddNote is wired without onNoteVoice', () => {
+    // The hub wires note authoring without a voice handler (transcription is not
+    // wired in the hub). The text input must render, but the mic must be gated out
+    // rather than shown as a dead button that does nothing on press.
+    render(
+      <SubjectHubNotesSection
+        notes={[selfNote]}
+        canStudy
+        onAddNote={jest.fn()}
+      />,
+    );
+
+    screen.getByTestId('subject-hub-notes-add-row');
+    screen.getByTestId('subject-hub-notes-input');
+    expect(screen.queryByTestId('notes-mic')).toBeNull();
+  });
+
   it('omits the add input, mic, and empty-add when canStudy but no persistence handler is wired', () => {
     // Subject-hub note persistence is deferred, so SubjectHub renders this section
     // without onAddNote. The add affordance must NOT appear — an input with no

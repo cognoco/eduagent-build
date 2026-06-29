@@ -3988,7 +3988,8 @@
       "authorMentor": "Guardado del tutor",
       "addNote": "Añadir una nota",
       "micLabel": "Añadir una nota por voz",
-      "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura."
+      "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura.",
+      "saveErrorTitle": "No se pudo guardar la nota"
     },
     "sheet": {
       "close": "Cerrar",
