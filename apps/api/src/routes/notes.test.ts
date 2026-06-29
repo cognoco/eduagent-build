@@ -532,8 +532,8 @@ describe('note routes', () => {
         signals: {
           [TOPIC_ID]: {
             verified: true,
-            hasTutorAddition: false,
-            tutorAdditions: [],
+            hasMentorAddition: false,
+            mentorAdditions: [],
           },
         },
       });

@@ -4,6 +4,10 @@ const { createInngestTransportCapture } =
 const mockInngestTransport = createInngestTransportCapture();
 const mockGetStepDatabase = jest.fn();
 const mockCaptureException = jest.fn();
+const mockRunWithStepDatabaseScope = jest.fn(
+  async <T>(callback: () => Promise<T>) => callback(),
+);
+const mockCloseStepDatabases = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
   '../client', // gc1-allow: Inngest client boundary
@@ -27,6 +31,9 @@ jest.mock(
     return {
       ...actual,
       getStepDatabase: () => mockGetStepDatabase(),
+      runWithStepDatabaseScope: (callback: () => Promise<unknown>) =>
+        mockRunWithStepDatabaseScope(callback),
+      closeStepDatabases: () => mockCloseStepDatabases(),
     };
   },
 );
@@ -445,5 +452,7 @@ describe('topicProbeExtract onFailure', () => {
     expect(whereText).toContain('topicprobeextractionstatus');
     expect(whereText).toContain('completed');
     expect(whereText).toContain('<>');
+    expect(mockRunWithStepDatabaseScope).toHaveBeenCalledTimes(1);
+    expect(mockCloseStepDatabases).toHaveBeenCalledTimes(1);
   });
 });

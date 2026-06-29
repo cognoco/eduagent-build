@@ -45,9 +45,9 @@ export function InlineNoteCard({
   const cardTestID = testID ?? `note-card-${noteId}`;
   const accentBg = withOpacity(themeColors.accent, 0.08);
   const accentBorder = withOpacity(themeColors.accent, 0.35);
-  const tutorAdditions = conceptSignal?.tutorAdditions ?? [];
-  const hasTutorAdditions =
-    conceptSignal?.hasTutorAddition === true && tutorAdditions.length > 0;
+  const mentorAdditions = conceptSignal?.mentorAdditions ?? [];
+  const hasMentorAdditions =
+    conceptSignal?.hasMentorAddition === true && mentorAdditions.length > 0;
 
   return (
     <Pressable
@@ -182,14 +182,14 @@ export function InlineNoteCard({
       >
         {content}
       </Text>
-      {hasTutorAdditions ? (
+      {hasMentorAdditions ? (
         <Pressable
           testID={`${cardTestID}-addition-toggle`}
           accessibilityRole="button"
           accessibilityLabel={t(
             additionsExpanded
-              ? 'library.noteSignal.hideTutorAdditionAccessibilityLabel'
-              : 'library.noteSignal.showTutorAdditionAccessibilityLabel',
+              ? 'library.noteSignal.hideMentorAdditionAccessibilityLabel'
+              : 'library.noteSignal.showMentorAdditionAccessibilityLabel',
           )}
           onPress={(e) => {
             e?.stopPropagation?.();
@@ -210,13 +210,13 @@ export function InlineNoteCard({
             importantForAccessibility="no-hide-descendants"
           />
           <Text style={{ fontSize: 12, color: themeColors.textSecondary }}>
-            {t('library.noteSignal.tutorAddition')}
+            {t('library.noteSignal.mentorAddition')}
           </Text>
         </Pressable>
       ) : null}
-      {hasTutorAdditions && additionsExpanded ? (
+      {hasMentorAdditions && additionsExpanded ? (
         <View testID={`${cardTestID}-additions`} style={{ marginTop: 6 }}>
-          {tutorAdditions.map((addition) => (
+          {mentorAdditions.map((addition) => (
             <Text
               key={addition}
               style={{ fontSize: 13, color: themeColors.textSecondary }}

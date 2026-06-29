@@ -46,8 +46,8 @@ describe('NoteDisplay', () => {
         readOnly
         conceptSignal={{
           verified: true,
-          hasTutorAddition: false,
-          tutorAdditions: [],
+          hasMentorAddition: false,
+          mentorAdditions: [],
         }}
       />,
     );
@@ -62,8 +62,8 @@ describe('NoteDisplay', () => {
         readOnly
         conceptSignal={{
           verified: false,
-          hasTutorAddition: true,
-          tutorAdditions: [
+          hasMentorAddition: true,
+          mentorAdditions: [
             'ATP releases usable energy when a phosphate breaks off.',
           ],
         }}
@@ -76,7 +76,7 @@ describe('NoteDisplay', () => {
       ),
     ).toBeNull();
 
-    fireEvent.press(screen.getByTestId('note-tutor-addition-toggle'));
+    fireEvent.press(screen.getByTestId('note-mentor-addition-toggle'));
 
     expect(
       screen.getByText(

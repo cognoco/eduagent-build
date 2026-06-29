@@ -17,7 +17,11 @@ import {
 } from '@eduagent/schemas';
 
 import { inngest } from '../client';
-import { getStepDatabase } from '../helpers';
+import {
+  closeStepDatabases,
+  getStepDatabase,
+  runWithStepDatabaseScope,
+} from '../helpers';
 import {
   defaultExtractedSignals,
   extractSignalsFromExchangeHistory,
@@ -361,46 +365,50 @@ export const topicProbeExtract = inngest.createFunction(
         },
       });
 
-      try {
-        const db = getStepDatabase();
-        await db
-          .update(learningSessions)
-          .set({
-            metadata: sql`jsonb_set(
-              COALESCE(${learningSessions.metadata}, '{}'::jsonb),
-              '{topicProbeExtractionStatus}',
-              '"failed"'::jsonb,
-              true
-            )`,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(learningSessions.id, payload.sessionId),
-              eq(learningSessions.profileId, payload.profileId),
-              sql`COALESCE(${learningSessions.metadata} ->> 'topicProbeExtractionStatus', '') <> 'completed'`,
-            ),
-          );
-      } catch (cleanupError) {
-        logger.error('[topic-probe-extract] failure cleanup failed', {
-          event: 'topic_probe.failure_cleanup_failed',
-          profileId: payload.profileId,
-          sessionId: payload.sessionId,
-          topicId: payload.topicId,
-          error:
-            cleanupError instanceof Error
-              ? cleanupError.message
-              : String(cleanupError),
-        });
-        captureException(cleanupError, {
-          profileId: payload.profileId,
-          extra: {
-            site: 'topicProbeExtract.onFailure.cleanup',
+      await runWithStepDatabaseScope(async () => {
+        try {
+          const db = getStepDatabase();
+          await db
+            .update(learningSessions)
+            .set({
+              metadata: sql`jsonb_set(
+                COALESCE(${learningSessions.metadata}, '{}'::jsonb),
+                '{topicProbeExtractionStatus}',
+                '"failed"'::jsonb,
+                true
+              )`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(learningSessions.id, payload.sessionId),
+                eq(learningSessions.profileId, payload.profileId),
+                sql`COALESCE(${learningSessions.metadata} ->> 'topicProbeExtractionStatus', '') <> 'completed'`,
+              ),
+            );
+        } catch (cleanupError) {
+          logger.error('[topic-probe-extract] failure cleanup failed', {
+            event: 'topic_probe.failure_cleanup_failed',
+            profileId: payload.profileId,
             sessionId: payload.sessionId,
             topicId: payload.topicId,
-          },
-        });
-      }
+            error:
+              cleanupError instanceof Error
+                ? cleanupError.message
+                : String(cleanupError),
+          });
+          captureException(cleanupError, {
+            profileId: payload.profileId,
+            extra: {
+              site: 'topicProbeExtract.onFailure.cleanup',
+              sessionId: payload.sessionId,
+              topicId: payload.topicId,
+            },
+          });
+        } finally {
+          await closeStepDatabases();
+        }
+      });
     },
   },
   { event: 'app/topic-probe.requested' },

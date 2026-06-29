@@ -1,4 +1,4 @@
-// @inngest-admin: event-profile (accountId from event; external billing store teardown — Stripe + RevenueCat; no application DB access)
+// @inngest-admin: no-db (calls Stripe + RevenueCat external APIs for subscription-store erasure; no database access)
 import {
   subscriptionStoreTeardownRequestedDataSchema,
   summarizeRawPayload,

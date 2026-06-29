@@ -27,14 +27,6 @@
     "pl": "sesja",
     "ja": "セッション"
   },
-  "tutor": {
-    "nb": "veileder",
-    "de": "Tutor",
-    "es": "tutor",
-    "pt": "tutor",
-    "pl": "tutor",
-    "ja": "チューター"
-  },
   "quiz": {
     "nb": "quiz",
     "de": "Quiz",
@@ -58,5 +50,13 @@
     "pt": "biblioteca",
     "pl": "biblioteka",
     "ja": "ライブラリ"
+  },
+  "mentor": {
+    "nb": "mentor",
+    "de": "Mentor",
+    "es": "mentor",
+    "pt": "mentor",
+    "pl": "mentor",
+    "ja": "メンター"
   }
 }
