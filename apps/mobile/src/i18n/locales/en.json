@@ -601,7 +601,7 @@
       "noteSaveErrorTitle": "Couldn't save the note"
     },
     "mentorMemory": {
-      "title": "Help your mentor learn how to teach you",
+      "title": "What your mentor knows about you.",
       "subtitle": "Add what helps, fix what feels wrong, and choose what your mentor can use.",
       "loadError": "We couldn't load your mentor memory right now",
       "loadTimeout": {
@@ -1496,9 +1496,9 @@
     "noteSignal": {
       "verified": "Verified",
       "verifiedAccessibilityLabel": "Verified - your words held up",
-      "tutorAddition": "The tutor has more on this topic",
-      "showTutorAdditionAccessibilityLabel": "Show what the tutor added",
-      "hideTutorAdditionAccessibilityLabel": "Hide what the tutor added"
+      "mentorAddition": "The mentor has more on this topic",
+      "showMentorAdditionAccessibilityLabel": "Show what the mentor added",
+      "hideMentorAdditionAccessibilityLabel": "Hide what the mentor added"
     },
     "bookmarkCard": {
       "accessibilityLabel": "Open saved bookmark: {{title}}"
@@ -3370,7 +3370,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "What your tutor knows about you.",
+      "title": "What your mentor knows about you.",
       "subtitle": "Tap to review or change."
     },
     "notificationPrimer": {

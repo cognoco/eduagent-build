@@ -445,8 +445,8 @@ describe('useConceptMasterySignals', () => {
           signals: {
             'topic-1': {
               verified: true,
-              hasTutorAddition: false,
-              tutorAdditions: [],
+              hasMentorAddition: false,
+              mentorAdditions: [],
             },
           },
         }),
@@ -465,8 +465,8 @@ describe('useConceptMasterySignals', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.signals['topic-1']).toEqual({
       verified: true,
-      hasTutorAddition: false,
-      tutorAdditions: [],
+      hasMentorAddition: false,
+      mentorAdditions: [],
     });
   });
 

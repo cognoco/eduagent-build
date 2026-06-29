@@ -293,7 +293,7 @@ describeIfDb('captureConceptMastery (integration)', () => {
     ]);
     expect(signals.get(topicId)).toMatchObject({
       verified: true,
-      hasTutorAddition: false,
+      hasMentorAddition: false,
     });
 
     await captureConceptMastery(

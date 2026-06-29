@@ -409,7 +409,7 @@
     "coachBand": {
       "estimatedMinutes": "{{minutes}} min",
       "a11yDismiss": "Descartar recomendación",
-      "a11yLoadingCard": "Cargando tarjeta de tutor",
+      "a11yLoadingCard": "Cargando tarjeta de mentor",
       "thisMorning": "ESTA MAÑANA",
       "thisAfternoon": "ESTA TARDE",
       "tonight": "ESTA NOCHE"
@@ -574,7 +574,7 @@
       "noteSaveErrorTitle": "No se pudo guardar la nota"
     },
     "mentorMemory": {
-      "title": "Lo que mi mentor sabe",
+      "title": "Lo que tu mentor sabe de ti.",
       "subtitle": "Revisa, edita o agrega lo que tu mentor recuerda.",
       "loadError": "No pudimos cargar la memoria de tu mentor en este momento",
       "loadTimeout": {
@@ -754,8 +754,8 @@
       "firstSessionGreeting": {
         "withNameSubjectInterest": "Hola, {{name}}. Estás aquí para practicar {{subject}}, y como te interesa {{interest}}, usaré ejemplos que tengan que ver. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
         "withNameSubject": "Hola, {{name}}. Estás aquí para practicar {{subject}}. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Por dónde empezamos con {{subject}}?",
-        "withName": "Hola, {{name}}. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?",
-        "generic": "Hola. Soy tu tutor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?"
+        "withName": "Hola, {{name}}. Soy tu mentor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?",
+        "generic": "Hola. Soy tu mentor. Pregúntame lo que sea que estés aprendiendo, trabajando o que te dé curiosidad. Tienes 10 preguntas gratis al día y 100 al mes. ¿Con qué quieres empezar?"
       },
       "returningSessionGreeting": {
         "withNameSubject": "Hola de nuevo, {{name}}. ¿Listo para retomar {{subject}}? Pregúntame lo que quieras. ¿Por dónde seguimos?",
@@ -968,18 +968,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "Dile al tutor",
-        "description": "Añade algo importante para que el tutor recuerde sobre este niño/a.",
-        "descriptionWithName": "Añade algo importante para que el tutor recuerde sobre {{childName}}.",
+        "title": "Dile al mentor",
+        "description": "Añade algo importante para que el mentor recuerde sobre este niño/a.",
+        "descriptionWithName": "Añade algo importante para que el mentor recuerde sobre {{childName}}.",
         "placeholder": "Le va mejor con ejemplos cortos y todavía se atasca con las fracciones."
       },
       "adult": {
-        "title": "Añade una nota para tu tutor",
-        "description": "Añade algo que quieras que tu tutor recuerde para futuras sesiones.",
+        "title": "Añade una nota para tu mentor",
+        "description": "Añade algo que quieras que tu mentor recuerde para futuras sesiones.",
         "placeholder": "Los ejemplos me ayudan mucho a entender las fracciones."
       },
       "teen": {
-        "title": "Dile algo a tu tutor",
+        "title": "Dile algo a tu mentor",
         "description": "Añade qué te ayuda a aprender, qué te gusta o qué todavía te parece difícil.",
         "placeholder": "Los ejemplos me ayudan mucho a entender las fracciones."
       }
@@ -1402,9 +1402,9 @@
     "noteSignal": {
       "verified": "Verificado",
       "verifiedAccessibilityLabel": "Verificado: tus palabras se han confirmado",
-      "tutorAddition": "El tutor tiene más sobre este tema",
-      "showTutorAdditionAccessibilityLabel": "Mostrar lo que ha añadido el tutor",
-      "hideTutorAdditionAccessibilityLabel": "Ocultar lo que ha añadido el tutor"
+      "mentorAddition": "El mentor tiene más sobre este tema.",
+      "showMentorAdditionAccessibilityLabel": "Mostrar lo que añadió el mentor.",
+      "hideMentorAdditionAccessibilityLabel": "Ocultar lo que añadió el mentor."
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador guardado: {{title}}"
@@ -2944,7 +2944,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "Lo que tu tutor sabe de ti.",
+      "title": "Lo que tu mentor sabe de ti.",
       "subtitle": "Toca para revisar o cambiar."
     },
     "notificationPrimer": {
@@ -3402,7 +3402,7 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "Aprende con un tutor",
+      "learnerCta": "Aprende con un mentor",
       "learnerHint": "Tu mentor personal por una fracción del precio.",
       "parentCta": "Pon fin a las peleas por la tarea.",
       "parentHint": "Recupera tus tardes."
@@ -3608,7 +3608,7 @@
     "hub": {
       "sessionsSubtitle": "Conversaciones que tuviste",
       "notesSubtitle": "Cosas que apuntaste",
-      "bookmarksSubtitle": "Respuestas del tutor que guardaste",
+      "bookmarksSubtitle": "Respuestas del mentor que guardaste",
       "countLoading": "Cargando",
       "countUnavailable": "No disponible"
     },
@@ -3629,9 +3629,9 @@
     "birthDateLabel": "Fecha de nacimiento",
     "parentBirthDateLabel": "Tu fecha de nacimiento",
     "childBirthDateLabel": "Fecha de nacimiento del niño/a",
-    "birthDateHint": "Así tu tutor se dirigirá a ti correctamente. La edad mínima es {{age}} años.",
+    "birthDateHint": "Así tu mentor se dirigirá a ti correctamente. La edad mínima es {{age}} años.",
     "parentBirthDateHint": "Esto es para el adulto que configura la cuenta. Después podrás añadir a tu hijo/a. La edad mínima es {{age}} años.",
-    "childBirthDateHint": "Así el tutor de tu hijo/a se dirigirá a él/ella correctamente. La edad mínima es {{age}} años.",
+    "childBirthDateHint": "Así el mentor de tu hijo/a se dirigirá a él/ella correctamente. La edad mínima es {{age}} años.",
     "webDateFormatHint": "Introduce tu fecha de nacimiento como AAAA-MM-DD.",
     "childWebDateFormatHint": "Introduce la fecha de nacimiento de tu hijo/a como AAAA-MM-DD.",
     "selectDob": "Selecciona la fecha de nacimiento",
@@ -3662,12 +3662,12 @@
     "a11yRetry": "Reintentar cambio de modo"
   },
   "memoryConsent": {
-    "defaultTitle": "Ayuda al tutor a aprender sobre {{name}}",
-    "defaultTitleNoName": "Ayuda al tutor a aprender sobre tu hijo/a",
-    "defaultDescription": "Esto permite al tutor recordar qué tipo de explicaciones funcionan, qué sigue siendo difícil y qué ejemplos son relevantes.",
+    "defaultTitle": "Ayuda al mentor a aprender sobre {{name}}",
+    "defaultTitleNoName": "Ayuda al mentor a aprender sobre tu hijo/a",
+    "defaultDescription": "Esto permite al mentor recordar qué tipo de explicaciones funcionan, qué sigue siendo difícil y qué ejemplos son relevantes.",
     "grant": "Sí, activar",
-    "a11yEnable": "Activar memoria del tutor",
-    "a11ySkip": "Omitir memoria del tutor"
+    "a11yEnable": "Activar memoria del mentor",
+    "a11ySkip": "Omitir memoria del mentor"
   },
   "saveWizard": {
     "title": "Genial, guardemos esto para que puedas empezar.",
@@ -3872,7 +3872,7 @@
       "more": "{{count}} opciones más"
     },
     "bar": {
-      "unavailable": "El tutor está desconectado un momento. Aún puedes escribir.",
+      "unavailable": "El mentor está desconectado un momento. Aún puedes escribir.",
       "cameraLabel": "Cámara",
       "placeholder": "Pregunta, pega o describe lo que quieres aprender.",
       "micLabel": "Micro",
@@ -3992,7 +3992,7 @@
     "notes": {
       "heading": "Notas",
       "authorSelf": "Mis notas",
-      "authorMentor": "Guardado del tutor",
+      "authorMentor": "Guardado del mentor",
       "addNote": "Añadir una nota",
       "micLabel": "Añadir una nota por voz",
       "empty": "Aún no hay notas. Apunta alguna idea sobre esta asignatura.",
@@ -4046,7 +4046,7 @@
   "journal": {
     "title": "Diario",
     "trust": {
-      "privacyPromise": "Tu historial de aprendizaje privado: momentos guardados, notas, informes y memoria del tutor."
+      "privacyPromise": "Tu historial de aprendizaje privado: momentos guardados, notas, informes y memoria del mentor."
     },
     "sections": {
       "reports": "Informes",
@@ -4054,7 +4054,7 @@
       "notes": "Notas",
       "notesSubtitle": "Explora tus notas y marcadores guardados.",
       "memory": "Memoria",
-      "memorySubtitle": "Ve y gestiona lo que tu tutor recuerda.",
+      "memorySubtitle": "Ve y gestiona lo que tu mentor recuerda.",
       "sessions": "Sesiones",
       "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes.",
       "practice": "Práctica",
@@ -4080,16 +4080,16 @@
       "error": "No se pudieron cargar tus informes."
     },
     "memory": {
-      "title": "Controles de memoria del tutor",
-      "body": "Revisa, edita, oculta, exporta o borra lo que tu tutor recuerda desde la pantalla de memoria completa.",
+      "title": "Controles de memoria del mentor",
+      "body": "Revisa, edita, oculta, exporta o borra lo que tu mentor recuerda desde la pantalla de memoria completa.",
       "open": "Abrir controles de memoria"
     },
     "notes": {
       "error": "No se han podido cargar tus notas.",
       "searchPlaceholder": "Buscar notas",
       "searchEmpty": "Ninguna nota coincide con la búsqueda.",
-      "empty": "Aquí aparecerán las notas que guardes y las respuestas del tutor que marques.",
-      "authorshipMentor": "Del tutor",
+      "empty": "Aquí aparecerán las notas que guardes y las respuestas del mentor que marques.",
+      "authorshipMentor": "Del mentor",
       "authorshipMine": "Mi nota",
       "filterAll": "Todo",
       "filterMine": "Mis notas",
@@ -4142,7 +4142,7 @@
       "confidenceLow": "Señal temprana"
     },
     "sourceBadge": {
-      "learner": "Se lo dijiste a tu tutor",
+      "learner": "Se lo dijiste a tu mentor",
       "parent": "Añadido por padre/madre"
     },
     "remove": "Eliminar"

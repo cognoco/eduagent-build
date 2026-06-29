@@ -607,7 +607,7 @@
       "noteSaveErrorTitle": "Nie udało się zapisać notatki"
     },
     "mentorMemory": {
-      "title": "Co wie mój mentor",
+      "title": "Co twój mentor wie o tobie.",
       "subtitle": "Przeglądaj, edytuj lub dodawaj to, co pamięta Twój mentor.",
       "loadError": "Nie mogliśmy teraz załadować pamięci Twojego mentora",
       "loadTimeout": {
@@ -1007,18 +1007,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "Powiedz Tutorowi",
-        "description": "Dodaj coś ważnego, co tutor powinien zapamiętać o tym dziecku.",
-        "descriptionWithName": "Dodaj coś ważnego, co tutor powinien zapamiętać o {{childName}}.",
+        "title": "Powiedz Mentorowi",
+        "description": "Dodaj coś ważnego, co mentor powinien zapamiętać o tym dziecku.",
+        "descriptionWithName": "Dodaj coś ważnego, co mentor powinien zapamiętać o {{childName}}.",
         "placeholder": "Najlepiej radzi sobie z krótkimi przykładami i wciąż ma problemy z ułamkami."
       },
       "adult": {
-        "title": "Dodaj notatkę dla swojego Tutora",
-        "description": "Dodaj coś, co Twój tutor powinien zapamiętać na przyszłe sesje.",
+        "title": "Dodaj notatkę dla swojego Mentora",
+        "description": "Dodaj coś, co Twój mentor powinien zapamiętać na przyszłe sesje.",
         "placeholder": "Przykłady naprawdę pomagają mi zrozumieć ułamki."
       },
       "teen": {
-        "title": "Powiedz coś swojemu Tutorowi",
+        "title": "Powiedz coś swojemu Mentorowi",
         "description": "Dodaj, co pomaga Ci w nauce, co lubisz, a co wciąż sprawia Ci trudność.",
         "placeholder": "Przykłady naprawdę pomagają mi zrozumieć ułamki."
       }
@@ -1461,9 +1461,9 @@
     "noteSignal": {
       "verified": "Zweryfikowano",
       "verifiedAccessibilityLabel": "Zweryfikowano – Twoje słowa się potwierdziły",
-      "tutorAddition": "Tutor ma więcej na ten temat",
-      "showTutorAdditionAccessibilityLabel": "Pokaż, co dodał tutor",
-      "hideTutorAdditionAccessibilityLabel": "Ukryj, co dodał tutor"
+      "mentorAddition": "Mentor ma więcej na ten temat.",
+      "showMentorAdditionAccessibilityLabel": "Pokaż, co dodał mentor.",
+      "hideMentorAdditionAccessibilityLabel": "Ukryj, co dodał mentor."
     },
     "bookmarkCard": {
       "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"
@@ -3095,7 +3095,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "Co wie o Tobie Twój tutor.",
+      "title": "Co twój mentor wie o tobie.",
       "subtitle": "Stuknij, aby sprawdzić lub zmienić."
     },
     "notificationPrimer": {
@@ -3754,7 +3754,7 @@
     "hub": {
       "sessionsSubtitle": "Twoje rozmowy",
       "notesSubtitle": "Twoje notatki",
-      "bookmarksSubtitle": "Zapisane odpowiedzi tutora",
+      "bookmarksSubtitle": "Zapisane odpowiedzi mentora",
       "countLoading": "Ładowanie",
       "countUnavailable": "Niedostępne"
     },
@@ -3808,9 +3808,9 @@
     "a11yRetry": "Spróbuj ponownie przełączyć tryb"
   },
   "memoryConsent": {
-    "defaultTitle": "Pomóż tutorowi dowiedzieć się więcej o {{name}}",
-    "defaultTitleNoName": "Pomóż tutorowi dowiedzieć się więcej o Twoim dziecku",
-    "defaultDescription": "Dzięki temu tutor zapamięta, jakie wyjaśnienia działają, co wciąż jest trudne i które przykłady są trafne.",
+    "defaultTitle": "Pomóż mentorowi dowiedzieć się więcej o {{name}}",
+    "defaultTitleNoName": "Pomóż mentorowi dowiedzieć się więcej o Twoim dziecku",
+    "defaultDescription": "Dzięki temu mentor zapamięta, jakie wyjaśnienia działają, co wciąż jest trudne i które przykłady są trafne.",
     "grant": "Tak, włącz",
     "a11yEnable": "Włącz pamięć mentora",
     "a11ySkip": "Pomiń pamięć mentora"
@@ -4030,7 +4030,7 @@
       "more": "Jeszcze {{count}} opcji"
     },
     "bar": {
-      "unavailable": "Tutor jest chwilowo niedostępny. Nadal możesz pisać.",
+      "unavailable": "Mentor jest chwilowo niedostępny. Nadal możesz pisać.",
       "cameraLabel": "Aparat",
       "placeholder": "Zapytaj, wklej lub opisz, czego chcesz się nauczyć.",
       "micLabel": "Mikrofon",
@@ -4152,7 +4152,7 @@
     "notes": {
       "heading": "Notatki",
       "authorSelf": "Moje notatki",
-      "authorMentor": "Zapisane od tutora",
+      "authorMentor": "Zapisane od mentora",
       "addNote": "Dodaj notatkę",
       "micLabel": "Dodaj notatkę głosowo",
       "empty": "Brak notatek. Zapisz myśl na temat tego przedmiotu.",
@@ -4240,16 +4240,16 @@
       "error": "Nie udało się wczytać raportów."
     },
     "memory": {
-      "title": "Zarządzanie pamięcią tutora",
-      "body": "Przeglądaj, edytuj, ukrywaj, eksportuj lub usuwaj to, co pamięta Twój tutor, na pełnym ekranie pamięci.",
+      "title": "Zarządzanie pamięcią mentora",
+      "body": "Przeglądaj, edytuj, ukrywaj, eksportuj lub usuwaj to, co pamięta Twój mentor, na pełnym ekranie pamięci.",
       "open": "Otwórz zarządzanie pamięcią"
     },
     "notes": {
       "error": "Nie udało się wczytać Twoich notatek.",
       "searchPlaceholder": "Szukaj w notatkach",
       "searchEmpty": "Brak notatek pasujących do wyszukiwania.",
-      "empty": "Zapisane notatki i odpowiedzi tutora dodane do zakładek pojawią się tutaj.",
-      "authorshipMentor": "Od tutora",
+      "empty": "Zapisane notatki i odpowiedzi mentora dodane do zakładek pojawią się tutaj.",
+      "authorshipMentor": "Od mentora",
       "authorshipMine": "Moja notatka",
       "filterAll": "Wszystkie",
       "filterMine": "Moje notatki",
@@ -4302,7 +4302,7 @@
       "confidenceLow": "Wczesny sygnał"
     },
     "sourceBadge": {
-      "learner": "Powiedziałeś/aś swojemu tutorowi",
+      "learner": "Powiedziałeś/aś swojemu mentorowi",
       "parent": "Dodane przez rodzica"
     },
     "remove": "Usuń"

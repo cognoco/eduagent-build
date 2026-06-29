@@ -201,10 +201,10 @@ export async function findOrCreateAccount(
   // legitimate "I lost my Clerk account" case is handled out-of-band until a
   // proper confirmation-token flow is built.
   //
-  // TODO(BUG-411): proper reclaim flow requires out-of-band email verification
-  //   + confirmation token. The attempt is blocked here and dispatched as
-  //   app/account.reclaim_attempt for a future workflow handler to notify the
-  //   original email owner and provide a safe resolution path.
+  // BUG-784: The attempt stays blocked here and is dispatched as
+  // app/account.reclaim_attempt. The Inngest handler notifies the original
+  // email owner out-of-band and directs them through support verification; it
+  // never rewires ownership automatically.
   if (email) {
     const existingByEmail = await db.query.accounts.findFirst({
       where: eq(accounts.email, email),
@@ -242,13 +242,6 @@ export async function findOrCreateAccount(
       await safeSend(
         () =>
           inngest.send({
-            // orphan-allow: observability-only marker. The reclaim attempt is
-            // already BLOCKED in-line (ConflictError thrown below) and escalated
-            // via logger.warn + captureException(Sentry). The Inngest event is a
-            // queryable audit signal for the (future, out-of-band) reclaim flow;
-            // it intentionally has no automated handler — a real reclaim
-            // workflow requires email verification + confirmation tokens
-            // (TODO BUG-411 above) and is out of scope here.
             name: 'app/account.reclaim_attempt',
             data: {
               incomingClerkUserId: clerkUserId,

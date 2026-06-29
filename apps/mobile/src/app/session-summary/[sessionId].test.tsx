@@ -648,7 +648,7 @@ describe('SessionSummaryScreen', () => {
       const cue = await screen.findByTestId(
         'session-summary-mentor-memory-cue',
       );
-      screen.getByText('What your tutor knows about you.');
+      screen.getByText('What your mentor knows about you.');
       screen.getByText('Tap to review or change.');
 
       fireEvent.press(cue);

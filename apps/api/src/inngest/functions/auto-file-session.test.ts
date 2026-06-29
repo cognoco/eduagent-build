@@ -16,6 +16,10 @@ const mockLoggerError = jest.fn();
 const mockLoggerWarn = jest.fn();
 const mockCaptureException = jest.fn();
 const mockWriteActivityMoment = jest.fn();
+const mockRunWithStepDatabaseScope = jest.fn(
+  async <T>(callback: () => Promise<T>) => callback(),
+);
+const mockCloseStepDatabases = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   const actual = jest.requireActual(
@@ -24,6 +28,9 @@ jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
   return {
     ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
+    runWithStepDatabaseScope: (callback: () => Promise<unknown>) =>
+      mockRunWithStepDatabaseScope(callback),
+    closeStepDatabases: () => mockCloseStepDatabases(),
   };
 });
 
@@ -475,6 +482,8 @@ describe('autoFileSession', () => {
         }),
       }),
     );
+    expect(mockRunWithStepDatabaseScope).toHaveBeenCalledTimes(1);
+    expect(mockCloseStepDatabases).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ status: 'failed' });
   });
 });
