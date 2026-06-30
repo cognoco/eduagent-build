@@ -7,6 +7,10 @@ const mockGenerateBookTopics = jest.fn();
 const mockPersistBookTopics = jest.fn();
 const mockGetProfileAge = jest.fn();
 const mockCaptureException = jest.fn();
+const mockRunWithStepDatabaseScope = jest.fn(
+  async <T>(callback: () => Promise<T>) => callback(),
+);
+const mockCloseStepDatabases = jest.fn().mockResolvedValue(undefined);
 
 // GC6: real module via requireActual; override only the two step accessors the
 // Inngest runtime would otherwise require (DB binding) + pin the cutover flag to
@@ -18,6 +22,9 @@ jest.mock('../helpers', () => {
   return {
     ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
+    runWithStepDatabaseScope: (callback: () => Promise<unknown>) =>
+      mockRunWithStepDatabaseScope(callback),
+    closeStepDatabases: () => mockCloseStepDatabases(),
     isIdentityV2EnabledInStep: () => false,
   };
 });
@@ -723,6 +730,23 @@ describe('subjectRetryCurriculum', () => {
         });
 
         expect(updateSet).not.toHaveBeenCalled();
+      });
+
+      it('wraps DB writes in runWithStepDatabaseScope and closes step databases', async () => {
+        // Regression guard: onFailure must scope and release the DB handle so
+        // connection leaks cannot occur on terminal failures (mirrors
+        // auto-file-session.ts and topic-probe-extract.ts onFailure pattern).
+        const { mockDb } = makeInspectableDb({ failedAt: null });
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const onFailure = (subjectRetryCurriculum as any).opts.onFailure;
+
+        await onFailure({
+          event: { data: { event: { data: validPayload() } } },
+          error: new Error('terminal failure'),
+        });
+
+        expect(mockRunWithStepDatabaseScope).toHaveBeenCalled();
+        expect(mockCloseStepDatabases).toHaveBeenCalled();
       });
     });
   });
