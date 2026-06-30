@@ -346,9 +346,7 @@ describe('account schemas', () => {
       profileId: UUID,
       actorJob: 'session-closer',
       kind: 'session_completed',
-      templateKey: 'session.completed.v1',
       params: { topicId: UUID, xp: 10 },
-      visibility: 'self' as const,
       createdAt: ISO,
       surfacedAt: null,
     };
@@ -357,15 +355,6 @@ describe('account schemas', () => {
       expect(
         dataExportMentorActivityLedgerRowSchema.safeParse(validRow).success,
       ).toBe(true);
-    });
-
-    it('rejects invalid visibility value', () => {
-      expect(
-        dataExportMentorActivityLedgerRowSchema.safeParse({
-          ...validRow,
-          visibility: 'private',
-        }).success,
-      ).toBe(false);
     });
 
     it('rejects when required actorJob is missing', () => {

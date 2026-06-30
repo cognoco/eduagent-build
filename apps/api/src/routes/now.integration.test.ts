@@ -120,7 +120,6 @@ describe('Integration: now routes', () => {
         profileId: profileA,
         actorJob: 'test',
         kind: 'milestone_reached',
-        templateKey: 'ledger.milestone_reached.default',
         params: {
           marker: 'profile-a-only',
           milestoneId: 'milestone-a',
@@ -132,7 +131,6 @@ describe('Integration: now routes', () => {
         profileId: profileB,
         actorJob: 'test',
         kind: 'milestone_reached',
-        templateKey: 'ledger.milestone_reached.default',
         params: {
           marker: 'profile-b-only',
           milestoneId: 'milestone-b',

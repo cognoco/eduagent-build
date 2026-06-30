@@ -270,7 +270,6 @@ describe('autoFileSession', () => {
       profileId,
       actorJob: 'auto-file-session',
       kind: 'session_filed',
-      templateKey: 'ledger.session_filed.default',
       params: {
         topicTitle: 'Gravity',
         subjectId: '00000000-0000-4000-8000-000000000009',

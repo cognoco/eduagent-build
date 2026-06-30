@@ -2,7 +2,6 @@ import { sql } from 'drizzle-orm';
 import {
   index,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -12,30 +11,26 @@ import {
 import { profiles } from './profiles';
 import { generateUUIDv7 } from '../utils/uuid';
 
-export const ledgerVisibilityEnum = pgEnum('ledger_visibility', [
-  'self',
-  'supporter',
-  'both',
-]);
-
+// MMT-ADR-0022 (activity feed = derive-on-read + thin seen-state): the table is
+// a narrow seen-state store. Visibility is self-only, enforced by profile scope
+// + RLS — there is no stored visibility column or `ledger_visibility` enum.
+// Display copy is resolved at read time by /now, so there is no stored
+// `template_key` column either.
 export const mentorActivityLedger = pgTable(
   'mentor_activity_ledger',
   {
     id: uuid('id')
       .primaryKey()
       .$defaultFn(() => generateUUIDv7()),
-    // ADR-0022 keeps S4 ledger visibility self-only; relationship visibility is read-time derived.
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     actorJob: text('actor_job').notNull(),
     kind: text('kind').notNull(),
-    templateKey: text('template_key').notNull(),
     params: jsonb('params')
       .notNull()
       .default({})
       .$type<Record<string, unknown>>(),
-    visibility: ledgerVisibilityEnum('visibility').notNull().default('self'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

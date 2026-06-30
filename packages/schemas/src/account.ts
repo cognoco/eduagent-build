@@ -544,9 +544,7 @@ export const dataExportMentorActivityLedgerRowSchema = z.object({
   profileId: z.string().uuid(),
   actorJob: z.string(),
   kind: z.string(),
-  templateKey: z.string(),
   params: z.record(z.string(), z.unknown()),
-  visibility: z.enum(['self', 'supporter', 'both']),
   createdAt: isoDateField,
   surfacedAt: isoDateField.nullable(),
 });
