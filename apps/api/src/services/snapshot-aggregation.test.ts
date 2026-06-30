@@ -1178,7 +1178,20 @@ describe('refreshProgressSnapshot', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers({ now: FIXED_NOW });
+    // doNotFake: keep real timer functions (setTimeout etc.) so withTransientDatabaseRetry
+    // delay calls work in the retry-path test. Only Date/Date.now is faked for snapshotDate.
+    jest.useFakeTimers({
+      now: FIXED_NOW,
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'nextTick',
+      ],
+    });
     (detectMilestones as jest.Mock).mockReturnValue([]);
     (storeMilestones as jest.Mock).mockResolvedValue([]);
   });

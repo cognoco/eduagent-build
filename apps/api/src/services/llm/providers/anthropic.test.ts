@@ -121,6 +121,14 @@ const mockSuccessResponse = {
 describe('createAnthropicProvider — responseFormat json in fetch payload', () => {
   let fetchSpy: jest.SpyInstance;
 
+  beforeAll(() => {
+    // jest's node-vm sandbox may not surface global.fetch as an own property.
+    // Seed a stub so jest.spyOn(global, 'fetch') has a target.
+    if (!Object.prototype.hasOwnProperty.call(global, 'fetch')) {
+      (global as Record<string, unknown>)['fetch'] = jest.fn();
+    }
+  });
+
   beforeEach(() => {
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
