@@ -43,7 +43,6 @@ export function ArchivedTranscriptCard({
         <Text className="text-h3 font-semibold text-text-primary mb-2">
           {t('sessionTranscript.archived.title', {
             date: archivedDate,
-            defaultValue: 'This conversation was archived on {{date}}.',
           })}
         </Text>
 
@@ -54,9 +53,7 @@ export function ArchivedTranscriptCard({
         {hasTopics ? (
           <>
             <Text className="text-body text-text-secondary mb-3">
-              {t('sessionTranscript.archived.intro', {
-                defaultValue: "Here's what you covered:",
-              })}
+              {t('sessionTranscript.archived.intro')}
             </Text>
             <View className="flex-row flex-wrap gap-2 mb-4">
               {summary.topicsCovered.map((topic) => (
@@ -89,15 +86,11 @@ export function ArchivedTranscriptCard({
             testID="archived-continue-topic-cta"
             onPress={onContinueTopic}
             accessibilityRole="button"
-            accessibilityLabel={t('sessionTranscript.archived.continueCta', {
-              defaultValue: 'Continue this topic',
-            })}
+            accessibilityLabel={t('sessionTranscript.archived.continueCta')}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              {t('sessionTranscript.archived.continueCta', {
-                defaultValue: 'Continue this topic',
-              })}
+              {t('sessionTranscript.archived.continueCta')}
             </Text>
           </Pressable>
         ) : null}
