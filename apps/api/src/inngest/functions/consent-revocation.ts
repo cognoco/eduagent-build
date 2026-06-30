@@ -3,7 +3,11 @@ import { NonRetriableError } from 'inngest';
 import { z } from 'zod';
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
-import { calculateAge } from '../../services/consent';
+// [WI-367] calculateAgeFromParts (not calculateAge): the v2-only revocation path
+// now reads birthMonth/birthDay via getPersonForConsentRevocationV2 and computes
+// the COPPA hard-delete boundary on exact age, falling back to year-only when the
+// full date is absent (the YYYY-01-01 sentinel).
+import { calculateAgeFromParts } from '../../services/consent';
 import {
   isConsentRevocationGenerationCurrentV2,
   getPersonForConsentRevocationV2,
@@ -231,13 +235,24 @@ export const consentRevocation = inngest.createFunction(
       // A vanished profile (deleted between steps) conservatively routes to
       // the delete branch, where the consent-generation guard no-ops safely.
       const profile = await loadChildForRevocation(db);
-      const age = profile ? calculateAge(profile.birthYear) : null;
+      // [WI-367] Exact age when full-date parts are persisted; falls back to
+      // year-diff when month/day are null (legacy rows, or the v2 `01-01`
+      // year-only sentinel). This makes the COPPA boundary precise without
+      // changing behavior for any existing year-only row.
+      const age = profile
+        ? calculateAgeFromParts(
+            profile.birthYear,
+            profile.birthMonth ?? undefined,
+            profile.birthDay ?? undefined,
+          )
+        : null;
       return {
         ownerProfileId,
         preference,
-        // 'never' = never archive, so it always hard-deletes. With only
-        // birthYear granularity, age 13 is treated conservatively as under
-        // the COPPA boundary because the birthday may not have happened yet.
+        // 'never' = never archive, so it always hard-deletes. age <= 13 routes
+        // to delete (COPPA). With full-date precision this is exact; when only
+        // birthYear is known it stays conservative (the birthday may not have
+        // happened yet), which over-deletes in the COPPA-protective direction.
         action:
           age === null || age <= 13 || preference === 'never'
             ? ('delete' as const)
@@ -368,10 +383,10 @@ export const consentRevocation = inngest.createFunction(
     });
 
     // Delete child profile (FK cascades handle all data).
-    // [F-093] Pass parentProfileId so deleteProfileIfConsentWithdrawn enforces
-    // the parent-chain account guard — same defence-in-depth as the archive
-    // branch (BUG-662 / FCR-2026-05-23-L3.L3.3). The ownerProfileId was
-    // resolved before deletion in `choose-final-action` and is safe to reuse.
+    // [WI-867] v2 deletion enforces the active consent generation in
+    // deletePersonIfConsentWithdrawnV2. The ownerProfileId was resolved before
+    // deletion in `choose-final-action` and is safe to reuse for parent notice
+    // ownership.
     //
     // The pending delete notice is recorded in this step too: the child name
     // must be captured BEFORE the row is gone, and it must reach later steps

@@ -142,10 +142,12 @@ export function SubjectsBrowse({
                         key={subject.subjectId}
                         accessibilityRole="button"
                         accessibilityLabel={
-                  subject.subjectName
-                    ? t('subjectsBrowse.openSubjectNamed', { subject: subject.subjectName })
-                    : t('subjectsBrowse.openSubject')
-                }
+                          subject.subjectName
+                            ? t('subjectsBrowse.openSubjectNamed', {
+                                subject: subject.subjectName,
+                              })
+                            : t('subjectsBrowse.openSubject')
+                        }
                         className="rounded-card bg-coaching-card p-4"
                         onPress={() => onOpenSubject(subject.subjectId)}
                         testID={`subjects-browse-row-${subject.subjectId}`}

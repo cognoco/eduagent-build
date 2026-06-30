@@ -36,8 +36,8 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 // [WI-867] v2-only: consent-revocation.ts now imports exclusively from the v2
-// service modules. ../../services/consent is NOT mocked — calculateAge (the only
-// fn the SUT still imports from it) runs real (pure arithmetic, no DB).
+// service modules. ../../services/consent is NOT mocked — calculateAgeFromParts
+// (the only fn the SUT still imports from it) runs real (pure arithmetic, no DB).
 //
 // SEEDABILITY (WI-867 doctrine): the three v2 consent reads the SUT calls —
 // isConsentRevocationGenerationCurrentV2 (db.query.membership/consentGrant),
@@ -532,6 +532,87 @@ describe('consentRevocation', () => {
     );
   });
 
+  // [WI-367] When the full birth date is persisted, the COPPA hard-delete
+  // boundary uses EXACT age, not the year-only overestimate. Clock is faked to
+  // 2026-01-15 (beforeEach). A child born 2012-06-15 is year-diff 14 but exactly
+  // 13 on
+  // 2026-01-15 (birthday not yet passed) → must hard-delete (the COPPA-protective
+  // direction). This is the precision the year-only path could not express.
+  it('hard-deletes when full-date exact age is 13 though year-only age is 14', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-exact-13',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst.mockResolvedValue({
+      granted: true,
+      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
+      displayName: 'Liam',
+      birthDate: '2012-06-15',
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-13',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      childProfileId: 'child-exact-13',
+    });
+    expect(mockDeletePersonIfConsentWithdrawnV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-exact-13',
+      new Date('2026-01-15T00:00:00.000Z'),
+    );
+  });
+
+  // [WI-367] Companion: same birthYear (2012) but a birthday already passed by
+  // the faked clock (2012-01-01 → exact age 14) archives, matching the year-only
+  // path — proving the exact path only diverges when the birthday is genuinely
+  // not yet passed, not for every full-date row.
+  it('archives when full-date exact age is 14 (birthday already passed)', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-exact-14',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst.mockResolvedValue({
+      granted: true,
+      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
+      displayName: 'Liam',
+      birthDate: '2012-01-01',
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-14',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'archived',
+      childProfileId: 'child-exact-14',
+    });
+  });
+
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
     it('skips notify-child push when a consent_expired notification was logged for the child in last 24h', async () => {
       // Warning allowed; child dedups; parent allowed.
@@ -645,11 +726,11 @@ describe('consentRevocation', () => {
 describe('archive path — auto preference, age 14', () => {
   it('archives profile and emits schedule-archive-cleanup event via step.sendEvent', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // [WI-867] v2: seed person birthDate 2012 → real getPersonForConsentRevocationV2
-    // returns birthYear 2012 → calculateAge 14 → archive branch.
+    // [WI-867] v2: seed person birthDate 2012-01-01; under the faked
+    // 2026-01-15 clock, exact age is 14 → archive branch.
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthDate: '2012-06-01',
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
 
@@ -684,11 +765,11 @@ describe('archive path — auto preference, age 14', () => {
 
   it('records archive notice against the resolved owner profile', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // [WI-867] v2: seed person birthDate 2012 → real getPersonForConsentRevocationV2
-    // returns birthYear 2012 → calculateAge 14 → archive branch.
+    // [WI-867] v2: seed person birthDate 2012-01-01; under the faked
+    // 2026-01-15 clock, exact age is 14 → archive branch.
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthDate: '2012-06-01',
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
     // [WI-867] v2: getFamilyOwnerPersonIdV2 replaces getFamilyOwnerProfileId.
@@ -715,10 +796,10 @@ describe('archive path — auto preference, age 14', () => {
     // (covered by consent-v2.integration.test.ts). Here we assert the mock is
     // called with the right args — revokedAt undefined → revocationRespondedAt undefined.
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // [WI-867] v2: seed person birthDate 2012 → age 14 → archive branch.
+    // [WI-867] v2: seed person birthDate 2012-01-01 → exact age 14 → archive branch.
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthDate: '2012-06-01',
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
 
@@ -739,10 +820,10 @@ describe('archive path — auto preference, age 14', () => {
 
   it('[WI-78 review] requires the archive to match the revocation generation', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // [WI-867] v2: seed person birthDate 2012 → age 14 → archive branch.
+    // [WI-867] v2: seed person birthDate 2012-01-01 → exact age 14 → archive branch.
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthDate: '2012-06-01',
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
     // Seed the consentGrant so the REAL isConsentRevocationGenerationCurrentV2
@@ -947,7 +1028,7 @@ describe('memoized step-state PII break test [F-088]', () => {
 
   it('archive path: never memoizes the child name or birth year', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // [WI-867] v2: seed person birthDate 2008 → age 18 → archive branch.
+    // [WI-867] v2: seed person birthDate 2008 → older than the COPPA boundary.
     seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
       birthDate: '2008-06-01',
@@ -1127,7 +1208,7 @@ describe('[WI-997] onFailure dead-letter handler', () => {
 import { NonRetriableError } from 'inngest';
 
 describe('[WI-973] malformed consent.revoked payload — NonRetriableError guard', () => {
-  it('throws NonRetriableError when revokedAt is omitted, and does NOT call deleteProfileIfConsentWithdrawn', async () => {
+  it('throws NonRetriableError when revokedAt is omitted, and does NOT call deletePersonIfConsentWithdrawnV2', async () => {
     await expect(
       executeRevocation({
         childProfileId: 'child-001',
