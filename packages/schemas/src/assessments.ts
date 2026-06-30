@@ -245,6 +245,13 @@ export const teachingPreferenceSchema = z
   .object({
     subjectId: z.string().uuid(),
     method: teachingMethodSchema,
+    // Documented canon carve-out (WI-1160): the "never .nullable().optional()" rule
+    // (docs/project_context.md, docs/architecture.md) does NOT fit this REQUEST field.
+    // analogyDomain is tri-state on the request: a value = set it, null = explicitly
+    // clear it, absent = leave unchanged. null-as-clear is established, tested product
+    // behavior (apps/api/src/routes/retention.test.ts → "accepts null analogyDomain to
+    // clear preference"), so both .nullable() (accept null) and .optional() (accept
+    // absent) are genuinely required here. See AGENTS.md → Known Exceptions.
     analogyDomain: analogyDomainSchema.nullable().optional(),
   })
   .strict();
