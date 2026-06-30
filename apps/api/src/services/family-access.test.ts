@@ -33,33 +33,36 @@ const PARENT_ID = 'parent-profile-aaa';
 const CHILD_ID = 'child-profile-bbb';
 const UNRELATED_ID = 'unrelated-profile-ccc';
 
-type LinkRow = { parentProfileId: string; childProfileId: string };
+type GuardianshipRow = { id: string };
 
 /**
  * Build a minimal Database stub that satisfies the one Drizzle call made by
- * hasParentAccess: `db.query.familyLinks.findFirst(...)`.
+ * hasParentAccess / assertParentAccess (post-collapse): `db.query.guardianship.findFirst(...)`.
  *
- * We construct the `familyLinks` table accessor once and store it so the mock
+ * We construct the `guardianship` table accessor once and store it so the mock
  * identity is stable across multiple property accesses.  (The neon-mock proxy
  * creates a new object on every `.query.tableName` read, so mock overrides on
  * cast references do not stick — this avoids that trap.)
+ *
+ * Active edge: non-null row (isGuardianOf returns true). No edge: undefined.
  */
-function makeDb(linkRow: LinkRow | undefined): Database {
-  const findFirst = jest.fn().mockResolvedValue(linkRow);
+function makeDb(edgeRow: GuardianshipRow | undefined): Database {
+  const findFirst = jest.fn().mockResolvedValue(edgeRow);
 
   return {
     query: {
-      familyLinks: { findFirst },
+      guardianship: { findFirst },
     },
   } as unknown as Database;
 }
 
-/** Mock DB where a family link exists between parent and child. */
-function dbWithLink(parentId: string, childId: string): Database {
-  return makeDb({ parentProfileId: parentId, childProfileId: childId });
+/** Mock DB where an active guardianship edge exists between guardian and charge. */
+function dbWithLink(_parentId: string, _childId: string): Database {
+  // Row shape: isGuardianOf only checks `row != null`; only `id` column is selected.
+  return makeDb({ id: 'edge-1' });
 }
 
-/** Mock DB where NO family link exists (findFirst returns undefined). */
+/** Mock DB where NO guardianship edge exists (findFirst returns undefined). */
 function dbWithoutLink(): Database {
   return makeDb(undefined);
 }
@@ -90,11 +93,11 @@ describe('hasParentAccess', () => {
     expect(result).toBe(false);
   });
 
-  it('queries familyLinks exactly once per call', async () => {
+  it('queries guardianship exactly once per call', async () => {
     const db = dbWithoutLink();
     const findFirstMock = (
-      db as unknown as { query: { familyLinks: { findFirst: jest.Mock } } }
-    ).query.familyLinks.findFirst;
+      db as unknown as { query: { guardianship: { findFirst: jest.Mock } } }
+    ).query.guardianship.findFirst;
 
     await hasParentAccess(db, PARENT_ID, CHILD_ID);
 
@@ -181,16 +184,6 @@ describe('hasParentAccess / assertParentAccess v2 dispatch (WI-786)', () => {
     return { db, familyLinksFindFirst, guardianshipFindFirst };
   }
 
-  it('[WI-786] flag-off: hasParentAccess reads familyLinks, never guardianship', async () => {
-    const { db, familyLinksFindFirst, guardianshipFindFirst } =
-      makeDispatchDb();
-
-    await hasParentAccess(db, PARENT_ID, CHILD_ID);
-
-    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
-    expect(guardianshipFindFirst).not.toHaveBeenCalled();
-  });
-
   it('[WI-786] flag-on: hasParentAccess reads guardianship, never familyLinks', async () => {
     const { db, familyLinksFindFirst, guardianshipFindFirst } =
       makeDispatchDb();
@@ -199,19 +192,6 @@ describe('hasParentAccess / assertParentAccess v2 dispatch (WI-786)', () => {
 
     expect(guardianshipFindFirst).toHaveBeenCalledTimes(1);
     expect(familyLinksFindFirst).not.toHaveBeenCalled();
-  });
-
-  it('[WI-786] flag-off: assertParentAccess reads familyLinks, never guardianship', async () => {
-    const { db, familyLinksFindFirst, guardianshipFindFirst } =
-      makeDispatchDb();
-
-    // No link → throws ForbiddenError (expected). The assertion is which read ran.
-    await expect(assertParentAccess(db, PARENT_ID, CHILD_ID)).rejects.toThrow(
-      ForbiddenError,
-    );
-
-    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
-    expect(guardianshipFindFirst).not.toHaveBeenCalled();
   });
 
   it('[WI-786] flag-on: assertParentAccess reads guardianship, never familyLinks', async () => {

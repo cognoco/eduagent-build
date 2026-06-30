@@ -16,16 +16,13 @@
 // at their local ~9 AM, then fans out per-profile events for daily nudges.
 // ---------------------------------------------------------------------------
 
-import { sql, eq, gt, and, or, exists, notExists, isNull } from 'drizzle-orm';
+import { sql, eq, gt, and, notExists, isNull } from 'drizzle-orm';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import {
-  profiles,
-  accounts,
   streaks,
   notificationPreferences,
   notificationLog,
-  consentStates,
   membership,
   organization,
   person,
@@ -43,118 +40,46 @@ export const dailyReminderScan = inngest.createFunction(
       // [CUT-B2] v2 scan: profiles×accounts → person×membership×organization;
       // timezone from organization; the consent CONSENTED-EXISTS-OR-no-rows
       // filter from the shared consentGateSatisfiedSql (current-row windowed).
-      if (isIdentityV2EnabledInStep()) {
-        const results = await db
-          .select({
-            profileId: person.id,
-            currentStreak: streaks.currentStreak,
-          })
-          .from(person)
-          .innerJoin(membership, eq(membership.personId, person.id))
-          .innerJoin(
-            organization,
-            eq(organization.id, membership.organizationId),
-          )
-          .innerJoin(
-            streaks,
-            and(eq(streaks.profileId, person.id), gt(streaks.currentStreak, 0)),
-          )
-          .innerJoin(
-            notificationPreferences,
-            and(
-              eq(notificationPreferences.profileId, person.id),
-              eq(notificationPreferences.pushEnabled, true),
-              eq(notificationPreferences.dailyReminders, true),
-            ),
-          )
-          .where(
-            and(
-              isNull(person.archivedAt),
-              consentGateSatisfiedSql(sql`${person.id}`),
-              sql`(NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time >= TIME '08:30'
-                  AND (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time < TIME '09:30'`,
-              notExists(
-                db
-                  .select({ _: sql`1` })
-                  .from(notificationLog)
-                  .where(
-                    and(
-                      eq(notificationLog.profileId, person.id),
-                      eq(notificationLog.type, 'daily_reminder'),
-                      sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::date`,
-                    ),
-                  ),
-              ),
-            ),
-          );
-        return results.map((r) => ({
-          profileId: r.profileId,
-          streakDays: r.currentStreak,
-        }));
-      }
-
       const results = await db
         .select({
-          profileId: profiles.id,
+          profileId: person.id,
           currentStreak: streaks.currentStreak,
         })
-        .from(profiles)
-        .innerJoin(accounts, eq(profiles.accountId, accounts.id))
+        .from(person)
+        .innerJoin(membership, eq(membership.personId, person.id))
+        .innerJoin(organization, eq(organization.id, membership.organizationId))
         .innerJoin(
           streaks,
-          and(eq(streaks.profileId, profiles.id), gt(streaks.currentStreak, 0)),
+          and(eq(streaks.profileId, person.id), gt(streaks.currentStreak, 0)),
         )
         .innerJoin(
           notificationPreferences,
           and(
-            eq(notificationPreferences.profileId, profiles.id),
+            eq(notificationPreferences.profileId, person.id),
             eq(notificationPreferences.pushEnabled, true),
             eq(notificationPreferences.dailyReminders, true),
           ),
         )
         .where(
           and(
-            isNull(profiles.archivedAt),
-            // Consent: CONSENTED record exists, or no consent records at all (adults)
-            or(
-              exists(
-                db
-                  .select({ _: sql`1` })
-                  .from(consentStates)
-                  .where(
-                    and(
-                      eq(consentStates.profileId, profiles.id),
-                      eq(consentStates.status, 'CONSENTED'),
-                    ),
-                  ),
-              ),
-              notExists(
-                db
-                  .select({ _: sql`1` })
-                  .from(consentStates)
-                  .where(eq(consentStates.profileId, profiles.id)),
-              ),
-            ),
-            // Timezone bucketing: local time within 08:30–09:30
-            // One hour after the recall-nudge window to avoid notification clustering
-            sql`(NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time >= TIME '08:30'
-                AND (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::time < TIME '09:30'`,
-            // Dedup: skip profiles that already received a daily_reminder today
+            isNull(person.archivedAt),
+            consentGateSatisfiedSql(sql`${person.id}`),
+            sql`(NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time >= TIME '08:30'
+                AND (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::time < TIME '09:30'`,
             notExists(
               db
                 .select({ _: sql`1` })
                 .from(notificationLog)
                 .where(
                   and(
-                    eq(notificationLog.profileId, profiles.id),
+                    eq(notificationLog.profileId, person.id),
                     eq(notificationLog.type, 'daily_reminder'),
-                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`,
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::date`,
                   ),
                 ),
             ),
           ),
         );
-
       return results.map((r) => ({
         profileId: r.profileId,
         streakDays: r.currentStreak,

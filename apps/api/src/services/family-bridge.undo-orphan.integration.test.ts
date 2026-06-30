@@ -26,7 +26,6 @@ import {
   curricula,
   curriculumBooks,
   curriculumTopics,
-  familyLinks,
   guardianship,
   organization,
   person,
@@ -37,7 +36,6 @@ import {
 import {
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from '../../../../tests/integration/helpers';
 import {
   deleteV2IdentitiesForTest,
@@ -47,7 +45,8 @@ import {
 import { cloneTopicFromChild, undoCloneFromChild } from './family-bridge';
 
 const RUN = !!process.env.DATABASE_URL;
-const SERVICE_OPTS = { identityV2Enabled: isIdentityV2Enabled() };
+// [WI-867] assertParentAccess → validateGuardianChargeRelationshipV2 unconditionally.
+const SERVICE_OPTS = { identityV2Enabled: true };
 
 const EMAIL = 'family-bridge-undo-orphan@integration.test';
 const CLERK_USER_ID = 'integration-family-bridge-undo-orphan-user';
@@ -127,78 +126,52 @@ async function seedFamily(): Promise<Fixture> {
   const adultId = randomUUID();
   const childId = randomUUID();
 
-  if (isIdentityV2Enabled()) {
-    // Learning tables still FK to profiles.id while the v2 identity graph is
-    // under rollout, so flag-on fixtures need legacy anchors as well.
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: adultId,
-      accountId,
-      displayName: 'Parent',
-      birthYear: 1985,
-      isOwner: true,
-      email: EMAIL,
-      clerkUserId: CLERK_USER_ID,
-    });
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: childId,
-      accountId,
-      displayName: 'Ada',
-      birthYear: 2013,
-      isOwner: false,
-    });
+  // [WI-867] v2 identity graph is unconditional. Learning tables still FK to
+  // profiles.id so legacy anchors are also needed.
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: adultId,
+    accountId,
+    displayName: 'Parent',
+    birthYear: 1985,
+    isOwner: true,
+    email: EMAIL,
+    clerkUserId: CLERK_USER_ID,
+  });
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: childId,
+    accountId,
+    displayName: 'Ada',
+    birthYear: 2013,
+    isOwner: false,
+  });
 
-    // v2 graph: organization + adult/child person + login/membership + edge.
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId,
-      profileId: adultId,
-      displayName: 'Parent',
-      birthYear: 1985,
-      clerkUserId: CLERK_USER_ID,
-      email: EMAIL,
-      isOwner: true,
-    });
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId,
-      profileId: childId,
-      displayName: 'Ada',
-      birthYear: 2013,
-      clerkUserId: `${CLERK_USER_ID}-child`,
-      email: `child-${EMAIL}`,
-      isOwner: false,
-    });
-    // resolveSubject() reads person.conversation_language to stamp the cloned
-    // subject's language; set it so the adult-subject create path succeeds.
-    await db
-      .update(person)
-      .set({ conversationLanguage: 'en' })
-      .where(eq(person.id, adultId));
-    await db.insert(guardianship).values({
-      guardianPersonId: adultId,
-      chargePersonId: childId,
-    });
-  } else {
-    // Legacy graph fallback (flag-off lanes).
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: adultId,
-      accountId,
-      displayName: 'Parent',
-      birthYear: 1985,
-      isOwner: true,
-      email: EMAIL,
-      clerkUserId: CLERK_USER_ID,
-    });
-    await ensureLegacyProfileAnchorForTest(db, {
-      profileId: childId,
-      accountId,
-      displayName: 'Ada',
-      birthYear: 2013,
-      isOwner: false,
-    });
-    await db.insert(familyLinks).values({
-      parentProfileId: adultId,
-      childProfileId: childId,
-    });
-  }
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId: adultId,
+    displayName: 'Parent',
+    birthYear: 1985,
+    clerkUserId: CLERK_USER_ID,
+    email: EMAIL,
+    isOwner: true,
+  });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId: childId,
+    displayName: 'Ada',
+    birthYear: 2013,
+    clerkUserId: `${CLERK_USER_ID}-child`,
+    email: `child-${EMAIL}`,
+    isOwner: false,
+  });
+  // resolveSubject() reads person.conversation_language to stamp the cloned subject.
+  await db
+    .update(person)
+    .set({ conversationLanguage: 'en' })
+    .where(eq(person.id, adultId));
+  await db.insert(guardianship).values({
+    guardianPersonId: adultId,
+    chargePersonId: childId,
+  });
 
   const childLearning = await seedLearningTree(db, {
     profileId: childId,
@@ -223,16 +196,15 @@ async function teardown(fixture: Fixture) {
   // person/org delete is not blocked by FKs through subjects.profile_id.
   await db.delete(subjects).where(eq(subjects.profileId, fixture.childId));
   await db.delete(subjects).where(eq(subjects.profileId, fixture.adultId));
-  if (isIdentityV2Enabled()) {
-    await db
-      .delete(guardianship)
-      .where(eq(guardianship.guardianPersonId, fixture.adultId));
-    await deleteV2IdentitiesForTest(db, {
-      accountIds: [fixture.accountId],
-      profileIds: [fixture.adultId, fixture.childId],
-    });
-    await db.delete(organization).where(eq(organization.id, fixture.accountId));
-  }
+  // [WI-867] v2 identity cleanup is unconditional.
+  await db
+    .delete(guardianship)
+    .where(eq(guardianship.guardianPersonId, fixture.adultId));
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [fixture.accountId],
+    profileIds: [fixture.adultId, fixture.childId],
+  });
+  await db.delete(organization).where(eq(organization.id, fixture.accountId));
   await cleanupAccounts({ emails: [EMAIL], clerkUserIds: [CLERK_USER_ID] });
 }
 

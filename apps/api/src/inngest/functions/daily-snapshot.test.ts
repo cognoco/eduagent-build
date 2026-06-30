@@ -367,7 +367,9 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('returns skipped status when profile does not exist', async () => {
-    mockSnapshotDb.query.profiles.findFirst.mockResolvedValue(null);
+    // [WI-867] flag collapsed to v2-always — liveness now reads person, not
+    // profiles. Use Once so the shared default person mock survives for later tests.
+    mockSnapshotDb.query.person.findFirst.mockResolvedValueOnce(null);
 
     const { result } = await executeRefreshSteps({
       profileId: PROFILE_ID_MISSING,
@@ -396,7 +398,9 @@ describe('dailySnapshotRefresh', () => {
 
   it('propagates DB lookup errors so Inngest retries (no silent swallow)', async () => {
     const error = new Error('DB connection error');
-    mockSnapshotDb.query.profiles.findFirst.mockRejectedValue(error);
+    // [WI-867] flag collapsed to v2-always — liveness reads person, not profiles.
+    // Use Once so the rejection does not bleed into subsequent tests.
+    mockSnapshotDb.query.person.findFirst.mockRejectedValueOnce(error);
 
     await expect(
       executeRefreshSteps({ profileId: PROFILE_ID, day: SNAPSHOT_DAY }),

@@ -1,0 +1,31 @@
+{
+  "_comment": "Orchestrator (PRG-06 Identity Cutover + Bug Lane) watcher set. Durable record of EXPECTED monitors; reconcile vs live /tasks at session-start/post-compact/post-resume per clacks/monitor-hygiene.md. Background tasks are job-scoped (job cd122717) and survive context compaction, so do NOT blind re-arm — the backstop firing post-compaction confirmed infra is live. Verify by direct-read at decision boundaries.",
+  "role": "orchestrator",
+  "last_reconciled": "2026-06-29T19:3xZ (post-compaction resume)",
+  "monitors": [
+    {
+      "target": "_wip/identity-cutover/_state/outbox.jsonl (WS-18 shepherd outbox)",
+      "purpose": "catch WS-18 merge-flags (#1647), consult-answers, status; high-water prg06ic-361",
+      "command": "tail -n0 -f on the outbox, persistent",
+      "task-id": "bs51779jz"
+    },
+    {
+      "target": "_wip/bug-lane/_state/outbox.jsonl (bug-lane shepherd outbox)",
+      "purpose": "catch bug-lane flags (#1645 rebase/merge), status; high-water bug-lane-096",
+      "command": "tail -n0 -f on the outbox, persistent",
+      "task-id": "bj86odryc"
+    },
+    {
+      "target": "WS-18 Cosmo Stage (workstream Identity Cutover)",
+      "purpose": "catch reviewer Stage transitions / bounces. LABELS UNRELIABLE — always direct-query verify the WI before acting",
+      "command": "Cosmo-Stage differ poll, persistent",
+      "task-id": "b82qr95tf"
+    },
+    {
+      "target": "PR #1645 required `main` check (one-shot backstop)",
+      "purpose": "RETIRED — fired post-compaction with 'settled=fail' (expected: main red until #1647 fix lands). #1645 stays parked for main-green; no re-arm needed.",
+      "command": "poll gh pr checks 1645 until main settles (one-shot)",
+      "task-id": "bvd1wopao (COMPLETED)"
+    }
+  ]
+}

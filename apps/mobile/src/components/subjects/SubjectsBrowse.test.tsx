@@ -18,6 +18,7 @@ jest.mock('react-i18next', () => ({
         'subjectsBrowse.reviewsDue': `${opts?.count} due`,
         'subjectsBrowse.bookCount': `${opts?.count} books`,
         'subjectsBrowse.openSubject': 'Open subject',
+        'subjectsBrowse.openSubjectNamed': `Open ${opts?.subject}`,
         'subjectsBrowse.sectionActive': 'Active',
         'subjectsBrowse.sectionPaused': 'Paused',
         'subjectsBrowse.sectionArchived': 'Archived',
@@ -274,5 +275,19 @@ describe('SubjectsBrowse', () => {
     // The search box and the empty/create state are not shown during loading.
     expect(screen.queryByTestId('subjects-browse-search')).toBeNull();
     expect(screen.queryByTestId('subjects-browse-create')).toBeNull();
+  });
+
+  it('gives each subject row a distinct, subject-specific accessibility label', () => {
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+    );
+
+    // Each row must announce the subject name so screen readers can distinguish them.
+    screen.getByLabelText('Open Spanish');
+    screen.getByLabelText('Open Algebra');
   });
 });

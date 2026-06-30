@@ -1,0 +1,17 @@
+{
+  "pageId": "3888bce9-1f7c-8123-b77a-cea04e3ea4c6",
+  "id": "WI-1059",
+  "name": "Validate API responses at the mobile trust boundary — high-risk hooks (parseJson helper)",
+  "description": "Mobile hooks cast (await res.json()) as T with no runtime validation at the trust boundary; highest risk in session/quiz/consent (state-machine + GDPR). Re-scoped 2026-06-25 to the 3 highest-risk hooks; the parseJson helper built here is then adopted across the remaining sites in WI-1098.",
+  "acceptanceCriteria": "Scope NARROWED 2026-06-25 (AC originally claimed ~68 sites/30 files; actual on main is 142 sites/38 files — remainder split to follow-up WI-1098). This WI now covers ONLY the three highest-blast-radius hooks. Done when: (1) a shared trust-boundary helper parseJson<T>(res, schema) parses the response body with its Zod schema and throws a typed, API-client-boundary-classified error on mismatch (never parsed per-screen); (2) the three hooks validate responses through it instead of (await res.json()) as T — use-sessions.ts (17 sites, session/state-machine), use-quiz.ts (7, scoring), use-consent.ts (5, GDPR). Verification: hook tests assert the helper REJECTS a malformed payload (negative path) and accepts a valid one; mobile tsc + targeted jest green. The other ~113 sites/~35 files are WI-1098.",
+  "riskImpact": "P2 — unvalidated API responses at the mobile trust boundary; session/quiz/consent carry the largest blast radius (broken state-machine decisions, mis-scored quizzes, mis-rendered GDPR consent).",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

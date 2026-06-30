@@ -1,0 +1,17 @@
+{
+  "pageId": "38e8bce9-1f7c-8102-be9f-e6148c4e4ad0",
+  "id": "WI-1147",
+  "name": "session.completed integration fixtures send mode:null — reds required main check (test-fixture-stale, NOT prod regression)",
+  "description": "TEST-FIXTURE-STALE, NOT A PROD REGRESSION. WI-972/#1477 (d0ac76385) tightened the session.completed event schema: mode is z.string().optional() (packages/schemas/src/inngest-events.ts:544) — accepts ABSENT, rejects null (NOT .nullable()). Real producers are safe (omit mode via truthy-guard / send none; server-only inngest.send, no client producer) so no prod path emits mode:null. But session-completed.integration.test.ts fixtures (happy-path + freeform, ~10 sites: lines 456/592/701/905/999/1110/1282/1346/1435...) pass explicit mode:null, which the optional-not-nullable schema rejects -> NonRetriableError at session-completed.ts:410 -> required 'main' check RED on main itself -> blocks ALL merges (WI-1104, WI-867, WI-1145). P1 on URGENCY only.",
+  "acceptanceCriteria": "Fix: in apps/api/src/inngest/functions/session-completed.integration.test.ts, OMIT the `mode` field from every fixture that currently sends `mode: null` (~10 sites), matching the producer truthy-omit contract (session-filing-dispatch.ts:109 `...(completion.mode ? {mode} : {})`). Variants (flows the bug manifests through): (a) curriculum/happy-path session fixtures, (b) freeform session fixtures — both currently emit mode:null and are rejected by the optional-not-nullable schema; the fix omits the field in both. Leave valid string modes unchanged (e.g. mode:'relearn'). Acceptance: (1) the 'API co-located integration tests' step passes and the required 'main' check goes green; (2) schema UNCHANGED — `mode` stays z.string().optional(), NOT loosened to .nullable(); (3) fixture-only — no prod/producer code change. Regression: session-completed.integration.test.ts (happy-path + freeform) fails before (NonRetriableError 'Invalid event payload' mode expected string received null at session-completed.ts:410) and passes after.",
+  "riskImpact": "URGENCY high: the required 'main' check is RED on main itself, blocking ALL merges (WI-1104, WI-867, WI-1145) until this lands. CHANGE RISK low: omits an optional field the schema already accepts as absent; test-fixture-only, no prod path emits mode:null (producers truthy-omit / send none; server-only inngest.send), no schema or producer change.",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "claude:wi1147-builder:WI-1147",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

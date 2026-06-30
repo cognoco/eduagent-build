@@ -12,6 +12,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 // ---------------------------------------------------------------------------
 // Database mock
@@ -63,6 +64,65 @@ jest.mock('../services/profile', () => {
     }),
   };
 });
+
+// [WI-867] Post-collapse, profile-scope middleware resolves the caller via the
+// v2 `findOwnerPersonScope` (auto-resolve) / `getPersonScope` (X-Profile-Id)
+// seam, which uses db.select() join chains the unit mock DB can't satisfy.
+// Continuity mock — the v2 rename of the legacy `findOwnerProfile`/`getProfile`
+// mocks above. Owner by default.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — findOwnerPersonScope/getPersonScope use db.select() join chains (persons→memberships→org) that return [] on the Proxy unit-mock; real path covered by apps/api/src/services/identity-v2/profile-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
+// [WI-867] billing-v2 seam — metering middleware calls ensureFreeSubscriptionV2
+// on LLM routes (challenge/topics/explain); accountMiddleware calls
+// ensureInitialTrialSubscriptionV2. Both use db.execute()/db.transaction()
+// paths the unit mock DB cannot satisfy. Continuity mock.
+const mockSubscriptionRow = {
+  id: 'test-subscription-id',
+  accountId: 'test-account-id',
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  tier: 'free' as const,
+  status: 'active' as const,
+  trialEndsAt: null,
+  currentPeriodStart: null,
+  currentPeriodEnd: null,
+  cancelledAt: null,
+  lastStripeEventTimestamp: null,
+  lastStripeEventId: null,
+  revenuecatOriginalAppUserId: null,
+  lastRevenuecatEventId: null,
+  lastRevenuecatEventTimestampMs: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureFreeSubscriptionV2/ensureInitialTrialSubscriptionV2 use db.execute()/db.transaction(); getOrProvisionProfileQuotaUsageV2 uses db.insert(...).returning() (returns [] on mock → undefined → throws); real paths covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureFreeSubscriptionV2: jest.fn().mockResolvedValue(mockSubscriptionRow),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+    getOrProvisionProfileQuotaUsageV2: jest.fn().mockResolvedValue({
+      id: 'pqu-v2-1',
+      subscriptionId: 'test-subscription-id',
+      profileId: 'test-profile-id',
+      role: 'owner',
+      monthlyLimit: 100,
+      usedThisMonth: 10,
+      dailyLimit: 10,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+    }),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Curriculum service mock
@@ -213,9 +273,11 @@ import { app } from '../index';
 import { curriculumRoutes } from './curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
-import { getProfile } from '../services/profile';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -420,19 +482,9 @@ describe('curriculum routes', () => {
     });
 
     it('[BREAK] returns 403 when the caller is not the account owner', async () => {
-      // Override the default isOwner: true profile for this single request so
-      // profile-scope middleware sets profileMeta.isOwner = false. The route
-      // calls assertOwnerProfile(c) which must throw ForbiddenError. If the
-      // assertOwnerProfile guard is removed, this test fails because the
-      // service mock would be invoked and the response would be 200.
-      (getProfile as jest.Mock).mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      // [WI-867] v2: isOwner comes from getPersonScope (profile-v2), not getProfile.
+      // Override for this single request so profile-scope middleware sets isOwner=false.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/curriculum/clone-from-child',
@@ -559,17 +611,8 @@ describe('curriculum routes', () => {
     });
 
     it('[BREAK] returns 403 when the caller is not the account owner', async () => {
-      // See the matching POST break-test: assertOwnerProfile must reject
-      // non-owner callers on the undo endpoint too. Removing the guard would
-      // let the mocked service run and return 200.
-      (getProfile as jest.Mock).mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      // [WI-867] v2: isOwner comes from getPersonScope (profile-v2), not getProfile.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/curriculum/clone-from-child/undo',

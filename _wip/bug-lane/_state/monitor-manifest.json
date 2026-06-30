@@ -1,0 +1,24 @@
+{
+  "role": "bug-lane-shepherd",
+  "updated": "2026-06-30",
+  "monitors": [
+    {
+      "target": "_wip/bug-lane/_state/inbox.jsonl",
+      "purpose": "catch orchestrator rulings/relays",
+      "command": "tail -n 0 -F _wip/bug-lane/_state/inbox.jsonl",
+      "task-id": "b6ka5dno6"
+    },
+    {
+      "target": "Cosmo Stage/State — Bug Lane WS 3858bce9-1f7c-8083-905b-d94bca4a4325",
+      "purpose": "catch Bug Lane WI verdicts (reviewer bounce, graduation)",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 3858bce9-1f7c-8083-905b-d94bca4a4325 120",
+      "task-id": "bp2wuk9nz"
+    },
+    {
+      "target": "Cosmo Stage/State — Review Backlog WS 38e8bce9-1f7c-8020-bb89-ef4f62321a5c",
+      "purpose": "DIRECTIVE-1 root fix: catch REVIEW REJECTIONS (Reviewing->Executing bounce / [zdx:review] rework) in the Review Backlog I am responsible for. Stage labels unreliable -> direct-query verify on any hit. (Gap that let WI-1086/1092 sit ~23h.)",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 38e8bce9-1f7c-8020-bb89-ef4f62321a5c 120",
+      "task-id": "bdjaen2xy"
+    }
+  ]
+}

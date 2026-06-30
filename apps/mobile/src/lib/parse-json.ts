@@ -21,6 +21,10 @@
  * body via `res.text()` when the response is NOT ok. For ok responses assertOk
  * returns early without reading the body, so `res.json()` here is the first
  * (and only) body read.
+ *
+ * JSON parse failures (e.g. a 2xx HTML error page) are caught and re-thrown as
+ * `ApiResponseShapeError` so callers always see a typed, classified error — never
+ * a raw `SyntaxError`.
  */
 import type { ZodType } from 'zod';
 import { ApiResponseShapeError } from '@eduagent/schemas';
@@ -30,7 +34,17 @@ export async function parseJson<T>(
   schema: ZodType<T>,
   context?: string,
 ): Promise<T> {
-  const raw: unknown = await res.json();
+  let raw: unknown;
+  try {
+    raw = await res.json();
+  } catch (e) {
+    throw new ApiResponseShapeError(context ?? 'API response', [
+      {
+        message:
+          e instanceof Error ? e.message : 'Response body is not valid JSON',
+      },
+    ]);
+  }
   const result = schema.safeParse(raw);
   if (!result.success) {
     throw new ApiResponseShapeError(

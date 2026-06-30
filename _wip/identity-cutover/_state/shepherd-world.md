@@ -1537,3 +1537,39 @@ git: HEAD=5edfd9176 (clean), branch wi-867-rederive, origin/WI-867=5edfd9176. Li
 **VERIFICATION:** no docker; stg DATABASE_URL available but shared/risky. Plan: throwaway (867+1145) combined branch, run flag-OFF representative suites (streaks/language-progress/account-security/family-bridge-gdpr) against stg → 208-signature clears. CI is authoritative gate.
 
 git: WI-1145 worktree branch=WI-1145 @origin/main tip. WI-867 parked 5edfd9176. Last in=ic-orch-266, last out=prg06ic-337.
+
+## Block 32 — 2026-06-29 ~11:25Z — WI-1145 core implemented + flag-off regression verified
+
+**DONE — `tests/integration/route-fixtures.ts` (7 edits, all dual-seed/dual-read):**
+1. `createProfileViaRoute` post-create READ → membership(v2)-first, fallback profiles(legacy). [clears the 208 createProfileViaRoute-not-found]
+2. `seedDirectChildProfileForTest` → person+membership seeded UNCONDITIONALLY (dropped stale flag gate).
+3. `seedFamilyLinkForTest` → guardianship seeded UNCONDITIONALLY. [clears validateGuardianshipEdgeV2-Forbidden]
+4. `setProfileConsentStatusForTest` → v2 consent_request/grant UNCONDITIONAL.
+5. `setSubscriptionTierForProfile` → robust accountId resolve + updates BOTH legacy `subscriptions` AND v2 `subscription` (planTier/status).
+6. Added `resolveAccountId(db, profileId)` helper (membership-first, profiles fallback) + second consent helper converted to use it + unconditional v2 seed.
+7. Added `subscription as subscriptionV2` import; removed orphaned `isIdentityV2Enabled` import.
+Seed-consistency guard (ic-266) honored: same id mapping (person.id==profile.id, org.id==account.id), matching field values.
+
+**VERIFIED:** `language-progress.integration.test.ts` PASS 4/4 flag-off vs stg from pre-collapse worktree → route-fixtures.ts compiles (ts-jest), main lane not broken, dual-read fallback works.
+
+**REMAINING:**
+- `apps/api/src/test-utils/legacy-identity-anchors.ts` `ensureV2IdentityForLegacyProfileTest`: add v2 `subscription` insert (planTier 'free', status 'active', payerPersonId=owner personId, id=legacy sub id) — for DIRECT-seeded owners' billing/metering v2 reads. Pattern: mirror billing-lifecycle.integration.test.ts seedSubscription (lines 136-195).
+- BINDING-GATE verification: throwaway (867+1145) combined branch, flag-OFF representative suites (streaks/account-security/family-bridge-gdpr) vs stg → confirm 208-signature clears. (pre-collapse worktree can't show post-collapse behavior.)
+- commit (own-work scope, route-fixtures + legacy-identity-anchors) + open WI-1145 PR + drive CI (flag-on advisory lane = diagnostic; main lane green = regression).
+
+**PENDING ORCHESTRATOR RULING (prg06ic-337):** gate=post-collapse-main (not flag-on advisory) + scope 1145 to identity-v2 dual-seed + capture flag-on session-payload/env separately. Watcher b6r0zray2 armed.
+
+## Block 33 — 2026-06-29 ~11:55Z — WI-1145 committed (eas.json contamination removed); SURFACE LARGER than one file
+
+**COMMITTED:** `ae985bdb0` on origin/WI-1145 (force-with-lease, own branch). Files: `tests/integration/route-fixtures.ts` + `apps/api/src/test-utils/legacy-identity-anchors.ts` ONLY. NOTE: the /commit fork wrongly staged `apps/mobile/eas.json` (env:sync artifact removing EXPO_PUBLIC_ENABLE_MODE_NAV_V2 from dev/preview — NAV flag, out of scope) → amended out + restored to origin/main. WATCH: env:sync mutates eas.json on every worktree setup; never stage it.
+
+**SCOPE FINDING (binding-gate sufficiency):** the 208 post-collapse-main failures span ~41 suites. My route-fixtures dual-read clears the dominant ~216 createProfileViaRoute-not-found (shared helper). BUT confirmed local-seeding suites NOT covered:
+- `account-security.integration.test.ts:44-67` local `createOwnerProfile` reads `profiles` unconditionally (no v2/membership fallback) → "Profile row missing".
+- `family-bridge-gdpr.integration.test.ts:22-49` local direct `.insert(accounts/profiles/familyLinks)` — legacy-only, NO v2 person/membership/guardianship → validateGuardianshipEdgeV2 Forbidden.
+- identity-graph.ts UNCHANGED by 867 → still attempts profiles dual-write, yet 208 show profiles empty ⇒ legacy tables unpopulated/absent on the post-collapse main DB ⇒ ALL legacy reads fail.
+
+⇒ Remaining = a SWEEP of per-suite LOCAL seed helpers (each needs v2 dual-seed / membership-first reads), not one shared file. Survey agent a1f6ff9cbcd637fc3 categorizing all 41 (COVERED vs NEEDS-FIX) — awaiting.
+
+**VERIFICATION still pending:** combined 867+1145 branch flag-off across buckets (needs new worktree+install+stg). Deferred until sweep complete.
+
+**RECONCILE sent prg06ic-339** (surface larger than ic-265/267 framing). git: WI-1145 @ae985bdb0 pushed. WI-867 parked 5edfd9176. Last in=ic-orch-268, last out=prg06ic-339.

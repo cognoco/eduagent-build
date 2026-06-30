@@ -1,20 +1,17 @@
 // @inngest-admin: parent-chain (curriculumBooks ownership verified via subjects.profileId)
 import { NonRetriableError } from 'inngest';
 import { eq, and, or, lt, isNull } from 'drizzle-orm';
-import {
-  curriculumBooks,
-  profiles,
-  subjects,
-  type Database,
-} from '@eduagent/database';
+import { curriculumBooks, subjects, type Database } from '@eduagent/database';
 import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import {
+  closeStepDatabases,
+  getStepDatabase,
+  runWithStepDatabaseScope,
+} from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { markBookFailed, persistBookTopics } from '../../services/curriculum';
-import { getProfileAge } from '../../services/profile';
-import { isGdprProcessingAllowed } from '../../services/consent';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
 import {
   getPersonAge,
@@ -76,34 +73,40 @@ export const subjectRetryCurriculum = inngest.createFunction(
         return { status: 'skipped', reason: 'invalid_payload' as const };
       }
       const { profileId, subjectId, bookId } = parsed.data;
-      const db = getStepDatabase();
-      const book = await db.query.curriculumBooks.findFirst({
-        where: and(
-          eq(curriculumBooks.id, bookId),
-          eq(curriculumBooks.subjectId, subjectId),
-        ),
+      return runWithStepDatabaseScope(async () => {
+        try {
+          const db = getStepDatabase();
+          const book = await db.query.curriculumBooks.findFirst({
+            where: and(
+              eq(curriculumBooks.id, bookId),
+              eq(curriculumBooks.subjectId, subjectId),
+            ),
+          });
+          // Ownership is established by the parent-chain check in the main flow
+          // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
+          // onFailure operates on that same owner-verified event payload.
+          if (book && !book.topicsGenerated && book.failedAt === null) {
+            // The pre-read above avoids re-stamping an existing failure; the
+            // shared writer carries the atomic `topicsGenerated = false` guard so
+            // the write can never race a concurrent success.
+            await markBookFailed(db, subjectId, bookId, 'generation_error');
+          }
+          captureException(
+            error instanceof Error ? error : new Error(String(error)),
+            {
+              profileId,
+              extra: {
+                site: 'subjectRetryCurriculum.onFailure',
+                subjectId,
+                bookId,
+              },
+            },
+          );
+          return { status: 'failed' as const, subjectId, bookId };
+        } finally {
+          await closeStepDatabases();
+        }
       });
-      // Ownership is established by the parent-chain check in the main flow
-      // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
-      // onFailure operates on that same owner-verified event payload.
-      if (book && !book.topicsGenerated && book.failedAt === null) {
-        // The pre-read above avoids re-stamping an existing failure; the
-        // shared writer carries the atomic `topicsGenerated = false` guard so
-        // the write can never race a concurrent success.
-        await markBookFailed(db, subjectId, bookId, 'generation_error');
-      }
-      captureException(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          profileId,
-          extra: {
-            site: 'subjectRetryCurriculum.onFailure',
-            subjectId,
-            bookId,
-          },
-        },
-      );
-      return { status: 'failed' as const, subjectId, bookId };
     },
   },
   { event: 'app/subject.curriculum-retry-requested' },
@@ -128,10 +131,7 @@ export const subjectRetryCurriculum = inngest.createFunction(
       // age data, call the LLM, or persist derived topics for a profile whose
       // consent is no longer granted.
       // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver; legacy via consent_states.
-      const v2 = isIdentityV2EnabledInStep();
-      const gdprAllowed = v2
-        ? await isGdprProcessingAllowedV2(db, profileId)
-        : await isGdprProcessingAllowed(db, profileId);
+      const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
       if (!gdprAllowed) {
         // Consent-blocked is NOT a curriculum failure — it is owned by the
         // consent gate (a retry cannot grant consent). Leave failed_at unset so
@@ -139,21 +139,11 @@ export const subjectRetryCurriculum = inngest.createFunction(
         return { status: 'consent-blocked' as const };
       }
 
-      // [CUT-B1 §2.5(iii)] v2 seam: age + conversation_language from person.
-      let rawConversationLanguage: string | null | undefined;
-      let learnerAge: number;
-      if (v2) {
-        const ctx = await getPersonLlmContext(db, profileId);
-        rawConversationLanguage = ctx?.conversationLanguage;
-        learnerAge = await getPersonAge(db, profileId);
-      } else {
-        const langRow = await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
-          columns: { conversationLanguage: true },
-        });
-        rawConversationLanguage = langRow?.conversationLanguage;
-        learnerAge = await getProfileAge(db, profileId);
-      }
+      // [CUT-B1 §2.5(iii)] age + conversation_language from person (v2 always-on).
+      const ctx = await getPersonLlmContext(db, profileId);
+      const rawConversationLanguage: string | null | undefined =
+        ctx?.conversationLanguage;
+      const learnerAge = await getPersonAge(db, profileId);
       return {
         status: 'pending' as const,
         bookTitle: book.title,
@@ -248,9 +238,7 @@ export const subjectRetryCurriculum = inngest.createFunction(
         // consent withdrawal that occurred after the first run would otherwise be
         // missed and stale-allowed learner data would still reach the LLM.
         // [CUT-B1 §2.5(i)] v2 seam.
-        const stepGdprAllowed = isIdentityV2EnabledInStep()
-          ? await isGdprProcessingAllowedV2(db, profileId)
-          : await isGdprProcessingAllowed(db, profileId);
+        const stepGdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
         if (!stepGdprAllowed) {
           // Consent-blocked: not a curriculum failure (see load-context gate).
           return;

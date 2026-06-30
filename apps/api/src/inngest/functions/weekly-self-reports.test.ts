@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
-const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
+// [WI-867] flag collapsed — source now calls v2 eligibility fns unconditionally.
+// GDPR gate (isGdprProcessingAllowedV2) is SEEDED, not mocked: the real fn reads
+// membership.findFirst (null → allowed) + the consent chain, so denial tests seed
+// WITHDRAWN via seedConsentState and the real reduction returns false.
+const mockListEligibleSelfReportPersonIdsV2 = jest.fn().mockResolvedValue([]);
+const mockListEligibleSelfReportPersonIdsAtLocalHour9V2 = jest
   .fn()
   .mockResolvedValue([]);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
@@ -54,8 +58,17 @@ const mockInsertValues = jest
   .mockReturnValue({ onConflictDoNothing: mockOnConflictDoNothing });
 const mockInsert = jest.fn().mockReturnValue({ values: mockInsertValues });
 
-const mockDb = {
-  query: {
+const mockSelectDistinct = jest.fn().mockReturnValue({
+  from: jest.fn().mockReturnValue({
+    where: jest.fn().mockResolvedValue([]),
+  }),
+});
+
+// Fresh query object each test — seedConsentState wraps mockDb.query in a Proxy,
+// so beforeEach must restore a clean object to prevent a prior denial test's
+// seeded consent/membership rows leaking into a later allow test.
+function makeQuery() {
+  return {
     consentStates: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -65,22 +78,42 @@ const mockDb = {
     profiles: {
       findFirst: jest.fn().mockResolvedValue({ displayName: 'Alex' }),
     },
-  },
+    // [WI-867] v2 paths read person, membership, guardianship.
+    person: {
+      findFirst: jest.fn().mockResolvedValue({ displayName: 'Alex' }),
+    },
+    membership: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    guardianship: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  };
+}
+
+const mockDb: {
+  query: ReturnType<typeof makeQuery>;
+  insert: typeof mockInsert;
+  selectDistinct: typeof mockSelectDistinct;
+} = {
+  query: makeQuery(),
   insert: mockInsert,
+  selectDistinct: mockSelectDistinct,
 };
 
+// [WI-867] flag collapsed — mock v2 eligibility module; old solo-progress-reports mock is dead.
 jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: pattern-a conversion */,
+  '../../services/identity-v2/solo-progress-reports-v2' /* gc1-allow: db.selectDistinct join — listEligibleSelfReportPersonIdsV2 / ...AtLocalHour9V2 scan via selectDistinct, not seedable on the unit Proxy mock-db; no weekly-self-reports integration twin yet — selectDistinct eligibility coverage gap tracked WI-905 */,
   () => {
     const actual = jest.requireActual(
-      '../../services/solo-progress-reports',
-    ) as typeof import('../../services/solo-progress-reports');
+      '../../services/identity-v2/solo-progress-reports-v2',
+    ) as typeof import('../../services/identity-v2/solo-progress-reports-v2');
     return {
       ...actual,
-      listEligibleSelfReportProfileIds: (...args: unknown[]) =>
-        mockListEligibleSelfReportProfileIds(...args),
-      listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
-        mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
+      listEligibleSelfReportPersonIdsV2: (...args: unknown[]) =>
+        mockListEligibleSelfReportPersonIdsV2(...args),
+      listEligibleSelfReportPersonIdsAtLocalHour9V2: (...args: unknown[]) =>
+        mockListEligibleSelfReportPersonIdsAtLocalHour9V2(...args),
     };
   },
 );
@@ -168,6 +201,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+import { seedConsentState } from '../../test-utils/consent-seed';
 import {
   selfProgressReportsBackfill,
   weeklySelfReportCron,
@@ -181,7 +215,8 @@ describe('weeklySelfReportCron', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers({ now: new Date('2026-05-11T09:00:00.000Z') });
-    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
+    mockDb.query = makeQuery();
+    mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -189,7 +224,7 @@ describe('weeklySelfReportCron', () => {
   });
 
   it('fans out one weekly self-report event per eligible profile', async () => {
-    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
+    mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([
       PROFILE_A,
     ]);
 
@@ -219,7 +254,7 @@ describe('weeklySelfReportCron', () => {
   });
 
   it('[WI-84 DS-038] throws when a fan-out batch fails so Inngest retries the cron', async () => {
-    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
+    mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([
       PROFILE_A,
     ]);
 
@@ -248,10 +283,11 @@ describe('weeklySelfReportGenerate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers({ now: new Date('2026-05-11T09:00:00.000Z') });
-    mockListEligibleSelfReportProfileIds.mockResolvedValue([PROFILE_A]);
-    mockDb.query.consentStates.findFirst.mockResolvedValue(null);
-    mockDb.query.familyLinks.findFirst.mockResolvedValue(null);
-    mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    // [WI-867] v2: eligibility via v2 fn (mocked — selectDistinct); GDPR gate via
+    // the REAL isGdprProcessingAllowedV2 reading membership (null → allowed).
+    // Fresh query strips any Proxy a prior denial test's seedConsentState left.
+    mockDb.query = makeQuery();
+    mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([PROFILE_A]);
     mockFilterProgressMetricsToActiveSubjects.mockReset();
     mockFilterProgressMetricsToActiveSubjects.mockImplementation(
       async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
@@ -269,19 +305,25 @@ describe('weeklySelfReportGenerate', () => {
   });
 
   describe('[WI-368] weekly self-report GDPR consent helper consolidation', () => {
-    it('uses isGdprProcessingAllowed instead of an inline GDPR consent query', () => {
+    // [WI-867] flag collapsed — source now uses isGdprProcessingAllowedV2 from identity-v2.
+    it('uses isGdprProcessingAllowedV2 instead of an inline GDPR consent query', () => {
       const source = readFileSync(
         join(__dirname, 'weekly-self-reports.ts'),
         'utf8',
       );
 
-      expect(source).toContain("from '../../services/consent'");
-      expect(source).toContain('isGdprProcessingAllowed(db, profileId)');
+      expect(source).toContain(
+        "from '../../services/identity-v2/consent-status-v2'",
+      );
+      expect(source).toContain('isGdprProcessingAllowedV2(db, profileId)');
       expect(source).not.toContain('db.query.consentStates.findFirst');
       expect(source).not.toContain("eq(consentStates.consentType, 'GDPR')");
       expect(source).not.toContain("status !== 'CONSENTED'");
     });
 
+    // [WI-867] GDPR gate is the REAL isGdprProcessingAllowedV2 over a seeded
+    // consent chain. WITHDRAWN/PENDING/PCR all reduce to denied; only allowed/
+    // denied matters to the handler.
     it.each([
       ['PENDING'],
       ['PARENTAL_CONSENT_REQUESTED'],
@@ -289,9 +331,19 @@ describe('weeklySelfReportGenerate', () => {
     ] as const)(
       'skips weekly self report when latest GDPR consent is %s',
       async (status) => {
-        mockDb.query.consentStates.findFirst.mockResolvedValue({
-          status,
-          requestedAt: new Date('2026-05-10T00:00:00.000Z'),
+        // [WI-867] SEED the v2 consent chain so the REAL isGdprProcessingAllowedV2
+        // resolves a denied status. WITHDRAWN/PENDING/PCR all reduce to "not
+        // allowed" (only null/CONSENTED pass). membership is seeded to a row so
+        // the consent reduction is actually consulted (not the no-org shortcut).
+        const seedState =
+          status === 'WITHDRAWN'
+            ? 'WITHDRAWN'
+            : status === 'PENDING'
+              ? 'PENDING'
+              : 'PCR';
+        seedConsentState(mockDb as unknown as Record<string, unknown>, {
+          personId: PROFILE_A,
+          state: seedState,
         });
 
         const result = await (weeklySelfReportGenerate as any).fn({
@@ -317,19 +369,12 @@ describe('weeklySelfReportGenerate', () => {
       },
     );
 
-    it.each([
-      [
-        'CONSENTED',
-        {
-          status: 'CONSENTED',
-          requestedAt: new Date('2026-05-10T00:00:00.000Z'),
-        },
-      ],
-      ['absent', null],
-    ] as const)(
+    it.each([['CONSENTED'], ['absent']] as const)(
       'stores weekly self report when latest GDPR consent is %s',
-      async (_label, consentRow) => {
-        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+      async (_label) => {
+        // v2: membership.findFirst = null (beforeEach default) → the real
+        // isGdprProcessingAllowedV2 takes the no-org "allowed" shortcut.
+        // CONSENTED and absent both resolve to allowed; no consent seeding needed.
 
         const result = await (weeklySelfReportGenerate as any).fn({
           event: {
@@ -452,7 +497,7 @@ describe('selfProgressReportsBackfill', () => {
   });
 
   it('queues the latest monthly report plus four recent weekly self reports', async () => {
-    mockListEligibleSelfReportProfileIds
+    mockListEligibleSelfReportPersonIdsV2
       .mockResolvedValueOnce([PROFILE_A])
       .mockResolvedValueOnce([PROFILE_A])
       .mockResolvedValueOnce([PROFILE_A, PROFILE_B])
@@ -519,7 +564,7 @@ describe('selfProgressReportsBackfill', () => {
   });
 
   it('[WI-84 DS-038] throws when backfill fan-out fails instead of returning partial', async () => {
-    mockListEligibleSelfReportProfileIds
+    mockListEligibleSelfReportPersonIdsV2
       .mockResolvedValueOnce([PROFILE_A])
       .mockResolvedValueOnce([]);
 

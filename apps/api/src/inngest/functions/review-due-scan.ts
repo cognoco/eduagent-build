@@ -16,22 +16,10 @@
 // and fans out per-profile events for independent notification delivery.
 // ---------------------------------------------------------------------------
 
-import {
-  sql,
-  eq,
-  lt,
-  and,
-  or,
-  exists,
-  notExists,
-  isNull,
-  ne,
-} from 'drizzle-orm';
+import { sql, eq, lt, and, notExists, isNull, ne } from 'drizzle-orm';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import {
-  profiles,
-  accounts,
   retentionCards,
   curriculumTopics,
   curriculumBooks,
@@ -39,7 +27,6 @@ import {
   subjects,
   notificationPreferences,
   notificationLog,
-  consentStates,
   membership,
   organization,
   person,
@@ -57,94 +44,21 @@ export const reviewDueScan = inngest.createFunction(
       // [CUT-B2] v2 scan: profiles×accounts → person×membership×organization;
       // learning-table joins unchanged (profileId = person.id); the consent
       // gate from the shared current-row-windowed predicate; timezone from org.
-      if (isIdentityV2EnabledInStep()) {
-        const results = await db
-          .select({
-            profileId: person.id,
-            overdueCount: sql<number>`count(${retentionCards.id})::int`,
-            topTopicIds: sql<
-              string[]
-            >`(array_agg(${retentionCards.topicId} ORDER BY ${retentionCards.nextReviewAt} ASC))[1:3]`,
-          })
-          .from(person)
-          .innerJoin(membership, eq(membership.personId, person.id))
-          .innerJoin(
-            organization,
-            eq(organization.id, membership.organizationId),
-          )
-          .innerJoin(
-            retentionCards,
-            and(
-              eq(retentionCards.profileId, person.id),
-              lt(retentionCards.nextReviewAt, sql`NOW()`),
-            ),
-          )
-          .innerJoin(
-            curriculumTopics,
-            eq(curriculumTopics.id, retentionCards.topicId),
-          )
-          .innerJoin(
-            curriculumBooks,
-            eq(curriculumBooks.id, curriculumTopics.bookId),
-          )
-          .innerJoin(curricula, eq(curricula.id, curriculumTopics.curriculumId))
-          .innerJoin(
-            subjects,
-            and(
-              eq(subjects.id, curriculumBooks.subjectId),
-              eq(subjects.id, curricula.subjectId),
-              eq(subjects.profileId, person.id),
-              ne(subjects.status, 'archived'),
-            ),
-          )
-          .innerJoin(
-            notificationPreferences,
-            and(
-              eq(notificationPreferences.profileId, person.id),
-              eq(notificationPreferences.pushEnabled, true),
-              eq(notificationPreferences.reviewReminders, true),
-            ),
-          )
-          .where(
-            and(
-              isNull(person.archivedAt),
-              consentGateSatisfiedSql(sql`${person.id}`),
-              notExists(
-                db
-                  .select({ _: sql`1` })
-                  .from(notificationLog)
-                  .where(
-                    and(
-                      eq(notificationLog.profileId, person.id),
-                      eq(notificationLog.type, 'review_reminder'),
-                      sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::date`,
-                    ),
-                  ),
-              ),
-            ),
-          )
-          .groupBy(person.id);
-        return results.map((r) => ({
-          profileId: r.profileId,
-          overdueCount: r.overdueCount,
-          topTopicIds: r.topTopicIds ?? [],
-        }));
-      }
-
       const results = await db
         .select({
-          profileId: profiles.id,
+          profileId: person.id,
           overdueCount: sql<number>`count(${retentionCards.id})::int`,
           topTopicIds: sql<
             string[]
           >`(array_agg(${retentionCards.topicId} ORDER BY ${retentionCards.nextReviewAt} ASC))[1:3]`,
         })
-        .from(profiles)
-        .innerJoin(accounts, eq(profiles.accountId, accounts.id))
+        .from(person)
+        .innerJoin(membership, eq(membership.personId, person.id))
+        .innerJoin(organization, eq(organization.id, membership.organizationId))
         .innerJoin(
           retentionCards,
           and(
-            eq(retentionCards.profileId, profiles.id),
+            eq(retentionCards.profileId, person.id),
             lt(retentionCards.nextReviewAt, sql`NOW()`),
           ),
         )
@@ -162,59 +76,37 @@ export const reviewDueScan = inngest.createFunction(
           and(
             eq(subjects.id, curriculumBooks.subjectId),
             eq(subjects.id, curricula.subjectId),
-            eq(subjects.profileId, profiles.id),
+            eq(subjects.profileId, person.id),
             ne(subjects.status, 'archived'),
           ),
         )
         .innerJoin(
           notificationPreferences,
           and(
-            eq(notificationPreferences.profileId, profiles.id),
+            eq(notificationPreferences.profileId, person.id),
             eq(notificationPreferences.pushEnabled, true),
             eq(notificationPreferences.reviewReminders, true),
           ),
         )
         .where(
           and(
-            isNull(profiles.archivedAt),
-            // Consent: CONSENTED record exists, or no consent records at all (adults)
-            or(
-              exists(
-                db
-                  .select({ _: sql`1` })
-                  .from(consentStates)
-                  .where(
-                    and(
-                      eq(consentStates.profileId, profiles.id),
-                      eq(consentStates.status, 'CONSENTED'),
-                    ),
-                  ),
-              ),
-              notExists(
-                db
-                  .select({ _: sql`1` })
-                  .from(consentStates)
-                  .where(eq(consentStates.profileId, profiles.id)),
-              ),
-            ),
-            // Dedup: skip profiles that already received a review_reminder today
-            // (using account timezone for date boundary to handle DST correctly)
+            isNull(person.archivedAt),
+            consentGateSatisfiedSql(sql`${person.id}`),
             notExists(
               db
                 .select({ _: sql`1` })
                 .from(notificationLog)
                 .where(
                   and(
-                    eq(notificationLog.profileId, profiles.id),
+                    eq(notificationLog.profileId, person.id),
                     eq(notificationLog.type, 'review_reminder'),
-                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${accounts.timezone}, 'UTC'))::date`,
+                    sql`${notificationLog.sentAt} >= (NOW() AT TIME ZONE COALESCE(${organization.timezone}, 'UTC'))::date`,
                   ),
                 ),
             ),
           ),
         )
-        .groupBy(profiles.id);
-
+        .groupBy(person.id);
       return results.map((r) => ({
         profileId: r.profileId,
         overdueCount: r.overdueCount,

@@ -1,0 +1,17 @@
+{
+  "pageId": "3888bce9-1f7c-81d7-a13e-c6e3a83f5c06",
+  "id": "WI-1071",
+  "name": "Adopt curriculum-topic-ownership helper across services",
+  "description": "A shared `curriculum-topic-ownership` helper (`apps/api/src/services/curriculum-topic-ownership.ts`) exists and is imported by ~12 services, but `apps/api/src/services/notes.ts` contains a local `verifyTopicOwnership` function (lines 270-303) that duplicates the same join pattern. Any ownership-check bug fixed in the canonical helper is not automatically propagated to the local copy.",
+  "acceptanceCriteria": "Current state: `apps/api/src/services/notes.ts:270-303` defines a local `verifyTopicOwnership(db, profileId, subjectId, topicId)` that performs a manual `curriculumTopics → curriculumBooks → subjects(profileId)` join. The canonical helper `findOwnedCurriculumTopic` in `services/curriculum-topic-ownership.ts` already performs this same join and returns typed topic data.\n\nDedup note: WI-322/199/288 (Closed) fixed cross-profile topic ownership exploits — those added the helper. This WI is the systemic sweep to ensure `notes.ts` (and any other non-adopters) migrate to the shared helper. Complements those closed items.\n\nAffected sites — grep `verifyTopicOwnership` in `apps/api/src/services/`: only `notes.ts` defines and calls it (at lines 322, 520, 588). Three call sites in the same file.\n\nApproach: Replace the three `verifyTopicOwnership(...)` calls with `const owned = await findOwnedCurriculumTopic(db, { profileId, topicId, subjectId }); if (!owned) throw new NotFoundError('Topic');`. Import `findOwnedCurriculumTopic` from `./curriculum-topic-ownership`. Delete the local `verifyTopicOwnership` function.\n\nVerification: `pnpm exec nx run api:test --testPathPattern=notes` green before and after. Run `pnpm exec nx run api:typecheck` — no new errors.",
+  "riskImpact": "",
+  "type": "Hygiene",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

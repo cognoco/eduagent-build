@@ -1,0 +1,25 @@
+{
+  "role": "shepherd",
+  "lane": "pr-cleanup",
+  "monitors": [
+    {
+      "target": "_state/inbox.jsonl",
+      "purpose": "catch orchestrator rulings/answers/directives (esp. the release directive) while holding",
+      "command": "tail -n0 -F _quartet/working/lanes/pr-cleanup/_state/inbox.jsonl",
+      "task-id": "bg12m7pqi"
+    },
+    {
+      "target": "WS-27 Cosmo Stage (ZDX Work Items DB, Workstream relation filter)",
+      "purpose": "catch review verdicts: Reviewing->Closed (advance) / Reviewing->Executing (rework)",
+      "command": "node _quartet/working/lanes/pr-cleanup/_state/cosmo-ws27-monitor.mjs",
+      "task-id": "b8v6l9yuv"
+    },
+    {
+      "target": "WS-27 per-ID Cosmo Stage + claim (9 WIs, robust vs relation drift)",
+      "purpose": "stage changes + Executing-unclaimed alarm; orchestrator-mandated invariant (inb-9)",
+      "command": "node _quartet/working/lanes/pr-cleanup/_state/cosmo-perID-monitor.mjs",
+      "task-id": "bzcbvwm1s"
+    }
+  ],
+  "notes": "Per-ID monitor added (inb-9 invariant): polls 560/902/1059/1071/1075/1087/1132/1165/1166 by unique_id, alarms on Executing&&ClaimedBy-empty. Relation monitor b8v6l9yuv kept as secondary (relation confirmed intact). Claims lodged for all 8 bounces; 1071+1075 re-completed to Reviewing."
+}

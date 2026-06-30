@@ -1,0 +1,47 @@
+{
+  "WI-560": {
+    "stage": "Executing",
+    "claimed": "claude:builder:WI-560",
+    "alarm": false
+  },
+  "WI-902": {
+    "stage": "Closed",
+    "claimed": "",
+    "alarm": false
+  },
+  "WI-1059": {
+    "stage": "Reviewing",
+    "claimed": "",
+    "alarm": false
+  },
+  "WI-1071": {
+    "stage": "Closed",
+    "claimed": "",
+    "alarm": false
+  },
+  "WI-1075": {
+    "stage": "Closed",
+    "claimed": "",
+    "alarm": false
+  },
+  "WI-1087": {
+    "stage": "Closed",
+    "claimed": "",
+    "alarm": false
+  },
+  "WI-1132": {
+    "stage": "Executing",
+    "claimed": "claude:builder:WI-1132",
+    "alarm": false
+  },
+  "WI-1165": {
+    "stage": "Executing",
+    "claimed": "claude:builder:WI-1165",
+    "alarm": false
+  },
+  "WI-1166": {
+    "stage": "Executing",
+    "claimed": "claude:builder:WI-1166",
+    "alarm": false
+  }
+}

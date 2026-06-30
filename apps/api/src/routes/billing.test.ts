@@ -8,6 +8,7 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDbInsert = jest.fn().mockReturnValue({
   values: jest.fn().mockReturnValue({
@@ -28,6 +29,23 @@ const mockFindOwnerProfile = jest.fn().mockResolvedValue({
   conversationLanguage: null,
   isOwner: true,
 });
+
+// [WI-867] v2 profile-scope seam continuity mock.
+// birthYear: 1985 mirrors the legacy findOwnerProfile mock value.
+const mockFindOwnerPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 1985 }));
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 1985 }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -195,6 +213,55 @@ jest.mock('../services/billing', () => {
     buildUsageDateLabels: (input: unknown) => mockBuildUsageDateLabels(input),
   };
 });
+
+// [WI-867] billing/billing-v2 continuity mock — billing.ts now imports v2 twins
+// directly. Route delegates to the same mock fns the legacy billing mock uses,
+// so existing toHaveBeenCalled() assertions stay valid and the real DB join chain
+// is not exercised in this unit test. Real behaviour covered by billing-v2
+// integration suites.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — route now calls v2 twins directly; DB join chain unrunnable on unit mock DB; real path covered by billing-v2 integration suites */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/billing/billing-v2',
+    ) as typeof import('../services/billing/billing-v2');
+    return {
+      ...actual,
+      // account middleware calls ensureInitialTrialSubscriptionV2 on every
+      // authenticated request — must be a no-op stub so the mock DB isn't hit.
+      ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+      getSubscriptionByAccountIdV2: (...args: unknown[]) =>
+        mockGetSubscriptionByAccountId(...args),
+      // [WI-867] checkout/top-up now resolve the Stripe customer via the
+      // BUG-827 race-safe v2 helper (main de-gated the v0/v2 ternary to the
+      // v2 arm). Delegate to the same mock the legacy seam used so the
+      // existing toHaveBeenCalled() assertions stay valid.
+      getOrCreateStripeCustomerV2: (...args: unknown[]) =>
+        mockGetOrCreateStripeCustomer(...args),
+      getQuotaPoolV2: (...args: unknown[]) => mockGetQuotaPool(...args),
+      linkStripeCustomerV2: (...args: unknown[]) =>
+        mockLinkStripeCustomer(...args),
+      ensureFreeSubscriptionV2: (...args: unknown[]) =>
+        mockEnsureFreeSubscription(...args),
+      markSubscriptionCancelledV2: (...args: unknown[]) =>
+        mockMarkSubscriptionCancelled(...args),
+      getEffectiveAccessForSubscriptionV2: (...args: unknown[]) =>
+        mockGetEffectiveAccessForSubscription(...args),
+      getOrProvisionProfileQuotaUsageV2: (...args: unknown[]) =>
+        mockGetOrProvisionProfileQuotaUsage(...args),
+      listFamilyMembersV2: (...args: unknown[]) =>
+        mockListFamilyMembers(...args),
+      addProfileToSubscriptionV2: (...args: unknown[]) =>
+        mockAddProfileToSubscription(...args),
+      removeProfileFromSubscriptionV2: (...args: unknown[]) =>
+        mockRemoveProfileFromSubscription(...args),
+      getFamilyPoolStatusV2: (...args: unknown[]) =>
+        mockGetFamilyPoolStatus(...args),
+      getUsageBreakdownForProfileV2: (...args: unknown[]) =>
+        mockGetUsageBreakdownForProfile(...args),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Mock KV service
@@ -390,6 +457,9 @@ beforeEach(() => {
     conversationLanguage: null,
     isOwner: true,
   });
+  // [WI-867] re-arm v2 profile-scope mock after clearAllMocks().
+  mockFindOwnerPersonScope.mockResolvedValue(personScope({ birthYear: 1985 }));
+  mockGetPersonScope.mockResolvedValue(personScope({ birthYear: 1985 }));
   mockProfileFindFirst.mockResolvedValue(undefined);
   mockFamilyLinksFindFirst.mockResolvedValue(undefined);
   mockConsentStateFindFirst.mockResolvedValue(undefined);
@@ -498,6 +568,8 @@ describe('billing routes', () => {
         mockSubscription({ tier: 'family' }),
       );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+      // [WI-867] v2: getPersonScope controls profileMeta.isOwner for X-Profile-Id path.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/subscription',
@@ -977,6 +1049,8 @@ describe('billing routes', () => {
 
     it('does not fall back to shared-pool reads when per-profile usage has no active profile', async () => {
       mockFindOwnerProfile.mockResolvedValueOnce(null);
+      // [WI-867] v2: findOwnerPersonScope null → no profileId set → 400 (profile required for per-profile quota).
+      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool({ usedThisMonth: 450 }));
 
@@ -1001,6 +1075,8 @@ describe('billing routes', () => {
       '%s tier requires active profile and does not leak shared-pool aggregates',
       async (tier) => {
         mockFindOwnerProfile.mockResolvedValueOnce(null);
+        // [WI-867] v2: findOwnerPersonScope null → no profileId → 400 (profile required).
+        mockFindOwnerPersonScope.mockResolvedValueOnce(null);
         mockGetSubscriptionByAccountId.mockResolvedValue(
           mockSubscription({ tier }),
         );
@@ -1061,6 +1137,11 @@ describe('billing routes', () => {
         selfUsedToday: 3,
         selfUsedThisMonth: 12,
       });
+      // [WI-867] v2: getPersonScope controls profileMeta; conversationLanguage: 'nb'
+      // mirrors the legacy mockProfileFindFirst value for the locale assertion.
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ isOwner: false, conversationLanguage: 'nb' }),
+      );
 
       const res = await app.request(
         '/v1/usage',
@@ -1353,6 +1434,8 @@ describe('billing routes', () => {
         mockSubscription({ tier: 'family' }),
       );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+      // [WI-867] v2: getPersonScope controls profileMeta.isOwner for X-Profile-Id path.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/subscription/status',
@@ -1423,6 +1506,8 @@ describe('billing routes', () => {
 
     it('does not fall back to shared-pool reads when per-profile status has no active profile', async () => {
       mockFindOwnerProfile.mockResolvedValueOnce(null);
+      // [WI-867] v2: findOwnerPersonScope null → profileMeta stays undefined → assertOwnerProfile → 403.
+      mockFindOwnerPersonScope.mockResolvedValueOnce(null);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
 
@@ -1593,6 +1678,8 @@ describe('billing routes', () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
         mockSubscription({ tier: 'family' }),
       );
+      // [WI-867] v2: getPersonScope controls profileMeta.isOwner for X-Profile-Id path.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/subscription/family',
@@ -1801,6 +1888,8 @@ describe('billing routes', () => {
         createdAt: new Date('2025-01-01T00:00:00.000Z'),
         updatedAt: new Date('2025-01-01T00:00:00.000Z'),
       });
+      // [WI-867] v2: getPersonScope controls profileMeta.isOwner for X-Profile-Id path.
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/subscription/family/remove',
@@ -1995,15 +2084,7 @@ describe('[CUT-B1] GET /subscription/status v2 pre-graph (graphless owner)', () 
     expect(mockGetSubscriptionByAccountId).not.toHaveBeenCalled();
   });
 
-  it('[CUT-B1] returns 401 (not 200) when flag off — confirms the branch is flag-gated', async () => {
-    const res = await makePreGraphApp().request(
-      '/subscription/status',
-      {},
-      { IDENTITY_V2_ENABLED: 'false' },
-    );
-    // Flag off → falls through to requireAccount() → 401 (no account set).
-    expect(res.status).toBe(401);
-  });
+  // [WI-867] Flag-off test deleted — source collapsed to v2-only; branch is unconditional.
 });
 
 describe('[WI-137 / DS-048] billing proxy-mode guard', () => {

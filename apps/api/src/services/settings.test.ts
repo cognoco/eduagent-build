@@ -69,7 +69,11 @@ function createMockDb({
     }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(selectResult),
+        where: jest.fn().mockReturnValue(
+          Object.assign(Promise.resolve(selectResult), {
+            limit: jest.fn().mockResolvedValue(selectResult),
+          }),
+        ),
       }),
     }),
   } as unknown as Database;
@@ -137,6 +141,7 @@ describe('upsertNotificationPrefs', () => {
         pushEnabled: true,
         maxDailyPush: 7,
       },
+      { callerPersonId: profileId },
     );
 
     expect(result).toEqual({
@@ -175,6 +180,7 @@ describe('upsertNotificationPrefs', () => {
         dailyReminders: true,
         pushEnabled: true,
       },
+      { callerPersonId: profileId },
     );
 
     expect(result).toEqual({
@@ -202,6 +208,7 @@ describe('upsertNotificationPrefs', () => {
         dailyReminders: false,
         pushEnabled: false,
       },
+      { callerPersonId: profileId },
     );
 
     expect(result.maxDailyPush).toBe(3);
@@ -234,11 +241,17 @@ describe('upsertNotificationPrefs', () => {
     });
 
     await expect(
-      upsertNotificationPrefs(db, profileId, TEST_ACCOUNT_ID, {
-        reviewReminders: true,
-        dailyReminders: false,
-        pushEnabled: false,
-      }),
+      upsertNotificationPrefs(
+        db,
+        profileId,
+        TEST_ACCOUNT_ID,
+        {
+          reviewReminders: true,
+          dailyReminders: false,
+          pushEnabled: false,
+        },
+        { callerPersonId: profileId },
+      ),
     ).rejects.toThrow(/not owned by account/);
   });
 
@@ -252,26 +265,36 @@ describe('upsertNotificationPrefs', () => {
       findFirstResult: undefined,
       selectResult: [{ id: profileId }],
     });
-    // First select (verifyProfileOwnership at top) returns the profile,
-    // second select (pre-insert ownership check) returns empty.
+    // First select (verifyPersonOwnershipV2 membership check) returns the
+    // member row so the guard passes; second select (pre-insert ownership
+    // check) returns empty so the INSERT is blocked.
     let callCount = 0;
     (db.select as jest.Mock).mockImplementation(() => {
       callCount++;
+      const result = callCount === 1 ? [{ personId: profileId }] : [];
       return {
         from: jest.fn().mockReturnValue({
-          where: jest
-            .fn()
-            .mockResolvedValue(callCount === 1 ? [{ id: profileId }] : []),
+          where: jest.fn().mockReturnValue(
+            Object.assign(Promise.resolve(result), {
+              limit: jest.fn().mockResolvedValue(result),
+            }),
+          ),
         }),
       };
     });
 
     await expect(
-      upsertNotificationPrefs(db, profileId, TEST_ACCOUNT_ID, {
-        reviewReminders: true,
-        dailyReminders: false,
-        pushEnabled: false,
-      }),
+      upsertNotificationPrefs(
+        db,
+        profileId,
+        TEST_ACCOUNT_ID,
+        {
+          reviewReminders: true,
+          dailyReminders: false,
+          pushEnabled: false,
+        },
+        { callerPersonId: profileId },
+      ),
     ).rejects.toThrow(/not owned by account/);
     expect(db.insert).not.toHaveBeenCalled();
   });
@@ -327,7 +350,9 @@ describe('upsertCelebrationLevel', () => {
   it('inserts when no row exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
     await expect(
-      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'off'),
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'off', {
+        callerPersonId: profileId,
+      }),
     ).resolves.toEqual({ celebrationLevel: 'off' });
     expect(db.insert).toHaveBeenCalled();
   });
@@ -337,7 +362,9 @@ describe('upsertCelebrationLevel', () => {
       findFirstResult: { celebrationLevel: 'all' },
     });
     await expect(
-      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only'),
+      upsertCelebrationLevel(db, profileId, TEST_ACCOUNT_ID, 'big_only', {
+        callerPersonId: profileId,
+      }),
     ).resolves.toEqual({ celebrationLevel: 'big_only' });
     expect(db.update).toHaveBeenCalled();
   });
@@ -363,10 +390,29 @@ describe('family pool breakdown sharing', () => {
   });
 
   it('requires an owner profile for owned reads', async () => {
-    const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
+    // verifyPersonOwnershipV2 (select#1): membership check passes (self-write)
+    // verifyPersonIsOrgAdminV2 (select#2): admin check returns empty → not
+    // admin → isProfileOwner returns false → throws ForbiddenError
+    const db = createMockDb();
+    let callCount = 0;
+    (db.select as jest.Mock).mockImplementation(() => {
+      callCount++;
+      const result = callCount === 1 ? [{ personId: profileId }] : [];
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue(
+            Object.assign(Promise.resolve(result), {
+              limit: jest.fn().mockResolvedValue(result),
+            }),
+          ),
+        }),
+      };
+    });
 
     await expect(
-      getOwnedFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID),
+      getOwnedFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, {
+        callerPersonId: profileId,
+      }),
     ).rejects.toThrow('Profile owner required');
   });
 
@@ -374,17 +420,38 @@ describe('family pool breakdown sharing', () => {
     const db = createMockDb();
 
     await expect(
-      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true),
+      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true, {
+        callerPersonId: profileId,
+      }),
     ).resolves.toEqual({ value: true });
 
     expect(db.insert).toHaveBeenCalled();
   });
 
   it('rejects writes from non-owner profiles', async () => {
-    const db = createMockDb({ profileFindFirstResult: { isOwner: false } });
+    // verifyPersonOwnershipV2 (select#1): membership check passes (self-write)
+    // verifyPersonIsOrgAdminV2 (select#2): admin check returns empty → not
+    // admin → isProfileOwner returns false → throws ForbiddenError
+    const db = createMockDb();
+    let callCount = 0;
+    (db.select as jest.Mock).mockImplementation(() => {
+      callCount++;
+      const result = callCount === 1 ? [{ personId: profileId }] : [];
+      return {
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue(
+            Object.assign(Promise.resolve(result), {
+              limit: jest.fn().mockResolvedValue(result),
+            }),
+          ),
+        }),
+      };
+    });
 
     await expect(
-      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true),
+      upsertFamilyPoolBreakdownSharing(db, profileId, TEST_ACCOUNT_ID, true, {
+        callerPersonId: profileId,
+      }),
     ).rejects.toThrow('Profile owner required');
   });
 });
@@ -433,6 +500,7 @@ describe('registerPushToken', () => {
       profileId,
       TEST_ACCOUNT_ID,
       'ExponentPushToken[abc]',
+      { callerPersonId: profileId },
     );
 
     expect(db.insert).toHaveBeenCalled();
@@ -448,6 +516,7 @@ describe('registerPushToken', () => {
       profileId,
       TEST_ACCOUNT_ID,
       'ExponentPushToken[new]',
+      { callerPersonId: profileId },
     );
 
     expect(db.update).toHaveBeenCalled();
