@@ -274,6 +274,29 @@ describe('DictationReviewScreen', () => {
       getByTestId('review-remediation-screen');
     });
 
+    it('submits the typed correction from the keyboard return key', () => {
+      mockReviewResult = {
+        mistakes: [
+          {
+            original: 'Test sentence.',
+            written: 'Tset sentence.',
+            error: 'Spelling',
+            correction: 'Test sentence.',
+            explanation: 'Test is t-e-s-t.',
+          },
+        ],
+        correctCount: 0,
+        totalSentences: 1,
+      };
+
+      const { getByTestId } = render(<DictationReviewScreen />);
+      const input = getByTestId('review-correction-input');
+      fireEvent.changeText(input, 'Test sentence.');
+      fireEvent(input, 'submitEditing');
+
+      getByTestId('review-celebration');
+    });
+
     it('shows celebration after all mistakes are corrected', () => {
       const { getByTestId } = render(<DictationReviewScreen />);
       // First mistake
