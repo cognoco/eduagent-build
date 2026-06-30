@@ -1736,7 +1736,8 @@
     "addFirstNoteSummary": "Dodaj swoją pierwszą notatkę do tego tematu",
     "loadingBookmarks": "Ładowanie zapisanych wyjaśnień...",
     "loadingSessions": "Ładowanie sesji...",
-    "noSessionsSummary": "Brak sesji"
+    "noSessionsSummary": "Brak sesji",
+    "ctaStartChallenge": "Rozpocznij wyzwanie"
   },
   "subject": {
     "settings": {

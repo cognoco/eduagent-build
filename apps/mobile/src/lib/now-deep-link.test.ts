@@ -53,7 +53,21 @@ describe('pushNowDeepLink', () => {
     );
   });
 
-  it('maps retention and challenge catalog keys to the existing topic leaf', () => {
+  it('retention.review deep link produces topic path with mode=review', () => {
+    const router = { push: jest.fn() };
+
+    pushNowDeepLink(router, {
+      route: 'retention.review',
+      params: { subjectId: 'subject-1', topicId: 'topic-1' },
+      chain: [],
+    });
+
+    expect(router.push).toHaveBeenCalledWith(
+      '/(app)/topic/topic-1?mode=review',
+    );
+  });
+
+  it('challenge.start deep link produces topic path with mode=challenge', () => {
     const router = { push: jest.fn() };
 
     pushNowDeepLink(router, {
@@ -62,7 +76,9 @@ describe('pushNowDeepLink', () => {
       chain: [],
     });
 
-    expect(router.push).toHaveBeenCalledWith('/(app)/topic/topic-1');
+    expect(router.push).toHaveBeenCalledWith(
+      '/(app)/topic/topic-1?mode=challenge',
+    );
   });
 
   it('pushes profile-level journal ledger moments without route params', () => {

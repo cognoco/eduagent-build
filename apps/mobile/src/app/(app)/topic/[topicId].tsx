@@ -281,11 +281,13 @@ export default function TopicDetailScreen() {
     bookId: paramBookId,
     topicId,
     chapter: paramChapter,
+    mode: deepLinkMode,
   } = useLocalSearchParams<{
     subjectId: string;
     bookId?: string;
     topicId: string;
     chapter: string;
+    mode?: string;
   }>();
 
   // [H9] Attempt counter — incremented on Retry to force a new query key and a fresh network call.
@@ -448,10 +450,18 @@ export default function TopicDetailScreen() {
     ? t('topic.loadingSessions')
     : (sessionsSummary ?? t('topic.noSessionsSummary'));
 
-  const studyCTA = useMemo(
-    () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus, t),
-    [topicProgress?.completionStatus, retentionStatus, t],
-  );
+  const studyCTA = useMemo(() => {
+    if (deepLinkMode === 'review') {
+      return { label: t('topic.ctaReview'), variant: 'primary' as const };
+    }
+    if (deepLinkMode === 'challenge') {
+      return {
+        label: t('topic.ctaStartChallenge'),
+        variant: 'primary' as const,
+      };
+    }
+    return deriveStudyCTA(topicProgress?.completionStatus, retentionStatus, t);
+  }, [deepLinkMode, topicProgress?.completionStatus, retentionStatus, t]);
 
   useEffect(() => {
     if (noteInputMode !== null) {
@@ -460,6 +470,26 @@ export default function TopicDetailScreen() {
   }, [noteInputMode]);
 
   const handleStudyPress = useMemo(() => {
+    // Deep-link mode overrides: route directly to the appropriate mode entry point.
+    if (deepLinkMode === 'review' && subjectId && topicId) {
+      return () =>
+        router.push({
+          pathname: '/(app)/session',
+          params: { mode: 'review', subjectId, topicId, topicName },
+        } as Href);
+    }
+    if (deepLinkMode === 'challenge' && topicId) {
+      return () =>
+        router.push({
+          pathname: '/(app)/topic/recall-test',
+          params: {
+            topicId,
+            ...(subjectId && { subjectId }),
+            ...(topicName && { topicName }),
+          },
+        } as Href);
+    }
+
     if (!topicProgress) return noop;
 
     const completionStatus = topicProgress.completionStatus;
@@ -506,6 +536,7 @@ export default function TopicDetailScreen() {
     };
   }, [
     activeSession?.sessionId,
+    deepLinkMode,
     retentionCard?.nextReviewAt,
     resumeTarget,
     router,
