@@ -21,7 +21,8 @@ jest.mock(
 let mockFetch: RoutedMockFetch;
 
 jest.mock(
-  '../../lib/api-client' /* gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client */,
+  // gc1-allow: Clerk useAuth() external boundary; component test exercises real query + schema parsing over a routed Hono client
+  '../../lib/api-client',
   () => {
     const {
       createRoutedMockFetch,
