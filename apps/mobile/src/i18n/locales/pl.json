@@ -4124,7 +4124,6 @@
     "emptyMessage": "Utwórz przedmiot, aby zacząć budować swoją mapę nauki.",
     "createSubject": "Utwórz przedmiot",
     "openSubject": "Otwórz przedmiot",
-
     "openSubjectNamed": "Otwórz {{subject}}",
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
     "reviewsDue": "{{count}} zaległych powtórek",
@@ -4218,6 +4217,8 @@
       "cta": "Przeglądaj książki"
     },
     "manage": {
+      "open": "Zarządzaj",
+      "accessibilityLabel": "Zarządzaj przedmiotem",
       "title": "Zarządzaj przedmiotem",
       "description": "Wstrzymaj ten przedmiot, aby ukryć go z aktywnej nauki, lub zarchiwizuj go, dopóki go nie przywrócisz.",
       "close": "Zamknij"

@@ -3965,7 +3965,6 @@
     "createSubject": "Fach erstellen",
     "openSubject": "Fach öffnen",
     "openSubjectNamed": "{{subject}} öffnen",
-
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
@@ -4056,6 +4055,8 @@
       "cta": "Bücher durchsuchen"
     },
     "manage": {
+      "open": "Verwalten",
+      "accessibilityLabel": "Fach verwalten",
       "title": "Fach verwalten",
       "description": "Pausiere dieses Fach, um es aus dem aktiven Lernen auszublenden, oder archiviere es, bis du es wiederherstellst.",
       "close": "Schließen"

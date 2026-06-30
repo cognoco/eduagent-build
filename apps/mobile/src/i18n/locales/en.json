@@ -3078,6 +3078,8 @@
     "loading": "Loading subject...",
     "linkLabel": "Open subject hub",
     "manage": {
+      "open": "Manage",
+      "accessibilityLabel": "Manage subject",
       "title": "Manage subject",
       "description": "Pause this subject to hide it from active learning, or archive it until you restore it.",
       "close": "Close"

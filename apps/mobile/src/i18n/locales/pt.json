@@ -3964,7 +3964,6 @@
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
-
     "openSubjectNamed": "Abrir {{subject}}",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
@@ -4056,6 +4055,8 @@
       "cta": "Procurar livros"
     },
     "manage": {
+      "open": "Gerir",
+      "accessibilityLabel": "Gerir disciplina",
       "title": "Gerir disciplina",
       "description": "Pausa esta disciplina para a ocultar da aprendizagem ativa, ou arquiva-a até a restaurares.",
       "close": "Fechar"

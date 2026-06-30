@@ -3965,7 +3965,6 @@
     "createSubject": "科目を作成",
     "openSubject": "科目を開く",
     "openSubjectNamed": "{{subject}}を開く",
-
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",
@@ -4056,6 +4055,8 @@
       "cta": "本を探す"
     },
     "manage": {
+      "open": "管理",
+      "accessibilityLabel": "科目を管理",
       "title": "科目の管理",
       "description": "この科目を一時停止して学習項目から非表示にしたり、復元するまでアーカイブしたりできます。",
       "close": "閉じる"

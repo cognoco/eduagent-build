@@ -3965,7 +3965,6 @@
     "createSubject": "Crear tema",
     "openSubject": "Abrir tema",
     "openSubjectNamed": "Abrir {{subject}}",
-
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",
@@ -4056,6 +4055,8 @@
       "cta": "Explorar libros"
     },
     "manage": {
+      "open": "Gestionar",
+      "accessibilityLabel": "Gestionar asignatura",
       "title": "Gestionar asignatura",
       "description": "Pausa esta asignatura para ocultarla del aprendizaje activo, o archívala hasta que la restaures.",
       "close": "Cerrar"

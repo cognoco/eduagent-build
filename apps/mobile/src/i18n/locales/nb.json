@@ -3965,7 +3965,6 @@
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
     "openSubjectNamed": "Åpne {{subject}}",
-
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
@@ -4056,6 +4055,8 @@
       "cta": "Se bøker"
     },
     "manage": {
+      "open": "Administrer",
+      "accessibilityLabel": "Administrer emne",
       "title": "Administrer emne",
       "description": "Sett dette emnet på pause for å skjule det fra aktiv læring, eller arkiver det til du gjenoppretter det.",
       "close": "Lukk"
