@@ -62,7 +62,6 @@
   "private": true,
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
-    "@babel/plugin-transform-react-jsx": "^7.27.1",
     "@babel/runtime": "~7.27.6",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
@@ -93,7 +92,6 @@
     "babel-jest": "30.2.0",
     "babel-preset-expo": "~54.0.7",
     "dotenv": "^16.4.7",
-    "dotenv-cli": "^11.0.0",
     "esbuild": "^0.25.0",
     "eslint": "9.37.0",
     "eslint-config-prettier": "^10.0.0",
