@@ -47,6 +47,19 @@ jest.mock(
 );
 
 jest.mock(
+  '../../hooks/use-library-search' /* gc1-allow: route screen test pins search to idle state; real query behavior is covered in SubjectsBrowse.test.tsx and use-library-search.test.ts */,
+  () => ({
+    useLibrarySearch: () => ({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: jest.fn(),
+    }),
+  }),
+);
+
+jest.mock(
   '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
   () => {
     const { Text, View } = require('react-native');
