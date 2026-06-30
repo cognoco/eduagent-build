@@ -2,6 +2,7 @@ import {
   useMutation,
   useQueryClient,
   type UseMutationResult,
+  type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
   NotificationPrefsInput,
@@ -21,7 +22,7 @@ import { useApiQuery } from './use-api-query';
 // Query hooks
 // ---------------------------------------------------------------------------
 
-export function useNotificationSettings() {
+export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -33,7 +34,7 @@ export function useNotificationSettings() {
   });
 }
 
-export function useCelebrationLevel() {
+export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -48,7 +49,9 @@ export function useCelebrationLevel() {
   });
 }
 
-export function useChildCelebrationLevel(childProfileId: string | undefined) {
+export function useChildCelebrationLevel(
+  childProfileId: string | undefined,
+): UseQueryResult<CelebrationLevel> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -67,7 +70,7 @@ export function useChildCelebrationLevel(childProfileId: string | undefined) {
   });
 }
 
-export function useWithdrawalArchivePreference() {
+export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchivePreference> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -83,7 +86,7 @@ export function useWithdrawalArchivePreference() {
   });
 }
 
-export function useFamilyPoolBreakdownSharing() {
+export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -300,7 +303,9 @@ export function useNotifyParentSubscribe(): UseMutationResult<
 // Analogy Domain (FR134-137)
 // ---------------------------------------------------------------------------
 
-export function useAnalogyDomain(subjectId: string) {
+export function useAnalogyDomain(
+  subjectId: string,
+): UseQueryResult<AnalogyDomain | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
@@ -349,7 +354,9 @@ export function useUpdateAnalogyDomain(
   });
 }
 
-export function useNativeLanguage(subjectId: string) {
+export function useNativeLanguage(
+  subjectId: string,
+): UseQueryResult<LanguageCode | null> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
