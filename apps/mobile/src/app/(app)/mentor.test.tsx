@@ -239,7 +239,7 @@ describe('MentorScreen', () => {
       ...mockScopeContext,
       activeScope: { kind: 'supporter-hub' },
     };
-    const [emmaScope] = mockScopeContext.availableScopes;
+    const emmaScope = mockScopeContext.availableScopes[0]!;
 
     render(<MentorScreen />);
 
