@@ -46,27 +46,14 @@ function renderCard(
   onDecline: (card: NowCardData) => void,
   arcState?: NowCardArcState,
   onCompleted?: (card: NowCardData) => void,
-  enterDelayMs = 0,
-  reduceMotion = false,
 ) {
   if (card.kind === 'ledger_moment') {
-    // LedgerMomentCard has no internal animation, so apply the stagger entering
-    // (and matching exit) via a wrapper shell so module cards animate uniformly
-    // — without this a dismissed ledger card would vanish abruptly while a
-    // sibling NowCard fades out.
     return (
-      <Animated.View
-        entering={
-          reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300)
-        }
-        exiting={reduceMotion ? undefined : FadeOut.duration(200)}
-      >
-        <LedgerMomentCard
-          card={card}
-          onContinue={onContinue}
-          onDecline={onDecline}
-        />
-      </Animated.View>
+      <LedgerMomentCard
+        card={card}
+        onContinue={onContinue}
+        onDecline={onDecline}
+      />
     );
   }
   return (
@@ -77,7 +64,7 @@ function renderCard(
       onContinue={onContinue}
       onDecline={onDecline}
       onCompleted={onCompleted}
-      enterDelayMs={enterDelayMs}
+      animate={false}
     />
   );
 }
@@ -109,10 +96,20 @@ export function NowCardStack({
     return null;
   }
 
+  const slotAnimation = (enterDelayMs: number) => ({
+    entering: reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300),
+    exiting: reduceMotion ? undefined : FadeOut.duration(200),
+  });
+
   return (
     <View testID="now-card-stack" accessibilityRole="list" className="gap-3">
       {anchor ? (
-        <View testID="now-card-slot-anchor" key={getNowCardDismissKey(anchor)}>
+        <Animated.View
+          testID="now-card-slot-anchor"
+          key={getNowCardDismissKey(anchor)}
+          collapsable={false}
+          {...slotAnimation(0)}
+        >
           {renderCard(
             anchor,
             'anchor',
@@ -120,15 +117,15 @@ export function NowCardStack({
             onDecline,
             getArcState?.(anchor) ?? anchorArcState,
             onCompleted,
-            0,
-            reduceMotion,
           )}
-        </View>
+        </Animated.View>
       ) : null}
       {modules.map((card, index) => (
-        <View
+        <Animated.View
           key={getNowCardDismissKey(card)}
           testID={`now-card-slot-module-${index}`}
+          collapsable={false}
+          {...slotAnimation((index + 1) * 50)}
         >
           {renderCard(
             card,
@@ -137,10 +134,8 @@ export function NowCardStack({
             onDecline,
             getArcState?.(card),
             onCompleted,
-            (index + 1) * 50,
-            reduceMotion,
           )}
-        </View>
+        </Animated.View>
       ))}
       {feed.overflowCount > 0 ? (
         <Pressable
