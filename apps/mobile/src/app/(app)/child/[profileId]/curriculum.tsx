@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
+import type { TranslateKey } from '../../../../i18n';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import {
   childProfileHref,
@@ -67,7 +68,9 @@ const SubjectRow = memo(function SubjectRow({
           </Text>
         ) : null}
         <Text className="mt-2 text-caption font-semibold text-primary">
-          {t(`parentView.retention.${subject.retentionStatus}.label`)}
+          {t(
+            `parentView.retention.${subject.retentionStatus}.label` as TranslateKey
+          )}
         </Text>
       </View>
       {id ? (

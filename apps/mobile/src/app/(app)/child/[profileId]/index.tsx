@@ -32,7 +32,10 @@ import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
-import type { Translate as I18nTranslate } from '../../../../i18n';
+import type {
+  Translate as I18nTranslate,
+  TranslateKey,
+} from '../../../../i18n';
 
 function formatLastSession(
   isoDate: string | null | undefined,
@@ -458,7 +461,9 @@ function SubjectCard({
         {showRetentionBadge ? (
           <View className="rounded-full bg-primary-soft px-3 py-1">
             <Text className="text-caption font-semibold text-primary">
-              {t(`parentView.retention.${subject.retentionStatus}.label`)}
+              {t(
+                `parentView.retention.${subject.retentionStatus}.label` as TranslateKey
+              )}
             </Text>
           </View>
         ) : null}
