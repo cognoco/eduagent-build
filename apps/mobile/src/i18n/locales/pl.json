@@ -4133,7 +4133,8 @@
     "bookCount_one": "{{count}} książka",
     "bookCount_few": "{{count}} książki",
     "bookCount_many": "{{count}} książek",
-    "bookCount_other": "{{count}} książek"
+    "bookCount_other": "{{count}} książek",
+    "searching": "Wyszukiwanie..."
   },
   "subjectHub": {
     "loading": "Ładowanie przedmiotu...",

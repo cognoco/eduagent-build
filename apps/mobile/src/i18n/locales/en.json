@@ -3070,7 +3070,8 @@
     "sectionPaused": "Paused",
     "sectionArchived": "Archived",
     "bookCount_one": "{{count}} book",
-    "bookCount_other": "{{count}} books"
+    "bookCount_other": "{{count}} books",
+    "searching": "Searching..."
   },
   "subjectHub": {
     "loading": "Loading subject...",

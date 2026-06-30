@@ -3971,7 +3971,8 @@
     "sectionPaused": "一時停止中",
     "sectionArchived": "アーカイブ済み",
     "bookCount_one": "{{count}}冊の本",
-    "bookCount_other": "{{count}}冊の本"
+    "bookCount_other": "{{count}}冊の本",
+    "searching": "検索中..."
   },
   "subjectHub": {
     "loading": "科目を読み込み中…",

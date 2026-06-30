@@ -3971,7 +3971,8 @@
     "sectionPaused": "Satt på pause",
     "sectionArchived": "Arkivert",
     "bookCount_one": "{{count}} bok",
-    "bookCount_other": "{{count}} bøker"
+    "bookCount_other": "{{count}} bøker",
+    "searching": "Søker ..."
   },
   "subjectHub": {
     "loading": "Laster inn emne ...",

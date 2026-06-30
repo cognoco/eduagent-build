@@ -1,7 +1,23 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import { SubjectsBrowse } from './SubjectsBrowse';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
+import {
+  createHookWrapper,
+  createQueryWrapper,
+  createTestProfile,
+} from '../../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../../lib/api-client';
+
+// ---------------------------------------------------------------------------
+// Per-file i18n mock (external-library mock — not a GC1 violation)
+// Keys mapped to predictable test strings; unmapped keys return the raw key.
+// ---------------------------------------------------------------------------
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -21,12 +37,28 @@ jest.mock('react-i18next', () => ({
         'subjectsBrowse.sectionActive': 'Active',
         'subjectsBrowse.sectionPaused': 'Paused',
         'subjectsBrowse.sectionArchived': 'Archived',
+        'subjectsBrowse.searching': 'Searching...',
         'common.loading': 'Loading',
       };
       return map[key] ?? key;
     },
   }),
+  // SubjectsBrowse now imports useLibrarySearch → api-client → i18n/index.ts,
+  // which has a module-level IIFE that calls i18next.use(initReactI18next).
+  // Without this export the call receives undefined and throws an unhandled
+  // rejection that Jest blames on the first test. i18next is already
+  // initialised by test-setup.ts, so this is a harmless no-op registration.
+  initReactI18next: {
+    type: '3rdParty',
+    init: (): void => {
+      return;
+    },
+  },
 }));
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
 
 function item(over: Partial<SubjectIndexItem>): SubjectIndexItem {
   return {
@@ -57,7 +89,18 @@ const ALGEBRA = item({
 });
 const ITEMS: SubjectIndexItem[] = [SPANISH, ALGEBRA];
 
+// ---------------------------------------------------------------------------
+// Existing subject-list tests
+// All render calls include a QueryClient wrapper — SubjectsBrowse now calls
+// useLibrarySearch which uses useQuery internally (disabled when no profile).
+// ---------------------------------------------------------------------------
+
 describe('SubjectsBrowse', () => {
+  // Shared QueryClient wrapper for tests that don't need profile context.
+  // The search hook is disabled (no activeProfile in context default) so no
+  // fetch fires — we only need a QueryClient in the tree.
+  const { wrapper } = createQueryWrapper();
+
   it('renders the full subject list before search and opens a subject row', () => {
     const onOpenSubject = jest.fn();
     render(
@@ -66,6 +109,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={onOpenSubject}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     screen.getByText('Show me everything');
@@ -88,6 +132,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     fireEvent.changeText(screen.getByTestId('subjects-browse-search'), 'alg');
@@ -109,6 +154,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={onCreateSubject}
       />,
+      { wrapper },
     );
 
     // Populated list still renders the rows...
@@ -127,6 +173,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={onCreateSubject}
       />,
+      { wrapper },
     );
 
     screen.getByText('No subjects yet');
@@ -158,6 +205,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     screen.getByTestId('subjects-browse-section-active');
@@ -175,6 +223,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     screen.getByTestId('subjects-browse-section-active');
@@ -200,6 +249,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     const rows = screen
@@ -228,6 +278,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     const rows = screen
@@ -255,6 +306,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     screen.getByText('3 books');
@@ -268,11 +320,322 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     screen.getByTestId('subjects-browse-skeleton');
     // The search box and the empty/create state are not shown during loading.
     expect(screen.queryByTestId('subjects-browse-search')).toBeNull();
     expect(screen.queryByTestId('subjects-browse-create')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Search behavior tests (WI-1133 — cross-entity search: notes + sessions)
+// These tests exercise the useLibrarySearch integration and need a profile
+// context (so the query is enabled) plus a mocked globalThis.fetch.
+// ---------------------------------------------------------------------------
+
+describe('SubjectsBrowse — search behavior', () => {
+  const mockFetch = jest.fn();
+  const originalFetch = globalThis.fetch;
+
+  const TEST_PROFILE_ID = 'search-test-profile';
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+    globalThis.fetch = mockFetch as typeof fetch;
+    setActiveProfileId(TEST_PROFILE_ID);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setActiveProfileId(undefined);
+  });
+
+  /** Build a minimal LibrarySearchResult with only notes populated. */
+  function noteSearchResult() {
+    return {
+      subjects: [],
+      books: [],
+      topics: [],
+      notes: [
+        {
+          id: 'note-1',
+          sessionId: 'session-1',
+          topicId: 'topic-1',
+          topicName: 'Pyramids',
+          bookId: 'book-1',
+          subjectId: SPANISH.subjectId,
+          subjectName: 'Spanish',
+          contentSnippet: 'nota sobre pirámides',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      sessions: [],
+    };
+  }
+
+  /** Build a minimal LibrarySearchResult with only sessions populated. */
+  function sessionSearchResult() {
+    return {
+      subjects: [],
+      books: [],
+      topics: [],
+      notes: [],
+      sessions: [
+        {
+          sessionId: 'session-99',
+          topicId: 'topic-1',
+          topicTitle: 'Grammar',
+          bookId: 'book-1',
+          subjectId: SPANISH.subjectId,
+          subjectName: 'Spanish',
+          snippet: 'explored verbs today',
+          occurredAt: '2026-01-02T00:00:00.000Z',
+        },
+      ],
+    };
+  }
+
+  it('shows full subject list when query is empty — no API call fires', async () => {
+    // No fetch mock needed: query is empty so useLibrarySearch is disabled.
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    // Subject list visible (not search results)
+    screen.getByText('Show me everything');
+    expect(screen.queryByTestId('library-search-results')).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('shows a loading indicator while the search request is in-flight', async () => {
+    // Never resolves during this test — keeps loading state active.
+    // Never resolves — keeps loading state active for the duration of the test.
+    mockFetch.mockReturnValue(
+      new Promise((_resolve) => {
+        void _resolve;
+      }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('subjects-browse-search'),
+      'pyramid',
+    );
+
+    // After debounce fires (≤300ms) the loading indicator appears.
+    await waitFor(
+      () => {
+        expect(
+          screen.getByTestId('subjects-browse-search-loading'),
+        ).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+
+    // Subject list is hidden while searching.
+    expect(screen.queryByText('Show me everything')).toBeNull();
+  });
+
+  it('renders note and session results from the API via LibrarySearchResults', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(noteSearchResult()), { status: 200 }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('subjects-browse-search'),
+      'pyramid',
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('library-search-results')).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+
+    // A note row from the search result should be visible.
+    expect(screen.getByTestId('note-row-note-1')).toBeTruthy();
+    // Fetched — at least one call was made.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders session results from the API', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(sessionSearchResult()), { status: 200 }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(screen.getByTestId('subjects-browse-search'), 'verbs');
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('library-search-results')).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+
+    expect(screen.getByTestId('session-row-session-99')).toBeTruthy();
+  });
+
+  it('shows an empty-results state when the API returns no matches', async () => {
+    const emptyResult = {
+      subjects: [],
+      books: [],
+      topics: [],
+      notes: [],
+      sessions: [],
+    };
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(emptyResult), { status: 200 }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(screen.getByTestId('subjects-browse-search'), 'xyzzy');
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('search-results-empty')).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+  });
+
+  it('shows an error state when the API call fails', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 500 }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('subjects-browse-search'),
+      'error-query',
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('search-results-error')).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+  });
+
+  it('clears query and restores subject list when clear is pressed', async () => {
+    const emptyResult = {
+      subjects: [],
+      books: [],
+      topics: [],
+      notes: [],
+      sessions: [],
+    };
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify(emptyResult), { status: 200 }),
+    );
+
+    const { wrapper } = createHookWrapper({
+      activeProfile: createTestProfile({ id: TEST_PROFILE_ID }),
+    });
+
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    fireEvent.changeText(
+      screen.getByTestId('subjects-browse-search'),
+      'clear-me',
+    );
+
+    // Wait for empty results (clear button renders here)
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('library-search-clear-results')).toBeTruthy();
+      },
+      { timeout: 1500 },
+    );
+
+    fireEvent.press(screen.getByTestId('library-search-clear-results'));
+
+    // After clear, subject list is restored.
+    await waitFor(() => {
+      expect(screen.getByText('Show me everything')).toBeTruthy();
+    });
   });
 });
