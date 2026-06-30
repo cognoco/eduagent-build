@@ -245,7 +245,7 @@ export const teachingPreferenceSchema = z
   .object({
     subjectId: z.string().uuid(),
     method: teachingMethodSchema,
-    analogyDomain: analogyDomainSchema.nullable().optional(),
+    analogyDomain: analogyDomainSchema.optional(),
   })
   .strict();
 export type TeachingPreferenceInput = z.infer<typeof teachingPreferenceSchema>;
@@ -432,8 +432,8 @@ export type NeedsDeepeningResponse = z.infer<
 export const teachingPreferenceResponseDataSchema = z.object({
   subjectId: z.string().uuid(),
   method: teachingMethodSchema,
-  analogyDomain: analogyDomainSchema.nullable().optional(),
-  nativeLanguage: z.string().nullable().optional(),
+  analogyDomain: analogyDomainSchema.nullable(),
+  nativeLanguage: z.string().nullable(),
 });
 
 /** GET /subjects/:subjectId/teaching-preference
