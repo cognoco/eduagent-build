@@ -77,6 +77,7 @@ export default function CameraScreen(): React.ReactNode {
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
   const [droppedProblems, setDroppedProblems] = useState<HomeworkProblem[]>([]);
+  const [taskConfirmed, setTaskConfirmed] = useState(false);
   const [manualText, setManualText] = useState('');
   const [voiceProblemId, setVoiceProblemId] = useState<string | null>(null);
   const [flash, setFlash] = useState<FlashMode>('off');
@@ -111,6 +112,7 @@ export default function CameraScreen(): React.ReactNode {
       setOcrText('');
       setDraftProblems([]);
       setDroppedProblems([]);
+      setTaskConfirmed(false);
       setManualText('');
       setVoiceProblemId(null);
       lastAppliedTranscriptRef.current = '';
@@ -219,6 +221,7 @@ export default function CameraScreen(): React.ReactNode {
       setOcrText(ocr.text);
       setDraftProblems(splitResult.problems);
       setDroppedProblems(splitResult.droppedProblems);
+      setTaskConfirmed(false);
     } else if (ocr.status === 'error' && ocr.error) {
       // Use the typed errorCode for localised, user-facing copy when available.
       // Retain the raw ocr.error string for Sentry/log breadcrumbs only — it
@@ -252,6 +255,10 @@ export default function CameraScreen(): React.ReactNode {
 
   const combinedProblemText = getHomeworkProblemText(draftProblems);
   const homeworkCaptureSource = state.imageUri ? state.source : undefined;
+  const requiresTaskConfirmation = draftProblems.some(
+    (problem) => problem.source === 'ocr',
+  );
+  const canStartSession = !requiresTaskConfirmation || taskConfirmed;
 
   // Auto-classify subject when OCR text is available and no subjectId
   useEffect(() => {
@@ -441,6 +448,7 @@ export default function CameraScreen(): React.ReactNode {
     setOcrText('');
     setDraftProblems([]);
     setDroppedProblems([]);
+    setTaskConfirmed(false);
     setManualText('');
     setManualSubjectName('');
     setAutoDetectedSubject(null);
@@ -459,6 +467,7 @@ export default function CameraScreen(): React.ReactNode {
     lastAppliedTranscriptRef.current = '';
     setOcrText('');
     setDroppedProblems([]);
+    setTaskConfirmed(false);
     setManualText('');
     setManualSubjectName('');
     setAutoDetectedSubject(null);
@@ -543,6 +552,13 @@ export default function CameraScreen(): React.ReactNode {
       platformAlert(t('homework.noSubjectTitle'), t('homework.noSubjectBody'));
       return;
     }
+    if (!canStartSession) {
+      platformAlert(
+        t('homework.confirmTaskRequiredTitle'),
+        t('homework.confirmTaskRequiredBody'),
+      );
+      return;
+    }
     navigateToSession(
       effectiveSubjectId,
       effectiveSubjectName,
@@ -559,6 +575,7 @@ export default function CameraScreen(): React.ReactNode {
     autoDetectedSubject,
     combinedProblemText,
     draftProblems,
+    canStartSession,
     state.imageUri,
     ocrText,
     homeworkCaptureSource,
@@ -567,6 +584,13 @@ export default function CameraScreen(): React.ReactNode {
 
   const handlePickSubject = useCallback(
     (sid: string, sName: string) => {
+      if (!canStartSession) {
+        platformAlert(
+          t('homework.confirmTaskRequiredTitle'),
+          t('homework.confirmTaskRequiredBody'),
+        );
+        return;
+      }
       navigateToSession(
         sid,
         sName,
@@ -584,12 +608,21 @@ export default function CameraScreen(): React.ReactNode {
       state.imageUri,
       ocrText,
       homeworkCaptureSource,
+      canStartSession,
+      t,
     ],
   );
 
   const handleManualSubjectContinue = useCallback(async () => {
     const typedName = manualSubjectName.trim();
     if (!typedName) return;
+    if (!canStartSession) {
+      platformAlert(
+        t('homework.confirmTaskRequiredTitle'),
+        t('homework.confirmTaskRequiredBody'),
+      );
+      return;
+    }
 
     const existingSubject = subjects?.find(
       (subject) =>
@@ -633,6 +666,7 @@ export default function CameraScreen(): React.ReactNode {
     navigateToSession,
     ocrText,
     homeworkCaptureSource,
+    canStartSession,
     state.imageUri,
     subjects,
     t,
@@ -742,6 +776,7 @@ export default function CameraScreen(): React.ReactNode {
 
   const handleProblemTextChange = useCallback(
     (problemId: string, text: string) => {
+      setTaskConfirmed(false);
       setDraftProblems((prev) =>
         prev.map((problem) =>
           problem.id === problemId ? { ...problem, text } : problem,
@@ -752,6 +787,7 @@ export default function CameraScreen(): React.ReactNode {
   );
 
   const handleAddProblem = useCallback(() => {
+    setTaskConfirmed(false);
     setDraftProblems((prev) => [
       ...prev,
       createHomeworkProblem('', { source: 'manual', originalText: null }),
@@ -760,11 +796,13 @@ export default function CameraScreen(): React.ReactNode {
 
   const handleRestoreDroppedProblems = useCallback(() => {
     if (droppedProblems.length === 0) return;
+    setTaskConfirmed(false);
     setDraftProblems((prev) => [...prev, ...droppedProblems]);
     setDroppedProblems([]);
   }, [droppedProblems]);
 
   const handleRemoveProblem = useCallback((problemId: string) => {
+    setTaskConfirmed(false);
     setDraftProblems((prev) =>
       prev.filter((problem) => problem.id !== problemId),
     );
@@ -1250,6 +1288,41 @@ export default function CameraScreen(): React.ReactNode {
           </Text>
         </Pressable>
 
+        {requiresTaskConfirmation && (
+          <Pressable
+            testID="confirm-task-button"
+            onPress={() => setTaskConfirmed((prev) => !prev)}
+            className={`mt-4 rounded-card border p-4 flex-row items-start gap-3 ${
+              taskConfirmed
+                ? 'bg-primary/10 border-primary/40'
+                : 'bg-surface border-border'
+            }`}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: taskConfirmed }}
+            accessibilityLabel={
+              taskConfirmed
+                ? t('homework.confirmedTaskCta')
+                : t('homework.confirmTaskCta')
+            }
+          >
+            <Ionicons
+              name={taskConfirmed ? 'checkbox' : 'square-outline'}
+              size={24}
+              color={taskConfirmed ? colors.primary : colors.textSecondary}
+            />
+            <View className="flex-1 gap-1">
+              <Text className="text-body font-semibold text-text-primary">
+                {taskConfirmed
+                  ? t('homework.confirmedTaskCta')
+                  : t('homework.confirmTaskCta')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary">
+                {t('homework.confirmTaskHint')}
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
         {/* M10: Classification done but no subject resolved and picker not shown */}
         {needsSubjectPick &&
           !classifyMutation.isPending &&
@@ -1497,11 +1570,21 @@ export default function CameraScreen(): React.ReactNode {
               <Pressable
                 testID="confirm-button"
                 onPress={handleConfirmResult}
-                className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+                disabled={!canStartSession}
+                className={`flex-1 rounded-button py-4 min-h-[48px] items-center justify-center ${
+                  canStartSession ? 'bg-primary' : 'bg-surface-elevated'
+                }`}
                 accessibilityLabel={t('homework.startSessionLabel')}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: !canStartSession }}
               >
-                <Text className="text-body font-semibold text-text-inverse">
+                <Text
+                  className={`text-body font-semibold ${
+                    canStartSession
+                      ? 'text-text-inverse'
+                      : 'text-text-secondary'
+                  }`}
+                >
                   {t('homework.letsGo')}
                 </Text>
               </Pressable>
@@ -1525,11 +1608,19 @@ export default function CameraScreen(): React.ReactNode {
             <Pressable
               testID="confirm-button"
               onPress={handleConfirmResult}
-              className="flex-1 bg-primary rounded-button py-4 min-h-[48px] items-center justify-center"
+              disabled={!canStartSession}
+              className={`flex-1 rounded-button py-4 min-h-[48px] items-center justify-center ${
+                canStartSession ? 'bg-primary' : 'bg-surface-elevated'
+              }`}
               accessibilityLabel={t('homework.startSessionLabel')}
               accessibilityRole="button"
+              accessibilityState={{ disabled: !canStartSession }}
             >
-              <Text className="text-body font-semibold text-text-inverse">
+              <Text
+                className={`text-body font-semibold ${
+                  canStartSession ? 'text-text-inverse' : 'text-text-secondary'
+                }`}
+              >
                 {t('homework.letsGo')}
               </Text>
             </Pressable>

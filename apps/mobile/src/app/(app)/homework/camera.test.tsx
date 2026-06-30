@@ -971,6 +971,44 @@ describe('CameraScreen', () => {
     expect(queryByTestId('dropped-fragments-chip')).toBeNull();
   });
 
+  it('requires confirming the extracted task before starting the session', async () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Solve for x: 2x + 5 = 13',
+      status: 'done',
+      error: null,
+      errorCode: undefined,
+      source: 'local',
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      getByTestId('confirm-button');
+    });
+
+    fireEvent.press(getByTestId('confirm-button'));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId('confirm-task-button'));
+    fireEvent.press(getByTestId('confirm-button'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          mode: 'homework',
+          problemText: 'Solve for x: 2x + 5 = 13',
+        }),
+      }),
+    );
+  });
+
   it('navigates to session with correct params including imageUri on confirm', async () => {
     (useHomeworkOcr as jest.Mock).mockReturnValue({
       text: 'Solve for x: 2x + 5 = 13',
@@ -994,6 +1032,7 @@ describe('CameraScreen', () => {
       { timeout: 5_000 },
     );
 
+    fireEvent.press(getByTestId('confirm-task-button'));
     fireEvent.press(getByTestId('confirm-button'));
 
     expect(mockRouter.replace).toHaveBeenCalledWith(
@@ -1123,6 +1162,7 @@ describe('CameraScreen', () => {
       getByTestId('subject-picker');
     });
 
+    fireEvent.press(getByTestId('confirm-task-button'));
     fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
     fireEvent.press(getByTestId('camera-continue-button'));
 
@@ -1628,6 +1668,7 @@ describe('CameraScreen', () => {
       });
 
       // Confirm routes to the session with the created subject.
+      fireEvent.press(getByTestId('confirm-task-button'));
       fireEvent.press(getByTestId('confirm-button'));
       expect(mockRouter.replace).toHaveBeenCalledWith(
         expect.objectContaining({
