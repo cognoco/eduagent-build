@@ -31,28 +31,19 @@ when relocating `_quartet/`.
 
 ## External work this depends on
 
-### Reviewer-leg productization — LANDED (the four blockers, settled 2026-06-29)
-Quartet **consumes** the Cosmo reviewer mechanism; it does not reimplement it. The "Cosmo
-improvements" workstream (project: ZDX-Marketplace) delivered the contract Quartet's reviewer leg
-assumes:
-- **WI-888** (reviewer reads only the latest completion summary; parser-robust; re-finalize clearable) — Closed/Done.
-- **WI-889** (`execute complete` authors Fixed In; DoD hard-requires non-empty) — Closed/Done.
-- **WI-890** (watcher de-dupe / stale-replay) — Closed **superseded**: both concerns already resolved in `clacks/review-watcher.ts` (transition-key de-dupe). No external fix needed.
-- **WI-891** (reviewer respects advisory/continue-on-error red lanes in closure-verification) — Closed/Done.
+Quartet's forward-dependencies — the Cosmo work-system / planning-layer capabilities it consumes —
+are **owned and tracked live in Cosmo under the ZDX Productization program** (`INI-25` in the
+Initiatives DB) → its workstreams ("Cosmo improvements", "NEX/ZDX improvements") → work items.
+**Check Cosmo there for current status; do not mirror it here** (one-fact-one-home,
+`planning-rules.md` §1.4). That program is owned by a separate orchestrator.
 
-These pin the reviewer **input** (completion-summary shape), the executor→complete **handoff**
-(`builder.md` Phase-7), and the **greenness** definition (shepherd green-PR gate). Keep the
-completion-summary parser-clean per the finalization runbook (folded to the cosmo/zdx skill docs via
-**WI-887**, Ready).
+Two durable facts a Quartet orchestrator can rely on:
+- The **planning layer is live** — the Initiatives DB, the Workstream records, and the
+  Initiative→Workstream→Work-Item relations exist and are in use (this repo's program runs on them).
+- The **reviewer-leg contract** Quartet's reviewer consumes — completion-summary shape, `Fixed In`
+  authored by `execute complete`, advisory/continue-on-error red handling — **landed** (mid-2026).
+  Keep completion summaries parser-clean per the finalization runbook.
 
-### NEX/ZDX ontology — PENDING (forward-compat, do not block on)
-The "NEX/ZDX improvements" workstream is design-phase (all Captured/Backlog/Parked) and may reshape
-work-system primitives: **WI-835** (two-layer planning/execution ontology + childless WP), **WI-838**
-(Planning DB: Initiative/Epic/Story), **WI-839** (planning→execution relations), **WI-852**
-(disentangle "Initiative" from the persistent-system concept), **WI-590/840** (terminology). Until
-these land, write Quartet contracts against **stable concepts** — Work Item, Workstream, Stage,
-State, Execution Path, claim, reviewer disposition, evidence — and treat "Initiative" / the
-planning-layer / "childless WP" as terms in flux. Source of truth on terminology is the current ZDX
-standard, not this folder.
-
-> WI states above are point-in-time (2026-06-29). Re-check Cosmo before treating any as current.
+Write Quartet contracts against **stable primitives** — Work Item, Workstream, Stage, State,
+Execution Path, claim, reviewer disposition, evidence. Source of truth on terminology is the current
+ZDX standard, not this folder.

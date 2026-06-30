@@ -23,7 +23,8 @@ interface SubjectHubNotesSectionProps {
   // Driven by the data, never by a client persona/ownership read (spec §6.3).
   // The masked supporter scope hands canStudy=false → no add input, no mic.
   canStudy?: boolean;
-  onAddNote?: (content: string) => void;
+  onAddNote?: (content: string) => void | Promise<void>;
+  isAddingNote?: boolean;
   onNoteVoice?: (request: SubjectHubNotesVoiceRequest) => void;
   // Empty-state copy, resolved by the caller so it can match the mount context:
   // the subject-level mount keeps the default ("…about this subject"); the
@@ -55,6 +56,7 @@ export function SubjectHubNotesSection({
   notes,
   canStudy = true,
   onAddNote,
+  isAddingNote = false,
   onNoteVoice,
   emptyMessage,
 }: SubjectHubNotesSectionProps): React.ReactElement {
@@ -62,6 +64,7 @@ export function SubjectHubNotesSection({
   const colors = useThemeColors();
   const [selectedOrigin, setSelectedOrigin] = useState<NoteOrigin>('self');
   const [draft, setDraft] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const notesByOrigin = useMemo(
     () => ({
       self: notes.filter((note) => note.origin === 'self'),
@@ -74,13 +77,22 @@ export function SubjectHubNotesSection({
   // Only offer adding a note when something can actually persist it.
   const canAddNote = canStudy && !!onAddNote;
   const hasDraftText = draft.trim().length > 0;
+  const isSavingNote = isAddingNote || isSubmitting;
+  const canSubmitDraft = hasDraftText && !isSavingNote;
 
-  const submitDraft = () => {
-    if (!onAddNote) return;
+  const submitDraft = async () => {
+    if (!onAddNote || isSavingNote) return;
     const trimmed = draft.trim();
     if (!trimmed) return;
-    onAddNote(trimmed);
-    setDraft('');
+    setIsSubmitting(true);
+    try {
+      await onAddNote(trimmed);
+      setDraft('');
+    } catch {
+      // The caller owns user-facing error copy. Keep the draft so the learner can retry.
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -106,6 +118,7 @@ export function SubjectHubNotesSection({
             value={draft}
             onChangeText={setDraft}
             onSubmitEditing={submitDraft}
+            editable={!isSavingNote}
             placeholder={t('subjectHub.notes.addNote')}
             placeholderTextColor={colors.textSecondary}
             className="min-h-12 flex-1 text-body text-text-primary"
@@ -151,11 +164,11 @@ export function SubjectHubNotesSection({
               testID="subject-hub-notes-empty-add"
               accessibilityRole="button"
               accessibilityLabel={t('subjectHub.notes.addNote')}
-              accessibilityState={{ disabled: !hasDraftText }}
-              disabled={!hasDraftText}
+              accessibilityState={{ disabled: !canSubmitDraft }}
+              disabled={!canSubmitDraft}
               onPress={submitDraft}
               className={`mt-3 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-5 ${
-                hasDraftText ? '' : 'opacity-50'
+                canSubmitDraft ? '' : 'opacity-50'
               }`}
             >
               <Text className="text-body-sm font-semibold text-text-primary">

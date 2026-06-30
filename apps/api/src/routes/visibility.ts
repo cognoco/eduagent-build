@@ -27,7 +27,7 @@ import {
 } from '../services/linking-ceremony';
 import { requestSelfUnlink } from '../services/supportership-revocation';
 import { buildAttentionReport } from '../services/supporter-report';
-import { projectSharedRecord } from '../services/shared-record';
+import { readSharedRecordForSupportee } from '../services/shared-record-read-model';
 import { safeSend } from '../services/safe-non-core';
 
 const idParamSchema = z.object({
@@ -181,9 +181,10 @@ export const visibilityRoutes = new Hono<VisibilityRouteEnv>()
         supporterPersonId: callerPersonId,
         supporteePersonId: personId,
       });
-      const record = projectSharedRecord({
+      const record = await readSharedRecordForSupportee(db, {
         supportershipId: contract.supportershipId,
-        facts: [],
+        supporterPersonId: callerPersonId,
+        supporteePersonId: personId,
       });
       return c.json(sharedRecordSchema.parse(record));
     },

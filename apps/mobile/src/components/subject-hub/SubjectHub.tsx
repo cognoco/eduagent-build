@@ -29,7 +29,8 @@ interface SubjectHubProps {
   onSearchVoice?: (request: SubjectHubVoiceRequest) => void;
   // Topic-scoped note authoring (felt-knowing loop Flow 1). Threaded to the focused
   // topic's detail sheet; the subject-level notes section stays read-only.
-  onAddNote?: (topicId: string, content: string) => void;
+  onAddNote?: (topicId: string, content: string) => void | Promise<void>;
+  isAddingNote?: boolean;
 }
 
 export function SubjectHub({
@@ -39,6 +40,7 @@ export function SubjectHub({
   onReviewTopic,
   onSearchVoice,
   onAddNote,
+  isAddingNote = false,
 }: SubjectHubProps): React.ReactElement {
   const { t } = useTranslation();
   const tint = useSubjectTint(data.subjectId);
@@ -128,6 +130,7 @@ export function SubjectHub({
         onStudyTopic={onStudyTopic}
         onReviewTopic={onReviewTopic}
         onAddNote={onAddNote}
+        isAddingNote={isAddingNote}
       />
     </>
   );
