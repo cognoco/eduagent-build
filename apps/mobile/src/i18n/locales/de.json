@@ -4056,8 +4056,6 @@
       "cta": "Bücher durchsuchen"
     },
     "manage": {
-      "open": "Verwalten",
-      "accessibilityLabel": "Fach verwalten",
       "title": "Fach verwalten",
       "description": "Pausiere dieses Fach, um es aus dem aktiven Lernen auszublenden, oder archiviere es, bis du es wiederherstellst.",
       "close": "Schließen"

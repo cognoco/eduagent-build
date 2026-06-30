@@ -4056,8 +4056,6 @@
       "cta": "Se bøker"
     },
     "manage": {
-      "open": "Administrer",
-      "accessibilityLabel": "Administrer emne",
       "title": "Administrer emne",
       "description": "Sett dette emnet på pause for å skjule det fra aktiv læring, eller arkiver det til du gjenoppretter det.",
       "close": "Lukk"

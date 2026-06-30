@@ -4056,8 +4056,6 @@
       "cta": "Explorar libros"
     },
     "manage": {
-      "open": "Gestionar",
-      "accessibilityLabel": "Gestionar asignatura",
       "title": "Gestionar asignatura",
       "description": "Pausa esta asignatura para ocultarla del aprendizaje activo, o archívala hasta que la restaures.",
       "close": "Cerrar"

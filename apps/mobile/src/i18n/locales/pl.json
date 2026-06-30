@@ -4218,8 +4218,6 @@
       "cta": "Przeglądaj książki"
     },
     "manage": {
-      "open": "Zarządzaj",
-      "accessibilityLabel": "Zarządzaj przedmiotem",
       "title": "Zarządzaj przedmiotem",
       "description": "Wstrzymaj ten przedmiot, aby ukryć go z aktywnej nauki, lub zarchiwizuj go, dopóki go nie przywrócisz.",
       "close": "Zamknij"
