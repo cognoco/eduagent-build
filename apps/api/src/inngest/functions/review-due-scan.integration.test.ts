@@ -132,17 +132,12 @@ async function seedAccount(opts?: {
     })
     .returning({ id: accounts.id });
 
-  // [WI-793] v2 identity rows — required by the v2 scan path (person×membership×
-  // organization) under IDENTITY_V2_ENABLED=true. Deterministic reseed:
-  // organization.id = account.id (the WI-788 reuse-same-id invariant).
-  // Self-inerting under flag-OFF (the v2 JOIN is never reached).
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    await db.insert(organization).values({
-      id: account!.id,
-      name: `RDS Seed org ${account!.id.slice(0, 8)}`,
-      timezone: opts?.timezone ?? null,
-    });
-  }
+  // [WI-867] v2 identity rows are unconditional (flag collapsed).
+  await db.insert(organization).values({
+    id: account!.id,
+    name: `RDS Seed org ${account!.id.slice(0, 8)}`,
+    timezone: opts?.timezone ?? null,
+  });
 
   return { accountId: account!.id };
 }
@@ -158,21 +153,18 @@ async function seedProfile(accountId: string): Promise<{ profileId: string }> {
     })
     .returning({ id: profiles.id });
 
-  // [WI-793] v2 identity rows — the v2 scan JOINs person×membership×organization;
-  // person.id = profile.id (deterministic reseed invariant from WI-788).
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    await db.insert(person).values({
-      id: profile!.id,
-      displayName: 'Review Test User',
-      birthDate: '1990-01-01',
-      residenceJurisdiction: 'ROW',
-    });
-    await db.insert(membership).values({
-      personId: profile!.id,
-      organizationId: accountId,
-      roles: ['learner'],
-    });
-  }
+  // [WI-867] v2 identity rows are unconditional (flag collapsed).
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: 'Review Test User',
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'ROW',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: accountId,
+    roles: ['learner'],
+  });
 
   return { profileId: profile!.id };
 }
@@ -265,14 +257,9 @@ async function seedConsentState(
     status,
   });
 
-  // [WI-793] v2 consent rows — the v2 scan gate (consentGateSatisfiedSql)
-  // checks consent_grant / consent_request tables, not consent_states.
-  // CONSENTED → write a consent_grant row (granted=true, withdrawn_at=null).
-  // PENDING / NOT_CONSENTED / WITHDRAWN → write a consent_request row so the
-  //   "no consent rows at all" branch fails and the gate blocks the profile.
-  // No-op when flag-OFF (v2 consent tables not read) or when no accountId
+  // [WI-867] v2 consent rows are unconditional. Skip only when no accountId
   // (caller omits it for adult tests where "no rows" is the expected pass path).
-  if (process.env['IDENTITY_V2_ENABLED'] !== 'true' || !accountId) return;
+  if (!accountId) return;
 
   if (status === 'CONSENTED') {
     await db.insert(consentGrant).values({
@@ -322,41 +309,31 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  // [WI-793] v2 identity cleanup — mirrors the WI-792 pattern. The legacy
-  // accounts delete does not cascade to v2 tables (no FK from accounts to
-  // organization/person). Clean up v2 rows first, before the legacy delete.
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    // Resolve account IDs for our seeded rows so we can derive org/person IDs.
-    const testAccounts = await db.query.accounts.findMany({
-      where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
+  // [WI-867] v2 identity cleanup is unconditional. The legacy accounts delete
+  // does not cascade to v2 tables (no FK from accounts to organization/person).
+  const testAccounts = await db.query.accounts.findMany({
+    where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
+    columns: { id: true },
+  });
+  const accountIds = testAccounts.map((a) => a.id);
+  if (accountIds.length > 0) {
+    const testProfiles = await db.query.profiles.findMany({
+      where: and(
+        inArray(profiles.accountId, accountIds),
+        isNull(profiles.archivedAt),
+      ),
       columns: { id: true },
     });
-    const accountIds = testAccounts.map((a) => a.id);
-    if (accountIds.length > 0) {
-      // Resolve seeded profile IDs (person.id = profile.id) via the legacy FK.
-      // The isNull(profiles.archivedAt) filter satisfies the cross-profile
-      // archived-profile guard (archived-profile-scan.guard.test.ts) — this
-      // afterAll cleanup only ever targets this suite's live seeded profiles
-      // (no test path archives a profile), so scoping to non-archived is sound.
-      const testProfiles = await db.query.profiles.findMany({
-        where: and(
-          inArray(profiles.accountId, accountIds),
-          isNull(profiles.archivedAt),
-        ),
-        columns: { id: true },
-      });
-      const profileIds = testProfiles.map((p) => p.id);
-      if (profileIds.length > 0) {
-        // consent_grant.chargePersonId → person.id RESTRICT: delete grants first.
-        await db
-          .delete(consentGrant)
-          .where(inArray(consentGrant.chargePersonId, profileIds));
-        // person cascade: membership, login (consent_request also cascades).
-        await db.delete(person).where(inArray(person.id, profileIds));
-      }
-      // organization cascade: membership (already gone). subscription if any.
-      await db.delete(organization).where(inArray(organization.id, accountIds));
+    const profileIds = testProfiles.map((p) => p.id);
+    if (profileIds.length > 0) {
+      // consent_grant.chargePersonId → person.id RESTRICT: delete grants first.
+      await db
+        .delete(consentGrant)
+        .where(inArray(consentGrant.chargePersonId, profileIds));
+      // person cascade: membership, login (consent_request also cascades).
+      await db.delete(person).where(inArray(person.id, profileIds));
     }
+    await db.delete(organization).where(inArray(organization.id, accountIds));
   }
   // FK cascades clean all child rows: profiles → subjects → retention_cards,
   // notification_preferences, notification_log, consent_states, curriculum_*, etc.

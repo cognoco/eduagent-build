@@ -56,11 +56,15 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  membership,
+  organization,
+  person,
   profiles,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
+import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
 import {
   _resetCircuits,
   registerProvider,
@@ -224,6 +228,8 @@ const llm = createBranchingLlm();
 // ---------------------------------------------------------------------------
 
 let seedCounter = 0;
+const seededV2AccountIds: string[] = [];
+const seededV2ProfileIds: string[] = [];
 
 async function seedProfileAndSubject(
   db: Database,
@@ -246,6 +252,24 @@ async function seedProfileAndSubject(
       isOwner: true,
     })
     .returning({ id: profiles.id });
+
+  // [WI-867] v2 identity graph — loadProfileRowByIdV2 reads person unconditionally.
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `Grader Org ${idx}` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: `Grader Tester ${idx}`,
+    birthDate: '2006-01-01',
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
+  seededV2AccountIds.push(account!.id);
+  seededV2ProfileIds.push(profile!.id);
 
   const [subject] = await db
     .insert(subjects)
@@ -445,6 +469,13 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
   });
 
   afterAll(async () => {
+    // [WI-867] Clean up v2 graph before accounts (no FK from accounts to org/person).
+    if (seededV2AccountIds.length > 0 || seededV2ProfileIds.length > 0) {
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: seededV2AccountIds,
+        profileIds: seededV2ProfileIds,
+      });
+    }
     // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
     await db
       .delete(accounts)
