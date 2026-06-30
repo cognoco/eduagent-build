@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 import { SubjectHubNotesSection } from './SubjectHubNotesSection';
 import type { SubjectHubNote } from './_view-models/subject-hub-state';
@@ -69,7 +75,7 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByText('subjectHub.notes.empty')).toBeNull();
   });
 
-  it('disables the empty-state add action until the draft has text', () => {
+  it('disables the empty-state add action until the draft has text', async () => {
     const onAddNote = jest.fn();
     render(<SubjectHubNotesSection notes={[]} onAddNote={onAddNote} />);
 
@@ -100,7 +106,11 @@ describe('SubjectHubNotesSection', () => {
     fireEvent.press(screen.getByTestId('subject-hub-notes-empty-add'));
 
     expect(onAddNote).toHaveBeenCalledWith('remember mitosis');
-    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe('');
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe(
+        '',
+      );
+    });
   });
 
   it('renders the add-note input + transcription-only mic when canStudy and add is wired', () => {
@@ -153,7 +163,7 @@ describe('SubjectHubNotesSection', () => {
     expect(screen.queryByTestId('subject-hub-notes-empty-add')).toBeNull();
   });
 
-  it('submits a trimmed draft through onAddNote and clears the input', () => {
+  it('submits a trimmed draft through onAddNote and clears the input', async () => {
     const onAddNote = jest.fn();
     render(<SubjectHubNotesSection notes={[selfNote]} onAddNote={onAddNote} />);
 
@@ -161,7 +171,42 @@ describe('SubjectHubNotesSection', () => {
     fireEvent.changeText(input, '  remember mitosis  ');
     fireEvent(input, 'submitEditing');
     expect(onAddNote).toHaveBeenCalledWith('remember mitosis');
-    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe('');
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe(
+        '',
+      );
+    });
+  });
+
+  it('keeps the draft available for retry when add-note save rejects', async () => {
+    let rejectSave!: (error: Error) => void;
+    const failedSave = new Promise<void>((_resolve, reject) => {
+      rejectSave = reject;
+    });
+    failedSave.catch(() => undefined);
+    const onAddNote = jest.fn(() => failedSave);
+
+    render(<SubjectHubNotesSection notes={[selfNote]} onAddNote={onAddNote} />);
+
+    const input = screen.getByTestId('subject-hub-notes-input');
+    fireEvent.changeText(input, 'This took a while to write');
+    fireEvent(input, 'submitEditing');
+
+    expect(onAddNote).toHaveBeenCalledWith('This took a while to write');
+    expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe(
+      'This took a while to write',
+    );
+
+    await act(async () => {
+      rejectSave(new Error('network down'));
+      await failedSave.catch(() => undefined);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subject-hub-notes-input').props.value).toBe(
+        'This took a while to write',
+      );
+    });
   });
 
   it('omits the add input and mic when canStudy is false (masked supporter view)', () => {

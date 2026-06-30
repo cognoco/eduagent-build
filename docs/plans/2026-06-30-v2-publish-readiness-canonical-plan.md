@@ -53,7 +53,7 @@ Out of scope:
 
 ## Priority Tasks
 
-- [ ] T1 / WI-1168: Make shared-record Journal real — done when mobile person-scope and supporter-hub Journal fetch `GET /visibility/reports/:personId/shared-record`, render real report/recap/milestone facts, show honest empty/error states, and the dossier maps identify the feature as `CODE` rather than placeholder.
+- [x] T1 / WI-1168: Make shared-record Journal real — mobile person-scope and supporter-hub Journal fetch `GET /visibility/reports/:personId/shared-record`, render report/recap/milestone shared-record facts, show loading/error/empty states through `SharedRecordView`, and the dossier maps identify the feature as `CODE` rather than placeholder.
 
 - [ ] T2 / WI-1169: Add person-scope Subject drill-in — done when a supporter can open a supported person's subject from the Subjects tab into a masked Subject Hub or equivalent structural detail view, with private artifacts excluded by server response shape and tests proving private notes, mentor memory, and conversations are not exposed.
 

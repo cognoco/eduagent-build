@@ -3965,7 +3965,6 @@
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
     "openSubjectNamed": "Åpne {{subject}}",
-
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
