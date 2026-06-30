@@ -70,7 +70,7 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 // prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
+jest.mock(
   '../../services/notifications',
   () => {
     const actual = jest.requireActual('../../services/notifications') as typeof import('../../services/notifications');
@@ -90,7 +90,7 @@ jest.mock( // gc1-allow: pattern-a conversion
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/settings',
   () => {
     const actual = jest.requireActual('../../services/settings') as typeof import('../../services/settings');
@@ -107,7 +107,7 @@ const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/snapshot-aggregation',
   () => {
     const actual = jest.requireActual('../../services/snapshot-aggregation') as typeof import('../../services/snapshot-aggregation');
@@ -131,7 +131,7 @@ const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/weekly-report',
   () => {
     const actual = jest.requireActual('../../services/weekly-report') as typeof import('../../services/weekly-report');
@@ -144,12 +144,14 @@ jest.mock( /* gc1-allow: pattern-a conversion */
 );
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
+// WI-867: seeds v2 GDPR consent chain (membership+consentGrant+consentRequest) on db.query Proxy
+import { seedConsentState } from '../../test-utils/consent-seed';
 
 const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/practice-activity-summary',
   () => {
     const actual = jest.requireActual('../../services/practice-activity-summary') as typeof import('../../services/practice-activity-summary');
@@ -174,21 +176,6 @@ let dbState: {
   struggles: Array<{ topic: string }>;
   childDisplayName: string;
 };
-
-// Walks a drizzle WHERE expression (cycle-safe) and reports whether the
-// given literal value is bound anywhere inside it. Lets mocks dispatch on
-// the queried profileId instead of brittle call-count ordering.
-function whereExpressionContainsValue(node: unknown, value: string): boolean {
-  const visited = new WeakSet<object>();
-  const visit = (current: unknown): boolean => {
-    if (current === value) return true;
-    if (!current || typeof current !== 'object') return false;
-    if (visited.has(current as object)) return false;
-    visited.add(current as object);
-    return Object.values(current as Record<string, unknown>).some(visit);
-  };
-  return visit(node);
-}
 
 function resetDbState() {
   dbState = {
@@ -263,6 +250,33 @@ function buildMockDb(
           .fn()
           .mockResolvedValue({ struggles: dbState.struggles }),
       },
+      // WI-867: isPersonLive (v2 liveness) reads db.query.person.findFirst.
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: PARENT_ID }),
+      },
+      // WI-867: getChargePersonIds (v2 child-discovery) reads guardianship.findMany.
+      // Mirror the childLinks the caller passed so the prepare step finds the same
+      // children that familyLinks.findMany would have returned pre-collapse.
+      guardianship: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue(
+            childLinks.map((l) => ({ chargePersonId: l.childProfileId })),
+          ),
+      },
+      // WI-867: send-email step reads login.findFirst for parent email (v2).
+      login: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(
+            dbState.parentEmail ? { email: dbState.parentEmail } : null,
+          ),
+      },
+      // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first.
+      // null = no org = allowed immediately (IDENTITY_V2_ENABLED=true in .env.development.local).
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       ...extraQueryOverrides,
     },
     insert: mockInsert,
@@ -275,7 +289,7 @@ function buildMockDb(
 }
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -287,7 +301,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-import { getStepDatabase } from '../helpers';
+import { getStepDatabase, setIdentityV2Enabled } from '../helpers';
 import { weeklyProgressPushGenerate } from './weekly-progress-push';
 import { monthlyReportGenerate } from './monthly-report-cron';
 
@@ -375,6 +389,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockInngestTransport.clear();
   resetDbState();
+  // [WI-867] Reset the v2 flag binding to default; v2-consent tests opt in
+  // explicitly so the legacy-consent tests aren't affected by leak.
+  setIdentityV2Enabled(undefined);
   mockGetStepResendApiKey.mockReturnValue('test-resend-key');
 
   // Default snapshot responses for weekly tests
@@ -451,6 +468,8 @@ describe('Email digest channel — weekly', () => {
       consentType: 'GDPR',
     });
     db.query.accounts.findFirst = jest.fn().mockResolvedValue(null);
+    // WI-867: send-email step reads login.findFirst for parent email (v2).
+    db.query.login.findFirst = jest.fn().mockResolvedValue(null);
 
     await executeWeeklyGenerate(PARENT_ID, db);
 
@@ -595,15 +614,23 @@ describe('Email digest channel — weekly', () => {
 
   // Break test 8: Restricted-consent child's row is redacted from push + email
   // Tests all three restricted statuses
-  it.each([['PENDING'], ['PARENTAL_CONSENT_REQUESTED'], ['WITHDRAWN']])(
+  it.each([
+    ['PENDING', 'PENDING' as const],
+    ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
+    ['WITHDRAWN', 'WITHDRAWN' as const],
+  ])(
     '(T8) redacts child with consent status %s from both push and email digests',
-    async (consentStatus) => {
+    async (_label, seedState) => {
       const db = buildMockDb([{ childProfileId: CHILD_ID_RESTRICTED }]);
-      db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
-        status: consentStatus,
-        profileId: CHILD_ID_RESTRICTED,
-        consentType: 'GDPR',
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+      seedConsentState(db as unknown as Record<string, unknown>, {
+        state: seedState,
+        personId: CHILD_ID_RESTRICTED,
       });
+      // [WI-867] Activate the v2 consent gate (boundary-left flag-branch in
+      // weekly-digest.ts) so isGdprProcessingAllowedV2 reads the seeded chain.
+      setIdentityV2Enabled('true');
 
       const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
         status: string;
@@ -624,11 +651,13 @@ describe('Email digest channel — weekly', () => {
       { childProfileId: CHILD_ID_A },
       { childProfileId: CHILD_ID_B },
     ]);
-    db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
-      status: 'WITHDRAWN',
-      profileId: CHILD_ID_A,
-      consentType: 'GDPR',
+    // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+    // Both children WITHDRAWN — seed two WITHDRAWN states in call sequence.
+    seedConsentState(db as unknown as Record<string, unknown>, {
+      state: ['WITHDRAWN', 'WITHDRAWN'],
     });
+    // [WI-867] Activate the v2 consent gate (boundary-left flag-branch).
+    setIdentityV2Enabled('true');
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
       status: string;
@@ -655,25 +684,14 @@ describe('Email digest channel — weekly', () => {
     db.query.profiles.findFirst = jest
       .fn()
       .mockResolvedValue({ displayName: 'Alice', accountId: 'account-001' });
-    // Dispatch on the profileId bound into the WHERE expression (not call
-    // count): the send steps now re-check consent per child when they
-    // rebuild the digest in-step, so the same child is queried repeatedly.
-    db.query.consentStates.findFirst = jest
-      .fn()
-      .mockImplementation((queryArgs: unknown) => {
-        if (whereExpressionContainsValue(queryArgs, CHILD_ID_B)) {
-          return Promise.resolve({
-            status: 'WITHDRAWN',
-            profileId: CHILD_ID_B,
-            consentType: 'GDPR',
-          });
-        }
-        return Promise.resolve({
-          status: 'CONSENTED',
-          profileId: CHILD_ID_A,
-          consentType: 'GDPR',
-        });
-      });
+    // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+    // Call order: prepare(A=CONSENTED), prepare(B=WITHDRAWN),
+    //             send-push(A=CONSENTED), send-email(A=CONSENTED).
+    seedConsentState(db as unknown as Record<string, unknown>, {
+      state: ['CONSENTED', 'WITHDRAWN', 'CONSENTED', 'CONSENTED'],
+    });
+    // [WI-867] Activate the v2 consent gate (boundary-left flag-branch).
+    setIdentityV2Enabled('true');
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
       status: string;
@@ -718,7 +736,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 });
 
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/monthly-report',
   () => {
     const actual = jest.requireActual('../../services/monthly-report') as typeof import('../../services/monthly-report');
@@ -790,6 +808,31 @@ function buildMonthlyMockDb(
         findFirst: jest
           .fn()
           .mockResolvedValue({ struggles: dbState.struggles }),
+      },
+      // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first;
+      // null = no org = allowed immediately. Consent denial tests override via
+      // seedConsentState after building the db.
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      // WI-867: isGuardianOf (monthly-report-cron:292) reads guardianship.findFirst;
+      // non-null = guardian has active access to the child.
+      guardianship: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'g-1' }),
+      },
+      // WI-867: monthly-report-cron:301 reads person.findFirst for child display name;
+      // monthly-report-cron:310 via isPersonLive reads it for parent liveness.
+      person: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'person-001',
+          displayName: dbState.childDisplayName,
+        }),
+      },
+      // WI-867: monthly-report-cron:607 reads login.findFirst for parent email (v2).
+      login: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(effectiveEmail ? { email: effectiveEmail } : null),
       },
     },
     insert: mockInsert,
@@ -905,13 +948,23 @@ describe('Email digest channel — monthly', () => {
   });
 
   // Break test 8 (monthly): Restricted consent child's row is redacted
-  it.each([['PENDING'], ['PARENTAL_CONSENT_REQUESTED'], ['WITHDRAWN']])(
+  it.each([
+    ['PENDING', 'PENDING' as const],
+    ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
+    ['WITHDRAWN', 'WITHDRAWN' as const],
+  ])(
     '(T8-monthly) skips monthly report when child consent status is %s',
-    async (consentStatus) => {
+    async (_label, seedState) => {
       // Reset snapshot mock since it won't be reached for consent-blocked children
       mockGetSnapshotsInRange.mockReset();
 
-      const db = buildMonthlyMockDb({ status: consentStatus });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, always-on for monthly).
+      // Must seed the v2 chain so the consent denial is picked up.
+      const db = buildMonthlyMockDb();
+      seedConsentState(db as unknown as Record<string, unknown>, {
+        state: seedState,
+        personId: 'child-restricted',
+      });
 
       const result = (await executeMonthlyGenerate(
         PARENT_ID,

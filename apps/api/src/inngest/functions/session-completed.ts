@@ -5,7 +5,6 @@ import {
   getStepDatabase,
   getStepMemoryFactsDedupConfig,
   getStepVoyageApiKey,
-  isIdentityV2EnabledInStep,
 } from '../helpers';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
@@ -31,7 +30,6 @@ import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { insertSessionXpEntry } from '../../services/xp';
 import { extractAndStoreHomeworkSummary } from '../../services/homework-summary';
 import { updateMedianResponseSeconds } from '../../services/settings';
-import { isGdprProcessingAllowed } from '../../services/consent';
 import {
   processEvaluateCompletion,
   processTeachBackCompletion,
@@ -54,7 +52,6 @@ import {
   membership,
   memoryFacts,
   person,
-  profiles,
   retentionCards,
   sessionEvents,
   sessionSummaries,
@@ -87,7 +84,6 @@ import {
 } from '../../config';
 import { runDedupForProfile } from '../../services/memory/dedup-pass';
 import {
-  ensureFreeSubscription,
   ensureFreeSubscriptionV2,
   decrementQuota,
   safeRefundQuota,
@@ -929,7 +925,6 @@ export const sessionCompleted = inngest.createFunction(
           // already updated after the session ended and returns it cached.
           await refreshProgressSnapshot(db, profileId, {
             sessionEndedAt: timestamp ? new Date(timestamp) : new Date(),
-            identityV2Enabled: isIdentityV2EnabledInStep(),
           });
           await createPendingSessionSummary(
             db,
@@ -940,10 +935,7 @@ export const sessionCompleted = inngest.createFunction(
           );
 
           // Precompute coaching card and write to cache (ARCH-11)
-          // [CUT-B1 §2.5(iii)] v2 seam threaded via the step flag.
-          const card = await precomputeCoachingCard(db, profileId, {
-            identityV2Enabled: isIdentityV2EnabledInStep(),
-          });
+          const card = await precomputeCoachingCard(db, profileId);
           await writeCoachingCardCache(db, profileId, card);
         }),
       ),
@@ -1038,7 +1030,7 @@ export const sessionCompleted = inngest.createFunction(
             let profileForBracket:
               | { birthYear: number; conversationLanguage: string | null }
               | undefined;
-            if (isIdentityV2EnabledInStep()) {
+            {
               const ctx = await getPersonLlmContext(db, profileId);
               profileForBracket = ctx
                 ? {
@@ -1046,16 +1038,6 @@ export const sessionCompleted = inngest.createFunction(
                     conversationLanguage: ctx.conversationLanguage,
                   }
                 : undefined;
-            } else {
-              const [row] = await db
-                .select({
-                  birthYear: profiles.birthYear,
-                  conversationLanguage: profiles.conversationLanguage,
-                })
-                .from(profiles)
-                .where(eq(profiles.id, profileId))
-                .limit(1);
-              profileForBracket = row;
             }
             const ageBracket =
               profileForBracket?.birthYear != null
@@ -1107,20 +1089,13 @@ export const sessionCompleted = inngest.createFunction(
 
           if (!highlight) {
             // [WI-586] v2 path: read displayName from person (profiles dropped).
-            const displayName = isIdentityV2EnabledInStep()
-              ? ((
-                  await db.query.person.findFirst({
-                    where: eq(person.id, profileId),
-                    columns: { displayName: true },
-                  })
-                )?.displayName ?? null)
-              : ((
-                  await db
-                    .select({ displayName: profiles.displayName })
-                    .from(profiles)
-                    .where(eq(profiles.id, profileId))
-                    .limit(1)
-                )[0]?.displayName ?? null);
+            const displayName =
+              (
+                await db.query.person.findFirst({
+                  where: eq(person.id, profileId),
+                  columns: { displayName: true },
+                })
+              )?.displayName ?? null;
             const profile = { displayName };
             const topicTitle = topicId
               ? await loadTopicTitle(db, topicId, profileId)
@@ -1211,17 +1186,7 @@ export const sessionCompleted = inngest.createFunction(
           }
 
           // [WI-586] v2 path: read birthYear + conversationLanguage from person.
-          const profile = isIdentityV2EnabledInStep()
-            ? await getPersonLlmContext(db, profileId)
-            : await db
-                .select({
-                  birthYear: profiles.birthYear,
-                  conversationLanguage: profiles.conversationLanguage,
-                })
-                .from(profiles)
-                .where(eq(profiles.id, profileId))
-                .limit(1)
-                .then((rows) => rows[0] ?? null);
+          const profile = await getPersonLlmContext(db, profileId);
 
           if (!profile) {
             throw new Error(
@@ -1309,22 +1274,13 @@ export const sessionCompleted = inngest.createFunction(
           // i18n Phase 1 — load conversation_language so the parent-facing
           // summary renders in the learner's selected language.
           // [WI-586] v2 path: read conversationLanguage from person (profiles dropped).
-          const llmSummaryConversationLanguage = isIdentityV2EnabledInStep()
-            ? ((
-                await db.query.person.findFirst({
-                  where: eq(person.id, profileId),
-                  columns: { conversationLanguage: true },
-                })
-              )?.conversationLanguage ?? null)
-            : ((
-                await db
-                  .select({
-                    conversationLanguage: profiles.conversationLanguage,
-                  })
-                  .from(profiles)
-                  .where(eq(profiles.id, profileId))
-                  .limit(1)
-              )[0]?.conversationLanguage ?? null);
+          const llmSummaryConversationLanguage =
+            (
+              await db.query.person.findFirst({
+                where: eq(person.id, profileId),
+                columns: { conversationLanguage: true },
+              })
+            )?.conversationLanguage ?? null;
 
           const summary = await generateAndStoreLlmSummary(db, {
             sessionId,
@@ -1462,9 +1418,7 @@ export const sessionCompleted = inngest.createFunction(
             // the external LLM provider (the regulated processing act under GDPR
             // Art. 7(3)) before applyAnalysis later blocks only the write.
             // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
-            const gdprAllowed = isIdentityV2EnabledInStep()
-              ? await isGdprProcessingAllowedV2(db, profileId)
-              : await isGdprProcessingAllowed(db, profileId);
+            const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
             if (!gdprAllowed) {
               return;
             }
@@ -1556,7 +1510,6 @@ export const sessionCompleted = inngest.createFunction(
               subjectRow?.name ?? null,
               'inferred',
               subjectId,
-              { identityV2Enabled: isIdentityV2EnabledInStep() },
             );
 
             // FR247.6 — struggle pushes to the parent, sent at the source so
@@ -1570,9 +1523,7 @@ export const sessionCompleted = inngest.createFunction(
             struggleNotificationsDetected = analysisResult.notifications.length;
             for (const notification of analysisResult.notifications) {
               try {
-                await sendStruggleNotification(db, profileId, notification, {
-                  identityV2Enabled: isIdentityV2EnabledInStep(),
-                });
+                await sendStruggleNotification(db, profileId, notification);
                 struggleNotificationsSent += 1;
               } catch (err) {
                 struggleNotificationsFailed += 1;
@@ -1791,10 +1742,8 @@ export const sessionCompleted = inngest.createFunction(
           // status to WITHDRAWN without touching the memory gate, so this step
           // must re-check the regulatory consent itself — exactly as the
           // profile step does — and skip before any transcript leaves Neon.
-          // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
-          const gdprAllowed = isIdentityV2EnabledInStep()
-            ? await isGdprProcessingAllowedV2(db, profileId)
-            : await isGdprProcessingAllowed(db, profileId);
+          // [WI-867] v2 always: GDPR gate via v2 resolver.
+          const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
           if (!gdprAllowed) {
             return;
           }
@@ -1835,44 +1784,30 @@ export const sessionCompleted = inngest.createFunction(
         // [WI-784] v2 twin: under IDENTITY_V2_ENABLED read person +
         // membership (no profiles.accountId which was dropped 2026-06-14).
         // Legacy path (flag-off) is byte-identical.
-        const identityV2 = isIdentityV2EnabledInStep();
-        let homeworkProfile:
-          | { conversationLanguage: string | null }
-          | undefined;
+        const identityV2 = true; // flag always-on post-cutover
         let homeworkOrganizationId: string | undefined;
-        if (identityV2) {
-          const [personRow] = await db
-            .select({ conversationLanguage: person.conversationLanguage })
-            .from(person)
-            .where(eq(person.id, profileId))
-            .limit(1);
-          homeworkProfile = personRow;
-          if (personRow) {
-            // person → membership(org) resolution. No orderBy: this mirrors the
-            // canonical v2 resolver `organizationOfPerson` in billing-v2/family-v2.ts
-            // (and every other person→org site in identity-v2/), which all rely on
-            // the single-membership-per-person assumption the cutover seeds. The
-            // membership_person_org_unique index only bars duplicate (person,org)
-            // pairs, so if multi-org membership is ever introduced this — and the
-            // shared resolver — must gain a deterministic orderBy together; pinning
-            // only this site would diverge from the established pattern.
-            const membershipRow = await db.query.membership.findFirst({
-              where: eq(membership.personId, profileId),
-              columns: { organizationId: true },
-            });
-            homeworkOrganizationId = membershipRow?.organizationId;
-          }
-        } else {
-          const [profileRow] = await db
-            .select({
-              conversationLanguage: profiles.conversationLanguage,
-              accountId: profiles.accountId,
-            })
-            .from(profiles)
-            .where(eq(profiles.id, profileId))
-            .limit(1);
-          homeworkProfile = profileRow;
-          homeworkOrganizationId = profileRow?.accountId ?? undefined;
+        const [personRow] = await db
+          .select({ conversationLanguage: person.conversationLanguage })
+          .from(person)
+          .where(eq(person.id, profileId))
+          .limit(1);
+        const homeworkProfile:
+          | { conversationLanguage: string | null }
+          | undefined = personRow;
+        if (personRow) {
+          // person → membership(org) resolution. No orderBy: this mirrors the
+          // canonical v2 resolver `organizationOfPerson` in billing-v2/family-v2.ts
+          // (and every other person→org site in identity-v2/), which all rely on
+          // the single-membership-per-person assumption the cutover seeds. The
+          // membership_person_org_unique index only bars duplicate (person,org)
+          // pairs, so if multi-org membership is ever introduced this — and the
+          // shared resolver — must gain a deterministic orderBy together; pinning
+          // only this site would diverge from the established pattern.
+          const membershipRow = await db.query.membership.findFirst({
+            where: eq(membership.personId, profileId),
+            columns: { organizationId: true },
+          });
+          homeworkOrganizationId = membershipRow?.organizationId;
         }
 
         // Route through the metered wrapper. The HTTP middleware
@@ -1941,9 +1876,10 @@ export const sessionCompleted = inngest.createFunction(
         // `subscription` table keyed by organizationId; legacy path reads
         // `subscriptions` via accountId. decrementQuota / safeRefundQuota
         // already accept identityV2 to select the v2 ownership cross-check.
-        const subscription = identityV2
-          ? await ensureFreeSubscriptionV2(db, homeworkOrganizationId)
-          : await ensureFreeSubscription(db, homeworkOrganizationId);
+        const subscription = await ensureFreeSubscriptionV2(
+          db,
+          homeworkOrganizationId,
+        );
         const decrementResult = await decrementQuota(
           db,
           subscription.id,

@@ -3,7 +3,7 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -13,20 +13,17 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
-jest.mock(
-  '../../services/consent' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/consent',
-    ) as typeof import('../../services/consent');
-    return {
-      ...actual,
-      getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
-      getProfileForConsentRevocation: (...args: unknown[]) =>
-        mockGetProfileForConsentRevocation(...args),
-    };
-  },
-);
+jest.mock('../../services/consent', () => {
+  const actual = jest.requireActual(
+    '../../services/consent',
+  ) as typeof import('../../services/consent');
+  return {
+    ...actual,
+    getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+    getProfileForConsentRevocation: (...args: unknown[]) =>
+      mockGetProfileForConsentRevocation(...args),
+  };
+});
 
 // [F-122] archive-cleanup now performs an ATOMIC conditional delete via
 // deleteArchivedProfileIfStillEligible (eligibility folded into the DELETE's
@@ -34,82 +31,67 @@ jest.mock(
 const mockDeleteArchivedProfileIfStillEligible = jest
   .fn()
   .mockResolvedValue(true);
-jest.mock(
-  '../../services/deletion' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/deletion',
-    ) as typeof import('../../services/deletion');
-    return {
-      ...actual,
-      deleteArchivedProfileIfStillEligible: (...args: unknown[]) =>
-        mockDeleteArchivedProfileIfStillEligible(...args),
-    };
-  },
-);
+jest.mock('../../services/deletion', () => {
+  const actual = jest.requireActual(
+    '../../services/deletion',
+  ) as typeof import('../../services/deletion');
+  return {
+    ...actual,
+    deleteArchivedProfileIfStillEligible: (...args: unknown[]) =>
+      mockDeleteArchivedProfileIfStillEligible(...args),
+  };
+});
 
 // [CUT-B2] v2 consent service mocks
 const mockResolveOrgIdForPerson = jest.fn();
-jest.mock(
-  '../../services/identity-v2/family-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/identity-v2/family-v2',
-    ) as typeof import('../../services/identity-v2/family-v2');
-    return {
-      ...actual,
-      resolveOrgIdForPerson: (...args: unknown[]) =>
-        mockResolveOrgIdForPerson(...args),
-    };
-  },
-);
+jest.mock('../../services/identity-v2/family-v2', () => {
+  const actual = jest.requireActual(
+    '../../services/identity-v2/family-v2',
+  ) as typeof import('../../services/identity-v2/family-v2');
+  return {
+    ...actual,
+    resolveOrgIdForPerson: (...args: unknown[]) =>
+      mockResolveOrgIdForPerson(...args),
+  };
+});
 
 const mockResolveLatestConsentStatusAnyBasis = jest.fn();
-jest.mock(
-  '../../services/identity-v2/consent-status-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/identity-v2/consent-status-v2',
-    ) as typeof import('../../services/identity-v2/consent-status-v2');
-    return {
-      ...actual,
-      resolveLatestConsentStatusAnyBasis: (...args: unknown[]) =>
-        mockResolveLatestConsentStatusAnyBasis(...args),
-    };
-  },
-);
+jest.mock('../../services/identity-v2/consent-status-v2', () => {
+  const actual = jest.requireActual(
+    '../../services/identity-v2/consent-status-v2',
+  ) as typeof import('../../services/identity-v2/consent-status-v2');
+  return {
+    ...actual,
+    resolveLatestConsentStatusAnyBasis: (...args: unknown[]) =>
+      mockResolveLatestConsentStatusAnyBasis(...args),
+  };
+});
 
 const mockGetPersonForConsentRevocationV2 = jest.fn();
 const mockDeleteArchivedPersonIfStillEligibleV2 = jest
   .fn()
   .mockResolvedValue(true);
-jest.mock(
-  '../../services/identity-v2/consent-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/identity-v2/consent-v2',
-    ) as typeof import('../../services/identity-v2/consent-v2');
-    return {
-      ...actual,
-      getPersonForConsentRevocationV2: (...args: unknown[]) =>
-        mockGetPersonForConsentRevocationV2(...args),
-    };
-  },
-);
+jest.mock('../../services/identity-v2/consent-v2', () => {
+  const actual = jest.requireActual(
+    '../../services/identity-v2/consent-v2',
+  ) as typeof import('../../services/identity-v2/consent-v2');
+  return {
+    ...actual,
+    getPersonForConsentRevocationV2: (...args: unknown[]) =>
+      mockGetPersonForConsentRevocationV2(...args),
+  };
+});
 
-jest.mock(
-  '../../services/identity-v2/deletion-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/identity-v2/deletion-v2',
-    ) as typeof import('../../services/identity-v2/deletion-v2');
-    return {
-      ...actual,
-      deleteArchivedPersonIfStillEligibleV2: (...args: unknown[]) =>
-        mockDeleteArchivedPersonIfStillEligibleV2(...args),
-    };
-  },
-);
+jest.mock('../../services/identity-v2/deletion-v2', () => {
+  const actual = jest.requireActual(
+    '../../services/identity-v2/deletion-v2',
+  ) as typeof import('../../services/identity-v2/deletion-v2');
+  return {
+    ...actual,
+    deleteArchivedPersonIfStillEligibleV2: (...args: unknown[]) =>
+      mockDeleteArchivedPersonIfStillEligibleV2(...args),
+  };
+});
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { archiveCleanup } from './archive-cleanup';
@@ -177,9 +159,10 @@ describe('archiveCleanup', () => {
   it('hard-deletes (atomically) after consent remains withdrawn and 30 days elapsed', async () => {
     await executeArchiveCleanup('profile-delete');
 
-    // [F-122] The terminal delete is the atomic helper, called with the
-    // profileId and a retention-cutoff Date.
-    expect(mockDeleteArchivedProfileIfStillEligible).toHaveBeenCalledWith(
+    // [WI-867] v2-only: source collapsed to always call deleteArchivedPersonIfStillEligibleV2
+    // (v1 deleteArchivedProfileIfStillEligible is no longer reached). Same atomic
+    // conditional-delete semantic; profile-scoped → person-scoped.
+    expect(mockDeleteArchivedPersonIfStillEligibleV2).toHaveBeenCalledWith(
       expect.anything(),
       'profile-delete',
       expect.any(Date),

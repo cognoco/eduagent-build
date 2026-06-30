@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Füge deine erste Notiz für dieses Thema hinzu",
     "loadingBookmarks": "Gespeicherte Erklärungen werden geladen ...",
     "loadingSessions": "Sitzungen werden geladen ...",
-    "noSessionsSummary": "Noch keine Sitzungen"
+    "noSessionsSummary": "Noch keine Sitzungen",
+    "ctaStartChallenge": "Herausforderung starten"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Erstelle ein Fach, um deine Lernlandkarte aufzubauen.",
     "createSubject": "Fach erstellen",
     "openSubject": "Fach öffnen",
+    "openSubjectNamed": "{{subject}} öffnen",
+
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
@@ -4073,9 +4076,7 @@
       "memory": "Gedächtnis",
       "memorySubtitle": "Sieh und verwalte, woran sich dein Mentor erinnert.",
       "sessions": "Sitzungen",
-      "sessionsSubtitle": "Überprüfe Zusammenfassungen letzter Sitzungen.",
-      "practice": "Übung",
-      "practiceSubtitle": "Öffne den Übungs-Hub oder sieh dir deine bisherigen Aktivitäten an."
+      "sessionsSubtitle": "Überprüfe Zusammenfassungen letzter Sitzungen."
     },
     "moments": {
       "title": "Letzte Momente",
@@ -4111,21 +4112,6 @@
       "filterAll": "Alle",
       "filterMine": "Meine Notizen",
       "filterMentor": "Lesezeichen"
-    },
-    "practice": {
-      "openHub": "Übungs-Hub öffnen",
-      "pastActivityTitle": "Meine bisherigen Aktivitäten",
-      "empty": "Deine Quizze, Wiederholungen, Bewertungen und Übungen erscheinen hier.",
-      "error": "Wir konnten deine vergangenen Aktivitäten nicht laden.",
-      "type": {
-        "all": "Alle",
-        "quiz": "Quiz",
-        "review": "Wiederholung",
-        "assessment": "Bewertung",
-        "dictation": "Diktat",
-        "recitation": "Sprechübung",
-        "fluency_drill": "Flüssigkeitsübung"
-      }
     }
   },
   "accountAdmin": {
@@ -4213,9 +4199,10 @@
     "journal": {
       "title": "Journal",
       "subtitle": "An dich gesendete Support-Einträge, nach Lernenden gruppiert.",
-      "personHint": "Geteilte Einträge kommen hier an, nachdem die Zustimmung abgeschlossen ist.",
-      "personPlaceholderTitle": "Geteilte Einträge kommen in S5 an",
-      "personPlaceholderMessage": "Vorerst hält dieser Bereich Notizen, Chats und private Journaleinträge von Lernenden verborgen."
+      "personHint": "Mit dir geteilte Updates erscheinen hier.",
+      "personPlaceholderTitle": "Noch keine teilbaren Updates",
+      "emptyMessage": "Wenn {{name}} eine Sitzung oder einen Bericht abschließt, erscheinen hier die mit dir geteilten Updates.",
+      "personPlaceholderMessage": "Private Chats, Notizen und Mentor-Gedächtnis werden hier nicht angezeigt."
     }
   },
   "visibility": {
@@ -4240,7 +4227,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Noch kein gemeinsamer Bericht",
-      "emptyForPerson": "{{name}}: noch kein gemeinsamer Bericht.",
       "structuralOnly": "Nur strukturelle Fakten. Keine Roh-Notizen oder Chat-Texte.",
       "errorTitle": "Gemeinsamer Bericht konnte nicht geladen werden",
       "errorMessage": "Gleich erneut versuchen.",

@@ -766,7 +766,6 @@ async function collectLedgerMomentCandidates(
         params: {
           ...params,
           ledgerKind: kind.data,
-          ledgerTemplateKey: row.templateKey,
         },
         deepLink,
         scope,
@@ -789,20 +788,8 @@ function resolveLedgerDeepLink(
   params: Record<string, unknown>,
 ): NowDeepLink | null {
   const subjectId = stringParam(params, 'subjectId');
-  const bookId = stringParam(params, 'bookId');
-  const topicId = stringParam(params, 'topicId');
   const sessionId = stringParam(params, 'sessionId');
 
-  if (
-    (kind === 'topic_mastered' ||
-      kind === 'recap_ready' ||
-      kind === 'needs_deepening_added') &&
-    subjectId &&
-    bookId &&
-    topicId
-  ) {
-    return resolveDeepLink('subject.topic', { subjectId, bookId, topicId });
-  }
   if (subjectId) {
     return resolveDeepLink('subject.hub', { subjectId });
   }

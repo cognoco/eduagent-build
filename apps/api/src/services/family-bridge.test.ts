@@ -20,10 +20,16 @@ import {
   getChildTopicSnapshotForParent,
   undoCloneFromChild,
 } from './family-bridge';
+import {
+  TEST_TOPIC_ID,
+  TEST_TOPIC_ID_2,
+  TEST_BOOK_ID,
+  TEST_SUBJECT_ID,
+} from '@eduagent/test-utils';
 
 const PARENT_ID = '11111111-1111-4111-8111-111111111111';
 const CHILD_ID = '22222222-2222-4222-8222-222222222222';
-const TOPIC_ID = '33333333-3333-4333-8333-333333333333';
+const TOPIC_ID = TEST_TOPIC_ID;
 
 /**
  * A Database stub that records which identity read the dispatch reached:
@@ -49,18 +55,6 @@ function makeDb(): {
 }
 
 describe('getChildTopicSnapshotForParent dispatch (WP-6 v2 seam)', () => {
-  it('flag-off reads familyLinks (legacy guard), never guardianship', async () => {
-    const { db, familyLinksFindFirst, guardianshipFindFirst } = makeDb();
-
-    // No family link → assertParentAccess throws ForbiddenError before any read.
-    await expect(
-      getChildTopicSnapshotForParent(db, PARENT_ID, CHILD_ID, TOPIC_ID),
-    ).rejects.toThrow();
-
-    expect(familyLinksFindFirst).toHaveBeenCalledTimes(1);
-    expect(guardianshipFindFirst).not.toHaveBeenCalled();
-  });
-
   it('flag-on reads guardianship (v2 edge guard), never familyLinks', async () => {
     const { db, familyLinksFindFirst, guardianshipFindFirst } = makeDb();
 
@@ -87,9 +81,9 @@ describe('getChildTopicSnapshotForParent dispatch (WP-6 v2 seam)', () => {
 // ---------------------------------------------------------------------------
 
 const ADULT_ID = '44444444-4444-4444-8444-444444444444';
-const CREATED_TOPIC_ID = '55555555-5555-4555-8555-555555555555';
-const CREATED_BOOK_ID = '66666666-6666-4666-8666-666666666666';
-const CREATED_SUBJECT_ID = '77777777-7777-4777-8777-777777777777';
+const CREATED_TOPIC_ID = TEST_TOPIC_ID_2;
+const CREATED_BOOK_ID = TEST_BOOK_ID;
+const CREATED_SUBJECT_ID = TEST_SUBJECT_ID;
 
 /**
  * Identify the Drizzle table by reference equality against the imported table
@@ -206,9 +200,9 @@ describe('[WI-1060] undoCloneFromChild transaction atomicity', () => {
   it('rolls back the topic delete when the ancestor cascade throws (atomic undo)', async () => {
     const { db, committed } = makeUndoDb({ failOnBookDelete: true });
 
-    await expect(
-      undoCloneFromChild(db, ADULT_ID, createdIds),
-    ).rejects.toThrow(/Injected failure: delete curriculum_books/);
+    await expect(undoCloneFromChild(db, ADULT_ID, createdIds)).rejects.toThrow(
+      /Injected failure: delete curriculum_books/,
+    );
 
     // The topic delete must NOT have committed — the transaction rolled back.
     expect(committed).not.toContain('curriculum_topics');

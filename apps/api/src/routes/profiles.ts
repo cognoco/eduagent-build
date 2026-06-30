@@ -17,7 +17,6 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
-import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import {
@@ -36,13 +35,7 @@ import {
   ConflictError,
 } from '../errors';
 import {
-  listProfiles,
-  createProfileWithLimitCheck,
-  getProfile,
-  updateProfile,
   updateProfileAppContext,
-  switchProfile,
-  assertProfileCreationAllowed,
   ProfileValidationError,
   ProfileLimitError,
 } from '../services/profile';
@@ -136,41 +129,19 @@ function buildBootstrapProfile(
 export const profileRoutes = new Hono<ProfileEnv>()
   .get('/profiles', async (c) => {
     const db = c.get('db');
-    const v2Enabled = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
-    // [CUT-B1 §2.2a] v2 pre-graph: a graphless owner (clerkIdentity set, no
-    // account/graph yet) has no profiles. The pre-graph allowlist routes this
-    // GET here to return the documented empty list — NOT a 401 — so the
-    // onboarding flow can list profiles before POST /profiles bootstraps the
-    // graph. Without this branch, requireAccount() below 401s every
-    // pre-onboarding user and the client's 401→sign-out makes onboarding an
-    // unbreakable sign-in loop.
-    if (v2Enabled && !c.get('account') && c.get('clerkIdentity')) {
+    if (!c.get('account') && c.get('clerkIdentity')) {
       return c.json(profileListResponseSchema.parse({ profiles: [] }));
     }
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    // [CUT-B2] Post-graph v2 read: under IDENTITY_V2_ENABLED the resolved
-    // account.id IS the caller's organization.id (identity-resolve.ts), so
-    // listProfilesV2(db, account.id) is org-scoped to the caller's own org —
-    // the IDOR guard. The legacy listProfiles path stays intact until WP-FLAG.
-    const profiles = v2Enabled
-      ? await listProfilesV2(db, account.id)
-      : await listProfiles(db, account.id);
+    const profiles = await listProfilesV2(db, account.id);
     return c.json(profileListResponseSchema.parse({ profiles }));
   })
   .post('/profiles', zValidator('json', profileCreateSchema), async (c) => {
     const db = c.get('db');
     const input = c.req.valid('json');
 
-    // [CUT-B1 §2.2a] v2 owner-bootstrap seam. Under IDENTITY_V2_ENABLED the
-    // owner-create POST creates the whole identity graph in one transaction.
-    // The legacy `createProfileWithLimitCheck` writer (which targets
-    // `profiles.account_id -> accounts.id`) MUST NOT run flag-on — the v2
-    // bootstrap created an `organization`/`person` graph, not a legacy
-    // `accounts` row, so the legacy writer would 500 on the FK or write to the
-    // wrong store. So the entire flag-on branch is self-contained and never
-    // falls through to the legacy path.
-    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
+    {
       // Account resolved → the graph already exists (the bootstrap created the
       // owner). This POST is therefore a post-graph request:
       //   - an idempotent replay of the owner create (network retry /
@@ -318,54 +289,12 @@ export const profileRoutes = new Hono<ProfileEnv>()
         throw err;
       }
     }
-
-    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
-    const account = requireAccount(c.get('account'));
-
-    // [CR-2026-05-19-H1 / BUG-407] Profile-creation authorization is owned by
-    // the service layer (assertProfileCreationAllowed). It throws ForbiddenError
-    // for the not-owner / fail-closed cases; the route translates that to 403.
-    try {
-      await assertProfileCreationAllowed(db, account.id, c.get('profileMeta'));
-
-      const profile = await createProfileWithLimitCheck(db, account.id, input, {
-        // [OPT-C] Default 'true' when binding missing (safe default; matches config default).
-        adultOwnerGateEnabled: c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
-      });
-
-      return c.json(profileResponseSchema.parse({ profile }), 201);
-    } catch (err) {
-      if (err instanceof ForbiddenError) {
-        // Covers both the route-entry gate (assertProfileCreationAllowed) and
-        // the service-side adult-owner gate inside createProfileWithLimitCheck.
-        return apiError(c, 403, ERROR_CODES.FORBIDDEN, err.message);
-      }
-      if (err instanceof ProfileLimitError) {
-        // [FIX-API-7] 402 Payment Required is the correct status for a quota gate
-        // that requires a subscription upgrade. 403 Forbidden implies a permissions
-        // issue the user can't resolve; 402 routes the mobile upgrade modal correctly.
-        return apiError(
-          c,
-          402,
-          ERROR_CODES.PROFILE_LIMIT_EXCEEDED,
-          'Your subscription does not support additional profiles. Please upgrade to Family or Pro.',
-        );
-      }
-      if (err instanceof ProfileValidationError) {
-        return validationError(c, { [err.field]: [err.message] });
-      }
-      throw err;
-    }
   })
   .get('/profiles/:id', async (c) => {
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
-    // [WI-586 C1] v2 seam: getProfileV2 reads person/membership/guardianship
-    // (no profiles/family_links/consent_states touch). Flag-off unchanged.
-    const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-      ? await getProfileV2(db, c.req.param('id'), account.id)
-      : await getProfile(db, c.req.param('id'), account.id);
+    const profile = await getProfileV2(db, c.req.param('id'), account.id);
     if (!profile) return notFound(c, 'Profile not found');
     return c.json(profileResponseSchema.parse({ profile }));
   })
@@ -413,9 +342,6 @@ export const profileRoutes = new Hono<ProfileEnv>()
           id,
           account.id,
           defaultAppContext,
-          {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) {
@@ -469,12 +395,7 @@ export const profileRoutes = new Hono<ProfileEnv>()
         );
       }
 
-      // [WI-586 C2] v2 seam: updateProfileV2 writes person table columns
-      // (displayName/avatarUrl/conversationLanguage/pronouns) via an atomic
-      // membership-scoped UPDATE. Flag-off unchanged.
-      const profile = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await updateProfileV2(db, id, account.id, input)
-        : await updateProfile(db, id, account.id, input);
+      const profile = await updateProfileV2(db, id, account.id, input);
       if (!profile) return notFound(c, 'Profile not found');
       return c.json(profileResponseSchema.parse({ profile }));
     },
@@ -493,14 +414,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
       // reverification, proven by Clerk fva, before targeting the owner profile.
       // [WI-586 T1] v2 seam: getPersonScope verifies person ↔ org membership
       // (no profiles table touch). Returns null when not found → same 403.
-      const found = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await getPersonScope(db, profileId, account.id)
-        : await switchProfile(db, profileId, account.id);
+      const found = await getPersonScope(db, profileId, account.id);
       if (!found)
         return forbidden(c, 'Profile does not belong to this account');
 
-      const targetIsOwner =
-        'meta' in found ? found.meta.isOwner : found.isOwner;
+      const targetIsOwner = found.meta.isOwner;
       if (
         isOwnerElevationGateEnabled(c.env?.OWNER_ELEVATION_GATE_ENABLED) &&
         targetIsOwner &&

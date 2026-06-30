@@ -25,7 +25,7 @@ const mockGenerateProgressSummary = jest.fn();
 const mockUpsertProgressSummary = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -35,7 +35,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -47,41 +47,35 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/snapshot-aggregation',
-    ) as typeof import('../../services/snapshot-aggregation');
-    return {
-      ...actual,
-      buildKnowledgeInventory: (...args: unknown[]) =>
-        mockBuildKnowledgeInventory(...args),
-    };
-  },
-);
+jest.mock('../../services/snapshot-aggregation', () => {
+  const actual = jest.requireActual(
+    '../../services/snapshot-aggregation',
+  ) as typeof import('../../services/snapshot-aggregation');
+  return {
+    ...actual,
+    buildKnowledgeInventory: (...args: unknown[]) =>
+      mockBuildKnowledgeInventory(...args),
+  };
+});
 
-jest.mock(
-  '../../services/progress-summary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/progress-summary',
-    ) as typeof import('../../services/progress-summary');
-    return {
-      ...actual,
-      deterministicProgressSummaryFallback: (childName: string) =>
-        `Fallback summary for ${childName}.`,
-      findLatestCompletedLearningSession: (...args: unknown[]) =>
-        mockFindLatestCompletedLearningSession(...args),
-      generateProgressSummary: (...args: unknown[]) =>
-        mockGenerateProgressSummary(...args),
-      upsertProgressSummary: (...args: unknown[]) =>
-        mockUpsertProgressSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/progress-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/progress-summary',
+  ) as typeof import('../../services/progress-summary');
+  return {
+    ...actual,
+    deterministicProgressSummaryFallback: (childName: string) =>
+      `Fallback summary for ${childName}.`,
+    findLatestCompletedLearningSession: (...args: unknown[]) =>
+      mockFindLatestCompletedLearningSession(...args),
+    generateProgressSummary: (...args: unknown[]) =>
+      mockGenerateProgressSummary(...args),
+    upsertProgressSummary: (...args: unknown[]) =>
+      mockUpsertProgressSummary(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -93,6 +87,7 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 
 import { learningSessions } from '@eduagent/database';
 import { progressSummaryGeneration } from './progress-summary';
+import { seedConsentState } from '../../test-utils/consent-seed';
 
 function createStep() {
   return {
@@ -114,6 +109,23 @@ function createDb(fallbackRows: Array<{ id: string; startedAt: Date }> = []) {
         findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
       consentStates: { findFirst: jest.fn() },
+      // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first.
+      // null = no org = allowed immediately (IDENTITY_V2_ENABLED=true in .env.development.local).
+      membership: { findFirst: jest.fn().mockResolvedValue(null) },
+      // WI-867: getGuardianPersonIds (progress-summary.ts:47) reads guardianship.findMany.
+      // Return a guardian so hasParent=true and the gather-context step proceeds.
+      guardianship: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ guardianPersonId: 'parent-1' }]),
+      },
+      // WI-867: progress-summary.ts:58 reads person.findFirst for child display name + language.
+      person: {
+        findFirst: jest.fn().mockResolvedValue({
+          displayName: 'Emma',
+          conversationLanguage: 'en',
+        }),
+      },
     },
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -196,6 +208,17 @@ describe('progressSummaryGeneration', () => {
       { id: 'session-1', startedAt: new Date('2026-05-13T10:00:00Z') },
     ]);
     sharedDb.query.consentStates.findFirst.mockResolvedValue(undefined);
+    // WI-867: membership.findFirst = null → no org → allowed immediately (v2 GDPR gate).
+    sharedDb.query.membership.findFirst.mockResolvedValue(null);
+    // WI-867: guardianship.findMany → one guardian so hasParent=true and gather-context proceeds.
+    sharedDb.query.guardianship.findMany.mockResolvedValue([
+      { guardianPersonId: 'parent-1' },
+    ]);
+    // WI-867: person.findFirst → child display name + language for gather-context step.
+    sharedDb.query.person.findFirst.mockResolvedValue({
+      displayName: 'Emma',
+      conversationLanguage: 'en',
+    });
     mockGetStepDatabase.mockReturnValue(sharedDb);
     mockBuildKnowledgeInventory.mockResolvedValue({
       profileId: 'child-1',
@@ -332,13 +355,17 @@ describe('progressSummaryGeneration', () => {
   // [WI-82] GDPR consent gate — background job must re-check consent at execution time
   describe('GDPR consent gate', () => {
     it.each([
-      ['WITHDRAWN', { status: 'WITHDRAWN' }],
-      ['PENDING', { status: 'PENDING' }],
-      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+      ['WITHDRAWN', 'WITHDRAWN' as const],
+      ['PENDING', 'PENDING' as const],
+      ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
     ])(
       'skips and returns consent_not_granted when consent status is %s',
-      async (_label, consentRow) => {
-        sharedDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+      async (_label, seedState) => {
+        // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+        // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+        seedConsentState(sharedDb as unknown as Record<string, unknown>, {
+          state: seedState,
+        });
 
         const { result } = await invokeProgressSummary({
           profileId: 'child-1',
@@ -355,9 +382,7 @@ describe('progressSummaryGeneration', () => {
     );
 
     it('proceeds normally when consent status is CONSENTED', async () => {
-      sharedDb.query.consentStates.findFirst.mockResolvedValue({
-        status: 'CONSENTED',
-      });
+      // WI-867: membership.findFirst = null (default) → no org → allowed immediately.
       mockFindLatestCompletedLearningSession.mockResolvedValue({
         id: 'session-1',
         startedAt: new Date('2026-05-13T10:00:00Z'),
@@ -382,11 +407,11 @@ describe('progressSummaryGeneration', () => {
         id: 'session-1',
         startedAt: new Date('2026-05-13T10:00:00Z'),
       });
-      // First call (gather-context): CONSENTED → context becomes 'ok'.
-      // Second call (generate-summary): WITHDRAWN → return null → skipped.
-      sharedDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Sequence: gather-context = CONSENTED, generate-summary = WITHDRAWN.
+      seedConsentState(sharedDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
 
       const { result } = await invokeProgressSummary({
         profileId: 'child-1',

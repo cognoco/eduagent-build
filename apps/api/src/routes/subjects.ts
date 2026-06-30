@@ -39,7 +39,6 @@ import { notFound, apiError, SubjectNotFoundError } from '../errors';
 import { parseConversationLanguage } from '../services/llm';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile } from '../route-utils/route-context';
-import { isIdentityV2Enabled } from '../config';
 
 type SubjectRouteEnv = {
   Bindings: {
@@ -118,7 +117,6 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
         conversationLanguage: parseConversationLanguage(
           subjectProfileMeta?.conversationLanguage,
         ),
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
       });
       return c.json(
         createSubjectWithStructureResponseSchema.parse(result),

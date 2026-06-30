@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { getApiUrl } from '../lib/api';
 
@@ -101,5 +101,8 @@ export function useApiReachability(): ApiReachability {
     return () => subscription.remove();
   }, [checkHealth]);
 
-  return { isApiReachable, isChecked, recheck: checkHealth };
+  return useMemo(
+    () => ({ isApiReachable, isChecked, recheck: checkHealth }),
+    [isApiReachable, isChecked, checkHealth],
+  );
 }

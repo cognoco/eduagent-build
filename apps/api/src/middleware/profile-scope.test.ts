@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppVariables } from '../types/hono';
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -11,6 +11,17 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
     addBreadcrumb: jest.fn(),
   };
 });
+
+const mockGetPersonScope = jest.fn();
+const mockFindOwnerPersonScope = jest.fn();
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — profile-scope mw calls getPersonScope/findOwnerPersonScope (db.select() innerJoin chains, unrunnable on unit mock DB); real path covered by identity integration suite — coverage gap tracked WI-905 */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+  }),
+);
 
 import {
   profileScopeMiddleware,
@@ -30,46 +41,34 @@ function captureHttpException(callback: () => unknown): HTTPException {
   expect(thrown).toBeInstanceOf(HTTPException);
   return thrown as HTTPException;
 }
-
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
-      // Only return profile when it "belongs" to the account
-      if (profileId === 'valid-profile-id' && accountId === 'test-account-id') {
-        return Promise.resolve({
-          id: 'valid-profile-id',
-          accountId: 'test-account-id',
-          displayName: 'Test',
-          birthYear: 2014,
-          location: 'EU',
-          consentStatus: 'CONSENTED',
-          isOwner: true,
-        });
-      }
-      return Promise.resolve(null);
-    }),
-    findOwnerProfile: jest.fn().mockImplementation((_db, accountId) => {
-      if (accountId === 'test-account-id') {
-        return Promise.resolve({
-          id: 'owner-profile-id',
-          accountId: 'test-account-id',
-          displayName: 'Owner',
-          birthYear: 2014,
-          location: 'EU',
-          consentStatus: 'CONSENTED',
-          isOwner: true,
-        });
-      }
-      return Promise.resolve(null);
-    }),
-  };
-});
-
 describe('profileScopeMiddleware', () => {
+  beforeEach(() => {
+    mockGetPersonScope.mockReset();
+    mockFindOwnerPersonScope.mockReset();
+    // Default: valid profile belongs to account
+    mockGetPersonScope.mockResolvedValue({
+      profileId: 'valid-profile-id',
+      meta: {
+        birthYear: 2014,
+        location: 'EU',
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: true,
+      },
+    });
+    // Default: owner auto-resolve
+    mockFindOwnerPersonScope.mockResolvedValue({
+      profileId: 'owner-profile-id',
+      meta: {
+        birthYear: 2014,
+        location: 'EU',
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        isOwner: true,
+      },
+    });
+  });
+
   function createApp(): Hono<{ Variables: AppVariables }> {
     const app = new Hono<{ Variables: AppVariables }>();
     // Simulate account middleware having run
@@ -131,6 +130,7 @@ describe('profileScopeMiddleware', () => {
   });
 
   it('returns 403 with proper error body when profile does not belong to account', async () => {
+    mockGetPersonScope.mockResolvedValueOnce(null);
     // [BUG-231] Use `jest.fn()` (typed empty mock) instead of `() => {}` so
     // we don't need to suppress @typescript-eslint/no-empty-function. The
     // intent — silence noisy warnings during this assertion — is preserved
@@ -188,7 +188,7 @@ describe('profileScopeMiddleware', () => {
     });
   });
 
-  // [BUG-487 / BUG-502] Break test: when findOwnerProfile throws a transient
+  // [BUG-487 / BUG-502] Break test: when findOwnerPersonScope throws a transient
   // DB error, profileScopeMiddleware must respond 503 (fail closed) and must
   // NOT call next(). Previous behavior was to swallow the error and call
   // next() with profileId undefined, allowing consent to skip enforcement.
@@ -199,13 +199,12 @@ describe('profileScopeMiddleware', () => {
   // This preserves the CR-SILENT-RECOVERY-1 requirement while fixing the
   // fail-open bug.
   it('[BUG-487/502] returns 503 + logs + captures when findOwnerProfile throws', async () => {
-    const { findOwnerProfile } = jest.requireMock('../services/profile');
     // [BUG-231] See above — jest.fn() avoids the empty-function suppression.
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(jest.fn());
     (captureException as jest.Mock).mockClear();
 
     const dbError = new Error('DB connection lost');
-    findOwnerProfile.mockRejectedValueOnce(dbError);
+    mockFindOwnerPersonScope.mockRejectedValueOnce(dbError);
 
     const app = createApp();
     const res = await app.request('/test');
@@ -240,8 +239,7 @@ describe('profileScopeMiddleware', () => {
   });
 
   it('leaves profileMeta unset when findOwnerProfile returns null (new account) [BUG-TEMP-28]', async () => {
-    const { findOwnerProfile } = jest.requireMock('../services/profile');
-    findOwnerProfile.mockResolvedValueOnce(null);
+    mockFindOwnerPersonScope.mockResolvedValueOnce(null);
 
     const app = createApp();
     const res = await app.request('/test');

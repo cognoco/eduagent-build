@@ -16,9 +16,10 @@
  */
 import { inngest } from '../../inngest/client';
 import { maybeDispatchSuitabilityJudge } from './session-exchange';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
-const PROFILE_ID = '00000000-0000-4000-8000-0000000000c1';
-const SESSION_ID = '00000000-0000-4000-8000-0000000000c2';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
 const REPLY_EVENT_ID = '00000000-0000-4000-8000-0000000000c3';
 const PRECEDING_EVENT_ID = '00000000-0000-4000-8000-0000000000c4';
 

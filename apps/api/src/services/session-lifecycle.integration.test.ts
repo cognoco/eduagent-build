@@ -11,6 +11,9 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { createDatabase } from '@eduagent/database';
 import {
   accounts,
+  membership,
+  organization,
+  person,
   profiles,
   subjects,
   learningSessions,
@@ -70,14 +73,31 @@ async function seedProfile() {
     .values({ clerkUserId, email })
     .returning({ id: accounts.id });
 
+  const birthYear = new Date().getFullYear() - 15;
   const [profile] = await db
     .insert(profiles)
     .values({
       accountId: account!.id,
       displayName: 'Integration Test Learner',
-      birthYear: new Date().getFullYear() - 15,
+      birthYear,
     })
     .returning({ id: profiles.id });
+
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: 'Lifecycle Test Org' });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: 'Integration Test Learner',
+    birthDate: `${birthYear}-06-15`,
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
 
   return { accountId: account!.id, profileId: profile!.id };
 }

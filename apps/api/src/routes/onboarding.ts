@@ -29,13 +29,10 @@ import {
 } from '../services/family-access';
 import { notFound } from '../errors';
 import {
-  updateConversationLanguage,
-  updatePronouns,
   updateInterestsContext,
   assertPronounsSelfEditAllowed,
   OnboardingNotFoundError,
 } from '../services/onboarding';
-import { isIdentityV2Enabled } from '../config';
 import {
   updateConversationLanguageV2,
   updatePronounsV2,
@@ -58,51 +55,30 @@ type OnboardingRouteEnv = {
   };
 };
 
-/**
- * [CUT-B1] Dispatch a conversation-language update to the v2 (person) or legacy
- * (profiles) writer. The v2 writers return false on a missing/cross-org person;
- * map that to the same OnboardingNotFoundError the legacy writer throws so the
- * route's catch behaves identically. `accountId` = organization.id in v2.
- */
+// [WI-867] v2 always: collapsed from dispatch-with-flag pattern.
 async function dispatchUpdateConversationLanguage(
-  v2: boolean,
   db: Database,
   profileId: string,
   accountId: string,
-  conversationLanguage: Parameters<typeof updateConversationLanguage>[3],
+  conversationLanguage: Parameters<typeof updateConversationLanguageV2>[3],
 ): Promise<void> {
-  if (v2) {
-    const ok = await updateConversationLanguageV2(
-      db,
-      profileId,
-      accountId,
-      conversationLanguage,
-    );
-    if (!ok) throw new OnboardingNotFoundError(profileId);
-    return;
-  }
-  await updateConversationLanguage(
+  const ok = await updateConversationLanguageV2(
     db,
     profileId,
     accountId,
     conversationLanguage,
   );
+  if (!ok) throw new OnboardingNotFoundError(profileId);
 }
 
-/** [CUT-B1] Same dispatch shape for pronouns. */
 async function dispatchUpdatePronouns(
-  v2: boolean,
   db: Database,
   profileId: string,
   accountId: string,
-  pronouns: Parameters<typeof updatePronouns>[3],
+  pronouns: Parameters<typeof updatePronounsV2>[3],
 ): Promise<void> {
-  if (v2) {
-    const ok = await updatePronounsV2(db, profileId, accountId, pronouns);
-    if (!ok) throw new OnboardingNotFoundError(profileId);
-    return;
-  }
-  await updatePronouns(db, profileId, accountId, pronouns);
+  const ok = await updatePronounsV2(db, profileId, accountId, pronouns);
+  if (!ok) throw new OnboardingNotFoundError(profileId);
 }
 
 export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
@@ -124,7 +100,6 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const { conversationLanguage } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
-          isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           db,
           profileId,
           account.id,
@@ -149,13 +124,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-      });
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { conversationLanguage } = c.req.valid('json');
       try {
         await dispatchUpdateConversationLanguage(
-          isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           db,
           childProfileId,
           account.id,
@@ -197,13 +169,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       assertNotProxyMode(c);
       const { pronouns } = c.req.valid('json');
       try {
-        await dispatchUpdatePronouns(
-          isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          db,
-          profileId,
-          account.id,
-          pronouns,
-        );
+        await dispatchUpdatePronouns(db, profileId, account.id, pronouns);
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');
@@ -223,18 +189,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-      });
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { pronouns } = c.req.valid('json');
       try {
-        await dispatchUpdatePronouns(
-          isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          db,
-          childProfileId,
-          account.id,
-          pronouns,
-        );
+        await dispatchUpdatePronouns(db, childProfileId, account.id, pronouns);
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');
@@ -261,9 +219,7 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       assertNotProxyMode(c);
       const { interests } = c.req.valid('json');
       try {
-        await updateInterestsContext(db, profileId, account.id, interests, {
-          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-        });
+        await updateInterestsContext(db, profileId, account.id, interests);
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');
@@ -283,20 +239,10 @@ export const onboardingRoutes = new Hono<OnboardingRouteEnv>()
       const parentProfileId = requireProfileId(c.get('profileId'));
       const childProfileId = c.req.param('profileId');
       // [CR-2026-05-19-H1] isOwner gate + IDOR guard (see learner-profile.ts)
-      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId, {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-      });
+      await assertOwnerAndParentAccess(c, db, parentProfileId, childProfileId);
       const { interests } = c.req.valid('json');
       try {
-        await updateInterestsContext(
-          db,
-          childProfileId,
-          account.id,
-          interests,
-          {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          },
-        );
+        await updateInterestsContext(db, childProfileId, account.id, interests);
       } catch (err) {
         if (err instanceof OnboardingNotFoundError) {
           return notFound(c, 'Profile not found');

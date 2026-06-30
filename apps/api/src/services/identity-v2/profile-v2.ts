@@ -72,6 +72,21 @@ function birthYearFromDate(birthDate: string): number {
   return Number(birthDate.slice(0, 4));
 }
 
+/** Month/day-from-DATE, with YYYY-01-01 preserving the year-only sentinel. */
+function birthMonthDayFromDate(birthDate: string): {
+  birthMonth: number | null;
+  birthDay: number | null;
+} {
+  const month = Number(birthDate.slice(5, 7));
+  const day = Number(birthDate.slice(8, 10));
+  const isYearOnlySentinel = month === 1 && day === 1;
+
+  return {
+    birthMonth: isYearOnlySentinel ? null : month,
+    birthDay: isYearOnlySentinel ? null : day,
+  };
+}
+
 /**
  * Premium-LLM derivation (§1.3). `has_premium_llm` is NOT stored on the new
  * model; no application code ever wrote the legacy column (schema default false
@@ -667,6 +682,7 @@ export async function loadProfileRowByIdV2(
 
   const row = rows[0];
   if (!row) return null;
+  const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
 
   return {
     id: row.id,
@@ -674,6 +690,8 @@ export async function loadProfileRowByIdV2(
     displayName: row.displayName,
     avatarUrl: row.avatarUrl ?? null,
     birthYear: birthYearFromDate(row.birthDate),
+    birthMonth,
+    birthDay,
     birthYearSetBy: null,
     location: jurisdictionToLocation(row.residenceJurisdiction),
     isOwner: row.roles.includes('admin'),

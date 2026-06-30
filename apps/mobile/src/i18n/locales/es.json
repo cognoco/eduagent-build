@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Añade tu primera nota para este tema",
     "loadingBookmarks": "Cargando explicaciones guardadas...",
     "loadingSessions": "Cargando sesiones...",
-    "noSessionsSummary": "Aún no hay sesiones"
+    "noSessionsSummary": "Aún no hay sesiones",
+    "ctaStartChallenge": "Iniciar desafío"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Crea un tema para empezar a construir tu mapa de aprendizaje.",
     "createSubject": "Crear tema",
     "openSubject": "Abrir tema",
+    "openSubjectNamed": "Abrir {{subject}}",
+
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",
@@ -4073,9 +4076,7 @@
       "memory": "Memoria",
       "memorySubtitle": "Ve y gestiona lo que tu mentor recuerda.",
       "sessions": "Sesiones",
-      "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes.",
-      "practice": "Práctica",
-      "practiceSubtitle": "Abre el centro de práctica o revisa tu actividad pasada."
+      "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes."
     },
     "moments": {
       "title": "Momentos recientes",
@@ -4111,21 +4112,6 @@
       "filterAll": "Todo",
       "filterMine": "Mis notas",
       "filterMentor": "Marcadores"
-    },
-    "practice": {
-      "openHub": "Abrir centro de práctica",
-      "pastActivityTitle": "Mi actividad pasada",
-      "empty": "Tus quizzes, repasos, evaluaciones y ejercicios aparecerán aquí.",
-      "error": "No pudimos cargar tu actividad anterior.",
-      "type": {
-        "all": "Todos",
-        "quiz": "Quiz",
-        "review": "Repaso",
-        "assessment": "Evaluación",
-        "dictation": "Dictado",
-        "recitation": "Recitación",
-        "fluency_drill": "Ejercicio de fluidez"
-      }
     }
   },
   "accountAdmin": {
@@ -4213,9 +4199,10 @@
     "journal": {
       "title": "Diario",
       "subtitle": "Registros de apoyo que te han enviado, agrupados por estudiante.",
-      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento.",
-      "personPlaceholderTitle": "Los registros compartidos llegan en S5",
-      "personPlaceholderMessage": "Por ahora, este ámbito mantiene ocultas las notas del estudiante, los chats y los elementos privados del diario."
+      "personHint": "Las actualizaciones compartidas contigo aparecen aquí.",
+      "personPlaceholderTitle": "Aún no hay actualizaciones para compartir",
+      "emptyMessage": "Cuando {{name}} termine una sesión o un informe, las actualizaciones compartidas contigo aparecerán aquí.",
+      "personPlaceholderMessage": "Los chats privados, las notas y la memoria del mentor no se muestran aquí."
     }
   },
   "visibility": {
@@ -4240,7 +4227,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Aún no hay registro compartido",
-      "emptyForPerson": "{{name}}: aún no hay registro compartido.",
       "structuralOnly": "Solo datos estructurales. Sin notas ni textos de chat en bruto.",
       "errorTitle": "No se pudo cargar el registro compartido",
       "errorMessage": "Inténtalo de nuevo en un momento.",

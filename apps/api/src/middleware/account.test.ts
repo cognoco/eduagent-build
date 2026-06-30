@@ -1,64 +1,38 @@
 import { Hono } from 'hono';
 import { accountMiddleware, requireAccountMiddleware } from './account';
 import { clearVerifiedClerkEmailCacheForTest } from '../services/clerk-user';
+import { createDatabaseModuleMock } from '../test-utils/database-module';
 import type { AppVariables } from '../types/hono';
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
   return { ...actual, captureException: jest.fn() };
 });
 
-const mockResolveIdentityV2 = jest.fn();
-jest.mock(
-  '../services/identity-v2/identity-resolve' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/identity-v2/identity-resolve',
-    ) as typeof import('../services/identity-v2/identity-resolve');
-    return {
-      ...actual,
-      resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
-    };
-  },
-);
+// [WI-867] resolveIdentityV2 reads login → membership → organization — ALL
+// SEEDABLE. Rather than convenience-mocking the function, seed the canonical
+// OWNER identity graph (account/org id 'test-account-id', person
+// 'test-profile-id') via createDatabaseModuleMock and let the REAL
+// resolveIdentityV2 run against it. Each test sets `seededDb` into context
+// before accountMiddleware runs (see each test's auth middleware).
+const { db: seededDb } = createDatabaseModuleMock();
 
 const mockEnsureInitialTrialSubscriptionV2 = jest.fn();
-jest.mock(
-  '../services/billing/billing-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/billing/billing-v2',
-    ) as typeof import('../services/billing/billing-v2');
-    return {
-      ...actual,
-      ensureInitialTrialSubscriptionV2: (...args: unknown[]) =>
-        mockEnsureInitialTrialSubscriptionV2(...args),
-    };
-  },
-);
-
-import { captureException } from '../services/sentry';
-
-// Mock the account service
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+// gc1-allow: ensureInitialTrialSubscriptionV2 is a WRITE (db.insert) — genuinely unseedable; twin: WI-905 v2 initial-trial-provisioning integration seam (no billing integration suite exists yet)
+jest.mock('../services/billing/billing-v2', () => {
   const actual = jest.requireActual(
-    '../services/account',
-  ) as typeof import('../services/account');
+    '../services/billing/billing-v2',
+  ) as typeof import('../services/billing/billing-v2');
   return {
     ...actual,
-    findOrCreateAccount: jest.fn().mockResolvedValue({
-      id: 'test-account-id',
-      clerkUserId: 'user_test',
-      email: 'test@example.com',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
+    ensureInitialTrialSubscriptionV2: (...args: unknown[]) =>
+      mockEnsureInitialTrialSubscriptionV2(...args),
   };
 });
 
-import { findOrCreateAccount } from '../services/account';
+import { captureException } from '../services/sentry';
 
 type TestEnv = {
   Bindings: { CLERK_SECRET_KEY?: string };
@@ -88,6 +62,7 @@ describe('accountMiddleware', () => {
         email: 'test@example.com',
         emailVerified: true,
       } as AppVariables['user']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -136,30 +111,40 @@ describe('accountMiddleware', () => {
 
     expect(res.status).toBe(401);
     expect(body.message).toMatch(/email/i);
-    expect(findOrCreateAccount).not.toHaveBeenCalled();
+    // On rejection no identity provisioning may run.
+    expect(mockEnsureInitialTrialSubscriptionV2).not.toHaveBeenCalled();
   });
 
-  it('passes correct clerkUserId and email to findOrCreateAccount', async () => {
+  it('resolves identity and provisions the initial trial for a verified caller', async () => {
     const app = new Hono<TestEnv>();
 
     app.use('*', async (c, next) => {
+      // userId matches the seeded login row (clerkUserId 'user_test') so the
+      // real resolveIdentityV2 resolves the canonical owner graph.
       c.set('user', {
-        userId: 'clerk_abc',
+        userId: 'user_test',
         email: 'user@test.com',
         emailVerified: true,
       } as AppVariables['user']);
-      c.set('db', {} as AppVariables['db']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
-    app.get('/test', (c) => c.json({ ok: true }));
+    app.get('/test', (c) => {
+      const account = c.get('account');
+      return c.json({ accountId: account?.id });
+    });
 
-    await app.request('/test');
+    const res = await app.request('/test');
+    const body = await res.json();
 
-    expect(findOrCreateAccount).toHaveBeenCalledWith(
-      {},
-      'clerk_abc',
-      'user@test.com',
+    // Outcome at full strength: the seeded identity resolved (account id) AND
+    // the resolved identity flowed into trial provisioning.
+    expect(res.status).toBe(200);
+    expect(body.accountId).toBe('test-account-id');
+    expect(mockEnsureInitialTrialSubscriptionV2).toHaveBeenCalledWith(
+      seededDb,
+      'test-account-id',
     );
   });
 
@@ -187,14 +172,14 @@ describe('accountMiddleware', () => {
 
     expect(res.status).toBe(401);
     expect(body.message).toMatch(/not verified/i);
-    // findOrCreateAccount must never be called with an unverified email
-    expect(findOrCreateAccount).not.toHaveBeenCalled();
+    // No identity provisioning may run with an unverified email.
+    expect(mockEnsureInitialTrialSubscriptionV2).not.toHaveBeenCalled();
   });
 
   it('[BREAK][BUG-1016] accepts when email_verified is absent but Clerk backend confirms primary email', async () => {
     const app = new Hono<TestEnv>();
 
-    globalThis.fetch = jest.fn(async () => {
+    const fetchMock = jest.fn(async () => {
       return new Response(
         JSON.stringify({
           primary_email_address_id: 'email_primary',
@@ -208,14 +193,18 @@ describe('accountMiddleware', () => {
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
-    }) as unknown as typeof globalThis.fetch;
+    });
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
 
     app.use('*', async (c, next) => {
+      // emailVerified deliberately ABSENT from the JWT claims — the break
+      // scenario. userId matches the seeded login row so the v2 identity
+      // resolves once the email is confirmed via the Clerk backend fallback.
       c.set('user', {
-        userId: 'clerk_no_verified_claim',
+        userId: 'user_test',
         email: 'someone@example.com',
       } as AppVariables['user']);
-      c.set('db', {} as AppVariables['db']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -225,12 +214,12 @@ describe('accountMiddleware', () => {
       CLERK_SECRET_KEY: 'sk_test_123',
     });
 
+    // Core break property: an absent email_verified claim must NOT reject when
+    // Clerk's backend confirms the primary email → request is accepted (200).
     expect(res.status).toBe(200);
-    expect(findOrCreateAccount).toHaveBeenCalledWith(
-      {},
-      'clerk_no_verified_claim',
-      'verified@example.com',
-    );
+    // LOAD-BEARING: the Clerk-backend fetch fallback must actually fire — if the
+    // email-verification fallback is ever removed, this assertion fails.
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it('[BREAK][BUG-497] rejects with 401 when email_verified claim is absent and Clerk fallback is unavailable', async () => {
@@ -253,31 +242,38 @@ describe('accountMiddleware', () => {
 
     expect(res.status).toBe(401);
     expect(body.message).toMatch(/not verified/i);
-    expect(findOrCreateAccount).not.toHaveBeenCalled();
+    // No identity provisioning may run when verification cannot be confirmed.
+    expect(mockEnsureInitialTrialSubscriptionV2).not.toHaveBeenCalled();
   });
 
-  it('accepts request when email is present and email_verified is true', async () => {
+  it('accepts a verified caller, resolves identity, and provisions the initial trial', async () => {
     const app = new Hono<TestEnv>();
 
     app.use('*', async (c, next) => {
+      // userId matches the seeded login row so the real resolveIdentityV2
+      // resolves the canonical owner graph.
       c.set('user', {
-        userId: 'clerk_verified',
+        userId: 'user_test',
         email: 'user@example.com',
         emailVerified: true,
       } as AppVariables['user']);
-      c.set('db', {} as AppVariables['db']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
-    app.get('/test', (c) => c.json({ ok: true }));
+    app.get('/test', (c) => {
+      const account = c.get('account');
+      return c.json({ accountId: account?.id });
+    });
 
     const res = await app.request('/test');
+    const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(findOrCreateAccount).toHaveBeenCalledWith(
-      {},
-      'clerk_verified',
-      'user@example.com',
+    expect(body.accountId).toBe('test-account-id');
+    expect(mockEnsureInitialTrialSubscriptionV2).toHaveBeenCalledWith(
+      seededDb,
+      'test-account-id',
     );
   });
 
@@ -289,28 +285,20 @@ describe('accountMiddleware', () => {
   it('[BREAK][WI-820] escalates to Sentry when billing repair fails, and still calls next()', async () => {
     const repairError = new Error('billing-repair-boom');
     mockEnsureInitialTrialSubscriptionV2.mockRejectedValue(repairError);
-    mockResolveIdentityV2.mockResolvedValue({
-      account: {
-        id: 'acct-v2',
-        clerkUserId: 'clerk_v2',
-        email: 'v2@example.com',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      personId: 'person-v2',
-    });
 
     const app = new Hono<{
       Bindings: { IDENTITY_V2_ENABLED?: string };
       Variables: AppVariables;
     }>();
     app.use('*', async (c, next) => {
+      // userId matches the seeded login row so the real resolveIdentityV2
+      // resolves the owner graph and the billing-repair branch is reached.
       c.set('user', {
-        userId: 'clerk_v2',
+        userId: 'user_test',
         email: 'v2@example.com',
         emailVerified: true,
       } as AppVariables['user']);
-      c.set('db', {} as AppVariables['db']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -397,11 +385,14 @@ describe('[CR-353] requireAccountMiddleware — middleware-ordering regression g
     const app = new Hono<{ Variables: AppVariables }>();
 
     app.use('*', async (c, next) => {
+      // userId matches the seeded login row so the real resolveIdentityV2
+      // resolves the canonical owner graph (account id 'test-account-id').
       c.set('user', {
-        userId: 'user_happy',
+        userId: 'user_test',
         email: 'happy@example.com',
         emailVerified: true,
       } as AppVariables['user']);
+      c.set('db', seededDb as unknown as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);

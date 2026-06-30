@@ -18,6 +18,16 @@
 | `02-what-dies-in-user-terms.md` | "What will I notice missing, and where did its job go?" — code-verified |
 | `03-decision-ledger.md` | "What must I still decide, what does each block, and what's the recommendation?" |
 | `04-reels.html` | **Layer 2** — the clickable walkthrough of the V2 shell (open in any browser). All four scenes + free-roam shell screens; gaps 1–3 given concrete PROPOSAL frames; §13.4 name toggle and §13.7 tone toggle built in; the §2.1 noticing loop animated |
+| `06-screen-function-access-map.md` | Code-backed V2 screen matrix: functionality, trigger, reason, access, and source status for each shell/screen |
+| `07-trigger-flow-logic-map.md` | Mermaid and tabular trigger map showing how users move between V2 surfaces and where logic branches |
+
+## Living publish-readiness plan
+
+The canonical cross-phase checklist for getting V2 publishable is
+[`../2026-06-30-v2-publish-readiness-canonical-plan.md`](../2026-06-30-v2-publish-readiness-canonical-plan.md).
+It sits above the individual S4/S5/S6 phase plans and keeps the current priority
+order explicit: finish supporter visibility, wire real shared records, preserve
+concrete progress in Subjects/Journal, then prepare S6 without executing it.
 
 ## The headline surprises (found 2026-06-12)
 

@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "このトピックの最初のメモを追加",
     "loadingBookmarks": "保存した解説を読み込み中...",
     "loadingSessions": "セッションを読み込み中...",
-    "noSessionsSummary": "まだセッションがありません"
+    "noSessionsSummary": "まだセッションがありません",
+    "ctaStartChallenge": "チャレンジを開始"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "科目を作成して、学習マップの作成を始めましょう。",
     "createSubject": "科目を作成",
     "openSubject": "科目を開く",
+    "openSubjectNamed": "{{subject}}を開く",
+
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",
@@ -4073,9 +4076,7 @@
       "memory": "記憶",
       "memorySubtitle": "メンターが記憶している内容を確認・管理します。",
       "sessions": "セッション",
-      "sessionsSubtitle": "最近のセッションの概要を確認できます。",
-      "practice": "練習",
-      "practiceSubtitle": "練習ハブを開いたり、過去のアクティビティを確認したりできます。"
+      "sessionsSubtitle": "最近のセッションの概要を確認できます。"
     },
     "moments": {
       "title": "最近のモーメント",
@@ -4111,21 +4112,6 @@
       "filterAll": "すべて",
       "filterMine": "自分のノート",
       "filterMentor": "ブックマーク"
-    },
-    "practice": {
-      "openHub": "練習ハブを開く",
-      "pastActivityTitle": "過去のアクティビティ",
-      "empty": "クイズ、復習、アセスメント、ドリルがここに表示されます。",
-      "error": "過去のアクティビティを読み込めませんでした。",
-      "type": {
-        "all": "すべて",
-        "quiz": "クイズ",
-        "review": "復習",
-        "assessment": "アセスメント",
-        "dictation": "ディクテーション",
-        "recitation": "音読",
-        "fluency_drill": "流暢さドリル"
-      }
     }
   },
   "accountAdmin": {
@@ -4213,9 +4199,10 @@
     "journal": {
       "title": "ジャーナル",
       "subtitle": "あなたに送信されたサポート記録を学習者ごとにグループ化しています。",
-      "personHint": "同意が完了すると、共有された記録がここに届きます。",
-      "personPlaceholderTitle": "共有記録はS5に届きます",
-      "personPlaceholderMessage": "現時点では、このスコープでは学習者のメモ、チャット、プライベートなジャーナルの成果物は非表示になっています。"
+      "personHint": "あなたと共有された更新がここに表示されます。",
+      "personPlaceholderTitle": "共有できる更新はまだありません",
+      "emptyMessage": "{{name}} がセッションまたはレポートを完了すると、あなたと共有された更新がここに表示されます。",
+      "personPlaceholderMessage": "プライベートなチャット、メモ、メンターの記憶はここには表示されません。"
     }
   },
   "visibility": {
@@ -4240,7 +4227,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "共有記録はまだありません",
-      "emptyForPerson": "{{name}}: 共有記録はまだありません。",
       "structuralOnly": "構造的な情報のみ。メモやチャットの原文は含まれません。",
       "errorTitle": "共有記録を読み込めませんでした",
       "errorMessage": "しばらくしてからもう一度お試しください。",

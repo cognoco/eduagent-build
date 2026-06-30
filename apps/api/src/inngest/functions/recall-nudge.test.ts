@@ -16,7 +16,7 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -27,7 +27,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
@@ -449,7 +449,10 @@ describe('recallNudge — find-eligible-profiles step DB path', () => {
     const handler = (recallNudge as any).fn;
     await handler({ step });
 
-    expect(db.builder.innerJoin).toHaveBeenCalledTimes(7);
+    // [WI-867] v2-only collapse: query now joins person×membership×organization
+    // (3) + retentionCards + curriculumTopics + curriculumBooks + curricula +
+    // subjects + notificationPreferences = 8. Pre-collapse v1 path had 7.
+    expect(db.builder.innerJoin).toHaveBeenCalledTimes(8);
   });
 
   it('fans out correctly when DB query returns eligible profiles', async () => {

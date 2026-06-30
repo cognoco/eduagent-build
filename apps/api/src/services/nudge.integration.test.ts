@@ -220,6 +220,67 @@ describeIfDb('nudge service (integration)', () => {
     await seedConsent(childXProfileId);
     await seedConsent(childYProfileId);
     await seedPushToken(childXProfileId);
+
+    // [WI-867] v2 identity rows — assertParentAccess now reads guardianship
+    // (flag collapsed to v2-only). Mirror the familyLinks seeded above.
+    await db.insert(organization).values([
+      { id: accA!.id, name: 'Nudge Test Org A' },
+      { id: accB!.id, name: 'Nudge Test Org B' },
+      { id: accChild!.id, name: 'Nudge Test Org Child' },
+    ]);
+    await db.insert(person).values([
+      {
+        id: parentAProfileId,
+        displayName: 'Parent A',
+        birthDate: '1980-06-15',
+        residenceJurisdiction: 'EU',
+      },
+      {
+        id: parentBProfileId,
+        displayName: 'Parent B',
+        birthDate: '1982-06-15',
+        residenceJurisdiction: 'EU',
+      },
+      {
+        id: childXProfileId,
+        displayName: 'Child X',
+        birthDate: '2013-06-15',
+        residenceJurisdiction: 'EU',
+      },
+      {
+        id: childYProfileId,
+        displayName: 'Child Y',
+        birthDate: '2015-06-15',
+        residenceJurisdiction: 'EU',
+      },
+    ]);
+    await db.insert(membership).values([
+      {
+        personId: parentAProfileId,
+        organizationId: accA!.id,
+        roles: ['admin', 'learner'],
+      },
+      {
+        personId: parentBProfileId,
+        organizationId: accB!.id,
+        roles: ['admin', 'learner'],
+      },
+      {
+        personId: childXProfileId,
+        organizationId: accChild!.id,
+        roles: ['learner'],
+      },
+      {
+        personId: childYProfileId,
+        organizationId: accChild!.id,
+        roles: ['learner'],
+      },
+    ]);
+    await db.insert(guardianship).values([
+      { guardianPersonId: parentAProfileId, chargePersonId: childXProfileId },
+      { guardianPersonId: parentBProfileId, chargePersonId: childXProfileId },
+      { guardianPersonId: parentAProfileId, chargePersonId: childYProfileId },
+    ]);
   });
 
   afterAll(async () => {

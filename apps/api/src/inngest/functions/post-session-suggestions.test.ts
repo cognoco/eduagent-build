@@ -9,7 +9,7 @@
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
     '../../services/llm',
   ) as typeof import('../../services/llm');
@@ -19,18 +19,15 @@ jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/llm/sanitize' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/llm/sanitize',
-    ) as typeof import('../../services/llm/sanitize');
-    return {
-      ...actual,
-      sanitizeXmlValue: (s: string) => s,
-    };
-  },
-);
+jest.mock('../../services/llm/sanitize', () => {
+  const actual = jest.requireActual(
+    '../../services/llm/sanitize',
+  ) as typeof import('../../services/llm/sanitize');
+  return {
+    ...actual,
+    sanitizeXmlValue: (s: string) => s,
+  };
+});
 
 const mockDb = {
   query: {
@@ -39,12 +36,17 @@ const mockDb = {
     curriculumTopics: { findMany: jest.fn() },
     consentStates: { findFirst: jest.fn() },
     profiles: { findFirst: jest.fn() },
+    // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first.
+    // null = no org = allowed immediately (IDENTITY_V2_ENABLED=true in .env.development.local).
+    membership: { findFirst: jest.fn() },
+    // WI-867: getPersonLlmContext (helpers.ts:62) reads person.findFirst for birth year + language.
+    person: { findFirst: jest.fn() },
   },
   select: jest.fn(),
   insert: jest.fn(),
 };
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -56,9 +58,10 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { seedConsentState } from '../../test-utils/consent-seed';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -105,6 +108,10 @@ beforeEach(() => {
   mockDb.insert.mockReturnValue({ values: valuesThunk });
   // Default: no consent row → processing allowed (pre-consent-flow account).
   mockDb.query.consentStates.findFirst.mockResolvedValue(undefined);
+  // WI-867: membership.findFirst = null → no org → isGdprProcessingAllowedV2 returns true immediately.
+  mockDb.query.membership.findFirst.mockResolvedValue(null);
+  // WI-867: person.findFirst = null → no person LLM context (allowed; function handles null gracefully).
+  mockDb.query.person.findFirst.mockResolvedValue(null);
   // i18n Phase 1: profile lookup for conversationLanguage.
   mockDb.query.profiles.findFirst.mockResolvedValue({
     conversationLanguage: null,
@@ -219,12 +226,17 @@ describe('post-session-suggestions [WI-116] consent re-check', () => {
   // middleware. A filing event queued before GDPR consent was withdrawn (or
   // a replay) must NOT send learner curriculum data to the LLM or persist
   // derived suggestions for a profile whose consent is no longer granted.
-  it.each(['WITHDRAWN', 'PENDING', 'PARENTAL_CONSENT_REQUESTED'] as const)(
+  it.each([
+    ['WITHDRAWN', 'WITHDRAWN' as const],
+    ['PENDING', 'PENDING' as const],
+    ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
+  ])(
     'skips without calling the LLM or inserting when GDPR consent is %s',
-    async (status) => {
-      mockDb.query.consentStates.findFirst.mockResolvedValue({
-        status,
-        consentType: 'GDPR',
+    async (_label, seedState) => {
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: seedState,
       });
       mockRouteAndCall.mockResolvedValue({
         response: '{"suggestions": ["A", "B"]}',
@@ -244,10 +256,7 @@ describe('post-session-suggestions [WI-116] consent re-check', () => {
   );
 
   it('proceeds when GDPR consent is CONSENTED', async () => {
-    mockDb.query.consentStates.findFirst.mockResolvedValue({
-      status: 'CONSENTED',
-      consentType: 'GDPR',
-    });
+    // WI-867: membership.findFirst = null (default) → no org → allowed immediately.
     mockRouteAndCall.mockResolvedValue({
       response: '{"suggestions": ["A", "B"]}',
     });

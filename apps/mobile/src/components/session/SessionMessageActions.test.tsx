@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react-native';
-import { SessionMessageActions } from './SessionMessageActions';
+import { SessionMessageActions, arePropsEqual } from './SessionMessageActions';
 import type { SessionMessageActionsProps } from './SessionMessageActions';
 import type { ChatMessage } from '../session';
 import { tokens } from '../../lib/design-tokens';
@@ -244,5 +244,138 @@ describe('SessionMessageActions stage gating', () => {
     );
     // QuotaExceededCard renders — we check it's not null (component has testID internally)
     expect(queryByTestId('quota-exceeded-card')).toBeTruthy();
+  });
+});
+
+describe('SessionMessageActions arePropsEqual (React.memo comparator) [WI-964]', () => {
+  it('skips render for identical props', () => {
+    expect(arePropsEqual(defaultProps, { ...defaultProps })).toBe(true);
+  });
+
+  // The crux: messageFeedback is a shared Record whose identity changes whenever
+  // ANY message's feedback changes. The comparator must look only at THIS
+  // message's slice, so an unrelated message's feedback must NOT re-render us.
+  it('skips render when only an UNRELATED message feedback changes', () => {
+    const next: SessionMessageActionsProps = {
+      ...defaultProps,
+      messageFeedback: { 'some-other-message': 'helpful' },
+    };
+    expect(arePropsEqual(defaultProps, next)).toBe(true);
+  });
+
+  it('re-renders when THIS message feedback changes', () => {
+    const next: SessionMessageActionsProps = {
+      ...defaultProps,
+      messageFeedback: { 'ai-1': 'helpful' },
+    };
+    expect(arePropsEqual(defaultProps, next)).toBe(false);
+  });
+
+  it('skips render when only an UNRELATED bookmark changes', () => {
+    const prev: SessionMessageActionsProps = {
+      ...defaultProps,
+      bookmarkState: { 'evt-1': null },
+    };
+    const next: SessionMessageActionsProps = {
+      ...defaultProps,
+      bookmarkState: { 'evt-1': null, 'evt-other': 'bm-1' },
+    };
+    expect(arePropsEqual(prev, next)).toBe(true);
+  });
+
+  it('re-renders when THIS message bookmark changes', () => {
+    const prev: SessionMessageActionsProps = {
+      ...defaultProps,
+      bookmarkState: { 'evt-1': null },
+    };
+    const next: SessionMessageActionsProps = {
+      ...defaultProps,
+      bookmarkState: { 'evt-1': 'bm-1' },
+    };
+    expect(arePropsEqual(prev, next)).toBe(false);
+  });
+
+  it('re-renders when the message identity changes', () => {
+    const next: SessionMessageActionsProps = {
+      ...defaultProps,
+      message: { ...baseMessage },
+    };
+    expect(arePropsEqual(defaultProps, next)).toBe(false);
+  });
+
+  it('re-renders when a gating prop changes', () => {
+    expect(
+      arePropsEqual(defaultProps, { ...defaultProps, isStreaming: true }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, { ...defaultProps, stage: 'greeting' }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        latestAiMessageId: 'ai-2',
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        showWrongSubjectChip: true,
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, { ...defaultProps, isOwner: false }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        challengeRoundInFlight: true,
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, { ...defaultProps, userMessageCount: 4 }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        consumedQuickChipMessageId: 'ai-1',
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        quotaError: {
+          type: 'daily',
+          limit: 10,
+          resetAt: '2026-01-01',
+        } as any,
+      }),
+    ).toBe(false);
+  });
+
+  it('re-renders when a callback identity changes', () => {
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        handleMessageFeedback: jest.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        handleQuickChip: jest.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        onToggleBookmark: jest.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        handleReconnect: jest.fn(),
+      }),
+    ).toBe(false);
   });
 });

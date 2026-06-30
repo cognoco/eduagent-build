@@ -1,11 +1,6 @@
 // @inngest-admin: event-profile (profileId from event; consent check + hard delete scoped by that profileId)
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import {
-  getConsentStatus,
-  getProfileForConsentRevocation,
-} from '../../services/consent';
-import { deleteArchivedProfileIfStillEligible } from '../../services/deletion';
+import { getStepDatabase } from '../helpers';
 import { resolveLatestConsentStatusAnyBasis } from '../../services/identity-v2/consent-status-v2';
 import { getPersonForConsentRevocationV2 } from '../../services/identity-v2/consent-v2';
 import { deleteArchivedPersonIfStillEligibleV2 } from '../../services/identity-v2/deletion-v2';
@@ -41,57 +36,28 @@ export const archiveCleanup = inngest.createFunction(
       // before the delete is the F-122 TOCTOU.
 
       // [CUT-B2] Dispatch to v2 consent model when flag is enabled.
-      if (isIdentityV2EnabledInStep()) {
-        const orgId = await resolveOrgIdForPerson(db, profileId);
-        if (orgId !== null) {
-          const consentStatus = await resolveLatestConsentStatusAnyBasis(
-            db,
-            profileId,
-            orgId,
-          );
-          if (consentStatus === 'CONSENTED') {
-            return { deleted: false, reason: 'consent_restored' };
-          }
-        }
-
-        const person = await getPersonForConsentRevocationV2(db, profileId);
-        if (!person?.archivedAt) {
-          return { deleted: false, reason: 'not_archived' };
-        }
-        if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
-          return { deleted: false, reason: 'retention_window_not_elapsed' };
-        }
-
-        const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
-        const deleted = await deleteArchivedPersonIfStillEligibleV2(
+      const orgId = await resolveOrgIdForPerson(db, profileId);
+      if (orgId !== null) {
+        const consentStatus = await resolveLatestConsentStatusAnyBasis(
           db,
           profileId,
-          retentionCutoff,
+          orgId,
         );
-        return deleted
-          ? { deleted: true }
-          : { deleted: false, reason: 'consent_restored_or_unarchived' };
+        if (consentStatus === 'CONSENTED') {
+          return { deleted: false, reason: 'consent_restored' };
+        }
       }
 
-      const consentStatus = await getConsentStatus(db, profileId);
-      if (consentStatus === 'CONSENTED') {
-        return { deleted: false, reason: 'consent_restored' };
-      }
-
-      const profile = await getProfileForConsentRevocation(db, profileId);
-      if (!profile?.archivedAt) {
+      const person = await getPersonForConsentRevocationV2(db, profileId);
+      if (!person?.archivedAt) {
         return { deleted: false, reason: 'not_archived' };
       }
-      if (Date.now() - profile.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
+      if (Date.now() - person.archivedAt.getTime() < ARCHIVE_RETENTION_MS) {
         return { deleted: false, reason: 'retention_window_not_elapsed' };
       }
 
-      // [F-122] The terminal delete is ATOMIC: the eligibility predicate
-      // (still archived, past retention, not CONSENTED) is folded into the
-      // DELETE's WHERE so a concurrent restoreConsent() between the reads above
-      // and this statement cannot lose a restored profile.
       const retentionCutoff = new Date(Date.now() - ARCHIVE_RETENTION_MS);
-      const deleted = await deleteArchivedProfileIfStillEligible(
+      const deleted = await deleteArchivedPersonIfStillEligibleV2(
         db,
         profileId,
         retentionCutoff,

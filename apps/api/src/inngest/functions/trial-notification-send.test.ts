@@ -24,7 +24,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -38,46 +38,42 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 // [BUG-117] Atomic dedup gate. Default false = not limited = caller may send.
 const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      checkAndLogRateLimitInternal: (...args: unknown[]) =>
-        mockCheckAndLogRateLimitInternal(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
+  };
+});
 
-const mockFindOwnerProfile = jest.fn();
+// [WI-867] findOwnerPersonId — db.select({personId}).from(person).innerJoin(membership) UNSEEDABLE join.
+// Integration twin: tests/integration/inngest-trial-expiry.integration.test.ts
+const mockFindOwnerPersonId = jest.fn();
 jest.mock(
-  '../../services/profile' /* gc1-allow: pattern-a conversion */,
+  '../../services/identity-v2/helpers' /* gc1-allow: findOwnerPersonId — db.select({personId}).from(person).innerJoin(membership) UNSEEDABLE join. Integration twin: tests/integration/inngest-trial-expiry.integration.test.ts */,
   () => {
     const actual = jest.requireActual(
-      '../../services/profile',
-    ) as typeof import('../../services/profile');
+      '../../services/identity-v2/helpers',
+    ) as typeof import('../../services/identity-v2/helpers');
     return {
       ...actual,
-      findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+      findOwnerPersonId: (...args: unknown[]) => mockFindOwnerPersonId(...args),
     };
   },
 );
@@ -110,19 +106,15 @@ async function runHandler(data: {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
-  // Pin the identity cutover flag OFF so sendTrialNotificationToAccountOwner
-  // resolves the owner via the legacy findOwnerProfile path these mocks target,
-  // regardless of any IDENTITY_V2_ENABLED leaked into process.env by the
-  // Doppler-synced .env.development.local.
-  process.env['IDENTITY_V2_ENABLED'] = 'false';
-  mockFindOwnerProfile.mockImplementation(
-    async (_db: unknown, accountId: string) => ({ id: `owner-${accountId}` }),
+  // [WI-867] IDENTITY_V2_ENABLED collapsed → v2 always-on. No flag pin.
+  // findOwnerPersonId returns string | null directly (not { id: string }).
+  mockFindOwnerPersonId.mockImplementation(
+    async (_db: unknown, accountId: string) => `owner-${accountId}`,
   );
 });
 
 afterEach(() => {
   delete process.env['DATABASE_URL'];
-  delete process.env['IDENTITY_V2_ENABLED'];
 });
 
 describe('trialNotificationSend', () => {
@@ -219,7 +211,8 @@ describe('trialNotificationSend', () => {
   });
 
   it('reports skipped when the owner profile cannot be resolved', async () => {
-    mockFindOwnerProfile.mockResolvedValueOnce(null);
+    // [WI-867] findOwnerPersonId returns null when no admin member found.
+    mockFindOwnerPersonId.mockResolvedValueOnce(null);
 
     const { result } = await runHandler({
       accountId: 'acc-no-owner',

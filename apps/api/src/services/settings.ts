@@ -10,7 +10,6 @@ import {
   notificationLog,
   learningModes,
   learningProfiles,
-  profiles,
   membership,
   withdrawalArchivePreferences,
   familyPreferences,
@@ -77,26 +76,16 @@ async function verifyProfileOwnership(
   accountId: string,
   opts?: IdentityV2Opts,
 ): Promise<void> {
-  if (opts?.identityV2Enabled) {
-    // v2: account.id = organization.id; write authority = self OR guardian edge
-    // (membership alone is existence-visibility, not write authority).
-    // callerPersonId is the authenticated caller, never request-supplied.
-    // v2: profileId === personId on the cutover path (see CUT-B migration notes).
-    await verifyPersonOwnershipV2(
-      db,
-      profileId,
-      accountId,
-      requireCallerPersonId(opts),
-    );
-    return;
-  }
-  const [owner] = await db
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)));
-  if (!owner) {
-    throw new Error(`Profile ${profileId} not found for account`);
-  }
+  // v2: account.id = organization.id; write authority = self OR guardian edge
+  // (membership alone is existence-visibility, not write authority).
+  // callerPersonId is the authenticated caller, never request-supplied.
+  // v2: profileId === personId on the cutover path (see CUT-B migration notes).
+  await verifyPersonOwnershipV2(
+    db,
+    profileId,
+    accountId,
+    requireCallerPersonId(opts!),
+  );
 }
 
 /**
@@ -111,14 +100,7 @@ async function isProfileOwner(
   accountId: string,
   opts?: IdentityV2Opts,
 ): Promise<boolean> {
-  if (opts?.identityV2Enabled) {
-    return verifyPersonIsOrgAdminV2(db, profileId, accountId);
-  }
-  const profile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, profileId),
-    columns: { isOwner: true },
-  });
-  return profile?.isOwner ?? false;
+  return verifyPersonIsOrgAdminV2(db, profileId, accountId);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,31 +172,19 @@ export async function upsertNotificationPrefs(
       .where(
         and(
           eq(notificationPreferences.profileId, profileId),
-          opts?.identityV2Enabled
-            ? // v2 defense-in-depth: enforce the person↔org link via an EXISTS
-              // subquery against membership (account.id = organization.id).
-              exists(
-                db
-                  .select({ _: sql`1` })
-                  .from(membership)
-                  .where(
-                    and(
-                      eq(membership.personId, profileId),
-                      eq(membership.organizationId, accountId),
-                    ),
-                  ),
-              )
-            : exists(
-                db
-                  .select({ _: sql`1` })
-                  .from(profiles)
-                  .where(
-                    and(
-                      eq(profiles.id, profileId),
-                      eq(profiles.accountId, accountId),
-                    ),
-                  ),
+          // v2 defense-in-depth: enforce the person↔org link via an EXISTS
+          // subquery against membership (account.id = organization.id).
+          exists(
+            db
+              .select({ _: sql`1` })
+              .from(membership)
+              .where(
+                and(
+                  eq(membership.personId, profileId),
+                  eq(membership.organizationId, accountId),
+                ),
               ),
+          ),
         ),
       )
       .returning({ id: notificationPreferences.id });
@@ -232,22 +202,15 @@ export async function upsertNotificationPrefs(
     // [BUG-661] Same defense-in-depth on insert: verify profile ownership
     // immediately before write to close the read-then-write TOCTOU window
     // (in addition to verifyProfileOwnership at the top of the function).
-    const [ownerCheck] = opts?.identityV2Enabled
-      ? await db
-          .select({ id: membership.personId })
-          .from(membership)
-          .where(
-            and(
-              eq(membership.personId, profileId),
-              eq(membership.organizationId, accountId),
-            ),
-          )
-      : await db
-          .select({ id: profiles.id })
-          .from(profiles)
-          .where(
-            and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)),
-          );
+    const [ownerCheck] = await db
+      .select({ id: membership.personId })
+      .from(membership)
+      .where(
+        and(
+          eq(membership.personId, profileId),
+          eq(membership.organizationId, accountId),
+        ),
+      );
     if (!ownerCheck) {
       throw new Error(
         `notification_preferences upsert blocked: profile ${profileId} not owned by account ${accountId}`,

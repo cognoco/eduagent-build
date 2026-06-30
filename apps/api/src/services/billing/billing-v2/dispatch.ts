@@ -12,36 +12,10 @@
 // flag-off break test (config.identity-v2.test.ts) pins that semantics.
 // ---------------------------------------------------------------------------
 
-import { isIdentityV2Enabled } from '../../../config';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
 import type { StripePriceEnv } from '../../billing-pricing';
 import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
-
-// Legacy handlers
-import {
-  handleSubscriptionEvent,
-  handleSubscriptionDeleted,
-  handleCheckoutCompleted,
-  handlePaymentFailed,
-  handlePaymentSucceeded,
-} from '../stripe-webhook-handler';
-import {
-  resolveAccountId,
-  handleInitialPurchase,
-  handleRenewal,
-  handleCancellation,
-  handleExpiration,
-  handleBillingIssue,
-  handleSubscriberAlias,
-  handleProductChange,
-  handleNonRenewingPurchase,
-  handleUncancellation,
-} from '../revenuecat-webhook-handler';
-import {
-  ensureFreeSubscription,
-  isRevenuecatEventProcessed,
-} from '../../billing';
 
 // v2 handlers
 import {
@@ -106,14 +80,6 @@ export interface StripeWebhookHandlers {
   ) => Promise<void>;
 }
 
-const LEGACY_STRIPE_HANDLERS: StripeWebhookHandlers = {
-  handleSubscriptionEvent,
-  handleSubscriptionDeleted,
-  handleCheckoutCompleted,
-  handlePaymentFailed,
-  handlePaymentSucceeded,
-};
-
 const V2_STRIPE_HANDLERS: StripeWebhookHandlers = {
   handleSubscriptionEvent: handleSubscriptionEventV2,
   handleSubscriptionDeleted: handleSubscriptionDeletedV2,
@@ -125,9 +91,7 @@ const V2_STRIPE_HANDLERS: StripeWebhookHandlers = {
 export function getStripeWebhookHandlers(env: {
   IDENTITY_V2_ENABLED?: string;
 }): StripeWebhookHandlers {
-  return isIdentityV2Enabled(env.IDENTITY_V2_ENABLED)
-    ? V2_STRIPE_HANDLERS
-    : LEGACY_STRIPE_HANDLERS;
+  return V2_STRIPE_HANDLERS;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,21 +154,6 @@ export interface RevenuecatWebhookHandlers {
   ) => Promise<void>;
 }
 
-const LEGACY_REVENUECAT_HANDLERS: RevenuecatWebhookHandlers = {
-  resolveAccountId,
-  isRevenuecatEventProcessed,
-  ensureFreeSubscription,
-  handleInitialPurchase,
-  handleRenewal,
-  handleCancellation,
-  handleExpiration,
-  handleBillingIssue,
-  handleSubscriberAlias,
-  handleProductChange,
-  handleNonRenewingPurchase,
-  handleUncancellation,
-};
-
 const V2_REVENUECAT_HANDLERS: RevenuecatWebhookHandlers = {
   resolveAccountId: resolveAccountIdV2,
   isRevenuecatEventProcessed: isRevenuecatEventProcessedV2,
@@ -223,7 +172,5 @@ const V2_REVENUECAT_HANDLERS: RevenuecatWebhookHandlers = {
 export function getRevenuecatWebhookHandlers(env: {
   IDENTITY_V2_ENABLED?: string;
 }): RevenuecatWebhookHandlers {
-  return isIdentityV2Enabled(env.IDENTITY_V2_ENABLED)
-    ? V2_REVENUECAT_HANDLERS
-    : LEGACY_REVENUECAT_HANDLERS;
+  return V2_REVENUECAT_HANDLERS;
 }

@@ -19,11 +19,14 @@
 import { eq, inArray, and, count, gte } from 'drizzle-orm';
 import {
   accounts,
+  guardianship,
+  person,
   profiles,
   familyLinks,
   notificationLog,
   createDatabase,
 } from '@eduagent/database';
+import { ensureV2IdentityForLegacyProfileTest } from '../test-utils/legacy-identity-anchors';
 import { ForbiddenError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
@@ -79,6 +82,17 @@ async function seedFixture() {
       isOwner: true,
     })
     .returning();
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: profile!.id,
+    displayName: 'Settings Test User',
+    birthYear: 2000,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    isOwner: true,
+    seedBaselineSubscription: false,
+  });
   return { account: account!, profile: profile! };
 }
 
@@ -126,6 +140,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         account.id,
         NOTIFICATION_TYPE,
         { hours: HOURS, maxCount: MAX_COUNT },
+        { callerPersonId: profile.id },
       );
       expect(rateLimited).toBe(false);
     }
@@ -149,10 +164,14 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
     const CONCURRENT = 15;
     const results = await Promise.allSettled(
       Array.from({ length: CONCURRENT }, () =>
-        checkAndLogRateLimit(db, profile.id, account.id, NOTIFICATION_TYPE, {
-          hours: HOURS,
-          maxCount: MAX_COUNT,
-        }),
+        checkAndLogRateLimit(
+          db,
+          profile.id,
+          account.id,
+          NOTIFICATION_TYPE,
+          { hours: HOURS, maxCount: MAX_COUNT },
+          { callerPersonId: profile.id },
+        ),
       ),
     );
 
@@ -203,6 +222,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
         account.id,
         NOTIFICATION_TYPE,
         { hours: HOURS, maxCount: MAX_COUNT },
+        { callerPersonId: profile.id },
       );
       expect(limited).toBe(false);
     }
@@ -214,6 +234,7 @@ describe('[BUG-861] checkAndLogRateLimit concurrent cap enforcement (integration
       account.id,
       NOTIFICATION_TYPE,
       { hours: HOURS, maxCount: MAX_COUNT },
+      { callerPersonId: profile.id },
     );
     expect(rateLimited).toBe(true);
 
@@ -295,10 +316,36 @@ async function seedCelebrationFixture() {
     })
     .returning();
 
-  // Link child only to parent A
+  // Link child only to parent A (legacy table — kept for legacy-path callers)
   await db.insert(familyLinks).values({
     parentProfileId: profileA!.id,
     childProfileId: childProfile!.id,
+  });
+
+  // [WI-867] v2 identity rows — assertParentAccess now reads guardianship.
+  await db.insert(person).values([
+    {
+      id: profileA!.id,
+      displayName: 'Parent A',
+      birthDate: '1985-06-15',
+      residenceJurisdiction: 'EU',
+    },
+    {
+      id: profileB!.id,
+      displayName: 'Parent B',
+      birthDate: '1986-06-15',
+      residenceJurisdiction: 'EU',
+    },
+    {
+      id: childProfile!.id,
+      displayName: 'Child',
+      birthDate: '2014-06-15',
+      residenceJurisdiction: 'EU',
+    },
+  ]);
+  await db.insert(guardianship).values({
+    guardianPersonId: profileA!.id,
+    chargePersonId: childProfile!.id,
   });
 
   return {

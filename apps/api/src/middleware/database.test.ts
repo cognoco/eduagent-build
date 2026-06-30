@@ -69,7 +69,10 @@ describe('databaseMiddleware', () => {
 
     await app.request('/test', {}, TEST_ENV);
 
-    expect(dbFromContext).toEqual({ mock: true });
+    // [WI-867] The database middleware now augments the handle with a `query`
+    // Proxy (v2 db.query seam); assert the original handle is preserved without
+    // over-specifying the added key.
+    expect(dbFromContext).toMatchObject({ mock: true });
   });
 
   it('closes the request database handle after the handler finishes', async () => {

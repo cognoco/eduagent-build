@@ -357,6 +357,61 @@ Each phase ships independently, behind flags, and is valuable alone. Per-phase i
 | **S5** | Visibility contract surfaces: linking ceremony, two-way transparency views, managed/credentialized tiers, graduation moment | **Yes** | The trust layer |
 | **S6** | Cutover & deletions: exit funnel dissolves (gated on S3 evals), old tabs retire, V0 constraint retirement **ruling executed** (§13) | — | The ~25-screen end state |
 
+### 11.1 V2 App Map
+
+These drawings are the review entry point for "which screen does what, when is it triggered, why does it exist, and who can access it." The code-backed screen matrix lives in [`../plans/v2-dossier/06-screen-function-access-map.md`](../plans/v2-dossier/06-screen-function-access-map.md); the trigger-level logic map lives in [`../plans/v2-dossier/07-trigger-flow-logic-map.md`](../plans/v2-dossier/07-trigger-flow-logic-map.md).
+
+```mermaid
+flowchart TD
+  Start[Signed-in app route] --> Gates{Auth, profile, consent gates clear?}
+  Gates -- no --> GateScreens[Sign-in / profile / consent / save-wizard gates]
+  Gates -- yes --> Flag{MODE_NAV_V2_ENABLED?}
+  Flag -- no --> Legacy[V0/V1 shell remains available until S6]
+  Flag -- yes --> Shell[V2 shell: Mentor + Subjects + Journal]
+  Shell --> Scope[Scope chip / active scope]
+  Scope --> Me[Me scope]
+  Scope --> Support[Support hub scope]
+  Scope --> Person[Person scope]
+
+  Me --> Mentor[Mentor: /now feed, cold start, ask bar, homework, light practice]
+  Me --> Subjects[Subjects: browse, create, open Subject Hub]
+  Me --> Journal[Journal: moments, sessions, notes, practice, memory, reports]
+
+  Support --> SHMentor[Support Mentor: people/support list]
+  Support --> SHSubjects[Support Subjects: supported people]
+  Support --> SHJournal[Support Journal: shared-record placeholders]
+
+  Person --> PMentor[Person Mentor: person support placeholder]
+  Person --> PSubjects[Person Subjects: structural mask]
+  Person --> PJournal[Person Journal: shared-record placeholder]
+
+  Mentor --> Session[Session engine]
+  Mentor --> Homework[Homework camera]
+  Mentor --> Quiz[Quiz / Dictation / Practice]
+  Subjects --> Hub[Subject Hub]
+  Hub --> Session
+  Hub --> Topic[Topic / review / challenge]
+  Journal --> Account[Avatar/account admin for old More jobs]
+```
+
+```mermaid
+flowchart LR
+  Now[GET /now?scope=self] --> Cards{Now card kind}
+  Cards -- unfinished_session --> Resume[Resume session]
+  Cards -- retention_due --> Review[Topic review]
+  Cards -- parked_item / needs_deepening / challenge_ready --> Hub[Subject Hub or Topic]
+  Cards -- ledger_moment --> Moment[Journal moments / reward receipt]
+  Cards -- support.hub --> SupportHub[Support hub]
+
+  Bar[Mentor input bar] --> Intent{Text intent}
+  Intent -- question --> NewSession[New Mentor session]
+  Intent -- route words --> DeepLink[Now deep-link route]
+  Intent -- uncertain --> LightPractice[Light practice]
+
+  Camera[Mentor camera/homework] --> Capture[Homework camera]
+  Capture --> HWSession[Session with help-me/check-answer first response]
+```
+
 **Evidence gate (S2 → S3) — justify per-phase, not the whole program.** The discovery thesis is a hypothesis sourced from a code atlas, not usage telemetry (§Problem source), and the program's most valuable phases (S4/S5: chip collapse, privacy contract) are *blocked* on the identity runway anyway. So the program is **not** committed as a unit. S1+S2 are the cheap bet that buys evidence: ship them behind `MODE_NAV_V2_ENABLED` and evaluate them through an **observed cohort** while pre-launch telemetry is unavailable. Minimum bar: 3–5 friendly families with a 13+ teen; pass means (a) the teen returns unprompted at least twice in week one and engages a feed/Subject action that is not only the camera, and (b) the parent can answer "what did my kid work on this week?" from the app alone in under one minute. **S3–S6 proceed only on that evidence** (and, for S4+, identity-foundation landing). If the feed does not move discovery, the redesign stops at a validated S2 having spent two phases, not six; the pre-committed correction is to demote the feed and keep a camera-first shell rather than continue the full redesign on vibes. This is the strangle's whole point made explicit — the back half must earn its commitment, it is not pre-authorized by this spec.
 
 ## 12. ADR obligations

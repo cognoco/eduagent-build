@@ -23,6 +23,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
@@ -44,6 +45,12 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
       return {
         findFirst: (...args: unknown[]) => mockFindConsentState(...args),
       };
+    }
+    // [WI-867] v2: assertParentAccess now delegates to validateGuardianChargeRelationshipV2
+    // → isGuardianOf → db.query.guardianship.findFirst. Share the same mock so
+    // existing IDOR tests that set mockFindFamilyLink to null still block access.
+    if (prop === 'guardianship') {
+      return { findFirst: (...args: unknown[]) => mockFindFamilyLink(...args) };
     }
     return Reflect.get(target, prop, receiver);
   },
@@ -92,12 +99,29 @@ jest.mock('../services/profile', () => {
   };
 });
 
+// [WI-867] v2 profile-scope seam continuity mock.
+// birthYear: 2008 mirrors the legacy getProfile mock's value (age 18 in 2026),
+// required for assertPronounsSelfEditAllowed (min age 13).
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockResolvedValue(personScope({ birthYear: 2008 }));
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Onboarding service mock
 // ---------------------------------------------------------------------------
 
-const mockUpdateConversationLanguage = jest.fn();
-const mockUpdatePronouns = jest.fn();
+// [WI-867] v2 onboarding mocks (collapsed from flag-branch dispatch)
+const mockUpdateConversationLanguageV2 = jest.fn().mockResolvedValue(true);
+const mockUpdatePronounsV2 = jest.fn().mockResolvedValue(true);
 const mockUpdateInterestsContext = jest.fn();
 
 jest.mock('../services/onboarding', () => {
@@ -107,13 +131,22 @@ jest.mock('../services/onboarding', () => {
   return {
     ...actual,
     // Preserve the error class so instanceof checks work in the route handler
-    updateConversationLanguage: (...args: unknown[]) =>
-      mockUpdateConversationLanguage(...args),
-    updatePronouns: (...args: unknown[]) => mockUpdatePronouns(...args),
     updateInterestsContext: (...args: unknown[]) =>
       mockUpdateInterestsContext(...args),
   };
 });
+// [WI-867] v2 onboarding: collapsed route always calls v2 fns. updateConversationLanguageV2
+// and updatePronounsV2 use db.update(person); can't execute against the unit mock DB.
+// Real-execution coverage: services/identity-v2/onboarding-v2.integration.test.ts
+jest.mock(
+  '../services/identity-v2/onboarding-v2' /* gc1-allow: v2 onboarding fns do db.update(person) — unrunnable against this route test's unit mock DB; real-execution coverage in services/identity-v2/onboarding-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/onboarding-v2'),
+    updateConversationLanguageV2: (...args: unknown[]) =>
+      mockUpdateConversationLanguageV2(...args),
+    updatePronounsV2: (...args: unknown[]) => mockUpdatePronounsV2(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Inngest framework boundary mock (required by index.ts import chain)
@@ -181,6 +214,9 @@ describe('onboarding routes', () => {
       childProfileId: CHILD_PROFILE_ID,
     });
     mockFindConsentState.mockResolvedValue(undefined);
+    // [WI-867] Restore v2 seam defaults after clearAllMocks.
+    mockFindOwnerPersonScope.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue(personScope({ birthYear: 2008 }));
   });
 
   function mockAutoResolvedOwnerProfile() {
@@ -194,13 +230,20 @@ describe('onboarding routes', () => {
       conversationLanguage: 'en',
       isOwner: true,
     });
+    // [WI-867] Post-collapse the v2 profile-scope auto-resolve path resolves via
+    // findOwnerPersonScope (no X-Profile-Id header). Seed it to the owner so
+    // resolution SUCCEEDS with resolvedVia:'auto' — the 403 must then come from
+    // the owner gate refusing 'auto', not from an unresolved 400.
+    mockFindOwnerPersonScope.mockResolvedValueOnce(
+      personScope({ isOwner: true }),
+    );
   }
 
   // ---- PATCH /v1/onboarding/language (self) --------------------------------
 
   describe('PATCH /v1/onboarding/language', () => {
     it('returns 200 on successful language update', async () => {
-      mockUpdateConversationLanguage.mockResolvedValueOnce(undefined);
+      mockUpdateConversationLanguageV2.mockResolvedValueOnce(true);
 
       const res = await app.request(
         '/v1/onboarding/language',
@@ -215,7 +258,7 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
-      expect(mockUpdateConversationLanguage).toHaveBeenCalledWith(
+      expect(mockUpdateConversationLanguageV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
         'test-account-id',
@@ -235,7 +278,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(400);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 400 for missing conversationLanguage field', async () => {
@@ -250,13 +293,11 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(400);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 404 when profile not found (OnboardingNotFoundError)', async () => {
-      mockUpdateConversationLanguage.mockRejectedValueOnce(
-        new OnboardingNotFoundError('test-profile-id'),
-      );
+      mockUpdateConversationLanguageV2.mockResolvedValueOnce(false);
 
       const res = await app.request(
         '/v1/onboarding/language',
@@ -297,23 +338,15 @@ describe('onboarding routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(400);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     // [CR-2026-05-21-011] Break test: a non-owner (child) profile must NOT be
     // able to PATCH conversationLanguage on its own profile. The tutor language
     // is an account-level setting owned by the parent.
     it('[CR-2026-05-21-011] returns 403 when non-owner profile tries to PATCH conversationLanguage', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
       // Caller is a child profile (isOwner: false)
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2010,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(personScope({ isOwner: false }));
 
       const res = await app.request(
         '/v1/onboarding/language',
@@ -334,13 +367,13 @@ describe('onboarding routes', () => {
         code: 'FORBIDDEN',
         message: 'Only the account owner can change the conversation language.',
       });
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     // [CR-2026-05-21-011] Positive companion: an owner profile can still PATCH
     // conversationLanguage successfully.
     it('[CR-2026-05-21-011] returns 200 when owner profile PATCHes conversationLanguage', async () => {
-      mockUpdateConversationLanguage.mockResolvedValueOnce(undefined);
+      mockUpdateConversationLanguageV2.mockResolvedValueOnce(true);
       // Default mock already returns isOwner: true — no override needed.
 
       const res = await app.request(
@@ -356,7 +389,7 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
-      expect(mockUpdateConversationLanguage).toHaveBeenCalledWith(
+      expect(mockUpdateConversationLanguageV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
         'test-account-id',
@@ -369,7 +402,7 @@ describe('onboarding routes', () => {
 
   describe('PATCH /v1/onboarding/:profileId/language (parent)', () => {
     it('returns 200 when parent has access to child', async () => {
-      mockUpdateConversationLanguage.mockResolvedValueOnce(undefined);
+      mockUpdateConversationLanguageV2.mockResolvedValueOnce(true);
 
       const res = await app.request(
         `/v1/onboarding/${CHILD_PROFILE_ID}/language`,
@@ -383,7 +416,7 @@ describe('onboarding routes', () => {
 
       expect(res.status).toBe(200);
       // Must write to child profile ID, not the parent's
-      expect(mockUpdateConversationLanguage).toHaveBeenCalledWith(
+      expect(mockUpdateConversationLanguageV2).toHaveBeenCalledWith(
         expect.anything(),
         CHILD_PROFILE_ID,
         'test-account-id',
@@ -406,7 +439,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     // [BUG-406 / CR-2026-05-19-H1] Break test: a non-owner profile (child on
@@ -415,16 +448,10 @@ describe('onboarding routes', () => {
     // assertParentAccess only checked the link — not whether the caller is the
     // account owner. assertOwnerAndParentAccess adds that gate.
     it('[BUG-406] returns 403 when non-owner profile tries to update child language', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
       // Caller profile is a child account (isOwner: false)
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       // Family link exists — the bug was that this was sufficient to grant access
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
@@ -442,13 +469,11 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 404 when child profile not found after access granted', async () => {
-      mockUpdateConversationLanguage.mockRejectedValueOnce(
-        new OnboardingNotFoundError(CHILD_PROFILE_ID),
-      );
+      mockUpdateConversationLanguageV2.mockResolvedValueOnce(false);
 
       const res = await app.request(
         `/v1/onboarding/${CHILD_PROFILE_ID}/language`,
@@ -476,7 +501,7 @@ describe('onboarding routes', () => {
         TEST_ENV,
       );
       expect(res.status).toBe(400);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 401 without auth', async () => {
@@ -497,7 +522,7 @@ describe('onboarding routes', () => {
 
   describe('PATCH /v1/onboarding/pronouns', () => {
     it('returns 200 on successful pronouns update', async () => {
-      mockUpdatePronouns.mockResolvedValueOnce(undefined);
+      mockUpdatePronounsV2.mockResolvedValueOnce(true);
 
       const res = await app.request(
         '/v1/onboarding/pronouns',
@@ -512,7 +537,7 @@ describe('onboarding routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.success).toBe(true);
-      expect(mockUpdatePronouns).toHaveBeenCalledWith(
+      expect(mockUpdatePronounsV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
         'test-account-id',
@@ -521,7 +546,7 @@ describe('onboarding routes', () => {
     });
 
     it('returns 200 when clearing pronouns (null)', async () => {
-      mockUpdatePronouns.mockResolvedValueOnce(undefined);
+      mockUpdatePronounsV2.mockResolvedValueOnce(true);
 
       const res = await app.request(
         '/v1/onboarding/pronouns',
@@ -534,7 +559,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockUpdatePronouns).toHaveBeenCalledWith(
+      expect(mockUpdatePronounsV2).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
         'test-account-id',
@@ -554,7 +579,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(400);
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     it('returns 400 for missing pronouns field entirely', async () => {
@@ -569,13 +594,11 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(400);
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     it('returns 404 when profile not found', async () => {
-      mockUpdatePronouns.mockRejectedValueOnce(
-        new OnboardingNotFoundError('test-profile-id'),
-      );
+      mockUpdatePronounsV2.mockResolvedValueOnce(false);
 
       const res = await app.request(
         '/v1/onboarding/pronouns',
@@ -610,7 +633,7 @@ describe('onboarding routes', () => {
 
   describe('PATCH /v1/onboarding/:profileId/pronouns (parent)', () => {
     it('returns 200 when parent has access to child', async () => {
-      mockUpdatePronouns.mockResolvedValueOnce(undefined);
+      mockUpdatePronounsV2.mockResolvedValueOnce(true);
 
       const res = await app.request(
         `/v1/onboarding/${CHILD_PROFILE_ID}/pronouns`,
@@ -623,7 +646,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(mockUpdatePronouns).toHaveBeenCalledWith(
+      expect(mockUpdatePronounsV2).toHaveBeenCalledWith(
         expect.anything(),
         CHILD_PROFILE_ID,
         'test-account-id',
@@ -645,20 +668,14 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
     it('[BUG-406] returns 403 when non-owner profile tries to update child pronouns', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
         childProfileId: CHILD_PROFILE_ID,
@@ -675,7 +692,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     it('returns 401 without auth', async () => {
@@ -721,7 +738,6 @@ describe('onboarding routes', () => {
         'test-profile-id',
         'test-account-id',
         validInterests,
-        { identityV2Enabled: false },
       );
     });
 
@@ -869,7 +885,6 @@ describe('onboarding routes', () => {
         CHILD_PROFILE_ID,
         'test-account-id',
         validInterests,
-        { identityV2Enabled: false },
       );
     });
 
@@ -892,15 +907,9 @@ describe('onboarding routes', () => {
 
     // [BUG-406 / CR-2026-05-19-H1] Break test: non-owner profile must be blocked.
     it('[BUG-406] returns 403 when non-owner profile tries to update child interests', async () => {
-      const { getProfile } = jest.requireMock('../services/profile');
-      getProfile.mockResolvedValueOnce({
-        id: 'test-profile-id',
-        birthYear: 2008,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({ birthYear: 2008, isOwner: false }),
+      );
       mockFindFamilyLink.mockResolvedValue({
         parentProfileId: 'test-profile-id',
         childProfileId: CHILD_PROFILE_ID,
@@ -965,7 +974,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 403 on child language when owner identity was auto-resolved', async () => {
@@ -983,7 +992,7 @@ describe('onboarding routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
-      expect(mockUpdateConversationLanguage).not.toHaveBeenCalled();
+      expect(mockUpdateConversationLanguageV2).not.toHaveBeenCalled();
     });
 
     it('returns 403 on self pronouns when owner identity was auto-resolved', async () => {
@@ -1000,7 +1009,7 @@ describe('onboarding routes', () => {
       );
 
       expect(res.status).toBe(403);
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     it('returns 403 on child pronouns when owner identity was auto-resolved', async () => {
@@ -1018,7 +1027,7 @@ describe('onboarding routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
-      expect(mockUpdatePronouns).not.toHaveBeenCalled();
+      expect(mockUpdatePronounsV2).not.toHaveBeenCalled();
     });
 
     it('returns 403 on self interests when owner identity was auto-resolved', async () => {

@@ -19,6 +19,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import type { Vocabulary } from '@eduagent/schemas';
 
 function TypeBadge({ type }: { type: 'word' | 'chunk' }) {
@@ -229,41 +230,29 @@ export default function VocabularyListScreen() {
       </View>
 
       {vocabularyQuery.isLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator
-            size="large"
-            color={colors.primary}
-            accessibilityLabel={t('common.loading')}
-          />
-        </View>
+        <TimeoutLoader
+          isLoading
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void vocabularyQuery.refetch(),
+          }}
+          secondaryAction={{ label: t('common.back'), onPress: goBack }}
+        />
       ) : vocabularyQuery.isError && !vocabularyQuery.data ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-body text-text-secondary text-center mb-4">
-            {t('vocabulary.loadError')}
-          </Text>
-          <Pressable
-            onPress={() => void vocabularyQuery.refetch()}
-            className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.retry')}
-            testID="vocabulary-retry"
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              {t('common.retry')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={goBack}
-            className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center border border-border"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.goBack')}
-            testID="vocabulary-error-back"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('common.back')}
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorFallback
+          variant="centered"
+          message={t('vocabulary.loadError')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void vocabularyQuery.refetch(),
+            testID: 'vocabulary-retry',
+          }}
+          secondaryAction={{
+            label: t('common.back'),
+            onPress: goBack,
+            testID: 'vocabulary-error-back',
+          }}
+        />
       ) : !vocabularyQuery.data?.length ? (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">

@@ -125,15 +125,11 @@ export default function PlaybackScreen(): React.ReactElement {
           testID="playback-pace"
           accessibilityRole="button"
           accessibilityLabel={t('dictation.playback.paceLabel', {
-            pace: t(`dictation.playback.pace.${prefs.pace}`, {
-              defaultValue: prefs.pace,
-            }),
+            pace: t(`dictation.playback.pace.${prefs.pace}`),
           })}
         >
           <Text className="text-body-sm font-semibold text-text-primary">
-            {t(`dictation.playback.pace.${prefs.pace}`, {
-              defaultValue: prefs.pace,
-            })}
+            {t(`dictation.playback.pace.${prefs.pace}`)}
           </Text>
         </Pressable>
 

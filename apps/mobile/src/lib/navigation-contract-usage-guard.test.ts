@@ -337,6 +337,13 @@ const NON_NAV_DOMAIN_FILES: readonly LegitimateRawNavigationGateFile[] = [
       'account ownership: parent-owned settings queries remain outside the tab navigation contract.',
     expectedFindings: { 'profile-owner-read': 3 },
   },
+  {
+    file: 'apps/mobile/src/components/session/SessionMessageActions.tsx',
+    category: 'non-nav-domain-read',
+    reason:
+      'React.memo comparator read (WI-964): prev/next.isOwner are compared only to re-render the QuotaExceededCard owner-vs-non-owner copy on the quota_exceeded message branch. Not a navigation/tab gate — active-user nav gating is unaffected.',
+    expectedFindings: { 'profile-owner-read': 2 },
+  },
 ];
 
 const LEGITIMATE_RAW_NAV_GATE_FILES: readonly LegitimateRawNavigationGateFile[] =

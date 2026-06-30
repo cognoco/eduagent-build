@@ -62,6 +62,20 @@ const mockDatabaseModule = createDatabaseModuleMock({
       personId: col('personId'),
       organizationId: col('organizationId'),
     },
+    // WI-867: reduceBasisState (isGdprProcessingAllowedV2) accesses these schema columns
+    // to build WHERE clauses. col() produces a stub that drizzle eq() can accept.
+    consentGrant: {
+      chargePersonId: col('chargePersonId'),
+      purpose: col('purpose'),
+      organizationId: col('organizationId'),
+      lawfulBasis: col('lawfulBasis'),
+    },
+    consentRequest: {
+      chargePersonId: col('chargePersonId'),
+      purpose: col('purpose'),
+      organizationId: col('organizationId'),
+      requestedBasis: col('requestedBasis'),
+    },
   },
 });
 
@@ -87,19 +101,16 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const mockGetSessionTranscript = jest.fn();
-jest.mock(
-  '../../services/session' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session',
-    ) as typeof import('../../services/session');
-    return {
-      ...actual,
-      getSessionTranscript: (...args: unknown[]) =>
-        mockGetSessionTranscript(...args),
-    };
-  },
-);
+jest.mock('../../services/session', () => {
+  const actual = jest.requireActual(
+    '../../services/session',
+  ) as typeof import('../../services/session');
+  return {
+    ...actual,
+    getSessionTranscript: (...args: unknown[]) =>
+      mockGetSessionTranscript(...args),
+  };
+});
 
 const mockBuildLibraryIndex = jest.fn().mockResolvedValue({ shelves: [] });
 const mockFileToLibrary = jest.fn().mockResolvedValue({
@@ -120,7 +131,7 @@ const mockResolveFilingResult = jest.fn().mockResolvedValue({
   isNew: { shelf: false, book: false, chapter: false },
 });
 
-jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/filing', () => {
   const actual = jest.requireActual(
     '../../services/filing',
   ) as typeof import('../../services/filing');
@@ -135,7 +146,7 @@ jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
     '../../services/llm',
   ) as typeof import('../../services/llm');
@@ -152,6 +163,7 @@ jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
 import { freeformFilingRetry } from './freeform-filing';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import type { InngestStepSendEventCall } from '../../test-utils/inngest-step-runner';
+import { seedConsentState } from '../../test-utils/consent-seed';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -434,8 +446,10 @@ describe('freeformFilingRetry', () => {
 
   describe('GDPR consent gate', () => {
     it('[WI-550/F-019] skips filing and LLM work when GDPR consent is not granted', async () => {
-      mockDb.query.consentStates.findFirst.mockResolvedValue({
-        status: 'WITHDRAWN',
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: 'WITHDRAWN',
       });
       mockGetSessionTranscript.mockResolvedValue({
         session: { sessionId: 'session-001' },
@@ -463,9 +477,11 @@ describe('freeformFilingRetry', () => {
     });
 
     it('[WI-550/F-019] skips transcript and filing work when GDPR consent is withdrawn between Inngest steps', async () => {
-      mockDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // First step = CONSENTED (proceed to transcript), second step = WITHDRAWN (skip filing).
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
       mockGetSessionTranscript.mockResolvedValue({
         session: { sessionId: 'session-001' },
         exchanges: [

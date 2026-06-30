@@ -8,14 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull } from 'drizzle-orm';
-import {
-  person,
-  profiles,
-  weeklyReports,
-  type Database,
-} from '@eduagent/database';
-import { isGdprProcessingAllowed } from './consent';
-import { isIdentityV2EnabledInStep } from '../inngest/helpers';
+import { person, weeklyReports, type Database } from '@eduagent/database';
 import { isGdprProcessingAllowedV2 } from './identity-v2/consent-status-v2';
 import {
   filterProgressMetricsToActiveSubjects,
@@ -65,29 +58,16 @@ export async function buildChildWeeklyDigestLine(
   reportWeekStart: string,
   opts: { persistReport: boolean; snapshotOnOrBefore?: string },
 ): Promise<ChildWeeklyDigestLine | null> {
-  // [CUT-B2] GDPR gate + child liveness dispatch by the cutover flag (this
-  // helper runs only inside the weekly-progress-push Inngest steps, where the
-  // per-invocation binding is set).
-  const v2 = isIdentityV2EnabledInStep();
-  const gdprOk = v2
-    ? await isGdprProcessingAllowedV2(db, childProfileId)
-    : await isGdprProcessingAllowed(db, childProfileId);
+  // [WI-867] v2 always: GDPR gate via v2 resolver, child liveness via person.
+  const gdprOk = await isGdprProcessingAllowedV2(db, childProfileId);
   if (!gdprOk) {
     return null;
   }
 
-  const child = v2
-    ? await db.query.person.findFirst({
-        where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
-        columns: { displayName: true },
-      })
-    : await db.query.profiles.findFirst({
-        where: and(
-          eq(profiles.id, childProfileId),
-          isNull(profiles.archivedAt),
-        ),
-        columns: { displayName: true },
-      });
+  const child = await db.query.person.findFirst({
+    where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
+    columns: { displayName: true },
+  });
   if (!child) return null;
 
   let latest = await getLatestSnapshot(db, childProfileId);

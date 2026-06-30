@@ -10,7 +10,7 @@ import { BadRequestError, ConflictError } from '@eduagent/schemas';
 // [CR-2026-05-19-M1] Sentry external-boundary mock — proves captureException
 // fires on mastery upsert failure. Sentry is an external boundary (Sentry SDK).
 const mockCaptureException = jest.fn();
-jest.mock('../sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../sentry', () => {
   const actual = jest.requireActual('../sentry') as typeof import('../sentry');
   return {
     ...actual,
@@ -51,6 +51,11 @@ import {
 import { QUIZ_CONFIG } from './config';
 import type { Database } from '@eduagent/database';
 import * as database from '@eduagent/database';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_PROFILE_ID_3,
+} from '@eduagent/test-utils';
 
 describe('calculateScore', () => {
   it('counts correct answers', () => {
@@ -754,7 +759,7 @@ describe('buildMasterySm2Input [CR-2026-05-19-H9 break test]', () => {
 // Uses jest.spyOn on createScopedRepository (avoiding jest.mock of @eduagent/database)
 // so the real module loads but the repo is controlled per-test.
 describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]', () => {
-  const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+  const PROFILE_ID = TEST_PROFILE_ID;
   const ROUND_ID = '00000000-0000-4000-8000-000000000002';
 
   const capitalsQuestion: CapitalsQuestion = {
@@ -947,7 +952,7 @@ describe('completeQuizRound mastery upsert Sentry escalation [CR-2026-05-19-M1]'
 //   (b) probe (non-final) attempts per question are capped; the (cap+1)th throws
 //       ConflictError.
 describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', () => {
-  const PROFILE_ID = '00000000-0000-4000-8000-000000000010';
+  const PROFILE_ID = TEST_PROFILE_ID_2;
   const ROUND_ID = '00000000-0000-4000-8000-000000000011';
 
   const capitalsQuestion: CapitalsQuestion = {
@@ -1183,7 +1188,7 @@ describe('checkQuizAnswerWithCorrect [BUG-852] duplicate-append abuse guard', ()
 // client calls /complete without any prior /check calls, instead of silently
 // completing the round with score=0.
 describe('completeQuizRound empty recordedResults guard [BUG-854]', () => {
-  const PROFILE_ID = '00000000-0000-4000-8000-000000000011';
+  const PROFILE_ID = TEST_PROFILE_ID_3;
   const ROUND_ID = '00000000-0000-4000-8000-000000000012';
 
   const capitalsQuestion: CapitalsQuestion = {

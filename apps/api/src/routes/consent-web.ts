@@ -2,13 +2,10 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
 import {
-  processConsentResponse,
-  getChildNameByToken,
   ConsentTokenNotFoundError,
   ConsentAlreadyProcessedError,
   ConsentTokenExpiredError,
 } from '../services/consent';
-import { isIdentityV2Enabled } from '../config';
 import {
   processConsentResponseV2,
   getChildNameByTokenV2,
@@ -61,18 +58,11 @@ type ConsentWebEnv = {
   Variables: { db: Database };
 };
 
-/**
- * [CUT-B2] Token → child name, dispatching to the v2 (consent_request) or
- * legacy (consent_states) reader by the flag. Same null semantics.
- */
 function dispatchGetChildNameByToken(
-  c: { env?: { IDENTITY_V2_ENABLED?: string } },
   db: Database,
   token: string,
 ): Promise<string | null> {
-  return isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-    ? getChildNameByTokenV2(db, token)
-    : getChildNameByToken(db, token);
+  return getChildNameByTokenV2(db, token);
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +339,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     }
 
     const db = c.get('db');
-    const childName = await dispatchGetChildNameByToken(c, db, token);
+    const childName = await dispatchGetChildNameByToken(db, token);
 
     if (!childName) {
       return c.html(
@@ -418,7 +408,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     }
 
     const db = c.get('db');
-    const childName = await dispatchGetChildNameByToken(c, db, token);
+    const childName = await dispatchGetChildNameByToken(db, token);
 
     if (!childName) {
       return c.html(
@@ -513,7 +503,7 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
     try {
       // Fetch child name BEFORE processing — denial deletes the profile
       const childName =
-        (await dispatchGetChildNameByToken(c, db, token)) ?? 'Your child';
+        (await dispatchGetChildNameByToken(db, token)) ?? 'Your child';
       // [Bug #872] Audit metadata captured at response time.
       const audit = {
         policyVersion: c.env.CONSENT_POLICY_VERSION,
@@ -523,14 +513,12 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
           undefined,
         userAgent: c.req.header('user-agent') ?? undefined,
       };
-      let v2Result: Awaited<
-        ReturnType<typeof processConsentResponseV2>
-      > | null = null;
-      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        v2Result = await processConsentResponseV2(db, token, approved, audit);
-      } else {
-        await processConsentResponse(db, token, approved, audit);
-      }
+      const v2Result = await processConsentResponseV2(
+        db,
+        token,
+        approved,
+        audit,
+      );
 
       // [P0 email-consent-withdrawal] On approval (v2 path only), mint the
       // durable, non-expiring withdrawal link (MMT-ADR-0027) and deliver it two

@@ -40,11 +40,11 @@ const PATH_BUILDERS: Record<NowDeepLinkRoute, PathBuilder> = {
   'retention.review': (params) =>
     `/(app)/topic/${encodeURIComponent(
       requiredParam(params, 'topicId', 'retention.review'),
-    )}`,
+    )}?mode=review`,
   'challenge.start': (params) =>
     `/(app)/topic/${encodeURIComponent(
       requiredParam(params, 'topicId', 'challenge.start'),
-    )}`,
+    )}?mode=challenge`,
   'support.hub': () => '/(app)/mentor',
   journal: () => '/(app)/journal',
 };

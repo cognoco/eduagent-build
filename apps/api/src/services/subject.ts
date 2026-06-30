@@ -41,7 +41,6 @@ import {
   regenerateLanguageCurriculum,
 } from './language-curriculum';
 import { createLogger } from './logger';
-import { getProfileAge } from './profile';
 import { getPersonAge } from './identity-v2/helpers';
 import { setNativeLanguage } from './retention-data';
 import { safeSend } from './safe-non-core';
@@ -635,9 +634,8 @@ export async function createSubjectWithStructure(
     };
   }
 
-  const learnerAge = options?.identityV2Enabled
-    ? await getPersonAge(db, profileId)
-    : await getProfileAge(db, profileId);
+  // [WI-867] v2 always: learner age from person.
+  const learnerAge = await getPersonAge(db, profileId);
   const { detectSubjectType } = await import('./book-generation');
   const subject = await createSubject(db, profileId, input);
   let classificationFailed = false;

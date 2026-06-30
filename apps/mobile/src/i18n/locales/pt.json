@@ -1686,7 +1686,8 @@
     "addFirstNoteSummary": "Adicione sua primeira nota para este tópico",
     "loadingBookmarks": "Carregando explicações salvas...",
     "loadingSessions": "Carregando sessões...",
-    "noSessionsSummary": "Nenhuma sessão ainda"
+    "noSessionsSummary": "Nenhuma sessão ainda",
+    "ctaStartChallenge": "Iniciar desafio"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
+
+    "openSubjectNamed": "Abrir {{subject}}",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
     "errorTitle": "Não foi possível carregar as matérias",
@@ -4073,9 +4076,7 @@
       "memory": "Memória",
       "memorySubtitle": "Veja e gerencie o que seu mentor se lembra.",
       "sessions": "Sessões",
-      "sessionsSubtitle": "Reveja os resumos das sessões recentes.",
-      "practice": "Prática",
-      "practiceSubtitle": "Abra o centro de prática ou reveja a sua atividade passada."
+      "sessionsSubtitle": "Reveja os resumos das sessões recentes."
     },
     "moments": {
       "title": "Momentos recentes",
@@ -4111,21 +4112,6 @@
       "filterAll": "Tudo",
       "filterMine": "Minhas anotações",
       "filterMentor": "Marcadores"
-    },
-    "practice": {
-      "openHub": "Abrir centro de prática",
-      "pastActivityTitle": "Minha atividade passada",
-      "empty": "Os teus quizzes, revisões, avaliações e exercícios vão aparecer aqui.",
-      "error": "Não foi possível carregar a tua atividade anterior.",
-      "type": {
-        "all": "Todos",
-        "quiz": "Quiz",
-        "review": "Revisão",
-        "assessment": "Avaliação",
-        "dictation": "Ditado",
-        "recitation": "Recitação",
-        "fluency_drill": "Exercício de fluência"
-      }
     }
   },
   "accountAdmin": {
@@ -4213,9 +4199,10 @@
     "journal": {
       "title": "Diário",
       "subtitle": "Registos de apoio enviados para si, agrupados por aluno.",
-      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento.",
-      "personPlaceholderTitle": "Registos partilhados chegam no S5",
-      "personPlaceholderMessage": "Por enquanto, este âmbito mantém ocultas as notas do aluno, conversas e artefactos privados do diário."
+      "personHint": "As atualizações partilhadas consigo aparecem aqui.",
+      "personPlaceholderTitle": "Ainda não há atualizações partilháveis",
+      "emptyMessage": "Quando {{name}} terminar uma sessão ou relatório, as atualizações partilhadas consigo aparecerão aqui.",
+      "personPlaceholderMessage": "Conversas privadas, notas e memória do mentor não são mostradas aqui."
     }
   },
   "visibility": {
@@ -4240,7 +4227,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Nenhum registro compartilhado ainda",
-      "emptyForPerson": "{{name}}: nenhum registro compartilhado ainda.",
       "structuralOnly": "Apenas fatos estruturais. Sem notas brutas ou texto de chat.",
       "errorTitle": "Erro ao carregar registro compartilhado",
       "errorMessage": "Tente novamente em um instante.",

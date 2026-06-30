@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import { seedConsentState } from '../../test-utils/consent-seed';
 import {
   createInngestStepRunner,
   type InngestStepRunnerOptions,
@@ -21,7 +22,7 @@ jest.mock(
 );
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -34,135 +35,144 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-const mockGetConsentStatus = jest.fn();
-const mockIsConsentRevocationGenerationCurrent = jest.fn();
-const mockGetProfileDisplayName = jest.fn();
-const mockGetProfileForConsentRevocation = jest.fn();
-const mockGetFamilyOwnerProfileId = jest.fn();
+// [WI-867] v2-only: consent-revocation.ts now imports exclusively from the v2
+// service modules. ../../services/consent is NOT mocked — calculateAgeFromParts
+// (the only fn the SUT still imports from it) runs real (pure arithmetic, no DB).
+//
+// SEEDABILITY (WI-867 doctrine): the three v2 consent reads the SUT calls —
+// isConsentRevocationGenerationCurrentV2 (db.query.membership/consentGrant),
+// getPersonDisplayNameV2 + getPersonForConsentRevocationV2 (db.query.person) —
+// are db.query.findFirst SEEDABLE reads, so they run REAL against query-seam
+// seeds (seedConsentState + the local seedPerson Proxy in beforeEach). They are
+// NOT mocked. Only the genuinely-unseedable v2 fns are mocked below.
+
+// archivePersonOnRevocationV2 reaches a WRITE (tx.update(person).returning())
+// inside a transaction — unseedable; mock the whole fn. Its consentGrant read +
+// guardianship guard are exercised in the integration twin, not here.
+const mockArchivePersonOnRevocationV2 = jest.fn();
 jest.mock(
-  '../../services/consent' /* gc1-allow: pattern-a conversion — DB-backed; calculateAge kept real */,
+  '../../services/identity-v2/consent-v2' /* gc1-allow: archivePersonOnRevocationV2 — reaches tx.update(person).returning() (WRITE) inside db.transaction; cannot run against the mocked DB boundary. The seedable db.query reads in this module (isConsentRevocationGenerationCurrentV2, getPerson*V2) are NOT mocked — they run real via query-seam seeds. Write-path twin: WI-905 (no integration coverage for archivePersonOnRevocationV2 yet) */,
   () => {
     const actual = jest.requireActual(
-      '../../services/consent',
-    ) as typeof import('../../services/consent');
+      '../../services/identity-v2/consent-v2',
+    ) as typeof import('../../services/identity-v2/consent-v2');
     return {
       ...actual,
-      // consentRevocation only reaches calculateAge plus the four DB-backed
-      // functions below; add an override here if the SUT gains another call.
-      getFamilyOwnerProfileId: (...args: unknown[]) =>
-        mockGetFamilyOwnerProfileId(...args),
-      getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
-      isConsentRevocationGenerationCurrent: (...args: unknown[]) =>
-        mockIsConsentRevocationGenerationCurrent(...args),
-      getProfileForConsentRevocation: (...args: unknown[]) =>
-        mockGetProfileForConsentRevocation(...args),
-      getProfileDisplayName: (...args: unknown[]) =>
-        mockGetProfileDisplayName(...args),
+      archivePersonOnRevocationV2: (...args: unknown[]) =>
+        mockArchivePersonOnRevocationV2(...args),
     };
   },
 );
 
-// [GC6] services/deletion is NOT mocked: the real
-// deleteProfileIfConsentWithdrawn runs against the mocked @eduagent/database
-// boundary (db.execute resolves { rowCount: 1 } in beforeEach). Deletion
-// behaviour is asserted at the SQL level via findProfileDeleteSql().
+// getFamilyOwnerPersonIdV2 reaches findOwnerPersonId → db.select().innerJoin()
+// (UNSEEDABLE join; createMockDb resolves all db.select chains to []), so the
+// real fn would always return the fallback id. Mock the whole fn.
+const mockGetFamilyOwnerPersonIdV2 = jest.fn();
+jest.mock(
+  '../../services/identity-v2/family-v2' /* gc1-allow: getFamilyOwnerPersonIdV2 — reaches findOwnerPersonId() db.select().innerJoin(); db.select joins are UNSEEDABLE on the mock DB boundary. Twin: WI-905 (no integration coverage for getFamilyOwnerPersonIdV2 yet) */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/family-v2',
+    ) as typeof import('../../services/identity-v2/family-v2');
+    return {
+      ...actual,
+      getFamilyOwnerPersonIdV2: (...args: unknown[]) =>
+        mockGetFamilyOwnerPersonIdV2(...args),
+    };
+  },
+);
+
+// deletePersonIfConsentWithdrawnV2 runs a multi-step db.transaction
+// (tx.query.consentGrant.findFirst + tx.delete(person)) — unseedable; mock whole.
+const mockDeletePersonIfConsentWithdrawnV2 = jest.fn();
+jest.mock(
+  '../../services/identity-v2/deletion-v2' /* gc1-allow: deletePersonIfConsentWithdrawnV2 — runs a db.transaction (read consentGrant THEN delete person) that cannot execute against the mocked DB boundary. Twin: apps/api/src/services/identity-v2/consent-v2.integration.test.ts (5 references) */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/identity-v2/deletion-v2',
+    ) as typeof import('../../services/identity-v2/deletion-v2');
+    return {
+      ...actual,
+      deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
+        mockDeletePersonIfConsentWithdrawnV2(...args),
+    };
+  },
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-      getWithdrawalArchivePreference: (...args: unknown[]) =>
-        mockGetWithdrawalArchivePreference(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+    getWithdrawalArchivePreference: (...args: unknown[]) =>
+      mockGetWithdrawalArchivePreference(...args),
+  };
+});
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
 const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
-jest.mock(
-  '../../services/notices' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notices',
-    ) as typeof import('../../services/notices');
-    return {
-      ...actual,
-      recordPendingNotice: (...args: unknown[]) =>
-        mockRecordPendingNotice(...args),
-      getPendingNoticeChildName: (...args: unknown[]) =>
-        mockGetPendingNoticeChildName(...args),
-    };
-  },
-);
+jest.mock('../../services/notices', () => {
+  const actual = jest.requireActual(
+    '../../services/notices',
+  ) as typeof import('../../services/notices');
+  return {
+    ...actual,
+    recordPendingNotice: (...args: unknown[]) =>
+      mockRecordPendingNotice(...args),
+    getPendingNoticeChildName: (...args: unknown[]) =>
+      mockGetPendingNoticeChildName(...args),
+  };
+});
 
 import { consentRevocation } from './consent-revocation';
 
 const ORIGINAL_IDENTITY_V2_ENABLED = process.env['IDENTITY_V2_ENABLED'];
 
-function extractSqlTextAndValues(
-  node: unknown,
-  visited = new WeakSet<object>(),
-): string[] {
-  if (node === null || node === undefined) return [];
-  if (node instanceof Date) return [node.toISOString().toLowerCase()];
-  if (typeof node !== 'object') return [String(node).toLowerCase()];
-  if (visited.has(node as object)) return [];
-  visited.add(node as object);
+// [WI-867] extractSqlTextAndValues + findProfileDeleteSql() removed:
+// deleteProfileIfConsentWithdrawn (v1, ran against mocked DB execute) is
+// replaced by deletePersonIfConsentWithdrawnV2 (v2, mocked at service
+// boundary). Deletion assertions now use mockDeletePersonIfConsentWithdrawnV2
+// call assertions. The archivePersonOnRevocationV2 SQL lock/generation guard
+// is covered by consent-v2.integration.test.ts.
 
-  const values: string[] = [];
-  const obj = node as Record<string, unknown>;
-  if (typeof obj['value'] === 'string') values.push(obj['value'].toLowerCase());
-  if (Array.isArray(obj['value'])) {
-    for (const item of obj['value']) {
-      values.push(...extractSqlTextAndValues(item, visited));
-    }
-  }
-  for (const key of ['queryChunks', 'left', 'right', 'conditions']) {
-    const child = obj[key];
-    if (Array.isArray(child)) {
-      for (const item of child) {
-        values.push(...extractSqlTextAndValues(item, visited));
-      }
-    } else {
-      values.push(...extractSqlTextAndValues(child, visited));
-    }
-  }
-  return values;
-}
-
-/**
- * [GC6] Returns the lowercased text+values of the first db.execute call whose
- * SQL is the profile DELETE issued by the real deleteProfileIfConsentWithdrawn,
- * or undefined when no delete was issued.
- */
-function findProfileDeleteSql(): string | undefined {
-  const calls = (mockDatabaseModule.db.execute as jest.Mock).mock.calls;
-  return calls
-    .map((call: unknown[]) => extractSqlTextAndValues(call[0]).join(' '))
-    .find((text: string) => text.includes('delete from profiles'));
+// [WI-867] Query-seam seed for db.query.person.findFirst — the read used by the
+// REAL getPersonDisplayNameV2 + getPersonForConsentRevocationV2. seedConsentState
+// does not cover `person`, so we layer a small Proxy here (same pattern).
+// IMPORTANT: getPersonForConsentRevocationV2 does Number(row.birthDate.slice(0,4)),
+// so birthDate MUST be a date STRING, not a birthYear number.
+function seedPerson(
+  db: Record<string, unknown>,
+  row: { displayName: string; birthDate: string; archivedAt: Date | null },
+): jest.Mock {
+  const personFindFirst = jest.fn().mockResolvedValue(row);
+  const originalQuery =
+    db.query && typeof db.query === 'object'
+      ? (db.query as Record<string | symbol, unknown>)
+      : ({} as Record<string | symbol, unknown>);
+  db.query = new Proxy(originalQuery, {
+    get(target, prop) {
+      if (prop === 'person') return { findFirst: personFindFirst };
+      return target[prop];
+    },
+  });
+  return personFindFirst;
 }
 
 async function executeRevocation(
@@ -198,16 +208,28 @@ beforeEach(() => {
   (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValue({
     rowCount: 1,
   });
-  mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
-  mockIsConsentRevocationGenerationCurrent.mockResolvedValue(true);
-  mockGetProfileDisplayName.mockResolvedValue('Liam');
-  mockGetProfileForConsentRevocation.mockResolvedValue({
+  // [WI-867] v2-only: SEED the db.query seams; the real v2 consent reads run.
+  // - seedConsentState seeds membership + consentGrant (+ consentRequest) so the
+  //   REAL isConsentRevocationGenerationCurrentV2 resolves "still withdrawn".
+  //   WITHDRAWN → grant.withdrawnAt set (no revokedAt arg ⇒ true ⇒ not restored).
+  // - seedPerson seeds db.query.person so the REAL getPersonDisplayNameV2 +
+  //   getPersonForConsentRevocationV2 return Liam / 2018.
+  seedConsentState(mockDatabaseModule.db as Record<string, unknown>, {
+    personId: 'child-001',
+    organizationId: 'test-account-id',
+    state: 'WITHDRAWN',
+  });
+  seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
     displayName: 'Liam',
-    birthYear: 2018,
+    birthDate: '2018-06-01',
     archivedAt: null,
   });
-  mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
+  mockGetFamilyOwnerPersonIdV2.mockResolvedValue('parent-001');
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
+  // deletePersonIfConsentWithdrawnV2 returns true (= deleted) by default.
+  mockDeletePersonIfConsentWithdrawnV2.mockResolvedValue(true);
+  // archivePersonOnRevocationV2 returns true (= archived) by default.
+  mockArchivePersonOnRevocationV2.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -241,7 +263,7 @@ describe('consentRevocation', () => {
     const { runner } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(runner.sleepCalls).toEqual(
@@ -253,10 +275,11 @@ describe('consentRevocation', () => {
   });
 
   it('sends a consent_warning push to the parent at the 6-day mark', async () => {
+    // [WI-867] v2: isConsentRevocationGenerationCurrentV2 default true (still withdrawn)
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(mockGetRecentNotificationCount).toHaveBeenCalledWith(
@@ -279,13 +302,18 @@ describe('consentRevocation', () => {
   });
 
   it('does not send a warning if consent was restored before the 6-day mark', async () => {
-    mockGetConsentStatus.mockResolvedValue('CONSENTED');
-    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
+    // [WI-867] v2: seed CONSENTED → grant.withdrawnAt null → the REAL
+    // isConsentRevocationGenerationCurrentV2 returns false (restored).
+    seedConsentState(mockDatabaseModule.db as Record<string, unknown>, {
+      personId: 'child-001',
+      organizationId: 'test-account-id',
+      state: 'CONSENTED',
+    });
 
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
@@ -300,7 +328,7 @@ describe('consentRevocation', () => {
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(mockSendPushNotification).not.toHaveBeenCalledWith(
@@ -310,8 +338,12 @@ describe('consentRevocation', () => {
   });
 
   it('[WI-78 review] does not warn for a stale revocation generation while consent is withdrawn again', async () => {
-    mockIsConsentRevocationGenerationCurrent.mockResolvedValueOnce(false);
-
+    // [WI-867] v2: exercise the REAL generation guard. Seeded WITHDRAWN grant
+    // carries withdrawnAt = 2026-05-01T00:00:01Z (consent-seed REFERENCE_DATE+1s);
+    // we pass a NON-matching revokedAt, so isConsentRevocationGenerationCurrentV2's
+    // timestamp compare (withdrawnAt.getTime() === revokedAt.getTime()) is false →
+    // a stale/superseded generation, no warning. (Default beforeEach already seeds
+    // WITHDRAWN for child-001.)
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
@@ -325,26 +357,53 @@ describe('consentRevocation', () => {
   });
 
   it('returns restored without pushing or deleting when consent was restored', async () => {
-    mockGetConsentStatus
-      .mockResolvedValueOnce('CONSENTED')
-      .mockResolvedValueOnce('CONSENTED');
-    mockIsConsentRevocationGenerationCurrent.mockResolvedValue(false);
+    // [WI-867] v2: seed CONSENTED → real isConsentRevocationGenerationCurrentV2
+    // returns false on every call → restored, no push, no delete.
+    seedConsentState(mockDatabaseModule.db as Record<string, unknown>, {
+      personId: 'child-001',
+      organizationId: 'test-account-id',
+      state: 'CONSENTED',
+    });
 
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-001' });
     expect(mockSendPushNotification).not.toHaveBeenCalled();
-    expect(findProfileDeleteSql()).toBeUndefined();
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
   });
 
   it('[WI-78 review] stops before child notifications when the grace-end check sees a newer withdrawal generation', async () => {
-    mockIsConsentRevocationGenerationCurrent
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    // [WI-867] v2: genuine WITHDRAWN→restored flip across two real
+    // isConsentRevocationGenerationCurrentV2 calls. Script the seeded
+    // consentGrant.findFirst handle directly (seedConsentState's sequence
+    // mechanism advances only on consentRequest reads, which this fn never
+    // makes — it reads membership + consentGrant only).
+    //   call 1 (send-warning-push): grant withdrawn (revokedAt matches) → true.
+    //   call 2 (check-restoration):  grant withdrawnAt null → false → restored.
+    const revokedAt = new Date('2026-01-10T10:00:00.000Z');
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-001',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst
+      .mockResolvedValueOnce({
+        granted: true,
+        withdrawnAt: revokedAt,
+        grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        granted: true,
+        withdrawnAt: null,
+        grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
 
     const { result } = await executeRevocation({
       childProfileId: 'child-001',
@@ -360,15 +419,18 @@ describe('consentRevocation', () => {
         type: 'consent_expired',
       }),
     );
-    expect(findProfileDeleteSql()).toBeUndefined();
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
   });
 
   describe('happy path — still WITHDRAWN', () => {
-    it('pushes child, deletes profile, pushes parent in order', async () => {
+    it('pushes child, deletes person, pushes parent in order', async () => {
+      // [WI-867] v2: deletePersonIfConsentWithdrawnV2 replaces
+      // deleteProfileIfConsentWithdrawn; parent-chain SQL guard removed (v2
+      // enforces ownership via guardianship edge in the deletion service).
       const { result, runner } = await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-001',
-        revokedAt: '2026-01-15T00:00:00.000Z',
+        revokedAt: '2026-05-01T00:00:01.000Z',
       });
 
       expect(result).toEqual({
@@ -398,16 +460,14 @@ describe('consentRevocation', () => {
         // [WI-369] consent push bypasses preference (GDPR regulatory notice).
         { bypassPreferenceCheck: true },
       );
-      // Profile deletion — the real deleteProfileIfConsentWithdrawn issues the
-      // DELETE through the mocked db.execute. [F-093] the SQL must carry the
-      // parent-chain account guard bound to the resolved ownerProfileId.
-      const deleteSql = findProfileDeleteSql();
-      expect(deleteSql).toBeDefined();
-      expect(deleteSql).toContain('child-001');
-      expect(deleteSql).toContain(
-        'account_id = (select account_id from profiles where id =',
+      // [WI-867] v2: deletion via deletePersonIfConsentWithdrawnV2 mock.
+      expect(mockDeletePersonIfConsentWithdrawnV2).toHaveBeenCalledWith(
+        expect.anything(),
+        'child-001',
+        // [WI-867 re-derive] source forwards the event revokedAt (now aligned to
+        // the consent-seed withdrawnAt) to the v2 deletion seam.
+        new Date('2026-05-01T00:00:01.000Z'),
       );
-      expect(deleteSql).toContain('parent-001');
       // Parent push
       expect(mockSendPushNotification).toHaveBeenNthCalledWith(
         3,
@@ -420,10 +480,7 @@ describe('consentRevocation', () => {
         { bypassPreferenceCheck: true },
       );
 
-      // Step ordering: notify-child before delete-child-profile before
-      // notify-parent. The delete notice is recorded inside
-      // delete-child-profile (name captured pre-delete, memoized as an
-      // opaque notice id — never the name itself).
+      // Step ordering: notify-child before delete-child-profile before notify-parent.
       expect(runner.runNames()).toEqual([
         'clear-unread-nudges',
         'send-warning-push',
@@ -439,32 +496,112 @@ describe('consentRevocation', () => {
 
   it('hard-deletes conservatively when birth-year-only age is 13', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2013 → real getPersonForConsentRevocationV2
+    // returns birthYear 2013 → calculateAge ≤ 13 → conservative hard-delete.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2013,
+      birthDate: '2013-06-01',
       archivedAt: null,
     });
 
     const { result } = await executeRevocation({
       childProfileId: 'child-boundary',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(result).toEqual({
       status: 'deleted',
       childProfileId: 'child-boundary',
     });
-    // [F-093] real DELETE SQL carries the account guard. revokedAt is now
-    // required by the schema (WI-973), so responded_at appears in the SQL.
-    const deleteSql = findProfileDeleteSql();
-    expect(deleteSql).toBeDefined();
-    expect(deleteSql).toContain('child-boundary');
-    expect(deleteSql).toContain(
-      'account_id = (select account_id from profiles where id =',
+    // [WI-867] v2: deletion via deletePersonIfConsentWithdrawnV2 mock;
+    // revokedAt absent → undefined passed; no responded_at guard in v2 signature.
+    expect(mockDeletePersonIfConsentWithdrawnV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-boundary',
+      new Date('2026-05-01T00:00:01.000Z'),
     );
-    expect(deleteSql).toContain('parent-001');
-    expect(deleteSql).toContain('responded_at');
+  });
+
+  // [WI-367] When the full birth date is persisted, the COPPA hard-delete
+  // boundary uses EXACT age, not the year-only overestimate. Clock is faked to
+  // 2026-01-15 (beforeEach). A child born 2012-06-15 is year-diff 14 but exactly
+  // 13 on
+  // 2026-01-15 (birthday not yet passed) → must hard-delete (the COPPA-protective
+  // direction). This is the precision the year-only path could not express.
+  it('hard-deletes when full-date exact age is 13 though year-only age is 14', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-exact-13',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst.mockResolvedValue({
+      granted: true,
+      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
+      displayName: 'Liam',
+      birthDate: '2012-06-15',
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-13',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      childProfileId: 'child-exact-13',
+    });
+    expect(mockDeletePersonIfConsentWithdrawnV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-exact-13',
+      new Date('2026-01-15T00:00:00.000Z'),
+    );
+  });
+
+  // [WI-367] Companion: same birthYear (2012) but a birthday already passed by
+  // the faked clock (2012-01-01 → exact age 14) archives, matching the year-only
+  // path — proving the exact path only diverges when the birthday is genuinely
+  // not yet passed, not for every full-date row.
+  it('archives when full-date exact age is 14 (birthday already passed)', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-exact-14',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst.mockResolvedValue({
+      granted: true,
+      withdrawnAt: new Date('2026-01-15T00:00:00.000Z'),
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
+      displayName: 'Liam',
+      birthDate: '2012-01-01',
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-14',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'archived',
+      childProfileId: 'child-exact-14',
+    });
   });
 
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
@@ -478,7 +615,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-dup',
         parentProfileId: 'parent-001',
-        revokedAt: '2026-01-15T00:00:00.000Z',
+        revokedAt: '2026-05-01T00:00:01.000Z',
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
@@ -507,7 +644,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-dup',
-        revokedAt: '2026-01-15T00:00:00.000Z',
+        revokedAt: '2026-05-01T00:00:01.000Z',
       });
 
       expect(mockGetRecentNotificationCount).toHaveBeenNthCalledWith(
@@ -536,7 +673,7 @@ describe('consentRevocation', () => {
       const { result } = await executeRevocation({
         childProfileId: 'child-dup',
         parentProfileId: 'parent-dup',
-        revokedAt: '2026-01-15T00:00:00.000Z',
+        revokedAt: '2026-05-01T00:00:01.000Z',
       });
 
       // Function still completes through the pipeline (deletion still runs).
@@ -551,15 +688,12 @@ describe('consentRevocation', () => {
         // [WI-369] consent push bypasses preference (GDPR regulatory notice).
         { bypassPreferenceCheck: true },
       );
-      // Profile deletion proceeds regardless of push dedup. [F-093] the real
-      // DELETE SQL carries the account guard bound to the resolved owner.
-      const deleteSql = findProfileDeleteSql();
-      expect(deleteSql).toBeDefined();
-      expect(deleteSql).toContain('child-dup');
-      expect(deleteSql).toContain(
-        'account_id = (select account_id from profiles where id =',
+      // [WI-867] v2: deletion proceeds regardless of push dedup; asserted at mock level.
+      expect(mockDeletePersonIfConsentWithdrawnV2).toHaveBeenCalledWith(
+        expect.anything(),
+        'child-dup',
+        new Date('2026-05-01T00:00:01.000Z'),
       );
-      expect(deleteSql).toContain('parent-001');
     });
 
     it('still pushes when no recent consent_expired notifications exist for either party', async () => {
@@ -568,7 +702,7 @@ describe('consentRevocation', () => {
       await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-001',
-        revokedAt: '2026-01-15T00:00:00.000Z',
+        revokedAt: '2026-05-01T00:00:01.000Z',
       });
 
       expect(mockSendPushNotification).toHaveBeenCalledTimes(3);
@@ -583,16 +717,18 @@ describe('consentRevocation', () => {
 describe('archive path — auto preference, age 14', () => {
   it('archives profile and emits schedule-archive-cleanup event via step.sendEvent', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2012-01-01; under the faked
+    // 2026-01-15 clock, exact age is 14 → archive branch.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2012,
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
 
     const { result, runner } = await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(result).toEqual({ status: 'archived', childProfileId: 'child-014' });
@@ -614,23 +750,26 @@ describe('archive path — auto preference, age 14', () => {
       ]),
     );
 
-    // delete must NOT have been issued (archive branch only UPDATEs)
-    expect(findProfileDeleteSql()).toBeUndefined();
+    // [WI-867] v2: archive branch does not call deletePersonIfConsentWithdrawnV2.
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
   });
 
   it('records archive notice against the resolved owner profile', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2012-01-01; under the faked
+    // 2026-01-15 clock, exact age is 14 → archive branch.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2012,
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
-    mockGetFamilyOwnerProfileId.mockResolvedValue('owner-profile-001');
+    // [WI-867] v2: getFamilyOwnerPersonIdV2 replaces getFamilyOwnerProfileId.
+    mockGetFamilyOwnerPersonIdV2.mockResolvedValue('owner-profile-001');
 
     await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'coparent-profile-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(mockRecordPendingNotice).toHaveBeenCalledWith(
@@ -642,40 +781,63 @@ describe('archive path — auto preference, age 14', () => {
     );
   });
 
-  it('[WI-78 review] locks the GDPR consent row before archiving the profile', async () => {
+  it('[WI-78 review] atomically archives only when consent is still withdrawn', async () => {
+    // [WI-867] v2: archivePersonOnRevocationV2 replaces the raw SQL execute.
+    // The archive lock + generation guard live inside archivePersonOnRevocationV2
+    // (covered by consent-v2.integration.test.ts). Here we assert the mock is
+    // called with the right args — revokedAt undefined → revocationRespondedAt undefined.
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2012-01-01 → exact age 14 → archive branch.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2012,
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
 
     await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'parent-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
-    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
-      .calls[0]?.[0];
-    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
-    expect(sqlText).toContain('with locked_consent');
-    expect(sqlText).toContain('for update');
-    expect(sqlText).toContain('consent_type');
-    expect(sqlText).toContain('gdpr');
-    expect(sqlText).toContain('withdrawn');
+    expect(mockArchivePersonOnRevocationV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-014',
+      'parent-001', // ownerProfileId resolved by getFamilyOwnerPersonIdV2 default ('parent-001')
+      expect.any(Date),
+      new Date('2026-05-01T00:00:01.000Z'), // revocationRespondedAt = event revokedAt
+    );
   });
 
   it('[WI-78 review] requires the archive to match the revocation generation', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2012-01-01 → exact age 14 → archive branch.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2012,
+      birthDate: '2012-01-01',
       archivedAt: null,
     });
-    (mockDatabaseModule.db.execute as jest.Mock).mockResolvedValueOnce({
-      rowCount: 0,
+    // Seed the consentGrant so the REAL isConsentRevocationGenerationCurrentV2
+    // timestamp compare (withdrawnAt === revokedAt) holds → both generation
+    // checks pass → flow reaches the archive branch. (Persistent, not Once.)
+    const { consentGrantFindFirst } = seedConsentState(
+      mockDatabaseModule.db as Record<string, unknown>,
+      {
+        personId: 'child-014',
+        organizationId: 'test-account-id',
+        state: 'WITHDRAWN',
+      },
+    );
+    consentGrantFindFirst.mockResolvedValue({
+      granted: true,
+      withdrawnAt: new Date('2026-01-10T10:00:00.000Z'),
+      grantedAt: new Date('2026-01-01T00:00:00.000Z'),
     });
+    // [WI-867] v2: simulate the GDPR lock failing (consent restored between
+    // steps) by having archivePersonOnRevocationV2 (the mocked WRITE fn) return
+    // false → SUT returns { status: 'restored' }. Persistent (not Once): the
+    // archive branch is reached exactly once in this flow.
+    mockArchivePersonOnRevocationV2.mockResolvedValue(false);
 
     const { result } = await executeRevocation({
       childProfileId: 'child-014',
@@ -683,12 +845,18 @@ describe('archive path — auto preference, age 14', () => {
       revokedAt: '2026-01-10T10:00:00.000Z',
     });
 
+    // [WI-867] v2: archivePersonOnRevocationV2 returning false → { status: 'restored' }.
+    // The generation guard (revokedAt timestamp) lives inside archivePersonOnRevocationV2
+    // and is covered by consent-v2.integration.test.ts. Here we verify the call
+    // shape and the returned status.
     expect(result).toEqual({ status: 'restored', childProfileId: 'child-014' });
-    const sqlArg = (mockDatabaseModule.db.execute as jest.Mock).mock
-      .calls[0]?.[0];
-    const sqlText = extractSqlTextAndValues(sqlArg).join(' ');
-    expect(sqlText).toContain('responded_at');
-    expect(sqlText).toContain('2026-01-10t10:00:00.000z');
+    expect(mockArchivePersonOnRevocationV2).toHaveBeenCalledWith(
+      expect.anything(),
+      'child-014',
+      'parent-001',
+      expect.any(Date),
+      new Date('2026-01-10T10:00:00.000Z'), // revocationRespondedAt from revokedAt
+    );
   });
 });
 
@@ -710,13 +878,12 @@ describe('archive path — auto preference, age 14', () => {
 
 describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolution', () => {
   it('records delete notice against the owner resolved BEFORE deletion, not after cascade', async () => {
+    // [WI-867] v2: getFamilyOwnerPersonIdV2 replaces getFamilyOwnerProfileId.
     // First call (inside `choose-final-action`, before deletion): returns the
     // real owner-of-the-family ('owner-profile-001'). Any subsequent call
     // simulates the post-cascade state where family_links is gone — falls back
-    // to the event-sender ('coparent-profile-001'). The fix must NOT call
-    // getFamilyOwnerProfileId a second time; if it does, the notice would
-    // route to the wrong account.
-    mockGetFamilyOwnerProfileId
+    // to the event-sender ('coparent-profile-001').
+    mockGetFamilyOwnerPersonIdV2
       .mockResolvedValueOnce('owner-profile-001')
       .mockResolvedValue('coparent-profile-001');
 
@@ -724,7 +891,7 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
       childProfileId: 'child-001',
       // Event sender is the co-parent, NOT the account owner.
       parentProfileId: 'coparent-profile-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     expect(mockRecordPendingNotice).toHaveBeenCalledWith(
@@ -745,16 +912,17 @@ describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolu
   });
 
   it('resolves owner exactly once across the entire revocation flow (no post-deletion re-query)', async () => {
-    mockGetFamilyOwnerProfileId.mockResolvedValue('owner-profile-001');
+    // [WI-867] v2: getFamilyOwnerPersonIdV2 replaces getFamilyOwnerProfileId.
+    mockGetFamilyOwnerPersonIdV2.mockResolvedValue('owner-profile-001');
 
     await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'coparent-profile-001',
-      revokedAt: '2026-01-15T00:00:00.000Z',
+      revokedAt: '2026-05-01T00:00:01.000Z',
     });
 
     // Exactly one call: inside `choose-final-action`, before any mutation.
-    expect(mockGetFamilyOwnerProfileId).toHaveBeenCalledTimes(1);
+    expect(mockGetFamilyOwnerPersonIdV2).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -807,7 +975,7 @@ describe('memoized step-state PII break test [F-088]', () => {
         data: {
           childProfileId: 'child-001',
           parentProfileId: 'parent-001',
-          revokedAt: '2026-01-15T00:00:00.000Z',
+          revokedAt: '2026-05-01T00:00:01.000Z',
         },
         name: 'app/consent.revoked',
       },
@@ -851,9 +1019,10 @@ describe('memoized step-state PII break test [F-088]', () => {
 
   it('archive path: never memoizes the child name or birth year', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockGetProfileForConsentRevocation.mockResolvedValue({
+    // [WI-867] v2: seed person birthDate 2008 → older than the COPPA boundary.
+    seedPerson(mockDatabaseModule.db as Record<string, unknown>, {
       displayName: 'Liam',
-      birthYear: 2008,
+      birthDate: '2008-06-01',
       archivedAt: null,
     });
 
@@ -1030,7 +1199,7 @@ describe('[WI-997] onFailure dead-letter handler', () => {
 import { NonRetriableError } from 'inngest';
 
 describe('[WI-973] malformed consent.revoked payload — NonRetriableError guard', () => {
-  it('throws NonRetriableError when revokedAt is omitted, and does NOT call deleteProfileIfConsentWithdrawn', async () => {
+  it('throws NonRetriableError when revokedAt is omitted, and does NOT call deletePersonIfConsentWithdrawnV2', async () => {
     await expect(
       executeRevocation({
         childProfileId: 'child-001',
@@ -1040,7 +1209,7 @@ describe('[WI-973] malformed consent.revoked payload — NonRetriableError guard
     ).rejects.toThrow(NonRetriableError);
 
     // Deletion must NOT have been reached.
-    expect(findProfileDeleteSql()).toBeUndefined();
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
   });
 
   it('throws NonRetriableError when childProfileId is absent', async () => {
@@ -1061,6 +1230,6 @@ describe('[WI-973] malformed consent.revoked payload — NonRetriableError guard
       }),
     ).rejects.toThrow(NonRetriableError);
 
-    expect(findProfileDeleteSql()).toBeUndefined();
+    expect(mockDeletePersonIfConsentWithdrawnV2).not.toHaveBeenCalled();
   });
 });

@@ -20,7 +20,7 @@ jest.mock(
 
 const mockFetchPriorTopics = jest.fn();
 const mockFetchCrossSubjectHighlights = jest.fn();
-jest.mock('../prior-learning' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../prior-learning', () => {
   const actual = jest.requireActual(
     '../prior-learning',
   ) as typeof import('../prior-learning');
@@ -35,7 +35,7 @@ jest.mock('../prior-learning' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetTeachingPreference = jest.fn();
-jest.mock('../retention-data' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../retention-data', () => {
   const actual = jest.requireActual(
     '../retention-data',
   ) as typeof import('../retention-data');
@@ -47,7 +47,7 @@ jest.mock('../retention-data' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetLearningModeRecord = jest.fn();
-jest.mock('../settings' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../settings', () => {
   const actual = jest.requireActual(
     '../settings',
   ) as typeof import('../settings');
@@ -59,7 +59,7 @@ jest.mock('../settings' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockGetLearningProfile = jest.fn();
-jest.mock('../learner-profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../learner-profile', () => {
   const actual = jest.requireActual(
     '../learner-profile',
   ) as typeof import('../learner-profile');
@@ -90,7 +90,7 @@ jest.mock(
 );
 
 const mockGetSubject = jest.fn();
-jest.mock('../subject' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../subject', () => {
   const actual = jest.requireActual(
     '../subject',
   ) as typeof import('../subject');
@@ -102,7 +102,7 @@ jest.mock('../subject' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockLoadProfileRowById = jest.fn();
-jest.mock('../profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../profile', () => {
   const actual = jest.requireActual(
     '../profile',
   ) as typeof import('../profile');
@@ -114,21 +114,18 @@ jest.mock('../profile' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockLoadProfileRowByIdV2 = jest.fn();
-jest.mock(
-  '../identity-v2/profile-v2' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../identity-v2/profile-v2',
-    ) as typeof import('../identity-v2/profile-v2');
-    return {
-      ...actual,
-      // [WI-586] controls reader selection to verify the identity-v2 flag routes
-      // the profile read to the person/membership twin vs the legacy profiles read.
-      loadProfileRowByIdV2: (...args: unknown[]) =>
-        mockLoadProfileRowByIdV2(...args),
-    };
-  },
-);
+jest.mock('../identity-v2/profile-v2', () => {
+  const actual = jest.requireActual(
+    '../identity-v2/profile-v2',
+  ) as typeof import('../identity-v2/profile-v2');
+  return {
+    ...actual,
+    // [WI-586] controls reader selection to verify the identity-v2 flag routes
+    // the profile read to the person/membership twin vs the legacy profiles read.
+    loadProfileRowByIdV2: (...args: unknown[]) =>
+      mockLoadProfileRowByIdV2(...args),
+  };
+});
 
 import {
   clearSessionStaticContextForProfile,
@@ -382,8 +379,10 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       false,
     );
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(_sessionStaticContextCacheSize()).toBe(2);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    // [WI-867] Post-collapse the legacy/idv2 key split is gone — both reads
+    // share the single :idv2 key, so the static cache holds one entry.
+    expect(_sessionStaticContextCacheSize()).toBe(1);
     expect(
       getSessionStaticContextCacheKey('profile-1', 'session-1', true),
     ).toBe('profile-1:session-1:idv2');
@@ -408,8 +407,10 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       false,
     );
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(_sessionStaticContextCacheSize()).toBe(2);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    // [WI-867] Post-collapse the legacy/idv2 key split is gone — both reads
+    // share the single :idv2 key, so the static cache holds one entry.
+    expect(_sessionStaticContextCacheSize()).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -535,23 +536,23 @@ describe('[WI-586] getSessionStaticContext — identity-v2 profile reader select
     expect(entry.profile).toBe(v2Row);
   });
 
-  it('flag OFF → reads the legacy profiles table, not the v2 twin', async () => {
+  it('always reads via the v2 twin regardless of flag arg (legacy path removed)', async () => {
     const entry = await read('profile-off', false);
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(mockLoadProfileRowById).toHaveBeenCalledWith(
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledWith(
       {} as never,
       'profile-off',
     );
-    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(legacyRow);
+    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(v2Row);
   });
 
-  it('defaults to the legacy reader when the flag arg is omitted', async () => {
+  it('always reads via v2 twin when flag arg is omitted', async () => {
     const entry = await read('profile-default');
 
-    expect(mockLoadProfileRowById).toHaveBeenCalledTimes(1);
-    expect(mockLoadProfileRowByIdV2).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(legacyRow);
+    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
+    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
+    expect(entry.profile).toBe(v2Row);
   });
 });

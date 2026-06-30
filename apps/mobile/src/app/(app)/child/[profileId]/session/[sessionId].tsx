@@ -1,10 +1,4 @@
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +18,7 @@ import { EngagementChip } from '../../../../../components/parent/EngagementChip'
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 import { useThemeColors } from '../../../../../lib/theme';
 import { AddToMyLearningButton } from '../../../../../components/family/AddToMyLearningButton';
+import { QueryStateView } from '../../../../../components/common';
 import { useDurationLabel } from '../../../../../hooks/use-time-format';
 import { formatShortDate } from '../../../../../lib/format-datetime';
 let Clipboard: typeof import('expo-clipboard') | null = null;
@@ -95,46 +90,18 @@ export default function SessionDetailScreen() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || (isError && !session)) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator
-          testID="loading"
-          accessibilityLabel={t('common.loading')}
-        />
-      </View>
-    );
-  }
-
-  if (isError && !session) {
-    return (
-      <View className="flex-1 items-center justify-center bg-background px-6">
-        <Text className="text-text-secondary mb-4 text-center">
-          {t('parentView.session.somethingWentWrong')}
-        </Text>
-        <Pressable
-          testID="retry-session"
-          onPress={() => refetch()}
-          className="rounded-lg bg-primary px-6 py-3"
-        >
-          <Text className="text-text-inverse font-medium">
-            {t('common.retry')}
-          </Text>
-        </Pressable>
-        {/* [F-033] Secondary escape — UX resilience rule requires a Go Back
-            action on every error state, not just Retry. */}
-        <Pressable
-          testID="error-go-back"
-          onPress={handleBack}
-          className="mt-3 px-6 py-3"
-          accessibilityRole="button"
-          accessibilityLabel={t('common.goBack')}
-        >
-          <Text className="text-text-secondary font-medium">
-            {t('common.goBack')}
-          </Text>
-        </Pressable>
-      </View>
+      <QueryStateView
+        isLoading={isLoading}
+        error={isError && !session ? true : undefined}
+        retry={{ onPress: () => refetch(), testID: 'retry-session' }}
+        back={{ onPress: handleBack, testID: 'error-go-back' }}
+        errorTitle={t('parentView.session.somethingWentWrong')}
+        testID="loading"
+      >
+        {null}
+      </QueryStateView>
     );
   }
 

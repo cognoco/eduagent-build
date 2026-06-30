@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   useInfiniteQuery,
   useQueryClient,
@@ -109,7 +109,12 @@ export function useAllBooks(): {
   // delete-scope readiness, header topic totals), so we keep loading until the
   // cursor is exhausted. This preserves the pre-pagination behaviour (every
   // book present) without un-bounding the server query.
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = libraryBooksQuery;
+  const {
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch: queryRefetch,
+  } = libraryBooksQuery;
   useEffect(() => {
     if (hasNextPage && !isFetchingNextPage) {
       void fetchNextPage();
@@ -140,25 +145,43 @@ export function useAllBooks(): {
     );
   }, [libraryBooksQuery.data]);
 
-  const refetch = (): void => {
-    void libraryBooksQuery.refetch();
+  // [WI-964] Stable identity: queryRefetch/fetchNextPage are referentially
+  // stable RQ methods, so these callbacks (and the memoized return object) hold
+  // their identity across renders that don't change the query's status/data —
+  // consumers that destructure a callback no longer re-run effects every render.
+  const refetch = useCallback((): void => {
+    void queryRefetch();
     // Also bust per-subject cache — drill-into-book uses /subjects/:id/books
     // separately and otherwise wouldn't notice changes.
     void queryClient.invalidateQueries({ queryKey: ['books'] });
-  };
+  }, [queryRefetch, queryClient]);
 
-  return {
-    books,
-    isLoading: libraryBooksQuery.isLoading,
-    isSuccess: libraryBooksQuery.isSuccess,
-    isError: libraryBooksQuery.isError,
-    hasNextPage,
-    isFetchingNextPage,
-    isFullyLoaded:
-      libraryBooksQuery.isSuccess && !hasNextPage && !isFetchingNextPage,
-    fetchNextPage: (): void => {
-      void fetchNextPage();
-    },
-    refetch,
-  };
+  const fetchAllNextPages = useCallback((): void => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
+
+  return useMemo(
+    () => ({
+      books,
+      isLoading: libraryBooksQuery.isLoading,
+      isSuccess: libraryBooksQuery.isSuccess,
+      isError: libraryBooksQuery.isError,
+      hasNextPage,
+      isFetchingNextPage,
+      isFullyLoaded:
+        libraryBooksQuery.isSuccess && !hasNextPage && !isFetchingNextPage,
+      fetchNextPage: fetchAllNextPages,
+      refetch,
+    }),
+    [
+      books,
+      libraryBooksQuery.isLoading,
+      libraryBooksQuery.isSuccess,
+      libraryBooksQuery.isError,
+      hasNextPage,
+      isFetchingNextPage,
+      fetchAllNextPages,
+      refetch,
+    ],
+  );
 }

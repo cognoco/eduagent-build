@@ -190,6 +190,10 @@ export async function createChildProfileV2(
         displayName: input.displayName,
         avatarUrl: input.avatarUrl ?? null,
         birthYear: input.birthYear,
+        // [WI-367] Mirror full-date precision onto the legacy bridge row so
+        // consent-revocation (which reads `profiles`) computes exact age.
+        birthMonth: input.birthMonth ?? null,
+        birthDay: input.birthDay ?? null,
         location: input.location ?? null,
         isOwner: false,
         hasPremiumLlm: false,

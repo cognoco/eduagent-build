@@ -5,7 +5,7 @@
 
 // Mocks must be declared before any imports.
 
-jest.mock('./milestone-detection' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./milestone-detection', () => {
   const actual = jest.requireActual(
     './milestone-detection',
   ) as typeof import('./milestone-detection');
@@ -16,7 +16,7 @@ jest.mock('./milestone-detection' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./celebrations' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./celebrations', () => {
   const actual = jest.requireActual(
     './celebrations',
   ) as typeof import('./celebrations');
@@ -33,7 +33,7 @@ jest.mock(
   }),
 );
 
-jest.mock('./language-curriculum' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./language-curriculum', () => {
   const actual = jest.requireActual(
     './language-curriculum',
   ) as typeof import('./language-curriculum');
@@ -43,7 +43,7 @@ jest.mock('./language-curriculum' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,
@@ -54,7 +54,7 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
 
 const loggerWarnMock = jest.fn();
 
-jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./logger', () => {
   const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,
@@ -1178,7 +1178,20 @@ describe('refreshProgressSnapshot', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers({ now: FIXED_NOW });
+    // doNotFake: keep real timer functions (setTimeout etc.) so withTransientDatabaseRetry
+    // delay calls work in the retry-path test. Only Date/Date.now is faked for snapshotDate.
+    jest.useFakeTimers({
+      now: FIXED_NOW,
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'nextTick',
+      ],
+    });
     (detectMilestones as jest.Mock).mockReturnValue([]);
     (storeMilestones as jest.Mock).mockResolvedValue([]);
   });
@@ -1459,7 +1472,6 @@ describe('refreshProgressSnapshot', () => {
       profileId,
       actorJob: 'snapshot-aggregation',
       kind: 'milestone_reached',
-      templateKey: 'ledger.milestone_reached.default',
       params: {
         milestoneId: detectedMilestone.id,
         milestoneType: 'session_count',

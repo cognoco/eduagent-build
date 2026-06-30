@@ -17,11 +17,7 @@ import {
   subscriptions,
 } from '@eduagent/database';
 
-import {
-  cleanupAccounts,
-  createIntegrationDb,
-  isIdentityV2Enabled,
-} from './helpers';
+import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
 import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
@@ -40,18 +36,17 @@ async function seedAccount(clerkUserId: string, email: string) {
     .values({ clerkUserId, email })
     .returning();
 
-  if (isIdentityV2Enabled()) {
-    await ensureV2IdentityForLegacyProfileTest(db, {
-      accountId: account!.id,
-      profileId: generateUUIDv7(),
-      displayName: 'Quota Reset Owner',
-      birthYear: 1990,
-      clerkUserId,
-      email,
-      isOwner: true,
-      seedBaselineSubscription: false,
-    });
-  }
+  // [WI-867] v2 identity always seeded (flag collapsed to v2-only).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: account!.id,
+    profileId: generateUUIDv7(),
+    displayName: 'Quota Reset Owner',
+    birthYear: 1990,
+    clerkUserId,
+    email,
+    isOwner: true,
+    seedBaselineSubscription: false,
+  });
 
   return account!;
 }
@@ -77,25 +72,24 @@ async function seedSubscriptionWithQuota(input: {
     })
     .returning();
 
-  if (isIdentityV2Enabled()) {
-    const ownerMembership = await db.query.membership.findFirst({
-      where: eq(membership.organizationId, input.accountId),
-      columns: { personId: true },
-    });
-    if (!ownerMembership) {
-      throw new Error('Owner membership not found for v2 quota reset seed');
-    }
-
-    await db.insert(subscriptionV2).values({
-      id: subscription!.id,
-      organizationId: input.accountId,
-      planTier: input.tier,
-      status: 'active',
-      payerPersonId: ownerMembership.personId,
-      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
-      periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
-    });
+  // [WI-867] v2 subscription always seeded (flag collapsed to v2-only).
+  const ownerMembership = await db.query.membership.findFirst({
+    where: eq(membership.organizationId, input.accountId),
+    columns: { personId: true },
+  });
+  if (!ownerMembership) {
+    throw new Error('Owner membership not found for v2 quota reset seed');
   }
+
+  await db.insert(subscriptionV2).values({
+    id: subscription!.id,
+    organizationId: input.accountId,
+    planTier: input.tier,
+    status: 'active',
+    payerPersonId: ownerMembership.personId,
+    periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+    periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
+  });
 
   const [quotaPool] = await db
     .insert(quotaPools)

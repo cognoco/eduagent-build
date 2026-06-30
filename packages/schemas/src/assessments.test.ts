@@ -370,7 +370,7 @@ describe('teachingPreferenceResponseDataSchema', () => {
     }
   });
 
-  it('still allows analogyDomain to be null and omitted (nullable + optional preserved)', () => {
+  it('allows analogyDomain and nativeLanguage to be null but requires both keys to be present', () => {
     expect(
       teachingPreferenceResponseDataSchema.parse({
         subjectId: SUBJECT_UUID,
@@ -380,12 +380,23 @@ describe('teachingPreferenceResponseDataSchema', () => {
       }).analogyDomain,
     ).toBeNull();
 
-    const omitted = teachingPreferenceResponseDataSchema.parse({
-      subjectId: SUBJECT_UUID,
-      method: 'step_by_step',
-      nativeLanguage: null,
-    });
-    expect(omitted.analogyDomain).toBeUndefined();
+    // analogyDomain key omitted → response fails (response schema is .nullable(), not .optional())
+    expect(
+      teachingPreferenceResponseDataSchema.safeParse({
+        subjectId: SUBJECT_UUID,
+        method: 'step_by_step',
+        nativeLanguage: null,
+      }).success,
+    ).toBe(false);
+
+    // nativeLanguage key omitted → response fails (symmetric to analogyDomain)
+    expect(
+      teachingPreferenceResponseDataSchema.safeParse({
+        subjectId: SUBJECT_UUID,
+        method: 'step_by_step',
+        analogyDomain: null,
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects an out-of-enum method', () => {

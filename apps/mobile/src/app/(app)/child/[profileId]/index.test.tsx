@@ -91,11 +91,23 @@ jest.mock(
 );
 
 // Common components barrel (includes Reanimated animations — cannot render in
-// JSDOM). We keep a thin ErrorFallback shim so the data-absent fallback testIDs
-// stay assertable.
+// JSDOM). We keep thin ErrorFallback + TimeoutLoader shims so the data-absent
+// fallback and identity-loading testIDs stay assertable.
 jest.mock(
   '../../../../components/common' /* gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM */,
   () => ({
+    // Mirrors TimeoutLoader's steady loading state: a progressbar View carrying
+    // the forwarded testID. The retry/back actions only surface after the
+    // timeout in the real component, so the pre-timeout shim omits them.
+    TimeoutLoader: ({ testID }: { testID?: string }) => {
+      const { View } = require('react-native');
+      return (
+        <View
+          testID={testID ?? 'timeout-loader'}
+          accessibilityRole="progressbar"
+        />
+      );
+    },
     ErrorFallback: ({
       title,
       message,

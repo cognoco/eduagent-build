@@ -81,7 +81,6 @@ import {
   NoInterleavedTopicsError,
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
-import { getProfileAgeBracket } from '../services/profile';
 import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import {
   markPersisted,
@@ -95,7 +94,6 @@ import {
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
-  isIdentityV2Enabled,
   isJudgeFrameworkEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
@@ -285,7 +283,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           input,
           {
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
         // [L8-F11] Validate response shape against the public contract.
@@ -573,7 +570,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -656,11 +652,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         );
       }
 
-      // [WI-586 flip-safety] v2 reads the age bracket from `person`; flag-off
-      // legacy reads `profiles` (dropped post-#8). Route-context flag mechanism.
-      const ageBracket = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await getPersonAgeBracket(db, profileId)
-        : await getProfileAgeBracket(db, profileId);
+      const ageBracket = await getPersonAgeBracket(db, profileId);
       const result = await evaluateSessionDepth(transcript, { ageBracket });
       const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
         if (exchange.role !== 'user') return sum;
@@ -774,7 +766,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -849,9 +840,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     challengeRoundRuntimeEnabled,
                     reviewCallbackOpenerEnabled,
                     judgeFrameworkEnabled,
-                    identityV2Enabled: isIdentityV2Enabled(
-                      c.env?.IDENTITY_V2_ENABLED,
-                    ),
                   },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -1190,9 +1178,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 challengeRoundRuntimeEnabled,
                 reviewCallbackOpenerEnabled,
                 judgeFrameworkEnabled,
-                identityV2Enabled: isIdentityV2Enabled(
-                  c.env?.IDENTITY_V2_ENABLED,
-                ),
               },
             );
             return streamSSEUtf8(c, async (sseStream) => {

@@ -11,7 +11,7 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -22,7 +22,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
@@ -403,18 +403,14 @@ describe('[BREAK] daily-reminder-scan fan-out event shape', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-777] Identity-V2 wiring guard (CUT-B2).
+// [WI-777 / WI-867] Identity-V2 wiring guard (CUT-B2, flag collapsed).
 //
-// The find-streak-profiles step branches on isIdentityV2EnabledInStep():
-//   - v2:     SELECT … FROM person  (person × membership × organization +
-//             consentGateSatisfiedSql; no consentStates subquery)
-//   - legacy: SELECT … FROM profiles (profiles × accounts × consentStates)
-// The runResults-based tests above bypass the step body, so they cannot see
-// this branch. These tests run the real find-streak-profiles query against a
-// chainable DB stub and assert the correct query root per flag — guarding the
-// v2 wiring against regression before WP-FLAG drops the legacy tables. The DB
-// module is NOT mocked here, so `person` / `profiles` / `consentStates` are the
-// real Drizzle table objects the source passes to `.from(...)`.
+// The find-streak-profiles step always uses the v2 path (flag collapsed in
+// WI-867): SELECT … FROM person (person × membership × organization +
+// consentGateSatisfiedSql; no consentStates subquery). The tests below assert
+// that `person` is always the query root regardless of flag state.
+// The DB module is NOT mocked here, so `person` / `profiles` / `consentStates`
+// are the real Drizzle table objects the source passes to `.from(...)`.
 // ---------------------------------------------------------------------------
 
 function buildChainableDb(
@@ -476,7 +472,8 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
     }
   });
 
-  it('flag-off: legacy path stays intact — query reads `profiles`, not `person`', async () => {
+  // [WI-867] flag collapsed — legacy path is dead; flag-off now routes to v2.
+  it('flag-off → v2: query still reads `person`, not legacy `profiles`', async () => {
     const prev = process.env['IDENTITY_V2_ENABLED'];
     delete process.env['IDENTITY_V2_ENABLED'];
     try {
@@ -487,8 +484,9 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
       const handler = (dailyReminderScan as any).fn;
       await handler({ event: { id: 'evt-v2-off' }, step });
 
-      expect(db.builder.from).toHaveBeenCalledWith(profiles);
-      expect(db.builder.from).not.toHaveBeenCalledWith(person);
+      // Flag is collapsed; source always uses person even when env var is absent.
+      expect(db.builder.from).toHaveBeenCalledWith(person);
+      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
     } finally {
       restoreFlag(prev);
     }

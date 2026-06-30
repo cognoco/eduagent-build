@@ -18,15 +18,7 @@ import { requireProfileId, requireAccount } from '../middleware/profile-scope';
 import { withProfile } from '../route-utils/route-context';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import type { Context } from 'hono';
-import { getProfile } from '../services/profile';
 import {
-  requestConsent,
-  resendConsent,
-  processConsentResponse,
-  getProfileConsentState,
-  getChildConsentForParent,
-  revokeConsent,
-  restoreConsent,
   ConsentResendLimitError,
   ConsentRecipientChangeLimitError,
   ConsentRequestNotFoundError,
@@ -43,7 +35,6 @@ import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
 } from '../services/family-access';
-import { isIdentityV2Enabled } from '../config';
 import {
   requestConsentV2,
   resendConsentV2,
@@ -161,9 +152,7 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   // assertOwnerAndParentAccess throws ForbiddenError (→ 403) for a non-owner
   // profile or an owner with no link to this child (IDOR).
   // [WI-786] Flag-gated: flag-on resolves via guardianship, flag-off via family_links.
-  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId, {
-    identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-  });
+  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
 }
 
 type ConsentRouteEnv = {
@@ -195,44 +184,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
-      // [WI-809] Gate the child display-name read behind the V2 flag. The legacy
-      // getProfile() reads profiles + consent_states + family_links — all dropped
-      // at M-DROP — so flag-on resolves the name via the v2 person graph instead,
-      // or it 500s post-drop. getOrgMemberDisplayNameV2 PRESERVES legacy
-      // getProfile's account/org scoping + not-archived filter: it returns null for
-      // a non-member, archived, OR non-existent child — one indistinguishable
-      // outcome — so flag-on does not weaken the gate into a person-existence
-      // oracle nor allow out-of-org / archived targets the legacy path rejected.
-      // Authorization is separately (and v2-awarely) enforced by
-      // assertCanRequestConsentForChild below.
-      let childName: string;
-      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        const displayName = await getOrgMemberDisplayNameV2(
-          db,
-          input.childProfileId,
-          account.id,
+      const displayName = await getOrgMemberDisplayNameV2(
+        db,
+        input.childProfileId,
+        account.id,
+      );
+      if (displayName === null) {
+        return forbidden(
+          c,
+          'Not authorized to request consent for this profile',
         );
-        if (displayName === null) {
-          return forbidden(
-            c,
-            'Not authorized to request consent for this profile',
-          );
-        }
-        childName = displayName;
-      } else {
-        const childProfile = await getProfile(
-          db,
-          input.childProfileId,
-          account.id,
-        );
-        if (!childProfile) {
-          return forbidden(
-            c,
-            'Not authorized to request consent for this profile',
-          );
-        }
-        childName = childProfile.displayName ?? 'your child';
       }
+      const childName = displayName;
 
       // [BUG-791] Account ownership alone is insufficient — gate on the active
       // profile (self-service for own profile, or owner-with-parent-link for a
@@ -265,16 +228,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         userAgent: c.req.header('user-agent') ?? undefined,
       };
       let emailDelivered: boolean;
-      // The requestedAt the consent.requested event carries — the legacy path
-      // uses the DB-stored value; the v2 path uses request time (the v2 write
-      // does not return the row's requestedAt, and the event field is
-      // informational — both are within the same request).
       let eventRequestedAt: string;
       try {
-        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-          // [CUT-B2] v2 write machine. organizationId = account.id; childName
-          // resolved above (v2 person graph when flag-on). Same caps / audit /
-          // error types.
+        {
           const res = await requestConsentV2(db, {
             chargePersonId: input.childProfileId,
             organizationId: account.id,
@@ -290,20 +246,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
           });
           emailDelivered = res.emailDelivered;
           eventRequestedAt = new Date().toISOString();
-        } else {
-          const res = await requestConsent(
-            db,
-            input,
-            apiOrigin,
-            {
-              resendApiKey: c.env.RESEND_API_KEY,
-              emailFrom: c.env.EMAIL_FROM,
-            },
-            account.id,
-            audit,
-          );
-          emailDelivered = res.emailDelivered;
-          eventRequestedAt = res.consentState.requestedAt;
         }
       } catch (error) {
         // [WI-374] Both the resend cap (same email) and the recipient-change
@@ -363,38 +305,18 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const account = requireAccount(c.get('account'));
       const input = c.req.valid('json');
 
-      // [WI-809] Gate the child display-name read behind the V2 flag — see the
-      // request handler above. flag-on resolves via getOrgMemberDisplayNameV2,
-      // which preserves legacy getProfile's account/org + not-archived scoping
-      // (the legacy getProfile reads dropped tables and 500s post-drop).
-      let childName: string;
-      if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-        const displayName = await getOrgMemberDisplayNameV2(
-          db,
-          input.childProfileId,
-          account.id,
+      const displayName = await getOrgMemberDisplayNameV2(
+        db,
+        input.childProfileId,
+        account.id,
+      );
+      if (displayName === null) {
+        return forbidden(
+          c,
+          'Not authorized to request consent for this profile',
         );
-        if (displayName === null) {
-          return forbidden(
-            c,
-            'Not authorized to request consent for this profile',
-          );
-        }
-        childName = displayName;
-      } else {
-        const childProfile = await getProfile(
-          db,
-          input.childProfileId,
-          account.id,
-        );
-        if (!childProfile) {
-          return forbidden(
-            c,
-            'Not authorized to request consent for this profile',
-          );
-        }
-        childName = childProfile.displayName ?? 'your child';
       }
+      const childName = displayName;
 
       // [BUG-791] Account ownership alone is insufficient — gate on the active
       // profile (self-service for own profile, or owner-with-parent-link for a
@@ -411,38 +333,20 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       let resultConsentType: typeof input.consentType;
       let eventRequestedAt: string;
       try {
-        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-          // [CUT-B2] v2 resend. Reuses the stored recipient (WI-261) — the v2
-          // machine reads guardianEmail off the request row; no email supplied.
-          const res = await resendConsentV2(db, {
-            chargePersonId: input.childProfileId,
-            organizationId: account.id,
-            consentType: input.consentType,
-            childName,
-            appUrl: apiOrigin,
-            emailOptions: {
-              resendApiKey: c.env.RESEND_API_KEY,
-              emailFrom: c.env.EMAIL_FROM,
-            },
-          });
-          emailDelivered = res.emailDelivered;
-          resultConsentType = input.consentType;
-          eventRequestedAt = new Date().toISOString();
-        } else {
-          const res = await resendConsent(
-            db,
-            input,
-            apiOrigin,
-            {
-              resendApiKey: c.env.RESEND_API_KEY,
-              emailFrom: c.env.EMAIL_FROM,
-            },
-            account.id,
-          );
-          emailDelivered = res.emailDelivered;
-          resultConsentType = res.consentState.consentType;
-          eventRequestedAt = res.consentState.requestedAt;
-        }
+        const res = await resendConsentV2(db, {
+          chargePersonId: input.childProfileId,
+          organizationId: account.id,
+          consentType: input.consentType,
+          childName,
+          appUrl: apiOrigin,
+          emailOptions: {
+            resendApiKey: c.env.RESEND_API_KEY,
+            emailFrom: c.env.EMAIL_FROM,
+          },
+        });
+        emailDelivered = res.emailDelivered;
+        resultConsentType = input.consentType;
+        eventRequestedAt = new Date().toISOString();
       } catch (error) {
         if (error instanceof ConsentResendLimitError) {
           return apiError(c, 429, ERROR_CODES.RATE_LIMITED, error.message);
@@ -515,16 +419,7 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             undefined,
           userAgent: c.req.header('user-agent') ?? undefined,
         };
-        if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-          await processConsentResponseV2(
-            db,
-            input.token,
-            input.approved,
-            audit,
-          );
-        } else {
-          await processConsentResponse(db, input.token, input.approved, audit);
-        }
+        await processConsentResponseV2(db, input.token, input.approved, audit);
         return c.json(
           consentRespondResultSchema.parse({
             message: input.approved ? 'Consent granted' : 'Consent denied',
@@ -559,16 +454,8 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       );
     }
     const db = c.get('db');
-    const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-      ? await getProfileConsentStateV2(db, profileId)
-      : await getProfileConsentState(db, profileId);
-    // The v2 state names the recipient `guardianEmail`; legacy `parentEmail`.
-    const recipient =
-      state == null
-        ? null
-        : 'parentEmail' in state
-          ? state.parentEmail
-          : state.guardianEmail;
+    const state = await getProfileConsentStateV2(db, profileId);
+    const recipient = state?.guardianEmail ?? null;
     return c.json(
       myConsentStatusSchema.parse({
         consentStatus: state?.status ?? null,
@@ -587,9 +474,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can manage child consent.');
 
     try {
-      const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await getChildConsentForParentV2(db, childProfileId, parentProfileId)
-        : await getChildConsentForParent(db, childProfileId, parentProfileId);
+      const state = await getChildConsentForParentV2(
+        db,
+        childProfileId,
+        parentProfileId,
+      );
       if (!state) {
         return c.json(
           childConsentStatusSchema.parse({
@@ -623,17 +512,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can revoke child consent.');
 
     try {
-      const v2 = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED);
-      const { status, revokedAt } = v2
-        ? await revokeChildConsentV2(db, childProfileId, parentProfileId).then(
-            (r) => ({ status: r.status, revokedAt: r.withdrawnAt }),
-          )
-        : await revokeConsent(db, childProfileId, parentProfileId).then(
-            (s) => ({
-              status: s.status,
-              revokedAt: s.respondedAt,
-            }),
-          );
+      const { status, revokedAt } = await revokeChildConsentV2(
+        db,
+        childProfileId,
+        parentProfileId,
+      ).then((r) => ({ status: r.status, revokedAt: r.withdrawnAt }));
 
       await safeSend(
         () =>
@@ -677,9 +560,11 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     assertOwnerProfile(c, 'Only the account owner can restore child consent.');
 
     try {
-      const state = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-        ? await restoreChildConsentV2(db, childProfileId, parentProfileId)
-        : await restoreConsent(db, childProfileId, parentProfileId);
+      const state = await restoreChildConsentV2(
+        db,
+        childProfileId,
+        parentProfileId,
+      );
       return c.json(
         consentActionResultSchema.parse({
           message: 'Consent restored. Deletion cancelled.',

@@ -7,17 +7,10 @@ const mockUseChildDetail = jest.fn();
 const mockUseDashboard = jest.fn();
 const mockCanEnter = jest.fn(() => true);
 
-jest.mock('react-i18next', () => ({
-  initReactI18next: { type: '3rdParty', init: jest.fn() },
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts.defaultValue === 'string') {
-        return opts.defaultValue;
-      }
-      return key;
-    },
-  }),
-}));
+jest.mock(
+  'react-i18next',
+  () => require('../../../../test-utils/mock-i18n').i18nMock,
+);
 
 jest.mock('expo-router', () => ({
   Redirect: ({ href }: { href: string }) => {
@@ -106,7 +99,7 @@ describe('ChildCurriculumScreen', () => {
     screen.getByTestId('child-curriculum-screen');
     screen.getByText("Browse Emma's subjects and topics");
     screen.getByText('Mathematics');
-    screen.getByText('Started from: math homework');
+    screen.getByText('Your child searched for "math homework"');
 
     fireEvent.press(
       screen.getByTestId(

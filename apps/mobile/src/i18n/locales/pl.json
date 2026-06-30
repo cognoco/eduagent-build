@@ -1736,7 +1736,8 @@
     "addFirstNoteSummary": "Dodaj swoją pierwszą notatkę do tego tematu",
     "loadingBookmarks": "Ładowanie zapisanych wyjaśnień...",
     "loadingSessions": "Ładowanie sesji...",
-    "noSessionsSummary": "Brak sesji"
+    "noSessionsSummary": "Brak sesji",
+    "ctaStartChallenge": "Rozpocznij wyzwanie"
   },
   "subject": {
     "settings": {
@@ -4123,6 +4124,8 @@
     "emptyMessage": "Utwórz przedmiot, aby zacząć budować swoją mapę nauki.",
     "createSubject": "Utwórz przedmiot",
     "openSubject": "Otwórz przedmiot",
+
+    "openSubjectNamed": "Otwórz {{subject}}",
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
     "reviewsDue": "{{count}} zaległych powtórek",
     "errorTitle": "Nie udało się wczytać tematów",
@@ -4235,9 +4238,7 @@
       "memory": "Pamięć",
       "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym.",
       "sessions": "Sesje",
-      "sessionsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
-      "practice": "Ćwiczenia",
-      "practiceSubtitle": "Otwórz centrum ćwiczeń lub przejrzyj swoją ostatnią aktywność."
+      "sessionsSubtitle": "Przeglądaj podsumowania ostatnich sesji."
     },
     "moments": {
       "title": "Ostatnie chwile",
@@ -4273,21 +4274,6 @@
       "filterAll": "Wszystkie",
       "filterMine": "Moje notatki",
       "filterMentor": "Zakładki"
-    },
-    "practice": {
-      "openHub": "Otwórz centrum ćwiczeń",
-      "pastActivityTitle": "Moja ostatnia aktywność",
-      "empty": "Twoje quizy, powtórki, testy i ćwiczenia pojawią się tutaj.",
-      "error": "Nie udało się wczytać Twojej ostatniej aktywności.",
-      "type": {
-        "all": "Wszystkie",
-        "quiz": "Quiz",
-        "review": "Powtórka",
-        "assessment": "Test",
-        "dictation": "Dyktando",
-        "recitation": "Recytacja",
-        "fluency_drill": "Ćwiczenie płynności"
-      }
     }
   },
   "accountAdmin": {
@@ -4377,9 +4363,10 @@
     "journal": {
       "title": "Dziennik",
       "subtitle": "Zapisy wsparcia wysłane do Ciebie, pogrupowane według uczniów.",
-      "personHint": "Udostępnione zapisy pojawią się tutaj po wyrażeniu zgody.",
-      "personPlaceholderTitle": "Udostępnione zapisy pojawią się w S5",
-      "personPlaceholderMessage": "Na razie ten zakres ukrywa notatki uczniów, czaty i prywatne zapisy w dzienniku."
+      "personHint": "Udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderTitle": "Nie ma jeszcze aktualizacji do udostępnienia",
+      "emptyMessage": "Gdy {{name}} ukończy sesję lub raport, udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderMessage": "Prywatne czaty, notatki i pamięć mentora nie są tutaj pokazywane."
     }
   },
   "visibility": {
@@ -4404,7 +4391,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Brak udostępnionych danych",
-      "emptyForPerson": "{{name}}: brak udostępnionych danych.",
       "structuralOnly": "Tylko fakty strukturalne. Bez surowych notatek i treści czatów.",
       "errorTitle": "Nie udało się wczytać udostępnionych danych",
       "errorMessage": "Spróbuj ponownie za chwilę.",

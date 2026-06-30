@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Legg til ditt første notat for dette emnet",
     "loadingBookmarks": "Laster inn lagrede forklaringer ...",
     "loadingSessions": "Laster inn økter ...",
-    "noSessionsSummary": "Ingen økter ennå"
+    "noSessionsSummary": "Ingen økter ennå",
+    "ctaStartChallenge": "Start utfordring"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Opprett et emne for å begynne å bygge læringskartet ditt.",
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
+    "openSubjectNamed": "Åpne {{subject}}",
+
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
@@ -4073,9 +4076,7 @@
       "memory": "Minne",
       "memorySubtitle": "Se og administrer hva mentoren din husker.",
       "sessions": "Økter",
-      "sessionsSubtitle": "Se gjennom nylige øktsammendrag.",
-      "practice": "Øving",
-      "practiceSubtitle": "Åpne øvingssenteret eller se gjennom tidligere aktivitet."
+      "sessionsSubtitle": "Se gjennom nylige øktsammendrag."
     },
     "moments": {
       "title": "Nylige øyeblikk",
@@ -4111,21 +4112,6 @@
       "filterAll": "Alle",
       "filterMine": "Mine notater",
       "filterMentor": "Bokmerker"
-    },
-    "practice": {
-      "openHub": "Åpne øvingssenter",
-      "pastActivityTitle": "Min tidligere aktivitet",
-      "empty": "Dine quizer, repetisjoner, vurderinger og øvelser vil vises her.",
-      "error": "Vi kunne ikke laste inn din tidligere aktivitet.",
-      "type": {
-        "all": "Alle",
-        "quiz": "Quiz",
-        "review": "Repetisjon",
-        "assessment": "Vurdering",
-        "dictation": "Diktat",
-        "recitation": "Resitasjon",
-        "fluency_drill": "Flytøvelse"
-      }
     }
   },
   "accountAdmin": {
@@ -4213,9 +4199,10 @@
     "journal": {
       "title": "Logg",
       "subtitle": "Støtteoppføringer sendt til deg, gruppert etter elev.",
-      "personHint": "Delte oppføringer kommer hit etter at samtykke er fullført.",
-      "personPlaceholderTitle": "Delte oppføringer kommer i S5",
-      "personPlaceholderMessage": "Foreløpig holder dette omfanget elevnotater, chatter og private loggelementer skjult."
+      "personHint": "Oppdateringer som deles med deg, vises her.",
+      "personPlaceholderTitle": "Ingen delbare oppdateringer ennå",
+      "emptyMessage": "Når {{name}} fullfører en økt eller rapport, vises oppdateringer som deles med deg her.",
+      "personPlaceholderMessage": "Private chatter, notater og mentor-minne vises ikke her."
     }
   },
   "visibility": {
@@ -4240,7 +4227,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Ingen delt oversikt ennå",
-      "emptyForPerson": "{{name}}: ingen delt oversikt ennå.",
       "structuralOnly": "Kun strukturelle fakta. Ingen rånotater eller chattetekst.",
       "errorTitle": "Kunne ikke laste den delte oversikten",
       "errorMessage": "Prøv igjen om et øyeblikk.",

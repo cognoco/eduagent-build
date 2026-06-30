@@ -184,12 +184,12 @@ describe('POST /outbox-spillover', () => {
       'test-account-id',
       'support_outbox_spillover',
       { hours: 1, maxCount: 20 },
-      { identityV2Enabled: false },
+      { callerPersonId: undefined }, // [WI-867] v2 always: no identityV2Enabled prop
     );
     expect(mockRecordOutboxSpillover).toHaveBeenCalledTimes(1);
   });
 
-  it('[WI-774] flag-on arms the v2 write guard: identityV2Enabled:true + callerPersonId', async () => {
+  it('[WI-774] v2 write guard: callerPersonId is threaded to checkAndLogRateLimit', async () => {
     mockRecordOutboxSpillover.mockResolvedValue({ written: 1 });
     mockCheckAndLogRateLimit.mockResolvedValue(false);
     const app = createApp('test-profile-id', 'person-test-id');
@@ -205,15 +205,14 @@ describe('POST /outbox-spillover', () => {
     );
 
     expect(res.status).toBe(200);
-    // A wrong env-binding name or context key would leave the guard un-armed on
-    // the live staging (flag-on) path — assert the exact identity opts shape.
+    // [WI-867] v2 always: assert callerPersonId is threaded (no identityV2Enabled prop).
     expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
       {},
       'test-profile-id',
       'test-account-id',
       'support_outbox_spillover',
       { hours: 1, maxCount: 20 },
-      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+      { callerPersonId: 'person-test-id' },
     );
   });
 

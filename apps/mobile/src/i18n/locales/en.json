@@ -1741,6 +1741,7 @@
     "ctaStartStudying": "Start studying",
     "ctaPracticeAgain": "Practice again",
     "ctaReview": "Review this topic",
+    "ctaStartChallenge": "Start challenge",
     "resolveTimeoutTitle": "Taking too long to open this topic",
     "resolveTimeoutMessage": "Check your connection and try again.",
     "a11yRetryTopic": "Retry loading topic",
@@ -3062,6 +3063,7 @@
     "emptyMessage": "Create a subject to start building your learning map.",
     "createSubject": "Create subject",
     "openSubject": "Open subject",
+    "openSubjectNamed": "Open {{subject}}",
     "errorTitle": "We could not load subjects",
     "errorMessage": "Try again, or come back in a moment.",
     "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",
@@ -3169,8 +3171,6 @@
       "notesSubtitle": "Browse your notes and saved bookmarks.",
       "sessions": "Sessions",
       "sessionsSubtitle": "Review recent session summaries.",
-      "practice": "Practice",
-      "practiceSubtitle": "Open the practice hub or review your past activity.",
       "memory": "Memory",
       "memorySubtitle": "See and manage what your mentor remembers.",
       "reports": "Reports",
@@ -3205,21 +3205,6 @@
       "filterAll": "All",
       "filterMine": "My notes",
       "filterMentor": "Bookmarks"
-    },
-    "practice": {
-      "openHub": "Open practice hub",
-      "pastActivityTitle": "My past activity",
-      "empty": "Your quizzes, reviews, assessments, and drills will appear here.",
-      "error": "We couldn't load your past activity.",
-      "type": {
-        "all": "All",
-        "quiz": "Quiz",
-        "review": "Review",
-        "assessment": "Assessment",
-        "dictation": "Dictation",
-        "recitation": "Recitation",
-        "fluency_drill": "Fluency drill"
-      }
     },
     "memory": {
       "title": "Mentor memory controls",
@@ -3967,9 +3952,10 @@
     "journal": {
       "title": "Journal",
       "subtitle": "Support records sent to you, grouped by learner.",
-      "personHint": "Shared records arrive here after consent is finalized.",
-      "personPlaceholderTitle": "Shared records arrive in S5",
-      "personPlaceholderMessage": "For now, this scope keeps learner notes, chats and private journal artifacts hidden."
+      "personHint": "Updates shared with you appear here.",
+      "personPlaceholderTitle": "No shareable updates yet",
+      "emptyMessage": "When {{name}} finishes a session or report, updates shared with you will appear here.",
+      "personPlaceholderMessage": "Private chats, notes, and mentor memory are not shown here."
     }
   },
   "visibility": {
@@ -3994,7 +3980,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "No shared record yet",
-      "emptyForPerson": "{{name}}: no shared record yet.",
       "structuralOnly": "Structural facts only. No raw notes or chat text.",
       "errorTitle": "Couldn't load the shared record",
       "errorMessage": "Try again in a moment.",

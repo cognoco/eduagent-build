@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { SubjectStatus } from '@eduagent/schemas';
 
+import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { ShimmerSkeleton } from '../common/ShimmerSkeleton';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
@@ -108,6 +109,12 @@ export function SubjectsBrowse({
 
           {subjects.length === 0 ? (
             <View className="mt-8 rounded-card bg-coaching-card p-5">
+              <View className="items-center" pointerEvents="none">
+                <BookPageFlipAnimation
+                  size={112}
+                  testID="subjects-browse-empty-book-animation"
+                />
+              </View>
               <Text className="text-h3 font-semibold text-text-primary">
                 {t('subjectsBrowse.emptyTitle')}
               </Text>
@@ -141,7 +148,13 @@ export function SubjectsBrowse({
                       <Pressable
                         key={subject.subjectId}
                         accessibilityRole="button"
-                        accessibilityLabel={t('subjectsBrowse.openSubject')}
+                        accessibilityLabel={
+                          subject.subjectName
+                            ? t('subjectsBrowse.openSubjectNamed', {
+                                subject: subject.subjectName,
+                              })
+                            : t('subjectsBrowse.openSubject')
+                        }
                         className="rounded-card bg-coaching-card p-4"
                         onPress={() => onOpenSubject(subject.subjectId)}
                         testID={`subjects-browse-row-${subject.subjectId}`}

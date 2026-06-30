@@ -126,12 +126,23 @@ const loginTableMock = {
   email: col('email'),
 };
 
+// [WI-867] db.select({conversationLanguage: person.conversationLanguage}).from(person).where(...).limit(1)
+// is used in generate step to resolve the parent's conversation language for LLM prose.
+// Default: null row (no language override → defaults to English).
+const mockSelectFromPersonLimit = jest.fn().mockResolvedValue([]);
+const mockSelectFromPersonWhere = jest
+  .fn()
+  .mockReturnValue({ limit: mockSelectFromPersonLimit });
+
 const mockSelectFrom = jest.fn().mockImplementation((table: unknown) => {
   if (table === profilesTableMock) {
     return { where: mockSelectFromProfilesWhere };
   }
   if (table === guardianshipTableMock) {
     return { where: mockSelectFromGuardianshipWhere };
+  }
+  if (table === personTableMock) {
+    return { where: mockSelectFromPersonWhere };
   }
   return { where: mockSelectFromFamilyLinksWhere };
 });
@@ -151,7 +162,9 @@ const mockMonthlyReportDb = createTransactionalMockDb({
       findFirst: jest.fn().mockResolvedValue({ id: 'link-1' }),
     },
     guardianship: {
-      findFirst: jest.fn().mockResolvedValue(null),
+      // [WI-867] Default truthy — most generate tests need isGuardianOf to pass.
+      // The IDOR guard test overrides to null via mockResolvedValueOnce.
+      findFirst: jest.fn().mockResolvedValue({ id: 'edge-1' }),
     },
     profiles: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -271,53 +284,49 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   nextSteps: ['Keep going'],
   comparison: null,
 });
-const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
+// [WI-867] flag collapsed — source now calls listEligibleSelfReportPersonIdsV2 unconditionally.
+const mockListEligibleSelfReportPersonIdsV2 = jest.fn().mockResolvedValue([]);
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
 const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 
-jest.mock(
-  '../../services/monthly-report' /* gc1-allow: pattern-a conversion — generateReportHighlights calls LLM (external boundary) */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/monthly-report',
-    ) as typeof import('../../services/monthly-report');
-    return {
-      ...actual,
-      generateMonthlyReportData: (...args: unknown[]) =>
-        mockGenerateMonthlyReportData(...args),
-      generateReportHighlights: (...args: unknown[]) =>
-        mockGenerateReportHighlights(...args),
-    };
-  },
-);
+jest.mock('../../services/monthly-report', () => {
+  const actual = jest.requireActual(
+    '../../services/monthly-report',
+  ) as typeof import('../../services/monthly-report');
+  return {
+    ...actual,
+    generateMonthlyReportData: (...args: unknown[]) =>
+      mockGenerateMonthlyReportData(...args),
+    generateReportHighlights: (...args: unknown[]) =>
+      mockGenerateReportHighlights(...args),
+  };
+});
 
-jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: pattern-a conversion — DB-dependent aggregate; integration sibling covers real path */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/practice-activity-summary',
-    ) as typeof import('../../services/practice-activity-summary');
-    return {
-      ...actual,
-      getPracticeActivitySummary: (...args: unknown[]) =>
-        mockGetPracticeActivitySummary(...args),
-    };
-  },
-);
+jest.mock('../../services/practice-activity-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/practice-activity-summary',
+  ) as typeof import('../../services/practice-activity-summary');
+  return {
+    ...actual,
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  };
+});
 
+// [WI-867] flag collapsed — mock v2 eligibility module; old solo-progress-reports mock is dead.
 jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: pattern-a conversion — DB-dependent eligibility query */,
+  '../../services/identity-v2/solo-progress-reports-v2' /* gc1-allow: db.selectDistinct join — listEligibleSelfReportPersonIdsV2 scans eligibility via selectDistinct, not seedable on the unit Proxy mock-db; no monthly-report-cron integration twin yet — selectDistinct eligibility coverage gap tracked WI-905 */,
   () => {
     const actual = jest.requireActual(
-      '../../services/solo-progress-reports',
-    ) as typeof import('../../services/solo-progress-reports');
+      '../../services/identity-v2/solo-progress-reports-v2',
+    ) as typeof import('../../services/identity-v2/solo-progress-reports-v2');
     return {
       ...actual,
-      listEligibleSelfReportProfileIds: (...args: unknown[]) =>
-        mockListEligibleSelfReportProfileIds(...args),
+      listEligibleSelfReportPersonIdsV2: (...args: unknown[]) =>
+        mockListEligibleSelfReportPersonIdsV2(...args),
     };
   },
 );
@@ -327,24 +336,21 @@ const mockFilterProgressMetricsToActiveSubjects = jest.fn(
   async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
 );
 
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion — drives CURRENT/PREVIOUS snapshot pair via mockResolvedValueOnce ordering; integration sibling covers real DB path */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/snapshot-aggregation',
-    ) as typeof import('../../services/snapshot-aggregation');
-    return {
-      ...actual,
-      filterProgressMetricsToActiveSubjects: (
-        db: unknown,
-        profileId: unknown,
-        metrics: unknown,
-      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
-      getSnapshotsInRange: (...args: unknown[]) =>
-        mockGetSnapshotsInRange(...args),
-    };
-  },
-);
+jest.mock('../../services/snapshot-aggregation', () => {
+  const actual = jest.requireActual(
+    '../../services/snapshot-aggregation',
+  ) as typeof import('../../services/snapshot-aggregation');
+  return {
+    ...actual,
+    filterProgressMetricsToActiveSubjects: (
+      db: unknown,
+      profileId: unknown,
+      metrics: unknown,
+    ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
+    getSnapshotsInRange: (...args: unknown[]) =>
+      mockGetSnapshotsInRange(...args),
+  };
+});
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
@@ -357,72 +363,60 @@ const mockFormatMonthlyProgressEmail = jest.fn(
   }),
 );
 
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion — push/email delivery is the external boundary; integration sibling exercises real Expo/Resend pipeline */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-      formatMonthlyProgressEmail: (
-        to: string,
-        body: string,
-        struggleLines: ChildStruggleLine[],
-      ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatMonthlyProgressEmail: (
+      to: string,
+      body: string,
+      struggleLines: ChildStruggleLine[],
+    ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
+  };
+});
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
 // individual tests override to simulate a prior successful send (replay path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion — bypasses 24h dedup gate without seeding notificationLog; dedup behaviour itself covered by integration sibling */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
-  '../../services/sentry' /* gc1-allow: pattern-a conversion — Sentry SDK external boundary */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/sentry',
-    ) as typeof import('../../services/sentry');
-    return {
-      ...actual,
-      captureException: (...args: unknown[]) => mockCaptureException(...args),
-    };
-  },
-);
+jest.mock('../../services/sentry', () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
-jest.mock(
-  '../helpers' /* gc1-allow: pattern-a conversion — getStepDatabase must return the shared mockMonthlyReportDb (no real Neon WS connection in unit test env) */,
-  () => {
-    const actual = jest.requireActual(
-      '../helpers',
-    ) as typeof import('../helpers');
-    return {
-      ...actual,
-      getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
-      getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
-    };
-  },
-);
+jest.mock('../helpers', () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+    getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
+  };
+});
 
 import {
   monthlyReportCron,
@@ -575,15 +569,22 @@ beforeEach(() => {
   // [WI-777] v2-path chains default empty; the v2 wiring test seeds them.
   mockSelectDistinctLearningSessionsWhere.mockResolvedValue([]);
   mockSelectFromGuardianshipWhere.mockResolvedValue([]);
+  // [WI-867] person-select chain: db.select({conversationLanguage}).from(person).where(...).limit(1).
+  mockSelectFromPersonLimit.mockResolvedValue([]);
+  mockSelectFromPersonWhere.mockReturnValue({
+    limit: mockSelectFromPersonLimit,
+  });
   (
     mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
   ).mockResolvedValue([]);
   (
     mockMonthlyReportDb.query.familyLinks.findFirst as jest.Mock
   ).mockResolvedValue({ id: 'link-1' });
+  // [WI-867] flag collapsed — isGuardianOf reads guardianship.findFirst; default to
+  // truthy so generate tests pass. The IDOR guard test overrides to null explicitly.
   (
     mockMonthlyReportDb.query.guardianship.findFirst as jest.Mock
-  ).mockResolvedValue(null);
+  ).mockResolvedValue({ id: 'edge-1' });
   // [L7-F3] select(...).from(familyLinks).where(...) — derives from
   // familyLinks.findMany AND intersects with the selectDistinct result
   // (active children), mirroring the real `inArray(childProfileId,
@@ -600,8 +601,8 @@ beforeEach(() => {
     );
     return allLinks.filter((l) => activeChildIds.has(l.childProfileId));
   });
-  (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockReset();
-  (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock).mockResolvedValue(
+  (mockMonthlyReportDb.query.person.findFirst as jest.Mock).mockReset();
+  (mockMonthlyReportDb.query.person.findFirst as jest.Mock).mockResolvedValue(
     null,
   );
   (mockMonthlyReportDb.query.profiles.findMany as jest.Mock).mockImplementation(
@@ -614,11 +615,8 @@ beforeEach(() => {
         ids.add(link.parentProfileId);
         ids.add(link.childProfileId);
       }
-      const selfProfileIds =
-        (await mockListEligibleSelfReportProfileIds()) as string[];
-      for (const profileId of selfProfileIds) {
-        ids.add(profileId);
-      }
+      // [WI-867] legacy profiles.findMany no longer used by the cron step (v2 uses person.findMany).
+      // Keep list populated from familyLinks only for any legacy test paths still using profiles.
       return Array.from(ids).map((id) => ({ id }));
     },
   );
@@ -627,6 +625,8 @@ beforeEach(() => {
   // self-report id active. The guardianship read resolves from
   // mockSelectFromGuardianshipWhere; v2 self-reports default empty.
   (mockMonthlyReportDb.query.person.findMany as jest.Mock).mockReset();
+  // [WI-867] v2 active-filter mirrors legacy pattern: marks every guardianship-pair
+  // endpoint active. v2 self-report ids are also included via mockListEligibleSelfReportPersonIdsV2.
   (mockMonthlyReportDb.query.person.findMany as jest.Mock).mockImplementation(
     async () => {
       const pairs = (await mockSelectFromGuardianshipWhere()) as Array<{
@@ -637,6 +637,11 @@ beforeEach(() => {
       for (const pair of pairs) {
         ids.add(pair.parentProfileId);
         ids.add(pair.childProfileId);
+      }
+      const selfProfileIds =
+        (await mockListEligibleSelfReportPersonIdsV2()) as string[];
+      for (const profileId of selfProfileIds) {
+        ids.add(profileId);
       }
       return Array.from(ids).map((id) => ({ id }));
     },
@@ -674,7 +679,7 @@ beforeEach(() => {
     async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
   );
   mockOnConflictDoNothing.mockResolvedValue(undefined);
-  mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
+  mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -733,15 +738,14 @@ describe('monthlyReportCron', () => {
     });
 
     it('queues pairs for children who have snapshots in last month range', async () => {
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue([
-        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
-        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
-      ]);
-      // child-001 is active, child-002 is not
+      // [WI-867] flag collapsed — source always reads guardianship, not familyLinks.
       mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: CHILD_ID_1 },
+        { childProfileId: 'child-001' },
+        { childProfileId: 'child-002' },
+      ]);
+      mockSelectFromGuardianshipWhere.mockResolvedValue([
+        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+        // child-002 has no guardianship edge → excluded
       ]);
 
       const { result } = await executeCronSteps();
@@ -750,15 +754,14 @@ describe('monthlyReportCron', () => {
     });
 
     it('includes eligible self-managed profiles alongside linked child pairs', async () => {
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue([
-        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
-      ]);
+      // [WI-867] flag collapsed — guardianship replaces familyLinks; v2 eligibility fn.
       mockSelectDistinctWhere.mockResolvedValue([
         { childProfileId: CHILD_ID_1 },
       ]);
-      mockListEligibleSelfReportProfileIds.mockResolvedValue([
+      mockSelectFromGuardianshipWhere.mockResolvedValue([
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+      ]);
+      mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([
         '11111111-1111-4111-8111-111111111111',
       ]);
 
@@ -788,15 +791,14 @@ describe('monthlyReportCron', () => {
     });
 
     it('fans out sendEvent for each pair found', async () => {
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue([
-        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
-        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
-      ]);
+      // [WI-867] flag collapsed — source reads guardianship.
       mockSelectDistinctWhere.mockResolvedValue([
         { childProfileId: CHILD_ID_1 },
         { childProfileId: CHILD_ID_2 },
+      ]);
+      mockSelectFromGuardianshipWhere.mockResolvedValue([
+        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
       ]);
 
       const { runner } = await executeCronSteps();
@@ -821,16 +823,26 @@ describe('monthlyReportCron', () => {
     });
 
     it('returns queuedPairs equal to number of active children', async () => {
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue([
-        { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
-        { parentProfileId: PARENT_ID_2, childProfileId: CHILD_ID_2 },
+      // [WI-867] flag collapsed — source reads guardianship.
+      mockSelectDistinctWhere.mockResolvedValue([
+        { childProfileId: 'child-001' },
+        { childProfileId: 'child-002' },
+        { childProfileId: 'child-003' },
+      ]);
+      mockSelectFromGuardianshipWhere.mockResolvedValue([
+        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+        { parentProfileId: 'parent-002', childProfileId: 'child-002' },
         { parentProfileId: 'parent-003', childProfileId: 'child-003' },
       ]);
-      mockSelectDistinctWhere.mockResolvedValue([
-        { childProfileId: CHILD_ID_1 },
-        { childProfileId: 'child-003' },
+      // Only child-001 and child-003 appear in person.findMany (active filter).
+      // Override default to exclude child-002.
+      (
+        mockMonthlyReportDb.query.person.findMany as jest.Mock
+      ).mockResolvedValueOnce([
+        { id: 'parent-001' },
+        { id: 'child-001' },
+        { id: 'parent-003' },
+        { id: 'child-003' },
       ]);
 
       const { result } = await executeCronSteps();
@@ -839,7 +851,7 @@ describe('monthlyReportCron', () => {
     });
 
     it('batches large sets into chunks of 200', async () => {
-      // 201 pairs → 2 sendEvent calls
+      // 201 pairs → 2 sendEvent calls. [WI-867] source reads guardianship.
       const links = Array.from({ length: 201 }, (_, i) => ({
         parentProfileId: `parent-${i}`,
         childProfileId: `child-${i}`,
@@ -848,10 +860,8 @@ describe('monthlyReportCron', () => {
         childProfileId: l.childProfileId,
       }));
 
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue(links);
       mockSelectDistinctWhere.mockResolvedValue(activeRows);
+      mockSelectFromGuardianshipWhere.mockResolvedValue(links);
 
       const { runner, result } = await executeCronSteps();
 
@@ -865,15 +875,12 @@ describe('monthlyReportCron', () => {
     });
 
     // -----------------------------------------------------------------------
-    // [WI-777] Identity-V2 wiring guard (CUT-B2).
+    // [WI-777 / WI-867] Identity-V2 wiring guard (CUT-B2, flag collapsed).
     //
-    // find-report-pairs branches on isIdentityV2EnabledInStep():
-    //   - v2:     derives pairs from select().from(guardianship) (canonical
-    //             consent-authority edge) + db.query.person.findMany active
-    //             filter
-    //   - legacy: select().from(familyLinks) + db.query.profiles.findMany
-    // These tests assert the correct edge table is read per flag, guarding the
-    // v2 wiring against regression before WP-FLAG drops the legacy tables.
+    // find-report-pairs always uses the v2 path (flag collapsed in WI-867):
+    // derives pairs from select().from(guardianship) + db.query.person.findMany.
+    // The test below guards the v2 wiring against regression (legacy familyLinks
+    // path is dead but seeded to make regressions observable).
     // -----------------------------------------------------------------------
     it('[WI-777] flag-on: derives pairs from guardianship, not familyLinks', async () => {
       const prev = process.env['IDENTITY_V2_ENABLED'];
@@ -920,24 +927,24 @@ describe('monthlyReportCron', () => {
       }
     });
 
-    it('[WI-777] flag-off: legacy path intact — derives pairs from familyLinks, not guardianship', async () => {
+    // [WI-867] flag collapsed — legacy path is dead; flag-off routes to v2 (guardianship).
+    it('[WI-777] flag-off → v2: derives pairs from guardianship even without IDENTITY_V2_ENABLED', async () => {
       const prev = process.env['IDENTITY_V2_ENABLED'];
       delete process.env['IDENTITY_V2_ENABLED'];
       try {
         mockSelectDistinctWhere.mockResolvedValue([
           { childProfileId: CHILD_ID_1 },
         ]);
-        (
-          mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-        ).mockResolvedValue([
-          { parentProfileId: PARENT_ID_1, childProfileId: CHILD_ID_1 },
+        mockSelectFromGuardianshipWhere.mockResolvedValue([
+          { parentProfileId: 'parent-001', childProfileId: 'child-001' },
         ]);
 
         const { result } = await executeCronSteps();
 
         expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
-        expect(mockSelectFromFamilyLinksWhere).toHaveBeenCalled();
-        expect(mockSelectFromGuardianshipWhere).not.toHaveBeenCalled();
+        // Flag collapsed: always reads guardianship, never familyLinks.
+        expect(mockSelectFromGuardianshipWhere).toHaveBeenCalled();
+        expect(mockSelectFromFamilyLinksWhere).not.toHaveBeenCalled();
       } finally {
         restoreIdentityV2Flag(prev);
       }
@@ -963,10 +970,9 @@ describe('monthlyReportCron', () => {
         childProfileId: l.childProfileId,
       }));
 
-      (
-        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
-      ).mockResolvedValue(links);
+      // [WI-867] flag collapsed — source reads guardianship.
       mockSelectDistinctWhere.mockResolvedValue(activeRows);
+      mockSelectFromGuardianshipWhere.mockResolvedValue(links);
 
       const runner = createInngestStepRunner({
         sendEventErrors: {
@@ -1040,7 +1046,7 @@ describe('monthlyReportGenerate', () => {
   describe('child_missing — child profile not found', () => {
     it('returns skipped with reason child_missing when child profile does not exist', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue(null);
 
       const { result } = await executeGenerateSteps(makeGenerateEvent());
@@ -1074,7 +1080,7 @@ describe('monthlyReportGenerate', () => {
 
     it('does not call getSnapshotsInRange when child is missing', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue(null);
 
       await executeGenerateSteps(makeGenerateEvent());
@@ -1084,7 +1090,7 @@ describe('monthlyReportGenerate', () => {
 
     it('does not insert a report when child is missing', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue(null);
 
       await executeGenerateSteps(makeGenerateEvent());
@@ -1094,12 +1100,13 @@ describe('monthlyReportGenerate', () => {
   });
 
   describe('[WI-550/F-092] parent-child link guard', () => {
+    // [WI-867] flag collapsed — isGuardianOf reads guardianship.findFirst (not familyLinks).
     it('skips forged monthly-report events when parentId is not linked to childId', async () => {
       (
-        mockMonthlyReportDb.query.familyLinks.findFirst as jest.Mock
+        mockMonthlyReportDb.query.guardianship.findFirst as jest.Mock
       ).mockResolvedValueOnce(null);
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1127,7 +1134,7 @@ describe('monthlyReportGenerate', () => {
   describe('no_snapshot — no progress data in range', () => {
     it('returns skipped with reason no_snapshot when current snapshots are empty', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1143,7 +1150,7 @@ describe('monthlyReportGenerate', () => {
 
     it('does not generate a report when current snapshots are empty', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1159,7 +1166,7 @@ describe('monthlyReportGenerate', () => {
   describe('happy path — snapshots found, report generated', () => {
     beforeEach(() => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1297,17 +1304,15 @@ describe('monthlyReportGenerate', () => {
       (
         mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
       ).mockResolvedValueOnce(null);
-      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
-        .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ id: PARENT_ID_1 })
-        .mockResolvedValueOnce({ id: PARENT_ID_1 })
-        .mockResolvedValueOnce({ id: CHILD_ID_1, displayName: 'Emma' })
-        .mockResolvedValueOnce({ accountId: 'account-parent' })
-        // Email step rehydrates the child name here instead of reading it
-        // from the memoized generate-step return.
-        .mockResolvedValueOnce({ id: CHILD_ID_1, displayName: 'Emma' });
+      (mockMonthlyReportDb.query.person.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' }) // generate: child
+        .mockResolvedValueOnce({ id: 'parent-001' }) // generate: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'parent-001' }) // push: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' }) // push: child rehydration
+        .mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' }); // email: child rehydration
+      // [WI-867] v2: parent email lives on login (person→login), not accounts.findFirst.
       (
-        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+        mockMonthlyReportDb.query.login.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
 
       await executeGenerateSteps(makeGenerateEvent());
@@ -1401,7 +1406,7 @@ describe('monthlyReportGenerate', () => {
   describe('no previous month snapshots', () => {
     it('passes null previousMetrics when previous window has no snapshots', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Sam',
       });
@@ -1427,7 +1432,7 @@ describe('monthlyReportGenerate', () => {
 
     it('still generates report and sends notification when previousMetrics is null', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Sam',
       });
@@ -1452,7 +1457,7 @@ describe('monthlyReportGenerate', () => {
   describe('displayName fallback', () => {
     it('uses "Your child" when child displayName is null', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: null,
       });
@@ -1477,7 +1482,7 @@ describe('monthlyReportGenerate', () => {
 
     it('skips self reports with a blank display name and avoids notifications', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: '',
       });
@@ -1505,7 +1510,7 @@ describe('monthlyReportGenerate', () => {
     it('stores a self report without sending push or email', async () => {
       const profileId = '11111111-1111-4111-8111-111111111111';
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Alex',
       });
@@ -1541,7 +1546,7 @@ describe('monthlyReportGenerate', () => {
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
     beforeEach(() => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({ displayName: 'Emma' });
       mockGetSnapshotsInRange
         .mockResolvedValueOnce([
@@ -1575,7 +1580,7 @@ describe('monthlyReportGenerate', () => {
     it('[WI-86] skips monthly push and email when parent is archived after report generation', async () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue(null);
 
       const { result } = await executeGenerateSteps(makeGenerateEvent(), {
@@ -1599,8 +1604,8 @@ describe('monthlyReportGenerate', () => {
 
     it('[WI-86] skips monthly push and email when child is archived after report generation', async () => {
       mockGetRecentNotificationCount.mockResolvedValueOnce(0);
-      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
-        .mockResolvedValueOnce({ id: PARENT_ID_1 })
+      (mockMonthlyReportDb.query.person.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ id: 'parent-001' })
         .mockResolvedValueOnce(null);
 
       const { result } = await executeGenerateSteps(makeGenerateEvent(), {
@@ -1665,7 +1670,7 @@ describe('monthlyReportGenerate', () => {
         mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
       ).mockResolvedValue(null); // null → monthlyProgressEmail defaults to true
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         id: 'active-profile',
         accountId: 'account-parent',
@@ -1714,6 +1719,17 @@ describe('monthlyReportGenerate', () => {
       // send-push-notification step, the dedup check would fire again, and
       // email would be lost.  With the split, send-monthly-push is skipped
       // entirely on retry and email lands.
+      //
+      // [WI-867] seed email-step DB reads: notif prefs (default on), child profile + login email (v2).
+      (
+        mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
+      ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
+      (
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ id: 'child-001', displayName: 'Emma' });
+      (
+        mockMonthlyReportDb.query.login.findFirst as jest.Mock
+      ).mockResolvedValueOnce({ email: 'parent@example.test' });
       const runner = createInngestStepRunner({
         runResults: {
           'generate-monthly-report': REPORT_RESULT,
@@ -1794,7 +1810,7 @@ describe('monthlyReportGenerate', () => {
   describe('duplicate report handling', () => {
     it('does not crash when onConflictDoNothing silently skips insert', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1824,7 +1840,7 @@ describe('monthlyReportGenerate', () => {
     // weekly-progress-push.test.ts.
     it('[J-11] re-throws so Inngest retries when an unexpected error occurs', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
       await expect(executeGenerateSteps(makeGenerateEvent())).rejects.toThrow(
@@ -1834,7 +1850,7 @@ describe('monthlyReportGenerate', () => {
 
     it('calls captureException with parentId and childId context on error', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockRejectedValueOnce(new Error('DB connection lost'));
 
       await expect(
@@ -1859,7 +1875,7 @@ describe('monthlyReportGenerate', () => {
 
     it('calls captureException when generateReportHighlights throws', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1892,7 +1908,7 @@ describe('monthlyReportGenerate', () => {
     // step as failed and schedules a retry for ONLY that step).
     it('[J-6] push step propagates error so Inngest retries only the push (not LLM+insert)', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1918,7 +1934,7 @@ describe('monthlyReportGenerate', () => {
   describe('snapshot range calculations', () => {
     it('queries getSnapshotsInRange twice — once for current, once for previous window', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1935,7 +1951,7 @@ describe('monthlyReportGenerate', () => {
 
     it('passes childId to both getSnapshotsInRange calls', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -1965,7 +1981,7 @@ describe('monthlyReportGenerate', () => {
 
     it('uses the last snapshot in the current window as thisMonthMetrics', async () => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({
         displayName: 'Emma',
       });
@@ -2000,7 +2016,7 @@ describe('monthlyReportGenerate', () => {
   describe('[WI-115] monthly push respects push preference opt-out', () => {
     beforeEach(() => {
       (
-        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+        mockMonthlyReportDb.query.person.findFirst as jest.Mock
       ).mockResolvedValue({ displayName: 'Emma' });
       mockGetSnapshotsInRange
         .mockResolvedValueOnce([
@@ -2044,15 +2060,15 @@ describe('monthlyReportGenerate', () => {
       (
         mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
       ).mockResolvedValueOnce(null); // null → monthlyProgressEmail defaults to true
-      (mockMonthlyReportDb.query.profiles.findFirst as jest.Mock)
-        .mockResolvedValueOnce({ displayName: 'Emma' })
-        .mockResolvedValueOnce({ id: PARENT_ID_1 })
-        .mockResolvedValueOnce({ id: PARENT_ID_1 })
-        .mockResolvedValueOnce({ id: CHILD_ID_1 })
-        .mockResolvedValueOnce({ accountId: 'account-parent' })
-        .mockResolvedValueOnce({ id: CHILD_ID_1 });
+      (mockMonthlyReportDb.query.person.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ displayName: 'Emma' }) // generate: child
+        .mockResolvedValueOnce({ id: 'parent-001' }) // generate: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'parent-001' }) // push: isPersonLive(parent)
+        .mockResolvedValueOnce({ id: 'child-001' }) // push: child rehydration
+        .mockResolvedValueOnce({ id: 'child-001' }); // email: child rehydration
+      // [WI-867] v2: parent email comes from login, not accounts.
       (
-        mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
+        mockMonthlyReportDb.query.login.findFirst as jest.Mock
       ).mockResolvedValueOnce({ email: 'parent@example.test' });
 
       await executeGenerateSteps(makeGenerateEvent());
@@ -2141,22 +2157,23 @@ describe('monthlyReportGenerate', () => {
 // struggle topics.
 describe('memoized step-state PII break test [F-086]', () => {
   it('never returns the child name or struggle topics from any step', async () => {
-    (
-      mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
-    ).mockResolvedValue({
-      id: CHILD_ID_1,
-      displayName: 'Emma',
-      accountId: 'account-parent',
-    });
+    (mockMonthlyReportDb.query.person.findFirst as jest.Mock).mockResolvedValue(
+      {
+        id: 'child-001',
+        displayName: 'Emma',
+        accountId: 'account-parent',
+      },
+    );
     (
       mockMonthlyReportDb.query.learningProfiles.findFirst as jest.Mock
     ).mockResolvedValue({ struggles: [{ topic: 'Fractions' }] });
     (
       mockMonthlyReportDb.query.notificationPreferences.findFirst as jest.Mock
     ).mockResolvedValue(null); // email default on
-    (
-      mockMonthlyReportDb.query.accounts.findFirst as jest.Mock
-    ).mockResolvedValue({ email: 'parent@example.test' });
+    // [WI-867] v2: parent email lives on login (person→login), not accounts.findFirst.
+    (mockMonthlyReportDb.query.login.findFirst as jest.Mock).mockResolvedValue({
+      email: 'parent@example.test',
+    });
     mockGetSnapshotsInRange
       .mockResolvedValueOnce([
         { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },

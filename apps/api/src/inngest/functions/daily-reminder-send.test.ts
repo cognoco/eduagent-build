@@ -6,28 +6,25 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatDailyReminderBody = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
   return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
 });
 
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-      formatDailyReminderBody: (...args: unknown[]) =>
-        mockFormatDailyReminderBody(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    formatDailyReminderBody: (...args: unknown[]) =>
+      mockFormatDailyReminderBody(...args),
+  };
+});
 
 // [BUG-838] daily-reminder-send was migrated from
 // getRecentNotificationCount → checkAndLogRateLimitInternal to close the
@@ -38,24 +35,21 @@ const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 // `false` = not rate-limited → handler proceeds to send. Each test that
 // wants to simulate "already sent in 24h" overrides this with `true`.
 const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-      checkAndLogRateLimitInternal: (...args: unknown[]) =>
-        mockCheckAndLogRateLimitInternal(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -69,7 +63,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
@@ -96,6 +90,10 @@ describe('dailyReminderSend', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -104,6 +102,7 @@ describe('dailyReminderSend', () => {
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
     mockSendPushNotification.mockResolvedValue({
       sent: true,
@@ -206,7 +205,9 @@ describe('dailyReminderSend', () => {
   });
 
   it('[WI-86] skips stale send events for archived profiles', async () => {
-    mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
+    // WI-867: source now calls isPersonLive (db.query.person.findFirst); null =
+    // archived/missing → skip. Old profiles.findFirst override no longer reached.
+    mockDb.query.person.findFirst.mockResolvedValueOnce(null);
 
     const { result } = await executeHandler({
       profileId: 'p-archived',
@@ -250,6 +251,10 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -258,6 +263,7 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 
@@ -334,6 +340,10 @@ describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal D
       profiles: {
         findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
       },
+      // WI-867: isPersonLive (v2 liveness seam) reads db.query.person.findFirst
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'p-1' }),
+      },
     },
   };
 
@@ -342,6 +352,7 @@ describe('[BUG-976 / BUG-838] daily-reminder-send checkAndLogRateLimitInternal D
     mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
 

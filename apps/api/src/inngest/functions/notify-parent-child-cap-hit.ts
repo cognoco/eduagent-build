@@ -4,8 +4,7 @@ import {
   type BillingProfileQuotaExhaustedEvent,
 } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import { recordChildCapNotificationForSubscription } from '../../services/child-cap-notifications';
+import { getStepDatabase } from '../helpers';
 // [CUT-B3 / WI-693] v2 owner/child resolution (person × membership) selected by
 // the cutover flag. Legacy (flag-off) is byte-identical.
 import { recordChildCapNotificationForSubscriptionV2 } from '../../services/billing/billing-v2';
@@ -30,9 +29,7 @@ export const notifyParentChildCapHit = inngest.createFunction(
         resetsAt: data.resetsAt,
         occurredAt: data.occurredAt,
       };
-      return isIdentityV2EnabledInStep()
-        ? recordChildCapNotificationForSubscriptionV2(db, payload)
-        : recordChildCapNotificationForSubscription(db, payload);
+      return recordChildCapNotificationForSubscriptionV2(db, payload);
     });
 
     return { status: 'recorded' as const, inserted: result.inserted };

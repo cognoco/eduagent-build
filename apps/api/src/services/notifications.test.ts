@@ -26,7 +26,7 @@ const mockLogNotification = jest.fn();
 const mockCheckAndLogRateLimitInternal = jest.fn();
 const mockIsPushEnabled = jest.fn().mockResolvedValue(true);
 
-jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./settings', () => {
   const actual = jest.requireActual(
     './settings',
   ) as typeof import('./settings');
@@ -443,18 +443,80 @@ function dbWithFamilyLink(
     | 'WITHDRAWN'
     | null = null,
 ) {
-  const familyLinkRow = parentProfileId
-    ? { parentProfileId, childProfileId: 'child-1' }
-    : null;
-  const childProfileRow = { displayName: 'Emma' };
-  const consentStateRow =
-    consentStatus != null ? { status: consentStatus } : null;
+  // guardianship.findMany — used by getGuardianPersonIds
+  const guardianshipRows = parentProfileId
+    ? [{ guardianPersonId: parentProfileId }]
+    : [];
+
+  // membership.findFirst — used by isGdprProcessingAllowedV2 to resolve org.
+  // When consentStatus is null (presumed consent), return no membership row so
+  // isGdprProcessingAllowedV2 short-circuits to true (no org → allowed).
+  const membershipRow =
+    consentStatus != null ? { organizationId: 'org-1' } : null;
+
+  // consentGrant.findFirst — used by reduceBasisState.
+  let consentGrantRow: {
+    granted: boolean;
+    withdrawnAt: Date | null;
+    grantedAt: Date;
+  } | null = null;
+  if (consentStatus === 'CONSENTED') {
+    consentGrantRow = {
+      granted: true,
+      withdrawnAt: null,
+      grantedAt: new Date(),
+    };
+  } else if (consentStatus === 'WITHDRAWN') {
+    consentGrantRow = {
+      granted: true,
+      withdrawnAt: new Date(),
+      grantedAt: new Date(),
+    };
+  }
+
+  // consentRequest.findFirst — used by reduceBasisState when no grant row.
+  let consentRequestRow: {
+    status: string;
+    requestedAt: Date | null;
+    createdAt: Date;
+  } | null = null;
+  if (consentStatus === 'PENDING') {
+    consentRequestRow = {
+      status: 'pending',
+      requestedAt: new Date(),
+      createdAt: new Date(),
+    };
+  } else if (consentStatus === 'PARENTAL_CONSENT_REQUESTED') {
+    consentRequestRow = {
+      status: 'requested',
+      requestedAt: new Date(),
+      createdAt: new Date(),
+    };
+  }
+
+  // db.select chain — used by reduceBasisState when needsMin is true (grant
+  // present but no request row). Returns a minGrantedAt ISO string so the
+  // reducer can compute an ordering key without hitting a real DB.
+  const selectChain = {
+    from: () => ({
+      where: () =>
+        Promise.resolve([{ minGrantedAt: new Date().toISOString() }]),
+    }),
+  };
+
   return {
+    select: jest.fn().mockReturnValue(selectChain),
     query: {
-      familyLinks: { findFirst: jest.fn().mockResolvedValue(familyLinkRow) },
-      profiles: { findFirst: jest.fn().mockResolvedValue(childProfileRow) },
-      consentStates: {
-        findFirst: jest.fn().mockResolvedValue(consentStateRow),
+      guardianship: {
+        findMany: jest.fn().mockResolvedValue(guardianshipRows),
+      },
+      membership: { findFirst: jest.fn().mockResolvedValue(membershipRow) },
+      consentGrant: { findFirst: jest.fn().mockResolvedValue(consentGrantRow) },
+      consentRequest: {
+        findFirst: jest.fn().mockResolvedValue(consentRequestRow),
+      },
+      person: {
+        findFirst: jest.fn().mockResolvedValue({ displayName: 'Emma' }),
       },
     },
   } as unknown as Database;
@@ -941,21 +1003,33 @@ describe('[WI-82] sendStruggleNotification push preference gating', () => {
     pushEnabled: boolean,
     consentStatus: 'CONSENTED' | null = 'CONSENTED',
   ) {
-    const consentStateRow =
-      consentStatus != null ? { status: consentStatus } : null;
+    const membershipRow =
+      consentStatus != null ? { organizationId: 'org-1' } : null;
+    const consentGrantRow =
+      consentStatus === 'CONSENTED'
+        ? { granted: true, withdrawnAt: null, grantedAt: new Date() }
+        : null;
+    const selectChain = {
+      from: () => ({
+        where: () =>
+          Promise.resolve([{ minGrantedAt: new Date().toISOString() }]),
+      }),
+    };
     return {
+      select: jest.fn().mockReturnValue(selectChain),
       query: {
-        familyLinks: {
-          findFirst: jest.fn().mockResolvedValue({
-            parentProfileId: 'parent-pref',
-            childProfileId: 'child-pref',
-          }),
+        guardianship: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ guardianPersonId: 'parent-pref' }]),
         },
-        profiles: {
+        membership: { findFirst: jest.fn().mockResolvedValue(membershipRow) },
+        consentGrant: {
+          findFirst: jest.fn().mockResolvedValue(consentGrantRow),
+        },
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+        person: {
           findFirst: jest.fn().mockResolvedValue({ displayName: 'Lily' }),
-        },
-        consentStates: {
-          findFirst: jest.fn().mockResolvedValue(consentStateRow),
         },
       },
     } as unknown as Database;
@@ -1010,18 +1084,17 @@ describe('[WI-82] notifyParentToSubscribe push preference gating', () => {
   function dbForSubscribe() {
     return {
       query: {
-        familyLinks: {
-          findFirst: jest.fn().mockResolvedValue({
-            parentProfileId: 'parent-sub',
-            childProfileId: 'child-sub',
-          }),
+        guardianship: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ guardianPersonId: 'parent-sub' }]),
         },
-        profiles: {
+        person: {
           findFirst: jest.fn().mockResolvedValue({ displayName: 'Max' }),
         },
-        consentStates: {
-          findFirst: jest.fn().mockResolvedValue(null),
-        },
+        // consentRequest.findFirst used to look up guardian email (returns null
+        // here = no email sent, which is fine for the push-preference test).
+        consentRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       },
     } as unknown as Database;
   }

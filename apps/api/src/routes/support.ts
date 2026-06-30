@@ -9,7 +9,6 @@ import { recordOutboxSpillover } from '../services/support/spillover';
 import { createLogger } from '../services/logger';
 import { checkAndLogRateLimit } from '../services/settings';
 import { apiError } from '../errors';
-import { isIdentityV2Enabled } from '../config';
 import { outboxSpilloverResultSchema, ERROR_CODES } from '@eduagent/schemas';
 
 const logger = createLogger();
@@ -78,7 +77,6 @@ export const supportRoutes = new Hono<SupportRouteEnv>().post(
       'support_outbox_spillover',
       { hours: SPILLOVER_WINDOW_HOURS, maxCount: SPILLOVER_MAX_PER_HOUR },
       {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
         callerPersonId: c.get('callerPersonId'),
       },
     );

@@ -221,38 +221,30 @@ async function seedProfile(input: {
     })
     .returning({ id: profiles.id });
 
-  // [WI-793] v2 identity rows — required by the v2 cron path under
-  // IDENTITY_V2_ENABLED=true. The cron queries organization.timezone for the
-  // local-hour-9 filter (person×membership→organization), and the generate
-  // handler reads isPersonLive (person) and login (email lookup).
-  // Deterministic reseed: organization.id = account.id, person.id = profile.id
-  // (WI-788 invariant). login.clerkUserId carries the same clerkUserId so the
-  // FK anchor is consistent. Self-inerting under flag-OFF.
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    await db.insert(organization).values({
-      id: account!.id,
-      name: `WPP Seed org ${account!.id.slice(0, 8)}`,
-      timezone: input.timezone ?? null,
-    });
-    await db.insert(person).values({
-      id: profile!.id,
-      displayName: input.displayName,
-      birthDate: '1985-01-01',
-      residenceJurisdiction: 'ROW',
-    });
-    const loginId = generateUUIDv7();
-    await db.insert(login).values({
-      id: loginId,
-      personId: profile!.id,
-      clerkUserId,
-      email,
-    });
-    await db.insert(membership).values({
-      personId: profile!.id,
-      organizationId: account!.id,
-      roles: ['admin', 'learner'],
-    });
-  }
+  // [WI-867] v2 identity rows are unconditional (flag collapsed).
+  await db.insert(organization).values({
+    id: account!.id,
+    name: `WPP Seed org ${account!.id.slice(0, 8)}`,
+    timezone: input.timezone ?? null,
+  });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: input.displayName,
+    birthDate: '1985-01-01',
+    residenceJurisdiction: 'ROW',
+  });
+  const loginId = generateUUIDv7();
+  await db.insert(login).values({
+    id: loginId,
+    personId: profile!.id,
+    clerkUserId,
+    email,
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['admin', 'learner'],
+  });
 
   return { accountId: account!.id, profileId: profile!.id };
 }
@@ -289,16 +281,11 @@ async function seedFamilyLink(
 ): Promise<void> {
   await db.insert(familyLinks).values({ parentProfileId, childProfileId });
 
-  // [WI-793] v2 guardianship edge — getAllActiveGuardianPersonIds reads
-  // guardianship.guardianPersonId (not familyLinks) under IDENTITY_V2_ENABLED=true.
-  // guardianPersonId = parentProfileId, chargePersonId = childProfileId
-  // (person.id = profiles.id deterministic invariant from WI-788).
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    await db.insert(guardianship).values({
-      guardianPersonId: parentProfileId,
-      chargePersonId: childProfileId,
-    });
-  }
+  // [WI-867] v2 guardianship edge is unconditional (flag collapsed).
+  await db.insert(guardianship).values({
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
+  });
 }
 
 async function seedSnapshot(input: {
@@ -480,36 +467,32 @@ afterAll(async () => {
     process.env['RESEND_API_KEY'] = originalResendApiKey;
   }
 
-  // [WI-793] v2 identity cleanup — mirrors the WI-792 pattern. The legacy
-  // accounts delete does not cascade to v2 tables (no FK from accounts →
-  // organization/person). Clean up v2 rows first.
-  if (process.env['IDENTITY_V2_ENABLED'] === 'true') {
-    const testAccounts = await db.query.accounts.findMany({
-      where: like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`),
+  // [WI-867] v2 identity cleanup is unconditional. The legacy accounts delete
+  // does not cascade to v2 tables (no FK from accounts → organization/person).
+  const testAccounts = await db.query.accounts.findMany({
+    where: like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`),
+    columns: { id: true },
+  });
+  const accountIds = testAccounts.map((a) => a.id);
+  if (accountIds.length > 0) {
+    const testProfiles = await db.query.profiles.findMany({
+      where: inArray(profiles.accountId, accountIds),
       columns: { id: true },
     });
-    const accountIds = testAccounts.map((a) => a.id);
-    if (accountIds.length > 0) {
-      const testProfiles = await db.query.profiles.findMany({
-        where: inArray(profiles.accountId, accountIds),
-        columns: { id: true },
-      });
-      const profileIds = testProfiles.map((p) => p.id);
-      if (profileIds.length > 0) {
-        // guardianship.guardianPersonId / chargePersonId → person.id RESTRICT:
-        // delete guardianship edges before person.
-        await db
-          .delete(guardianship)
-          .where(inArray(guardianship.guardianPersonId, profileIds));
-        await db
-          .delete(guardianship)
-          .where(inArray(guardianship.chargePersonId, profileIds));
-        // person cascade: membership, login (consentRequest also cascades).
-        await db.delete(person).where(inArray(person.id, profileIds));
-      }
-      // organization has no remaining FKs after membership cleanup (cascaded).
-      await db.delete(organization).where(inArray(organization.id, accountIds));
+    const profileIds = testProfiles.map((p) => p.id);
+    if (profileIds.length > 0) {
+      // guardianship.guardianPersonId / chargePersonId → person.id RESTRICT:
+      // delete guardianship edges before person.
+      await db
+        .delete(guardianship)
+        .where(inArray(guardianship.guardianPersonId, profileIds));
+      await db
+        .delete(guardianship)
+        .where(inArray(guardianship.chargePersonId, profileIds));
+      // person cascade: membership, login (consentRequest also cascades).
+      await db.delete(person).where(inArray(person.id, profileIds));
     }
+    await db.delete(organization).where(inArray(organization.id, accountIds));
   }
 
   await db

@@ -6,7 +6,7 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatReviewReminderBody = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -56,7 +56,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, ...mockInngestTransport.module };
 });
@@ -120,6 +120,7 @@ describe('reviewDueSend', () => {
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue(
       'You have 2 topics to review.',
     );
@@ -182,10 +183,9 @@ describe('reviewDueSend', () => {
     });
 
     it('[WI-86] skips stale send events for archived profiles', async () => {
-      // v2 path: isPersonLive reads person.findFirst; legacy reads
-      // profiles.findFirst. Null both so the archived branch is hit either way.
+      // WI-867: source now calls isPersonLive (db.query.person.findFirst); null =
+      // archived/missing → skip. Old profiles.findFirst override no longer reached.
       mockDb.query.person.findFirst.mockResolvedValueOnce(null);
-      mockDb.query.profiles.findFirst.mockResolvedValueOnce(null);
 
       const { result } = await executeHandler({
         profileId: 'p-archived',
@@ -264,6 +264,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 
@@ -353,6 +354,7 @@ describe('[BUG-976 / BUG-839] review-due-send checkAndLogRateLimitInternal DB fa
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockDb.query.profiles.findFirst.mockResolvedValue({ id: 'p-1' });
+    mockDb.query.person.findFirst.mockResolvedValue({ id: 'p-1' });
     mockFormatReviewReminderBody.mockReturnValue('Topics fading');
   });
 

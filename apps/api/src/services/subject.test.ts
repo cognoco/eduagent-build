@@ -15,7 +15,6 @@ import {
 import { inngest } from '../inngest/client';
 import * as sentry from './sentry';
 import * as bookGeneration from './book-generation';
-import * as profileService from './profile';
 import * as identityV2Helpers from './identity-v2/helpers';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
@@ -818,21 +817,24 @@ describe('createSubjectWithStructure deterministic fallback', () => {
   let detectSubjectTypeSpy: jest.SpiedFunction<
     typeof bookGeneration.detectSubjectType
   >;
-  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
+  // [WI-867] collapsed to v2: getPersonAge always (getProfileAge removed from path)
+  let getPersonAgeSpy: jest.SpiedFunction<
+    typeof identityV2Helpers.getPersonAge
+  >;
 
   beforeEach(() => {
     jest.clearAllMocks();
     detectSubjectTypeSpy = jest
       .spyOn(bookGeneration, 'detectSubjectType')
       .mockRejectedValue(new Error('LLM unavailable'));
-    getProfileAgeSpy = jest
-      .spyOn(profileService, 'getProfileAge')
+    getPersonAgeSpy = jest
+      .spyOn(identityV2Helpers, 'getPersonAge')
       .mockResolvedValue(11);
   });
 
   afterEach(() => {
     detectSubjectTypeSpy.mockRestore();
-    getProfileAgeSpy.mockRestore();
+    getPersonAgeSpy.mockRestore();
   });
 
   it('keeps broad subjects on the book-picker path when LLM classification fails', async () => {
@@ -882,7 +884,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
   });
 
   it('[WI-256] propagates unexpected setup errors instead of reporting fallback success', async () => {
-    getProfileAgeSpy.mockRejectedValueOnce(new Error('profile DB offline'));
+    getPersonAgeSpy.mockRejectedValueOnce(new Error('profile DB offline'));
     const subjectRow = mockSubjectRow({
       id: uuidSubjectId,
       profileId: uuidProfileId,
@@ -891,7 +893,7 @@ describe('createSubjectWithStructure deterministic fallback', () => {
     const db = {
       query: {
         // [WI-855] Gate reads all subjects first; empty → under the cap, so
-        // execution proceeds to the getProfileAge read that this test rejects.
+        // execution proceeds to the getPersonAge read that this test rejects.
         subjects: createSubjectQueryMocks(),
       },
       insert: jest.fn(() => ({
@@ -1072,8 +1074,9 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     const detectSpy = jest
       .spyOn(bookGeneration, 'detectSubjectType')
       .mockRejectedValue(new Error('LLM unavailable'));
+    // [WI-867] collapsed to v2: mock getPersonAge instead of getProfileAge
     const ageSpy = jest
-      .spyOn(profileService, 'getProfileAge')
+      .spyOn(identityV2Helpers, 'getPersonAge')
       .mockResolvedValue(11);
     const subjectRow = mockSubjectRow({
       id: uuidSubjectId,
@@ -1120,8 +1123,9 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
     const detectSpy = jest
       .spyOn(bookGeneration, 'detectSubjectType')
       .mockRejectedValue(new Error('LLM unavailable'));
+    // [WI-867] collapsed to v2: mock getPersonAge instead of getProfileAge
     const ageSpy = jest
-      .spyOn(profileService, 'getProfileAge')
+      .spyOn(identityV2Helpers, 'getPersonAge')
       .mockResolvedValue(11);
     const db = withCapTransaction({
       query: {
@@ -1146,16 +1150,11 @@ describe('[WI-855] createSubjectWithStructure hard subject-limit gate', () => {
   });
 });
 
-describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
-  // The learner-age read at the deterministic (no-focus) path must switch
-  // between the legacy `getProfileAge` (reads the soon-to-be-dropped `profiles`
-  // table) and the v2 `getPersonAge` (reads person/membership) based on the
-  // `identityV2Enabled` opt. After migration 0118 drops `profiles`, the legacy
-  // read 500s on prod, so the gate is the cutover-safety contract.
+describe('[WI-867] createSubjectWithStructure always uses getPersonAge (v2 collapsed)', () => {
+  // [WI-867] Flag collapsed — getPersonAge (v2) is always called; getProfileAge removed from path.
   let detectSubjectTypeSpy: jest.SpiedFunction<
     typeof bookGeneration.detectSubjectType
   >;
-  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
   let getPersonAgeSpy: jest.SpiedFunction<
     typeof identityV2Helpers.getPersonAge
   >;
@@ -1188,9 +1187,6 @@ describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
     detectSubjectTypeSpy = jest
       .spyOn(bookGeneration, 'detectSubjectType')
       .mockRejectedValue(new Error('LLM unavailable'));
-    getProfileAgeSpy = jest
-      .spyOn(profileService, 'getProfileAge')
-      .mockResolvedValue(11);
     getPersonAgeSpy = jest
       .spyOn(identityV2Helpers, 'getPersonAge')
       .mockResolvedValue(11);
@@ -1198,45 +1194,15 @@ describe('[WI-586] createSubjectWithStructure learner-age v2 gating', () => {
 
   afterEach(() => {
     detectSubjectTypeSpy.mockRestore();
-    getProfileAgeSpy.mockRestore();
     getPersonAgeSpy.mockRestore();
   });
 
-  it('flag-off: reads learner age via legacy getProfileAge, never getPersonAge', async () => {
+  it('always reads learner age via v2 getPersonAge', async () => {
     const db = makeBroadFallbackDb();
 
     await createSubjectWithStructure(db, uuidProfileId, { name: 'History' });
 
-    expect(getProfileAgeSpy).toHaveBeenCalledWith(db, uuidProfileId);
-    expect(getPersonAgeSpy).not.toHaveBeenCalled();
-  });
-
-  it('flag-off (explicit false): reads learner age via legacy getProfileAge, never getPersonAge', async () => {
-    const db = makeBroadFallbackDb();
-
-    await createSubjectWithStructure(
-      db,
-      uuidProfileId,
-      { name: 'History' },
-      { identityV2Enabled: false },
-    );
-
-    expect(getProfileAgeSpy).toHaveBeenCalledWith(db, uuidProfileId);
-    expect(getPersonAgeSpy).not.toHaveBeenCalled();
-  });
-
-  it('flag-on: reads learner age via v2 getPersonAge, never legacy getProfileAge', async () => {
-    const db = makeBroadFallbackDb();
-
-    await createSubjectWithStructure(
-      db,
-      uuidProfileId,
-      { name: 'History' },
-      { identityV2Enabled: true },
-    );
-
     expect(getPersonAgeSpy).toHaveBeenCalledWith(db, uuidProfileId);
-    expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
 });
 

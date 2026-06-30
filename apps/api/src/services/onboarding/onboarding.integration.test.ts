@@ -13,6 +13,9 @@
 import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
+  membership,
+  organization,
+  person,
   profiles,
   learningProfiles,
   createDatabase,
@@ -82,6 +85,23 @@ async function seedAccountAndProfile(index: number) {
     })
     .returning();
 
+  // [WI-867] v2 identity graph — updateInterestsContext reads membership unconditionally.
+  await db.insert(organization).values({
+    id: account!.id,
+    name: `Onboarding Test Org ${index}`,
+  });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: `Onboarding Test ${index}`,
+    birthDate: '2012-01-01',
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
+
   return { account: account!, profile: profile! };
 }
 
@@ -96,6 +116,19 @@ async function cleanupTestAccounts() {
   const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
 
   if (ids.length > 0) {
+    // [WI-867] Clean up v2 graph before accounts (no FK cascade from accounts).
+    const profileRows = await db.query.profiles.findMany({
+      where: inArray(profiles.accountId, ids),
+      columns: { id: true },
+    });
+    const profileIds = profileRows.map((p) => p.id);
+    if (profileIds.length > 0) {
+      await db
+        .delete(membership)
+        .where(inArray(membership.personId, profileIds));
+      await db.delete(person).where(inArray(person.id, profileIds));
+    }
+    await db.delete(organization).where(inArray(organization.id, ids));
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
 }

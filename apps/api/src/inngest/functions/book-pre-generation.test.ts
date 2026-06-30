@@ -59,20 +59,16 @@ const mockGenerateBookTopics = jest.fn().mockResolvedValue({
   connections: [],
 });
 
-jest.mock(
-  '../../services/book-generation' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/book-generation',
-    ) as typeof import('../../services/book-generation');
-    return {
-      ...actual,
-      // gc1-allow: prevents real LLM calls while asserting topic generation boundary
-      generateBookTopics: (...args: unknown[]) =>
-        mockGenerateBookTopics(...args),
-    };
-  },
-);
+jest.mock('../../services/book-generation', () => {
+  const actual = jest.requireActual(
+    '../../services/book-generation',
+  ) as typeof import('../../services/book-generation');
+  return {
+    ...actual,
+    // gc1-allow: prevents real LLM calls while asserting topic generation boundary
+    generateBookTopics: (...args: unknown[]) => mockGenerateBookTopics(...args),
+  };
+});
 
 const mockPersistBookTopics = jest.fn().mockResolvedValue({
   book: { id: 'book-2', title: 'Next Book' },
@@ -82,23 +78,25 @@ const mockPersistBookTopics = jest.fn().mockResolvedValue({
   completedTopicCount: 0,
 });
 
-jest.mock(
-  '../../services/curriculum' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/curriculum',
-    ) as typeof import('../../services/curriculum');
-    return {
-      ...actual,
-      // gc1-allow: prevents real DB writes while asserting curriculum persistence boundary
-      persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
-    };
-  },
-);
+jest.mock('../../services/curriculum', () => {
+  const actual = jest.requireActual(
+    '../../services/curriculum',
+  ) as typeof import('../../services/curriculum');
+  return {
+    ...actual,
+    // gc1-allow: prevents real DB writes while asserting curriculum persistence boundary
+    persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
+  };
+});
 
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { bookPreGeneration } from './book-pre-generation';
+import {
+  TEST_PROFILE_ID,
+  TEST_SUBJECT_ID,
+  TEST_BOOK_ID,
+} from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,9 +117,9 @@ async function executeSteps(
 }
 
 // Use valid v4 UUIDs — bookTopicsGeneratedEventSchema validates uuid format (RFC 4122)
-const SUBJECT_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
-const BOOK_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
-const PROFILE_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const BOOK_ID = TEST_BOOK_ID;
+const PROFILE_ID = TEST_PROFILE_ID;
 
 function createEventData(
   overrides: Record<string, unknown> = {},

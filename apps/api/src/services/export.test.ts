@@ -316,9 +316,7 @@ function mockMentorActivityLedgerRow(overrides: Row = {}): Row {
     profileId: fixtureUuid(100),
     actorJob: 'mentor',
     kind: 'session_recap',
-    templateKey: 'recap.v1',
     params: {},
-    visibility: 'self',
     createdAt: NOW,
     surfacedAt: null,
     ...overrides,
@@ -907,7 +905,7 @@ describe('generateExport', () => {
     )[0]!;
     expect(exported['id']).toBe(ledgerId);
     expect(exported['profileId']).toBe(ledgerProfileId);
-    expect(exported['templateKey']).toBe('recap.v1');
+    expect(exported['kind']).toBe('session_recap');
     // Date serialisation: createdAt must be an ISO string, not a Date object
     expect(typeof exported['createdAt']).toBe('string');
     expect(exported['createdAt']).toBe('2025-01-15T10:00:00.000Z');

@@ -1907,7 +1907,8 @@ export default function BookScreen() {
                         ? count
                         : undefined
                     }
-                    onPress={() => handleTopicPress(topic.id)}
+                    topicId={topic.id}
+                    onPress={handleTopicPress}
                     testID={`${state}-row-${topic.id}`}
                   />
                 ))}

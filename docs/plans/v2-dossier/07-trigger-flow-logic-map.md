@@ -1,0 +1,182 @@
+# V2 Trigger Flow Logic Map
+
+**Last verified:** 2026-06-30  
+**Purpose:** Review why users move between V2 surfaces. This complements `06-screen-function-access-map.md` by mapping triggers, decision points, and access boundaries.
+
+## Source Legend
+
+- `CODE` means current implementation exists.
+- `PARTIAL` means current implementation is present but incomplete versus V2 intent.
+- `PLAN` means the flow is specified but not fully implemented.
+- `OPEN` means a concrete build gap remains.
+
+## Visual Flow: V2 Shell Entry
+
+```mermaid
+flowchart TD
+  A[Signed-in app route] --> B{Auth loaded and signed in?}
+  B -- no --> SI[Sign-in with pending redirect]
+  B -- yes --> C{Profile query ready?}
+  C -- loading/error --> C1[Loading or profile error recovery]
+  C -- ready --> D{Preview save wizard pending?}
+  D -- yes --> SW[SaveWizardGate]
+  D -- no --> E{Active profile exists?}
+  E -- no --> CP[CreateProfileGate]
+  E -- yes --> F{Consent blocks access?}
+  F -- pending --> CG[ConsentPendingGate]
+  F -- withdrawn --> WG[ConsentWithdrawnGate]
+  F -- clear --> P{Post-approval landing due?}
+  P -- yes --> PA[PostApprovalLanding]
+  P -- no --> V2{MODE_NAV_V2_ENABLED?}
+  V2 -- yes --> SH[V2 shell: Mentor + Subjects + Journal]
+  V2 -- no --> LEGACY[V0/V1 legacy shell]
+  SH --> SC[ScopeContextProvider loads /scopes]
+  SC --> TAB[Active scope controls each tab body]
+```
+
+**Code anchors:** `(app)/_layout.tsx:453-621`, `feature-flags.ts:32`, `use-navigation-contract.ts:185-194`, `scope-context.tsx:127-151`.
+
+## Visual Flow: Scope Lenses
+
+```mermaid
+flowchart LR
+  API[GET /scopes] --> Shape{scopeList.shape}
+  Shape -- learner --> Me[Implicit Me scope]
+  Shape -- supporter --> Hub[Support hub scope]
+  Shape -- supporter --> Person[Person scopes]
+  Shape -- supporter + first own learning state --> Me2[Me scope]
+
+  Me --> M1[Mentor: learner feed]
+  Me --> S1[Subjects: own subjects]
+  Me --> J1[Journal: private record]
+
+  Hub --> M2[Mentor: support hub list]
+  Hub --> S2[Subjects: supported people list]
+  Hub --> J2[Journal: shared-record placeholders]
+
+  Person --> M3[Mentor: person support view]
+  Person --> S3[Subjects: structural mask]
+  Person --> J3[Journal: person shared-record placeholder]
+```
+
+**Code anchors:** `scope-resolution.ts:71-83`, `ScopeChip.tsx:40`, `mentor.tsx:370-381`, `subjects.tsx:23-33`, `journal/index.tsx:15-27`.
+
+## Visual Flow: Learner Mentor
+
+```mermaid
+flowchart TD
+  M[Mentor tab in Me scope] --> FEED[Load /now?scope=self]
+  M --> SUBJ[Load subjects index]
+  FEED --> First{Any first real state?}
+  SUBJ --> First
+  First -- no --> Cold[ColdStartCard]
+  Cold --> Text[Input text or voice]
+  Cold --> Camera[Open homework camera]
+  First -- yes --> Cards[NowCardStack]
+  Cards --> Continue[Continue card]
+  Continue --> DL[pushNowDeepLink]
+  DL --> Session[Session resume]
+  DL --> Hub[Subject Hub]
+  DL --> Topic[Topic/review/challenge]
+  Cards --> Decline[Decline card]
+  Decline --> Light[Light practice]
+  Cards --> Done[Mark completed]
+  Done --> Celebration[Celebration + reward receipt]
+  M --> Bar[MentorInputBar]
+  Bar --> Intent{matchBarIntent}
+  Intent -- jump --> DL
+  Intent -- question --> NewSession[Session entrySource=mentor]
+  Intent -- uncertain --> Light
+  Bar --> Camera
+  Camera --> Homework[Homework camera]
+  Homework --> HWSession[Session with mentor-homework first response]
+```
+
+**Code anchors:** `mentor.tsx:85-181`, `:225-347`, `use-now-feed.ts:29`, `bar-intent-match.ts:21-96`, `now-deep-link.ts:24-49`, `homework/camera.tsx:498`, `session-route-params.ts:110-114`.
+
+## Visual Flow: Subjects And Subject Hub
+
+```mermaid
+flowchart TD
+  ST[Subjects tab] --> Scope{Active scope}
+  Scope -- me --> Browse[SubjectsBrowse]
+  Browse --> Search[Name search]
+  Browse --> Create[Create subject -> onboarding]
+  Browse --> Open[Open subject]
+  Open --> Hub[Subject Hub]
+  Hub --> State{Hub data state}
+  State -- preparing --> Preparing[Preparing + retry/poll]
+  State -- stuck --> Stuck[Retry curriculum or back]
+  State -- no books --> PickBook[Pick book]
+  State -- ready --> Ready[Next-up + progress + chapters + notes]
+  Ready --> Next{Next-up kind}
+  Next -- resume --> Resume[Resume session]
+  Next -- review-due --> Review[Topic review]
+  Next -- up-next --> Topic[Topic detail/session]
+  Ready --> AddNote[Add topic note]
+  Ready --> Manage[Manage subject status]
+
+  Scope -- supporter-hub --> People[Supported people list]
+  People --> PersonScope[Switch to person scope]
+  Scope -- person --> Mask[Structural subject mask]
+```
+
+**Code anchors:** `subjects.tsx:15-65`, `SubjectsBrowse.tsx:19-185`, `subject-hub/[subjectId]/index.tsx:35-319`, `use-subject-hub.ts:228-553`, `PersonScopeStructuralSubjects.tsx:18-83`.
+
+## Visual Flow: Journal
+
+```mermaid
+flowchart TD
+  JT[Journal tab] --> Scope{Active scope}
+  Scope -- me --> Private[JournalTabView]
+  Private --> Moments[Moments strip from /now ledger cards]
+  Moments --> DL[pushNowDeepLink]
+  Private --> Sections{Segmented sections}
+  Sections -- Sessions --> Recaps[Recaps/session rows]
+  Sections -- Notes --> Notes[Notes + mentor bookmarks archive]
+  Sections -- Practice --> Practice[Practice history + open Practice hub]
+  Sections -- Memory --> Memory[Mentor memory screen]
+  Sections -- Reports --> Reports[Weekly/monthly reports]
+
+  Scope -- supporter-hub --> HubRecord[Per-person shared-record cards]
+  Scope -- person --> PersonRecord[Person shared-record placeholder]
+  HubRecord -. missing .-> RealShared[Fetch real shared-record API]
+  PersonRecord -. missing .-> RealShared
+```
+
+**Code anchors:** `journal/index.tsx:10-27`, `JournalTabView.tsx:44`, `:214`, `:406`, `:470`, `:593`, `:845`, `:936`, `:1072`, `SupportHubJournalTab.tsx:33-65`, `PersonScopeJournalPlaceholder.tsx:9-42`, `visibility.ts:175-188`.
+
+## Trigger Matrix
+
+| Trigger | Lands on | Decision point | Why | Access/source |
+|---|---|---|---|---|
+| App opens after auth/profile/consent | V2 shell, intended Mentor tab | Layout gates clear, V2 flag on. | First actionable object should be Mentor, not another setup surface. | `CODE` shell; `PLAN` exact post-auth Mentor landing copy: spec lines `131-135`. |
+| Tap Mentor tab | Mentor tab body for active scope | `activeScope.kind` chooses self/supporter/person view. | One tab, multiple lenses. | `CODE`: `mentor.tsx:370-381`. |
+| Tap Subjects tab | Subjects body for active scope | `activeScope.kind` chooses own browse, supporter people list, or structural mask. | Same IA for learner and supporter, with server mask. | `CODE/PARTIAL`: `subjects.tsx:23-65`. |
+| Tap Journal tab | Journal body for active scope | `activeScope.kind` chooses private Journal or shared-record placeholder. | Private record for self; transparent shared record for supporter edges. | `CODE/PARTIAL`: `journal/index.tsx:15-27`. |
+| Tap scope chip option | Same tab, different scope body | `setActiveScope()` accepts only known scopes and persists key. | Avoid shell switching and proxy impersonation. | `CODE`: `ScopeChip.tsx:40-70`, `scope-context.tsx:84-118`. |
+| `/now` returns unfinished session | Mentor card -> session resume | Card deep link route `session.resume`. | Continue where left off outranks browsing. | `CODE`: `mentor.tsx:48-55`, `now-deep-link.ts:24-27`. |
+| `/now` returns subject/topic/review/challenge | Mentor card -> Subject Hub/topic/review/challenge | `pushNowDeepLink()` follows optional chain first. | Feed proposes, persistent screen handles. | `CODE`: `now-deep-link.ts:28-45`, `mentor.tsx:125-132`. |
+| `/now` returns ledger moment | Journal moments strip and/or Mentor reward receipt | `card.kind === ledger_moment`; Journal renders moment text and deep-link. | Achievement/progress becomes a moment, not a gallery. | `CODE`: `mentor.tsx:59-76`, `JournalTabView.tsx:214-292`. |
+| Learner has no first real state | ColdStartCard | `hasFirstRealState()` false across active subjects/feed/completed exchanges. | Avoid blank feed and avoid subject-picker first. | `CODE`: `first-real-state.ts:7-16`, `mentor.tsx:105-116`, `:225`. |
+| Mentor text input is a question | Session with `entrySource=mentor`, `mode=freeform`, `rawInput`. | `matchBarIntent()` returns `mentor`. | Open-ended ask enters tutor engine directly. | `CODE`: `bar-intent-match.ts:17-96`, `mentor.tsx:161-178`. |
+| Mentor text input names known route tokens | Deep link to session/subject/topic/review/challenge. | `matchBarIntent()` returns `jump`. | Let explicit navigation language work without making user browse. | `CODE`: `bar-intent-match.ts:29-86`, `mentor.tsx:161-166`. |
+| Mentor text input is uncertain or thin feed | Light practice affordance. | `matchBarIntent()` uncertain or feed has <=1 card. | Offer low-pressure practice instead of dead-ending. | `CODE`: `mentor.tsx:181-195`, `:347-356`. |
+| Camera/homework from Mentor | Homework camera -> session with mentor-homework frame. | Params include `entrySource=mentor`, `returnTo=mentor`; session detects `mentor-homework`. | Dedicated capture, same conversation continuity. | `CODE`: `mentor.tsx:78-82`, `homework/camera.tsx:498`, `session-route-params.ts:110-114`, `SessionAccessories.tsx:529-556`. |
+| First V2 Mentor session closes | In-thread first-session wrap-up. | `isV2MentorEntry && isFirstSession`. | Replaces separate exit funnel before S6 deletes it. | `CODE`: `session/index.tsx:1068`, `:1424`; S6 deletion remains `PLAN`. |
+| Subject row pressed | Subject Hub | `SubjectsBrowse` calls `onOpenSubject(subjectId)`. | Browse leads to the persistent subject workspace. | `CODE`: `SubjectsBrowse.tsx:146`, `subjects.tsx:59-64`. |
+| Subject Hub Next-up pressed | Resume, review, or topic. | `nextUp.kind` controls route. | One next action per subject. | `CODE`: `subject-hub/[subjectId]/index.tsx:162-178`, `use-subject-hub.ts:228-276`. |
+| Person scope Subjects opened | Structural masked subject list. | Fetch `GET /scopes/:personId/subjects`. | Supporter sees only shareable structure. | `CODE/PARTIAL`: `PersonScopeStructuralSubjects.tsx:26-33`, `scopes.ts:25-35`. |
+| Supporter Journal opened | Empty shared-record projections. | Current mobile constructs local empty `SharedRecord`. | Placeholder for S5 visibility contract. | `PARTIAL`: `SupportHubJournalTab.tsx:15-31`, `PersonScopeJournalPlaceholder.tsx:13-34`; real API route at `visibility.ts:175-188`. |
+| Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
+
+## Current Gaps To Review Before Calling V2 Complete
+
+| Gap | User-visible risk | Owner phase |
+|---|---|---|
+| Support hub is still mostly list/placeholder UI. | Parent/supporter cannot yet answer the full "what should I do now?" job from V2 alone. | S4 |
+| Shared-record Journal uses local empty records. | Supporters see the shape of trust UI, not real report/recap facts. | S5 |
+| Person-scope Subjects has no masked Subject Hub drill-in. | Supporters can see a structural list but cannot inspect masked learning structure deeply. | S4/S5 |
+| Visibility ceremony screens are missing. | Link/accept/revoke/trust-contract flows are API-backed but not mobile-complete. | S5 |
+| S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
+

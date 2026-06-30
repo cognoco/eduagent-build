@@ -9,7 +9,7 @@ const consoleLogSpy = jest
   .spyOn(console, 'log')
   .mockImplementation(() => undefined);
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,

@@ -1,12 +1,22 @@
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { subjectRetryCurriculum } from './subject-retry-curriculum';
+import { seedConsentState } from '../../test-utils/consent-seed';
+import {
+  TEST_PROFILE_ID,
+  TEST_SUBJECT_ID,
+  TEST_BOOK_ID,
+} from '@eduagent/test-utils';
 
 const mockGetStepDatabase = jest.fn();
 const mockGenerateBookTopics = jest.fn();
 const mockPersistBookTopics = jest.fn();
 const mockGetProfileAge = jest.fn();
 const mockCaptureException = jest.fn();
+const mockRunWithStepDatabaseScope = jest.fn(
+  async <T>(callback: () => Promise<T>) => callback(),
+);
+const mockCloseStepDatabases = jest.fn().mockResolvedValue(undefined);
 
 // GC6: real module via requireActual; override only the two step accessors the
 // Inngest runtime would otherwise require (DB binding) + pin the cutover flag to
@@ -18,6 +28,9 @@ jest.mock('../helpers', () => {
   return {
     ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
+    runWithStepDatabaseScope: (callback: () => Promise<unknown>) =>
+      mockRunWithStepDatabaseScope(callback),
+    closeStepDatabases: () => mockCloseStepDatabases(),
     isIdentityV2EnabledInStep: () => false,
   };
 });
@@ -58,9 +71,9 @@ jest.mock(
 
 const handler = (subjectRetryCurriculum as any).fn;
 
-const PROFILE_ID = 'a0000000-0000-4000-8000-000000000001';
-const SUBJECT_ID = 'a0000000-0000-4000-8000-000000000002';
-const BOOK_ID = 'a0000000-0000-4000-8000-000000000003';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const BOOK_ID = TEST_BOOK_ID;
 
 function validPayload(overrides?: Record<string, unknown>) {
   return {
@@ -101,6 +114,20 @@ function makeMockDb(
       },
       consentStates: {
         findFirst: jest.fn().mockResolvedValue(undefined),
+      },
+      // WI-867: isGdprProcessingAllowedV2 reads membership.findFirst first.
+      // null = no org = allowed immediately (IDENTITY_V2_ENABLED=true in .env.development.local).
+      membership: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      // WI-867: getPersonLlmContext + getPersonBirthYear (helpers.ts) both read person.findFirst.
+      // birthDate '2012-01-01' → birthYear 2012 → age 14 (2026-2012), matching the test assertion.
+      // (Old code used mocked getProfileAge; v2 reads person.birthDate directly.)
+      person: {
+        findFirst: jest.fn().mockResolvedValue({
+          birthDate: '2012-01-01',
+          conversationLanguage: null,
+        }),
       },
       // i18n Phase 1: profile lookup for conversationLanguage.
       profiles: {
@@ -380,14 +407,18 @@ describe('subjectRetryCurriculum', () => {
 
   describe('GDPR consent gate', () => {
     it.each([
-      ['WITHDRAWN', { status: 'WITHDRAWN' }],
-      ['PENDING', { status: 'PENDING' }],
-      ['PARENTAL_CONSENT_REQUESTED', { status: 'PARENTAL_CONSENT_REQUESTED' }],
+      ['WITHDRAWN', 'WITHDRAWN' as const],
+      ['PENDING', 'PENDING' as const],
+      ['PARENTAL_CONSENT_REQUESTED', 'PCR' as const],
     ])(
       'skips and returns consent_not_granted when consent status is %s',
-      async (_label, consentRow) => {
+      async (_label, seedState) => {
         const mockDb = makeMockDb();
-        mockDb.query.consentStates.findFirst.mockResolvedValue(consentRow);
+        // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+        // Seed the v2 consent chain; old consentStates.findFirst is no longer consulted.
+        seedConsentState(mockDb as unknown as Record<string, unknown>, {
+          state: seedState,
+        });
         mockGetStepDatabase.mockReturnValue(mockDb);
         const { step } = createInngestStepRunner();
 
@@ -434,9 +465,11 @@ describe('subjectRetryCurriculum', () => {
       // load-retry-context sees CONSENTED → context becomes 'pending'.
       // retry-generate-and-persist sees WITHDRAWN → LLM must be skipped.
       const loadDb = makeMockDb();
-      loadDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
+      // Sequence: first check = CONSENTED (load step), second check = WITHDRAWN (generate step).
+      seedConsentState(loadDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
       const confirmDb = makeMockDb({ topicsGenerated: false });
       let callCount = 0;
       mockGetStepDatabase.mockImplementation(() => {
@@ -627,8 +660,10 @@ describe('subjectRetryCurriculum', () => {
 
     it('writes NO failure signal when consent is not granted in load-retry-context', async () => {
       const { mockDb, updateSet } = makeInspectableDb();
-      mockDb.query.consentStates.findFirst.mockResolvedValue({
-        status: 'WITHDRAWN',
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2 membership/consentGrant
+      // chain), not legacy consentStates. Seed the v2 chain WITHDRAWN.
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: 'WITHDRAWN',
       });
       mockGetStepDatabase.mockReturnValue(mockDb);
       const { step } = createInngestStepRunner();
@@ -648,9 +683,11 @@ describe('subjectRetryCurriculum', () => {
     it('writes NO failure signal in the in-step gate when consent is withdrawn between steps', async () => {
       const { mockDb, updateSet } = makeInspectableDb();
       // load step sees CONSENTED → context 'pending'; in-step gate sees WITHDRAWN.
-      mockDb.query.consentStates.findFirst
-        .mockResolvedValueOnce({ status: 'CONSENTED' })
-        .mockResolvedValueOnce({ status: 'WITHDRAWN' });
+      // WI-867: source reads isGdprProcessingAllowedV2 (v2 chain); seed the
+      // sequence on the v2 seam, not legacy consentStates.
+      seedConsentState(mockDb as unknown as Record<string, unknown>, {
+        state: ['CONSENTED', 'WITHDRAWN'],
+      });
       mockGetStepDatabase.mockReturnValue(mockDb);
       const { step } = createInngestStepRunner();
 
@@ -723,6 +760,23 @@ describe('subjectRetryCurriculum', () => {
         });
 
         expect(updateSet).not.toHaveBeenCalled();
+      });
+
+      it('wraps DB writes in runWithStepDatabaseScope and closes step databases', async () => {
+        // Regression guard: onFailure must scope and release the DB handle so
+        // connection leaks cannot occur on terminal failures (mirrors
+        // auto-file-session.ts and topic-probe-extract.ts onFailure pattern).
+        const { mockDb } = makeInspectableDb({ failedAt: null });
+        mockGetStepDatabase.mockReturnValue(mockDb);
+        const onFailure = (subjectRetryCurriculum as any).opts.onFailure;
+
+        await onFailure({
+          event: { data: { event: { data: validPayload() } } },
+          error: new Error('terminal failure'),
+        });
+
+        expect(mockRunWithStepDatabaseScope).toHaveBeenCalled();
+        expect(mockCloseStepDatabases).toHaveBeenCalled();
       });
     });
   });

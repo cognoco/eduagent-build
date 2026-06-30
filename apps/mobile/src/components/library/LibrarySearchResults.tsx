@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -201,7 +202,7 @@ function ResultRow({
   );
 }
 
-function BookRow({
+const BookRow = memo(function BookRow({
   item,
   onPress,
 }: {
@@ -219,9 +220,9 @@ function BookRow({
       onPress={() => onPress(item.subjectId, item.id)}
     />
   );
-}
+});
 
-function TopicRow({
+const TopicRow = memo(function TopicRow({
   item,
   onPress,
 }: {
@@ -239,9 +240,9 @@ function TopicRow({
       onPress={() => onPress(item.id, item.subjectId, item.bookId)}
     />
   );
-}
+});
 
-function NoteRow({
+const NoteRow = memo(function NoteRow({
   item,
   onPress,
 }: {
@@ -261,9 +262,9 @@ function NoteRow({
       onPress={() => onPress(item.topicId, item.subjectId, item.bookId)}
     />
   );
-}
+});
 
-function SessionRow({
+const SessionRow = memo(function SessionRow({
   item,
   onPress,
 }: {
@@ -289,7 +290,7 @@ function SessionRow({
       onPress={() => onPress(item.sessionId, item.subjectId, item.topicId)}
     />
   );
-}
+});
 
 function hasResults(
   data: LibrarySearchResult | undefined,
