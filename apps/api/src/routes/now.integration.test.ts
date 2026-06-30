@@ -230,7 +230,6 @@ describe('Integration: now routes', () => {
       profileId,
       actorJob: 'test',
       kind: 'milestone_reached',
-      templateKey: 'ledger.milestone_reached.default',
       params: {
         marker: 'ranking-ledger',
         milestoneId: 'milestone-ranking',
