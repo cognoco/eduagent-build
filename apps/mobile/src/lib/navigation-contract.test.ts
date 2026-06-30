@@ -915,64 +915,312 @@ describe('resolveNavigationContract snapshot surface', () => {
       }),
     };
 
-    expect(
-      Object.fromEntries(
-        Object.entries(contexts).map(([name, context]) => {
-          const contract = resolveNavigationContract(context);
+    // Explicit structural assertions (replaces toMatchSnapshot).
+    // Expected values recovered from the committed snapshot at:
+    //   apps/mobile/src/lib/__snapshots__/navigation-contract.test.ts.snap
+    const resolved = Object.fromEntries(
+      Object.entries(contexts).map(([name, context]) => {
+        const contract = resolveNavigationContract(context);
 
-          return [
-            name,
-            {
-              chrome: contract.chrome,
-              diagnostic: contract.diagnostic,
-              gates: contract.gates,
-              home: contract.home,
-              queryScope: contract.queryScope,
-              routeSurface: {
-                child: {
-                  canEnter: contract.canEnter(
-                    'child/[profileId]',
-                    linkedChildParams,
-                  ),
-                  isSurfaced: contract.isSurfaced(
-                    'child/[profileId]',
-                    linkedChildParams,
-                  ),
-                },
-                childCurriculum: {
-                  canEnter: contract.canEnter(
-                    'child/[profileId]/curriculum',
-                    linkedChildParams,
-                  ),
-                  isSurfaced: contract.isSurfaced(
-                    'child/[profileId]/curriculum',
-                    linkedChildParams,
-                  ),
-                },
-                library: {
-                  canEnter: contract.canEnter('library'),
-                  isSurfaced: contract.isSurfaced('library'),
-                },
-                recaps: {
-                  canEnter: contract.canEnter('recaps'),
-                  isSurfaced: contract.isSurfaced('recaps'),
-                },
-                session: {
-                  canEnter: contract.canEnter('session'),
-                  isSurfaced: contract.isSurfaced('session'),
-                },
-                subscription: {
-                  canEnter: contract.canEnter('subscription'),
-                  isSurfaced: contract.isSurfaced('subscription'),
-                },
+        return [
+          name,
+          {
+            chrome: contract.chrome,
+            diagnostic: contract.diagnostic,
+            gates: contract.gates,
+            home: contract.home,
+            queryScope: contract.queryScope,
+            routeSurface: {
+              child: {
+                canEnter: contract.canEnter(
+                  'child/[profileId]',
+                  linkedChildParams,
+                ),
+                isSurfaced: contract.isSurfaced(
+                  'child/[profileId]',
+                  linkedChildParams,
+                ),
               },
-              shape: contract.shape,
-              tabs: sortedTabs(contract),
+              childCurriculum: {
+                canEnter: contract.canEnter(
+                  'child/[profileId]/curriculum',
+                  linkedChildParams,
+                ),
+                isSurfaced: contract.isSurfaced(
+                  'child/[profileId]/curriculum',
+                  linkedChildParams,
+                ),
+              },
+              library: {
+                canEnter: contract.canEnter('library'),
+                isSurfaced: contract.isSurfaced('library'),
+              },
+              recaps: {
+                canEnter: contract.canEnter('recaps'),
+                isSurfaced: contract.isSurfaced('recaps'),
+              },
+              session: {
+                canEnter: contract.canEnter('session'),
+                isSurfaced: contract.isSurfaced('session'),
+              },
+              subscription: {
+                canEnter: contract.canEnter('subscription'),
+                isSurfaced: contract.isSurfaced('subscription'),
+              },
             },
-          ];
-        }),
-      ),
-    ).toMatchSnapshot();
+            shape: contract.shape,
+            tabs: sortedTabs(contract),
+          },
+        ];
+      }),
+    );
+
+    expect(resolved.child).toEqual({
+      chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
+      diagnostic: {
+        activeProfileId: '00000000-0000-7000-a000-000000000201',
+        effectiveAppContext: 'study',
+        isFamilyCapable: false,
+        isParentProxy: false,
+        linkedChildIds: [],
+        reason: 'child-study-only',
+        role: 'child',
+        shape: 'study',
+      },
+      gates: {
+        progressScope: 'self',
+        sessionIsOwner: false,
+        showAccommodationChildEditor: false,
+        showAccountSecurity: false,
+        showAddChild: false,
+        showBilling: false,
+        showCelebrationsChildEditor: false,
+        showExportDelete: false,
+        showFamilyChildActivity: false,
+        showFamilyHome: false,
+        showInlineStudyInvite: false,
+        showLearnThisToo: false,
+        showLearningActions: true,
+        showProgressProfilePicker: false,
+        showRemoveFamilyMember: false,
+      },
+      home: {
+        iconName: 'School',
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+      },
+      queryScope: {
+        appContext: 'study',
+        profileId: '00000000-0000-7000-a000-000000000201',
+      },
+      routeSurface: {
+        child: { canEnter: false, isSurfaced: false },
+        childCurriculum: { canEnter: false, isSurfaced: false },
+        library: { canEnter: true, isSurfaced: true },
+        recaps: { canEnter: false, isSurfaced: false },
+        session: { canEnter: true, isSurfaced: true },
+        subscription: { canEnter: false, isSurfaced: false },
+      },
+      shape: 'study',
+      tabs: ['home', 'library', 'more', 'progress'],
+    });
+
+    expect(resolved.family).toEqual({
+      chrome: { modeSwitcher: 'global-header', proxyBanner: 'hidden' },
+      diagnostic: {
+        activeProfileId: '00000000-0000-7000-a000-000000000102',
+        effectiveAppContext: 'family',
+        isFamilyCapable: true,
+        isParentProxy: false,
+        linkedChildIds: ['00000000-0000-7000-a000-000000000201'],
+        reason: 'explicit-family',
+        role: 'owner',
+        shape: 'family',
+      },
+      gates: {
+        progressScope: 'children',
+        sessionIsOwner: true,
+        showAccommodationChildEditor: true,
+        showAccountSecurity: true,
+        showAddChild: true,
+        showBilling: true,
+        showCelebrationsChildEditor: true,
+        showExportDelete: true,
+        showFamilyChildActivity: true,
+        showFamilyHome: true,
+        showInlineStudyInvite: true,
+        showLearnThisToo: true,
+        showLearningActions: true,
+        showProgressProfilePicker: true,
+        showRemoveFamilyMember: true,
+      },
+      home: {
+        iconName: 'Users',
+        screen: 'FamilyHome',
+        titleKey: 'tabs.children',
+      },
+      queryScope: {
+        appContext: 'family',
+        profileId: '00000000-0000-7000-a000-000000000102',
+      },
+      routeSurface: {
+        child: { canEnter: true, isSurfaced: true },
+        childCurriculum: { canEnter: true, isSurfaced: true },
+        library: { canEnter: false, isSurfaced: false },
+        recaps: { canEnter: true, isSurfaced: true },
+        session: { canEnter: true, isSurfaced: false },
+        subscription: { canEnter: true, isSurfaced: true },
+      },
+      shape: 'family',
+      tabs: ['home', 'more', 'progress', 'recaps'],
+    });
+
+    expect(resolved.loading).toEqual({
+      chrome: { modeSwitcher: 'hidden', proxyBanner: 'hidden' },
+      diagnostic: {
+        activeProfileId: null,
+        effectiveAppContext: 'study',
+        isFamilyCapable: false,
+        isParentProxy: false,
+        linkedChildIds: [],
+        reason: 'profile-loading',
+        role: null,
+        shape: 'study',
+      },
+      gates: {
+        progressScope: 'self',
+        sessionIsOwner: false,
+        showAccommodationChildEditor: false,
+        showAccountSecurity: false,
+        showAddChild: false,
+        showBilling: false,
+        showCelebrationsChildEditor: false,
+        showExportDelete: false,
+        showFamilyChildActivity: false,
+        showFamilyHome: false,
+        showInlineStudyInvite: false,
+        showLearnThisToo: false,
+        showLearningActions: true,
+        showProgressProfilePicker: false,
+        showRemoveFamilyMember: false,
+      },
+      home: {
+        iconName: 'School',
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+      },
+      queryScope: { appContext: 'study', profileId: null },
+      routeSurface: {
+        child: { canEnter: false, isSurfaced: false },
+        childCurriculum: { canEnter: false, isSurfaced: false },
+        library: { canEnter: false, isSurfaced: false },
+        recaps: { canEnter: false, isSurfaced: false },
+        session: { canEnter: false, isSurfaced: false },
+        subscription: { canEnter: false, isSurfaced: false },
+      },
+      shape: 'study',
+      tabs: ['home', 'library', 'more', 'progress'],
+    });
+
+    expect(resolved.proxy).toEqual({
+      chrome: { modeSwitcher: 'hidden', proxyBanner: 'required' },
+      diagnostic: {
+        activeProfileId: '00000000-0000-7000-a000-000000000102',
+        effectiveAppContext: 'study',
+        isFamilyCapable: true,
+        isParentProxy: true,
+        linkedChildIds: ['00000000-0000-7000-a000-000000000201'],
+        reason: 'parent-proxy',
+        role: 'owner',
+        shape: 'study',
+      },
+      gates: {
+        progressScope: 'self',
+        sessionIsOwner: false,
+        showAccommodationChildEditor: false,
+        showAccountSecurity: false,
+        showAddChild: false,
+        showBilling: false,
+        showCelebrationsChildEditor: false,
+        showExportDelete: false,
+        showFamilyChildActivity: false,
+        showFamilyHome: false,
+        showInlineStudyInvite: false,
+        showLearnThisToo: false,
+        showLearningActions: false,
+        showProgressProfilePicker: false,
+        showRemoveFamilyMember: false,
+      },
+      home: {
+        iconName: 'School',
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+      },
+      queryScope: {
+        appContext: 'study',
+        profileId: '00000000-0000-7000-a000-000000000102',
+      },
+      routeSurface: {
+        child: { canEnter: false, isSurfaced: false },
+        childCurriculum: { canEnter: false, isSurfaced: false },
+        library: { canEnter: true, isSurfaced: true },
+        recaps: { canEnter: false, isSurfaced: false },
+        session: { canEnter: false, isSurfaced: false },
+        subscription: { canEnter: false, isSurfaced: false },
+      },
+      shape: 'study',
+      tabs: ['home', 'library', 'progress'],
+    });
+
+    expect(resolved.study).toEqual({
+      chrome: { modeSwitcher: 'global-header', proxyBanner: 'hidden' },
+      diagnostic: {
+        activeProfileId: '00000000-0000-7000-a000-000000000102',
+        effectiveAppContext: 'study',
+        isFamilyCapable: true,
+        isParentProxy: false,
+        linkedChildIds: ['00000000-0000-7000-a000-000000000201'],
+        reason: 'explicit-study',
+        role: 'owner',
+        shape: 'study',
+      },
+      gates: {
+        progressScope: 'self',
+        sessionIsOwner: true,
+        showAccommodationChildEditor: false,
+        showAccountSecurity: true,
+        showAddChild: true,
+        showBilling: true,
+        showCelebrationsChildEditor: false,
+        showExportDelete: true,
+        showFamilyChildActivity: false,
+        showFamilyHome: false,
+        showInlineStudyInvite: true,
+        showLearnThisToo: false,
+        showLearningActions: true,
+        showProgressProfilePicker: false,
+        showRemoveFamilyMember: false,
+      },
+      home: {
+        iconName: 'School',
+        screen: 'LearnerHome',
+        titleKey: 'tabs.myLearning',
+      },
+      queryScope: {
+        appContext: 'study',
+        profileId: '00000000-0000-7000-a000-000000000102',
+      },
+      routeSurface: {
+        child: { canEnter: false, isSurfaced: false },
+        childCurriculum: { canEnter: false, isSurfaced: false },
+        library: { canEnter: true, isSurfaced: true },
+        recaps: { canEnter: false, isSurfaced: false },
+        session: { canEnter: true, isSurfaced: true },
+        subscription: { canEnter: true, isSurfaced: true },
+      },
+      shape: 'study',
+      tabs: ['home', 'library', 'more', 'progress'],
+    });
   });
 
   it('keeps owner add-child access while the role discriminator is unresolved', () => {
