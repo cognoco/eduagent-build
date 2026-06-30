@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Añade tu primera nota para este tema",
     "loadingBookmarks": "Cargando explicaciones guardadas...",
     "loadingSessions": "Cargando sesiones...",
-    "noSessionsSummary": "Aún no hay sesiones"
+    "noSessionsSummary": "Aún no hay sesiones",
+    "ctaStartChallenge": "Iniciar desafío"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Crea un tema para empezar a construir tu mapa de aprendizaje.",
     "createSubject": "Crear tema",
     "openSubject": "Abrir tema",
+    "openSubjectNamed": "Abrir {{subject}}",
+
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",

@@ -60,9 +60,11 @@ export const profileCreateSchema = z
   .object({
     displayName: z.string().min(1).max(50),
     birthYear: birthYearSchema,
-    // WI-297: Optional full birth date components for exact age calculation.
-    // Persisted only as birthYear in the DB — these are used server-side to
-    // compute consent requirements precisely (avoids year-only overestimation).
+    // WI-297 / WI-367: Optional full birth date components for exact age.
+    // Used server-side at create to compute consent requirements precisely, and
+    // (WI-367) now persisted to profiles.birth_month / birth_day so post-hoc age
+    // reads (consent-revocation COPPA boundary, add-child adult gate) compute
+    // exact age. Create-only/immutable — profileUpdateSchema omits them.
     birthMonth: z.number().int().min(1).max(12).optional(),
     birthDay: z.number().int().min(1).max(31).optional(),
     avatarUrl: z.string().url().optional(),

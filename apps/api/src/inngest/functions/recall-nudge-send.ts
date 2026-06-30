@@ -1,16 +1,13 @@
 // @inngest-admin: parent-chain (curriculumTopics looked up by IDs from event; familyLinks enforced by profileId)
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { getStepDatabase } from '../helpers';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   curriculumBooks,
   curricula,
   curriculumTopics,
-  familyLinks,
-  profiles,
   subjects,
 } from '@eduagent/database';
-import { resolveProfileRole } from '../../services/profile';
 import { isPersonLive } from '../../services/identity-v2/helpers';
 import {
   resolveProfileRoleV2,
@@ -38,13 +35,7 @@ export const recallNudgeSend = inngest.createFunction(
     const result = await step.run('send-nudge', async () => {
       const db = getStepDatabase();
 
-      const v2 = isIdentityV2EnabledInStep();
-      const live = v2
-        ? await isPersonLive(db, profileId)
-        : !!(await db.query.profiles.findFirst({
-            where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-            columns: { id: true },
-          }));
+      const live = await isPersonLive(db, profileId);
       if (!live) {
         return {
           status: 'skipped' as const,
@@ -133,30 +124,13 @@ export const recallNudgeSend = inngest.createFunction(
       const topTopicTitle = topics[0]?.title ?? 'your fading topic';
 
       // Resolve role
-      const role = v2
-        ? await resolveProfileRoleV2(db, profileId)
-        : await resolveProfileRole(db, profileId);
+      const role = await resolveProfileRoleV2(db, profileId);
 
       // For guardians, look up child name
       let childName: string | undefined;
       if (role === 'guardian') {
-        if (v2) {
-          childName =
-            (await getFirstActiveChildNameV2(db, profileId)) ?? undefined;
-        } else {
-          const childLink = await db.query.familyLinks.findFirst({
-            where: eq(familyLinks.parentProfileId, profileId),
-          });
-          if (childLink) {
-            const childProfile = await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, childLink.childProfileId),
-                isNull(profiles.archivedAt),
-              ),
-            });
-            childName = childProfile?.displayName ?? undefined;
-          }
-        }
+        childName =
+          (await getFirstActiveChildNameV2(db, profileId)) ?? undefined;
       }
 
       // Format notification message

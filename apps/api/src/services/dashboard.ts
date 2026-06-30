@@ -17,16 +17,13 @@ import {
   isNull,
 } from 'drizzle-orm';
 import {
-  familyLinks,
   membership,
   person,
-  profiles,
   learningSessions,
   learningProfiles,
   progressSnapshots,
   sessionEvents,
   subjects,
-  consentStates,
   curricula,
   curriculumTopics,
   sessionSummaries,
@@ -76,7 +73,6 @@ import {
   selectCurrentlyWorkingOn,
 } from './learner-profile';
 import { assertParentAccess } from './family-access';
-import { getLatestGdprConsentByProfile } from './consent';
 import {
   getChildGdprConsentStatusV2,
   getChildPersonIdsForParentV2,
@@ -306,22 +302,9 @@ async function getLatestConsentStatus(
   opts?: { identityV2Enabled?: boolean },
 ): Promise<ConsentStatus | null> {
   // [WI-586] v2 path: resolve GDPR consent from the canonical consent graph
-  // (consent_grant via the child's org), flag-off reads legacy consent_states.
-  if (opts?.identityV2Enabled) {
-    const row = await getChildGdprConsentStatusV2(db, childProfileId);
-    return row?.status ?? null;
-  }
-
-  const consentState = await db.query.consentStates.findFirst({
-    where: and(
-      eq(consentStates.profileId, childProfileId),
-      eq(consentStates.consentType, 'GDPR'),
-    ),
-    orderBy: desc(consentStates.requestedAt),
-    columns: { status: true },
-  });
-
-  return consentState?.status ?? null;
+  // (consent_grant via the child's org).
+  const row = await getChildGdprConsentStatusV2(db, childProfileId);
+  return row?.status ?? null;
 }
 
 export async function assertChildDashboardDataVisible(
@@ -755,30 +738,21 @@ export async function getChildrenForParent(
   let childProfileIds: string[];
   // [WI-802] Resolve the guardian's org once on the flag-on path; reused below
   // for the consent-status read (avoids a second resolveOrgIdForPerson round-trip).
-  const guardianOrgId = opts?.identityV2Enabled
-    ? await resolveOrgIdForPerson(db, parentProfileId)
-    : null;
-  if (opts?.identityV2Enabled) {
-    // [WI-802] Read charges via guardianship, then restrict to same-org members
-    // (defense-in-depth: cross-org guardianship edges must not leak into dashboard).
-    const allCharges = await getChildPersonIdsForParentV2(db, parentProfileId);
-    if (allCharges.length === 0 || !guardianOrgId) {
-      childProfileIds = [];
-    } else {
-      const orgMembers = await db.query.membership.findMany({
-        where: and(
-          inArray(membership.personId, allCharges),
-          eq(membership.organizationId, guardianOrgId),
-        ),
-        columns: { personId: true },
-      });
-      childProfileIds = orgMembers.map((m) => m.personId);
-    }
+  const guardianOrgId = await resolveOrgIdForPerson(db, parentProfileId);
+  // [WI-802] Read charges via guardianship, then restrict to same-org members
+  // (defense-in-depth: cross-org guardianship edges must not leak into dashboard).
+  const allCharges = await getChildPersonIdsForParentV2(db, parentProfileId);
+  if (allCharges.length === 0 || !guardianOrgId) {
+    childProfileIds = [];
   } else {
-    const links = await db.query.familyLinks.findMany({
-      where: eq(familyLinks.parentProfileId, parentProfileId),
+    const orgMembers = await db.query.membership.findMany({
+      where: and(
+        inArray(membership.personId, allCharges),
+        eq(membership.organizationId, guardianOrgId),
+      ),
+      columns: { personId: true },
     });
-    childProfileIds = links.map((l) => l.childProfileId);
+    childProfileIds = orgMembers.map((m) => m.personId);
   }
   if (childProfileIds.length === 0) return [];
   const allChildSubjects = await db.query.subjects.findMany({
@@ -798,27 +772,12 @@ export async function getChildrenForParent(
   // Fetch all child profiles in a single query instead of one per loop iteration.
   // [WI-586] v2 path: read from person table (no profiles post-M-DROP).
   const profilesById = new Map<string, { id: string; displayName: string }>();
-  if (opts?.identityV2Enabled) {
-    const allChildPersons = await db.query.person.findMany({
-      where: and(
-        inArray(person.id, childProfileIds),
-        isNull(person.archivedAt),
-      ),
-      columns: { id: true, displayName: true },
-    });
-    for (const p of allChildPersons) {
-      profilesById.set(p.id, p);
-    }
-  } else {
-    const allChildProfiles = await db.query.profiles.findMany({
-      where: and(
-        inArray(profiles.id, childProfileIds),
-        isNull(profiles.archivedAt),
-      ),
-    });
-    for (const p of allChildProfiles) {
-      profilesById.set(p.id, p);
-    }
+  const allChildPersons = await db.query.person.findMany({
+    where: and(inArray(person.id, childProfileIds), isNull(person.archivedAt)),
+    columns: { id: true, displayName: true },
+  });
+  for (const p of allChildPersons) {
+    profilesById.set(p.id, p);
   }
 
   // Batch recent sessions for all children in one query
@@ -911,29 +870,14 @@ export async function getChildrenForParent(
     string,
     { status: ConsentStatus; respondedAt: Date | null }
   >();
-  if (opts?.identityV2Enabled) {
-    if (guardianOrgId && childProfileIds.length > 0) {
-      const v2Statuses = await getChildrenGdprConsentStatusesV2(
-        db,
-        guardianOrgId,
-        childProfileIds,
-      );
-      for (const [childId, { status, withdrawnAt }] of v2Statuses) {
-        consentByProfile.set(childId, { status, respondedAt: withdrawnAt });
-      }
-    }
-  } else {
-    // [WI-489] Replaced the inline findMany + manual dedup with the shared
-    // helper. getLatestGdprConsentByProfile issues a single query with the
-    // BUG-394 desc(id) tiebreak and carries the real {status, respondedAt} per
-    // profile. Behaviour-preserving: profiles with NO GDPR row are ABSENT from
-    // the map (→ consentStatus resolves to null below), exactly as before.
-    const latestByProfile = await getLatestGdprConsentByProfile(
+  if (guardianOrgId && childProfileIds.length > 0) {
+    const v2Statuses = await getChildrenGdprConsentStatusesV2(
       db,
+      guardianOrgId,
       childProfileIds,
     );
-    for (const [id, { status, respondedAt }] of latestByProfile) {
-      consentByProfile.set(id, { status, respondedAt });
+    for (const [childId, { status, withdrawnAt }] of v2Statuses) {
+      consentByProfile.set(childId, { status, respondedAt: withdrawnAt });
     }
   }
 
@@ -1147,45 +1091,22 @@ export async function getChildDetail(
 
   // Step 1: Get the child's profile — 1 query
   // [WI-586] v2 path: read from person table; resolve consent via v2 resolver.
-  let profileDisplayName: string;
-  let consentStatus: ConsentStatus | null;
-  let consentRespondedAt: string | null;
-  if (opts?.identityV2Enabled) {
-    const personRow = await db.query.person.findFirst({
-      where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
-      columns: { displayName: true },
-    });
-    if (!personRow) return null;
-    profileDisplayName = personRow.displayName;
-    // [WI-809][BUG-465] GDPR-pinned, basis-explicit. A basis-blind AnyBasis read
-    // here lets a newer COPPA grant mask the child's GDPR status — the exact
-    // masking the flag-off branch below guards against (and the sibling
-    // getLatestConsentStatus already avoids). getChildGdprConsentStatusV2
-    // resolves the child's org internally and pins lawful_basis = GDPR.
-    // [WI-826] withdrawnAt is now surfaced from the consent grant so the
-    // WithdrawalCountdownBanner renders on the per-child detail path too.
-    const v2ConsentRow = await getChildGdprConsentStatusV2(db, childProfileId);
-    consentStatus = v2ConsentRow?.status ?? null;
-    consentRespondedAt = v2ConsentRow?.withdrawnAt?.toISOString() ?? null;
-  } else {
-    const profile = await db.query.profiles.findFirst({
-      where: and(eq(profiles.id, childProfileId), isNull(profiles.archivedAt)),
-    });
-    if (!profile) return null;
-    profileDisplayName = profile.displayName;
-    // [BUG-465] Filter to GDPR consent type only. Without this filter a more
-    // recent non-GDPR row (e.g. COPPA) masks the actual GDPR status, which can
-    // suppress learning metrics or show the wrong consent banner.
-    const consentState = await db.query.consentStates.findFirst({
-      where: and(
-        eq(consentStates.profileId, childProfileId),
-        eq(consentStates.consentType, 'GDPR'),
-      ),
-      orderBy: desc(consentStates.requestedAt),
-    });
-    consentStatus = consentState?.status ?? null;
-    consentRespondedAt = consentState?.respondedAt?.toISOString() ?? null;
-  }
+  const personRow = await db.query.person.findFirst({
+    where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
+    columns: { displayName: true },
+  });
+  if (!personRow) return null;
+  const profileDisplayName = personRow.displayName;
+  // [WI-809][BUG-465] GDPR-pinned, basis-explicit. A basis-blind AnyBasis read
+  // here lets a newer COPPA grant mask the child's GDPR status — the exact
+  // masking the flag-off branch below guards against (and the sibling
+  // getLatestConsentStatus already avoids). getChildGdprConsentStatusV2
+  // resolves the child's org internally and pins lawful_basis = GDPR.
+  // [WI-826] withdrawnAt is now surfaced from the consent grant so the
+  // WithdrawalCountdownBanner renders on the per-child detail path too.
+  const v2ConsentRow = await getChildGdprConsentStatusV2(db, childProfileId);
+  const consentStatus = v2ConsentRow?.status ?? null;
+  const consentRespondedAt = v2ConsentRow?.withdrawnAt?.toISOString() ?? null;
 
   // Step 2: Get the child's subjects — 1 query
   const childSubjects = await db.query.subjects.findMany({
@@ -1473,18 +1394,10 @@ export async function getChildSessions(
   await assertChildDashboardDataVisible(db, childProfileId, opts);
   // [WI-586] v2 path: the active-(non-archived)-profile check reads person
   // (profiles dropped); flag-off reads legacy profiles.
-  const activeProfile = opts?.identityV2Enabled
-    ? await db.query.person.findFirst({
-        where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
-        columns: { id: true },
-      })
-    : await db.query.profiles.findFirst({
-        where: and(
-          eq(profiles.id, childProfileId),
-          isNull(profiles.archivedAt),
-        ),
-        columns: { id: true },
-      });
+  const activeProfile = await db.query.person.findFirst({
+    where: and(eq(person.id, childProfileId), isNull(person.archivedAt)),
+    columns: { id: true },
+  });
   if (!activeProfile) return [];
   return getProfileSessions(db, childProfileId);
 }

@@ -8,8 +8,8 @@
 import { eq, and, gt, asc } from 'drizzle-orm';
 import { NonRetriableError } from 'inngest';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import { curriculumBooks, profiles, subjects } from '@eduagent/database';
+import { getStepDatabase } from '../helpers';
+import { curriculumBooks, subjects } from '@eduagent/database';
 import { bookTopicsGeneratedEventSchema } from '@eduagent/schemas';
 import { parseConversationLanguage } from '../../services/llm';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
@@ -109,19 +109,10 @@ export const bookPreGeneration = inngest.createFunction(
       }
 
       // [CUT-B1 §2.5(iii)] v2 seam: birthYear + conversation_language from person.
-      let birthYear: number | null;
-      let rawConversationLanguage: string | null | undefined;
-      if (isIdentityV2EnabledInStep()) {
-        const ctx = await getPersonLlmContext(db, profileId);
-        birthYear = ctx?.birthYear ?? null;
-        rawConversationLanguage = ctx?.conversationLanguage;
-      } else {
-        const profile = await db.query.profiles.findFirst({
-          where: eq(profiles.id, profileId),
-        });
-        birthYear = profile?.birthYear ?? null;
-        rawConversationLanguage = profile?.conversationLanguage;
-      }
+      const ctx = await getPersonLlmContext(db, profileId);
+      const birthYear: number | null = ctx?.birthYear ?? null;
+      const rawConversationLanguage: string | null | undefined =
+        ctx?.conversationLanguage;
       const currentYear = new Date().getFullYear();
       const learnerAge = birthYear ? currentYear - birthYear : 12;
 

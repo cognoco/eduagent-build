@@ -1459,7 +1459,6 @@ describe('refreshProgressSnapshot', () => {
       profileId,
       actorJob: 'snapshot-aggregation',
       kind: 'milestone_reached',
-      templateKey: 'ledger.milestone_reached.default',
       params: {
         milestoneId: detectedMilestone.id,
         milestoneType: 'session_count',

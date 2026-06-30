@@ -56,11 +56,15 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  membership,
+  organization,
+  person,
   profiles,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
+import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
 import {
   _resetCircuits,
   registerProvider,
@@ -114,48 +118,6 @@ const TUTOR_ENVELOPE_NO_EVAL = JSON.stringify({
     reason: 'test envelope',
   },
 });
-
-/**
- * Tutor envelope for the flag=OFF inline path — carries a solid inline
- * `challenge_round_evaluation` so the legacy path advances the state machine.
- *
- * The eval item MUST reference a real `user_message` event id: the server's
- * `validateEvaluationEventIds` re-reads every `answerEventId` from
- * `session_events` (scoped to the session, `eventType = 'user_message'`) and
- * REJECTS any item whose id is not found — so a missing `answerEventId` is
- * silently dropped and the round never advances (evaluation.ts §[#477]). The
- * caller seeds that answer event with a known id and passes it here.
- */
-function tutorEnvelopeWithEval(answerEventId: string): string {
-  return JSON.stringify({
-    reply: 'Correct! Now explain the inputs to photosynthesis.',
-    signals: {
-      partial_progress: false,
-      needs_deepening: false,
-      understanding_check: false,
-      ready_to_finish: false,
-      challenge_round_evaluation: [
-        {
-          concept: 'photosynthesis',
-          result: 'solid',
-          evidence: 'Learner explained clearly.',
-          // learnerQuote is replaced server-side with the event's content;
-          // matched here for readability.
-          learnerQuote: 'The light reactions and the Calvin cycle.',
-          answerEventId,
-        },
-      ],
-    },
-    ui_hints: {
-      note_prompt: { show: false, post_session: false },
-    },
-    private_sources: {
-      relied_on: ['conversation_history'],
-      insufficient: false,
-      reason: 'test envelope with eval',
-    },
-  });
-}
 
 /** Solid grader verdict — matches the `challengeRoundGraderVerdictSchema`. */
 const GRADER_VERDICT_SOLID = JSON.stringify({
@@ -266,6 +228,8 @@ const llm = createBranchingLlm();
 // ---------------------------------------------------------------------------
 
 let seedCounter = 0;
+const seededV2AccountIds: string[] = [];
+const seededV2ProfileIds: string[] = [];
 
 async function seedProfileAndSubject(
   db: Database,
@@ -288,6 +252,24 @@ async function seedProfileAndSubject(
       isOwner: true,
     })
     .returning({ id: profiles.id });
+
+  // [WI-867] v2 identity graph — loadProfileRowByIdV2 reads person unconditionally.
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `Grader Org ${idx}` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: `Grader Tester ${idx}`,
+    birthDate: '2006-01-01',
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
+  seededV2AccountIds.push(account!.id);
+  seededV2ProfileIds.push(profile!.id);
 
   const [subject] = await db
     .insert(subjects)
@@ -487,6 +469,13 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
   });
 
   afterAll(async () => {
+    // [WI-867] Clean up v2 graph before accounts (no FK from accounts to org/person).
+    if (seededV2AccountIds.length > 0 || seededV2ProfileIds.length > 0) {
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: seededV2AccountIds,
+        profileIds: seededV2ProfileIds,
+      });
+    }
     // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
     await db
       .delete(accounts)
@@ -594,61 +583,6 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
 
     // Verify the grader was actually called (not the inline tutor path)
     expect(llm.graderCallCount()).toBe(1);
-  });
-
-  // -------------------------------------------------------------------------
-  // Flag=OFF: inline (legacy) path unchanged
-  // -------------------------------------------------------------------------
-
-  it('flag=OFF: tutor-supplied evaluation advances challenge round via inline path', async () => {
-    const { profileId, subjectId } = await seedProfileAndSubject(db);
-    const topicId = await seedCurriculumTopic(db, subjectId);
-    const session = await seedActiveSession(db, profileId, subjectId, topicId);
-
-    await seedPriorAiResponse(
-      db,
-      profileId,
-      subjectId,
-      session.id,
-      topicId,
-      'What are the two main stages of photosynthesis?',
-    );
-
-    // The inline eval must reference a real `user_message` event id, or the
-    // server's validateEvaluationEventIds rejects it and the round stays
-    // `active` (evaluation.ts §[#477]). Seed that answer event with a known id.
-    const answerEventId = generateUUIDv7();
-    await db.insert(sessionEvents).values({
-      id: answerEventId,
-      profileId,
-      subjectId,
-      sessionId: session.id,
-      topicId,
-      eventType: 'user_message',
-      content: 'The light reactions and the Calvin cycle.',
-      metadata: { source: 'client' },
-    });
-
-    // Tutor envelope carries inline evaluation (flag=OFF path relies on this).
-    llm.setTutorResponse(tutorEnvelopeWithEval(answerEventId));
-
-    const result = await processMessage(
-      db,
-      profileId,
-      session.id,
-      { message: 'The light reactions and the Calvin cycle.' },
-      {
-        challengeRoundRuntimeEnabled: true,
-        challengeRoundGraderEnabled: false,
-      },
-    );
-
-    // The inline path should also transition to drafting
-    expect(result.challengeRound?.state).toBe('drafting');
-    expect(result.challengeRound?.evaluations).toHaveLength(1);
-
-    // Grader must NOT have been called on the flag=OFF path
-    expect(llm.graderCallCount()).toBe(0);
   });
 
   // -------------------------------------------------------------------------

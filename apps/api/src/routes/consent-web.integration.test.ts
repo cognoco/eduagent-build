@@ -22,7 +22,6 @@ import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
   profiles,
-  consentStates,
   consentGrant,
   consentRequest,
   membership,
@@ -99,7 +98,10 @@ interface SeededConsent {
 
 /**
  * Seeds the minimal chain needed to exercise the consent-web routes:
- *   account → profile (child) → consent_state with a token.
+ *   account → profile (child) → v2 identity graph → consentRequest with a token.
+ *
+ * [WI-867] Route now calls processConsentResponseV2 which reads consentRequest.
+ * Replaced legacy consentStates seed with v2 person/org/membership/consentRequest.
  */
 async function seedConsentToken(opts: {
   displayName: string;
@@ -128,13 +130,29 @@ async function seedConsentToken(opts: {
     })
     .returning();
 
-  await db.insert(consentStates).values({
-    profileId: profile!.id,
-    consentType: 'GDPR',
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: 'parent@example.com',
-    consentToken: token,
-    expiresAt,
+  // [WI-867] v2 identity rows required by processConsentResponseV2.
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `${PREFIX} Org` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: opts.displayName,
+    birthDate: '2013-06-15',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
+  await db.insert(consentRequest).values({
+    chargePersonId: profile!.id,
+    organizationId: account!.id,
+    requestedBasis: 'gdpr_parental_consent',
+    token,
+    tokenExpiresAt: expiresAt,
+    status: 'pending',
+    guardianEmail: 'parent@example.com',
   });
 
   return { accountId: account!.id, profileId: profile!.id, token };
@@ -406,11 +424,11 @@ describe('POST /v1/consent-page/confirm', () => {
       });
       expect(profile).toBeDefined();
 
-      // Consent row must still be PARENTAL_CONSENT_REQUESTED (not WITHDRAWN).
-      const consent = await db.query.consentStates.findFirst({
-        where: eq(consentStates.profileId, profileId),
+      // [WI-867] v2: consentRequest must still be pending (not denied/approved).
+      const request = await db.query.consentRequest.findFirst({
+        where: eq(consentRequest.chargePersonId, profileId),
       });
-      expect(consent?.status).toBe('PARENTAL_CONSENT_REQUESTED');
+      expect(request?.status).toBe('pending');
     },
   );
 
@@ -440,12 +458,16 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Family account ready');
     expect(html).toContain('Dana');
 
-    // Verify DB state: consent row must now be CONSENTED
+    // [WI-867] v2: consentRequest status must be 'approved'; consentGrant row created.
     const db = createIntegrationDb();
-    const consent = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, profileId),
+    const consentReq = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, profileId),
     });
-    expect(consent?.status).toBe('CONSENTED');
+    expect(consentReq?.status).toBe('approved');
+    const grant = await db.query.consentGrant.findFirst({
+      where: eq(consentGrant.chargePersonId, profileId),
+    });
+    expect(grant?.granted).toBe(true);
 
     // Profile must still exist after approval
     const profile = await db.query.profiles.findFirst({
@@ -470,18 +492,18 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Consent declined');
     expect(html).toContain('Eve');
 
-    // Profile must be cascade-deleted after denial (FR10)
+    // [WI-867] v2 denial: person row is deleted; consentRequest cascade-deletes with it.
     const db = createIntegrationDb();
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
+    const deletedPerson = await db.query.person.findFirst({
+      where: eq(person.id, profileId),
     });
-    expect(profile).toBeUndefined();
+    expect(deletedPerson).toBeUndefined();
 
-    // Consent state is also gone (cascaded from profile delete)
-    const consent = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, profileId),
+    // consentRequest.chargePersonId → person.id FK cascade delete.
+    const deletedRequest = await db.query.consentRequest.findFirst({
+      where: eq(consentRequest.chargePersonId, profileId),
     });
-    expect(consent).toBeUndefined();
+    expect(deletedRequest).toBeUndefined();
   });
 
   it('XSS: child name with <script> is escaped on the approval landing page', async () => {

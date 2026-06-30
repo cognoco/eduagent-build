@@ -459,7 +459,15 @@ export function resolveCanEnter(
     }
 
     if (FAMILY_CHILD_ROUTES.has(route)) {
-      return familyShape && isLinkedChildRoute(params, linkedChildIds);
+      // V0 never sets shape='family'. In V0, legacyV0ModeNavActive +
+      // effectiveAppContext='family' stands in for familyShape so family-child
+      // routes remain accessible in V0 family mode (matching pre-WI-1092 baseline
+      // where the outer MODE_NAV_V1_ENABLED guard prevented canEnter from firing).
+      const hasFamily =
+        familyShape ||
+        (resolution.legacyV0ModeNavActive &&
+          resolution.effectiveAppContext === 'family');
+      return hasFamily && isLinkedChildRoute(params, linkedChildIds);
     }
 
     if (route === 'topic/relearn') {
@@ -521,7 +529,12 @@ export function resolveIsSurfaced(
     }
 
     if (FAMILY_CHILD_ROUTES.has(route)) {
-      return familyShape && isLinkedChildRoute(params, linkedChildIds);
+      // Mirror the canEnter V0 escape hatch — familyShape is always false in V0.
+      const hasFamily =
+        familyShape ||
+        (resolution.legacyV0ModeNavActive &&
+          resolution.effectiveAppContext === 'family');
+      return hasFamily && isLinkedChildRoute(params, linkedChildIds);
     }
 
     switch (route) {

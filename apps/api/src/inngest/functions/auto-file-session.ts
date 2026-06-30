@@ -188,7 +188,6 @@ async function runAutoFileSession({
         profileId,
         actorJob: 'auto-file-session',
         kind: 'session_filed',
-        templateKey: 'ledger.session_filed.default',
         params: {
           topicTitle: result.topicTitle,
           subjectId: result.shelfId,

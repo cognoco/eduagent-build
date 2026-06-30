@@ -6,12 +6,10 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import type { Account } from '../services/account';
-import { getProfile, findOwnerProfile } from '../services/profile';
 import type { Database } from '@eduagent/database';
 import { forbidden } from '../errors';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
-import { isIdentityV2Enabled } from '../config';
 import {
   findOwnerPersonScope,
   getPersonScope,
@@ -137,48 +135,24 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
       const account = c.get('account');
       if (db && account) {
         try {
-          // [CUT-B1] v2 seam: resolve the owner person scope (person.id =
+          // [CUT-B1] v2: resolve the owner person scope (person.id =
           // profiles.id, account.id = organization.id). The returned meta is
           // byte-identical to the legacy ProfileMeta. NOTE: only the RESOLUTION
           // runs inside this try — `next()` runs after it (the shared call
           // below), so a downstream handler throwing is NOT mis-escalated as a
           // profile-scope transient error, and a transient error HERE still
-          // hits the same catch (sets profileScopeError + 503) as legacy.
-          if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-            const ownerScope = await findOwnerPersonScope(db, account.id);
-            if (ownerScope) {
-              c.set('profileId', ownerScope.profileId);
-              // [Issue 901] Auto-synthesized owner identity — mark it so the
-              // owner-only gates refuse it (see ProfileMeta.resolvedVia).
-              c.set('profileMeta', {
-                ...ownerScope.meta,
-                resolvedVia: 'auto',
-              });
-            }
-            // fall through to the shared `await next()` below (outside try).
-          } else {
-            const owner = await findOwnerProfile(db, account.id);
-            if (owner) {
-              c.set('profileId', owner.id);
-              c.set('profileMeta', {
-                birthYear: owner.birthYear,
-                location: owner.location,
-                consentStatus: owner.consentStatus,
-                hasPremiumLlm: owner.hasPremiumLlm ?? false,
-                conversationLanguage: owner.conversationLanguage,
-                // [BUG-410] Propagate the actual isOwner flag from the DB row.
-                // Previously hardcoded to true, which silently granted owner
-                // privileges when findOwnerProfile fell back to a non-owner row
-                // (no is_owner=true row in DB). The service now returns the real
-                // flag; the caller must not override it.
-                isOwner: owner.isOwner,
-                // [Issue 901] Auto-synthesized owner identity (no X-Profile-Id
-                // header) — mark it so the owner-only gates refuse it even
-                // though isOwner is true (see ProfileMeta.resolvedVia).
-                resolvedVia: 'auto',
-              });
-            }
+          // hits the same catch (sets profileScopeError + 503).
+          const ownerScope = await findOwnerPersonScope(db, account.id);
+          if (ownerScope) {
+            c.set('profileId', ownerScope.profileId);
+            // [Issue 901] Auto-synthesized owner identity — mark it so the
+            // owner-only gates refuse it (see ProfileMeta.resolvedVia).
+            c.set('profileMeta', {
+              ...ownerScope.meta,
+              resolvedVia: 'auto',
+            });
           }
+          // fall through to the shared `await next()` below (outside try).
         } catch (err) {
           logger.error('profile_scope.auto_resolve_failed', {
             accountId: account.id,
@@ -229,45 +203,20 @@ export const profileScopeMiddleware = createMiddleware<ProfileScopeEnv>(
         401,
       );
     }
-    // [CUT-B1] v2 seam: verify the person belongs to the org (membership) and
+    // [CUT-B1] v2: verify the person belongs to the org (membership) and
     // build the byte-identical ProfileMeta. account.id = organization.id.
-    if (isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)) {
-      const scope = await getPersonScope(db, profileIdHeader, account.id);
-      if (!scope) {
-        logger.warn('profile_scope.ownership_mismatch', {
-          accountId: account.id,
-          requestedProfileId: profileIdHeader,
-        });
-        return forbidden(c, 'Profile does not belong to this account');
-      }
-      c.set('profileId', scope.profileId);
-      // [Issue 901] Explicitly selected + verified profile — eligible for the
-      // owner-only gates if it is in fact the owner.
-      c.set('profileMeta', { ...scope.meta, resolvedVia: 'explicit-header' });
-      await next();
-      return;
-    }
-
-    const profile = await getProfile(db, profileIdHeader, account.id);
-    if (!profile) {
+    const scope = await getPersonScope(db, profileIdHeader, account.id);
+    if (!scope) {
       logger.warn('profile_scope.ownership_mismatch', {
         accountId: account.id,
         requestedProfileId: profileIdHeader,
       });
       return forbidden(c, 'Profile does not belong to this account');
     }
-    c.set('profileId', profile.id);
-    c.set('profileMeta', {
-      birthYear: profile.birthYear,
-      location: profile.location,
-      consentStatus: profile.consentStatus,
-      hasPremiumLlm: profile.hasPremiumLlm ?? false,
-      conversationLanguage: profile.conversationLanguage,
-      isOwner: profile.isOwner,
-      // [Issue 901] Explicitly selected + verified profile — eligible for the
-      // owner-only gates if it is in fact the owner.
-      resolvedVia: 'explicit-header',
-    });
+    c.set('profileId', scope.profileId);
+    // [Issue 901] Explicitly selected + verified profile — eligible for the
+    // owner-only gates if it is in fact the owner.
+    c.set('profileMeta', { ...scope.meta, resolvedVia: 'explicit-header' });
     await next();
     return;
   },

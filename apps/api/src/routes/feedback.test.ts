@@ -93,6 +93,13 @@ let fetchSpy: jest.SpiedFunction<typeof globalThis.fetch>;
 
 beforeEach(() => {
   insertedRetryRows.length = 0;
+  // [WI-867 fix] mockRestore() in afterEach restores globalThis.fetch to its
+  // original value (undefined in Jest env). Subsequent spyOn calls then fail
+  // with "Property `fetch` does not exist". Re-seed a no-op before spying so
+  // the property always exists when the spy is installed.
+  if (!globalThis.fetch) {
+    (globalThis as any).fetch = () => Promise.reject(new Error('no-op fetch'));
+  }
   fetchSpy = jest
     .spyOn(globalThis, 'fetch')
     .mockImplementation(async (input, init) => {

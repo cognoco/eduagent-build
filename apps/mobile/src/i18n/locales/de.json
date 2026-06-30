@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Füge deine erste Notiz für dieses Thema hinzu",
     "loadingBookmarks": "Gespeicherte Erklärungen werden geladen ...",
     "loadingSessions": "Sitzungen werden geladen ...",
-    "noSessionsSummary": "Noch keine Sitzungen"
+    "noSessionsSummary": "Noch keine Sitzungen",
+    "ctaStartChallenge": "Herausforderung starten"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Erstelle ein Fach, um deine Lernlandkarte aufzubauen.",
     "createSubject": "Fach erstellen",
     "openSubject": "Fach öffnen",
+    "openSubjectNamed": "{{subject}} öffnen",
+
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",

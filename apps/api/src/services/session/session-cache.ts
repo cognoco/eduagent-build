@@ -5,7 +5,6 @@
 import { type profiles, type Database } from '@eduagent/database';
 import type { LearningSession } from '@eduagent/schemas';
 import { getSubject } from '../subject';
-import { loadProfileRowById } from '../profile';
 import { loadProfileRowByIdV2 } from '../identity-v2/profile-v2';
 import { fetchPriorTopics } from '../prior-learning';
 import { getTeachingPreference } from '../retention-data';
@@ -86,12 +85,10 @@ const supplementaryInflight = new Map<
 export function getSessionStaticContextCacheKey(
   profileId: string,
   sessionId: string,
-  // The resolved profile row's SOURCE differs by identity mode (v2 person store
-  // vs legacy profiles table), so the mode is part of the cache identity. Without
-  // it, a row resolved under one mode could be served to a request in the other.
-  identityV2Enabled = false,
+  // [WI-867] identityV2Enabled param kept for callers; always resolves to 'idv2' (legacy path removed).
+  _identityV2Enabled = false,
 ): string {
-  return `${profileId}:${sessionId}:${identityV2Enabled ? 'idv2' : 'legacy'}`;
+  return `${profileId}:${sessionId}:idv2`;
 }
 
 export function pruneSessionStaticContextCache(now = Date.now()): void {
@@ -156,9 +153,7 @@ export async function getSessionStaticContext(
 
   const [subject, profile] = await Promise.all([
     getSubject(db, profileId, session.subjectId),
-    identityV2Enabled
-      ? loadProfileRowByIdV2(db, profileId)
-      : loadProfileRowById(db, profileId),
+    loadProfileRowByIdV2(db, profileId),
   ]);
 
   const entry: SessionStaticContextCacheEntry = {
@@ -255,18 +250,9 @@ export function clearSessionStaticContext(
   profileId: string,
   sessionId: string,
 ): void {
-  // The caller (settings/profile mutation) does not know which identity mode
-  // populated the entry, and the flag is process-wide anyway, so clear both
-  // mode variants. Cheap and keeps invalidation mode-agnostic.
-  for (const identityV2Enabled of [false, true]) {
-    const key = getSessionStaticContextCacheKey(
-      profileId,
-      sessionId,
-      identityV2Enabled,
-    );
-    sessionStaticContextCache.delete(key);
-    supplementaryInflight.delete(key);
-  }
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
+  sessionStaticContextCache.delete(key);
+  supplementaryInflight.delete(key);
 }
 
 // NOTE: This clears only the in-memory Map of the running Worker isolate.

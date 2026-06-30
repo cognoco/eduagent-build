@@ -9,8 +9,9 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock(
   '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
@@ -31,7 +32,20 @@ jest.mock('../services/account', () => {
 
 const mockFindOwnerProfile = jest.fn();
 const mockGetProfile = jest.fn();
-jest.mock('../services/profile', () => {
+
+// [WI-867] v2 profile-scope seam continuity mock.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
+
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -57,7 +71,11 @@ jest.mock('../services/coaching-cards', () => {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  // [WI-867] DATABASE_URL required so databaseMiddleware calls createDatabase (mock) and sets db on the context.
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
@@ -88,6 +106,9 @@ beforeEach(() => {
     location: null,
     consentStatus: 'CONSENTED',
   });
+  // [WI-867] Restore v2 seam defaults after clearAllMocks.
+  mockFindOwnerPersonScope.mockResolvedValue(null);
+  mockGetPersonScope.mockResolvedValue(personScope());
 });
 
 describe('coaching card routes', () => {

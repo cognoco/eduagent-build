@@ -7,7 +7,6 @@ import {
   learningSessions,
   needsDeepeningTopics,
   person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -107,63 +106,12 @@ export async function getChildTopicSnapshotForParent(
   topicId: string,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildTopicSnapshot | null> {
-  // [WP-6] v2 seam: the guardianship-edge guard + person/subject cross-person
-  // read. The v2 twin performs its own active-edge authorization (throwing
-  // ForbiddenError on no edge), so the legacy assertParentAccess + family_links
-  // join below run only on the flag-off legacy path.
-  if (opts?.identityV2Enabled) {
-    return getChargeSubjectsForGuardianV2(
-      db,
-      adultProfileId,
-      childProfileId,
-      topicId,
-    );
-  }
-
-  await assertParentAccess(db, adultProfileId, childProfileId);
-
-  const [row] = await db
-    .select({
-      childProfileId: profiles.id,
-      childDisplayName: profiles.displayName,
-      childBirthYear: profiles.birthYear,
-      subjectName: subjects.name,
-      subjectLanguage: subjects.languageCode,
-      bookTitle: curriculumBooks.title,
-      topicTitle: curriculumTopics.title,
-      topicDescription: curriculumTopics.description,
-      estimatedMinutes: curriculumTopics.estimatedMinutes,
-    })
-    .from(curriculumTopics)
-    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
-    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
-    .innerJoin(profiles, eq(subjects.profileId, profiles.id))
-    .where(
-      and(
-        eq(curriculumTopics.id, topicId),
-        eq(subjects.profileId, childProfileId),
-      ),
-    )
-    .limit(1);
-
-  if (!row) return null;
-
-  return {
-    childProfileId: row.childProfileId,
-    childDisplayName: row.childDisplayName,
-    subjectName: row.subjectName,
-    subjectLanguage: row.subjectLanguage,
-    bookTitle: row.bookTitle,
-    bookAuthor: null,
-    topicTitle: row.topicTitle,
-    topicDescription: row.topicDescription,
-    topicDescriptionHash: hashTopicDescription(
-      row.topicTitle,
-      row.topicDescription,
-    ),
-    estimatedMinutes: row.estimatedMinutes,
-    sourceAgeBracket: sourceAgeBracket(row.childBirthYear),
-  };
+  return getChargeSubjectsForGuardianV2(
+    db,
+    adultProfileId,
+    childProfileId,
+    topicId,
+  );
 }
 
 async function findAdultSubject(
@@ -193,15 +141,8 @@ async function getAdultConversationLanguage(
   adultProfileId: string,
   opts?: { identityV2Enabled?: boolean },
 ): Promise<string | null> {
-  if (opts?.identityV2Enabled) {
-    const row = await db.query.person.findFirst({
-      where: eq(person.id, adultProfileId),
-      columns: { conversationLanguage: true },
-    });
-    return row?.conversationLanguage ?? null;
-  }
-  const row = await db.query.profiles.findFirst({
-    where: eq(profiles.id, adultProfileId),
+  const row = await db.query.person.findFirst({
+    where: eq(person.id, adultProfileId),
     columns: { conversationLanguage: true },
   });
   return row?.conversationLanguage ?? null;

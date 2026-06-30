@@ -72,6 +72,15 @@ export const profiles = pgTable(
     displayName: text('display_name').notNull(),
     avatarUrl: text('avatar_url'),
     birthYear: integer('birth_year').notNull(),
+    // [WI-367] Optional full birth date components. birthYear stays the NOT NULL
+    // source of truth; month/day are nullable and, when present, let post-hoc
+    // age reads (consent-revocation COPPA boundary, add-child adult gate) compute
+    // exact age instead of year-only — eliminating the up-to-11-month
+    // overestimate. NULL = unknown → callers fall back to year-only. The v2
+    // `person.birth_date` column already carries full-date precision; these two
+    // columns close the same gap on the legacy `profiles` path.
+    birthMonth: integer('birth_month'),
+    birthDay: integer('birth_day'),
     birthYearSetBy: uuid('birth_year_set_by'),
     location: locationTypeEnum('location'),
     isOwner: boolean('is_owner').notNull().default(false),
@@ -114,6 +123,24 @@ export const profiles = pgTable(
     check(
       'profiles_default_app_context_check',
       sql`${table.defaultAppContext} IS NULL OR ${table.defaultAppContext} IN ('study','family')`,
+    ),
+    // [WI-367] DB-layer guards for the optional full-date components. The Zod
+    // schema (profileCreateSchema) is primary; these close the gap for paths
+    // that bypass the API (raw SQL, seed scripts, admin tools).
+    check(
+      'profiles_birth_month_range_check',
+      sql`${table.birthMonth} IS NULL OR (${table.birthMonth} BETWEEN 1 AND 12)`,
+    ),
+    check(
+      'profiles_birth_day_range_check',
+      sql`${table.birthDay} IS NULL OR (${table.birthDay} BETWEEN 1 AND 31)`,
+    ),
+    // Both-or-neither: a month without a day (or vice versa) is a client bug;
+    // exact-age computation needs both. Mirrors the v2 materialization guard
+    // (`birthMonth != null && birthDay != null`).
+    check(
+      'profiles_birth_month_day_pairwise_check',
+      sql`(${table.birthMonth} IS NULL) = (${table.birthDay} IS NULL)`,
     ),
   ],
 );

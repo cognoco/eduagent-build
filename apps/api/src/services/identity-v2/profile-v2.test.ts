@@ -82,6 +82,8 @@ describe('[WI-586] loadProfileRowByIdV2 — person→profiles row shaping', () =
       displayName: 'Ada',
       avatarUrl: null,
       birthYear: 2000, // year(birth_date)
+      birthMonth: 5,
+      birthDay: 1,
       birthYearSetBy: null,
       location: 'US',
       isOwner: true, // roles ∋ 'admin'
@@ -101,6 +103,22 @@ describe('[WI-586] loadProfileRowByIdV2 — person→profiles row shaping', () =
       'person-1',
     );
     expect(out?.isOwner).toBe(false);
+  });
+
+  it('maps the year-only YYYY-01-01 sentinel to null birth month/day', async () => {
+    const out = await loadProfileRowByIdV2(
+      stubDb({
+        ...baseRow,
+        birthDate: '2000-01-01',
+        roles: ['learner'],
+      }),
+      'person-1',
+    );
+    expect(out).toMatchObject({
+      birthYear: 2000,
+      birthMonth: null,
+      birthDay: null,
+    });
   });
 
   it('returns null when no live person row matches', async () => {

@@ -1197,6 +1197,45 @@ describe('V0 fallback - hard constraint (AGENTS.md, spec section Hard Constraint
     expect(contractPresentation.titleKey).not.toBe('tabs.myLearning');
     expect(legacyPresentation.titleKey).not.toBe('tabs.myLearning');
   });
+
+  it('allows a V0-on family-capable guardian in family context to enter a linked-child curriculum (regression for WI-1092 / PR #1566)', () => {
+    // Before WI-1092, curriculum.tsx guarded with `FEATURE_FLAGS.MODE_NAV_V1_ENABLED`
+    // so canEnter never fired in V0. After the guard removal, canEnter must return
+    // true in V0 family mode — resolveCanEnter previously denied it because
+    // familyShape is always false in V0 (shape stays 'study').
+    const contract = resolveNavigationContract(
+      makeContext({
+        activeProfile: familyAdult,
+        appContext: 'family',
+        flags: {
+          MODE_NAV_V0_ENABLED: true,
+          MODE_NAV_V1_ENABLED: false,
+        },
+        profiles: [familyAdult, child],
+        subscription: { status: 'ready', tier: 'family' },
+      }),
+    );
+
+    // V0 family baseline: shape stays 'study' but home is FamilyHome.
+    expect(contract.shape).toBe('study');
+    expect(contract.gates.showFamilyHome).toBe(true);
+
+    // Regression: linked-child curriculum must be enterable and surfaced in V0.
+    expect(
+      contract.canEnter('child/[profileId]/curriculum', linkedChildParams),
+    ).toBe(true);
+    expect(
+      contract.isSurfaced('child/[profileId]/curriculum', linkedChildParams),
+    ).toBe(true);
+
+    // Linked-child restriction must still hold — unlinked children are blocked.
+    expect(
+      contract.canEnter('child/[profileId]/curriculum', unlinkedChildParams),
+    ).toBe(false);
+    expect(
+      contract.isSurfaced('child/[profileId]/curriculum', unlinkedChildParams),
+    ).toBe(false);
+  });
 });
 
 describe('navigation-contract totality (fuzzed inputs never throw)', () => {

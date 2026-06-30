@@ -1111,6 +1111,9 @@ export async function getPersonForConsentRevocationV2(
 ): Promise<{
   displayName: string;
   birthYear: number;
+  // [WI-367] full-date components for exact-age COPPA boundary; null = unknown.
+  birthMonth: number | null;
+  birthDay: number | null;
   archivedAt: Date | null;
 } | null> {
   const row = await db.query.person.findFirst({
@@ -1118,9 +1121,20 @@ export async function getPersonForConsentRevocationV2(
     columns: { displayName: true, birthDate: true, archivedAt: true },
   });
   if (!row) return null;
+  // [WI-367] `person.birth_date` materializes to `${year}-01-01` when full-date
+  // parts were absent at create (child-profile-v2 / identity-graph). That `01-01`
+  // is a year-only sentinel, NOT a known Jan-1 birthday — treat it as unknown so
+  // the exact-age boundary stays conservative (falls back to year-only). A real
+  // Jan-1 birthday is indistinguishable here and also gets year-only treatment;
+  // resolving that needs a `birth_date_precision` flag on `person` (follow-up).
+  const month = Number(row.birthDate.slice(5, 7));
+  const day = Number(row.birthDate.slice(8, 10));
+  const isYearOnlySentinel = month === 1 && day === 1;
   return {
     displayName: row.displayName,
     birthYear: Number(row.birthDate.slice(0, 4)),
+    birthMonth: isYearOnlySentinel ? null : month,
+    birthDay: isYearOnlySentinel ? null : day,
     archivedAt: row.archivedAt ?? null,
   };
 }

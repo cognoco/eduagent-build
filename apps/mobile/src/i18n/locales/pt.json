@@ -1686,7 +1686,8 @@
     "addFirstNoteSummary": "Adicione sua primeira nota para este tópico",
     "loadingBookmarks": "Carregando explicações salvas...",
     "loadingSessions": "Carregando sessões...",
-    "noSessionsSummary": "Nenhuma sessão ainda"
+    "noSessionsSummary": "Nenhuma sessão ainda",
+    "ctaStartChallenge": "Iniciar desafio"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
+
+    "openSubjectNamed": "Abrir {{subject}}",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
     "errorTitle": "Não foi possível carregar as matérias",

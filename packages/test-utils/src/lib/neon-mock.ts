@@ -60,7 +60,18 @@ export function createMockDb(): unknown {
       {},
       {
         get(_target, prop) {
-          if (prop === 'then') return undefined; // prevent auto-await
+          if (prop === 'then') {
+            // [WI-867] Chain-built queries (select / insert…returning) resolve
+            // to `[]` per this mock's documented contract. Returning a real
+            // thenable (instead of `undefined`) means `await db.select()…`
+            // yields `[]` — so array consumers get a clean empty result and the
+            // "no rows" branch, instead of a truthy garbage proxy that survives
+            // an `if (!rows[0])` guard and then crashes on field access
+            // (e.g. `rows[0].roles.includes(...)`). Configure the query to
+            // return real rows when the test's subject needs data.
+            return (onFulfilled: (value: unknown) => unknown) =>
+              onFulfilled([]);
+          }
           return chainFn();
         },
       },
@@ -80,7 +91,7 @@ export function createMockDb(): unknown {
     },
   );
 
-  return {
+  const db = {
     query: queryProxy,
     insert: chainFn(),
     update: chainFn(),
@@ -89,4 +100,13 @@ export function createMockDb(): unknown {
     selectDistinct: chainFn(),
     execute: jest.fn().mockResolvedValue([]),
   };
+  // Marker so harnesses (createDatabaseModuleMock) can tell this is the
+  // configure-or-break default Proxy db — whose `query.<table>` always returns
+  // a fresh undefined/[] stub — from a caller-supplied plain-object db. Used to
+  // seed the v2 identity graph only when the test didn't bring its own.
+  Object.defineProperty(db, '__defaultMockDb', {
+    value: true,
+    enumerable: false,
+  });
+  return db;
 }

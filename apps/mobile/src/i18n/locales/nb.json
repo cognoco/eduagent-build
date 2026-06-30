@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Legg til ditt første notat for dette emnet",
     "loadingBookmarks": "Laster inn lagrede forklaringer ...",
     "loadingSessions": "Laster inn økter ...",
-    "noSessionsSummary": "Ingen økter ennå"
+    "noSessionsSummary": "Ingen økter ennå",
+    "ctaStartChallenge": "Start utfordring"
   },
   "subject": {
     "settings": {
@@ -3963,6 +3964,8 @@
     "emptyMessage": "Opprett et emne for å begynne å bygge læringskartet ditt.",
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
+    "openSubjectNamed": "Åpne {{subject}}",
+
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",

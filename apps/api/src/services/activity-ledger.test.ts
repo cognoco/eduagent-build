@@ -36,7 +36,7 @@ describe('activity ledger service', () => {
     jest.clearAllMocks();
   });
 
-  it('writes ledger moments as self-visible only', async () => {
+  it('writes ledger moments with the profile-scoped column set', async () => {
     const values = jest.fn().mockResolvedValue(undefined);
     const db = insertDb(values);
 
@@ -45,16 +45,13 @@ describe('activity ledger service', () => {
       profileId: 'profile-1',
       actorJob: 'auto-file-session',
       kind: 'session_filed',
-      templateKey: 'ledger.session_filed.default',
     });
 
     expect(values).toHaveBeenCalledWith({
       profileId: 'profile-1',
       actorJob: 'auto-file-session',
       kind: 'session_filed',
-      templateKey: 'ledger.session_filed.default',
       params: {},
-      visibility: 'self',
     });
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -69,7 +66,6 @@ describe('activity ledger service', () => {
         profileId: 'profile-1',
         actorJob: 'auto-file-session',
         kind: 'session_filed',
-        templateKey: 'ledger.session_filed.default',
         params: { topicTitle: 'Gravity' },
       }),
     ).resolves.toBeUndefined();

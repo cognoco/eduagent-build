@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -131,7 +132,7 @@ function ShelfBooksMotif({
   );
 }
 
-export function ShelfRow({
+export const ShelfRow = memo(function ShelfRow({
   subjectId,
   name,
   bookCount,
@@ -510,4 +511,4 @@ export function ShelfRow({
       </Pressable>
     </View>
   );
-}
+});
