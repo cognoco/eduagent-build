@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { NowCard, NowResponse } from '@eduagent/schemas';
+import type { NowCard, NowResponse, ScopeDescriptor } from '@eduagent/schemas';
+
+type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
@@ -14,21 +16,8 @@ let mockNowFeed: {
 };
 let mockSubjectsCount = 1;
 let mockScopeContext: {
-  activeScope:
-    | { kind: 'me' }
-    | { kind: 'supporter-hub' }
-    | {
-        kind: 'person';
-        personId: string;
-        edgeId: string;
-        displayName: string;
-      };
-  availableScopes: Array<{
-    kind: 'person';
-    personId: string;
-    edgeId: string;
-    displayName: string;
-  }>;
+  activeScope: { kind: 'me' } | { kind: 'supporter-hub' } | PersonScope;
+  availableScopes: PersonScope[];
   setActiveScope: jest.Mock;
 };
 
@@ -79,26 +68,10 @@ jest.mock(
         onOpenJournal,
       }: {
         activePersonScope?: { displayName: string };
-        personScopes: Array<{
-          personId: string;
-          edgeId: string;
-          displayName: string;
-        }>;
-        onOpenPersonScope?: (scope: {
-          personId: string;
-          edgeId: string;
-          displayName: string;
-        }) => void;
-        onOpenSubjects?: (scope: {
-          personId: string;
-          edgeId: string;
-          displayName: string;
-        }) => void;
-        onOpenJournal?: (scope: {
-          personId: string;
-          edgeId: string;
-          displayName: string;
-        }) => void;
+        personScopes: PersonScope[];
+        onOpenPersonScope?: (scope: PersonScope) => void;
+        onOpenSubjects?: (scope: PersonScope) => void;
+        onOpenJournal?: (scope: PersonScope) => void;
       }) => (
         <View
           testID={

@@ -372,14 +372,17 @@ export default function MentorScreen(): React.ReactElement {
   const personScopes = availableScopes.filter(
     (scope) => scope.kind === 'person',
   );
-  const openScopedSubjects = (scope: (typeof personScopes)[number]): void => {
+  const openScopedRoute = (
+    scope: (typeof personScopes)[number],
+    route: '/(app)/subjects' | '/(app)/journal',
+  ): void => {
     setActiveScope(scope);
-    router.push('/(app)/subjects' as Href);
+    router.push(route as Href);
   };
-  const openScopedJournal = (scope: (typeof personScopes)[number]): void => {
-    setActiveScope(scope);
-    router.push('/(app)/journal' as Href);
-  };
+  const openScopedSubjects = (scope: (typeof personScopes)[number]): void =>
+    openScopedRoute(scope, '/(app)/subjects');
+  const openScopedJournal = (scope: (typeof personScopes)[number]): void =>
+    openScopedRoute(scope, '/(app)/journal');
 
   if (activeScope.kind === 'supporter-hub') {
     return (
