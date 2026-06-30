@@ -212,7 +212,11 @@ export default function LinkContractScreen(): React.ReactElement {
           message={formatApiError(acceptMutation.error)}
           primaryAction={{
             label: t('common.tryAgain'),
-            onPress: () => acceptMutation.mutate({ contract, audience }),
+            onPress: () => {
+              if (actionableAudience) {
+                acceptMutation.mutate({ contract, audience: actionableAudience });
+              }
+            },
             testID: 'visibility-link-accept-retry',
           }}
           testID="visibility-link-accept-error"
