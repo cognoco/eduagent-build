@@ -110,6 +110,10 @@ describe('scheduledDeletion', () => {
     mockOrganizationExistsV2.mockResolvedValue(true);
     mockIsDeletionCancelledV2.mockResolvedValue(false);
     mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns
+    // SubscriptionStoreTeardownTarget[] (deletion-v2.ts:944, rows.map → always an
+    // array); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
     mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_v2-1');
     mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
@@ -201,8 +205,9 @@ describe('scheduledDeletion', () => {
     // executeDeletionV2). v1 short-circuited that step before acquiring a DB
     // connection, so count was 4. v2 path: check-account-exists,
     // capture-clerk-user-id, capture-owner-email, check-cancellation,
-    // delete-account-data = 5. delete-clerk-user uses getStepClerkSecretKey.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(5);
+    // capture-subscription-store-teardown-targets, delete-account-data = 6.
+    // delete-clerk-user uses getStepClerkSecretKey.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -317,6 +322,9 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
     mockIsDeletionCancelledV2.mockResolvedValue(false);
     // Default happy path; individual tests override for TOCTOU/already_deleted scenarios.
     mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns an array
+    // (deletion-v2.ts:944); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
     mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_v2-1');
     mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
@@ -392,6 +400,9 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
     mockOrganizationExistsV2.mockResolvedValue(true);
     mockIsDeletionCancelledV2.mockResolvedValue(false);
     mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns an array
+    // (deletion-v2.ts:944); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
     // [WI-867] v2 captures org-owner Clerk id instead of account Clerk id.
     mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_user_abc');
     mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
