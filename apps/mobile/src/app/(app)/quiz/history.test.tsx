@@ -74,9 +74,12 @@ jest.mock(
 
 const RECENT_ROUNDS_ROUTE = '/quiz/rounds/recent';
 
+const ROUND_GUESS_ID = 'cc0e8400-e29b-41d4-a716-446655440001';
+const ROUND_BOUNDARY_ID = 'cc0e8400-e29b-41d4-a716-446655440002';
+
 const recentRounds = [
   {
-    id: 'round-guess',
+    id: ROUND_GUESS_ID,
     activityType: 'guess_who',
     theme: 'Famous Scientists and Innovators',
     score: 4,
@@ -113,7 +116,7 @@ describe('QuizHistoryScreen', () => {
   it('navigates back to quiz index via goBackOrReplace when no returnTo param', async () => {
     mount();
     await waitFor(() => {
-      screen.getByTestId('quiz-history-row-round-guess');
+      screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
     });
     fireEvent.press(screen.getByTestId('quiz-history-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -128,7 +131,7 @@ describe('QuizHistoryScreen', () => {
     mockSearchParams = { returnTo: 'practice' };
     mount();
     await waitFor(() => {
-      screen.getByTestId('quiz-history-row-round-guess');
+      screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
     });
     fireEvent.press(screen.getByTestId('quiz-history-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
@@ -145,12 +148,12 @@ describe('QuizHistoryScreen', () => {
   it('navigates to round detail on row press', async () => {
     mount();
     await waitFor(() => {
-      screen.getByTestId('quiz-history-row-round-guess');
+      screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`);
     });
-    fireEvent.press(screen.getByTestId('quiz-history-row-round-guess'));
+    fireEvent.press(screen.getByTestId(`quiz-history-row-${ROUND_GUESS_ID}`));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/[roundId]',
-      params: { roundId: 'round-guess' },
+      params: { roundId: ROUND_GUESS_ID },
     });
   });
 
@@ -231,7 +234,7 @@ describe('QuizHistoryScreen', () => {
 
     const roundAtUTCMidnight = [
       {
-        id: 'round-boundary',
+        id: ROUND_BOUNDARY_ID,
         activityType: 'vocabulary',
         theme: 'Animals',
         score: 3,
@@ -243,7 +246,7 @@ describe('QuizHistoryScreen', () => {
 
     mount({ [RECENT_ROUNDS_ROUTE]: roundAtUTCMidnight });
     await waitFor(() => {
-      screen.getByTestId('quiz-history-row-round-boundary');
+      screen.getByTestId(`quiz-history-row-${ROUND_BOUNDARY_ID}`);
     });
 
     // 1. The grouping path must hand the helper the exact Date built from

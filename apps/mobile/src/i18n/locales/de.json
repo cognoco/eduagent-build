@@ -384,7 +384,7 @@
         "celebrationStreak": "{{name}} hat diese Woche einen echten Lauf – dieser Streak wird zur Gewohnheit.",
         "celebrationTopics": "Große Woche für {{name}} – viele neue Themen behandelt.",
         "worksFor": "Was für {{name}} funktioniert",
-        "mentorRead": "Tutors Einschätzung zu {{name}}",
+        "mentorRead": "Mentors Einschätzung zu {{name}}",
         "impatientAdvice": "Kurze Einstiege und schnelle Erfolgserlebnisse können {{name}} helfen, dranzubleiben."
       },
       "learnTogether": {
@@ -574,7 +574,7 @@
       "noteSaveErrorTitle": "Speichern der Notiz fehlgeschlagen"
     },
     "mentorMemory": {
-      "title": "Was mein Mentor weiß",
+      "title": "Was dein Mentor über dich weiß.",
       "subtitle": "Überprüfe, bearbeite oder füge hinzu, was dein Mentor sich merkt.",
       "loadError": "Wir konnten dein Mentor-Gedächtnis gerade nicht laden",
       "loadTimeout": {
@@ -968,18 +968,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "Dem Tutor mitteilen",
-        "description": "Füge etwas Wichtiges hinzu, das sich der Tutor über dieses Kind merken soll.",
-        "descriptionWithName": "Füge etwas Wichtiges hinzu, das sich der Tutor über {{childName}} merken soll.",
+        "title": "Dem Mentor mitteilen",
+        "description": "Füge etwas Wichtiges hinzu, das sich der Mentor über dieses Kind merken soll.",
+        "descriptionWithName": "Füge etwas Wichtiges hinzu, das sich der Mentor über {{childName}} merken soll.",
         "placeholder": "Kurze Beispiele helfen am besten, bei Brüchen hängt es noch."
       },
       "adult": {
-        "title": "Notiz für deinen Tutor hinzufügen",
-        "description": "Füge etwas hinzu, an das sich dein Tutor in zukünftigen Sitzungen erinnern soll.",
+        "title": "Notiz für deinen Mentor hinzufügen",
+        "description": "Füge etwas hinzu, an das sich dein Mentor in zukünftigen Sitzungen erinnern soll.",
         "placeholder": "Beispiele helfen mir sehr, Brüche zu verstehen."
       },
       "teen": {
-        "title": "Erzähle deinem Tutor etwas",
+        "title": "Erzähle deinem Mentor etwas",
         "description": "Füge hinzu, was dir beim Lernen hilft, was dir Spaß macht oder was noch schwierig ist.",
         "placeholder": "Beispiele helfen mir sehr, Brüche zu verstehen."
       }
@@ -1178,7 +1178,9 @@
       "surpriseMe": "Überrasche mich",
       "surpriseMeSubtitle": "Übe mit einem neuen Diktat",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "Vergangene Diktate",
+      "viewPastDictationsSubtitle": "Sieh dir an, was du geübt hast"
     },
     "complete": {
       "noSessionTitle": "Kein Diktat zum Beenden",
@@ -1264,6 +1266,21 @@
       "preparing": "Wird vorbereitet...",
       "takingLonger": "Das dauert länger als üblich – du kannst abbrechen und es erneut versuchen.",
       "cancelPreparing": "Diktatvorbereitung abbrechen"
+    },
+    "history": {
+      "title": "Vergangene Diktate",
+      "back": "Zurück",
+      "loading": "Deine Diktate werden geladen …",
+      "errorTitle": "Deine Diktate konnten nicht geladen werden",
+      "retry": "Erneut versuchen",
+      "empty": "Noch keine Diktate. Schließe eins ab und es wird hier angezeigt.",
+      "modeHomework": "Aus deinem Text",
+      "modeSurprise": "Überraschungsdiktat",
+      "scoreLabel": "{{correct}} von {{total}} richtig",
+      "sentenceCountLabel_one": "{{count}} Satz",
+      "sentenceCountLabel_other": "{{count}} Sätze",
+      "sentencesHeading": "Was du geübt hast",
+      "noSentences": "Der Text für dieses Diktat wurde nicht gespeichert."
     }
   },
   "library": {
@@ -1402,9 +1419,9 @@
     "noteSignal": {
       "verified": "Verifiziert",
       "verifiedAccessibilityLabel": "Verifiziert – deine Worte wurden bestätigt",
-      "tutorAddition": "Der Tutor hat mehr zu diesem Thema",
-      "showTutorAdditionAccessibilityLabel": "Tutor-Zusatz anzeigen",
-      "hideTutorAdditionAccessibilityLabel": "Tutor-Zusatz ausblenden"
+      "mentorAddition": "Der Mentor hat mehr zu diesem Thema.",
+      "showMentorAdditionAccessibilityLabel": "Zeige, was der Mentor hinzugefügt hat.",
+      "hideMentorAdditionAccessibilityLabel": "Verberge, was der Mentor hinzugefügt hat."
     },
     "bookmarkCard": {
       "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"
@@ -2944,7 +2961,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "Was dein Tutor über dich weiß.",
+      "title": "Was dein Mentor über dich weiß.",
       "subtitle": "Tippe, um es anzusehen oder zu ändern."
     },
     "notificationPrimer": {
@@ -3402,7 +3419,7 @@
   "welcomeIntro": {
     "chooser": {
       "question": "What brings you here?",
-      "learnerCta": "Lerne mit einem Tutor",
+      "learnerCta": "Lerne mit einem Mentor",
       "learnerHint": "Dein persönlicher Mentor für einen Bruchteil des Preises.",
       "parentCta": "Schluss mit Hausaufgaben-Streit",
       "parentHint": "Hol dir deine Abende zurück."
@@ -3608,7 +3625,7 @@
     "hub": {
       "sessionsSubtitle": "Unterhaltungen, die du hattest",
       "notesSubtitle": "Dinge, die du aufgeschrieben hast",
-      "bookmarksSubtitle": "Gespeicherte Antworten vom Tutor",
+      "bookmarksSubtitle": "Gespeicherte Antworten vom Mentor",
       "countLoading": "Lade...",
       "countUnavailable": "Nicht verfügbar"
     },
@@ -3629,9 +3646,9 @@
     "birthDateLabel": "Geburtsdatum",
     "parentBirthDateLabel": "Dein Geburtsdatum",
     "childBirthDateLabel": "Geburtsdatum des Kindes",
-    "birthDateHint": "Damit dein Tutor richtig mit dir spricht. Mindestalter ist {{age}}.",
+    "birthDateHint": "Damit dein Mentor richtig mit dir spricht. Mindestalter ist {{age}}.",
     "parentBirthDateHint": "Das ist für den Erwachsenen, der das Konto einrichtet. Du kannst dein Kind als Nächstes hinzufügen. Mindestalter ist {{age}}.",
-    "childBirthDateHint": "Damit der Tutor deines Kindes richtig mit ihm spricht. Mindestalter ist {{age}}.",
+    "childBirthDateHint": "Damit der Mentor deines Kindes richtig mit ihm spricht. Mindestalter ist {{age}}.",
     "webDateFormatHint": "Gib dein Geburtsdatum als JJJJ-MM-TT ein.",
     "childWebDateFormatHint": "Gib das Geburtsdatum deines Kindes als JJJJ-MM-TT ein.",
     "selectDob": "Geburtsdatum auswählen",
@@ -3662,12 +3679,12 @@
     "a11yRetry": "Moduswechsel wiederholen"
   },
   "memoryConsent": {
-    "defaultTitle": "Hilf dem Tutor, mehr über {{name}} zu lernen",
-    "defaultTitleNoName": "Hilf dem Tutor, mehr über dein Kind zu lernen",
-    "defaultDescription": "Dies ermöglicht dem Tutor, sich zu merken, welche Erklärungen funktionieren, was noch schwierig ist und welche Beispiele relevant erscheinen.",
+    "defaultTitle": "Hilf dem Mentor, mehr über {{name}} zu lernen",
+    "defaultTitleNoName": "Hilf dem Mentor, mehr über dein Kind zu lernen",
+    "defaultDescription": "Dies ermöglicht dem Mentor, sich zu merken, welche Erklärungen funktionieren, was noch schwierig ist und welche Beispiele relevant erscheinen.",
     "grant": "Ja, aktivieren",
     "a11yEnable": "Mentor-Gedächtnis aktivieren",
-    "a11ySkip": "Tutor-Gedächtnis überspringen"
+    "a11ySkip": "Mentor-Gedächtnis überspringen"
   },
   "saveWizard": {
     "title": "Super, lass uns das speichern und loslegen.",
@@ -3872,7 +3889,7 @@
       "more": "{{count}} weitere Optionen"
     },
     "bar": {
-      "unavailable": "Der Tutor ist kurz offline. Du kannst trotzdem schreiben.",
+      "unavailable": "Der Mentor ist kurz offline. Du kannst trotzdem schreiben.",
       "cameraLabel": "Kamera",
       "placeholder": "Frage, füge ein oder beschreibe, was du lernen willst.",
       "micLabel": "Mikro",
@@ -3992,7 +4009,7 @@
     "notes": {
       "heading": "Notizen",
       "authorSelf": "Meine Notizen",
-      "authorMentor": "Vom Tutor gespeichert",
+      "authorMentor": "Vom Mentor gespeichert",
       "addNote": "Notiz hinzufügen",
       "micLabel": "Notiz per Sprache hinzufügen",
       "empty": "Noch keine Notizen. Halte einen Gedanken zu diesem Thema fest.",
@@ -4034,6 +4051,13 @@
       "title": "Wähle dein erstes Buch",
       "message": "Wähle ein Buch, um mit dem Lernen dieses Fachs zu beginnen.",
       "cta": "Bücher durchsuchen"
+    },
+    "manage": {
+      "open": "Verwalten",
+      "accessibilityLabel": "Fach verwalten",
+      "title": "Fach verwalten",
+      "description": "Pausiere dieses Fach, um es aus dem aktiven Lernen auszublenden, oder archiviere es, bis du es wiederherstellst.",
+      "close": "Schließen"
     }
   },
   "journal": {
@@ -4073,8 +4097,8 @@
       "error": "Deine Berichte konnten nicht geladen werden."
     },
     "memory": {
-      "title": "Steuerung des Tutor-Gedächtnisses",
-      "body": "Überprüfe, bearbeite, verberge, exportiere oder lösche, was dein Tutor sich merkt, im vollständigen Gedächtnis-Bildschirm.",
+      "title": "Steuerung des Mentor-Gedächtnisses",
+      "body": "Überprüfe, bearbeite, verberge, exportiere oder lösche, was dein Mentor sich merkt, im vollständigen Gedächtnis-Bildschirm.",
       "open": "Gedächtnis-Steuerung öffnen"
     },
     "notes": {
@@ -4135,7 +4159,7 @@
       "confidenceLow": "Frühes Signal"
     },
     "sourceBadge": {
-      "learner": "Du hast es deinem Tutor gesagt",
+      "learner": "Du hast es deinem Mentor gesagt",
       "parent": "Von Elternteil hinzugefügt"
     },
     "remove": "Entfernen"

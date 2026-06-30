@@ -96,10 +96,18 @@ function isInsideSafeSendLambda(node: ts.Node): boolean {
   return false;
 }
 
-function isInsideTryBlock(node: ts.Node): boolean {
+function getEnclosingTryStatement(node: ts.Node): ts.TryStatement | null {
   let cur: ts.Node | undefined = node.parent;
   while (cur) {
-    if (ts.isTryStatement(cur)) return true;
+    if (ts.isTryStatement(cur)) {
+      const callStart = node.getStart();
+      if (
+        callStart >= cur.tryBlock.getStart() &&
+        callStart < cur.tryBlock.end
+      ) {
+        return cur;
+      }
+    }
     // Stop at function boundaries — a try in an outer (caller) function
     // doesn't catch errors thrown synchronously from this function body's
     // own statements at the moment the try block actually runs. If the
@@ -113,11 +121,50 @@ function isInsideTryBlock(node: ts.Node): boolean {
       ts.isArrowFunction(cur) ||
       ts.isMethodDeclaration(cur)
     ) {
-      return false;
+      return null;
     }
     cur = cur.parent;
   }
-  return false;
+  return null;
+}
+
+function hasMeaningfulCatchHandling(catchClause: ts.CatchClause): boolean {
+  let handled = false;
+  const visit = (node: ts.Node): void => {
+    if (handled) return;
+    if (ts.isThrowStatement(node)) {
+      handled = true;
+      return;
+    }
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (
+        ts.isIdentifier(expression) &&
+        ['safeSend', 'captureException', 'captureMessage'].includes(
+          expression.text,
+        )
+      ) {
+        handled = true;
+        return;
+      }
+      if (
+        ts.isPropertyAccessExpression(expression) &&
+        ['error', 'warn'].includes(expression.name.text)
+      ) {
+        handled = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(catchClause.block, visit);
+  return handled;
+}
+
+function isInsideHandledTryBlock(node: ts.Node): boolean {
+  const tryStatement = getEnclosingTryStatement(node);
+  if (!tryStatement?.catchClause) return false;
+  return hasMeaningfulCatchHandling(tryStatement.catchClause);
 }
 
 function hasCoreSendCommentAbove(
@@ -155,7 +202,7 @@ function classifySite(
 ): DispatchSite['status'] {
   if (isInsideSafeSendLambda(call)) return 'safesend';
   if (hasCoreSendCommentAbove(sourceFile, call)) return 'core-send';
-  if (isInsideTryBlock(call)) return 'try-catch';
+  if (isInsideHandledTryBlock(call)) return 'try-catch';
   return 'bare';
 }
 
@@ -342,6 +389,39 @@ describe('safe-non-core ratchet', () => {
     };
     visit(sf);
     expect(bareCount).toBe(1);
+  });
+
+  it('self-check: empty catch does not satisfy try-catch classification', () => {
+    const silentCatch = `
+      import { inngest } from './client';
+      export async function silent() {
+        try {
+          await inngest.send({ name: 'app/x', data: {} });
+        } catch {}
+      }
+    `;
+    const sf = ts.createSourceFile(
+      'silent-catch.ts',
+      silentCatch,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    const statuses: DispatchSite['status'][] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === 'inngest' &&
+        node.expression.name.text === 'send'
+      ) {
+        statuses.push(classifySite(sf, node));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    expect(statuses).toEqual(['bare']);
   });
 
   // Self-check: scanner recognises a core-send comment.

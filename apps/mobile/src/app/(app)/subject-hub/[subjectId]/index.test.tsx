@@ -15,6 +15,7 @@ import {
   createTestProfile,
 } from '../../../../test-utils/screen-render';
 import {
+  extractJsonBody,
   fetchCallsMatching,
   type RoutedMockFetch,
 } from '../../../../test-utils/mock-api-routes';
@@ -971,5 +972,95 @@ describe('SubjectHubRoute — preparing: personalized title', () => {
     // mock-i18n resolves against real en.json — the named key interpolated with
     // 'Spanish' produces the English string below.
     screen.getByText('Building your Spanish curriculum…');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1119 — the hub previously had no in-context manage/pause/archive entry
+// (only Library did). The entry must be present for a learner/owner scope and
+// must drive the same status mutation Library uses, and must be hidden for a
+// supporter-proxy scope (read-only over the child's subjects).
+// ---------------------------------------------------------------------------
+
+function proxyWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  return createScreenWrapper({
+    activeProfile: createTestProfile(),
+    profiles: [createTestProfile()],
+    queryClient,
+    isExplicitProxyMode: true,
+  }).wrapper;
+}
+
+describe('SubjectHubRoute — manage entry (WI-1119)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    seedRoutes();
+  });
+
+  it('shows the manage entry for the learner scope and archives via the sheet', async () => {
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    // The entry appears once the subject status query resolves (active).
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-manage');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-hub-manage'));
+    // Active subject → archive-first action set (pause + archive).
+    screen.getByTestId('subject-hub-pause');
+    fireEvent.press(screen.getByTestId('subject-hub-archive'));
+
+    await waitFor(() => {
+      const patches = fetchCallsMatching(
+        mockFetch,
+        `/subjects/${SUBJECT_ID}`,
+      ).filter((call) => call.init?.method === 'PATCH');
+      expect(patches).toHaveLength(1);
+      expect(extractJsonBody(patches[0]!.init)).toEqual({ status: 'archived' });
+    });
+  });
+
+  it('shows the resume action set for a paused subject', async () => {
+    // Deep-linked paused subject: the manage entry must reflect the real status
+    // (resume + archive), not the 'active' fallback (pause + archive).
+    mockFetch.setRoute('/subjects', {
+      subjects: [
+        {
+          id: SUBJECT_ID,
+          profileId: '990e8400-e29b-41d4-a716-446655440004',
+          name: 'Spanish',
+          status: 'paused',
+          curriculumStatus: 'ready',
+          pedagogyMode: 'socratic',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-manage');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-hub-manage'));
+    screen.getByTestId('subject-hub-resume');
+    screen.getByTestId('subject-hub-archive');
+    expect(screen.queryByTestId('subject-hub-pause')).toBeNull();
+  });
+
+  it('hides the manage entry for a supporter-proxy scope', async () => {
+    render(<SubjectHubRoute />, { wrapper: proxyWrapper() });
+
+    await waitFor(() => {
+      screen.getByTestId('subject-hub-screen');
+    });
+
+    expect(screen.queryByTestId('subject-hub-manage')).toBeNull();
   });
 });

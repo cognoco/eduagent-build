@@ -707,3 +707,63 @@ export const maybeReplayResponseSchema = z.object({
   latestExchangeId: z.string().nullable(),
 });
 export type MaybeReplayResponse = z.infer<typeof maybeReplayResponseSchema>;
+
+// MessageResult — POST /sessions/:sessionId/messages → 200
+// Response shape after sending a learner message (non-streaming path).
+export const messageResultSchema = z.object({
+  response: z.string(),
+  escalationRung: z.number(),
+  isUnderstandingCheck: z.boolean(),
+  exchangeCount: z.number(),
+  expectedResponseMinutes: z.number(),
+  aiEventId: z.string().optional(),
+});
+export type MessageResult = z.infer<typeof messageResultSchema>;
+
+// CloseResult — POST /sessions/:sessionId/close → 200
+// Response shape after closing a learning session.
+export const closeResultSchema = z.object({
+  message: z.string(),
+  sessionId: z.string(),
+  wallClockSeconds: z.number(),
+  summaryStatus: summaryStatusSchema,
+});
+export type CloseResult = z.infer<typeof closeResultSchema>;
+
+// SessionStartResult — POST /subjects/:subjectId/sessions → 201
+// Shared by tutoring, language, interleaved, and freeform session-start paths.
+export const sessionStartResultSchema = z.object({
+  session: learningSessionSchema,
+});
+export type SessionStartResult = z.infer<typeof sessionStartResultSchema>;
+
+// HomeworkStateSyncResponse — POST /sessions/:sessionId/homework-state-sync → 200
+export const homeworkStateSyncResponseSchema = z.object({
+  metadata: homeworkSessionMetadataSchema,
+});
+export type HomeworkStateSyncResponse = z.infer<
+  typeof homeworkStateSyncResponseSchema
+>;
+
+// SessionSummaryGetResponse — GET /sessions/:sessionId/summary → 200
+export const sessionSummaryGetResponseSchema = z.object({
+  summary: sessionSummarySchema.nullable(),
+});
+export type SessionSummaryGetResponse = z.infer<
+  typeof sessionSummaryGetResponseSchema
+>;
+
+// SubmitSummaryResult — POST /sessions/:sessionId/summary → 200
+// Picks only the fields returned by the submit endpoint (not the full summary).
+export const submitSummaryResultSchema = z.object({
+  summary: sessionSummarySchema.pick({
+    id: true,
+    sessionId: true,
+    content: true,
+    aiFeedback: true,
+    status: true,
+    baseXp: true,
+    reflectionBonusXp: true,
+  }),
+});
+export type SubmitSummaryResult = z.infer<typeof submitSummaryResultSchema>;

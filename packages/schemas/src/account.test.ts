@@ -4,6 +4,8 @@
  * Tightening from `z.record(z.string(), z.unknown())` inline per-table to a
  * single named alias (`dataExportRowSchema`) gives us one place to ratchet
  * stricter per-table shapes in future PRs. These tests pin the contract.
+ *
+ * [WI-1097] All 19 deferred aliases tightened to real z.object schemas.
  */
 
 import {
@@ -12,10 +14,28 @@ import {
   cancelDeletionResponseSchema,
   dataExportAssessmentRowSchema,
   dataExportConsentSchema,
+  dataExportCurriculumRowSchema,
+  dataExportCurriculumTopicRowSchema,
+  dataExportFamilyLinkRowSchema,
+  dataExportLearningModeRowSchema,
+  dataExportLearningSessionRowSchema,
+  dataExportMentorActivityLedgerRowSchema,
+  dataExportNeedsDeepeningTopicRowSchema,
+  dataExportNotificationPreferenceRowSchema,
+  dataExportParkingLotItemRowSchema,
+  dataExportQuotaPoolRowSchema,
+  dataExportRetentionCardRowSchema,
   dataExportRowSchema,
   dataExportSchema,
+  dataExportSessionEmbeddingRowSchema,
+  dataExportSessionEventRowSchema,
+  dataExportSessionSummaryRowSchema,
+  dataExportStreakRowSchema,
   dataExportSubjectRowSchema,
   dataExportSubscriptionRowSchema,
+  dataExportTeachingPreferenceRowSchema,
+  dataExportTopUpCreditRowSchema,
+  dataExportXpLedgerRowSchema,
 } from './account.js';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440000';
@@ -118,12 +138,34 @@ describe('account schemas', () => {
   });
 
   describe('[BUG-206] dataExportRowSchema centralisation', () => {
-    it('deferred per-table aliases still reference the canonical row schema', () => {
-      // Only non-tightened (deferred) aliases stay as dataExportRowSchema.
-      // [WI-978] subscriptions + assessments have been tightened to real z.object
-      // schemas — they are intentionally NOT toBe(dataExportRowSchema) any more.
-      expect(dataExportSubjectRowSchema).toBe(dataExportRowSchema);
-      // Verify the tightened schemas are distinct (not the stub):
+    it('[WI-1097] all 19 tightened schemas are distinct from the stub', () => {
+      // All 19 deferred aliases were z.record stubs after WI-978. After WI-1097
+      // they are real z.object schemas — none must equal dataExportRowSchema.
+      const tightened = [
+        dataExportSubjectRowSchema,
+        dataExportCurriculumRowSchema,
+        dataExportCurriculumTopicRowSchema,
+        dataExportLearningSessionRowSchema,
+        dataExportSessionEventRowSchema,
+        dataExportSessionSummaryRowSchema,
+        dataExportRetentionCardRowSchema,
+        dataExportXpLedgerRowSchema,
+        dataExportStreakRowSchema,
+        dataExportNotificationPreferenceRowSchema,
+        dataExportLearningModeRowSchema,
+        dataExportTeachingPreferenceRowSchema,
+        dataExportParkingLotItemRowSchema,
+        dataExportSessionEmbeddingRowSchema,
+        dataExportQuotaPoolRowSchema,
+        dataExportTopUpCreditRowSchema,
+        dataExportNeedsDeepeningTopicRowSchema,
+        dataExportFamilyLinkRowSchema,
+        dataExportMentorActivityLedgerRowSchema,
+      ];
+      for (const schema of tightened) {
+        expect(schema).not.toBe(dataExportRowSchema);
+      }
+      // Already-tightened (WI-978) schemas remain distinct:
       expect(dataExportSubscriptionRowSchema).not.toBe(dataExportRowSchema);
       expect(dataExportAssessmentRowSchema).not.toBe(dataExportRowSchema);
     });
@@ -144,6 +186,281 @@ describe('account schemas', () => {
     });
   });
 
+  describe('[WI-1097] dataExportSubjectRowSchema', () => {
+    const validSubject = {
+      id: UUID,
+      profileId: UUID,
+      name: 'Mathematics',
+      rawInput: null,
+      status: 'active' as const,
+      pedagogyMode: 'socratic' as const,
+      languageCode: null,
+      createdAt: ISO,
+      updatedAt: ISO,
+      urgencyBoostUntil: null,
+      urgencyBoostReason: null,
+      bookSuggestionsLastGenerationAttemptedAt: null,
+    };
+
+    it('accepts a valid subject row', () => {
+      expect(dataExportSubjectRowSchema.safeParse(validSubject).success).toBe(
+        true,
+      );
+    });
+
+    it('rejects a subject row missing required name', () => {
+      const { name: _omit, ...rest } = validSubject;
+      expect(dataExportSubjectRowSchema.safeParse(rest).success).toBe(false);
+    });
+
+    it('rejects an invalid status value', () => {
+      expect(
+        dataExportSubjectRowSchema.safeParse({
+          ...validSubject,
+          status: 'deleted',
+        }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportLearningSessionRowSchema', () => {
+    const validSession = {
+      id: UUID,
+      profileId: UUID,
+      subjectId: UUID,
+      topicId: null,
+      sessionType: 'learning' as const,
+      verificationType: null,
+      inputMode: 'text',
+      status: 'completed' as const,
+      escalationRung: 1,
+      exchangeCount: 5,
+      startedAt: ISO,
+      lastActivityAt: ISO,
+      endedAt: ISO,
+      durationSeconds: 300,
+      wallClockSeconds: 320,
+      metadata: null,
+      rawInput: null,
+      filedAt: null,
+      filingStatus: null,
+      filingRetryCount: 0,
+      createdAt: ISO,
+      updatedAt: ISO,
+    };
+
+    it('accepts a valid learning session row', () => {
+      expect(
+        dataExportLearningSessionRowSchema.safeParse(validSession).success,
+      ).toBe(true);
+    });
+
+    it('rejects a session row missing required profileId', () => {
+      const { profileId: _omit, ...rest } = validSession;
+      expect(dataExportLearningSessionRowSchema.safeParse(rest).success).toBe(
+        false,
+      );
+    });
+
+    it('rejects an invalid sessionType', () => {
+      expect(
+        dataExportLearningSessionRowSchema.safeParse({
+          ...validSession,
+          sessionType: 'unknown_type',
+        }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportRetentionCardRowSchema', () => {
+    const validCard = {
+      id: UUID,
+      profileId: UUID,
+      topicId: UUID,
+      easeFactor: 2.5,
+      intervalDays: 1,
+      repetitions: 0,
+      lastReviewedAt: null,
+      nextReviewAt: null,
+      masteredAt: null,
+      failureCount: 0,
+      consecutiveSuccesses: 0,
+      xpStatus: 'pending' as const,
+      evaluateDifficultyRung: null,
+      createdAt: ISO,
+      updatedAt: ISO,
+    };
+
+    it('accepts a valid retention card row', () => {
+      expect(
+        dataExportRetentionCardRowSchema.safeParse(validCard).success,
+      ).toBe(true);
+    });
+
+    it('rejects when easeFactor is a string', () => {
+      expect(
+        dataExportRetentionCardRowSchema.safeParse({
+          ...validCard,
+          easeFactor: 'high',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects invalid xpStatus', () => {
+      expect(
+        dataExportRetentionCardRowSchema.safeParse({
+          ...validCard,
+          xpStatus: 'unknown',
+        }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportFamilyLinkRowSchema', () => {
+    const validLink = {
+      id: UUID,
+      parentProfileId: UUID,
+      childProfileId: UUID,
+      createdAt: ISO,
+    };
+
+    it('accepts a valid family link row', () => {
+      expect(dataExportFamilyLinkRowSchema.safeParse(validLink).success).toBe(
+        true,
+      );
+    });
+
+    it('rejects when parentProfileId is not a UUID', () => {
+      expect(
+        dataExportFamilyLinkRowSchema.safeParse({
+          ...validLink,
+          parentProfileId: 'not-a-uuid',
+        }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportMentorActivityLedgerRowSchema', () => {
+    const validRow = {
+      id: UUID,
+      profileId: UUID,
+      actorJob: 'session-closer',
+      kind: 'session_completed',
+      templateKey: 'session.completed.v1',
+      params: { topicId: UUID, xp: 10 },
+      visibility: 'self' as const,
+      createdAt: ISO,
+      surfacedAt: null,
+    };
+
+    it('accepts a valid mentor activity ledger row', () => {
+      expect(
+        dataExportMentorActivityLedgerRowSchema.safeParse(validRow).success,
+      ).toBe(true);
+    });
+
+    it('rejects invalid visibility value', () => {
+      expect(
+        dataExportMentorActivityLedgerRowSchema.safeParse({
+          ...validRow,
+          visibility: 'private',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects when required actorJob is missing', () => {
+      const { actorJob: _omit, ...rest } = validRow;
+      expect(
+        dataExportMentorActivityLedgerRowSchema.safeParse(rest).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportStreakRowSchema', () => {
+    it('accepts a valid streak row (lastActivityDate is text, not timestamp)', () => {
+      const result = dataExportStreakRowSchema.safeParse({
+        id: UUID,
+        profileId: UUID,
+        currentStreak: 7,
+        longestStreak: 14,
+        lastActivityDate: '2026-05-19',
+        gracePeriodStartDate: null,
+        createdAt: ISO,
+        updatedAt: ISO,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects when currentStreak is a string', () => {
+      expect(
+        dataExportStreakRowSchema.safeParse({
+          id: UUID,
+          profileId: UUID,
+          currentStreak: 'seven',
+          longestStreak: 14,
+          lastActivityDate: null,
+          gracePeriodStartDate: null,
+          createdAt: ISO,
+          updatedAt: ISO,
+        }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportQuotaPoolRowSchema', () => {
+    const validPool = {
+      id: UUID,
+      subscriptionId: UUID,
+      monthlyLimit: 100,
+      usedThisMonth: 42,
+      dailyLimit: null,
+      usedToday: 5,
+      cycleResetAt: ISO,
+      createdAt: ISO,
+      updatedAt: ISO,
+    };
+
+    it('accepts a valid quota pool row', () => {
+      expect(dataExportQuotaPoolRowSchema.safeParse(validPool).success).toBe(
+        true,
+      );
+    });
+
+    it('rejects when subscriptionId is missing', () => {
+      const { subscriptionId: _omit, ...rest } = validPool;
+      expect(dataExportQuotaPoolRowSchema.safeParse(rest).success).toBe(false);
+    });
+  });
+
+  describe('[WI-1097] dataExportSessionEmbeddingRowSchema', () => {
+    it('accepts a valid session embedding row (embedding as number array)', () => {
+      const result = dataExportSessionEmbeddingRowSchema.safeParse({
+        id: UUID,
+        sessionId: UUID,
+        profileId: UUID,
+        topicId: null,
+        embedding: [0.1, -0.2, 0.3],
+        content: 'Topic summary text',
+        createdAt: ISO,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects when embedding contains non-numbers', () => {
+      expect(
+        dataExportSessionEmbeddingRowSchema.safeParse({
+          id: UUID,
+          sessionId: UUID,
+          profileId: UUID,
+          topicId: null,
+          embedding: ['a', 'b'],
+          content: 'text',
+          createdAt: ISO,
+        }).success,
+      ).toBe(false);
+    });
+  });
+
   describe('dataExportSchema (top-level GDPR Article 15 export)', () => {
     it('accepts a minimal export with only required fields', () => {
       const result = dataExportSchema.safeParse({
@@ -158,16 +475,30 @@ describe('account schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('accepts subjects/subscriptions/quotaPools arrays', () => {
-      // [WI-978] subscriptions now uses the tightened dataExportSubscriptionRowSchema;
-      // the payload must match the real schema (not an arbitrary record).
-      // Nullable fields must be explicitly null (not undefined) — DB nullable
-      // columns return null, not undefined.
+    it('accepts subjects/subscriptions/quotaPools arrays with valid tightened rows', () => {
+      // [WI-978] subscriptions uses tightened dataExportSubscriptionRowSchema.
+      // [WI-1097] subjects and quotaPools now use tightened schemas too.
+      // Nullable fields must be explicitly null (DB nullable columns return null).
       const result = dataExportSchema.safeParse({
         account: { email: 'user@example.com', createdAt: ISO },
         profiles: [],
         consentStates: [],
-        subjects: [{ id: UUID, name: 'Math' }],
+        subjects: [
+          {
+            id: UUID,
+            profileId: UUID,
+            name: 'Math',
+            rawInput: null,
+            status: 'active',
+            pedagogyMode: 'socratic',
+            languageCode: null,
+            createdAt: ISO,
+            updatedAt: ISO,
+            urgencyBoostUntil: null,
+            urgencyBoostReason: null,
+            bookSuggestionsLastGenerationAttemptedAt: null,
+          },
+        ],
         subscriptions: [
           {
             id: UUID,
@@ -189,7 +520,19 @@ describe('account schemas', () => {
             updatedAt: ISO,
           },
         ],
-        quotaPools: [{ pool: 'free' }],
+        quotaPools: [
+          {
+            id: UUID,
+            subscriptionId: UUID,
+            monthlyLimit: 100,
+            usedThisMonth: 0,
+            dailyLimit: null,
+            usedToday: 0,
+            cycleResetAt: ISO,
+            createdAt: ISO,
+            updatedAt: ISO,
+          },
+        ],
         exportedAt: ISO,
       });
       expect(result.success).toBe(true);

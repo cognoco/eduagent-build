@@ -67,6 +67,7 @@ jest.mock('../services/dictation', () => {
     reviewDictation: jest.fn(),
     recordDictationResult: jest.fn(),
     getDictationStreak: jest.fn(),
+    getDictationHistory: jest.fn(),
     fetchGenerateContext: jest.fn(),
   };
 });
@@ -105,6 +106,7 @@ import {
   reviewDictation,
   recordDictationResult,
   getDictationStreak,
+  getDictationHistory,
   fetchGenerateContext,
 } from '../services/dictation';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -382,6 +384,8 @@ describe('POST /v1/dictation/result', () => {
       mistakeCount: 2,
       mode: 'homework',
       reviewed: false,
+      // [WI-902] Persisted source sentences are part of the row contract now.
+      sentences: ['The cat sat.', 'The dog ran.'],
       createdAt: new Date().toISOString(),
     });
 
@@ -397,6 +401,7 @@ describe('POST /v1/dictation/result', () => {
           mistakeCount: 2,
           mode: 'homework',
           reviewed: false,
+          sentences: ['The cat sat.', 'The dog ran.'],
         }),
       },
       TEST_ENV,
@@ -404,7 +409,10 @@ describe('POST /v1/dictation/result', () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.result).toEqual(expect.objectContaining({}));
+    // [WI-902] Persisted sentences round-trip through the response.
+    expect(body.result).toEqual(
+      expect.objectContaining({ sentences: ['The cat sat.', 'The dog ran.'] }),
+    );
     expect(recordDictationResult).toHaveBeenCalledWith(
       mockDatabaseModule.db, // exact scoped db handle — guards against wrong-db injection
       'test-profile-id',
@@ -413,6 +421,8 @@ describe('POST /v1/dictation/result', () => {
         localDate: TODAY,
         sentenceCount: 5,
         mode: 'homework',
+        // [WI-902] Route forwards the source sentences to the service.
+        sentences: ['The cat sat.', 'The dog ran.'],
       }),
     );
   });
@@ -446,6 +456,8 @@ describe('POST /v1/dictation/result', () => {
       mistakeCount: null,
       mode: 'homework',
       reviewed: false,
+      // [WI-902] Old client omits sentences → row carries null.
+      sentences: null,
       createdAt: new Date().toISOString(),
     });
 
@@ -678,6 +690,70 @@ describe('GET /v1/dictation/streak', () => {
 
   it('returns 401 without auth header', async () => {
     const res = await app.request('/v1/dictation/streak', {}, TEST_ENV);
+    expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/dictation/history
+// ---------------------------------------------------------------------------
+
+const HISTORY_ENTRY = {
+  id: '550e8400-e29b-41d4-a716-446655440001',
+  profileId: '550e8400-e29b-41d4-a716-446655440002',
+  completionKey: '550e8400-e29b-41d4-a716-446655440003',
+  date: TODAY,
+  sentenceCount: 3,
+  mistakeCount: 1,
+  mode: 'surprise' as const,
+  reviewed: false,
+  sentences: ['The cat sat on the mat.'],
+};
+
+describe('GET /v1/dictation/history', () => {
+  it('returns 200 with entries array on success', async () => {
+    (getDictationHistory as jest.Mock).mockResolvedValueOnce([HISTORY_ENTRY]);
+
+    const res = await app.request(
+      '/v1/dictation/history',
+      { headers: AUTH_HEADERS },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.entries).toHaveLength(1);
+    expect(body.entries[0].id).toBe(HISTORY_ENTRY.id);
+    expect(body.entries[0].sentences).toEqual(HISTORY_ENTRY.sentences);
+  });
+
+  it('delegates to getDictationHistory with db and profileId', async () => {
+    (getDictationHistory as jest.Mock).mockResolvedValueOnce([]);
+
+    await app.request(
+      '/v1/dictation/history',
+      { headers: AUTH_HEADERS },
+      TEST_ENV,
+    );
+
+    expect(getDictationHistory).toHaveBeenCalledWith(
+      mockDatabaseModule.db,
+      'test-profile-id',
+    );
+  });
+
+  it('returns 400 when X-Profile-Id header is missing', async () => {
+    const res = await app.request(
+      '/v1/dictation/history',
+      { headers: makeAuthHeaders() },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 401 without auth header', async () => {
+    const res = await app.request('/v1/dictation/history', {}, TEST_ENV);
     expect(res.status).toBe(401);
   });
 });

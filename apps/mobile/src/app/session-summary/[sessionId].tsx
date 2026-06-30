@@ -643,8 +643,8 @@ export default function SessionSummaryScreen() {
       setAiFeedback(result.summary.aiFeedback);
       setSubmitted(true);
       setSubmittedXp({
-        baseXp: result.summary.baseXp,
-        reflectionBonusXp: result.summary.reflectionBonusXp,
+        baseXp: result.summary.baseXp ?? null,
+        reflectionBonusXp: result.summary.reflectionBonusXp ?? null,
       });
       // Server accepted the reflection — the local draft is redundant.
       if (activeProfile?.id && sessionId) {

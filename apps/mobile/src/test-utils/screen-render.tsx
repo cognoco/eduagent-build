@@ -267,6 +267,12 @@ export interface CreateScreenWrapperOptions {
   profiles: Profile[];
   isLoading?: boolean;
   queryClient?: QueryClient;
+  /**
+   * Render as a parent-proxy session (the EXPLICIT proxy flag — see
+   * use-parent-proxy.ts). Lets a screen test exercise proxy-gated UI without
+   * mocking the internal `useParentProxy` hook. Default false.
+   */
+  isExplicitProxyMode?: boolean;
 }
 
 export interface CreateScreenWrapperResult {
@@ -283,7 +289,7 @@ export function createScreenWrapper(
   const profileContextValue: ProfileContextValue = {
     profiles: opts.profiles,
     activeProfile: opts.activeProfile,
-    isExplicitProxyMode: false,
+    isExplicitProxyMode: opts.isExplicitProxyMode ?? false,
     switchProfile: async () => ({ success: true }),
     isLoading,
     profileLoadError: null,

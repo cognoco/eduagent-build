@@ -69,10 +69,12 @@ describe('useStartSession', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
-            topicId: 'topic-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: '770e8400-e29b-41d4-a716-446655440000',
             sessionType: 'homework',
+            inputMode: 'voice',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -80,6 +82,10 @@ describe('useStartSession', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -116,10 +122,12 @@ describe('useStartSession', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
-            topicId: 'topic-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: '770e8400-e29b-41d4-a716-446655440000',
             sessionType: 'learning',
+            inputMode: 'text',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -127,6 +135,10 @@ describe('useStartSession', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 201, headers: { 'Content-Type': 'application/json' } },
@@ -166,9 +178,12 @@ describe('useStartSession', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: null,
             sessionType: 'homework',
+            inputMode: 'text',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -176,6 +191,10 @@ describe('useStartSession', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -220,9 +239,12 @@ describe('useStartSession', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: null,
             sessionType: 'learning',
+            inputMode: 'text',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -230,6 +252,10 @@ describe('useStartSession', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -261,6 +287,7 @@ describe('useSendMessage', () => {
           escalationRung: 1,
           isUnderstandingCheck: false,
           exchangeCount: 1,
+          expectedResponseMinutes: 0,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -290,6 +317,8 @@ describe('useCloseSession', () => {
         JSON.stringify({
           message: 'Session closed',
           sessionId: 'session-1',
+          wallClockSeconds: 0,
+          summaryStatus: 'pending',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -317,6 +346,7 @@ describe('useCloseSession', () => {
           message: 'Session closed',
           sessionId: 'session-1',
           wallClockSeconds: 600,
+          summaryStatus: 'pending',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -345,6 +375,7 @@ describe('useCloseSession', () => {
           message: 'Session closed',
           sessionId: 'session-1',
           wallClockSeconds: 600,
+          summaryStatus: 'pending',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -418,9 +449,12 @@ describe('useSetSessionInputMode', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: null,
             sessionType: 'learning',
+            inputMode: 'voice',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -428,7 +462,10 @@ describe('useSetSessionInputMode', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
-            inputMode: 'voice',
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -456,9 +493,12 @@ describe('useSetSessionInputMode', () => {
       new Response(
         JSON.stringify({
           session: {
-            id: 'session-1',
-            subjectId: 'subject-1',
+            id: '660e8400-e29b-41d4-a716-446655440000',
+            subjectId: '550e8400-e29b-41d4-a716-446655440000',
+            topicId: null,
             sessionType: 'learning',
+            inputMode: 'text',
+            verificationType: null,
             status: 'active',
             escalationRung: 1,
             exchangeCount: 0,
@@ -466,7 +506,10 @@ describe('useSetSessionInputMode', () => {
             lastActivityAt: '2025-01-01T00:00:00Z',
             endedAt: null,
             durationSeconds: null,
-            inputMode: 'text',
+            wallClockSeconds: null,
+            filedAt: null,
+            filingStatus: null,
+            filingRetryCount: 0,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -495,11 +538,16 @@ describe('useSessionSummary', () => {
       new Response(
         JSON.stringify({
           summary: {
-            id: 'summary-1',
-            sessionId: 'session-1',
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'I learned about gravity',
             aiFeedback: 'Good summary',
             status: 'accepted',
+            closingLine: null,
+            learnerRecap: null,
+            nextTopicId: null,
+            nextTopicTitle: null,
+            nextTopicReason: null,
           },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -545,8 +593,8 @@ describe('useSubmitSummary', () => {
       new Response(
         JSON.stringify({
           summary: {
-            id: 'summary-1',
-            sessionId: 'session-1',
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
             aiFeedback: 'Clear and accurate summary.',
             status: 'accepted',
@@ -580,8 +628,8 @@ describe('useSubmitSummary', () => {
       new Response(
         JSON.stringify({
           summary: {
-            id: 'summary-1',
-            sessionId: 'session-1',
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: 'Gravity pulls objects toward Earth',
             aiFeedback: 'Clear and accurate summary.',
             status: 'accepted',
@@ -638,8 +686,8 @@ describe('useSkipSummary', () => {
       new Response(
         JSON.stringify({
           summary: {
-            id: 'summary-1',
-            sessionId: 'session-1',
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: '',
             aiFeedback: null,
             status: 'skipped',
@@ -668,8 +716,8 @@ describe('useSkipSummary', () => {
       new Response(
         JSON.stringify({
           summary: {
-            id: 'summary-1',
-            sessionId: 'session-1',
+            id: '880e8400-e29b-41d4-a716-446655440001',
+            sessionId: '660e8400-e29b-41d4-a716-446655440000',
             content: '',
             aiFeedback: null,
             status: 'skipped',
@@ -1270,7 +1318,7 @@ describe('useTopicParkingLot', () => {
         JSON.stringify({
           items: [
             {
-              id: 'parked-1',
+              id: 'aa0e8400-e29b-41d4-a716-446655440001',
               question: 'Why does factoring help here?',
               explored: false,
               createdAt: '2026-02-15T10:00:00.000Z',
@@ -1311,7 +1359,7 @@ describe('useAddParkingLotItem (profile-scoped invalidation)', () => {
       new Response(
         JSON.stringify({
           item: {
-            id: 'item-1',
+            id: 'aa0e8400-e29b-41d4-a716-446655440002',
             question: 'Why does this work?',
             explored: false,
             createdAt: '2026-02-15T10:00:00.000Z',

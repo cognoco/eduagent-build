@@ -68,6 +68,8 @@ export default function DictationReviewScreen(): React.ReactElement {
         mistakeCount,
         mode,
         reviewed: true,
+        // [WI-902] Persist source sentence texts for the dictation history.
+        sentences: sentences.map((s) => s.text),
       });
       // [CRIT-2] Navigate only after successful save — guarded per AGENTS.md
       router.replace('/(app)/practice' as Href);

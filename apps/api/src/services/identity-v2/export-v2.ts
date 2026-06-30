@@ -39,7 +39,12 @@ import {
   topUpCredits,
   type Database,
 } from '@eduagent/database';
-import { dataExportSubscriptionRowSchema } from '@eduagent/schemas';
+import {
+  dataExportSubscriptionRowSchema,
+  dataExportFamilyLinkRowSchema,
+  dataExportQuotaPoolRowSchema,
+  dataExportTopUpCreditRowSchema,
+} from '@eduagent/schemas';
 import type { ConsentStatus, DataExport, Profile } from '@eduagent/schemas';
 import { generateExport, serializeDates } from '../export';
 import {
@@ -236,14 +241,21 @@ export async function generateExportV2(
     },
     profiles: profilesExport,
     consentStates: consentStatesExport,
+    // [WI-1097] guardianship "replaces family_links" (schema comment): map the
+    // edge to the legacy/contract familyLinks row shape (guardian = parent,
+    // charge = child) so the v2 export's familyLinks conform to the now-strict
+    // dataExportFamilyLinkRowSchema — identical to the legacy export's shape.
+    // The prior {guardianPersonId, chargePersonId, qualification, grantedAt}
+    // shape was accepted only because the schema was a loose z.record.
     familyLinks: relevantEdges.map((g) =>
-      serializeDates({
-        guardianPersonId: g.guardianPersonId,
-        chargePersonId: g.chargePersonId,
-        qualification: g.qualification,
-        grantedAt: g.grantedAt,
-        createdAt: g.createdAt,
-      }),
+      dataExportFamilyLinkRowSchema.parse(
+        serializeDates({
+          id: g.id,
+          parentProfileId: g.guardianPersonId,
+          childProfileId: g.chargePersonId,
+          createdAt: g.createdAt,
+        }),
+      ),
     ),
     // Map the v2 `subscription` row (organization-keyed, plan_tier/period_*_at)
     // to the legacy-named export shape the schema expects (accountId/tier/
@@ -274,8 +286,12 @@ export async function generateExportV2(
         }),
       ),
     ),
-    quotaPools: quotaPoolRows.map(serializeDates),
-    topUpCredits: topUpCreditRows.map(serializeDates),
+    quotaPools: quotaPoolRows.map((row) =>
+      dataExportQuotaPoolRowSchema.parse(serializeDates(row)),
+    ),
+    topUpCredits: topUpCreditRows.map((row) =>
+      dataExportTopUpCreditRowSchema.parse(serializeDates(row)),
+    ),
   };
 }
 

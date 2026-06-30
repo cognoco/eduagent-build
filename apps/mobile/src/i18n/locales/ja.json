@@ -574,7 +574,7 @@
       "noteSaveErrorTitle": "メモを保存できませんでした"
     },
     "mentorMemory": {
-      "title": "私のメンターが知っていること",
+      "title": "メンターがあなたについて知っていること。",
       "subtitle": "メンターが記憶している内容を確認、編集、追加します。",
       "loadError": "現在、メンターの記憶を読み込めませんでした",
       "loadTimeout": {
@@ -968,18 +968,18 @@
     },
     "tellMentor": {
       "parent": {
-        "title": "チューターに伝える",
-        "description": "このお子さんについて、チューターに覚えておいてほしい重要なことを追加してください。",
-        "descriptionWithName": "{{childName}}について、チューターに覚えておいてほしい重要なことを追加してください。",
+        "title": "メンターに伝える",
+        "description": "このお子さんについて、メンターに覚えておいてほしい重要なことを追加してください。",
+        "descriptionWithName": "{{childName}}について、メンターに覚えておいてほしい重要なことを追加してください。",
         "placeholder": "短い例で最もよく理解し、分数でまだつまずきます。"
       },
       "adult": {
-        "title": "チューターへのメモを追加",
-        "description": "今後のセッションでチューターに覚えておいてほしいことを追加してください。",
+        "title": "メンターへのメモを追加",
+        "description": "今後のセッションでメンターに覚えておいてほしいことを追加してください。",
         "placeholder": "例があると分数の理解にとても役立ちます。"
       },
       "teen": {
-        "title": "チューターに伝えよう",
+        "title": "メンターに伝えよう",
         "description": "学習の助けになること、楽しいこと、まだ難しいと感じることを追加してください。",
         "placeholder": "例があると分数の理解にとても役立ちます。"
       }
@@ -1178,7 +1178,9 @@
       "surpriseMe": "おまかせ",
       "surpriseMeSubtitle": "新しいディクテーションで練習",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "過去のディクテーション",
+      "viewPastDictationsSubtitle": "練習した内容を振り返りましょう"
     },
     "complete": {
       "noSessionTitle": "完了するディクテーションがありません",
@@ -1264,6 +1266,21 @@
       "preparing": "準備中...",
       "takingLonger": "通常より時間がかかっています — キャンセルして再試行できます。",
       "cancelPreparing": "ディクテーションの準備をキャンセル"
+    },
+    "history": {
+      "title": "過去のディクテーション",
+      "back": "戻る",
+      "loading": "ディクテーションを読み込み中…",
+      "errorTitle": "ディクテーションを読み込めませんでした",
+      "retry": "再試行",
+      "empty": "まだディクテーションがありません。完了すると、ここに表示されます。",
+      "modeHomework": "自分のテキストから",
+      "modeSurprise": "おまかせディクテーション",
+      "scoreLabel": "{{total}}問中{{correct}}問正解",
+      "sentenceCountLabel_one": "{{count}}文",
+      "sentenceCountLabel_other": "{{count}}文",
+      "sentencesHeading": "練習した内容",
+      "noSentences": "このディクテーションのテキストは保存されませんでした。"
     }
   },
   "library": {
@@ -1402,9 +1419,9 @@
     "noteSignal": {
       "verified": "確認済み",
       "verifiedAccessibilityLabel": "確認済み - あなたの回答は正解でした",
-      "tutorAddition": "このトピックに関するチューターからの補足",
-      "showTutorAdditionAccessibilityLabel": "チューターが追加した内容を表示",
-      "hideTutorAdditionAccessibilityLabel": "チューターが追加した内容を非表示"
+      "mentorAddition": "このトピックに関するメンターからの追加情報",
+      "showMentorAdditionAccessibilityLabel": "メンターが追加した内容を表示",
+      "hideMentorAdditionAccessibilityLabel": "メンターが追加した内容を非表示"
     },
     "bookmarkCard": {
       "accessibilityLabel": "保存したブックマークを開く: {{title}}"
@@ -2944,7 +2961,7 @@
   },
   "sessionSummary": {
     "mentorMemoryCue": {
-      "title": "チューターがあなたについて知っていること。",
+      "title": "メンターがあなたについて知っていること。",
       "subtitle": "タップして確認または変更。"
     },
     "notificationPrimer": {
@@ -3629,9 +3646,9 @@
     "birthDateLabel": "生年月日",
     "parentBirthDateLabel": "あなたの生年月日",
     "childBirthDateLabel": "お子様の生年月日",
-    "birthDateHint": "チューターがあなたに合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
+    "birthDateHint": "メンターがあなたに合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
     "parentBirthDateHint": "これはアカウントを設定する大人の情報です。次にお子様を追加できます。対象年齢は{{age}}歳以上です。",
-    "childBirthDateHint": "チューターがお子様に合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
+    "childBirthDateHint": "メンターがお子様に合った話し方をするために必要です。対象年齢は{{age}}歳以上です。",
     "webDateFormatHint": "生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "childWebDateFormatHint": "お子様の生年月日を「YYYY-MM-DD」の形式で入力してください。",
     "selectDob": "生年月日を選択",
@@ -3662,9 +3679,9 @@
     "a11yRetry": "モード切り替えを再試行"
   },
   "memoryConsent": {
-    "defaultTitle": "チューターが{{name}}さんについて学習するのを手伝う",
-    "defaultTitleNoName": "チューターがお子様について学習するのを手伝う",
-    "defaultDescription": "これにより、チューターはどのような説明が効果的か、何がまだ難しいか、どの例が関連性があるかを記憶できます。",
+    "defaultTitle": "メンターが{{name}}さんについて学習するのを手伝う",
+    "defaultTitleNoName": "メンターがお子様について学習するのを手伝う",
+    "defaultDescription": "これにより、メンターはどのような説明が効果的か、何がまだ難しいか、どの例が関連性があるかを記憶できます。",
     "grant": "はい、有効にする",
     "a11yEnable": "メンターの記憶を有効にする",
     "a11ySkip": "メンターの記憶をスキップ"
@@ -3872,7 +3889,7 @@
       "more": "他{{count}}件の選択肢"
     },
     "bar": {
-      "unavailable": "チューターは一時的にオフラインです。入力は可能です。",
+      "unavailable": "メンターは一時的にオフラインです。入力は可能です。",
       "cameraLabel": "カメラ",
       "placeholder": "学習したいことを質問、貼り付け、または入力してください。",
       "micLabel": "マイク",
@@ -3992,7 +4009,7 @@
     "notes": {
       "heading": "メモ",
       "authorSelf": "自分のメモ",
-      "authorMentor": "チューターから保存",
+      "authorMentor": "メンターから保存",
       "addNote": "メモを追加",
       "micLabel": "音声でメモを追加",
       "empty": "まだメモはありません。この教科についての考えを記録しましょう。",
@@ -4034,6 +4051,13 @@
       "title": "最初の本を選びましょう",
       "message": "本を選んで、この教科の学習を始めましょう。",
       "cta": "本を探す"
+    },
+    "manage": {
+      "open": "管理",
+      "accessibilityLabel": "科目を管理",
+      "title": "科目の管理",
+      "description": "この科目を一時停止して学習項目から非表示にしたり、復元するまでアーカイブしたりできます。",
+      "close": "閉じる"
     }
   },
   "journal": {
@@ -4135,7 +4159,7 @@
       "confidenceLow": "初期の兆候"
     },
     "sourceBadge": {
-      "learner": "あなたがチューターに伝えたこと",
+      "learner": "あなたがメンターに伝えたこと",
       "parent": "保護者が追加"
     },
     "remove": "削除"

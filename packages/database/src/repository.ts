@@ -836,11 +836,9 @@ export function createScopedRepository(db: Database, profileId: string) {
     },
 
     dictationResults: {
-      async findMany(extraWhere?: SQL, orderBy?: SQL, limit?: number) {
+      async findMany(extraWhere?: SQL) {
         return db.query.dictationResults.findMany({
           where: scopedWhere(dictationResults, extraWhere),
-          ...(orderBy ? { orderBy } : {}),
-          ...(limit ? { limit } : {}),
         });
       },
       async listRecentDistinctDates(limit: number) {
@@ -859,6 +857,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         // [CR-162] Derive from schema enum so this type stays in sync automatically.
         mode: (typeof dictationModeEnum.enumValues)[number];
         reviewed: boolean;
+        // [WI-902] Source sentence texts; null/omitted for old clients.
+        sentences?: string[] | null;
       }) {
         // Conflict target is (profileId, completionKey): distinct dictation
         // sessions carry distinct completionKeys, so they persist as distinct
@@ -883,6 +883,16 @@ export function createScopedRepository(db: Database, profileId: string) {
               sentenceCount: values.sentenceCount,
               mistakeCount: values.mistakeCount,
               reviewed: values.reviewed,
+              // [WI-902] Refresh persisted sentences on a genuine retry only
+              // when the client supplied a non-null value; omit when null or
+              // undefined so a retry that omits or explicitly clears the field
+              // does not clobber a previously stored set. Note: the route and
+              // service coerce absent sentences to null before reaching here,
+              // so the guard must use != null (loose equality) rather than
+              // !== undefined to catch both forms.
+              ...(values.sentences != null
+                ? { sentences: values.sentences }
+                : {}),
             },
           })
           .returning();

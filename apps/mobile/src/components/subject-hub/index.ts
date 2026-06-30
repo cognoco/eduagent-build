@@ -1,5 +1,6 @@
 export * from './SubjectHub';
 export * from './SubjectHubChapterSection';
+export * from './SubjectHubManageSheet';
 export * from './SubjectHubNextUp';
 export * from './SubjectHubPreparing';
 export * from './SubjectHubProgressSummary';

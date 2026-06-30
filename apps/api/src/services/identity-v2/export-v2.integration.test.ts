@@ -42,8 +42,10 @@ import {
   membership,
   organization,
   person,
+  quotaPools,
   subjects,
   subscription,
+  topUpCredits,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -310,3 +312,245 @@ describeIfDb('generateExportV2 subscription mapping [WI-1161]', () => {
     expect(row.planTier).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [WI-1097] familyLinks field-mapping regression — runs on ANY DB with the v2
+// identity tables (NOT post-drop-gated). Verifies that generateExportV2 maps
+// guardianship edges to the correct familyLinks contract shape
+// {id, parentProfileId, childProfileId, createdAt} and that the pre-v2
+// fields (guardianPersonId, chargePersonId, qualification, grantedAt) are
+// ABSENT.
+//
+// Red-green-revert: revert export-v2.ts to the pre-WI-1097 mapping:
+//   familyLinks: relevantEdges.map((g) =>
+//     serializeDates({ guardianPersonId: g.guardianPersonId,
+//       chargePersonId: g.chargePersonId, qualification: g.qualification,
+//       grantedAt: g.grantedAt, createdAt: g.createdAt }),
+//   )
+// → dataExportFamilyLinkRowSchema.parse() throws (required `id`,
+//   `parentProfileId`, `childProfileId` absent from the input)
+// → generateExportV2 rejects → this test FAILS. Restore the correct mapping
+// → parse succeeds → GREEN.
+// ---------------------------------------------------------------------------
+describeIfDb('generateExportV2 familyLinks field mapping [WI-1097]', () => {
+  let db: Database;
+  const personIds: string[] = [];
+  const orgIds: string[] = [];
+
+  beforeAll(() => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    for (const pid of personIds) {
+      await db
+        .delete(guardianship)
+        .where(eq(guardianship.guardianPersonId, pid));
+      await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
+      await db.delete(login).where(eq(login.personId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of orgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+    personIds.length = 0;
+    orgIds.length = 0;
+  });
+
+  it('maps guardianship edges to {id, parentProfileId, childProfileId, createdAt} — qualification and grantedAt absent', async () => {
+    const [org] = await db
+      .insert(organization)
+      .values({ name: 'FamilyLinks Mapping Org' })
+      .returning();
+    orgIds.push(org!.id);
+
+    const [owner] = await db
+      .insert(person)
+      .values({
+        displayName: 'Owner',
+        birthDate: '1980-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(owner!.id);
+    await db.insert(membership).values({
+      personId: owner!.id,
+      organizationId: org!.id,
+      roles: ['admin'],
+    });
+    await db.insert(login).values({
+      personId: owner!.id,
+      clerkUserId: `fl-map-owner-${owner!.id}`,
+      email: `fl-map-owner-${owner!.id}@integration.test`,
+    });
+
+    const [child] = await db
+      .insert(person)
+      .values({
+        displayName: 'Child',
+        birthDate: '2015-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(child!.id);
+    await db.insert(membership).values({
+      personId: child!.id,
+      organizationId: org!.id,
+      roles: ['learner'],
+    });
+
+    const [edge] = await db
+      .insert(guardianship)
+      .values({
+        guardianPersonId: owner!.id,
+        chargePersonId: child!.id,
+        revokedAt: null,
+      })
+      .returning();
+
+    const result = await generateExportV2(db, org!.id);
+
+    expect(result.familyLinks).toHaveLength(1);
+    const link = result.familyLinks![0] as Record<string, unknown>;
+    // Correct contract fields present and correctly sourced:
+    expect(link['id']).toBe(edge!.id);
+    expect(link['parentProfileId']).toBe(owner!.id);
+    expect(link['childProfileId']).toBe(child!.id);
+    expect(typeof link['createdAt']).toBe('string');
+    // Pre-WI-1097 fields must be absent — they were never part of the
+    // family_links contract; the loose z.record schema silently allowed them.
+    expect(link['guardianPersonId']).toBeUndefined();
+    expect(link['chargePersonId']).toBeUndefined();
+    expect(link['qualification']).toBeUndefined();
+    expect(link['grantedAt']).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1097] quotaPools and topUpCredits schema-parse coverage — gated on the
+// post-0117 DB (IDENTITY_POST_DROP=1) where quota_pools.subscription_id FK
+// was repointed from legacy `subscriptions` to v2 `subscription`. In the
+// standard CI DB (Flag-ON lane) the FK still references the old table, so
+// inserts against the v2 `subscription` row violate the constraint. This
+// suite skips automatically in that lane and runs in the post-drop lane.
+//
+// Red-green-revert: revert export-v2.ts to the pre-WI-1097 mapping:
+//   quotaPools: quotaPoolRows.map(serializeDates),
+//   topUpCredits: topUpCreditRows.map(serializeDates),
+// → the .parse() call is removed; the output still passes these assertions
+//   (DB rows have the right fields), but any future column addition that
+//   doesn't match the schema would silently leak into the export. The parse
+//   call enforces the contract at runtime. This test confirms the parse path
+//   runs without throwing for valid rows.
+// ---------------------------------------------------------------------------
+describeIfPostDrop(
+  'generateExportV2 quotaPools and topUpCredits schema parse [WI-1097]',
+  () => {
+    let db: Database;
+    const personIds: string[] = [];
+    const orgIds: string[] = [];
+
+    beforeAll(() => {
+      db = createDatabase(process.env.DATABASE_URL!);
+    });
+
+    afterAll(async () => {
+      // subscription ON DELETE CASCADE removes quota_pools and top_up_credits.
+      for (const oid of orgIds) {
+        await db
+          .delete(subscription)
+          .where(eq(subscription.organizationId, oid));
+      }
+      for (const pid of personIds) {
+        await db.delete(login).where(eq(login.personId, pid));
+        await db.delete(membership).where(eq(membership.personId, pid));
+        await db.delete(person).where(eq(person.id, pid));
+      }
+      for (const oid of orgIds) {
+        await db.delete(organization).where(eq(organization.id, oid));
+      }
+      personIds.length = 0;
+      orgIds.length = 0;
+    });
+
+    it('exports quotaPools and topUpCredits with the expected schema-validated shape', async () => {
+      const [org] = await db
+        .insert(organization)
+        .values({ name: 'Quota Export Org' })
+        .returning();
+      orgIds.push(org!.id);
+
+      const [owner] = await db
+        .insert(person)
+        .values({
+          displayName: 'Owner',
+          birthDate: '1980-01-01',
+          residenceJurisdiction: 'EU',
+        })
+        .returning();
+      personIds.push(owner!.id);
+      await db.insert(membership).values({
+        personId: owner!.id,
+        organizationId: org!.id,
+        roles: ['admin'],
+      });
+      await db.insert(login).values({
+        personId: owner!.id,
+        clerkUserId: `quota-owner-${owner!.id}`,
+        email: `quota-owner-${owner!.id}@integration.test`,
+      });
+
+      const [sub] = await db
+        .insert(subscription)
+        .values({
+          organizationId: org!.id,
+          planTier: 'plus',
+          status: 'active',
+          payerPersonId: owner!.id,
+        })
+        .returning();
+
+      const cycleResetAt = new Date('2026-07-01T00:00:00.000Z');
+      const [pool] = await db
+        .insert(quotaPools)
+        .values({
+          subscriptionId: sub!.id,
+          monthlyLimit: 700,
+          cycleResetAt,
+        })
+        .returning();
+
+      const expiresAt = new Date('2027-01-01T00:00:00.000Z');
+      const [credit] = await db
+        .insert(topUpCredits)
+        .values({
+          subscriptionId: sub!.id,
+          amount: 50,
+          remaining: 50,
+          expiresAt,
+        })
+        .returning();
+
+      const result = await generateExportV2(db, org!.id);
+
+      // quotaPool round-trips through dataExportQuotaPoolRowSchema.parse():
+      expect(result.quotaPools).toHaveLength(1);
+      const poolRow = result.quotaPools![0] as Record<string, unknown>;
+      expect(poolRow['id']).toBe(pool!.id);
+      expect(poolRow['subscriptionId']).toBe(sub!.id);
+      expect(poolRow['monthlyLimit']).toBe(700);
+      expect(poolRow['usedThisMonth']).toBe(0);
+      expect(poolRow['cycleResetAt']).toBe(cycleResetAt.toISOString());
+
+      // topUpCredit round-trips through dataExportTopUpCreditRowSchema.parse():
+      expect(result.topUpCredits).toHaveLength(1);
+      const creditRow = result.topUpCredits![0] as Record<string, unknown>;
+      expect(creditRow['id']).toBe(credit!.id);
+      expect(creditRow['subscriptionId']).toBe(sub!.id);
+      expect(creditRow['amount']).toBe(50);
+      expect(creditRow['remaining']).toBe(50);
+      expect(creditRow['expiresAt']).toBe(expiresAt.toISOString());
+    });
+  },
+);

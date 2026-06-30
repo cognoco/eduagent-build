@@ -14,6 +14,7 @@ import {
   deriveLegacyDictationCompletionKey,
   recordDictationResult,
   getDictationStreak,
+  getDictationHistory,
 } from './result';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -438,6 +439,119 @@ describe('recordDictationResult (integration)', () => {
 
     // Cleanup the subject we just created (afterAll cleans accounts cascade).
     await db.delete(subjects).where(eq(subjects.id, ownSubject!.id));
+  });
+});
+
+describe('[WI-902] dictation full-text persistence + history (integration)', () => {
+  it('persists source sentences on record and returns them in history', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+    const sentences = [
+      'The quick brown fox jumps over the lazy dog.',
+      'She sells seashells by the seashore.',
+    ];
+
+    await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2000),
+      localDate: today,
+      sentenceCount: sentences.length,
+      mistakeCount: 1,
+      mode: 'homework',
+      reviewed: true,
+      sentences,
+    });
+
+    // Persisted on the row.
+    const [row] = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(row.sentences).toEqual(sentences);
+
+    // Returned by the history read.
+    const history = await getDictationHistory(db, profileId);
+    expect(history).toHaveLength(1);
+    expect(history[0]!.sentences).toEqual(sentences);
+    expect(history[0]!.sentenceCount).toBe(2);
+    expect(history[0]!.mistakeCount).toBe(1);
+    expect(history[0]!.date).toBe(today);
+  });
+
+  it('returns sentences=null for rows recorded without them (old-client path)', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2001),
+      localDate: today,
+      sentenceCount: 3,
+      mistakeCount: null,
+      mode: 'surprise',
+      reviewed: false,
+      // sentences intentionally omitted
+    });
+
+    const history = await getDictationHistory(db, profileId);
+    expect(history).toHaveLength(1);
+    expect(history[0]!.sentences).toBeNull();
+  });
+
+  it('returns recent sessions newest-first and bounds the result count', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    // Insert three sessions in a known order; createdAt advances per insert.
+    const first = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2010),
+      localDate: getDateDaysAgo(today, 2),
+      sentenceCount: 2,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+      sentences: ['first one'],
+    });
+    const second = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2011),
+      localDate: getDateDaysAgo(today, 1),
+      sentenceCount: 2,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+      sentences: ['second one'],
+    });
+    const third = await recordDictationResult(db, profileId, {
+      completionKey: completionKey(2012),
+      localDate: today,
+      sentenceCount: 2,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+      sentences: ['third one'],
+    });
+
+    const history = await getDictationHistory(db, profileId, 2);
+    expect(history).toHaveLength(2);
+    // Newest first: third, then second. first is dropped by the limit.
+    expect(history[0]!.id).toBe(third.id);
+    expect(history[1]!.id).toBe(second.id);
+    expect(history.map((h) => h.id)).not.toContain(first.id);
+  });
+
+  it('scopes history to the caller profile — never returns another profile rows', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    await recordDictationResult(db, victimProfileId, {
+      completionKey: completionKey(2020),
+      localDate: today,
+      sentenceCount: 2,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+      sentences: ['victim private sentence'],
+    });
+
+    const attackerHistory = await getDictationHistory(db, profileId);
+    expect(attackerHistory).toHaveLength(0);
   });
 });
 

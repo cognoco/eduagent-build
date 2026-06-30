@@ -46,6 +46,285 @@ function mockConsentRow(profileId: string) {
   };
 }
 
+// [WI-1097] The 19 GDPR learning/billing tables were tightened from a loose
+// z.record() to real z.object schemas, and the export service now runs each row
+// through `<schema>.parse(serializeDates(row))`. Real Drizzle rows carry every
+// column and uuid() ids, so the mock fixtures below must be COMPLETE valid rows
+// (uuid-shaped ids, all non-optional keys present) — reflecting what the DB
+// actually returns. A simple deterministic uuid generator keeps them readable.
+function fixtureUuid(n: number): string {
+  return `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+}
+
+type Row = Record<string, unknown>;
+
+function mockSubjectRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(1),
+    profileId: fixtureUuid(100),
+    name: 'Math',
+    rawInput: null,
+    status: 'active',
+    pedagogyMode: 'socratic',
+    languageCode: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    urgencyBoostUntil: null,
+    urgencyBoostReason: null,
+    bookSuggestionsLastGenerationAttemptedAt: null,
+    ...overrides,
+  };
+}
+
+function mockCurriculumRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(2),
+    subjectId: fixtureUuid(1),
+    version: 1,
+    generatedAt: NOW,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockCurriculumTopicRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(3),
+    curriculumId: fixtureUuid(2),
+    title: 'Algebra',
+    description: 'Intro to algebra',
+    sortOrder: 0,
+    relevance: 'core',
+    source: 'generated',
+    estimatedMinutes: 30,
+    bookId: fixtureUuid(30),
+    chapter: null,
+    skipped: false,
+    cefrLevel: null,
+    cefrSublevel: null,
+    targetWordCount: null,
+    targetChunkCount: null,
+    sourceChildProfileId: null,
+    filedFrom: 'pre_generated',
+    sessionId: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockLearningSessionRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(4),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    topicId: null,
+    sessionType: 'learning',
+    verificationType: null,
+    inputMode: 'text',
+    status: 'active',
+    escalationRung: 0,
+    exchangeCount: 0,
+    startedAt: NOW,
+    lastActivityAt: NOW,
+    endedAt: null,
+    durationSeconds: null,
+    wallClockSeconds: null,
+    metadata: null,
+    rawInput: null,
+    filedAt: null,
+    filingStatus: null,
+    filingRetryCount: 0,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockSessionEventRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(5),
+    sessionId: fixtureUuid(4),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    topicId: null,
+    eventType: 'user_message',
+    content: 'Hello',
+    metadata: null,
+    structuredAssessment: null,
+    drillCorrect: null,
+    drillTotal: null,
+    clientId: null,
+    orphanReason: null,
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockSessionSummaryRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(6),
+    sessionId: fixtureUuid(4),
+    profileId: fixtureUuid(100),
+    topicId: null,
+    content: null,
+    aiFeedback: null,
+    highlight: null,
+    narrative: null,
+    conversationPrompt: null,
+    engagementSignal: null,
+    closingLine: null,
+    learnerRecap: null,
+    nextTopicId: null,
+    nextTopicReason: null,
+    status: 'pending',
+    createdAt: NOW,
+    updatedAt: NOW,
+    llmSummary: null,
+    summaryGeneratedAt: null,
+    purgedAt: null,
+    ...overrides,
+  };
+}
+
+function mockRetentionCardRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(7),
+    profileId: fixtureUuid(100),
+    topicId: fixtureUuid(3),
+    easeFactor: 2.5,
+    intervalDays: 1,
+    repetitions: 0,
+    lastReviewedAt: null,
+    nextReviewAt: null,
+    masteredAt: null,
+    failureCount: 0,
+    consecutiveSuccesses: 0,
+    xpStatus: 'pending',
+    evaluateDifficultyRung: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockXpLedgerRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(8),
+    profileId: fixtureUuid(100),
+    topicId: fixtureUuid(3),
+    subjectId: fixtureUuid(1),
+    amount: 10,
+    status: 'pending',
+    earnedAt: NOW,
+    verifiedAt: null,
+    createdAt: NOW,
+    reflectionMultiplierApplied: false,
+    reflectionAppliedBySessionId: null,
+    ...overrides,
+  };
+}
+
+function mockStreakRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(9),
+    profileId: fixtureUuid(100),
+    currentStreak: 0,
+    longestStreak: 0,
+    lastActivityDate: null,
+    gracePeriodStartDate: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockNotificationPreferenceRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(10),
+    profileId: fixtureUuid(100),
+    reviewReminders: true,
+    dailyReminders: true,
+    weeklyProgressPush: true,
+    weeklyProgressEmail: true,
+    monthlyProgressEmail: true,
+    pushEnabled: true,
+    maxDailyPush: 3,
+    expoPushToken: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockLearningModeRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(11),
+    profileId: fixtureUuid(100),
+    medianResponseSeconds: null,
+    celebrationLevel: 'all',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockTeachingPreferenceRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(12),
+    profileId: fixtureUuid(100),
+    subjectId: fixtureUuid(1),
+    method: 'step_by_step',
+    analogyDomain: null,
+    nativeLanguage: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockParkingLotItemRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(13),
+    sessionId: fixtureUuid(4),
+    profileId: fixtureUuid(100),
+    topicId: null,
+    question: 'Why is the sky blue?',
+    explored: false,
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockSessionEmbeddingRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(14),
+    sessionId: fixtureUuid(4),
+    profileId: fixtureUuid(100),
+    topicId: null,
+    embedding: [0.1, 0.2, 0.3],
+    content: 'embedding content',
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
+function mockMentorActivityLedgerRow(overrides: Row = {}): Row {
+  return {
+    id: fixtureUuid(15),
+    profileId: fixtureUuid(100),
+    actorJob: 'mentor',
+    kind: 'session_recap',
+    templateKey: 'recap.v1',
+    params: {},
+    visibility: 'self',
+    createdAt: NOW,
+    surfacedAt: null,
+    ...overrides,
+  };
+}
+
 function createMockDb({
   account = mockAccountRow() as ReturnType<typeof mockAccountRow> | undefined,
   profiles = [] as ReturnType<typeof mockProfileRow>[],
@@ -233,13 +512,13 @@ describe('generateExport', () => {
 
   it('includes GDPR Article 15 tables when data is present', async () => {
     const profileRow = mockProfileRow('p1', 'Alice');
-    const subjectRow = { id: 'sub-1', profileId: 'p1', name: 'Math' };
-    const curriculumRow = { id: 'cur-1', subjectId: 'sub-1', version: 1 };
-    const topicRow = { id: 'top-1', curriculumId: 'cur-1', title: 'Algebra' };
-    const sessionRow = { id: 'ses-1', profileId: 'p1' };
-    const eventRow = { id: 'evt-1', profileId: 'p1' };
-    const summaryRow = { id: 'sum-1', profileId: 'p1' };
-    const cardRow = { id: 'card-1', profileId: 'p1' };
+    const subjectRow = mockSubjectRow();
+    const curriculumRow = mockCurriculumRow();
+    const topicRow = mockCurriculumTopicRow();
+    const sessionRow = mockLearningSessionRow();
+    const eventRow = mockSessionEventRow();
+    const summaryRow = mockSessionSummaryRow();
+    const cardRow = mockRetentionCardRow();
     // [WI-978] Assessment row must match the tightened dataExportAssessmentRowSchema.
     const now = new Date('2025-05-01T00:00:00.000Z').toISOString();
     const assessmentRow = {
@@ -257,12 +536,12 @@ describe('generateExport', () => {
       createdAt: now,
       updatedAt: now,
     };
-    const xpRow = { id: 'xp-1', profileId: 'p1' };
-    const streakRow = { id: 'str-1', profileId: 'p1' };
-    const notifRow = { id: 'notif-1', profileId: 'p1' };
-    const modeRow = { id: 'mode-1', profileId: 'p1' };
-    const teachRow = { id: 'teach-1', profileId: 'p1' };
-    const parkingRow = { id: 'park-1', profileId: 'p1' };
+    const xpRow = mockXpLedgerRow();
+    const streakRow = mockStreakRow();
+    const notifRow = mockNotificationPreferenceRow();
+    const modeRow = mockLearningModeRow();
+    const teachRow = mockTeachingPreferenceRow();
+    const parkingRow = mockParkingLotItemRow();
 
     const db = createMockDb({
       profiles: [profileRow],
@@ -310,20 +589,16 @@ describe('generateExport', () => {
       ui_hints: {},
     });
     const eventRows = [
-      {
-        id: 'evt-user',
-        profileId: 'p1',
-        sessionId: 'ses-1',
+      mockSessionEventRow({
+        id: fixtureUuid(50),
         eventType: 'user_message',
         content: 'What is gravity?',
-      },
-      {
-        id: 'evt-ai',
-        profileId: 'p1',
-        sessionId: 'ses-1',
+      }),
+      mockSessionEventRow({
+        id: fixtureUuid(51),
         eventType: 'ai_response',
         content: rawEnvelope,
-      },
+      }),
     ];
 
     const db = createMockDb({
@@ -359,15 +634,7 @@ describe('generateExport', () => {
       signals: { ready_to_finish: true },
       ui_hints: { fluency_drill: { active: false } },
     });
-    const embeddingRows = [
-      {
-        id: 'emb-1',
-        profileId: 'p1',
-        sessionId: 'ses-1',
-        content: rawEnvelope,
-        createdAt: NOW,
-      },
-    ];
+    const embeddingRows = [mockSessionEmbeddingRow({ content: rawEnvelope })];
 
     const db = createMockDb({
       profiles: [profileRow],
@@ -391,13 +658,9 @@ describe('generateExport', () => {
       ui_hints: { note_prompt: { show: false } },
     });
     const embeddingRows = [
-      {
-        id: 'emb-1',
-        profileId: 'p1',
-        sessionId: 'ses-1',
+      mockSessionEmbeddingRow({
         content: `What is photosynthesis?\n\n${rawEnvelope}\n\nWhy does chlorophyll matter?`,
-        createdAt: NOW,
-      },
+      }),
     ];
 
     const db = createMockDb({
@@ -425,13 +688,7 @@ describe('generateExport', () => {
       private_sources: { reason: 'internal source-pack detail' },
     });
     const embeddingRows = [
-      {
-        id: 'emb-1',
-        profileId: 'p1',
-        sessionId: 'ses-1',
-        content: `${learnerJson}\n\n${rawEnvelope}`,
-        createdAt: NOW,
-      },
+      mockSessionEmbeddingRow({ content: `${learnerJson}\n\n${rawEnvelope}` }),
     ];
 
     const db = createMockDb({
@@ -455,13 +712,9 @@ describe('generateExport', () => {
       extra: 'This makes the object arbitrary content, not an envelope.',
     });
     const embeddingRows = [
-      {
-        id: 'emb-1',
-        profileId: 'p1',
-        sessionId: 'ses-1',
+      mockSessionEmbeddingRow({
         content: `Please explain this JSON:\n\n${jsonExample}`,
-        createdAt: NOW,
-      },
+      }),
     ];
 
     const db = createMockDb({
@@ -509,16 +762,14 @@ describe('generateExport', () => {
       const profileRow = mockProfileRow('p1', 'Alice');
       const date = new Date('2025-03-10T08:30:00.000Z');
       // Simulate a Drizzle row that carries a raw Date object (neon-serverless).
-      const subjectRow = {
-        id: 'sub-1',
-        profileId: 'p1',
+      const subjectRow = mockSubjectRow({
         name: 'Biology',
         createdAt: date,
         updatedAt: date,
-      };
+      });
       const db = createMockDb({
         profiles: [profileRow],
-        subjects: [subjectRow as unknown as Record<string, unknown>],
+        subjects: [subjectRow],
       });
 
       const result = await generateExport(db, 'account-1');
@@ -534,16 +785,15 @@ describe('generateExport', () => {
     it('exports learningSessions rows with Date columns as ISO strings', async () => {
       const profileRow = mockProfileRow('p1', 'Alice');
       const date = new Date('2025-04-15T09:00:00.000Z');
-      const sessionRow = {
-        id: 'ses-1',
-        profileId: 'p1',
+      const sessionRow = mockLearningSessionRow({
         startedAt: date,
         endedAt: date,
         createdAt: date,
-      };
+        lastActivityAt: date,
+      });
       const db = createMockDb({
         profiles: [profileRow],
-        learningSessions: [sessionRow as unknown as Record<string, unknown>],
+        learningSessions: [sessionRow],
       });
 
       const result = await generateExport(db, 'account-1');
@@ -636,17 +886,13 @@ describe('generateExport', () => {
   // cascade was covered but portability was not.
   it('[WI-679] includes mentor_activity_ledger rows for the owning profile in the export', async () => {
     const profileRow = mockProfileRow('p1', 'Alice');
-    const ledgerRow = {
-      id: 'ledger-1',
-      profileId: 'p1',
-      actorJob: 'mentor',
-      kind: 'session_recap',
-      templateKey: 'recap.v1',
+    const ledgerId = fixtureUuid(200);
+    const ledgerProfileId = fixtureUuid(201);
+    const ledgerRow = mockMentorActivityLedgerRow({
+      id: ledgerId,
+      profileId: ledgerProfileId,
       params: { score: 42 },
-      visibility: 'self',
-      createdAt: NOW,
-      surfacedAt: null,
-    };
+    });
 
     const db = createMockDb({
       profiles: [profileRow],
@@ -659,8 +905,8 @@ describe('generateExport', () => {
     const exported = (
       result.mentorActivityLedger as Record<string, unknown>[]
     )[0]!;
-    expect(exported['id']).toBe('ledger-1');
-    expect(exported['profileId']).toBe('p1');
+    expect(exported['id']).toBe(ledgerId);
+    expect(exported['profileId']).toBe(ledgerProfileId);
     expect(exported['templateKey']).toBe('recap.v1');
     // Date serialisation: createdAt must be an ISO string, not a Date object
     expect(typeof exported['createdAt']).toBe('string');
@@ -678,17 +924,7 @@ describe('generateExport', () => {
     // service must NOT call findMany at all — the early-return guard is
     // the second half of the scoping proof.
     const profileRow = mockProfileRow('p1', 'Alice');
-    const ledgerRow = {
-      id: 'ledger-own',
-      profileId: 'p1',
-      actorJob: 'mentor',
-      kind: 'session_recap',
-      templateKey: 'recap.v1',
-      params: {},
-      visibility: 'self',
-      createdAt: NOW,
-      surfacedAt: null,
-    };
+    const ledgerRow = mockMentorActivityLedgerRow({ id: fixtureUuid(202) });
 
     const db = createMockDb({
       profiles: [profileRow],
@@ -748,15 +984,7 @@ describe('generateExport — [WI-809] learningOnlyProfileIds branch', () => {
       familyLinks: [
         { parentProfileId: 'g-1', childProfileId: 'person-1', createdAt: NOW },
       ],
-      subjects: [
-        {
-          id: 'subj-1',
-          profileId: 'person-1',
-          name: 'Math',
-          createdAt: NOW,
-          updatedAt: NOW,
-        },
-      ],
+      subjects: [mockSubjectRow()],
     });
 
     const result = await generateExport(db, 'org-1', {
