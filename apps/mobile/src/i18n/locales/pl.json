@@ -4123,6 +4123,8 @@
     "emptyMessage": "Utwórz przedmiot, aby zacząć budować swoją mapę nauki.",
     "createSubject": "Utwórz przedmiot",
     "openSubject": "Otwórz przedmiot",
+
+    "openSubjectNamed": "Otwórz {{subject}}",
     "subjectProgress": "{{mastered}} opanowane, {{learning}} w trakcie nauki, {{total}} tematów",
     "reviewsDue": "{{count}} zaległych powtórek",
     "errorTitle": "Nie udało się wczytać tematów",

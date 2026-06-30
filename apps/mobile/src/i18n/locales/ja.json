@@ -3963,6 +3963,8 @@
     "emptyMessage": "科目を作成して、学習マップの作成を始めましょう。",
     "createSubject": "科目を作成",
     "openSubject": "科目を開く",
+    "openSubjectNamed": "{{subject}}を開く",
+
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",

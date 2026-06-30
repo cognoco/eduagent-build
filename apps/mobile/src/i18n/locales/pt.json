@@ -3963,6 +3963,8 @@
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
+
+    "openSubjectNamed": "Abrir {{subject}}",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
     "errorTitle": "Não foi possível carregar as matérias",
