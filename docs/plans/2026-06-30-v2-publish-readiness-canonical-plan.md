@@ -5,7 +5,8 @@ profile: change
 workstream: WS-28
 work_items: [WI-1168, WI-1169, WI-1170, WI-1171, WI-1172, WI-1173, WI-1174, WI-1175]
 spec: docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md
-status: draft
+status: active
+cosmo_state: WS-28 items triaged and refined to Ready on 2026-06-30
 ---
 
 # V2 Publish Readiness — Canonical Priority Plan
