@@ -374,11 +374,39 @@ describe('analyzeProject — defaultValue misuse guard', () => {
     expect(result.defaultValueMisuse).toHaveLength(0);
   });
 
-  it('does NOT flag a t() call where defaultValue is a non-string (identifier)', () => {
+  it('flags a t() call where defaultValue is a non-string (identifier)', () => {
     const project = makeProject({
       'a.tsx': [
         'const { t } = useTranslation();',
         "t('some.key', { defaultValue: someVar });",
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(1);
+    expect(result.defaultValueMisuse[0].key).toBe('some.key');
+  });
+
+  it('flags dynamic enum-like defaultValue fallbacks on template keys', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+        't(`parentView.retention.${subject.retentionStatus}.label`, {',
+        '  defaultValue: subject.retentionStatus,',
+        '});',
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(1);
+    expect(result.defaultValueMisuse[0].key).toBe(
+      '`parentView.retention.${subject.retentionStatus}.label`',
+    );
+  });
+
+  it('allows defaultValue only with an explicit inline escape', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+        "t('some.key', { defaultValue: someVar }); // i18n-allow-default-value: third-party copy",
       ].join('\n'),
     });
     const result = analyzeProject(project);

@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
+import { ErrorFallback } from '../../../../components/common';
 import { RecentSessionsList } from '../../../../components/progress';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
@@ -32,7 +32,10 @@ import { platformAlert } from '../../../../lib/platform-alert';
 import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
-import type { Translate as I18nTranslate } from '../../../../i18n';
+import type {
+  Translate as I18nTranslate,
+  TranslateKey,
+} from '../../../../i18n';
 
 function formatLastSession(
   isoDate: string | null | undefined,
@@ -458,9 +461,9 @@ function SubjectCard({
         {showRetentionBadge ? (
           <View className="rounded-full bg-primary-soft px-3 py-1">
             <Text className="text-caption font-semibold text-primary">
-              {t(`parentView.retention.${subject.retentionStatus}.label`, {
-                defaultValue: subject.retentionStatus,
-              })}
+              {t(
+                `parentView.retention.${subject.retentionStatus}.label` as TranslateKey
+              )}
             </Text>
           </View>
         ) : null}
@@ -915,18 +918,16 @@ export default function ChildDetailScreen(): React.ReactElement {
 
   if (isChildIdentityLoading) {
     return (
-      <TimeoutLoader
-        isLoading
-        primaryAction={{
-          label: t('common.tryAgain'),
-          onPress: () => void refetch(),
-        }}
-        secondaryAction={{
-          label: t('parentView.index.backToDashboard'),
-          onPress: () => router.replace(FAMILY_HOME_PATH as Href),
-        }}
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="child-profile-loading"
-      />
+      >
+        <ActivityIndicator
+          size="large"
+          accessibilityLabel={t('common.loading')}
+        />
+      </View>
     );
   }
 
