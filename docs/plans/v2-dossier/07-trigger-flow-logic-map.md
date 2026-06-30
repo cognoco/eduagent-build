@@ -52,11 +52,11 @@ flowchart LR
 
   Hub --> M2[Mentor: support hub list]
   Hub --> S2[Subjects: supported people list]
-  Hub --> J2[Journal: shared-record placeholders]
+  Hub --> J2[Journal: API-backed shared records]
 
   Person --> M3[Mentor: person support view]
   Person --> S3[Subjects: structural mask]
-  Person --> J3[Journal: person shared-record placeholder]
+  Person --> J3[Journal: person API-backed shared record]
 ```
 
 **Code anchors:** `scope-resolution.ts:71-83`, `ScopeChip.tsx:40`, `mentor.tsx:370-381`, `subjects.tsx:23-33`, `journal/index.tsx:15-27`.
@@ -139,8 +139,8 @@ flowchart TD
   Sections -- Reports --> Reports[Weekly/monthly reports]
 
   Scope -- supporter-hub --> HubRecord[Per-person shared-record cards]
-  Scope -- person --> PersonRecord[Person shared-record placeholder]
-  HubRecord -. missing .-> RealShared[Fetch real shared-record API]
+  Scope -- person --> PersonRecord[Person shared-record]
+  HubRecord --> RealShared[Fetch real shared-record API]
   PersonRecord -. missing .-> RealShared
 ```
 
@@ -153,7 +153,7 @@ flowchart TD
 | App opens after auth/profile/consent | V2 shell, intended Mentor tab | Layout gates clear, V2 flag on. | First actionable object should be Mentor, not another setup surface. | `CODE` shell; `PLAN` exact post-auth Mentor landing copy: spec lines `131-135`. |
 | Tap Mentor tab | Mentor tab body for active scope | `activeScope.kind` chooses self/supporter/person view. | One tab, multiple lenses. | `CODE`: `mentor.tsx:370-381`. |
 | Tap Subjects tab | Subjects body for active scope | `activeScope.kind` chooses own browse, supporter people list, or structural mask. | Same IA for learner and supporter, with server mask. | `CODE/PARTIAL`: `subjects.tsx:23-65`. |
-| Tap Journal tab | Journal body for active scope | `activeScope.kind` chooses private Journal or shared-record placeholder. | Private record for self; transparent shared record for supporter edges. | `CODE/PARTIAL`: `journal/index.tsx:15-27`. |
+| Tap Journal tab | Journal body for active scope | `activeScope.kind` chooses private Journal or API-backed shared record. | Private record for self; transparent shared record for supporter edges. | `CODE`: `journal/index.tsx`, `SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx`, `use-shared-record.ts`. |
 | Tap scope chip option | Same tab, different scope body | `setActiveScope()` accepts only known scopes and persists key. | Avoid shell switching and proxy impersonation. | `CODE`: `ScopeChip.tsx:40-70`, `scope-context.tsx:84-118`. |
 | `/now` returns unfinished session | Mentor card -> session resume | Card deep link route `session.resume`. | Continue where left off outranks browsing. | `CODE`: `mentor.tsx:48-55`, `now-deep-link.ts:24-27`. |
 | `/now` returns subject/topic/review/challenge | Mentor card -> Subject Hub/topic/review/challenge | `pushNowDeepLink()` follows optional chain first. | Feed proposes, persistent screen handles. | `CODE`: `now-deep-link.ts:28-45`, `mentor.tsx:125-132`. |
@@ -167,7 +167,7 @@ flowchart TD
 | Subject row pressed | Subject Hub | `SubjectsBrowse` calls `onOpenSubject(subjectId)`. | Browse leads to the persistent subject workspace. | `CODE`: `SubjectsBrowse.tsx:146`, `subjects.tsx:59-64`. |
 | Subject Hub Next-up pressed | Resume, review, or topic. | `nextUp.kind` controls route. | One next action per subject. | `CODE`: `subject-hub/[subjectId]/index.tsx:162-178`, `use-subject-hub.ts:228-276`. |
 | Person scope Subjects opened | Structural masked subject list. | Fetch `GET /scopes/:personId/subjects`. | Supporter sees only shareable structure. | `CODE/PARTIAL`: `PersonScopeStructuralSubjects.tsx:26-33`, `scopes.ts:25-35`. |
-| Supporter Journal opened | Empty shared-record projections. | Current mobile constructs local empty `SharedRecord`. | Placeholder for S5 visibility contract. | `PARTIAL`: `SupportHubJournalTab.tsx:15-31`, `PersonScopeJournalPlaceholder.tsx:13-34`; real API route at `visibility.ts:175-188`. |
+| Supporter Journal opened | API-backed shared-record projections. | Mobile fetches `GET /visibility/reports/:personId/shared-record`; API projects weekly report, recap-presence, and milestone facts through `projectSharedRecord`. | Visibility contract record with reportable facts only. | `CODE`: `SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx`, `use-shared-record.ts`, `visibility.ts`, `shared-record-read-model.ts`. |
 | Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
 
 ## Current Gaps To Review Before Calling V2 Complete
@@ -175,8 +175,7 @@ flowchart TD
 | Gap | User-visible risk | Owner phase |
 |---|---|---|
 | Support hub is still mostly list/placeholder UI. | Parent/supporter cannot yet answer the full "what should I do now?" job from V2 alone. | S4 |
-| Shared-record Journal uses local empty records. | Supporters see the shape of trust UI, not real report/recap facts. | S5 |
+| Shared-record Journal data depends on available report/recap/milestone rows. | Supporters see honest empty state until reportable facts exist; private notes/chat text stay outside the record. | S5 |
 | Person-scope Subjects has no masked Subject Hub drill-in. | Supporters can see a structural list but cannot inspect masked learning structure deeply. | S4/S5 |
 | Visibility ceremony screens are missing. | Link/accept/revoke/trust-contract flows are API-backed but not mobile-complete. | S5 |
 | S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
-
