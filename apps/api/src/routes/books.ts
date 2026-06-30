@@ -37,7 +37,6 @@ import {
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
 import { buildFallbackBookTopics } from '../services/book-generation-fallbacks';
-import { getProfileAge } from '../services/profile';
 import { getPersonAge } from '../services/identity-v2/helpers';
 import { isIdentityV2Enabled } from '../config';
 import { inngest } from '../inngest/client';
@@ -267,11 +266,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             (topic) => !topic.skipped,
           ).length;
           if (expandExisting && activeTopicCount < MIN_GENERATED_BOOK_TOPICS) {
-            // [WI-586 flip-safety] v2 reads learner age from `person`; flag-off
-            // legacy reads `profiles` (dropped post-#8). Route-context flag.
-            const learnerAge = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-              ? await getPersonAge(db, profileId)
-              : await getProfileAge(db, profileId);
+            const learnerAge = await getPersonAge(db, profileId);
             const expanded = await expandExistingBookTopics(
               db,
               profileId,
@@ -288,11 +283,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
         let persisted: BookWithTopics;
         try {
-          // [WI-586 flip-safety] v2 reads learner age from `person`; flag-off
-          // legacy reads `profiles` (dropped post-#8). Route-context flag.
-          const learnerAge = isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)
-            ? await getPersonAge(db, profileId)
-            : await getProfileAge(db, profileId);
+          const learnerAge = await getPersonAge(db, profileId);
 
           const generated: BookTopicGenerationResult =
             await generateBookTopicsWithFallback(

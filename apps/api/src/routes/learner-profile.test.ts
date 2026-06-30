@@ -36,23 +36,38 @@ jest.mock('../inngest/client', () => {
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
-const mockFindFamilyLink = jest.fn().mockResolvedValue({
-  parentProfileId: '770e8400-e29b-41d4-a716-446655440000',
-  childProfileId: '770e8400-e29b-41d4-a716-446655440001',
+// [WI-867] Post-collapse: assertOwnerAndParentAccess → assertParentAccess →
+// validateGuardianChargeRelationshipV2 → isGuardianOf reads db.query.guardianship.findFirst
+// (SEEDABLE). Proxy exposes it on the mock DB so IDOR tests can control the edge.
+const mockFindGuardianship = jest.fn().mockResolvedValue({
+  id: 'guardianship-1',
+  guardianPersonId: '770e8400-e29b-41d4-a716-446655440000',
+  chargePersonId: '770e8400-e29b-41d4-a716-446655440001',
+  revokedAt: null,
 });
-const familyLinksQuery = {
-  findFirst: (...args: unknown[]) => mockFindFamilyLink(...args),
+const guardianshipQuery = {
+  findFirst: (...args: unknown[]) => mockFindGuardianship(...args),
   findMany: jest.fn().mockResolvedValue([]),
 };
 
 mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   get(target, prop, receiver) {
-    if (prop === 'familyLinks') return familyLinksQuery;
+    if (prop === 'guardianship') return guardianshipQuery;
     return Reflect.get(target, prop, receiver);
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit-level route test — no DB available; createDatabaseModuleMock provides controlled familyLinks stub for IDOR assertions
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit-level route test — no DB available; createDatabaseModuleMock provides controlled guardianship stub for IDOR assertions
+
+// [WI-867] billing-v2 seam — account middleware calls ensureInitialTrialSubscriptionV2
+// unconditionally post-collapse. Continuity mock resolves cleanly.
+jest.mock(
+  '../services/billing/billing-v2' /* gc1-allow: continuity — ensureInitialTrialSubscriptionV2 uses db.execute()/db.transaction() paths the unit mock DB cannot satisfy; real path covered by apps/api/src/services/billing/billing-v2/subscription-core-v2.integration.test.ts */,
+  () => ({
+    ...jest.requireActual('../services/billing/billing-v2'),
+    ensureInitialTrialSubscriptionV2: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 jest.mock('../services/account', () => {
   const actual = jest.requireActual(
@@ -119,26 +134,29 @@ jest.mock(
   }),
 );
 
-// [WI-774] v2 profile-scope resolver — resolves the X-Profile-Id header to the
-// parent profile under flag-on so profile-scope middleware does not hit the
-// unmocked DB. getPersonScope echoes the requested id (mirrors getProfile above).
+// [WI-867] profile-v2 seam — profile-scope middleware calls findOwnerPersonScope /
+// getPersonScope (db.select() join chains, unrunnable on unit mock DB).
+// Module-level refs allow per-test override (e.g. minor non-owner suites).
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest
+  .fn()
+  .mockImplementation(async (_db: unknown, profileId: string) => ({
+    profileId,
+    meta: {
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+      conversationLanguage: 'en',
+      isOwner: true,
+    },
+  }));
 jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
   () => ({
-    findOwnerPersonScope: jest.fn().mockResolvedValue(null),
-    getPersonScope: jest
-      .fn()
-      .mockImplementation(async (_db: unknown, profileId: string) => ({
-        profileId,
-        meta: {
-          birthYear: null,
-          location: null,
-          consentStatus: 'CONSENTED',
-          hasPremiumLlm: false,
-          conversationLanguage: 'en',
-          isOwner: true,
-        },
-      })),
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
   }),
 );
 
@@ -247,9 +265,12 @@ describe('learner-profile routes', () => {
   beforeEach(() => {
     clearJWKSCache();
     jest.clearAllMocks();
-    mockFindFamilyLink.mockResolvedValue({
-      parentProfileId: PARENT_PROFILE_ID,
-      childProfileId: OWN_CHILD_PROFILE_ID,
+    // [WI-867] Post-collapse: guardianship table uses guardianPersonId/chargePersonId.
+    mockFindGuardianship.mockResolvedValue({
+      id: 'guardianship-1',
+      guardianPersonId: PARENT_PROFILE_ID,
+      chargePersonId: OWN_CHILD_PROFILE_ID,
+      revokedAt: null,
     });
     mockGetOrCreateLearningProfile.mockResolvedValue(MINIMAL_PROFILE);
     mockDeleteAllMemory.mockResolvedValue(undefined);
@@ -268,7 +289,7 @@ describe('learner-profile routes', () => {
 
   describe('IDOR protection on /learner-profile/:profileId/* routes', () => {
     beforeEach(() => {
-      mockFindFamilyLink.mockResolvedValue(undefined);
+      mockFindGuardianship.mockResolvedValue(undefined);
     });
 
     it('returns 403 on GET /learner-profile/:profileId for another family', async () => {
@@ -280,14 +301,14 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
-      expect(mockFindFamilyLink).toHaveBeenCalledTimes(1);
+      expect(mockFindGuardianship).toHaveBeenCalledTimes(1);
 
       // Pin the actual UUIDs the route asked the family-link table about. A
       // future refactor that drops or swaps the parent/child equality clauses
       // would still 403 (because the mock returns undefined) but would silently
       // break the IDOR contract — this assertion catches that.
       const params = extractDrizzleParamValues(
-        mockFindFamilyLink.mock.calls[0]?.[0],
+        mockFindGuardianship.mock.calls[0]?.[0],
       );
       expect(params).toContain(PARENT_PROFILE_ID);
       expect(params).toContain(OTHER_FAMILY_CHILD_ID);
@@ -341,7 +362,7 @@ describe('learner-profile routes', () => {
 
   describe('parent with valid family link', () => {
     beforeEach(() => {
-      mockFindFamilyLink.mockResolvedValue({
+      mockFindGuardianship.mockResolvedValue({
         parentProfileId: PARENT_PROFILE_ID,
         childProfileId: OWN_CHILD_PROFILE_ID,
       });
@@ -412,14 +433,16 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
+      // [WI-867] Post-collapse: resolveIdentityV2 always runs → callerPersonId always set.
+      // RED-FLIP: remove callerPersonId and this assertion fails → proves the write guard is wired.
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
       // Family-link check is not required for self-scoped routes.
-      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
 
     it('[WI-774] flag-on arms the v2 write guard on DELETE /learner-profile/all', async () => {
@@ -454,14 +477,15 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
+      // [WI-867] Post-collapse: callerPersonId always set.
       expect(mockGrantMemoryConsent).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
-      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
 
     it('calls deleteMemoryItem with suppress flag on DELETE /learner-profile/item', async () => {
@@ -480,6 +504,7 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
+      // [WI-867] Post-collapse: callerPersonId always set.
       expect(mockDeleteMemoryItem).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
@@ -488,7 +513,7 @@ describe('learner-profile routes', () => {
         'dinosaurs',
         true,
         undefined,
-        { identityV2Enabled: false },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -521,14 +546,15 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
+      // [WI-867] Post-collapse: callerPersonId always set.
       expect(mockUpdateAccommodationMode).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
         'short-burst',
-        { identityV2Enabled: false },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
-      expect(mockFindFamilyLink).not.toHaveBeenCalled();
+      expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
 
     it('returns 400 when accommodationMode is not a valid enum value', async () => {
@@ -553,7 +579,7 @@ describe('learner-profile routes', () => {
 
   describe('PATCH /learner-profile/:profileId/accommodation-mode (parent)', () => {
     it('returns 200 and calls updateAccommodationMode for linked child', async () => {
-      mockFindFamilyLink.mockResolvedValue({
+      mockFindGuardianship.mockResolvedValue({
         parentProfileId: PARENT_PROFILE_ID,
         childProfileId: OWN_CHILD_PROFILE_ID,
       });
@@ -578,7 +604,7 @@ describe('learner-profile routes', () => {
     });
 
     it('returns 403 for non-linked child', async () => {
-      mockFindFamilyLink.mockResolvedValue(undefined);
+      mockFindGuardianship.mockResolvedValue(undefined);
 
       const res = await app.request(
         `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/accommodation-mode`,
@@ -611,19 +637,37 @@ describe('learner-profile routes', () => {
     });
 
     beforeEach(() => {
-      // getProfile resolves to a non-owner minor profile (birthYear 2012 -> age ~14).
-      const profileServiceMock = jest.requireMock(
-        '../services/profile',
-      ) as Record<string, jest.Mock>;
-      profileServiceMock['getProfile']!.mockImplementation(
+      // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (profile-v2).
+      // Override to return a non-owner minor profile (birthYear 2012 → age ~14).
+      // RED-FLIP: remove this override and all BREAK tests flip 403 → 200.
+      mockGetPersonScope.mockImplementation(
         async (_db: unknown, profileId: string) => ({
-          id: profileId,
-          birthYear: 2012,
-          location: null,
-          consentStatus: 'CONSENTED',
-          isOwner: false,
-          hasPremiumLlm: false,
-          conversationLanguage: 'en',
+          profileId,
+          meta: {
+            birthYear: 2012,
+            location: null,
+            consentStatus: 'CONSENTED',
+            hasPremiumLlm: false,
+            conversationLanguage: 'en',
+            isOwner: false,
+          },
+        }),
+      );
+    });
+
+    afterEach(() => {
+      // Restore owner scope so subsequent tests start from the right default.
+      mockGetPersonScope.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          profileId,
+          meta: {
+            birthYear: null,
+            location: null,
+            consentStatus: 'CONSENTED',
+            hasPremiumLlm: false,
+            conversationLanguage: 'en',
+            isOwner: true,
+          },
         }),
       );
     });
@@ -745,7 +789,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false, callerPersonId: undefined },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -766,7 +810,7 @@ describe('learner-profile routes', () => {
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false, callerPersonId: undefined },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
     });
   });
@@ -808,6 +852,34 @@ describe('learner-profile routes', () => {
           conversationLanguage: 'en',
         }),
       );
+      // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (v2).
+      // Override to minor non-owner so assertCanManageOwnConsent blocks the mutation.
+      mockGetPersonScope.mockImplementation(async (_db, profileId) => ({
+        profileId,
+        meta: {
+          birthYear: 2012,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: false,
+        },
+      }));
+    });
+
+    afterEach(() => {
+      // Restore default getPersonScope so sibling describe blocks are unaffected.
+      mockGetPersonScope.mockImplementation(async (_db, profileId) => ({
+        profileId,
+        meta: {
+          birthYear: null,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
+      }));
     });
 
     it('[BREAK] DELETE /learner-profile/all returns 403 for minor non-owner profile', async () => {
@@ -927,7 +999,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false, callerPersonId: undefined },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -948,7 +1020,7 @@ describe('learner-profile routes', () => {
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false, callerPersonId: undefined },
+        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
       );
     });
   });
@@ -960,27 +1032,46 @@ describe('learner-profile routes', () => {
     });
 
     beforeEach(() => {
-      // Override getProfile so X-Profile-Id resolves to a non-owner profile.
-      const profileServiceMock = jest.requireMock(
-        '../services/profile',
-      ) as Record<string, jest.Mock>;
-
-      profileServiceMock['getProfile']!.mockImplementation(
+      // [WI-867] Post-collapse: profile-scope middleware calls getPersonScope (profile-v2).
+      // Override to non-owner so isOwner gate fires 403 before IDOR check.
+      // RED-FLIP: remove this override and the non-owner tests flip 403 → 200.
+      mockGetPersonScope.mockImplementation(
         async (_db: unknown, profileId: string) => ({
-          id: profileId,
-          birthYear: 2012,
-          location: null,
-          consentStatus: 'CONSENTED',
-          isOwner: false,
-          hasPremiumLlm: false,
-          conversationLanguage: 'en',
+          profileId,
+          meta: {
+            birthYear: 2012,
+            location: null,
+            consentStatus: 'CONSENTED',
+            hasPremiumLlm: false,
+            conversationLanguage: 'en',
+            isOwner: false,
+          },
         }),
       );
       // Family link exists — IDOR check would pass, but isOwner gate must fire first.
-      mockFindFamilyLink.mockResolvedValue({
-        parentProfileId: NON_OWNER_PROFILE_ID,
-        childProfileId: OWN_CHILD_PROFILE_ID,
+      mockFindGuardianship.mockResolvedValue({
+        id: 'guardianship-1',
+        guardianPersonId: NON_OWNER_PROFILE_ID,
+        chargePersonId: OWN_CHILD_PROFILE_ID,
+        revokedAt: null,
       });
+    });
+
+    afterEach(() => {
+      // Restore owner scope so subsequent tests start from the right default.
+      mockGetPersonScope.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          profileId,
+          meta: {
+            birthYear: null,
+            location: null,
+            consentStatus: 'CONSENTED',
+            hasPremiumLlm: false,
+            conversationLanguage: 'en',
+            isOwner: true,
+          },
+        }),
+      );
     });
 
     it('[BREAK] GET /learner-profile/:profileId returns 403 for non-owner profile', async () => {
@@ -1059,9 +1150,26 @@ describe('learner-profile routes', () => {
       });
       // A valid parent->child family link exists; the rejection must come from
       // the explicit-header requirement, NOT a missing link.
-      mockFindFamilyLink.mockResolvedValue({
-        parentProfileId: PARENT_PROFILE_ID,
-        childProfileId: OWN_CHILD_PROFILE_ID,
+      mockFindGuardianship.mockResolvedValue({
+        id: 'guardianship-1',
+        guardianPersonId: PARENT_PROFILE_ID,
+        chargePersonId: OWN_CHILD_PROFILE_ID,
+        revokedAt: null,
+      });
+      // [WI-867] v2: with no X-Profile-Id, profileScopeMiddleware auto-resolves
+      // the account owner via findOwnerPersonScope. Seed it so the request
+      // reaches assertOwnerAndParentAccess — which then rejects (403) precisely
+      // because resolvedVia is 'auto', not 'explicit-header' (the attack guard).
+      mockFindOwnerPersonScope.mockResolvedValue({
+        profileId: PARENT_PROFILE_ID,
+        meta: {
+          birthYear: 1985,
+          location: null,
+          consentStatus: 'CONSENTED',
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+          isOwner: true,
+        },
       });
     });
 

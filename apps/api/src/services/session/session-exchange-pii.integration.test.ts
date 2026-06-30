@@ -18,6 +18,9 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
+  membership,
+  organization,
+  person,
   profiles,
   subjects,
   type Database,
@@ -55,6 +58,22 @@ async function seedLearner(
       isOwner: input.isOwner,
     })
     .returning({ id: profiles.id });
+
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `PII Test Org ${idx}` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: input.displayName,
+    birthDate: `${input.birthYear}-06-15`,
+    residenceJurisdiction: 'US',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
+  });
 
   const [subject] = await db
     .insert(subjects)

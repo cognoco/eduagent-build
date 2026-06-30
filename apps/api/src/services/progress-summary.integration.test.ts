@@ -30,7 +30,11 @@ import {
   accounts,
   createDatabase,
   familyLinks,
+  guardianship,
   learningSessions,
+  membership,
+  organization,
+  person,
   profiles,
   progressSummaries,
   subjects,
@@ -131,6 +135,22 @@ async function seedAccountWithProfileAndSubject(
     })
     .returning();
 
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `${PREFIX} Org` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: 'Test Learner',
+    birthDate: '2010-06-15',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: (opts.isOwner ?? true) ? ['admin', 'learner'] : ['learner'],
+  });
+
   return {
     accountId: account!.id,
     profileId: profile!.id,
@@ -138,7 +158,9 @@ async function seedAccountWithProfileAndSubject(
   };
 }
 
-async function seedParentAccount(emailSuffix = '-parent'): Promise<string> {
+async function seedParentAccount(
+  emailSuffix = '-parent',
+): Promise<{ profileId: string; accountId: string }> {
   const db = createIntegrationDb();
   const email = `${PREFIX}${emailSuffix}@integration.test`;
   const clerkUserId = `${PREFIX}${emailSuffix}-user`;
@@ -155,7 +177,24 @@ async function seedParentAccount(emailSuffix = '-parent'): Promise<string> {
       isOwner: true,
     })
     .returning();
-  return profile!.id;
+
+  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `${PREFIX} Parent Org` });
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: 'Test Parent',
+    birthDate: '1985-06-15',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['admin', 'learner'],
+  });
+
+  return { profileId: profile!.id, accountId: account!.id };
 }
 
 async function seedFamilyLink(
@@ -164,6 +203,11 @@ async function seedFamilyLink(
 ): Promise<void> {
   const db = createIntegrationDb();
   await db.insert(familyLinks).values({ parentProfileId, childProfileId });
+  // [WI-867] guardianship mirrors familyLinks for v2 assertParentAccess.
+  await db.insert(guardianship).values({
+    guardianPersonId: parentProfileId,
+    chargePersonId: childProfileId,
+  });
 }
 
 async function seedSession(input: {
@@ -205,7 +249,7 @@ afterAll(async () => {
 describe('getProgressSummary (integration)', () => {
   it('returns no_recent_activity when the profile has no completed sessions', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const parentProfileId = await seedParentAccount();
+    const { profileId: parentProfileId } = await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
@@ -225,7 +269,7 @@ describe('getProgressSummary (integration)', () => {
 
   it('returns fresh when the stored summary basis matches the latest completed session', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const parentProfileId = await seedParentAccount();
+    const { profileId: parentProfileId } = await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const now = new Date();
@@ -258,7 +302,7 @@ describe('getProgressSummary (integration)', () => {
 
   it('returns stale when a newer completed session lands after the stored summary basis', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const parentProfileId = await seedParentAccount();
+    const { profileId: parentProfileId } = await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
     const earlier = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
@@ -296,7 +340,7 @@ describe('getProgressSummary (integration)', () => {
 
   it('[REGRESSION bug 194] ignores sessions in non-completed statuses when computing freshness', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const parentProfileId = await seedParentAccount();
+    const { profileId: parentProfileId } = await seedParentAccount();
     await seedFamilyLink(parentProfileId, child.profileId);
     const db = createIntegrationDb();
 
@@ -346,7 +390,8 @@ describe('getProgressSummary (integration)', () => {
   // bypassing the route-level assertOwnerAndParentAccess.
   it('[BUG-400 break test] throws ForbiddenError when requester has no family link to child', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const unrelatedParentId = await seedParentAccount('-unrelated');
+    const { profileId: unrelatedParentId } =
+      await seedParentAccount('-unrelated');
     // Deliberately NO seedFamilyLink -- unrelated parent has no link to child.
     const db = createIntegrationDb();
 

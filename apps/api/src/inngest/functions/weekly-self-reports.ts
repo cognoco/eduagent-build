@@ -1,18 +1,9 @@
 // @inngest-admin: cross-profile
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import {
-  familyLinks,
-  person,
-  profiles,
-  weeklyReports,
-} from '@eduagent/database';
+import { person, weeklyReports } from '@eduagent/database';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
-import {
-  listEligibleSelfReportProfileIds,
-  listEligibleSelfReportProfileIdsAtLocalHour9,
-} from '../../services/solo-progress-reports';
+import { getStepDatabase } from '../helpers';
 import {
   listEligibleSelfReportPersonIdsV2,
   listEligibleSelfReportPersonIdsAtLocalHour9V2,
@@ -27,7 +18,6 @@ import {
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
 import { isoDate, subtractDays } from '../../services/progress-helpers';
-import { isGdprProcessingAllowed } from '../../services/consent';
 
 const weeklySelfReportEventSchema = z.object({
   profileId: z.string().uuid(),
@@ -143,9 +133,7 @@ export const weeklySelfReportCron = inngest.createFunction(
     const profileIds = await step.run('find-weekly-self-profiles', async () => {
       const db = getStepDatabase();
       const win = { start: trailingWeekStart, endExclusive: currentWeekStart };
-      return isIdentityV2EnabledInStep()
-        ? listEligibleSelfReportPersonIdsAtLocalHour9V2(db, win, nowUtc)
-        : listEligibleSelfReportProfileIdsAtLocalHour9(db, win, nowUtc);
+      return listEligibleSelfReportPersonIdsAtLocalHour9V2(db, win, nowUtc);
     });
 
     if (profileIds.length === 0) {
@@ -197,15 +185,15 @@ export const weeklySelfReportGenerate = inngest.createFunction(
     try {
       const result = await step.run('generate-weekly-self-report', async () => {
         const db = getStepDatabase();
-        const v2 = isIdentityV2EnabledInStep();
         const win = {
           start: activityWindowStart,
           endExclusive: reportWeekStartDate,
         };
 
-        const eligibleProfileIds = v2
-          ? await listEligibleSelfReportPersonIdsV2(db, win)
-          : await listEligibleSelfReportProfileIds(db, win);
+        const eligibleProfileIds = await listEligibleSelfReportPersonIdsV2(
+          db,
+          win,
+        );
         if (!eligibleProfileIds.includes(profileId)) {
           return {
             status: 'skipped' as const,
@@ -214,9 +202,7 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        const gdprOk = v2
-          ? await isGdprProcessingAllowedV2(db, profileId)
-          : await isGdprProcessingAllowed(db, profileId);
+        const gdprOk = await isGdprProcessingAllowedV2(db, profileId);
         if (!gdprOk) {
           return {
             status: 'skipped' as const,
@@ -225,14 +211,9 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        // Linked-child exclusion: v2 = is the charge of an active guardianship
-        // edge; legacy = appears as a family_links child.
-        const isLinkedChild = v2
-          ? (await getGuardianPersonIds(db, profileId)).length > 0
-          : (await db.query.familyLinks.findFirst({
-              where: eq(familyLinks.childProfileId, profileId),
-              columns: { childProfileId: true },
-            })) != null;
+        // Linked-child exclusion: is the charge of an active guardianship edge (v2 always-on).
+        const isLinkedChild =
+          (await getGuardianPersonIds(db, profileId)).length > 0;
         if (isLinkedChild) {
           return {
             status: 'skipped' as const,
@@ -241,18 +222,10 @@ export const weeklySelfReportGenerate = inngest.createFunction(
           };
         }
 
-        const profile = v2
-          ? await db.query.person.findFirst({
-              where: and(eq(person.id, profileId), isNull(person.archivedAt)),
-              columns: { displayName: true },
-            })
-          : await db.query.profiles.findFirst({
-              where: and(
-                eq(profiles.id, profileId),
-                isNull(profiles.archivedAt),
-              ),
-              columns: { displayName: true },
-            });
+        const profile = await db.query.person.findFirst({
+          where: and(eq(person.id, profileId), isNull(person.archivedAt)),
+          columns: { displayName: true },
+        });
         if (!profile) {
           return {
             status: 'skipped' as const,
@@ -390,9 +363,7 @@ export const selfProgressReportsBackfill = inngest.createFunction(
           start: lastMonthStart,
           endExclusive: lastMonthEndExclusive,
         };
-        return isIdentityV2EnabledInStep()
-          ? listEligibleSelfReportPersonIdsV2(db, win)
-          : listEligibleSelfReportProfileIds(db, win);
+        return listEligibleSelfReportPersonIdsV2(db, win);
       },
     );
 
@@ -412,9 +383,10 @@ export const selfProgressReportsBackfill = inngest.createFunction(
             start: subtractDays(reportWeekStartDate, 7),
             endExclusive: reportWeekStartDate,
           };
-          const eligibleProfileIds = isIdentityV2EnabledInStep()
-            ? await listEligibleSelfReportPersonIdsV2(db, backfillWin)
-            : await listEligibleSelfReportProfileIds(db, backfillWin);
+          const eligibleProfileIds = await listEligibleSelfReportPersonIdsV2(
+            db,
+            backfillWin,
+          );
 
           targets.push(
             ...eligibleProfileIds.map((profileId) => ({

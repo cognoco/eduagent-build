@@ -33,77 +33,89 @@ import type { Database } from '@eduagent/database';
 import { consentWebRoutes } from './consent-web';
 
 // ─── DB stub (external boundary) ───────────────────────────────────────────
-// Drives the real getChildNameByToken / processConsentResponse code paths.
-// A "row" present + unresponded + unexpired ⇒ child name disclosed.
+// [WI-867] Post-collapse: drives the real getChildNameByTokenV2 /
+// processConsentResponseV2 code paths. Field names match the v2 schema:
+// consentRequest table (token, tokenExpiresAt, respondedAt, status:'pending'|'approved'|'denied')
+// + person table (displayName).
 
 interface StubConsentRow {
   id: string;
-  profileId: string;
-  consentType: 'GDPR' | 'COPPA';
-  status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN';
-  parentEmail: string | null;
-  consentToken: string;
-  requestedAt: Date;
+  chargePersonId: string;
+  organizationId: string;
+  purpose: string;
+  requestedBasis: string;
+  policyVersion: string;
+  token: string;
+  status: 'pending' | 'approved' | 'denied';
   respondedAt: Date | null;
-  expiresAt: Date | null;
+  tokenExpiresAt: Date | null;
 }
 
 function makeRow(overrides: Partial<StubConsentRow> = {}): StubConsentRow {
   return {
     id: 'consent-1',
-    profileId: 'profile-child-1',
-    consentType: 'GDPR',
-    status: 'PARENTAL_CONSENT_REQUESTED',
-    parentEmail: 'parent@example.com',
-    consentToken: 'valid-token',
-    requestedAt: new Date(Date.now() - 60_000),
+    chargePersonId: 'person-child-1',
+    organizationId: 'org-1',
+    purpose: 'GDPR_CHILD',
+    requestedBasis: 'parental_consent',
+    policyVersion: 'v1-test',
+    token: 'valid-token',
+    status: 'pending',
     respondedAt: null,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    tokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     ...overrides,
   };
 }
 
 /**
- * Builds a db stub whose `consentStates.findFirst` returns `row` (or undefined)
- * and whose `profiles.findFirst` returns the given display name. The atomic
- * update chain used by processConsentResponse resolves to one matched row so
- * the status transition "succeeds".
+ * [WI-867] Builds a db stub for v2 consent fns:
+ * - getChildNameByTokenV2: reads query.consentRequest.findFirst + query.person.findFirst
+ * - processConsentResponseV2: reads query.consentRequest.findFirst then runs
+ *   db.transaction with tx.insert(consentGrant)+tx.update(consentRequest) (approve)
+ *   or tx.update(consentRequest)+tx.delete (deny).
  */
 function makeDb(opts: {
   row: StubConsentRow | undefined;
   displayName?: string | null;
 }): Database {
   const { row, displayName = 'Emma' } = opts;
+  // Approval path: tx.insert(consentGrant).values(...).returning({id})
+  const insertReturning = jest.fn().mockResolvedValue([{ id: 'grant-1' }]);
+  const insertValues = jest
+    .fn()
+    .mockReturnValue({ returning: insertReturning });
+  const insertChain = { values: insertValues };
+  // Update path: tx.update(X).set(...).where(...).returning({id})
   const updateReturning = jest
     .fn()
-    .mockResolvedValue(row ? [{ ...row, status: 'CONSENTED' }] : []);
+    .mockResolvedValue(row ? [{ id: row.id }] : []);
   const updateChain = {
     set: jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({ returning: updateReturning }),
     }),
   };
+  const deleteChain = { where: jest.fn().mockResolvedValue(undefined) };
+  const txMock = {
+    insert: jest.fn().mockReturnValue(insertChain),
+    update: jest.fn().mockReturnValue(updateChain),
+    delete: jest.fn().mockReturnValue(deleteChain),
+  };
   return {
     query: {
-      consentStates: { findFirst: jest.fn().mockResolvedValue(row) },
-      profiles: {
+      consentRequest: { findFirst: jest.fn().mockResolvedValue(row) },
+      person: {
         findFirst: jest
           .fn()
           .mockResolvedValue(displayName == null ? undefined : { displayName }),
       },
     },
     update: jest.fn().mockReturnValue(updateChain),
-    delete: jest
-      .fn()
-      .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
+    delete: jest.fn().mockReturnValue(deleteChain),
+    insert: jest.fn().mockReturnValue(insertChain),
     transaction: jest
       .fn()
       .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
-        cb({
-          update: jest.fn().mockReturnValue(updateChain),
-          delete: jest
-            .fn()
-            .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-        }),
+        cb(txMock),
       ),
   } as unknown as Database;
 }
@@ -313,10 +325,10 @@ describe('[QA-12] POST /consent-page/confirm — deny-confirmation + invalid han
   // assert the friendly page (never a 500).
 
   it('[BUG-870] renders the "already processed" page (409, not 500) when the token was already responded to', async () => {
-    // A terminal status (CONSENTED) makes the real processConsentResponse throw
-    // ConsentAlreadyProcessedError at the replay-protection check.
+    // [WI-867] Post-collapse: v2 status is 'approved' (was 'CONSENTED').
+    // A terminal status makes processConsentResponseV2 throw ConsentAlreadyProcessedError.
     const db = makeDb({
-      row: makeRow({ status: 'CONSENTED', respondedAt: new Date() }),
+      row: makeRow({ status: 'approved', respondedAt: new Date() }),
     });
     const res = await postConfirm(db, {
       token: 'valid-token',
@@ -331,10 +343,10 @@ describe('[QA-12] POST /consent-page/confirm — deny-confirmation + invalid han
   });
 
   it('[BUG-870] renders the "link expired" page (410, not 500) when the token has expired', async () => {
-    // A non-terminal row with a past expiresAt makes the real
-    // processConsentResponse throw ConsentTokenExpiredError.
+    // [WI-867] Post-collapse: v2 field is tokenExpiresAt (was expiresAt).
+    // processConsentResponseV2 throws ConsentTokenExpiredError for past tokenExpiresAt.
     const db = makeDb({
-      row: makeRow({ expiresAt: new Date(Date.now() - 1000) }),
+      row: makeRow({ tokenExpiresAt: new Date(Date.now() - 1000) }),
     });
     const res = await postConfirm(db, {
       token: 'valid-token',

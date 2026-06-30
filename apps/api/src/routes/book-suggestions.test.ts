@@ -17,7 +17,10 @@ import {
   createTransactionalMockDb,
 } from '../test-utils/database-module';
 
+// WI-867: includeActual required so resolveIdentityV2 (now unconditional) can
+// import Drizzle table schemas (login.clerkUserId etc.) from @eduagent/database.
 const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
   db: createTransactionalMockDb({
     execute: jest.fn().mockResolvedValue(undefined),
   }),
@@ -49,35 +52,26 @@ jest.mock('../services/account', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock profile service — profile-scope middleware auto-resolves owner profile
+// Mock profile-v2 — profile-scope middleware calls findOwnerPersonScope /
+// getPersonScope (db.select() join chains, unrunnable on unit mock DB).
+// WI-867 flag-collapse: services/profile seam removed; real path covered by
+// identity integration suite.
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test User',
-      birthYear: null,
-      location: null,
-      consentStatus: null,
-      hasPremiumLlm: false,
-    }),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test User',
-      birthYear: null,
-      location: null,
-      consentStatus: null,
-      hasPremiumLlm: false,
-    }),
-  };
-});
+import { personScope } from '../test-utils/identity-v2-scope-mock';
+
+// book-suggestions uses makeAuthHeaders() with no X-Profile-Id → auto-resolve
+// path; findOwnerPersonScope must return a valid scope for 200 responses.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(personScope());
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — post-collapse profile-scope middleware calls findOwnerPersonScope/getPersonScope (db.select() join chains, unrunnable on unit mock DB); real path covered by identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Mock suggestion services — stubs for route handler

@@ -101,13 +101,21 @@ describe('scheduledDeletion', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
+    // [WI-867] v2-only: flag collapsed; absent-identityVersion events route to v2.
+    // mockIsIdentityV2EnabledInStep is no longer called by the source — routing
+    // is determined by event.data.identityVersion (absent → v2 default).
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
-    // Default: account still exists at end of grace period (happy path)
-    mockAccountExists.mockResolvedValue(true);
-    // Default: account carries a Clerk login id and Clerk delete succeeds.
-    mockGetAccountClerkUserId.mockResolvedValue('clerk_acc-1');
+    // v2 defaults (replaces v1 mockAccountExists / mockGetAccountClerkUserId)
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns
+    // SubscriptionStoreTeardownTarget[] (deletion-v2.ts:944, rows.map → always an
+    // array); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_v2-1');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   });
 
@@ -135,8 +143,7 @@ describe('scheduledDeletion', () => {
 
   it('sleeps for 7-day grace period before checking cancellation', async () => {
     const { step, sleepCalls } = createInngestStepRunner();
-    mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2 mocks set in beforeEach — no per-test overrides needed.
 
     const handler = (scheduledDeletion as any).fn;
     await handler({
@@ -149,7 +156,10 @@ describe('scheduledDeletion', () => {
 
   it('returns cancelled status when deletion was cancelled during grace period', async () => {
     const { step } = createInngestStepRunner();
-    mockIsDeletionCancelled.mockResolvedValue(true);
+    // [WI-867] v2: isDeletionCancelledV2 replaces isDeletionCancelled; v2 still
+    // returns { status: 'cancelled' } (no accountId) from the check-cancellation
+    // early-exit (source line 166) — same shape as the pre-collapse v1 path.
+    mockIsDeletionCancelledV2.mockResolvedValue(true);
 
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
@@ -158,14 +168,13 @@ describe('scheduledDeletion', () => {
     });
 
     expect(result).toEqual({ status: 'cancelled' });
-    expect(mockIsDeletionCancelled).toHaveBeenCalledWith(mockDb, 'acc-1');
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+    expect(mockIsDeletionCancelledV2).toHaveBeenCalledWith(mockDb, 'acc-1');
+    expect(mockExecuteDeletionV2).not.toHaveBeenCalled();
   });
 
   it('executes deletion when not cancelled', async () => {
     const { step } = createInngestStepRunner();
-    mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2: executeDeletionV2 replaces executeDeletion.
 
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
@@ -174,13 +183,17 @@ describe('scheduledDeletion', () => {
     });
 
     expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
-    expect(mockExecuteDeletion).toHaveBeenCalledWith(mockDb, 'acc-1');
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
+      organizationId: 'acc-1',
+      ownerEmail: 'owner@example.com',
+      reason: 'user_initiated',
+      deletedBy: null,
+    });
   });
 
   it('calls getStepDatabase inside each step.run closure', async () => {
     const { step } = createInngestStepRunner();
-    mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2 mocks set in beforeEach.
 
     const handler = (scheduledDeletion as any).fn;
     await handler({
@@ -188,13 +201,13 @@ describe('scheduledDeletion', () => {
       step,
     });
 
-    // getStepDatabase called once each for check-account-exists,
-    // capture-clerk-user-id ([R1]), check-cancellation, delete-account-data
-    // ([BUG-844] added the existence check). On the v1 path the
-    // capture-owner-email step short-circuits BEFORE acquiring a DB connection
-    // (v2-only leg), so it does not add here. The delete-clerk-user step uses
-    // getStepClerkSecretKey, not getStepDatabase, so it does not add either.
-    expect(mockGetStepDatabase).toHaveBeenCalledTimes(4);
+    // [WI-867] v2 adds capture-owner-email step (pre-reads owner email for
+    // executeDeletionV2). v1 short-circuited that step before acquiring a DB
+    // connection, so count was 4. v2 path: check-account-exists,
+    // capture-clerk-user-id, capture-owner-email, check-cancellation,
+    // capture-subscription-store-teardown-targets, delete-account-data = 6.
+    // delete-clerk-user uses getStepClerkSecretKey.
+    expect(mockGetStepDatabase).toHaveBeenCalledTimes(6);
   });
 
   // [BREAK / BUG-844] If the account was removed during the 7-day sleep
@@ -205,7 +218,8 @@ describe('scheduledDeletion', () => {
   // reports 'deleted'.
   it('[BREAK / BUG-844] returns already_deleted without running cancellation/deletion when account is gone', async () => {
     const { step } = createInngestStepRunner();
-    mockAccountExists.mockResolvedValue(false);
+    // [WI-867] v2: organizationExistsV2 replaces accountExists.
+    mockOrganizationExistsV2.mockResolvedValue(false);
 
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
@@ -217,8 +231,8 @@ describe('scheduledDeletion', () => {
       status: 'already_deleted',
       accountId: 'acc-gone',
     });
-    expect(mockIsDeletionCancelled).not.toHaveBeenCalled();
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+    expect(mockIsDeletionCancelledV2).not.toHaveBeenCalled();
+    expect(mockExecuteDeletionV2).not.toHaveBeenCalled();
   });
 
   it('[BUG-844] still sleeps 7d before checking accountExists (no instant fast-path)', async () => {
@@ -238,7 +252,8 @@ describe('scheduledDeletion', () => {
       },
     };
 
-    mockAccountExists.mockResolvedValue(false);
+    // [WI-867] v2: organizationExistsV2 replaces accountExists.
+    mockOrganizationExistsV2.mockResolvedValue(false);
 
     const handler = (scheduledDeletion as any).fn;
     await handler({
@@ -300,16 +315,26 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
+    // [WI-867] v2-only: absent-identityVersion events default to v2.
     mockGetStepDatabase.mockReturnValue(mockDb);
-    mockAccountExists.mockResolvedValue(true);
-    mockIsDeletionCancelled.mockResolvedValue(false);
+    mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    // Default happy path; individual tests override for TOCTOU/already_deleted scenarios.
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns an array
+    // (deletion-v2.ts:944); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_v2-1');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
+    mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   });
 
   it('returns { status: "cancelled" } when executeDeletion atomic guard fires', async () => {
     // Simulates: user cancelled between check-cancellation and delete-account-data.
-    // The atomic WHERE in executeDeletion catches it and returns 'cancelled'.
-    mockExecuteDeletion.mockResolvedValue('cancelled');
+    // [WI-867] v2: the atomic WHERE in executeDeletionV2 catches it and returns
+    // 'cancelled'; same TOCTOU semantic, different store.
+    mockExecuteDeletionV2.mockResolvedValue('cancelled');
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -322,7 +347,7 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
   });
 
   it('returns { status: "deleted" } on the happy path', async () => {
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2: executeDeletionV2 set in beforeEach.
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -335,7 +360,9 @@ describe('[Fix Bug #494] TOCTOU cancellation detected by executeDeletion atomic 
   });
 
   it('returns { status: "already_deleted" } when executeDeletion finds row missing', async () => {
-    mockExecuteDeletion.mockResolvedValue('already_deleted');
+    // [WI-867] v2: executeDeletionV2 returning 'already_deleted' maps to same
+    // terminal status as before.
+    mockExecuteDeletionV2.mockResolvedValue('already_deleted');
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -367,17 +394,23 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsIdentityV2EnabledInStep.mockReturnValue(false);
+    // [WI-867] v2-only: absent-identityVersion events default to v2.
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
-    mockAccountExists.mockResolvedValue(true);
-    mockIsDeletionCancelled.mockResolvedValue(false);
-    mockGetAccountClerkUserId.mockResolvedValue('clerk_user_abc');
+    mockOrganizationExistsV2.mockResolvedValue(true);
+    mockIsDeletionCancelledV2.mockResolvedValue(false);
+    mockExecuteDeletionV2.mockResolvedValue('deleted');
+    // [WI-867] real getSubscriptionStoreTeardownTargetsV2 returns an array
+    // (deletion-v2.ts:944); default to the empty (no-subscriptions) case.
+    mockGetSubscriptionStoreTeardownTargetsV2.mockResolvedValue([]);
+    // [WI-867] v2 captures org-owner Clerk id instead of account Clerk id.
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue('clerk_user_abc');
+    mockGetOrganizationOwnerEmailV2.mockResolvedValue('owner@example.com');
     mockDeleteClerkUser.mockResolvedValue({ deleted: true });
   });
 
   it('[BREAK] erases the Clerk user with the captured id after a "deleted" result', async () => {
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2: executeDeletionV2 + getOrganizationOwnerClerkUserIdV2 set in beforeEach.
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -395,11 +428,12 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
 
   it('captures the Clerk id BEFORE executeDeletion removes the row', async () => {
     const callOrder: string[] = [];
-    mockGetAccountClerkUserId.mockImplementation(async () => {
+    // [WI-867] v2: getOrganizationOwnerClerkUserIdV2 replaces getAccountClerkUserId.
+    mockGetOrganizationOwnerClerkUserIdV2.mockImplementation(async () => {
       callOrder.push('capture');
       return 'clerk_user_abc';
     });
-    mockExecuteDeletion.mockImplementation(async () => {
+    mockExecuteDeletionV2.mockImplementation(async () => {
       callOrder.push('delete-db');
       return 'deleted';
     });
@@ -414,7 +448,8 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
   });
 
   it('does NOT erase the Clerk user when the deletion was cancelled', async () => {
-    mockExecuteDeletion.mockResolvedValue('cancelled');
+    // [WI-867] v2: executeDeletionV2 returning 'cancelled' — same gate.
+    mockExecuteDeletionV2.mockResolvedValue('cancelled');
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -424,7 +459,8 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
   });
 
   it('does NOT erase the Clerk user when the row was already gone', async () => {
-    mockExecuteDeletion.mockResolvedValue('already_deleted');
+    // [WI-867] v2: executeDeletionV2 returning 'already_deleted' — same gate.
+    mockExecuteDeletionV2.mockResolvedValue('already_deleted');
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
@@ -434,8 +470,8 @@ describe('[R1] Clerk identity erasure on account deletion', () => {
   });
 
   it('skips Clerk erasure when the account has no Clerk credential', async () => {
-    mockGetAccountClerkUserId.mockResolvedValue(null);
-    mockExecuteDeletion.mockResolvedValue('deleted');
+    // [WI-867] v2: getOrganizationOwnerClerkUserIdV2 returning null — same skip.
+    mockGetOrganizationOwnerClerkUserIdV2.mockResolvedValue(null);
 
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;

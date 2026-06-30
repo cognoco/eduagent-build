@@ -46,14 +46,13 @@ import { recallNudgeSend } from './recall-nudge-send';
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
 let db: Database;
-let fetchSpy: jest.SpyInstance;
+let fetchSpy: { mockRestore: () => void };
 let pushBodies: Array<{ title: string; body: string; to: string }>;
 
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `clerk_rns_send_${RUN_ID}`;
 const EXPO_TOKEN = 'ExponentPushToken[rns-send-integration]';
 let seedCounter = 0;
-const IDENTITY_V2 = () => process.env['IDENTITY_V2_ENABLED'] === 'true';
 
 // ── Step runner ──────────────────────────────────────────────────────────────
 
@@ -93,11 +92,10 @@ async function seedProfileWithPush(): Promise<{ profileId: string }> {
     })
     .returning({ id: accounts.id });
 
-  if (IDENTITY_V2()) {
-    await db
-      .insert(organization)
-      .values({ id: account!.id, name: `Recall Seed org ${idx}` });
-  }
+  // [WI-867] v2 identity rows are unconditional (flag collapsed).
+  await db
+    .insert(organization)
+    .values({ id: account!.id, name: `Recall Seed org ${idx}` });
 
   const [profile] = await db
     .insert(profiles)
@@ -109,19 +107,17 @@ async function seedProfileWithPush(): Promise<{ profileId: string }> {
     })
     .returning({ id: profiles.id });
 
-  if (IDENTITY_V2()) {
-    await db.insert(person).values({
-      id: profile!.id,
-      displayName: 'Recall Test User',
-      birthDate: '1990-01-01',
-      residenceJurisdiction: 'ROW',
-    });
-    await db.insert(membership).values({
-      personId: profile!.id,
-      organizationId: account!.id,
-      roles: ['learner'],
-    });
-  }
+  await db.insert(person).values({
+    id: profile!.id,
+    displayName: 'Recall Test User',
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'ROW',
+  });
+  await db.insert(membership).values({
+    personId: profile!.id,
+    organizationId: account!.id,
+    roles: ['learner'],
+  });
 
   await db.insert(notificationPreferences).values({
     profileId: profile!.id,
@@ -187,8 +183,12 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   pushBodies = [];
-  fetchSpy = jest
-    .spyOn(globalThis, 'fetch')
+  // [WI-867] Mock the Expo Push API boundary via direct assignment rather than
+  // jest.spyOn: jest-mock ≥30 requires an own+configurable property which
+  // mockRestore() strips across test runs (Node 26 exposes fetch via prototype).
+  const savedFetch = globalThis.fetch;
+  const mockFetch = jest
+    .fn()
     .mockImplementation(async (_url: unknown, init: unknown) => {
       const body = JSON.parse((init as { body: string }).body) as {
         title: string;
@@ -201,6 +201,20 @@ beforeEach(() => {
         headers: { 'Content-Type': 'application/json' },
       });
     });
+  Object.defineProperty(globalThis, 'fetch', {
+    value: mockFetch,
+    writable: true,
+    configurable: true,
+  });
+  fetchSpy = {
+    mockRestore: () => {
+      Object.defineProperty(globalThis, 'fetch', {
+        value: savedFetch,
+        writable: true,
+        configurable: true,
+      });
+    },
+  };
 });
 
 afterEach(() => {
@@ -208,25 +222,24 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  if (IDENTITY_V2()) {
-    const testAccounts = await db.query.accounts.findMany({
-      where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
-      columns: { id: true },
+  // [WI-867] v2 identity cleanup is unconditional.
+  const testAccounts = await db.query.accounts.findMany({
+    where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
+    columns: { id: true },
+  });
+  const accountIds = testAccounts.map((a) => a.id);
+  if (accountIds.length > 0) {
+    const testProfiles = await db.query.profiles.findMany({
+      where: like(profiles.displayName, 'Recall Test User'),
+      columns: { id: true, accountId: true },
     });
-    const accountIds = testAccounts.map((a) => a.id);
-    if (accountIds.length > 0) {
-      const testProfiles = await db.query.profiles.findMany({
-        where: like(profiles.displayName, 'Recall Test User'),
-        columns: { id: true, accountId: true },
-      });
-      const ids = testProfiles
-        .filter((p) => accountIds.includes(p.accountId))
-        .map((p) => p.id);
-      if (ids.length > 0) {
-        await db.delete(person).where(inArray(person.id, ids));
-      }
-      await db.delete(organization).where(inArray(organization.id, accountIds));
+    const ids = testProfiles
+      .filter((p) => accountIds.includes(p.accountId))
+      .map((p) => p.id);
+    if (ids.length > 0) {
+      await db.delete(person).where(inArray(person.id, ids));
     }
+    await db.delete(organization).where(inArray(organization.id, accountIds));
   }
   await db
     .delete(accounts)

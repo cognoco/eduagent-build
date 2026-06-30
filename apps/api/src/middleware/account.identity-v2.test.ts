@@ -105,25 +105,8 @@ describe('requireAccountMiddleware — v2 pre-graph allowlist (flag-on)', () => 
   });
 });
 
-describe('requireAccountMiddleware — flag-off invariant', () => {
-  const preGraph = {
-    user: FAKE_USER,
-    clerkIdentity: { clerkUserId: 'clerk_test', verifiedEmail: 'u@test.local' },
-  };
-
-  it.each([[undefined], ['false']])(
-    '401s every account-less route when flag is %s (allowlist inert)',
-    async (flag) => {
-      const { call } = buildApp(preGraph);
-      // Even the would-be-allowlisted bootstrap 401s when the flag is off.
-      const res = await call('/profiles', 'POST', {
-        IDENTITY_V2_ENABLED: flag,
-      });
-      expect(res.status).toBe(401);
-    },
-  );
-
-  it('passes through when an account IS resolved (legacy + v2 alike)', async () => {
+describe('requireAccountMiddleware — pre-graph allowlist', () => {
+  it('passes through when an account IS resolved', async () => {
     const { call } = buildApp({ user: FAKE_USER, account: { id: 'org_1' } });
     expect((await call('/sessions', 'GET', {})).status).toBe(200);
   });

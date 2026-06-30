@@ -39,6 +39,10 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     // [WI-221] GDPR gate reads the latest consent row; undefined ⇒ allowed
     // (pre-consent-flow account), so the happy-path analysis tests proceed.
     consentStates: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    // [WI-867] v2 consent seam: isGdprProcessingAllowedV2 reads consentGrant +
+    // consentRequest. undefined = no rows = null status = GDPR allowed (default).
+    consentGrant: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    consentRequest: { findFirst: jest.fn().mockResolvedValue(undefined) },
     // analyze-learner-profile reads the session row for rawInput
     learningSessions: {
       findFirst: jest.fn().mockResolvedValue({ rawInput: null, topicId: null }),
@@ -139,6 +143,17 @@ const mockDatabaseModule = createDatabaseModuleMock({
     consentStates: {
       profileId: col('profileId'),
       consentType: col('consentType'),
+      requestedAt: col('requestedAt'),
+    },
+    // [WI-867] v2 consent columns used by isGdprProcessingAllowedV2 WHERE clauses.
+    consentGrant: {
+      chargePersonId: col('chargePersonId'),
+      organizationId: col('organizationId'),
+      grantedAt: col('grantedAt'),
+    },
+    consentRequest: {
+      chargePersonId: col('chargePersonId'),
+      organizationId: col('organizationId'),
       requestedAt: col('requestedAt'),
     },
   },
@@ -1865,33 +1880,18 @@ describe('sessionCompleted', () => {
       (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       await executeSteps(createEventData({ sessionType: 'homework' }));
 
-      // [WI-784] Under IDENTITY_V2_ENABLED the v2 billing twin fires;
-      // otherwise the legacy path fires. The BREAK invariant is that SOME
-      // subscription is obtained and decrementQuota is called before the LLM.
-      const identityV2 = process.env['IDENTITY_V2_ENABLED'] === 'true';
-      if (identityV2) {
-        expect(mockEnsureFreeSubscriptionV2).toHaveBeenCalledWith(
-          expect.anything(),
-          ACCOUNT_ID, // membership mock returns organizationId=ACCOUNT_ID
-        );
-        expect(mockDecrementQuota).toHaveBeenCalledWith(
-          expect.anything(),
-          'sub-test-id',
-          PROFILE_ID,
-          true,
-        );
-      } else {
-        expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
-          expect.anything(),
-          ACCOUNT_ID,
-        );
-        expect(mockDecrementQuota).toHaveBeenCalledWith(
-          expect.anything(),
-          'sub-test-id',
-          PROFILE_ID,
-          false,
-        );
-      }
+      // [WI-867] IDENTITY_V2_ENABLED collapsed → v2 always-on. Flag-conditional
+      // branch removed; v2 path is the only path.
+      expect(mockEnsureFreeSubscriptionV2).toHaveBeenCalledWith(
+        expect.anything(),
+        ACCOUNT_ID, // membership mock returns organizationId=ACCOUNT_ID
+      );
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-test-id',
+        PROFILE_ID,
+        true,
+      );
       expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
       // No refund — LLM succeeded.
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
@@ -1900,14 +1900,9 @@ describe('sessionCompleted', () => {
     it('[WI-1061] retries transient billing setup before any quota decrement', async () => {
       (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
       const transientBillingError = new Error('temporary billing read failure');
-      const identityV2 = process.env['IDENTITY_V2_ENABLED'] === 'true';
-      if (identityV2) {
-        mockEnsureFreeSubscriptionV2.mockRejectedValueOnce(
-          transientBillingError,
-        );
-      } else {
-        mockEnsureFreeSubscription.mockRejectedValueOnce(transientBillingError);
-      }
+      // [WI-867] flag collapsed to v2-always — billing setup runs through
+      // ensureFreeSubscriptionV2 unconditionally.
+      mockEnsureFreeSubscriptionV2.mockRejectedValueOnce(transientBillingError);
 
       await expect(
         executeSteps(createEventData({ sessionType: 'homework' })),
@@ -2155,28 +2150,8 @@ describe('sessionCompleted', () => {
       }
     });
 
-    it('[WI-784] FLAG-OFF: legacy path unchanged — ensureFreeSubscription called, no v2 call', async () => {
-      // Ensure flag is off (default)
-      delete process.env['IDENTITY_V2_ENABLED'];
-      (createDatabase as jest.Mock).mockReturnValue(makeDbWithProfile());
-
-      await executeSteps(createEventData({ sessionType: 'homework' }));
-
-      // Legacy path fires (ACCOUNT_ID is profiles.accountId value the mock returns)
-      expect(mockEnsureFreeSubscription).toHaveBeenCalledWith(
-        expect.anything(),
-        ACCOUNT_ID,
-      );
-      // v2 must NOT fire under flag-off
-      expect(mockEnsureFreeSubscriptionV2).not.toHaveBeenCalled();
-      // decrementQuota called WITHOUT identityV2=true (3 args or 4th=false/undefined)
-      expect(mockDecrementQuota).toHaveBeenCalledWith(
-        expect.anything(),
-        'sub-test-id',
-        PROFILE_ID,
-        false,
-      );
-    });
+    // [WI-867] FLAG-OFF test deleted: IDENTITY_V2_ENABLED collapsed → v2 always-on.
+    // The legacy ensureFreeSubscription / flag=false branch is dead code.
   });
 
   describe('process-verification-completion step', () => {
@@ -2396,8 +2371,22 @@ describe('sessionCompleted', () => {
         memoryConsentStatus: 'granted',
         memoryCollectionEnabled: true,
       });
-      mockSessionCompletedDb.query.consentStates.findFirst.mockResolvedValueOnce(
-        { status: 'WITHDRAWN', consentType: 'GDPR' },
+      // [WI-867] v2 consent seam: reduceBasisFromRows detects WITHDRAWN via
+      // consentGrant.withdrawnAt set. Also seed consentRequest to prevent the
+      // needsMin path (grant!=null && request==null → db.select(MIN) UNSEEDABLE).
+      mockSessionCompletedDb.query.consentGrant.findFirst.mockResolvedValueOnce(
+        {
+          granted: true,
+          withdrawnAt: new Date('2026-05-02T00:00:00.000Z'),
+          grantedAt: new Date('2026-05-01T00:00:00.000Z'),
+        },
+      );
+      mockSessionCompletedDb.query.consentRequest.findFirst.mockResolvedValueOnce(
+        {
+          status: 'approved',
+          requestedAt: new Date('2026-05-01T00:00:00.000Z'),
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        },
       );
 
       await executeSteps(createEventData({ qualityRating: 4 }));

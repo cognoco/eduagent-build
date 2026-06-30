@@ -18,6 +18,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { personScope } from '../test-utils/identity-v2-scope-mock';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
@@ -63,6 +64,21 @@ jest.mock('../services/profile', () => {
     }),
   };
 });
+
+// [WI-867] Post-collapse, profile-scope middleware resolves the caller via the
+// v2 `findOwnerPersonScope` (auto-resolve) / `getPersonScope` (X-Profile-Id)
+// seam. Continuity mock — mirrors the legacy findOwnerProfile (null) /
+// getProfile (owner) defaults above.
+const mockFindOwnerPersonScope = jest.fn().mockResolvedValue(null);
+const mockGetPersonScope = jest.fn().mockResolvedValue(personScope());
+jest.mock(
+  '../services/identity-v2/profile-v2' /* gc1-allow: continuity — replaces the pre-collapse findOwnerProfile/getProfile mock; db.select() join chain unrunnable on the unit mock DB; real path covered by the identity integration suite */,
+  () => ({
+    ...jest.requireActual('../services/identity-v2/profile-v2'),
+    findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
+    getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Bookmarks service mock
@@ -116,7 +132,12 @@ jest.mock('../inngest/client', () => {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
-const TEST_ENV = { ...BASE_AUTH_ENV };
+const TEST_ENV = {
+  ...BASE_AUTH_ENV,
+  // [WI-867] DATABASE_URL required so databaseMiddleware calls createDatabase
+  // (mock) and sets db on the context — resolveIdentityV2 reads db.query.login.
+  DATABASE_URL: 'postgresql://test:test@localhost/test',
+};
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const BOOKMARK_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -153,6 +174,9 @@ describe('bookmark routes', () => {
   beforeEach(() => {
     clearJWKSCache();
     jest.clearAllMocks();
+    // [WI-867] Restore v2 seam defaults after clearAllMocks.
+    mockFindOwnerPersonScope.mockResolvedValue(null);
+    mockGetPersonScope.mockResolvedValue(personScope());
   });
 
   // ---- POST /v1/bookmarks --------------------------------------------------
@@ -211,18 +235,14 @@ describe('bookmark routes', () => {
     });
 
     it('returns 403 when in proxy mode (isOwner=false)', async () => {
-      // Simulate parent acting on child profile: getProfile returns isOwner=false
-      const { getProfile } = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-      };
-      getProfile.mockResolvedValueOnce({
-        id: 'child-profile-id',
-        birthYear: 2012,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      // Simulate parent acting on child profile: v2 getPersonScope returns isOwner=false
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({
+          profileId: 'child-profile-id',
+          birthYear: 2012,
+          isOwner: false,
+        }),
+      );
 
       const res = await app.request(
         '/v1/bookmarks',
@@ -510,17 +530,14 @@ describe('bookmark routes', () => {
     });
 
     it('returns 403 when in proxy mode (isOwner=false)', async () => {
-      const { getProfile } = jest.requireMock('../services/profile') as {
-        getProfile: jest.Mock;
-      };
-      getProfile.mockResolvedValueOnce({
-        id: 'child-profile-id',
-        birthYear: 2012,
-        location: null,
-        consentStatus: 'CONSENTED',
-        hasPremiumLlm: false,
-        isOwner: false,
-      });
+      // Simulate parent acting on child profile: v2 getPersonScope returns isOwner=false
+      mockGetPersonScope.mockResolvedValueOnce(
+        personScope({
+          profileId: 'child-profile-id',
+          birthYear: 2012,
+          isOwner: false,
+        }),
+      );
 
       const res = await app.request(
         `/v1/bookmarks/${BOOKMARK_ID}`,
