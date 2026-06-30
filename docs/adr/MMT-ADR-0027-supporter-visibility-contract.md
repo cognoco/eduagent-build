@@ -2,9 +2,11 @@
 
 **Status:** Accepted · 2026-06-20 · **Scope:** V2 supporter visibility surfaces · **Deciders:** Architect (jjoerg) + PM (owner) · **Builds on:** MMT-ADR-0000, MMT-ADR-0022
 
+> **Re-vet 2026-06-30:** **AMEND / KEEP ACCEPTED.** Human Architecture sign-off is recorded, and the decision stands. This amendment removes phase-label authority: the trust/reportability contract is the decision; the implementation plan is only a rollout consumer.
+
 ## Context
 
-The identity canon already defines Supportership as a Layer-2, edge-scoped visibility grant: the supporter sees only the named supportee and receives no consent authority. That answers who may see. S5 adds the product trust layer that answers what may be reported even to an authorized supporter.
+The identity canon already defines Supportership as a Layer-2, edge-scoped visibility grant: the supporter sees only the named supportee and receives no consent authority. That answers who may see. This ADR adds the product trust layer that answers what may be reported even to an authorized supporter.
 
 The risk is not only unauthorized access. A supporter with a valid edge could still receive confided affect, self-doubt, raw chat, private notes, or legacy LLM prose if reporting code treats every available string as eligible context. That would violate the V2 promise that the mentor is a channel the learner can trust.
 
@@ -16,7 +18,7 @@ The risk is not only unauthorized access. A supporter with a valid edge could st
 4. The artifact wall is mandatory: supportership creates no supporter read path to private notes, chats, or journal artifacts.
 5. Appeals produce richer structural detail only after a deliberate request and a core audit write. Appeals do not bypass the artifact wall.
 6. Safety escalation is separate from reporting. The reportability gate must not suppress a safety escalation path.
-7. S5-owned contract, audit, and notice tables key to the canonical `supportership` edge. Ceremony state is not added to the edge.
+7. Visibility-contract-owned contract, audit, and notice tables key to the canonical `supportership` edge. Ceremony state is not added to the edge.
 
 ## Consequences
 
@@ -35,6 +37,5 @@ The risk is not only unauthorized access. A supporter with a valid edge could st
 
 - `docs/canon/identity/domain-model.md` §2/§4 — Supportership is edge-scoped visibility, not consent authority.
 - `docs/canon/identity/ontology.md` inv 9/14/19 — visibility is scoped and opt-in.
-- `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §6.1 — visibility contract and non-reportable class.
+- `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §6.1 — contextual product spec for the visibility contract and non-reportable class; not authority for this ADR.
 - `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md` — cross-user moments derive from relationship/contract state, not ledger visibility.
-

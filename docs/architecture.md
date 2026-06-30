@@ -22,9 +22,9 @@ date: '2026-02-15'
 
 # Architecture
 
-_This document is **L1 canon** — the authoritative *what* of how the system is built (`MMT-ADR-0000` §I.1–I.2): outcomes and current rules, not the *why*. The reasoning behind a significant choice lives in an **ADR** (`docs/adr/`); new canon enters here only **in lockstep** with its ADR, in one change-set (`MMT-ADR-0000` §II.2–II.3). The legacy `ARCH-1…ARCH-26` register (`docs/specs/epics.md`) is **frozen** and draining to ADRs (`MMT-ADR-0000` Part III). See `docs/adr/README.md` § "How canon is authored" for the full entry process._
+_This document is **L1 canon** — the authoritative *what* of how the system is built (`MMT-ADR-0000` §I.1–I.2): outcomes and current rules, not the *why*. The reasoning behind a significant choice lives in an **ADR** (`docs/adr/`); new canon enters here only **in lockstep** with its ADR, in one change-set (`MMT-ADR-0000` §II.2–II.3). The legacy `ARCH-1…ARCH-26` register is **frozen** and draining to ADRs (`MMT-ADR-0000` Part III). See `docs/adr/README.md` § "How canon is authored" for the full entry process._
 
-> **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is **new, ratified canon** (identity-foundation runway, Phase H; cited to ADRs + `data-model.md`). **Every other section is LEGACY** — pre-refresh setup-record content, pending review/revision in the Stream-2 `architecture.md` rebuild (the `ARCH-N` reverse-engineering). Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. The direct conflicts the carve-out supersedes were flagged inline with `<!-- [LEGACY-REVIEW] -->` comments and **resolved in Phase I (2026-06-08)**; the legacy sections themselves remain pre-refresh, pending the Stream-2 rebuild. These transitional markers (`[TRANSITIONAL — DOC STATE]`, `[CANON-NEW]`, `[LEGACY-REVIEW]`) are temporary and stripped at the Stream-2 rebuild.
+> **[TRANSITIONAL — DOC STATE]** This document is mid-refresh. The **`## Identity Foundation`** section is ratified canon cited to ADRs + `data-model.md`. Other legacy sections remain pre-refresh and are pending review/revision. Where a legacy section conflicts with `## Identity Foundation`, **Identity Foundation wins**. The direct conflicts the carve-out supersedes were flagged inline with `<!-- [LEGACY-REVIEW] -->` comments and resolved on 2026-06-08; the legacy sections themselves remain pre-refresh.
 
 ## Project Context Analysis
 
@@ -75,7 +75,7 @@ _This document is **L1 canon** — the authoritative *what* of how the system is
 - **Age-based theming**: Teal primary + lavender secondary, dark-first default — theme follows system preference, components stay persona-unaware. `personaType` DB column removed in Epic 12.
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty
 - **Cold start framing**: Sessions 1-5 use coaching-voiced three-button menu, invisible transition to adaptive entry at session 6+
-- **Phase 1 MVP components**: `BaseCoachingCard`, Camera Capture, `ChatShell` + `MessageBubble`, `SessionCloseSummary`, `RetentionSignal`, `ErrorBoundary`, `ErrorFallback`
+- **MVP components**: `BaseCoachingCard`, Camera Capture, `ChatShell` + `MessageBubble`, `SessionCloseSummary`, `RetentionSignal`, `ErrorBoundary`, `ErrorFallback`
 
 ### Scale & Complexity Assessment
 
@@ -564,9 +564,9 @@ The `(app)/` group contains all authenticated screens. View differences between 
 
 ## Identity Foundation
 
-> **[CANON-NEW · ratified]** Authored Phase H (2026-06-08) from the locked identity-foundation canonical set (`_wip/identity-foundation/CANONICAL-SET.md`, updated by J0 to include the `docs/canon/identity/` domain canon + compliance register). Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `docs/canon/identity/data-model.md` §. This is a **relocatable unit** — the eventual `architecture.md` rebuild (Stream 2) re-homes it intact. Citations to `data-model.md` / `domain-model.md` / `prd.md` reference the ratified canon now at `docs/canon/identity/`.
+> **[CANON-NEW · ratified]** Authored 2026-06-08 from the locked identity-foundation canonical set now living in `docs/canon/identity/` plus the compliance register. Stated as **outcomes, not whys** (`MMT-ADR-0000` §I.2); every claim cites its ADR or `docs/canon/identity/data-model.md` §. Citations to `data-model.md` / `domain-model.md` / `prd.md` reference the ratified canon now at `docs/canon/identity/`.
 
-This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (the direct conflicts were flagged `[LEGACY-REVIEW]` and resolved in Phase I). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
+This section is the authoritative architecture of the app's identity / tenancy / role / consent / policy-engine foundation. It supersedes the legacy identity content elsewhere in this document (the direct conflicts were flagged `[LEGACY-REVIEW]` and resolved on 2026-06-08). The decision trail (the *why*) lives in `MMT-ADR-0001`, `0002`, `0007`–`0016`; the schema realization in `data-model.md`.
 
 ### Identity model & tenancy
 
@@ -1313,19 +1313,6 @@ The learner-home `/now` feed shows recent notable moments (e.g. "you filed a ses
 
 Decision rationale: `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`.
 
-**Scope Chip Relationship Lens (proposed, `MMT-ADR-0024`):**
-
-The V2 mobile shell treats active audience context as a relationship scope: implicit `me` for learners, and an explicit chip for supporters containing Support hub, one person-scope per active supportership edge, and `me` once the supporter has durable self-learning state.
-
-Key proposed rules:
-
-- **Supportership-derived visibility.** A person-scope chip is derived from an active `supportership` edge only; guardianship, membership, and payer state do not grant this everyday visibility.
-- **Scope-preserving tabs.** Bottom-tab navigation changes the tab inside the active scope; it does not silently switch scope.
-- **V0/V1 flag isolation.** `ModeSwitcher`, proxy-mode plumbing, and legacy tab-shape helpers stay alive for V0/V1 until a later retirement step. V2 supersedes them but does not delete them in the same change.
-- **User-owned default.** The server may return a `defaultScopeIndex`, but a persisted last-active scope for the active profile wins when still valid.
-
-Decision rationale: `docs/adr/MMT-ADR-0024-scope-chip-supersedes-nav-contract.md`.
-
 **Freeform Ask Anything — narrower persistence path (`MMT-ADR-0021`):**
 
 Ask Anything (freeform) sessions — a `learning` session with `effectiveMode = 'freeform'` and no `topicId` — are a deliberately narrower persistence path than guided learning:
@@ -1735,7 +1722,7 @@ All 121 MVP functional requirements have architectural support. The architecture
 | GDPR | Full | Consent state machine, deletion orchestrator, data export, profile isolation | Covered |
 | Minor consent & age | 13+ consent-capacity floor (sub-13 built, gated) | Append-only consent log; three-axis age model; backend-enforced floor — see § Identity Foundation (MMT-ADR-0015) | Defined — § Identity Foundation |
 | i18n | 7 locales | English source + 6 LLM-translated locales (de/es/ja/nb/pl/pt) registered in `apps/mobile/src/i18n/index.ts`. LLM `preferredLanguage` in system prompt for learning language. | Covered |
-| Accessibility | WCAG 2.1 AA | Phased per UX spec (MVP free, v1.1 moderate, v2.0 operational). NativeWind supports accessibility props. | Phased |
+| Accessibility | WCAG 2.1 AA | Tiered by release maturity: free-tier MVP support first, then broader operational hardening. NativeWind supports accessibility props. | Tiered |
 | Offline behavior | Read-only cached data | See "Offline Boundary" below | Defined |
 
 **Offline Boundary:**
@@ -1909,7 +1896,7 @@ Detox/Maestro setup on CI with Expo is notoriously finicky — device farms, bui
 
 **Architecture Status:** READY FOR IMPLEMENTATION
 
-**Next Phase:** Epics & Stories
+**Next Workstream:** Epics & Stories
 
 **Document Maintenance:** Update this architecture when major technical decisions are made during implementation.
 
