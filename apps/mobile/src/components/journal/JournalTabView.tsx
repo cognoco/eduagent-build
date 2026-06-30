@@ -3,11 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useRouter, type Href } from 'expo-router';
-import type {
-  NowCard,
-  RecapListItem,
-  ReportPracticeActivityType,
-} from '@eduagent/schemas';
+import type { NowCard, RecapListItem } from '@eduagent/schemas';
 
 import { ErrorFallback, TimeoutLoader } from '../common';
 import { RecapsEmptyState } from '../recaps/RecapsEmptyState';
@@ -17,34 +13,22 @@ import { LatestReportCard } from '../../app/(app)/progress/_components/LatestRep
 import { getLatestReport } from '../../app/(app)/progress/_view-models/progress-report-helpers';
 import { useAllNotes } from '../../hooks/use-notes';
 import { useBookmarks } from '../../hooks/use-bookmarks';
-import { usePracticeActivityHistory } from '../../hooks/use-practice-activity-history';
 import { useJournalRecaps } from '../../hooks/use-journal-recaps';
 import { useSpeechRecognition } from '../../hooks/use-speech-recognition';
-import {
-  useProfileReports,
-  useProfileWeeklyReports,
-} from '../../hooks/use-progress';
+import { useMyReports, useMyWeeklyReports } from '../../hooks/use-my-reports';
 import { useNowFeed } from '../../hooks/use-now-feed';
 import { pushNowDeepLink } from '../../lib/now-deep-link';
-import { useProfile } from '../../lib/profile';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
 
-type JournalSectionId =
-  | 'notes'
-  | 'sessions'
-  | 'practice'
-  | 'memory'
-  | 'reports';
+type JournalSectionId = 'notes' | 'sessions' | 'memory' | 'reports';
 
 // Landing order drives the two-row count-driven grid: the first row fills with
-// the first three, the rest wrap. Adding a sixth button (e.g. a future
-// "Common learning" tab for linked accounts) simply flows to the next row — no
-// layout change required.
+// the first two, the rest wrap. Adding a fifth button simply flows to the next
+// row — no layout change required.
 const JOURNAL_SECTIONS: JournalSectionId[] = [
   'notes',
   'sessions',
-  'practice',
   'memory',
   'reports',
 ];
@@ -187,8 +171,6 @@ function sectionTitle(section: JournalSectionId, t: TFunction): string {
       return t('journal.sections.notes');
     case 'sessions':
       return t('journal.sections.sessions');
-    case 'practice':
-      return t('journal.sections.practice');
     case 'memory':
       return t('journal.sections.memory');
     case 'reports':
@@ -202,8 +184,6 @@ function sectionSubtitle(section: JournalSectionId, t: TFunction): string {
       return t('journal.sections.notesSubtitle');
     case 'sessions':
       return t('journal.sections.sessionsSubtitle');
-    case 'practice':
-      return t('journal.sections.practiceSubtitle');
     case 'memory':
       return t('journal.sections.memorySubtitle');
     case 'reports':
@@ -470,9 +450,8 @@ function JournalRecapsSection(): React.ReactElement {
 function JournalReportsSection(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
-  const { activeProfile } = useProfile();
-  const monthlyReports = useProfileReports(activeProfile?.id);
-  const weeklyReports = useProfileWeeklyReports(activeProfile?.id);
+  const monthlyReports = useMyReports();
+  const weeklyReports = useMyWeeklyReports();
   const isLoading =
     (monthlyReports.isLoading && !monthlyReports.data) ||
     (weeklyReports.isLoading && !weeklyReports.data);
@@ -874,182 +853,6 @@ function JournalMemorySection(): React.ReactElement {
   );
 }
 
-// All practice activity types plus the "All" sentinel. The chip row drives the
-// SERVER query (the endpoint's `type` param) rather than client-filtering one
-// loaded page, so per-type pagination stays correct.
-type PracticeTypeFilter = 'all' | ReportPracticeActivityType;
-const PRACTICE_TYPE_FILTERS: PracticeTypeFilter[] = [
-  'all',
-  'quiz',
-  'review',
-  'assessment',
-  'dictation',
-  'recitation',
-  'fluency_drill',
-];
-
-function practiceTypeLabel(type: PracticeTypeFilter, t: TFunction): string {
-  return t(`journal.practice.type.${type}`);
-}
-
-function PracticeActivityRow({
-  item,
-  t,
-}: {
-  item: {
-    id: string;
-    activityType: ReportPracticeActivityType;
-    topicTitle: string | null;
-    subjectName: string | null;
-    occurredAt: string;
-  };
-  t: TFunction;
-}): React.ReactElement {
-  const typeLabel = practiceTypeLabel(item.activityType, t);
-  // Topic is the headline when known; otherwise the activity-type label leads.
-  const headline = item.topicTitle ?? typeLabel;
-  const occurred = new Date(item.occurredAt);
-  const dateLabel = Number.isNaN(occurred.getTime())
-    ? null
-    : occurred.toLocaleDateString();
-  // Type appears in the metadata line only when it is not already the headline,
-  // so a topic-less row never repeats its label twice.
-  const meta = [item.topicTitle ? typeLabel : null, item.subjectName, dateLabel]
-    .filter((value): value is string => Boolean(value))
-    .join(' · ');
-
-  return (
-    <View
-      testID={`journal-activity-${item.id}`}
-      className="rounded-card border border-border bg-surface p-4"
-    >
-      <Text className="text-body font-semibold text-text-primary">
-        {headline}
-      </Text>
-      {meta ? (
-        <Text className="mt-1 text-body-sm text-text-secondary">{meta}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function JournalPracticeSection(): React.ReactElement {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const [typeFilter, setTypeFilter] = useState<PracticeTypeFilter>('all');
-  const history = usePracticeActivityHistory({
-    limit: 50,
-    type: typeFilter === 'all' ? undefined : typeFilter,
-  });
-  const errorActions = useSectionErrorActions(
-    history.error,
-    () => void history.refetch(),
-  );
-
-  const items = useMemo(
-    () => history.data?.pages.flatMap((page) => page.items) ?? [],
-    [history.data],
-  );
-
-  return (
-    <View testID="journal-practice-section" className="gap-3">
-      {/* The full practice hub (quiz, review, assessment, dictation launchers)
-          stays one tap away — pinned on top rather than buried in a sub-tab. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('journal.practice.openHub')}
-        onPress={() => router.push('/(app)/practice' as Href)}
-        testID="journal-practice-open-hub"
-        className="min-h-[48px] items-center justify-center rounded-button bg-primary px-4 py-3"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          {t('journal.practice.openHub')}
-        </Text>
-      </Pressable>
-
-      <Text className="text-body font-semibold text-text-primary">
-        {t('journal.practice.pastActivityTitle')}
-      </Text>
-
-      {/* Type-filter chips — All + every activity type (the primary axis users
-          scan by). Wraps to a second row on small screens. */}
-      <View
-        className="flex-row flex-wrap gap-2"
-        testID="journal-practice-filter"
-      >
-        {PRACTICE_TYPE_FILTERS.map((key) => {
-          const selected = typeFilter === key;
-          const label = practiceTypeLabel(key, t);
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setTypeFilter(key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              accessibilityLabel={label}
-              testID={`journal-practice-filter-${key}`}
-              className={`min-h-[36px] justify-center rounded-full px-3 py-1.5 ${
-                selected ? 'bg-primary' : 'bg-surface-elevated'
-              }`}
-            >
-              <Text
-                className={`text-caption font-semibold ${
-                  selected ? 'text-text-inverse' : 'text-text-secondary'
-                }`}
-              >
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View testID="journal-practice-past-activity" className="gap-3">
-        {history.isLoading && !history.data ? (
-          <TimeoutLoader
-            isLoading
-            testID="journal-practice-loading"
-            loadingLabel={t('common.loading')}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => void history.refetch(),
-              testID: 'journal-practice-timeout-retry',
-            }}
-          />
-        ) : history.isError && items.length === 0 ? (
-          <ErrorFallback
-            variant="card"
-            testID="journal-practice-error"
-            title={t('journal.practice.error')}
-            primaryAction={
-              errorActions.primary
-                ? {
-                    ...errorActions.primary,
-                    testID: 'journal-practice-error-retry',
-                  }
-                : {
-                    label: t('common.tryAgain'),
-                    onPress: () => void history.refetch(),
-                    testID: 'journal-practice-error-retry',
-                  }
-            }
-            secondaryAction={errorActions.secondary}
-          />
-        ) : items.length === 0 ? (
-          <EmptyState
-            testID="journal-practice-empty"
-            title={t('journal.practice.empty')}
-          />
-        ) : (
-          items.map((item) => (
-            <PracticeActivityRow key={item.id} item={item} t={t} />
-          ))
-        )}
-      </View>
-    </View>
-  );
-}
-
 function ActiveSection({
   section,
 }: {
@@ -1060,8 +863,6 @@ function ActiveSection({
       return <JournalNotesArchive />;
     case 'sessions':
       return <JournalRecapsSection />;
-    case 'practice':
-      return <JournalPracticeSection />;
     case 'memory':
       return <JournalMemorySection />;
     case 'reports':

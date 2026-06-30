@@ -4238,9 +4238,7 @@
       "memory": "Pamięć",
       "memorySubtitle": "Zobacz, co pamięta Twój mentor, i zarządzaj tym.",
       "sessions": "Sesje",
-      "sessionsSubtitle": "Przeglądaj podsumowania ostatnich sesji.",
-      "practice": "Ćwiczenia",
-      "practiceSubtitle": "Otwórz centrum ćwiczeń lub przejrzyj swoją ostatnią aktywność."
+      "sessionsSubtitle": "Przeglądaj podsumowania ostatnich sesji."
     },
     "moments": {
       "title": "Ostatnie chwile",
@@ -4276,21 +4274,6 @@
       "filterAll": "Wszystkie",
       "filterMine": "Moje notatki",
       "filterMentor": "Zakładki"
-    },
-    "practice": {
-      "openHub": "Otwórz centrum ćwiczeń",
-      "pastActivityTitle": "Moja ostatnia aktywność",
-      "empty": "Twoje quizy, powtórki, testy i ćwiczenia pojawią się tutaj.",
-      "error": "Nie udało się wczytać Twojej ostatniej aktywności.",
-      "type": {
-        "all": "Wszystkie",
-        "quiz": "Quiz",
-        "review": "Powtórka",
-        "assessment": "Test",
-        "dictation": "Dyktando",
-        "recitation": "Recytacja",
-        "fluency_drill": "Ćwiczenie płynności"
-      }
     }
   },
   "accountAdmin": {

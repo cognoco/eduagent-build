@@ -3171,8 +3171,6 @@
       "notesSubtitle": "Browse your notes and saved bookmarks.",
       "sessions": "Sessions",
       "sessionsSubtitle": "Review recent session summaries.",
-      "practice": "Practice",
-      "practiceSubtitle": "Open the practice hub or review your past activity.",
       "memory": "Memory",
       "memorySubtitle": "See and manage what your mentor remembers.",
       "reports": "Reports",
@@ -3207,21 +3205,6 @@
       "filterAll": "All",
       "filterMine": "My notes",
       "filterMentor": "Bookmarks"
-    },
-    "practice": {
-      "openHub": "Open practice hub",
-      "pastActivityTitle": "My past activity",
-      "empty": "Your quizzes, reviews, assessments, and drills will appear here.",
-      "error": "We couldn't load your past activity.",
-      "type": {
-        "all": "All",
-        "quiz": "Quiz",
-        "review": "Review",
-        "assessment": "Assessment",
-        "dictation": "Dictation",
-        "recitation": "Recitation",
-        "fluency_drill": "Fluency drill"
-      }
     },
     "memory": {
       "title": "Mentor memory controls",
