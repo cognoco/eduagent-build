@@ -61,31 +61,15 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   return { ...actual, ...mockInngestTransport.module };
 });
 
-// Mock drizzle-orm + database
-jest.mock(
-  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
-  () => ({
-    and: jest.fn(),
-    eq: jest.fn(),
-    inArray: jest.fn(),
-    isNull: jest.fn(),
-    ne: jest.fn(),
-  }),
-);
-
-jest.mock(
-  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
-  () => ({
-    curriculumBooks: {},
-    curriculumTopics: {},
-    curricula: {},
-    profiles: { id: 'profiles.id', archivedAt: 'profiles.archivedAt' },
-    subjects: { status: 'subjects.status' },
-    // WI-867: isPersonLive (helpers.ts:126) accesses person.id + person.archivedAt
-    // to build WHERE clause. String stubs satisfy eq()/isNull() mocks.
-    person: { id: 'person.id', archivedAt: 'person.archivedAt' },
-  }),
-);
+// [BUG-900] No `jest.mock('drizzle-orm')` / `jest.mock('@eduagent/database')`.
+// The real drizzle operators and the real schema objects are used so the
+// query builder composes the genuine SQL AST (a column-name typo or a dropped
+// where-clause would surface here, not be papered over by hand-rolled stubs).
+// The actual WHERE/join *filtering* — and the wrong-user scoping guard — is
+// proven against a live DB in review-due-send.integration.test.ts, since only
+// Postgres can evaluate the parent-chain join. These unit tests stub the step
+// database (getStepDatabase) to a controlled fake `db` so the non-DB branch
+// logic (liveness, dedup, send) is exercised in isolation.
 
 import { reviewDueSend } from './review-due-send';
 
