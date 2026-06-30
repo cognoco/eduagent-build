@@ -13,7 +13,13 @@
       "purpose": "catch review verdicts: Reviewing->Closed (advance) / Reviewing->Executing (rework)",
       "command": "node _quartet/working/lanes/pr-cleanup/_state/cosmo-ws27-monitor.mjs",
       "task-id": "b8v6l9yuv"
+    },
+    {
+      "target": "WS-27 per-ID Cosmo Stage + claim (9 WIs, robust vs relation drift)",
+      "purpose": "stage changes + Executing-unclaimed alarm; orchestrator-mandated invariant (inb-9)",
+      "command": "node _quartet/working/lanes/pr-cleanup/_state/cosmo-perID-monitor.mjs",
+      "task-id": "bzcbvwm1s"
     }
   ],
-  "notes": "Armed per orchestrator directive pr-cleanup-inb-1 (2026-06-29). Baseline poll: 11 WS-27 items all Executing; tracker lists 14 (WI-885/902/1059/1132/1151 not yet in relation), and WI-849/1098 present but outside the 14-WI charter — orchestrator concurrently editing membership; reconcile on release. Still prime-and-hold until release directive."
+  "notes": "Per-ID monitor added (inb-9 invariant): polls 560/902/1059/1071/1075/1087/1132/1165/1166 by unique_id, alarms on Executing&&ClaimedBy-empty. Relation monitor b8v6l9yuv kept as secondary (relation confirmed intact). Claims lodged for all 8 bounces; 1071+1075 re-completed to Reviewing."
 }

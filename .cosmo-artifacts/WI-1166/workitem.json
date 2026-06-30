@@ -1,0 +1,17 @@
+{
+  "pageId": "38e8bce9-1f7c-815f-a436-f8f61adf9f8a",
+  "id": "WI-1166",
+  "name": "Account reclaim: implement out-of-band recovery workflow for blocked reclaim attempts",
+  "description": "Email-based account reclaim is safely fail-closed blocked, but the promised recovery workflow is unimplemented: no confirmation token to the original email owner, no support escalation/audit trail, and app/account.reclaim_attempt sits in KNOWN_PENDING_ORPHANS with no handler — a legitimate user who recreates their Clerk account with the same email is stuck until manual support notices.",
+  "acceptanceCriteria": "1. Resend retry-path test added: handler throws (triggering Inngest retry) when Resend returns a non-ok response (500). 2. Unused accounts import and void accounts; workaround removed from test file. 3. gc1-allow escape normalized to // gc1-allow: <reason> line-comment on same line as jest.mock(. 4. All 7 test cases pass locally and in CI (API Quality Gate, main, Playwright smoke, Merge completeness check all SUCCESS). 5. claude-review re-ran with 0 blocker/must-fix/should-fix findings.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

@@ -29,6 +29,7 @@
 - [project_ci_db_journaled_chain_divergence.md](project_ci_db_journaled_chain_divergence.md) — CI tests DB lacks prod's out-of-chain FK repoints; v2 baseline-anchor collides with self-sub-seeding suites → `seedBaselineSubscription:false`. Verify migration premise before authoring schema migrations.
 - [project_expo_router_pollution.md](_archive/project_expo_router_pollution.md) — Helpers under `app/(app)/` treated as routes. Fix: `_components/`, `_hooks/` dirs.
 - [project_claude_review_self_referential_401.md](project_claude_review_self_referential_401.md) — A PR editing `.github/workflows/claude*.yml` shows a benign RED claude-review (self-referential 401, not token exhaustion). Confirm via rerun-after-merge or a non-workflow follow-up PR.
+- [project_conflicting_pr_blocks_ci.md](project_conflicting_pr_blocks_ci.md) — CONFLICTING/DIRTY PR → ZERO github-actions CI runs (no merge ref); symptom = "every check app except github-actions". Check `gh pr view --json mergeable` FIRST; fix = rebase, not re-push/re-author/fresh-PR.
 - [feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md](feedback_flag_collapse_breaks_legacy_pinned_unit_mocks.md) — Collapsing a feature flag to one arm mass-breaks legacy-pinned mock-DB unit tests (v2 seams run unconditionally); diagnose by crash-site histogram (seams≠bespoke), verify counts vs base, delete-vs-migrate by phase-B-survival/integration-twin. Recurs for WI-868/869.
 
 ## Auth

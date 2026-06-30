@@ -1,0 +1,17 @@
+{
+  "pageId": "3858bce9-1f7c-8183-955a-cd5615a297d5",
+  "id": "WI-902",
+  "name": "Dictation: no way to review past dictations; full text not shown at end or saved",
+  "description": "After finishing a dictation there is no history/list of previous dictations anywhere in the app, and the completed full text is never shown to the learner or persisted. The only GET endpoint is /dictation/streak (apps/api/src/routes/dictation.ts) which returns a streak count. The dictation_results table (packages/database/src/schema/dictation.ts) stores only sentenceCount, mistakeCount, reviewed, mode, date — not the original sentences, what the learner wrote, or the LLM review details. The review screen shows per-mistake corrections during the session only; the final celebration screen shows score only and the text is lost on navigation.",
+  "acceptanceCriteria": "Learner can find a list of their previous dictations from a discoverable entry point, and can open a past dictation to see its full text (and ideally the corrections). Decide and document whether the original passage + learner mistakes are persisted server-side so they are re-fetchable, or whether 'full text at end' is a session-only display. If persisting, add the columns/endpoint; if session-only, at minimum show the full completed passage on the final screen. Enumerate variants: homework mode vs surprise mode; reviewed vs skipped-review.",
+  "riskImpact": "",
+  "type": "Enhancement",
+  "altitude": "Item",
+  "priority": "P3",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

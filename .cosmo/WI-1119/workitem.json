@@ -1,0 +1,17 @@
+{
+  "pageId": "38d8bce9-1f7c-8154-a1c1-e9a97c78ee01",
+  "id": "WI-1119",
+  "name": "S2: restore add-subject on populated path + manage/archive entry on hub",
+  "description": "Two distinct UI gaps: (1) SubjectsBrowse.tsx renders the onCreateSubject button only in the empty-state branch (subjects.length===0, lines 47-65); once one or more subjects exist there is no add-subject affordance on the screen. (2) SubjectHub (apps/mobile/src/app/(app)/subject-hub/[subjectId]/index.tsx:220) renders no manage/pause/archive/delete entry point; that functionality exists only in Library (library.tsx:1278-1328, archive-first pattern). Learners cannot add a second subject from the browse list, and cannot archive or pause a subject from the hub.",
+  "acceptanceCriteria": "1. SubjectsBrowse populated path (subjects.length>0) shows an 'Add subject' button — e.g. a row at the bottom of the list or a header action — that calls onCreateSubject; testID subjects-browse-create is present in both empty and populated states.\n2. SubjectHub screen exposes a manage entry — at minimum an overflow/kebab or pressable 'Manage' — that allows the owner/learner scope to pause or archive the subject following the archive-first pattern from Library.\n3. The manage entry is not shown for supporter-proxy scope (canStudy-derived gating, matching SubjectHubNotesSection pattern).\n4. Regression tests: SubjectsBrowse.test.tsx asserts subjects-browse-create is present when subjects.length>0; SubjectHubRoute.test.tsx asserts manage/archive entry is visible for learner scope and absent for proxy scope.",
+  "riskImpact": "Learners with existing subjects cannot add a second one without knowing to navigate back through onboarding. Users wanting to pause or archive a subject have no in-context path — they must discover the Library screen, a dead-end UX gap.",
+  "type": "Feature",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Executing",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "claude:sonnet:WI-1119-builder",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

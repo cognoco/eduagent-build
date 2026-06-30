@@ -85,7 +85,17 @@ b-1151/1644, b-1059/1617, b-1132/1643, b-1087/1593, b-1097/1609, b-1165/1603, b-
 - Pipeline per WI: builder claim→fix→green PR→report; shepherd merges (squash) + builder runs
   Phase-7 `/cosmo:execute complete` detached to squash SHA. **Merge constraint:** schema/integration
   PRs (#1644, #1593) sequenced deliberately, re-check `mergeStateStatus` after each land.
-- Monitors: inbox `bg12m7pqi`, WS-27 Cosmo-Stage `b8v6l9yuv`. Outbox through pr-cleanup-4.
+- Monitors: inbox `bg12m7pqi`, WS-27 Cosmo-Stage `b8v6l9yuv`. Outbox through pr-cleanup-5.
+
+### Progress (2026-06-30 ~06:00) — 9/10 residue WIs MERGED
+Merged + finalized → Reviewing: WI-1071(90edc43a), WI-1087(752f237f), WI-1165(cb2fb93f),
+WI-1166(cd1a6400), WI-1151(af2bc45b — shepherd-owned lifecycle: was Captured-stranded → bridged →
+shepherd-completed), WI-1119(b8ce52aa — needed force-push branch repair + eas.json V2-flag-regression
+fix), WI-902(dd58d9bd — Phase-7 pending confirm), WI-1059(f2bbc17c), WI-1097(660f784d).
+**LAST open: WI-1132/#1643** — `main` check failing, behind main; b-1132 re-merging + diagnosing.
+Gate-1 discipline caught: stale "green" reports, green-check-but-CHANGES_REQUESTED-verdict (#1644 billing
+should-fix, #1604 eas.json), event-profile-vs-no-db across #1603/#1643/#1644. Awaiting global-reviewer
+verdicts on the 8 Reviewing WIs.
 
 ## Launch gate (prime-and-hold)
 Released when the orchestrator posts an inbox `directive` (`type:"directive"`, `msg` ≈
@@ -110,3 +120,37 @@ orient, confirm reviewer coverage of WS-27, arm the inbox watcher, hold.
   to WS-27 (order 1500/1600 → 16 members). Provenance comments on both source issues. Shepherd
   directed via inbox-4. 1593/1609 routed to fix via inbox-3. WS-27 now: 6 Reviewing, 8 shepherd-
   residue (1593/1609/1604/1618/1644/1617/1643/1595), 2 new Ready (1165/1166).
+
+## ⚠️ BOUNCE RECONCILE (2026-06-30 ~06:20) — READ ON RESUME
+**Monitor went BLIND:** closed/processed WIs were dropped from the WS-27 `Workstream` relation, so the
+relation-filtered poll (`cosmo-ws27-monitor.mjs`) stopped seeing my 10 WIs → I missed 6 reviewer bounces
+(operator caught it). **FIX ON RESUME: read my WIs by ID, not WS-27 relation** — use `/tmp/wi-stage-read2.mjs`
+pattern (filter `{property:'ID', unique_id:{equals:N}}` on DB `f170be9e-04ae-45d4-9618-28f2438666bd`;
+read the page's own unique_id, NOT a blob scan which catches relation WIs). Re-arm a per-ID monitor.
+
+**True state (direct per-ID read):**
+- **CLOSED (done):** WI-1151, WI-1119, WI-1097. Their builders correctly shut down.
+- **WI-1132/#1643:** still PRE-MERGE. `main` fails on transient `pnpm: command not found` (poisoned run-context,
+  passes on main+all siblings). b-1132 (STILL ALIVE) pushing empty commit for fresh run. Watch + merge when green.
+- **6 BOUNCED → Executing (real fix-forward rework; originals already MERGED so each needs a NEW PR):**
+  - **WI-1071** (Fixed-In 90edc43a): post-merge `main` red on run 28399946343. main is GREEN now (660f784d) —
+    likely just needs that commit's required `main` context rerun green, then reviewer re-verifies. Lightest.
+  - **WI-1087** (752f237f): incomplete tutor→mentor sweep — leftover `mateFeedback: 'Opinia tutora'` at
+    `apps/mobile/src/i18n/locales/pl.json:3145` (+ sweep all locales for non-exception `tutor`). Rename/regen + rerun i18n.
+  - **WI-1165** (cb2fb93f): onFailure getStepDatabase sweep MISSED siblings `subject-retry-curriculum.ts:65-93`
+    + `subject-prewarm-curriculum.ts:85-111` (call getStepDatabase()/markBookFailed without
+    runWithStepDatabaseScope+closeStepDatabases). Scope them same pattern OR documented tracked deferral.
+  - **WI-1166** (cd1a6400): identity-v2 reclaim path `apps/api/src/services/identity-v2/identity-graph.ts` still
+    emits reclaim event with old orphan-allow comment + payload can give existingClerkUserId=null (new handler
+    only validates non-null). Fix/verify that emitter/handler path OR document scope exclusion.
+  - **WI-902** (dd58d9bd): integration test fails — `column "sentences" of relation "dictation_results" does not
+    exist` on Doppler dev DB (migration 0126 committed but not applied to validation DB). Apply/verify migration
+    on validation DB OR provide green integration evidence. 16/17 failed: `result.integration.test.ts`.
+  - **WI-1059** (f2bbc17c): `parseJson` calls `res.json()` OUTSIDE try/catch → 2xx non-JSON body throws raw
+    SyntaxError not ApiResponseShapeError. Classify JSON-parse failures at API client boundary + negative test.
+
+**RE-ENGAGE PLAN (post-compact):** re-dispatch a builder per bounced WI (fresh, fix-forward NEW PR; brief points at
+builder.md + the exact finding above + builder.md GATE-0 premise-verify). I SHUT DOWN the original 6 builders
+(b-1071/1087/1165/1166/902/1059) prematurely — dispatch fresh ones. Shepherd merges + re-completes (new Fixed-In).
+Gate-1 lesson reinforced: closure verifies against origin/main, so a green-PR-at-merge can still bounce if the
+post-merge `main` run is red or a completeness sweep finds siblings. Outbox through pr-cleanup-6.
