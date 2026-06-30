@@ -75,11 +75,6 @@ let fetchSpy: jest.SpyInstance;
 
 beforeEach(() => {
   provider = createGeminiProvider(TEST_API_KEY);
-  // jest's node-vm sandbox may not surface globalThis.fetch as an own property
-  // even when the host Node version has it. Seed a stub so spyOn has a target.
-  if (!Object.prototype.hasOwnProperty.call(globalThis, 'fetch')) {
-    (globalThis as unknown as Record<string, unknown>)['fetch'] = jest.fn();
-  }
   fetchSpy = jest.spyOn(globalThis, 'fetch');
 });
 
@@ -621,70 +616,42 @@ describe('Gemini Provider', () => {
       expect(body.safetySettings).toHaveLength(5);
     });
 
-    describe('stall timeout [BUG-32]', () => {
-      // Isolate fake timers to this describe so subsequent tests see real setTimeout.
-      beforeEach(() => {
-        jest.useFakeTimers();
+    it('throws on mid-stream stall after per-chunk timeout [BUG-32]', async () => {
+      jest.useFakeTimers();
+      const encoder = new TextEncoder();
+      const firstChunk = `data: ${JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'first' }] } }],
+      })}\n\n`;
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(firstChunk));
+        },
       });
-      afterEach(() => {
-        jest.useRealTimers();
-        // jest 30 node-vm bug: useRealTimers() does not always restore clearTimeout/setTimeout
-        // as own properties of globalThis. Patch from 'timers' so subsequent tests work.
-
-        const t = require('timers') as {
-          clearTimeout: typeof clearTimeout;
-          setTimeout: typeof setTimeout;
-        };
-        if (
-          typeof (globalThis as Record<string, unknown>)['clearTimeout'] ===
-          'undefined'
-        ) {
-          (globalThis as Record<string, unknown>)['clearTimeout'] =
-            t.clearTimeout;
+      fetchSpy.mockResolvedValue(
+        new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+      );
+      const chunks: string[] = [];
+      const streamPromise = (async () => {
+        for await (const chunk of provider.chatStream(
+          [{ role: 'user', content: 'test' }],
+          DEFAULT_CONFIG,
+        )) {
+          chunks.push(chunk);
         }
-        if (
-          typeof (globalThis as Record<string, unknown>)['setTimeout'] ===
-          'undefined'
-        ) {
-          (globalThis as Record<string, unknown>)['setTimeout'] = t.setTimeout;
-        }
-      });
-
-      it('throws on mid-stream stall after per-chunk timeout', async () => {
-        const encoder = new TextEncoder();
-        const firstChunk = `data: ${JSON.stringify({
-          candidates: [{ content: { parts: [{ text: 'first' }] } }],
-        })}\n\n`;
-        const stream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(encoder.encode(firstChunk));
-          },
-        });
-        fetchSpy.mockResolvedValue(
-          new Response(stream, {
-            status: 200,
-            headers: { 'Content-Type': 'text/event-stream' },
-          }),
-        );
-        const chunks: string[] = [];
-        const streamPromise = (async () => {
-          for await (const chunk of provider.chatStream(
-            [{ role: 'user', content: 'test' }],
-            DEFAULT_CONFIG,
-          )) {
-            chunks.push(chunk);
-          }
-        })();
-        const caughtError = streamPromise.catch((err: unknown) => err);
-        await jest.advanceTimersByTimeAsync(100);
-        await jest.advanceTimersByTimeAsync(10_000);
-        const error = await caughtError;
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe(
-          'Gemini stream stalled: no data received for 10s',
-        );
-        expect(chunks).toEqual(['first']);
-      });
+      })();
+      const caughtError = streamPromise.catch((err: unknown) => err);
+      await jest.advanceTimersByTimeAsync(100);
+      await jest.advanceTimersByTimeAsync(10_000);
+      const error = await caughtError;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        'Gemini stream stalled: no data received for 10s',
+      );
+      expect(chunks).toEqual(['first']);
+      jest.useRealTimers();
     });
 
     it('throws on safety block during stream', async () => {

@@ -110,14 +110,6 @@ async function request(token: string) {
 describe('[BUG-902] authMiddleware Clerk token max-age ceiling', () => {
   let fetchSpy: jest.SpyInstance;
 
-  beforeAll(() => {
-    // jest's node-vm sandbox may not surface globalThis.fetch as an own property.
-    // Seed a stub so jest.spyOn(globalThis, 'fetch') has a target.
-    if (!Object.prototype.hasOwnProperty.call(globalThis, 'fetch')) {
-      (globalThis as Record<string, unknown>)['fetch'] = jest.fn();
-    }
-  });
-
   beforeEach(() => {
     clearJWKSCache();
     // Stub the Clerk JWKS endpoint (external boundary). Every fetch in these
