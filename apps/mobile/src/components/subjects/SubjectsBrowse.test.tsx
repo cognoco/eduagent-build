@@ -437,7 +437,6 @@ describe('SubjectsBrowse — search behavior', () => {
   });
 
   it('shows a loading indicator while the search request is in-flight', async () => {
-    // Never resolves during this test — keeps loading state active.
     // Never resolves — keeps loading state active for the duration of the test.
     mockFetch.mockReturnValue(
       new Promise((_resolve) => {
