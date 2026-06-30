@@ -13,6 +13,7 @@ import {
 import { ErrorFallback, TimeoutLoader } from '../../../components/common';
 import { ContractCard } from '../../../components/visibility';
 import { useApiQuery } from '../../../hooks/use-api-query';
+import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useProfile } from '../../../lib/profile';
@@ -73,7 +74,8 @@ export default function LinkContractScreen(): React.ReactElement {
         param: { id: input.contract.id },
         json: { actorPersonId, audience: input.audience },
       });
-      return visibilityContractSchema.parse(await res.json());
+      const okRes = await assertOk(res);
+      return visibilityContractSchema.parse(await okRes.json());
     },
     onSuccess: (contract) => {
       queryClient.setQueryData(['visibility-contract', contract.id], contract);
@@ -85,7 +87,8 @@ export default function LinkContractScreen(): React.ReactElement {
       const res = await client.visibility.links[':id'].revoke.$post({
         param: { id: contract.supportershipId },
       });
-      return revocationNoticeSchema.parse(await res.json());
+      const okRes = await assertOk(res);
+      return revocationNoticeSchema.parse(await okRes.json());
     },
     onSuccess: () => {
       void contractQuery.refetch();

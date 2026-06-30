@@ -10,6 +10,7 @@ import {
 } from '@eduagent/schemas';
 
 import { ErrorFallback } from '../../../components/common';
+import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useProfile } from '../../../lib/profile';
@@ -52,7 +53,8 @@ export default function NewLinkScreen(): React.ReactElement {
           managedTier,
         },
       });
-      return visibilityContractSchema.parse(await res.json());
+      const okRes = await assertOk(res);
+      return visibilityContractSchema.parse(await okRes.json());
     },
     onSuccess: (contract) => {
       router.replace({
