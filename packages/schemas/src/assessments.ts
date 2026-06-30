@@ -245,7 +245,7 @@ export const teachingPreferenceSchema = z
   .object({
     subjectId: z.string().uuid(),
     method: teachingMethodSchema,
-    analogyDomain: analogyDomainSchema.optional(),
+    analogyDomain: analogyDomainSchema.nullable().optional(),
   })
   .strict();
 export type TeachingPreferenceInput = z.infer<typeof teachingPreferenceSchema>;
