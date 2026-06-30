@@ -13,6 +13,7 @@ import { ErrorFallback } from '../../../components/common';
 import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useProfile } from '../../../lib/profile';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -76,7 +77,7 @@ export default function NewLinkScreen(): React.ReactElement {
           message={t('visibility.link.missingMessage')}
           primaryAction={{
             label: t('common.goBack'),
-            onPress: router.back,
+            onPress: () => goBackOrReplace(router, '/(app)/home'),
             testID: 'visibility-link-new-missing-back',
           }}
           testID="visibility-link-new-missing"

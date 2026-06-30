@@ -120,7 +120,8 @@ describe('LinkContractScreen', () => {
 
     renderScreen();
 
-    await screen.findByText('Visibility contract');
+    await screen.findByTestId('visibility-contract-card');
+    screen.getByText('Visibility contract');
     screen.getByText('You are asking to support Emma.');
     screen.getByText('Private chats, notes and journal artifacts stay hidden.');
 

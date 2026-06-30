@@ -3,6 +3,7 @@ import { ScrollView, Text, View, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import {
   revocationNoticeSchema,
   visibilityContractSchema,
@@ -16,7 +17,9 @@ import { useApiQuery } from '../../../hooks/use-api-query';
 import { assertOk } from '../../../lib/assert-ok';
 import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useProfile } from '../../../lib/profile';
+import { useThemeColors } from '../../../lib/theme';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -38,6 +41,7 @@ function deriveAudience(
 export default function LinkContractScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const colors = useThemeColors();
   const params = useLocalSearchParams<{
     contractId?: string | string[];
     supporteeName?: string | string[];
@@ -104,7 +108,7 @@ export default function LinkContractScreen(): React.ReactElement {
           message={t('visibility.link.missingMessage')}
           primaryAction={{
             label: t('common.goBack'),
-            onPress: router.back,
+            onPress: () => goBackOrReplace(router, '/(app)/home'),
             testID: 'visibility-link-missing-back',
           }}
           testID="visibility-link-missing"
@@ -146,7 +150,7 @@ export default function LinkContractScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: router.back,
+            onPress: () => goBackOrReplace(router, '/(app)/home'),
             testID: 'visibility-link-error-back',
           }}
           testID="visibility-link-error"
@@ -179,6 +183,18 @@ export default function LinkContractScreen(): React.ReactElement {
       contentInsetAdjustmentBehavior="automatic"
       testID="visibility-link-screen"
     >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('common.goBack')}
+        className="min-h-[44px] flex-row items-center gap-2 self-start rounded-button border border-border px-4 py-2"
+        onPress={() => goBackOrReplace(router, '/(app)/home')}
+        testID="visibility-link-back"
+      >
+        <Ionicons name="chevron-back" size={18} color={colors.textSecondary} />
+        <Text className="text-body-sm font-semibold text-text-secondary">
+          {t('common.goBack')}
+        </Text>
+      </Pressable>
       <View>
         <Text className="text-display-sm font-semibold text-text-primary">
           {active
