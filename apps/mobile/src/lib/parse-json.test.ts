@@ -66,4 +66,18 @@ describe('parseJson', () => {
     expect(caught).toBeInstanceOf(ApiResponseShapeError);
     expect((caught as Error).message).toContain('GET /sessions/:id');
   });
+
+  it('throws ApiResponseShapeError (not SyntaxError) when 2xx body is not valid JSON', async () => {
+    // Regression guard for the bounced finding: res.json() was outside try/catch,
+    // so a 2xx non-JSON response (e.g. HTML error page) threw a raw SyntaxError
+    // instead of the typed ApiResponseShapeError. This test must be RED before the
+    // fix and GREEN after.
+    const res = new Response('not valid json <!DOCTYPE html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    });
+    await expect(parseJson(res, testSchema)).rejects.toBeInstanceOf(
+      ApiResponseShapeError,
+    );
+  });
 });
