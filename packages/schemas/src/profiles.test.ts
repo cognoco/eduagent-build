@@ -325,3 +325,59 @@ describe('profileCreateSchema — conversationLanguage at the create boundary (i
     ).toThrow();
   });
 });
+
+describe('profileCreateSchema — full birth date validation (WI-367)', () => {
+  const baseValid = {
+    displayName: 'Alex',
+    birthYear: 2013,
+  };
+
+  it('rejects a birth month without a birth day', () => {
+    const result = profileCreateSchema.safeParse({
+      ...baseValid,
+      birthMonth: 5,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['birthDay'],
+        }),
+      ]),
+    );
+  });
+
+  it('rejects a birth day without a birth month', () => {
+    const result = profileCreateSchema.safeParse({
+      ...baseValid,
+      birthDay: 15,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['birthMonth'],
+        }),
+      ]),
+    );
+  });
+
+  it('rejects a non-calendar birth date', () => {
+    const result = profileCreateSchema.safeParse({
+      ...baseValid,
+      birthMonth: 2,
+      birthDay: 31,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ['birthDay'],
+        }),
+      ]),
+    );
+  });
+});
