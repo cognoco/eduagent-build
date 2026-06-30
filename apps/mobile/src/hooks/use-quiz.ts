@@ -28,6 +28,7 @@ import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
+import { useApiQuery } from './use-api-query';
 
 export function useGenerateRound(): UseMutationResult<
   QuizRoundResponse,
@@ -55,27 +56,15 @@ export function useFetchRound(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<QuizRoundResponse>({
     queryKey: ['quiz-round', roundId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      if (!roundId) {
-        throw new Error('roundId is required');
-      }
-
-      const { signal, cleanup } = combinedSignal(querySignal);
-
-      try {
-        const res = await client.quiz.rounds[':id'].$get(
-          { param: { id: roundId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return parseJson(res, quizRoundResponseSchema, 'GET /quiz/rounds/:id');
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!roundId,
+    fetch: (signal) =>
+      client.quiz.rounds[':id'].$get(
+        { param: { id: roundId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => quizRoundResponseSchema.parse(json),
+    enabled: !!roundId,
   });
 }
 
@@ -115,7 +104,11 @@ export function useCheckAnswer(): UseMutationResult<
         },
       });
       await assertOk(res);
-      return parseJson(res, questionCheckResponseSchema, 'POST /quiz/rounds/:id/check');
+      return parseJson(
+        res,
+        questionCheckResponseSchema,
+        'POST /quiz/rounds/:id/check',
+      );
     },
   });
 }
@@ -135,7 +128,11 @@ export function useCompleteRound(): UseMutationResult<
         json: { results },
       });
       await assertOk(res);
-      return parseJson(res, completeRoundResponseSchema, 'POST /quiz/rounds/:id/complete');
+      return parseJson(
+        res,
+        completeRoundResponseSchema,
+        'POST /quiz/rounds/:id/complete',
+      );
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['quiz-recent'] });
@@ -154,23 +151,10 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<RecentRound[]>({
     queryKey: ['quiz-recent', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-
-      try {
-        const res = await client.quiz.rounds.recent.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return parseJson(res, z.array(recentRoundSchema), 'GET /quiz/rounds/recent');
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.quiz.rounds.recent.$get({}, { init: { signal } }),
+    select: (json) => z.array(recentRoundSchema).parse(json),
   });
 }
 
@@ -195,7 +179,11 @@ export function useRoundDetail(
           { init: { signal } },
         );
         await assertOk(res);
-        return parseJson(res, quizRoundResponseSchema, 'GET /quiz/rounds/:id (detail)');
+        return parseJson(
+          res,
+          quizRoundResponseSchema,
+          'GET /quiz/rounds/:id (detail)',
+        );
       } finally {
         cleanup();
       }

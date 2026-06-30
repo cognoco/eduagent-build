@@ -24,7 +24,30 @@ import * as ts from 'typescript';
 // cursor-paginated useInfiniteQuery (Practice "My past activity"), which the
 // single-query useApiQuery wrapper cannot express — non-migratable, like the
 // sibling useAllNotes infinite query.
-const BASELINE = 96;
+// 96 → 43 (WI-1068, 2026-06-30, hygiene burndown): ~53 sites migrated across
+// ~20 hook files. Non-migratable remainder (43 sites) by blocker type:
+//   staleTime/refetchInterval/retry/refetchOnWindowFocus: use-account,
+//     use-books.useBookWithTopics/useBooks, use-coaching-card, use-curriculum,
+//     use-filing, use-library-context, use-library-search, use-recaps,
+//     use-revenuecat, use-subjects, use-quiz.useRoundDetail/useQuizStats,
+//     use-subscription.useSubscriptionStatus, use-sessions.useSession/
+//     useSessionTranscript/useSessionSummary, use-progress.useLearningResumeTarget/
+//     useResumeNudge/useProgressInventory/useProgressMilestones,
+//     use-retention.useEvaluateEligibility;
+//   useInfiniteQuery: use-all-books, use-bookmarks.useBookmarks,
+//     use-notes.useAllNotes, use-practice-activity-history,
+//     use-progress.useProfileSessionsArchive;
+//   useQueries: use-subject-hub (2 sites);
+//   conditional two-branch fetch: use-progress.useProfileSessions/
+//     useProfileReports/useProfileWeeklyReports;
+//   Hono type cast + try/catch Sentry: use-progress.useChildWeeklyReports;
+//   Hono type cast in queryFn: use-progress.useChildProgressSummary/
+//     useProfileReportDetail/useProfileWeeklyReportDetail;
+//   isSignedIn gate (not activeProfile): use-profiles.useProfiles;
+//   cache side-effect in queryFn: use-dashboard.useDashboard;
+//   NotFoundError catch returning null: use-subscription.useFamilySubscription;
+//   custom retry fn: use-sessions.useSessionTranscript/useSession (counted above).
+const BASELINE = 43;
 
 const EXCLUDED = new Set([
   'apps/mobile/src/hooks/use-api-query.ts',

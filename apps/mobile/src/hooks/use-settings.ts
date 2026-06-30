@@ -1,9 +1,8 @@
 import {
-  useQuery,
   useMutation,
   useQueryClient,
-  type UseQueryResult,
   type UseMutationResult,
+  type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
   NotificationPrefsInput,
@@ -15,9 +14,9 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 // ---------------------------------------------------------------------------
 // Query hooks
@@ -27,23 +26,11 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ preferences: NotificationPrefs }, NotificationPrefs>({
     queryKey: queryKeys.settings.notifications(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings.notifications.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.preferences;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.settings.notifications.$get({}, { init: { signal } }),
+    select: (json) => json.preferences,
   });
 }
 
@@ -51,25 +38,14 @@ export function useCelebrationLevel(): UseQueryResult<CelebrationLevel> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ celebrationLevel: CelebrationLevel }, CelebrationLevel>({
     queryKey: queryKeys.settings.celebrationLevel(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings['celebration-level'].$get(
-          { query: {} },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          celebrationLevel: CelebrationLevel;
-        };
-        return data.celebrationLevel as CelebrationLevel;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.settings['celebration-level'].$get(
+        { query: {} },
+        { init: { signal } },
+      ),
+    select: (json) => json.celebrationLevel as CelebrationLevel,
   });
 }
 
@@ -79,28 +55,18 @@ export function useChildCelebrationLevel(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ celebrationLevel: CelebrationLevel }, CelebrationLevel>({
     queryKey: queryKeys.settings.childCelebrationLevel(
       childProfileId,
       activeProfile?.id,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings['celebration-level'].$get(
-          { query: childProfileId ? { childProfileId } : {} },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          celebrationLevel: CelebrationLevel;
-        };
-        return data.celebrationLevel as CelebrationLevel;
-      } finally {
-        cleanup();
-      }
-    },
     enabled: !!activeProfile?.isOwner && !!childProfileId,
+    fetch: (signal) =>
+      client.settings['celebration-level'].$get(
+        { query: childProfileId ? { childProfileId } : {} },
+        { init: { signal } },
+      ),
+    select: (json) => json.celebrationLevel as CelebrationLevel,
   });
 }
 
@@ -108,25 +74,15 @@ export function useWithdrawalArchivePreference(): UseQueryResult<WithdrawalArchi
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { value: WithdrawalArchivePreference },
+    WithdrawalArchivePreference
+  >({
     queryKey: queryKeys.settings.withdrawalArchive(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings['withdrawal-archive'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          value: WithdrawalArchivePreference;
-        };
-        return data.value as WithdrawalArchivePreference;
-      } finally {
-        cleanup();
-      }
-    },
     enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+    fetch: (signal) =>
+      client.settings['withdrawal-archive'].$get({}, { init: { signal } }),
+    select: (json) => json.value as WithdrawalArchivePreference,
   });
 }
 
@@ -134,23 +90,15 @@ export function useFamilyPoolBreakdownSharing(): UseQueryResult<boolean> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ value: boolean }, boolean>({
     queryKey: queryKeys.settings.familyPoolBreakdownSharing(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings['family-pool-breakdown-sharing'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { value: boolean };
-        return data.value;
-      } finally {
-        cleanup();
-      }
-    },
     enabled: !!activeProfile?.id && activeProfile.isOwner === true,
+    fetch: (signal) =>
+      client.settings['family-pool-breakdown-sharing'].$get(
+        {},
+        { init: { signal } },
+      ),
+    select: (json) => json.value,
   });
 }
 
@@ -361,22 +309,18 @@ export function useAnalogyDomain(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { analogyDomain: AnalogyDomain | null },
+    AnalogyDomain | null
+  >({
     queryKey: queryKeys.settings.analogyDomain(subjectId, activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings.subjects[':subjectId'][
-          'analogy-domain'
-        ].$get({ param: { subjectId } }, { init: { signal } });
-        await assertOk(res);
-        const data = await res.json();
-        return data.analogyDomain as AnalogyDomain | null;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    enabled: !!subjectId,
+    fetch: (signal) =>
+      client.settings.subjects[':subjectId']['analogy-domain'].$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.analogyDomain as AnalogyDomain | null,
   });
 }
 
@@ -416,22 +360,18 @@ export function useNativeLanguage(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { nativeLanguage: LanguageCode | null },
+    LanguageCode | null
+  >({
     queryKey: queryKeys.settings.nativeLanguage(subjectId, activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings.subjects[':subjectId'][
-          'native-language'
-        ].$get({ param: { subjectId } }, { init: { signal } });
-        await assertOk(res);
-        const data = await res.json();
-        return data.nativeLanguage as LanguageCode | null;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    enabled: !!subjectId,
+    fetch: (signal) =>
+      client.settings.subjects[':subjectId']['native-language'].$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.nativeLanguage as LanguageCode | null,
   });
 }
 

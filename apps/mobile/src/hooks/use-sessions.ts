@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import { transcriptResponseSchema } from '@eduagent/schemas';
+import { useApiQuery } from './use-api-query';
 import type {
   CelebrationReason,
   CloseResult,
@@ -755,29 +756,18 @@ export function useParkingLot(
   sessionId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSessionNavigationScope();
+  const { mode, profileId } = useSessionNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ items: ParkingLotItem[] }, ParkingLotItem[]>({
     queryKey: queryKeys.sessions.parkingLot(mode, sessionId, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.sessions[':sessionId']['parking-lot'].$get(
-          { param: { sessionId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await parseJson(
-          res,
-          z.object({ items: z.array(parkingLotItemSchema) }),
-          'GET /sessions/:sessionId/parking-lot',
-        );
-        return data.items;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!sessionId,
+    fetch: (signal) =>
+      client.sessions[':sessionId']['parking-lot'].$get(
+        { param: { sessionId } },
+        { init: { signal } },
+      ),
+    select: (json) =>
+      z.object({ items: z.array(parkingLotItemSchema) }).parse(json).items,
+    enabled: !!sessionId,
   });
 }
 
@@ -786,33 +776,23 @@ export function useTopicParkingLot(
   topicId: string,
 ): UseQueryResult<ParkingLotItem[]> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSessionNavigationScope();
+  const { mode, profileId } = useSessionNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ items: ParkingLotItem[] }, ParkingLotItem[]>({
     queryKey: queryKeys.sessions.topicParkingLot(
       mode,
       subjectId,
       topicId,
       profileId,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[':topicId'][
-          'parking-lot'
-        ].$get({ param: { subjectId, topicId } }, { init: { signal } });
-        await assertOk(res);
-        const data = await parseJson(
-          res,
-          z.object({ items: z.array(parkingLotItemSchema) }),
-          'GET /subjects/:subjectId/topics/:topicId/parking-lot',
-        );
-        return data.items;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].topics[':topicId']['parking-lot'].$get(
+        { param: { subjectId, topicId } },
+        { init: { signal } },
+      ),
+    select: (json) =>
+      z.object({ items: z.array(parkingLotItemSchema) }).parse(json).items,
+    enabled: !!subjectId && !!topicId,
   });
 }
 
