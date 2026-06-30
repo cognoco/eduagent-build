@@ -221,6 +221,7 @@ jobs:
       # cancel functions without corrupting profile-owned data. This guard
       # keeps the annotation coverage complete as new functions are added.
       - name: Inngest @inngest-admin annotation guard (WI-1075)
+        if: steps.scope.outputs.docs_only != 'true'
         run: pnpm exec tsx scripts/check-inngest-admin.ts
 
       # Forbid [MARKER] tokens in LLM prompt builders. State-machine signals
