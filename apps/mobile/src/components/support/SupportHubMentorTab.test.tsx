@@ -25,18 +25,21 @@ jest.mock(
 
 let mockFetch: RoutedMockFetch;
 
-jest.mock('../../lib/api-client', () => {
-  const actual = jest.requireActual('../../lib/api-client');
-  const {
-    createRoutedMockFetch,
-    mockApiClientFactory,
-  } = require('../../test-utils/mock-api-routes');
-  mockFetch = createRoutedMockFetch();
-  return {
-    ...actual,
-    ...mockApiClientFactory(mockFetch),
-  };
-});
+jest.mock(
+  '../../lib/api-client' /* gc1-allow: transport-boundary: Hono RPC client requires real HTTP transport */,
+  () => {
+    const actual = jest.requireActual('../../lib/api-client');
+    const {
+      createRoutedMockFetch,
+      mockApiClientFactory,
+    } = require('../../test-utils/mock-api-routes');
+    mockFetch = createRoutedMockFetch();
+    return {
+      ...actual,
+      ...mockApiClientFactory(mockFetch),
+    };
+  },
+);
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
