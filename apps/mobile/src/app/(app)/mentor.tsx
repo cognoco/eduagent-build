@@ -158,7 +158,12 @@ function LearnerMentorScreen(): React.ReactElement {
   };
 
   const handleSubmitText = (text: string): void => {
-    const result = matchBarIntent(text);
+    const result = matchBarIntent(text, {
+      subjects: subjectsIndex.subjects.map((s) => ({
+        id: s.subjectId,
+        name: s.subjectName,
+      })),
+    });
     if (result.kind === 'jump') {
       pushNowDeepLink(router, result.deepLink, {
         subjectHubTarget: 'v2-subject-hub',
