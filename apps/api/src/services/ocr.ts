@@ -208,17 +208,3 @@ export function setOcrProvider(provider: OcrProvider): void {
 export function resetOcrProvider(): void {
   _overrideProvider = null;
 }
-
-/**
- * Factory for creating OCR providers by type name.
- * @internal Test-only — not called from production routes.
- * Production code uses `getOcrProvider()` which fails closed.
- */
-export function createOcrProvider(type?: string): OcrProvider {
-  switch (type) {
-    case 'gemini':
-      return new GeminiOcrProvider();
-    default:
-      return new StubOcrProvider();
-  }
-}

@@ -58,6 +58,7 @@ import {
 } from '@eduagent/database';
 import { listSubjects } from './subject';
 import { getTierConfig } from './subscription';
+import { sleep } from './sleep';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -223,10 +224,6 @@ function isSeedManagedClerkUserId(
 
 function isSeedManagedClerkUser(user: ClerkUser): boolean {
   return user.external_id?.startsWith(SEED_CLERK_PREFIX) === true;
-}
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchClerkWithRetry(
