@@ -3965,7 +3965,6 @@
     "createSubject": "Crear tema",
     "openSubject": "Abrir tema",
     "openSubjectNamed": "Abrir {{subject}}",
-
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",
@@ -4199,9 +4198,7 @@
     "journal": {
       "title": "Diario",
       "subtitle": "Registros de apoyo que te han enviado, agrupados por estudiante.",
-      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento.",
-      "personPlaceholderTitle": "Los registros compartidos llegan en S5",
-      "personPlaceholderMessage": "Por ahora, este ámbito mantiene ocultas las notas del estudiante, los chats y los elementos privados del diario."
+      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento."
     }
   },
   "visibility": {
@@ -4226,7 +4223,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Aún no hay registro compartido",
-      "emptyForPerson": "{{name}}: aún no hay registro compartido.",
       "structuralOnly": "Solo datos estructurales. Sin notas ni textos de chat en bruto.",
       "errorTitle": "No se pudo cargar el registro compartido",
       "errorMessage": "Inténtalo de nuevo en un momento.",

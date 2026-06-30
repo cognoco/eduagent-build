@@ -3965,7 +3965,6 @@
     "createSubject": "科目を作成",
     "openSubject": "科目を開く",
     "openSubjectNamed": "{{subject}}を開く",
-
     "subjectProgress": "{{mastered}}個習得済み、{{learning}}個学習中、全{{total}}トピック",
     "reviewsDue": "{{count}}件の復習",
     "errorTitle": "教科を読み込めませんでした",
@@ -4199,9 +4198,7 @@
     "journal": {
       "title": "ジャーナル",
       "subtitle": "あなたに送信されたサポート記録を学習者ごとにグループ化しています。",
-      "personHint": "同意が完了すると、共有された記録がここに届きます。",
-      "personPlaceholderTitle": "共有記録はS5に届きます",
-      "personPlaceholderMessage": "現時点では、このスコープでは学習者のメモ、チャット、プライベートなジャーナルの成果物は非表示になっています。"
+      "personHint": "同意が完了すると、共有された記録がここに届きます。"
     }
   },
   "visibility": {
@@ -4226,7 +4223,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "共有記録はまだありません",
-      "emptyForPerson": "{{name}}: 共有記録はまだありません。",
       "structuralOnly": "構造的な情報のみ。メモやチャットの原文は含まれません。",
       "errorTitle": "共有記録を読み込めませんでした",
       "errorMessage": "しばらくしてからもう一度お試しください。",

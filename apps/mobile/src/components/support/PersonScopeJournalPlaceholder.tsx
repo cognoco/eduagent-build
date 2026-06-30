@@ -1,8 +1,9 @@
-import { View, Text } from 'react-native';
+import { ActivityIndicator, View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
+import type { ScopeDescriptor } from '@eduagent/schemas';
 
 import { SharedRecordView } from '../visibility';
+import { useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
@@ -12,23 +13,7 @@ export function PersonScopeJournalPlaceholder({
   scope: PersonScope;
 }): React.ReactElement {
   const { t } = useTranslation();
-  const emptyRecord: SharedRecord = {
-    supportershipId: scope.edgeId,
-    generatedAt: new Date().toISOString(),
-    factIds: [],
-    supporterView: {
-      audience: 'supporter',
-      factIds: [],
-      headline: t('visibility.sharedRecord.emptyTitle'),
-      facts: [],
-    },
-    supporteeView: {
-      audience: 'supportee',
-      factIds: [],
-      headline: t('visibility.sharedRecord.emptyTitle'),
-      facts: [],
-    },
-  };
+  const query = useSharedRecord(scope);
 
   return (
     <View
@@ -39,15 +24,15 @@ export function PersonScopeJournalPlaceholder({
         {scope.displayName}
       </Text>
       <View className="mt-4">
-        <SharedRecordView record={emptyRecord} />
-      </View>
-      <View className="mt-4 rounded-card border border-border bg-surface p-4">
-        <Text className="text-h3 font-semibold text-text-primary">
-          {t('supportHub.journal.personPlaceholderTitle')}
-        </Text>
-        <Text className="mt-2 text-body text-text-secondary">
-          {t('supportHub.journal.personPlaceholderMessage')}
-        </Text>
+        {query.isLoading ? (
+          <ActivityIndicator accessibilityLabel={t('common.loading')} />
+        ) : (
+          <SharedRecordView
+            record={query.data}
+            error={query.isError && !query.data ? query.error : null}
+            onRetry={() => void query.refetch()}
+          />
+        )}
       </View>
     </View>
   );

@@ -3965,7 +3965,6 @@
     "createSubject": "Opprett emne",
     "openSubject": "Åpne emne",
     "openSubjectNamed": "Åpne {{subject}}",
-
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
@@ -4199,9 +4198,7 @@
     "journal": {
       "title": "Logg",
       "subtitle": "Støtteoppføringer sendt til deg, gruppert etter elev.",
-      "personHint": "Delte oppføringer kommer hit etter at samtykke er fullført.",
-      "personPlaceholderTitle": "Delte oppføringer kommer i S5",
-      "personPlaceholderMessage": "Foreløpig holder dette omfanget elevnotater, chatter og private loggelementer skjult."
+      "personHint": "Delte oppføringer kommer hit etter at samtykke er fullført."
     }
   },
   "visibility": {
@@ -4226,7 +4223,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Ingen delt oversikt ennå",
-      "emptyForPerson": "{{name}}: ingen delt oversikt ennå.",
       "structuralOnly": "Kun strukturelle fakta. Ingen rånotater eller chattetekst.",
       "errorTitle": "Kunne ikke laste den delte oversikten",
       "errorMessage": "Prøv igjen om et øyeblikk.",

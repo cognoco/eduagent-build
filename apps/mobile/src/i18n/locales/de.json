@@ -3965,7 +3965,6 @@
     "createSubject": "Fach erstellen",
     "openSubject": "Fach öffnen",
     "openSubjectNamed": "{{subject}} öffnen",
-
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
@@ -4199,9 +4198,7 @@
     "journal": {
       "title": "Journal",
       "subtitle": "An dich gesendete Support-Einträge, nach Lernenden gruppiert.",
-      "personHint": "Geteilte Einträge kommen hier an, nachdem die Zustimmung abgeschlossen ist.",
-      "personPlaceholderTitle": "Geteilte Einträge kommen in S5 an",
-      "personPlaceholderMessage": "Vorerst hält dieser Bereich Notizen, Chats und private Journaleinträge von Lernenden verborgen."
+      "personHint": "Geteilte Einträge kommen hier an, nachdem die Zustimmung abgeschlossen ist."
     }
   },
   "visibility": {
@@ -4226,7 +4223,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Noch kein gemeinsamer Bericht",
-      "emptyForPerson": "{{name}}: noch kein gemeinsamer Bericht.",
       "structuralOnly": "Nur strukturelle Fakten. Keine Roh-Notizen oder Chat-Texte.",
       "errorTitle": "Gemeinsamer Bericht konnte nicht geladen werden",
       "errorMessage": "Gleich erneut versuchen.",

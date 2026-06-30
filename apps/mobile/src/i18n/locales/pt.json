@@ -3964,7 +3964,6 @@
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
     "openSubject": "Abrir matéria",
-
     "openSubjectNamed": "Abrir {{subject}}",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
@@ -4199,9 +4198,7 @@
     "journal": {
       "title": "Diário",
       "subtitle": "Registos de apoio enviados para si, agrupados por aluno.",
-      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento.",
-      "personPlaceholderTitle": "Registos partilhados chegam no S5",
-      "personPlaceholderMessage": "Por enquanto, este âmbito mantém ocultas as notas do aluno, conversas e artefactos privados do diário."
+      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento."
     }
   },
   "visibility": {
@@ -4226,7 +4223,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Nenhum registro compartilhado ainda",
-      "emptyForPerson": "{{name}}: nenhum registro compartilhado ainda.",
       "structuralOnly": "Apenas fatos estruturais. Sem notas brutas ou texto de chat.",
       "errorTitle": "Erro ao carregar registro compartilhado",
       "errorMessage": "Tente novamente em um instante.",
