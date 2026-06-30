@@ -15,10 +15,7 @@ import { useApiClient } from '../../../lib/api-client';
 import { formatApiError } from '../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useProfile } from '../../../lib/profile';
-
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
+import { firstParam } from '../../../lib/route-params';
 
 function parseRelation(value: string | undefined): SupporterRelation {
   return supporterRelationSchema.catch('other').parse(value);
