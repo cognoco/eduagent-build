@@ -73,12 +73,18 @@ import {
   learnerRecapRegenerate,
 } from './summary-regenerate';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_SUBJECT_ID,
+  TEST_TOPIC_ID,
+} from '@eduagent/test-utils';
 
 // Use valid v4 UUIDs — summaryEventPayloadSchema validates uuid format (RFC 4122)
-const PROFILE_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
-const SESSION_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
-const SUBJECT_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
-const TOPIC_ID = 'd4e5f6a1-b2c3-4444-8444-d4e5f6a1b2c3';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
 const SUMMARY_ID = 'e5f6a1b2-c3d4-4555-8555-e5f6a1b2c3d4';
 const TIMESTAMP = '2026-01-01T00:00:00.000Z';
 

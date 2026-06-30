@@ -1,5 +1,11 @@
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { handleReviewCalibrationGrade } from './review-calibration-grade';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_TOPIC_ID,
+  TEST_SUBJECT_ID,
+} from '@eduagent/test-utils';
 import { retrievalEvents, xpLedger } from '@eduagent/database';
 import {
   registerProvider,
@@ -105,9 +111,9 @@ function createMockStepDb() {
   return mock;
 }
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const SESSION_ID = '00000000-0000-4000-8000-000000000002';
-const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
 const CARD_ID = '00000000-0000-4000-8000-000000000004';
 const LEARNER_MESSAGE_EVENT_ID = '00000000-0000-4000-8000-000000000005';
 const EVENT_TS = '2026-01-15T12:00:00.000Z';
@@ -464,7 +470,7 @@ describe('reviewCalibrationGrade', () => {
   // cap is computed from the latest retrieval_events row.
   // -------------------------------------------------------------------------
 
-  const SUBJECT_ID = '00000000-0000-4000-8000-0000000000a1';
+  const SUBJECT_ID = TEST_SUBJECT_ID;
   const LEARNER_ANSWER = 'the learner said photosynthesis needs sunlight (PII)';
 
   async function runWithInlineClosure(opts: {

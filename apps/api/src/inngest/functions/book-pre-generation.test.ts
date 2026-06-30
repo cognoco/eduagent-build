@@ -99,6 +99,11 @@ jest.mock(
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { bookPreGeneration } from './book-pre-generation';
+import {
+  TEST_PROFILE_ID,
+  TEST_SUBJECT_ID,
+  TEST_BOOK_ID,
+} from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,9 +124,9 @@ async function executeSteps(
 }
 
 // Use valid v4 UUIDs — bookTopicsGeneratedEventSchema validates uuid format (RFC 4122)
-const SUBJECT_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
-const BOOK_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
-const PROFILE_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const BOOK_ID = TEST_BOOK_ID;
+const PROFILE_ID = TEST_PROFILE_ID;
 
 function createEventData(
   overrides: Record<string, unknown> = {},

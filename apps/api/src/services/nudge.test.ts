@@ -22,6 +22,11 @@ import {
   markNudgeRead,
   markAllNudgesRead,
 } from './nudge';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_ACCOUNT_ID,
+} from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Internal module stubs (gc1-allow: sibling services with their own suites)
@@ -80,10 +85,10 @@ jest.mock(
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const FROM_PROFILE_ID = 'aaaaaaaa-0000-4000-a000-000000000001';
-const TO_PROFILE_ID = 'bbbbbbbb-0000-4000-b000-000000000002';
+const FROM_PROFILE_ID = TEST_PROFILE_ID;
+const TO_PROFILE_ID = TEST_PROFILE_ID_2;
 const NUDGE_ID = 'cccccccc-0000-4000-c000-000000000003';
-const ACCOUNT_ID = 'dddddddd-0000-4000-d000-000000000004';
+const ACCOUNT_ID = TEST_ACCOUNT_ID;
 
 const BASE_NOW = new Date('2026-05-11T12:00:00.000Z'); // 12:00 UTC — well outside quiet hours
 
