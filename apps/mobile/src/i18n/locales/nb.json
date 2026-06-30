@@ -4253,6 +4253,32 @@
       "title": "Valgfri gjenfortelling",
       "fill": "Fyll inn svar",
       "dismiss": "Avvis"
+    },
+    "link": {
+      "title": "Se over deling",
+      "message": "Begge personene godtar den samme avtalen før noe deles.",
+      "createTitle": "Start delingsforespørsel",
+      "createMessage": "Be {{supporteeName}} om å se over nøyaktig hva en støttespiller kan se.",
+      "createSummaryTitle": "Før noen godtar",
+      "createAction": "Opprett delingsforespørsel",
+      "creating": "Oppretter forespørsel ...",
+      "createErrorTitle": "Kunne ikke opprette delingsforespørsel",
+      "loading": "Laster delingsavtale",
+      "missingTitle": "Delingslenke mangler",
+      "missingMessage": "Åpne denne fra støtteinvitasjonen igjen.",
+      "missingCreateParams": "Vi kunne ikke identifisere begge personene for denne forespørselen.",
+      "errorTitle": "Kunne ikke laste deling",
+      "errorMessage": "Prøv igjen om et øyeblikk.",
+      "acceptErrorTitle": "Kunne ikke godta deling",
+      "reviewTitle": "Deling er aktiv",
+      "reviewMessage": "Du kan se over denne avtalen her når som helst.",
+      "activeTitle": "Deling er aktiv",
+      "activeMessage": "Du kan se over denne avtalen her når som helst.",
+      "revoke": "Avslutt deling",
+      "revoking": "Avslutter deling ...",
+      "revoked": "Delingen avsluttes. Støttespilleren vil se et varsel.",
+      "revokeErrorTitle": "Kunne ikke avslutte deling",
+      "missingActor": "Vi kunne ikke identifisere den aktive personen."
     }
   }
 }

@@ -4253,6 +4253,32 @@
       "title": "任意の説明返し",
       "fill": "返信を入力",
       "dismiss": "閉じる"
+    },
+    "link": {
+      "title": "共有の確認",
+      "message": "共有が始まる前に、両者が同じ同意書に同意します。",
+      "createTitle": "共有リクエストを開始",
+      "createMessage": "サポーターが閲覧できる内容を、{{supporteeName}}さんに確認するよう依頼します。",
+      "createSummaryTitle": "同意する前に",
+      "createAction": "共有リクエストを作成",
+      "creating": "リクエストを作成中...",
+      "createErrorTitle": "共有リクエストを作成できませんでした",
+      "loading": "共有同意書を読み込み中",
+      "missingTitle": "共有リンクが見つかりません",
+      "missingMessage": "もう一度サポート招待から開いてください。",
+      "missingCreateParams": "このリクエストの両者を特定できませんでした。",
+      "errorTitle": "共有を読み込めませんでした",
+      "errorMessage": "しばらくしてからもう一度お試しください。",
+      "acceptErrorTitle": "共有を承諾できませんでした",
+      "reviewTitle": "共有が有効です",
+      "reviewMessage": "この同意書はいつでもここで確認できます。",
+      "activeTitle": "共有が有効です",
+      "activeMessage": "この同意書はいつでもここで確認できます。",
+      "revoke": "共有を終了",
+      "revoking": "共有を終了中...",
+      "revoked": "共有を終了します。サポーターに通知が表示されます。",
+      "revokeErrorTitle": "共有を終了できませんでした",
+      "missingActor": "アクティブなユーザーを特定できませんでした。"
     }
   }
 }

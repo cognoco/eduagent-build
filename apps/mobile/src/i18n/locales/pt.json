@@ -4253,6 +4253,32 @@
       "title": "Explicação opcional",
       "fill": "Preencher resposta",
       "dismiss": "Dispensar"
+    },
+    "link": {
+      "title": "Rever partilha",
+      "message": "Ambas as pessoas aceitam o mesmo acordo antes de qualquer coisa ser partilhada.",
+      "createTitle": "Iniciar pedido de partilha",
+      "createMessage": "Pede a {{supporteeName}} para rever exatamente o que um apoiante pode ver.",
+      "createSummaryTitle": "Antes de alguém aceitar",
+      "createAction": "Criar pedido de partilha",
+      "creating": "A criar pedido...",
+      "createErrorTitle": "Não foi possível criar o pedido de partilha",
+      "loading": "A carregar acordo de partilha",
+      "missingTitle": "Falta o link de partilha",
+      "missingMessage": "Abre isto novamente a partir do convite de apoio.",
+      "missingCreateParams": "Não conseguimos identificar ambas as pessoas para este pedido.",
+      "errorTitle": "Não foi possível carregar a partilha",
+      "errorMessage": "Tenta novamente dentro de momentos.",
+      "acceptErrorTitle": "Não foi possível aceitar a partilha",
+      "reviewTitle": "A partilha está ativa",
+      "reviewMessage": "Podes rever este acordo aqui a qualquer momento.",
+      "activeTitle": "A partilha está ativa",
+      "activeMessage": "Podes rever este acordo aqui a qualquer momento.",
+      "revoke": "Terminar partilha",
+      "revoking": "A terminar a partilha...",
+      "revoked": "A partilha está a terminar. O apoiante verá um aviso.",
+      "revokeErrorTitle": "Não foi possível terminar a partilha",
+      "missingActor": "Não conseguimos identificar a pessoa ativa."
     }
   }
 }
