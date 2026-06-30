@@ -3952,7 +3952,10 @@
     "journal": {
       "title": "Journal",
       "subtitle": "Support records sent to you, grouped by learner.",
-      "personHint": "Shared records arrive here after consent is finalized."
+      "personHint": "Updates shared with you appear here.",
+      "personPlaceholderTitle": "No shareable updates yet",
+      "emptyMessage": "When {{name}} finishes a session or report, updates shared with you will appear here.",
+      "personPlaceholderMessage": "Private chats, notes, and mentor memory are not shown here."
     }
   },
   "visibility": {

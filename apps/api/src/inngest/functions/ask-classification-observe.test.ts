@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -23,7 +23,7 @@ const consoleErrorSpy = jest
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, ...mockInngestTransport.module };
 });

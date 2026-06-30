@@ -4198,7 +4198,10 @@
     "journal": {
       "title": "Journal",
       "subtitle": "An dich gesendete Support-Einträge, nach Lernenden gruppiert.",
-      "personHint": "Geteilte Einträge kommen hier an, nachdem die Zustimmung abgeschlossen ist."
+      "personHint": "Mit dir geteilte Updates erscheinen hier.",
+      "personPlaceholderTitle": "Noch keine teilbaren Updates",
+      "emptyMessage": "Wenn {{name}} eine Sitzung oder einen Bericht abschließt, erscheinen hier die mit dir geteilten Updates.",
+      "personPlaceholderMessage": "Private Chats, Notizen und Mentor-Gedächtnis werden hier nicht angezeigt."
     }
   },
   "visibility": {

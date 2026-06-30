@@ -4198,7 +4198,10 @@
     "journal": {
       "title": "Logg",
       "subtitle": "Støtteoppføringer sendt til deg, gruppert etter elev.",
-      "personHint": "Delte oppføringer kommer hit etter at samtykke er fullført."
+      "personHint": "Oppdateringer som deles med deg, vises her.",
+      "personPlaceholderTitle": "Ingen delbare oppdateringer ennå",
+      "emptyMessage": "Når {{name}} fullfører en økt eller rapport, vises oppdateringer som deles med deg her.",
+      "personPlaceholderMessage": "Private chatter, notater og mentor-minne vises ikke her."
     }
   },
   "visibility": {

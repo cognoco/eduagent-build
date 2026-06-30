@@ -34,19 +34,16 @@ jest.mock(
 const mockInngestTransport = createInngestTransportCapture();
 jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
-jest.mock(
-  '../../services/billing' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/billing',
-    ) as typeof import('../../services/billing');
-    return {
-      ...actual,
-      findExpiringTopUpCredits: (...args: unknown[]) =>
-        mockFindExpiringTopUpCredits(...args),
-    };
-  },
-);
+jest.mock('../../services/billing', () => {
+  const actual = jest.requireActual(
+    '../../services/billing',
+  ) as typeof import('../../services/billing');
+  return {
+    ...actual,
+    findExpiringTopUpCredits: (...args: unknown[]) =>
+      mockFindExpiringTopUpCredits(...args),
+  };
+});
 
 import { topupExpiryReminder } from './topup-expiry-reminder';
 

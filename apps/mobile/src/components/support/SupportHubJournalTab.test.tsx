@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import type { SharedRecord } from '@eduagent/schemas';
+import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 
 import {
   cleanupScreen,
@@ -34,6 +34,13 @@ jest.mock(
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+
+const EMMA_SCOPE: Extract<ScopeDescriptor, { kind: 'person' }> = {
+  kind: 'person',
+  personId: PERSON_ID,
+  edgeId: EDGE_ID,
+  displayName: 'Emma',
+};
 
 const SHARED_RECORD: SharedRecord = {
   supportershipId: EDGE_ID,
@@ -69,6 +76,24 @@ const SHARED_RECORD: SharedRecord = {
   },
 };
 
+const EMPTY_SHARED_RECORD: SharedRecord = {
+  supportershipId: EDGE_ID,
+  generatedAt: '2026-06-30T12:00:00.000Z',
+  factIds: [],
+  supporterView: {
+    audience: 'supporter',
+    factIds: [],
+    headline: 'Emma has no shareable updates yet.',
+    facts: [],
+  },
+  supporteeView: {
+    audience: 'supportee',
+    factIds: [],
+    headline: 'No supporter-visible updates yet.',
+    facts: [],
+  },
+};
+
 function renderWithProfile(ui: React.ReactElement): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -100,16 +125,7 @@ describe('SupportHubJournalTab', () => {
 
   it('renders fetched shared-record facts for each person scope', async () => {
     queryClient = renderWithProfile(
-      <SupportHubJournalTab
-        personScopes={[
-          {
-            kind: 'person',
-            personId: PERSON_ID,
-            edgeId: EDGE_ID,
-            displayName: 'Emma',
-          },
-        ]}
-      />,
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
     );
 
     await waitFor(() => {
@@ -126,6 +142,35 @@ describe('SupportHubJournalTab', () => {
     ).toHaveLength(1);
   });
 
+  it('renders an honest empty journal state when the fetched record has no facts', async () => {
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/shared-record`,
+      EMPTY_SHARED_RECORD,
+    );
+
+    queryClient = renderWithProfile(
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId(`support-hub-journal-empty-lamp-${PERSON_ID}`, {
+        includeHiddenElements: true,
+      });
+    });
+
+    screen.getByTestId(`support-hub-journal-empty-pen-${PERSON_ID}`, {
+      includeHiddenElements: true,
+    });
+    screen.getByText('No shareable updates yet');
+    screen.getByText(
+      'When Emma finishes a session or report, updates shared with you will appear here.',
+    );
+    screen.getByText(
+      'Private chats, notes, and mentor memory are not shown here.',
+    );
+    expect(screen.queryByText('No shared record yet')).toBeNull();
+  });
+
   it('routes shared-record fetch failures through the shared error card', async () => {
     mockFetch.setRoute(
       `/visibility/reports/${PERSON_ID}/shared-record`,
@@ -133,16 +178,7 @@ describe('SupportHubJournalTab', () => {
     );
 
     queryClient = renderWithProfile(
-      <SupportHubJournalTab
-        personScopes={[
-          {
-            kind: 'person',
-            personId: PERSON_ID,
-            edgeId: EDGE_ID,
-            displayName: 'Emma',
-          },
-        ]}
-      />,
+      <SupportHubJournalTab personScopes={[EMMA_SCOPE]} />,
     );
 
     await waitFor(() => {

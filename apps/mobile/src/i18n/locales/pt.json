@@ -4198,7 +4198,10 @@
     "journal": {
       "title": "Diário",
       "subtitle": "Registos de apoio enviados para si, agrupados por aluno.",
-      "personHint": "Os registos partilhados chegam aqui após a finalização do consentimento."
+      "personHint": "As atualizações partilhadas consigo aparecem aqui.",
+      "personPlaceholderTitle": "Ainda não há atualizações partilháveis",
+      "emptyMessage": "Quando {{name}} terminar uma sessão ou relatório, as atualizações partilhadas consigo aparecerão aqui.",
+      "personPlaceholderMessage": "Conversas privadas, notas e memória do mentor não são mostradas aqui."
     }
   },
   "visibility": {

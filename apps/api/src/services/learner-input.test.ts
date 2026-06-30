@@ -1,4 +1,4 @@
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,
@@ -6,7 +6,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./learner-profile' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./learner-profile', () => {
   const actual = jest.requireActual(
     './learner-profile',
   ) as typeof import('./learner-profile');

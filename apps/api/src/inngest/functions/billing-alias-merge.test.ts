@@ -18,7 +18,7 @@ const consoleErrorSpy = jest
 
 // External boundary only: capture inngest.createFunction so the handler fn is
 // directly invocable (mirrors payment-failed-observe.test.ts).
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,

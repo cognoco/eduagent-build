@@ -1,4 +1,4 @@
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,

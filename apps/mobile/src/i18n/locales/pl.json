@@ -4362,7 +4362,10 @@
     "journal": {
       "title": "Dziennik",
       "subtitle": "Zapisy wsparcia wysłane do Ciebie, pogrupowane według uczniów.",
-      "personHint": "Udostępnione zapisy pojawią się tutaj po wyrażeniu zgody."
+      "personHint": "Udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderTitle": "Nie ma jeszcze aktualizacji do udostępnienia",
+      "emptyMessage": "Gdy {{name}} ukończy sesję lub raport, udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderMessage": "Prywatne czaty, notatki i pamięć mentora nie są tutaj pokazywane."
     }
   },
   "visibility": {

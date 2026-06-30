@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -96,7 +96,7 @@ const mockDb = {
     },
   })),
 };
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');

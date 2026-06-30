@@ -35,7 +35,7 @@ jest.mock(
 // flip-blocker far beyond its scope. Tracked for the GC6 burn-down lane, not
 // this WI. (The WI-803-introduced guardianship mock WAS removed — the v2 path
 // drives the real getChargePersonIds/getGuardianPersonIds via the DB stub.)
-jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./consent', () => {
   const actual = jest.requireActual('./consent') as typeof import('./consent');
   return {
     ...actual,

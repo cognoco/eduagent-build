@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -24,7 +24,7 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockLoggerWarn = jest.fn();
 const mockLoggerError = jest.fn();
-jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/logger', () => {
   const actual = jest.requireActual(
     '../../services/logger',
   ) as typeof import('../../services/logger');
@@ -39,7 +39,7 @@ jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,

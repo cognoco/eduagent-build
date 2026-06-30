@@ -4198,7 +4198,10 @@
     "journal": {
       "title": "Diario",
       "subtitle": "Registros de apoyo que te han enviado, agrupados por estudiante.",
-      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento."
+      "personHint": "Las actualizaciones compartidas contigo aparecen aquí.",
+      "personPlaceholderTitle": "Aún no hay actualizaciones para compartir",
+      "emptyMessage": "Cuando {{name}} termine una sesión o un informe, las actualizaciones compartidas contigo aparecerán aquí.",
+      "personPlaceholderMessage": "Los chats privados, las notas y la memoria del mentor no se muestran aquí."
     }
   },
   "visibility": {

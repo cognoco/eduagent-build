@@ -4,7 +4,7 @@ import { clearVerifiedClerkEmailCacheForTest } from '../services/clerk-user';
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import type { AppVariables } from '../types/hono';
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');

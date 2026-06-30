@@ -1,7 +1,9 @@
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { ScopeDescriptor } from '@eduagent/schemas';
+import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 
+import { DeskLampAnimation } from '../common/DeskLampAnimation';
+import { MagicPenAnimation } from '../common/MagicPenAnimation';
 import { SharedRecordView } from '../visibility';
 import { useSharedRecord } from './use-shared-record';
 
@@ -9,6 +11,49 @@ type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 interface SupportHubJournalTabProps {
   personScopes: readonly PersonScope[];
+}
+
+function hasShareableFacts(record?: SharedRecord): boolean {
+  return (record?.supporterView.facts.length ?? 0) > 0;
+}
+
+function SupportHubJournalEmptyState({
+  scope,
+}: {
+  scope: PersonScope;
+}): React.ReactElement {
+  const { t } = useTranslation();
+
+  return (
+    <View className="mt-4 border-t border-border pt-4">
+      <View
+        className="h-[132px] items-center justify-center"
+        pointerEvents="none"
+      >
+        <DeskLampAnimation
+          size={108}
+          testID={`support-hub-journal-empty-lamp-${scope.personId}`}
+        />
+        <View className="absolute bottom-0 right-6">
+          <MagicPenAnimation
+            size={62}
+            testID={`support-hub-journal-empty-pen-${scope.personId}`}
+          />
+        </View>
+      </View>
+      <Text className="mt-3 text-center text-h3 font-semibold text-text-primary">
+        {t('supportHub.journal.personPlaceholderTitle')}
+      </Text>
+      <Text className="mt-2 text-center text-body text-text-secondary">
+        {t('supportHub.journal.emptyMessage', {
+          name: scope.displayName,
+        })}
+      </Text>
+      <Text className="mt-2 text-center text-caption text-text-secondary">
+        {t('supportHub.journal.personPlaceholderMessage')}
+      </Text>
+    </View>
+  );
 }
 
 function SupportHubJournalPersonCard({
@@ -33,12 +78,19 @@ function SupportHubJournalPersonCard({
       <View className="mt-3">
         {query.isLoading ? (
           <ActivityIndicator accessibilityLabel={t('common.loading')} />
-        ) : (
+        ) : query.isError && !query.data ? (
           <SharedRecordView
-            record={query.data}
-            error={query.isError && !query.data ? query.error : null}
+            error={query.error}
             onRetry={() => void query.refetch()}
           />
+        ) : hasShareableFacts(query.data) ? (
+          <SharedRecordView
+            record={query.data}
+            error={null}
+            onRetry={() => void query.refetch()}
+          />
+        ) : (
+          <SupportHubJournalEmptyState scope={scope} />
         )}
       </View>
     </View>

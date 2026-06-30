@@ -24,7 +24,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -38,35 +38,29 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 // [BUG-117] Atomic dedup gate. Default false = not limited = caller may send.
 const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      checkAndLogRateLimitInternal: (...args: unknown[]) =>
-        mockCheckAndLogRateLimitInternal(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
+  };
+});
 
 // [WI-867] findOwnerPersonId — db.select({personId}).from(person).innerJoin(membership) UNSEEDABLE join.
 // Integration twin: tests/integration/inngest-trial-expiry.integration.test.ts
