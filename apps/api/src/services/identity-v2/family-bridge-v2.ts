@@ -23,9 +23,7 @@
 // never re-implements the edge primitive: it composes `isGuardianOf` from the
 // CUT-B2 guardianship read module (single source of truth).
 //
-// FLAG-GATED via the calling seam (the family-surface routes branch on
-// `isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED)`); legacy stays intact until
-// WP-FLAG.
+// [WI-867] Flag collapsed — always active; legacy family_links path removed from callers.
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';

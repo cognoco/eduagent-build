@@ -24,7 +24,7 @@ import { learningSessions, person } from '@eduagent/database';
 // selectDistinct produces a `SELECT DISTINCT profile_id` plan.
 import { inngest } from '../client';
 import { INNGEST_PLAN_CONCURRENCY_CAP } from '../plan-limits';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { snapshotRefreshEventSchema } from '@eduagent/schemas';
 import { captureException } from '../../services/sentry';
@@ -134,9 +134,7 @@ export const dailySnapshotRefresh = inngest.createFunction(
       }
 
       try {
-        const snapshot = await refreshProgressSnapshot(db, profileId, {
-          identityV2Enabled: isIdentityV2EnabledInStep(),
-        });
+        const snapshot = await refreshProgressSnapshot(db, profileId);
         return {
           status: 'completed',
           profileId,

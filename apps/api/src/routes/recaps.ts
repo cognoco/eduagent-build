@@ -21,7 +21,6 @@ import {
   listRecapsForParent,
   listRecapsForProfile,
 } from '../services/recaps';
-import { isIdentityV2Enabled } from '../config';
 
 type RecapsRouteEnv = {
   Bindings: {
@@ -48,7 +47,6 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
     const recaps = await listRecapsForParent(db, parentProfileId, {
       childProfileId: query.childProfileId,
       limit: query.limit,
-      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
     });
     return c.json(recapsResponseSchema.parse({ recaps }));
   })
@@ -74,9 +72,7 @@ export const recapsRoutes = new Hono<RecapsRouteEnv>()
       const db = c.get('db');
       const parentProfileId = requireProfileId(c.get('profileId'));
       const { recapId } = c.req.valid('param');
-      const recap = await getRecapForParent(db, parentProfileId, recapId, {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-      });
+      const recap = await getRecapForParent(db, parentProfileId, recapId);
 
       if (!recap) return notFound(c, 'Recap not found');
       return c.json(recapDetailResponseSchema.parse({ recap }));

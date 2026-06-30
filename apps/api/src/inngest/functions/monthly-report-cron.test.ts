@@ -292,35 +292,29 @@ const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 
-jest.mock(
-  '../../services/monthly-report' /* gc1-allow: pattern-a conversion — generateReportHighlights calls LLM (external boundary) */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/monthly-report',
-    ) as typeof import('../../services/monthly-report');
-    return {
-      ...actual,
-      generateMonthlyReportData: (...args: unknown[]) =>
-        mockGenerateMonthlyReportData(...args),
-      generateReportHighlights: (...args: unknown[]) =>
-        mockGenerateReportHighlights(...args),
-    };
-  },
-);
+jest.mock('../../services/monthly-report', () => {
+  const actual = jest.requireActual(
+    '../../services/monthly-report',
+  ) as typeof import('../../services/monthly-report');
+  return {
+    ...actual,
+    generateMonthlyReportData: (...args: unknown[]) =>
+      mockGenerateMonthlyReportData(...args),
+    generateReportHighlights: (...args: unknown[]) =>
+      mockGenerateReportHighlights(...args),
+  };
+});
 
-jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: pattern-a conversion — DB-dependent aggregate; integration sibling covers real path */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/practice-activity-summary',
-    ) as typeof import('../../services/practice-activity-summary');
-    return {
-      ...actual,
-      getPracticeActivitySummary: (...args: unknown[]) =>
-        mockGetPracticeActivitySummary(...args),
-    };
-  },
-);
+jest.mock('../../services/practice-activity-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/practice-activity-summary',
+  ) as typeof import('../../services/practice-activity-summary');
+  return {
+    ...actual,
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  };
+});
 
 // [WI-867] flag collapsed — mock v2 eligibility module; old solo-progress-reports mock is dead.
 jest.mock(
@@ -342,24 +336,21 @@ const mockFilterProgressMetricsToActiveSubjects = jest.fn(
   async (_db: unknown, _profileId: unknown, metrics: unknown) => metrics,
 );
 
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion — drives CURRENT/PREVIOUS snapshot pair via mockResolvedValueOnce ordering; integration sibling covers real DB path */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/snapshot-aggregation',
-    ) as typeof import('../../services/snapshot-aggregation');
-    return {
-      ...actual,
-      filterProgressMetricsToActiveSubjects: (
-        db: unknown,
-        profileId: unknown,
-        metrics: unknown,
-      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
-      getSnapshotsInRange: (...args: unknown[]) =>
-        mockGetSnapshotsInRange(...args),
-    };
-  },
-);
+jest.mock('../../services/snapshot-aggregation', () => {
+  const actual = jest.requireActual(
+    '../../services/snapshot-aggregation',
+  ) as typeof import('../../services/snapshot-aggregation');
+  return {
+    ...actual,
+    filterProgressMetricsToActiveSubjects: (
+      db: unknown,
+      profileId: unknown,
+      metrics: unknown,
+    ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
+    getSnapshotsInRange: (...args: unknown[]) =>
+      mockGetSnapshotsInRange(...args),
+  };
+});
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
@@ -372,72 +363,60 @@ const mockFormatMonthlyProgressEmail = jest.fn(
   }),
 );
 
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion — push/email delivery is the external boundary; integration sibling exercises real Expo/Resend pipeline */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-      formatMonthlyProgressEmail: (
-        to: string,
-        body: string,
-        struggleLines: ChildStruggleLine[],
-      ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatMonthlyProgressEmail: (
+      to: string,
+      body: string,
+      struggleLines: ChildStruggleLine[],
+    ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
+  };
+});
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
 // individual tests override to simulate a prior successful send (replay path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion — bypasses 24h dedup gate without seeding notificationLog; dedup behaviour itself covered by integration sibling */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
-  '../../services/sentry' /* gc1-allow: pattern-a conversion — Sentry SDK external boundary */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/sentry',
-    ) as typeof import('../../services/sentry');
-    return {
-      ...actual,
-      captureException: (...args: unknown[]) => mockCaptureException(...args),
-    };
-  },
-);
+jest.mock('../../services/sentry', () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
-jest.mock(
-  '../helpers' /* gc1-allow: pattern-a conversion — getStepDatabase must return the shared mockMonthlyReportDb (no real Neon WS connection in unit test env) */,
-  () => {
-    const actual = jest.requireActual(
-      '../helpers',
-    ) as typeof import('../helpers');
-    return {
-      ...actual,
-      getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
-      getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
-    };
-  },
-);
+jest.mock('../helpers', () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+    getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
+  };
+});
 
 import {
   monthlyReportCron,
@@ -896,15 +875,12 @@ describe('monthlyReportCron', () => {
     });
 
     // -----------------------------------------------------------------------
-    // [WI-777] Identity-V2 wiring guard (CUT-B2).
+    // [WI-777 / WI-867] Identity-V2 wiring guard (CUT-B2, flag collapsed).
     //
-    // find-report-pairs branches on isIdentityV2EnabledInStep():
-    //   - v2:     derives pairs from select().from(guardianship) (canonical
-    //             consent-authority edge) + db.query.person.findMany active
-    //             filter
-    //   - legacy: select().from(familyLinks) + db.query.profiles.findMany
-    // These tests assert the correct edge table is read per flag, guarding the
-    // v2 wiring against regression before WP-FLAG drops the legacy tables.
+    // find-report-pairs always uses the v2 path (flag collapsed in WI-867):
+    // derives pairs from select().from(guardianship) + db.query.person.findMany.
+    // The test below guards the v2 wiring against regression (legacy familyLinks
+    // path is dead but seeded to make regressions observable).
     // -----------------------------------------------------------------------
     it('[WI-777] flag-on: derives pairs from guardianship, not familyLinks', async () => {
       const prev = process.env['IDENTITY_V2_ENABLED'];

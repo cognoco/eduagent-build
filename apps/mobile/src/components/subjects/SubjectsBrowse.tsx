@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { SubjectStatus } from '@eduagent/schemas';
 
+import { BookPageFlipAnimation } from '../common/BookPageFlipAnimation';
 import { ShimmerSkeleton } from '../common/ShimmerSkeleton';
 import {
   LibrarySearchResults,
@@ -232,6 +233,12 @@ export function SubjectsBrowse({
 
               {subjects.length === 0 ? (
                 <View className="mt-8 rounded-card bg-coaching-card p-5">
+                  <View className="items-center" pointerEvents="none">
+                    <BookPageFlipAnimation
+                      size={112}
+                      testID="subjects-browse-empty-book-animation"
+                    />
+                  </View>
                   <Text className="text-h3 font-semibold text-text-primary">
                     {t('subjectsBrowse.emptyTitle')}
                   </Text>

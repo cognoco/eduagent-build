@@ -5,7 +5,6 @@ import {
   curriculumTopics,
   learningSessions,
   milestones,
-  profiles,
   progressSnapshots,
   streaks,
   subjects,
@@ -1356,13 +1355,8 @@ export async function refreshProgressSnapshot(
     // sends.
     let profile: { birthYear: number | null } | undefined;
     try {
-      // [CUT-B1 §2.5(iii)] v2 seam: learner age from person.birth_date.
-      profile = options.identityV2Enabled
-        ? { birthYear: await getPersonBirthYear(db, profileId) }
-        : await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
-            columns: { birthYear: true },
-          });
+      // [WI-867] v2 always: learner age from person.birth_date.
+      profile = { birthYear: await getPersonBirthYear(db, profileId) };
     } catch (err) {
       captureException(err, {
         extra: {

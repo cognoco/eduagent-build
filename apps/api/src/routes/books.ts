@@ -38,7 +38,6 @@ import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
 import { buildFallbackBookTopics } from '../services/book-generation-fallbacks';
 import { getPersonAge } from '../services/identity-v2/helpers';
-import { isIdentityV2Enabled } from '../config';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
 import { safeSend } from '../services/safe-non-core';
@@ -241,11 +240,6 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
               {
                 generateBookTopics,
                 captureException,
-                // [WI-586 flip-safety] thread the cutover flag so the service
-                // reads learner age from `person` (v2) vs `profiles` (legacy).
-                identityV2Enabled: isIdentityV2Enabled(
-                  c.env?.IDENTITY_V2_ENABLED,
-                ),
               },
             );
           if (incompleteClaimRepair.status === 'repaired') {

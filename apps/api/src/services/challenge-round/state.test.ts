@@ -7,8 +7,9 @@ import {
   resolveGraderStallTermination,
 } from './state';
 import { MAX_CHALLENGE_QUESTIONS } from './caps';
+import { TEST_TOPIC_ID } from '@eduagent/test-utils';
 
-const TOPIC_ID = '11111111-1111-1111-1111-111111111111';
+const TOPIC_ID = TEST_TOPIC_ID;
 
 function evalItem(
   overrides: Partial<ChallengeRoundEvaluationItem> = {},

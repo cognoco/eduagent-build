@@ -2,7 +2,7 @@
 // Mock the LLM router — true external boundary
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../llm', () => {
   const actual = jest.requireActual('../llm') as typeof import('../llm');
   return { ...actual, routeAndCall: jest.fn() };
 });

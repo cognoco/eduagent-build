@@ -8,13 +8,8 @@ export default function OnboardingIndex(): React.ReactElement {
   return (
     <ExplainedRedirect
       href="/(app)/onboarding/pronouns"
-      title={t('onboarding.index.redirectTitle', {
-        defaultValue: 'First, let’s personalise a couple of basics',
-      })}
-      message={t('onboarding.index.redirectBody', {
-        defaultValue:
-          'We’ll start with pronouns so the next steps feel right from the beginning.',
-      })}
+      title={t('onboarding.index.redirectTitle')}
+      message={t('onboarding.index.redirectBody')}
       ctaLabel={t('common.continue')}
       testID="onboarding-index-redirect"
       ctaTestID="onboarding-index-continue"

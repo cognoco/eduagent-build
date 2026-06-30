@@ -8,6 +8,15 @@ import {
 } from '../../test-utils/database-module';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { NonRetriableError } from 'inngest';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_SESSION_ID,
+  TEST_SESSION_ID_2,
+  TEST_TOPIC_ID,
+  TEST_SUBJECT_ID,
+  TEST_ACCOUNT_ID,
+} from '@eduagent/test-utils';
 
 const col = (name: string) => ({ name });
 // Joinable terminal: supports both direct .where()/.limit() (no joins)
@@ -164,15 +173,15 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: 
 // Default fixture UUIDs used across all tests via createEventData().
 // Must satisfy z.string().uuid() — the filing-timed-out event schema
 // (and other event schemas) tightened to UUID-only after FILING-TIMEOUT-OBS.
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const SESSION_ID = '00000000-0000-4000-8000-000000000002';
-const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
-const SUBJECT_ID = '00000000-0000-4000-8000-000000000004';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
 
 // Separate UUIDs used in the BUG-852 wait-for-filing timeout tests so
 // assertions on those specific values remain distinct from the defaults above.
-const validProfileId = '00000000-0000-4000-8000-000000000011';
-const validSessionId = '00000000-0000-4000-8000-000000000012';
+const validProfileId = TEST_PROFILE_ID_2;
+const validSessionId = TEST_SESSION_ID_2;
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockExtractSessionContent = jest
@@ -1598,18 +1607,10 @@ describe('sessionCompleted', () => {
     it('precomputes and caches a coaching card', async () => {
       await executeSteps(createEventData());
 
+      // [WI-867] v2 always: precomputeCoachingCard called with no opts (flag collapsed)
       expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        // [CUT-B1] coaching-card precompute carries the identity-cutover flag.
-        // env-adaptive (deliberate, not an oversight): this mirrors exactly what
-        // isIdentityV2EnabledInStep() returns at runtime, which reads
-        // IDENTITY_V2_ENABLED — true on this worktree (Doppler sync), false on the
-        // main checkout. The flag-on billing path is separately and explicitly
-        // asserted in [WI-784-BREAK]; this assertion only checks the flag is
-        // threaded through to precompute, so pinning it to a literal would make it
-        // fail in whichever env doesn't match the literal.
-        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
         expect.anything(),
@@ -1721,13 +1722,19 @@ describe('sessionCompleted', () => {
       // ungated. revokeConsent sets GDPR WITHDRAWN without clearing the memory
       // gate, so the embeddings step must re-check the GDPR processing gate
       // itself and skip both content extraction and the external embed call.
+      // [WI-867] v2 always: GDPR gate uses isGdprProcessingAllowedV2 (reads consentGrant,
+      // not consentStates). Simulate WITHDRAWN by returning a grant with withdrawnAt set.
       // mockResolvedValueOnce (not ...Value): default beforeEach memory consent
       // is 'pending', so analyze-learner-profile short-circuits at the memory
       // gate without reading GDPR consent — generate-embeddings is the sole
       // consumer here. A persistent mock would leak WITHDRAWN into later tests
       // (jest.clearAllMocks does not reset implementations).
-      mockSessionCompletedDb.query.consentStates.findFirst.mockResolvedValueOnce(
-        { status: 'WITHDRAWN', consentType: 'GDPR' },
+      mockSessionCompletedDb.query.consentGrant.findFirst.mockResolvedValueOnce(
+        {
+          granted: true,
+          withdrawnAt: new Date('2025-01-01'),
+          grantedAt: new Date('2024-01-01'),
+        },
       );
 
       await executeSteps(createEventData());
@@ -1826,7 +1833,7 @@ describe('sessionCompleted', () => {
     // [F-128] Billing path tests — require a DB mock that returns a profile
     // row with accountId so the quota gate runs. Override createDatabase in
     // these tests to return a chainable mock that resolves the profiles select.
-    const ACCOUNT_ID = '00000000-0000-4000-8000-000000000099';
+    const ACCOUNT_ID = TEST_ACCOUNT_ID;
 
     function makeDbWithProfile() {
       let selectCallCount = 0;
@@ -2348,6 +2355,7 @@ describe('sessionCompleted', () => {
       expect(mockAnalyzeSessionTranscript).toHaveBeenCalled();
       // applyAnalysis must fire with the authenticated profileId, the
       // analysis, subject name, source, and subjectId [CR-119.3].
+      // [WI-867] v2 always: applyAnalysis called with no opts (flag collapsed)
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
@@ -2355,11 +2363,6 @@ describe('sessionCompleted', () => {
         null,
         'inferred',
         SUBJECT_ID,
-        // [WI-809] applyAnalysis now receives the identity-v2 opts so its GDPR
-        // gate routes through the v2 consent graph. Non-vacuous + flag-adaptive
-        // (asserts true under IDENTITY_V2_ENABLED, false otherwise) — same
-        // pattern as the v2 reader assertions elsewhere in this suite.
-        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
     });
 
@@ -2779,8 +2782,7 @@ describe('sessionCompleted', () => {
 
       await executeSteps(createEventData({ qualityRating: 4 }));
 
-      // applyAnalysis args: (db, profileId, analysis, subjectName, source,
-      // subjectId, opts) — [WI-809] opts threads identity-v2 to the GDPR gate.
+      // [WI-867] v2 always: applyAnalysis called with no opts (flag collapsed)
       expect(mockApplyAnalysis).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
@@ -2788,8 +2790,6 @@ describe('sessionCompleted', () => {
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
         SUBJECT_ID, // subjectId threaded from event data
-        // flag-adaptive + non-vacuous (true under IDENTITY_V2_ENABLED, else false).
-        { identityV2Enabled: process.env['IDENTITY_V2_ENABLED'] === 'true' },
       );
     });
   });
@@ -3165,6 +3165,7 @@ describe('memoized step-state PII break test [F-089]', () => {
     };
 
     // Delivery still happens (rehydration-free: sent at the source).
+    // [WI-867] v2 always: sendStruggleNotification called with no opts (flag collapsed)
     expect(mockSendStruggleNotification).toHaveBeenCalledWith(
       expect.anything(),
       PROFILE_ID,
@@ -3172,7 +3173,6 @@ describe('memoized step-state PII break test [F-089]', () => {
         type: 'struggle_noticed',
         topic: 'long division',
       }),
-      expect.objectContaining({ identityV2Enabled: expect.any(Boolean) }),
     );
 
     // No memoized step return carries the struggle topic.

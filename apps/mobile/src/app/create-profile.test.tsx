@@ -1087,11 +1087,23 @@ describe('CreateProfileScreen', () => {
       });
       fireEvent.press(screen.getByTestId('create-profile-submit'));
 
+      // Advance to 20s — fires the 0ms dispatch_fn state-notification timer
+      // (createPostPending=true → "pending" mutation state), so React registers
+      // the 30s abort useEffect timer. Leave 10s of fake-time buffer so
+      // waitFor's per-poll 1ms advances stay well within the 30s threshold.
       act(() => {
-        jest.advanceTimersByTime(29_000);
+        jest.advanceTimersByTime(20_000);
       });
 
+      // useCreateProfile routes POST through useMutation. execute() does
+      // `await undefined` (for onMutate) before calling run(), so mockFetch
+      // (1st call) fires as a microtask — NOT synchronously inside the act
+      // above. The leading `await Promise.resolve()` yields to the microtask
+      // queue so execute() → run() → mockFetch fires and resolveCreate is
+      // populated before we call it. Without this yield, resolveCreate is still
+      // undefined when called, making the POST deferred Promise never resolve.
       await act(async () => {
+        await Promise.resolve();
         resolveCreate?.(
           new Response(JSON.stringify({ profile: newProfile }), {
             status: 200,
@@ -1100,9 +1112,16 @@ describe('CreateProfileScreen', () => {
         await Promise.resolve();
       });
 
-      await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledTimes(2);
-      });
+      // Use interval:1 so waitFor advances only 1ms of fake time per poll
+      // instead of the default 50ms. Default 50ms × ~200 polls = 10s of fake
+      // time, which from t=20s pushes past the 30s abort threshold before
+      // setCreatePostPending(false) can cancel the timer.
+      await waitFor(
+        () => {
+          expect(mockFetch).toHaveBeenCalledTimes(2);
+        },
+        { interval: 1 },
+      );
 
       act(() => {
         jest.advanceTimersByTime(1_000);
@@ -1209,7 +1228,11 @@ describe('CreateProfileScreen', () => {
       });
 
       const submit = screen.getByTestId('create-profile-submit');
-      act(() => {
+      // Async act so the fake-timer-based React MessageChannel scheduler
+      // (used by TanStack Query v5 useMutation) flushes between the presses.
+      // A sync act() does not advance fake timers, so the mutation function
+      // never fires within the sync boundary.
+      await act(async () => {
         fireEvent.press(submit);
         fireEvent.press(submit);
       });

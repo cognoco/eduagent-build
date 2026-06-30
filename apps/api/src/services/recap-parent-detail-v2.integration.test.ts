@@ -11,8 +11,9 @@
 // found no family_links row, and returned ForbiddenError. The per-child
 // ForbiddenError catch (recaps.ts:311-312) swallowed it → recap returned null.
 //
-// The fix: forward { identityV2Enabled: opts?.identityV2Enabled } as the 5th
-// arg — mirroring the already-correct list path at recaps.ts:207-209.
+// The fix (WI-823): forward opts to getChildSessionDetail so assertParentAccess
+// runs on the v2 path (guardianship). [WI-867] opts.identityV2Enabled collapsed;
+// v2 path is now unconditional — both list and detail use guardianship always.
 //
 // Cases:
 //   - [FLAG-ON] guardian holds a guardianship edge to the child, child has a

@@ -17,7 +17,6 @@ import type { Account } from '../services/account';
 import type { ProfileMeta } from '../middleware/profile-scope';
 import type { ClerkIdentity } from '../middleware/account';
 import { requireAccount } from '../middleware/profile-scope';
-import { isIdentityV2Enabled } from '../config';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import {
@@ -343,9 +342,6 @@ export const profileRoutes = new Hono<ProfileEnv>()
           id,
           account.id,
           defaultAppContext,
-          {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) {

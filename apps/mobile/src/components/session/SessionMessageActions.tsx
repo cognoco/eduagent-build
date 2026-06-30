@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticLight } from '../../lib/haptics';
@@ -39,7 +40,7 @@ export interface SessionMessageActionsProps {
   handleReconnect: (messageId: string) => Promise<void>;
 }
 
-export function SessionMessageActions({
+function SessionMessageActionsComponent({
   message,
   isStreaming,
   latestAiMessageId,
@@ -303,3 +304,52 @@ export function SessionMessageActions({
     </View>
   );
 }
+
+/**
+ * [WI-964] Custom equality for React.memo. The parent (`session/index.tsx`)
+ * spreads the same `actionProps` to every message row, so any chat-state change
+ * (a streaming tick, a feedback tap, a bookmark toggle) re-renders ALL rows
+ * unless we gate on what each row actually reads.
+ *
+ * The crux: `messageFeedback` and `bookmarkState` are shared Record objects
+ * whose identity churns whenever ANY message's feedback/bookmark changes — a
+ * naive shallow compare would never skip a render. We compare only the
+ * per-message SLICE this row reads (`messageFeedback[message.id]`,
+ * `bookmarkState[message.eventId]`), mirroring lines 102 / 280-294. Every other
+ * prop that drives visible output is compared by identity; the callbacks are
+ * already useCallback-stable but are compared defensively.
+ *
+ * Exported for direct unit testing of the slice logic (the highest-risk detail).
+ */
+export function arePropsEqual(
+  prev: SessionMessageActionsProps,
+  next: SessionMessageActionsProps,
+): boolean {
+  // Message identity is stable per row; a different message always re-renders.
+  if (prev.message !== next.message) return false;
+  const id = next.message.id;
+  const eventId = next.message.eventId ?? '';
+  return (
+    prev.isStreaming === next.isStreaming &&
+    prev.latestAiMessageId === next.latestAiMessageId &&
+    prev.consumedQuickChipMessageId === next.consumedQuickChipMessageId &&
+    prev.userMessageCount === next.userMessageCount &&
+    prev.showWrongSubjectChip === next.showWrongSubjectChip &&
+    prev.quotaError === next.quotaError &&
+    prev.isOwner === next.isOwner &&
+    prev.stage === next.stage &&
+    prev.challengeRoundInFlight === next.challengeRoundInFlight &&
+    // Per-message slices — NOT whole-Record identity (which churns constantly).
+    prev.messageFeedback[id] === next.messageFeedback[id] &&
+    prev.bookmarkState?.[eventId] === next.bookmarkState?.[eventId] &&
+    prev.handleQuickChip === next.handleQuickChip &&
+    prev.handleMessageFeedback === next.handleMessageFeedback &&
+    prev.onToggleBookmark === next.onToggleBookmark &&
+    prev.handleReconnect === next.handleReconnect
+  );
+}
+
+export const SessionMessageActions = memo(
+  SessionMessageActionsComponent,
+  arePropsEqual,
+);

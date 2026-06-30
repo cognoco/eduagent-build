@@ -5,10 +5,8 @@ import {
   getStepDatabase,
   getStepMemoryFactsDedupConfig,
   getStepVoyageApiKey,
-  isIdentityV2EnabledInStep,
 } from '../helpers';
 import { isGdprProcessingAllowedV2 } from '../../services/identity-v2/consent-status-v2';
-import { isGdprProcessingAllowed } from '../../services/consent';
 import { getPersonLlmContext } from '../../services/identity-v2/helpers';
 import {
   updateRetentionFromSession,
@@ -927,7 +925,6 @@ export const sessionCompleted = inngest.createFunction(
           // already updated after the session ended and returns it cached.
           await refreshProgressSnapshot(db, profileId, {
             sessionEndedAt: timestamp ? new Date(timestamp) : new Date(),
-            identityV2Enabled: isIdentityV2EnabledInStep(),
           });
           await createPendingSessionSummary(
             db,
@@ -938,10 +935,7 @@ export const sessionCompleted = inngest.createFunction(
           );
 
           // Precompute coaching card and write to cache (ARCH-11)
-          // [CUT-B1 §2.5(iii)] v2 seam threaded via the step flag.
-          const card = await precomputeCoachingCard(db, profileId, {
-            identityV2Enabled: isIdentityV2EnabledInStep(),
-          });
+          const card = await precomputeCoachingCard(db, profileId);
           await writeCoachingCardCache(db, profileId, card);
         }),
       ),
@@ -1516,7 +1510,6 @@ export const sessionCompleted = inngest.createFunction(
               subjectRow?.name ?? null,
               'inferred',
               subjectId,
-              { identityV2Enabled: isIdentityV2EnabledInStep() },
             );
 
             // FR247.6 — struggle pushes to the parent, sent at the source so
@@ -1530,9 +1523,7 @@ export const sessionCompleted = inngest.createFunction(
             struggleNotificationsDetected = analysisResult.notifications.length;
             for (const notification of analysisResult.notifications) {
               try {
-                await sendStruggleNotification(db, profileId, notification, {
-                  identityV2Enabled: isIdentityV2EnabledInStep(),
-                });
+                await sendStruggleNotification(db, profileId, notification);
                 struggleNotificationsSent += 1;
               } catch (err) {
                 struggleNotificationsFailed += 1;
@@ -1751,10 +1742,8 @@ export const sessionCompleted = inngest.createFunction(
           // status to WITHDRAWN without touching the memory gate, so this step
           // must re-check the regulatory consent itself — exactly as the
           // profile step does — and skip before any transcript leaves Neon.
-          // [CUT-B1 §2.5(i)] v2 seam: GDPR gate via resolver.
-          const gdprAllowed = isIdentityV2EnabledInStep()
-            ? await isGdprProcessingAllowedV2(db, profileId)
-            : await isGdprProcessingAllowed(db, profileId);
+          // [WI-867] v2 always: GDPR gate via v2 resolver.
+          const gdprAllowed = await isGdprProcessingAllowedV2(db, profileId);
           if (!gdprAllowed) {
             return;
           }

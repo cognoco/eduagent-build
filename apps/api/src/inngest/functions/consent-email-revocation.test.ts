@@ -27,7 +27,7 @@ jest.mock(
 );
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -64,49 +64,40 @@ jest.mock(
 // fixture. This gc1-allow mock follows the same pattern as the other DB-backed
 // identity-v2 function mocks above.
 const mockDeletePersonIfConsentWithdrawnV2 = jest.fn().mockResolvedValue(true);
-jest.mock(
-  '../../services/identity-v2/deletion-v2' /* gc1-allow: pattern-a conversion — requires real DB transaction support */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/identity-v2/deletion-v2',
-    ) as typeof import('../../services/identity-v2/deletion-v2');
-    return {
-      ...actual,
-      deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
-        mockDeletePersonIfConsentWithdrawnV2(...args),
-    };
-  },
-);
+jest.mock('../../services/identity-v2/deletion-v2', () => {
+  const actual = jest.requireActual(
+    '../../services/identity-v2/deletion-v2',
+  ) as typeof import('../../services/identity-v2/deletion-v2');
+  return {
+    ...actual,
+    deletePersonIfConsentWithdrawnV2: (...args: unknown[]) =>
+      mockDeletePersonIfConsentWithdrawnV2(...args),
+  };
+});
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  };
+});
 
 import { consentEmailRevocation } from './consent-email-revocation';
 

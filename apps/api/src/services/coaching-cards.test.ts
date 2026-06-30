@@ -15,7 +15,7 @@ jest.mock(
 
 // [BREAK] Sentry is a true external boundary — mock it to assert escalation.
 const mockCaptureException = jest.fn();
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,

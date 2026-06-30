@@ -13,7 +13,6 @@ import type { Account } from '../services/account';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { isIdentityV2Enabled } from '../config';
 import {
   createNudge,
   listUnreadNudges,
@@ -38,22 +37,16 @@ export const nudgeRoutes = new Hono<NudgeRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const input = c.req.valid('json');
-    const result = await createNudge(
-      db,
-      {
-        fromProfileId: profileId,
-        toProfileId: input.toProfileId,
-        template: input.template,
-      },
-      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
-    );
+    const result = await createNudge(db, {
+      fromProfileId: profileId,
+      toProfileId: input.toProfileId,
+      template: input.template,
+    });
     return c.json(nudgeCreateResponseSchema.parse(result));
   })
   .get('/nudges', async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
-    const nudges = await listUnreadNudges(c.get('db'), profileId, {
-      identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-    });
+    const nudges = await listUnreadNudges(c.get('db'), profileId);
     return c.json(nudgeListResponseSchema.parse({ nudges }));
   })
   .patch('/nudges/:id/read', async (c) => {

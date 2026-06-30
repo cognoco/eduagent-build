@@ -251,27 +251,7 @@ describe('POST /v1/subjects', () => {
       expect.anything(),
       PROFILE_ID,
       expect.objectContaining({ name: 'Chemistry' }),
-      { conversationLanguage: undefined, identityV2Enabled: false },
-    );
-  });
-
-  it('threads identityV2Enabled: true into the service when the v2 flag is on', async () => {
-    createSubjectWithStructureMock.mockResolvedValue({
-      subject: makeSubjectRecord(),
-      structureType: 'narrow',
-    });
-
-    const res = await makeApp().request('/v1/subjects', validCreateBody(), {
-      DATABASE_URL: 'postgres://test',
-      IDENTITY_V2_ENABLED: 'true',
-    });
-
-    expect(res.status).toBe(201);
-    expect(createSubjectWithStructureMock).toHaveBeenCalledWith(
-      expect.anything(),
-      PROFILE_ID,
-      expect.objectContaining({ name: 'Chemistry' }),
-      { conversationLanguage: undefined, identityV2Enabled: true },
+      { conversationLanguage: undefined },
     );
   });
 

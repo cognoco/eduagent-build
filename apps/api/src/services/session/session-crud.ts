@@ -503,7 +503,6 @@ async function materializeFocusedBookTopics(
   profileId: string,
   subjectId: string,
   bookId: string,
-  opts: { identityV2Enabled?: boolean } = {},
 ): Promise<void> {
   const [book] = await db
     .select({
@@ -910,7 +909,7 @@ export async function startFirstCurriculumSession(
   profileId: string,
   subjectId: string,
   input: FirstCurriculumSessionStartInput,
-  options: { matcherEnabled?: boolean; identityV2Enabled?: boolean } = {},
+  options: { matcherEnabled?: boolean } = {},
 ): Promise<LearningSession> {
   const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
@@ -939,7 +938,6 @@ export async function startFirstCurriculumSession(
         profileId,
         subjectId,
         input.bookId,
-        { identityV2Enabled: options.identityV2Enabled },
       );
       topicId = await sessionCrudDependencies.findFirstAvailableTopicId(
         db,

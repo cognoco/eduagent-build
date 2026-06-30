@@ -6,6 +6,7 @@ import {
   buildFallbackFilingResponse,
 } from './filing';
 import type { FilingLlmOutput, LibraryIndex } from '@eduagent/schemas';
+import { TEST_SUBJECT_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // buildLibraryIndex — mock-based tests (no createTestDb in this codebase)
@@ -451,7 +452,7 @@ describe('resolveFilingResult', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildFallbackFilingResponse [BUG-871]', () => {
-  const SUBJECT_ID = '11111111-1111-1111-1111-111111111111';
+  const SUBJECT_ID = TEST_SUBJECT_ID;
 
   it('falls back to "Uncategorized" when no suggestion is supplied', () => {
     const result = buildFallbackFilingResponse(SUBJECT_ID, 'Random raw input');

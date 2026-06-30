@@ -4200,9 +4200,10 @@
     "journal": {
       "title": "Diario",
       "subtitle": "Registros de apoyo que te han enviado, agrupados por estudiante.",
-      "personHint": "Los registros compartidos llegan aquí cuando se finaliza el consentimiento.",
-      "personPlaceholderTitle": "Los registros compartidos llegan en S5",
-      "personPlaceholderMessage": "Por ahora, este ámbito mantiene ocultas las notas del estudiante, los chats y los elementos privados del diario."
+      "personHint": "Las actualizaciones compartidas contigo aparecen aquí.",
+      "personPlaceholderTitle": "Aún no hay actualizaciones para compartir",
+      "emptyMessage": "Cuando {{name}} termine una sesión o un informe, las actualizaciones compartidas contigo aparecerán aquí.",
+      "personPlaceholderMessage": "Los chats privados, las notas y la memoria del mentor no se muestran aquí."
     }
   },
   "visibility": {
@@ -4227,7 +4228,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Aún no hay registro compartido",
-      "emptyForPerson": "{{name}}: aún no hay registro compartido.",
       "structuralOnly": "Solo datos estructurales. Sin notas ni textos de chat en bruto.",
       "errorTitle": "No se pudo cargar el registro compartido",
       "errorMessage": "Inténtalo de nuevo en un momento.",

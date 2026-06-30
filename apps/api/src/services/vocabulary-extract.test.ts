@@ -2,7 +2,7 @@
 // Vocabulary Extraction — Tests [4A.4]
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,
@@ -10,7 +10,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,

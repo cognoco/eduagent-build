@@ -43,9 +43,7 @@ export function RecentSessionsList({
       : undefined;
   const emptyAction = isActiveProfile
     ? {
-        label: t('parentView.index.startSession', {
-          defaultValue: 'Start a session',
-        }),
+        label: t('parentView.index.startSession'),
         // [WI-1067] Push the family home screen first so router.back() from session returns
         // to home rather than falling through to the active tab's first route. Mirrors pushLearningResumeTarget.
         onPress: () => {
@@ -54,9 +52,7 @@ export function RecentSessionsList({
         },
       }
     : {
-        label: t('parentView.index.goToCurriculum', {
-          defaultValue: 'Go to curriculum',
-        }),
+        label: t('parentView.index.goToCurriculum'),
         onPress: () =>
           router.push({
             pathname: '/(app)/child/[profileId]/curriculum',

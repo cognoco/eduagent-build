@@ -988,7 +988,7 @@ describe('POST /v1/dictation/review', () => {
     expect(reviewDictation).not.toHaveBeenCalled();
   });
 
-  it('[WI-774] flag-on arms the v2 rate-limit guard: identityV2Enabled:true + callerPersonId', async () => {
+  it('[WI-774] v2 rate-limit guard: callerPersonId is threaded to checkAndLogRateLimit', async () => {
     // Mount dictationRoutes on a minimal app with a pre-seeded context so the
     // test exercises the route handler's flag-on threading without the
     // app-level metering middleware (whose v2 billing path is out of scope
@@ -1035,16 +1035,14 @@ describe('POST /v1/dictation/review', () => {
     );
 
     expect(res.status).toBe(200);
-    // Under flag-on the route must pass identityV2Enabled:true AND the resolved
-    // callerPersonId. A wrong env-binding name or context key would silently
-    // mis-scope the rate limit on the live (staging, flag-on) path.
+    // [WI-867] v2 always: callerPersonId is threaded without the flag prop.
     expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
       expect.anything(),
       'test-profile-id',
       'test-account-id',
       'dictation_review',
       { hours: 1 / 60, maxCount: 10 },
-      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+      { callerPersonId: 'person-test-id' },
     );
   });
 

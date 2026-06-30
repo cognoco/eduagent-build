@@ -1165,15 +1165,9 @@ describe('billing routes', () => {
       expect(mockBuildUsageDateLabels).toHaveBeenCalledWith(
         expect.objectContaining({ locale: 'nb' }),
       );
-      // [WI-722] Flag-off → legacy guarantee. TEST_ENV omits IDENTITY_V2_ENABLED,
-      // so isIdentityV2Enabled() returns false and the route dispatches the
-      // breakdown to the LEGACY getUsageBreakdownForProfile — byte-identical to
-      // pre-WI-722 behavior. (The flag-ON dispatch to getUsageBreakdownForProfileV2
-      // is proven directly in family-usage-v2.test.ts: a full flag-on route test
-      // would transitively exercise the CUT-B1/B2 v2 identity middleware — a
-      // different seam with its own tests — so the dispatch decision is verified
-      // at the service-unit altitude, and the ternary here is identical in shape
-      // to the 11 other CUT-B3 billing-v2 seams in this handler.)
+      // [WI-867] v2 always: route always dispatches to getUsageBreakdownForProfileV2
+      // (mock delegates to mockGetUsageBreakdownForProfile). Real DB join chain
+      // covered by billing-v2 integration suites.
       expect(mockGetUsageBreakdownForProfile).toHaveBeenCalled();
     });
 

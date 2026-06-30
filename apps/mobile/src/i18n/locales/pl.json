@@ -4364,9 +4364,10 @@
     "journal": {
       "title": "Dziennik",
       "subtitle": "Zapisy wsparcia wysłane do Ciebie, pogrupowane według uczniów.",
-      "personHint": "Udostępnione zapisy pojawią się tutaj po wyrażeniu zgody.",
-      "personPlaceholderTitle": "Udostępnione zapisy pojawią się w S5",
-      "personPlaceholderMessage": "Na razie ten zakres ukrywa notatki uczniów, czaty i prywatne zapisy w dzienniku."
+      "personHint": "Udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderTitle": "Nie ma jeszcze aktualizacji do udostępnienia",
+      "emptyMessage": "Gdy {{name}} ukończy sesję lub raport, udostępnione Tobie aktualizacje pojawią się tutaj.",
+      "personPlaceholderMessage": "Prywatne czaty, notatki i pamięć mentora nie są tutaj pokazywane."
     }
   },
   "visibility": {
@@ -4391,7 +4392,6 @@
     },
     "sharedRecord": {
       "emptyTitle": "Brak udostępnionych danych",
-      "emptyForPerson": "{{name}}: brak udostępnionych danych.",
       "structuralOnly": "Tylko fakty strukturalne. Bez surowych notatek i treści czatów.",
       "errorTitle": "Nie udało się wczytać udostępnionych danych",
       "errorMessage": "Spróbuj ponownie za chwilę.",

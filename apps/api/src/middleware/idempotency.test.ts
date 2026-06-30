@@ -1,4 +1,4 @@
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -9,7 +9,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/logger', () => {
   const actual = jest.requireActual(
     '../services/logger',
   ) as typeof import('../services/logger');
@@ -24,18 +24,15 @@ jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/idempotency-assistant-state' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/idempotency-assistant-state',
-    ) as typeof import('../services/idempotency-assistant-state');
-    return {
-      ...actual,
-      lookupAssistantTurnState: jest.fn(),
-    };
-  },
-);
+jest.mock('../services/idempotency-assistant-state', () => {
+  const actual = jest.requireActual(
+    '../services/idempotency-assistant-state',
+  ) as typeof import('../services/idempotency-assistant-state');
+  return {
+    ...actual,
+    lookupAssistantTurnState: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 import { idempotencyPreflight } from './idempotency';

@@ -50,18 +50,15 @@ jest.mock(
 const mockResolveIdentityV2 = jest.fn().mockResolvedValue({
   organizationId: 'account-v2-test',
 });
-jest.mock(
-  '../../identity-v2/identity-resolve' /* gc1-allow: pattern-a conversion — DB-backed; only resolveIdentityV2 is needed */,
-  () => {
-    const actual = jest.requireActual(
-      '../../identity-v2/identity-resolve',
-    ) as typeof import('../../identity-v2/identity-resolve');
-    return {
-      ...actual,
-      resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
-    };
-  },
-);
+jest.mock('../../identity-v2/identity-resolve', () => {
+  const actual = jest.requireActual(
+    '../../identity-v2/identity-resolve',
+  ) as typeof import('../../identity-v2/identity-resolve');
+  return {
+    ...actual,
+    resolveIdentityV2: (...args: unknown[]) => mockResolveIdentityV2(...args),
+  };
+});
 
 // [WI-1010] revenuecat-v2 — DB-backed; pattern-a conversion.
 const mockUpdateSubscriptionFromRevenuecatWebhookV2 = jest
@@ -72,33 +69,27 @@ const mockUpdateSubscriptionFromRevenuecatWebhookV2 = jest
     webhookApplied: true,
     lastRevenuecatEventId: 'evt_billing_issue_1',
   });
-jest.mock(
-  './revenuecat-v2' /* gc1-allow: pattern-a conversion — DB-backed; only updateSubscriptionFromRevenuecatWebhookV2 is needed */,
-  () => {
-    const actual = jest.requireActual(
-      './revenuecat-v2',
-    ) as typeof import('./revenuecat-v2');
-    return {
-      ...actual,
-      updateSubscriptionFromRevenuecatWebhookV2: (...args: unknown[]) =>
-        mockUpdateSubscriptionFromRevenuecatWebhookV2(...args),
-    };
-  },
-);
+jest.mock('./revenuecat-v2', () => {
+  const actual = jest.requireActual(
+    './revenuecat-v2',
+  ) as typeof import('./revenuecat-v2');
+  return {
+    ...actual,
+    updateSubscriptionFromRevenuecatWebhookV2: (...args: unknown[]) =>
+      mockUpdateSubscriptionFromRevenuecatWebhookV2(...args),
+  };
+});
 
 // [WI-1010] safe-refresh-kv-cache-v2 — KV+DB-backed; pattern-a conversion.
-jest.mock(
-  './safe-refresh-kv-cache-v2' /* gc1-allow: pattern-a conversion — KV+DB-backed; no-op in unit tests */,
-  () => {
-    const actual = jest.requireActual(
-      './safe-refresh-kv-cache-v2',
-    ) as typeof import('./safe-refresh-kv-cache-v2');
-    return {
-      ...actual,
-      safeRefreshKvCacheV2: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
+jest.mock('./safe-refresh-kv-cache-v2', () => {
+  const actual = jest.requireActual(
+    './safe-refresh-kv-cache-v2',
+  ) as typeof import('./safe-refresh-kv-cache-v2');
+  return {
+    ...actual,
+    safeRefreshKvCacheV2: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 import {
   handleInitialPurchaseV2,

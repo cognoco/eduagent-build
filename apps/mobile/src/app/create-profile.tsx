@@ -14,19 +14,21 @@ import {
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { Redirect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   conversationLanguageSchema,
   PARENT_ACCOUNT_MINIMUM_AGE,
   PROFILE_MINIMUM_AGE,
 } from '@eduagent/schemas';
-import { useApiClient } from '../lib/api-client';
-import { assertOk } from '../lib/assert-ok';
-import { useProfile, type Profile } from '../lib/profile';
+import { useProfile } from '../lib/profile';
 import {
   readPreAuthAudienceSync,
   readPreAuthAudience,
@@ -35,6 +37,7 @@ import {
 import { useNavigationContract } from '../hooks/use-navigation-contract';
 import { useActiveProfileRole } from '../hooks/use-active-profile-role';
 import { useUpdateProfileAppContext } from '../hooks/use-profiles';
+import { useCreateProfile } from '../hooks/use-create-profile';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatShortDate } from '../lib/format-datetime';
@@ -102,8 +105,6 @@ export default function CreateProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ for?: 'child' }>();
   const colors = useThemeColors();
-  const queryClient = useQueryClient();
-  const client = useApiClient();
   const { isLoaded, isSignedIn } = useAuth();
   const {
     activeProfile,
@@ -114,6 +115,7 @@ export default function CreateProfileScreen() {
   const navigationContract = useNavigationContract();
   const activeProfileRole = useActiveProfileRole();
   const updateAppContext = useUpdateProfileAppContext();
+  const createProfile = useCreateProfile();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
   // When an account owner (parent) who already has a profile creates another
@@ -321,12 +323,14 @@ export default function CreateProfileScreen() {
         ...(isAddingChild ? { kind: 'child' as const } : {}),
       };
 
-      const res = await client.profiles.$post(
-        { json: body },
-        { init: { signal: controller.signal } },
-      );
-      await assertOk(res);
-      const result = (await res.json()) as { profile: Profile };
+      // useCreateProfile's onSuccess handles the BUG-264 optimistic cache
+      // update (setQueriesData + invalidateQueries) so we don't need to do
+      // it here. updateAppContext's own onSuccess patches the profile in
+      // cache after the family-context PATCH, keeping the cache consistent.
+      const profile = await createProfile.mutateAsync({
+        body,
+        signal: controller.signal,
+      });
       if (
         abortRef.current !== controller ||
         requestSeqRef.current !== requestSeq ||
@@ -345,11 +349,10 @@ export default function CreateProfileScreen() {
       // Wrapped in a non-throwing try so a flaky PATCH never blocks the
       // profile-created success path; the user can change mode later from
       // More → Account.
-      let intentPersistedProfile: Profile | null = null;
       if (wantsFamily) {
         try {
-          intentPersistedProfile = await updateAppContext.mutateAsync({
-            profileId: result.profile.id,
+          await updateAppContext.mutateAsync({
+            profileId: profile.id,
             defaultAppContext: 'family',
           });
         } catch (intentErr) {
@@ -361,23 +364,6 @@ export default function CreateProfileScreen() {
           }
         }
       }
-      const createdProfile = intentPersistedProfile ?? result.profile;
-
-      // BUG-264: Optimistically add the new profile to the query cache BEFORE
-      // invalidating. Without this, invalidateQueries triggers a refetch with
-      // stale data (empty array for first-time users), causing activeProfile to
-      // be null briefly, which remounts CreateProfileGate and flashes the
-      // welcome screen again.
-      queryClient.setQueriesData<Profile[]>(
-        {
-          predicate: (query) => String(query.queryKey[0]) === 'profiles',
-        },
-        (old) =>
-          old && !old.some((profile) => profile.id === createdProfile.id)
-            ? [...old, createdProfile]
-            : (old ?? [createdProfile]),
-      );
-      await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
       // BUG-239: When a parent adds a child, the API grants consent inline
       // (consentStatus === 'CONSENTED'). Do NOT redirect to the child consent
@@ -397,8 +383,8 @@ export default function CreateProfileScreen() {
       // Navigate FIRST — prevents crash from tree remount (themeKey change)
       // destroying the modal's navigation state during switchProfile.
       const needsConsentFlow =
-        result.profile.consentStatus === 'PENDING' ||
-        result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
+        profile.consentStatus === 'PENDING' ||
+        profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
       // [#7] Consent double-surface race fix. Previously this branch did
       // router.replace('/consent') AND THEN switchProfile to the pending child.
@@ -439,7 +425,7 @@ export default function CreateProfileScreen() {
       // later profile add does not re-trigger the family redirect.
       void clearPreAuthAudience();
 
-      const switchResult = await switchProfile(result.profile.id);
+      const switchResult = await switchProfile(profile.id);
       if (switchResult?.success === false) {
         platformAlert(
           t('createProfile.createdTitle'),
@@ -503,8 +489,7 @@ export default function CreateProfileScreen() {
     // language change between mount and submit would send the stale value.
     isAddingChild,
     i18n.language,
-    client,
-    queryClient,
+    createProfile,
     switchProfile,
     router,
     handleClose,

@@ -813,9 +813,8 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        // [WI-586] route forwards the identity-v2 flag into the service opts;
-        // flag-OFF under TEST_ENV.
-        { matcherEnabled: false, identityV2Enabled: false },
+        // [WI-867] identityV2Enabled collapsed — no longer threaded.
+        { matcherEnabled: false },
       );
     });
 
@@ -839,7 +838,7 @@ describe('session routes', () => {
           sessionType: 'learning',
           inputMode: 'text',
         }),
-        { matcherEnabled: true, identityV2Enabled: false },
+        { matcherEnabled: true },
       );
     });
   });

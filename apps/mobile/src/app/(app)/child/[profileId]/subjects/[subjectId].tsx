@@ -186,8 +186,6 @@ export default function SubjectTopicsScreen() {
             {t('parentView.subjects.description', {
               subject: subjectName,
               name: childName,
-              defaultValue:
-                "This is your child's progress in this subject. Topics appear once sessions connect to a lesson step.",
             })}
           </Text>
         </View>
@@ -290,29 +288,19 @@ export default function SubjectTopicsScreen() {
         ) : childIsNew ? (
           <View className="py-8 items-center" testID="topics-new-learner">
             <Text className="text-body text-text-secondary text-center mb-1">
-              {t('parentView.subjects.topicsNewLearnerTitle', {
-                defaultValue: 'No lesson topics yet',
-              })}
+              {t('parentView.subjects.topicsNewLearnerTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center">
-              {t('parentView.subjects.topicsNewLearnerBody', {
-                defaultValue:
-                  'This can happen after early sessions or free browsing. Recent sessions below still show what happened.',
-              })}
+              {t('parentView.subjects.topicsNewLearnerBody')}
             </Text>
           </View>
         ) : (
           <View className="py-8 items-center" testID="topics-empty">
             <Text className="text-body text-text-secondary text-center mb-1">
-              {t('parentView.subjects.noTopicsYetTitle', {
-                defaultValue: 'No lesson topics yet',
-              })}
+              {t('parentView.subjects.noTopicsYetTitle')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center">
-              {t('parentView.subjects.noTopicsYetBody', {
-                defaultValue:
-                  'Sessions may still exist here before the mentor has enough lesson-level progress to show.',
-              })}
+              {t('parentView.subjects.noTopicsYetBody')}
             </Text>
           </View>
         )}
@@ -322,7 +310,6 @@ export default function SubjectTopicsScreen() {
             <Text className="text-h3 font-semibold text-text-primary mb-1">
               {t('parentView.subjects.recentSubjectSessions', {
                 subject: subjectName,
-                defaultValue: `Recent ${subjectName} sessions`,
               })}
             </Text>
             {subjectSessions.slice(0, 5).map((session) => {
@@ -348,7 +335,6 @@ export default function SubjectTopicsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t('parentView.subjects.viewSessionFrom', {
                     date: formatSessionDate(session.startedAt, i18n?.language),
-                    defaultValue: `View session from ${formatSessionDate(session.startedAt, i18n?.language)}`,
                   })}
                   testID={`subject-session-card-${session.sessionId}`}
                 >
