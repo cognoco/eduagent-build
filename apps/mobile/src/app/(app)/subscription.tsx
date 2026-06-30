@@ -801,11 +801,6 @@ function SubscriptionContent(): React.ReactElement | null {
                     date: formatShortDate(
                       subscription.trialEndsAt,
                       i18n?.language,
-                      {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      },
                     ),
                   })}
                 </Text>
@@ -854,22 +849,12 @@ function SubscriptionContent(): React.ReactElement | null {
                       date: formatShortDate(
                         subscription.currentPeriodEnd,
                         i18n?.language,
-                        {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        },
                       ),
                     })
                   : t('subscription.renewsOn', {
                       date: formatShortDate(
                         subscription.currentPeriodEnd,
                         i18n?.language,
-                        {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        },
                       ),
                     })}
               </Text>
@@ -933,11 +918,6 @@ function SubscriptionContent(): React.ReactElement | null {
                   date: formatShortDate(
                     subscription.currentPeriodEnd,
                     i18n?.language,
-                    {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    },
                   ),
                 })}
               </Text>

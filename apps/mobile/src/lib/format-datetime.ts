@@ -32,22 +32,17 @@ export function formatMediumDateTime(isoValue: string | undefined): string {
   }
 }
 
-export function formatShortDate(
-  isoValue: string | Date | undefined,
-  locale?: string,
-  options?: Intl.DateTimeFormatOptions,
-): string {
-  if (!isoValue) return '';
-  const date = isoValue instanceof Date ? isoValue : new Date(isoValue);
-  if (Number.isNaN(date.getTime())) {
-    return typeof isoValue === 'string' ? isoValue : '';
-  }
-  const formatOptions = options ?? { dateStyle: 'medium' };
+export function formatShortDate(iso: string, locale?: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
   try {
-    return new Intl.DateTimeFormat(locale, formatOptions).format(date);
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
+      date,
+    );
   } catch {
     try {
-      return date.toLocaleDateString(locale, formatOptions);
+      return date.toLocaleDateString(locale, { dateStyle: 'medium' });
     } catch {
       return date.toISOString();
     }

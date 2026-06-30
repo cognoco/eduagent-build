@@ -81,10 +81,7 @@ function formatJoinedDate(
   if (!isoDate) return null;
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return null;
-  return formatShortDate(date, locale, {
-    month: 'long',
-    year: 'numeric',
-  });
+  return formatShortDate(date.toISOString(), locale);
 }
 
 type DashboardSubject = DashboardChild['subjects'][number];

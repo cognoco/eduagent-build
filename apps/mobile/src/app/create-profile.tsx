@@ -62,11 +62,7 @@ const MIN_DATE = new Date(
 );
 
 function formatDateForDisplay(date: Date, locale: string | undefined): string {
-  return formatShortDate(date, locale, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  return formatShortDate(date.toISOString(), locale);
 }
 
 function parseWebBirthDate(value: string): Date | null {

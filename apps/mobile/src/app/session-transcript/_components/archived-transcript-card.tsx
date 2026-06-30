@@ -20,11 +20,7 @@ export function ArchivedTranscriptCard({
   const colors = useThemeColors();
   const hasTopics = summary.topicsCovered.length > 0;
   const canContinueTopic = summary.topicId != null;
-  const archivedDate = formatShortDate(archivedAt, i18n?.language, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const archivedDate = formatShortDate(archivedAt, i18n?.language);
 
   return (
     <ScrollView contentContainerStyle={{ padding: 24 }}>

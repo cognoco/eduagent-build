@@ -98,11 +98,7 @@ export function SubscriptionUsageCard({
             {t('subscription.usageCard.quotaResets', {
               date:
                 usage.resetsAtLabel ??
-                formatShortDate(usage.cycleResetAt, i18n?.language, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                }),
+                formatShortDate(usage.cycleResetAt, i18n?.language),
             })}
           </Text>
           {usage.renewsAtLabel ? (

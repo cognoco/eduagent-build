@@ -143,11 +143,7 @@ export default function DeleteAccountScreen() {
     !statusLoadFailed;
 
   const formattedDate = gracePeriodEnds
-    ? formatShortDate(gracePeriodEnds, i18n?.language, {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
+    ? formatShortDate(gracePeriodEnds, i18n?.language)
     : null;
 
   // [F4] Defense-in-depth: this screen is normally reachable only via

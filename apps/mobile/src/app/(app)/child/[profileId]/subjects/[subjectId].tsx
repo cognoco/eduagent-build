@@ -49,12 +49,7 @@ function TopicSkeleton(): React.ReactNode {
 function formatSessionDate(iso: string, locale: string | undefined): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return formatShortDate(date, locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatShortDate(date.toISOString(), locale);
 }
 
 export default function SubjectTopicsScreen() {

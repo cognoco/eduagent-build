@@ -87,10 +87,7 @@ function formatSessionDate(
   createdAt: string,
   locale: string | undefined,
 ): string {
-  return formatShortDate(createdAt, locale, {
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatShortDate(createdAt, locale);
 }
 
 function formatSessionsSummary(

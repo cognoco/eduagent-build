@@ -33,12 +33,7 @@ const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
 };
 
 function formatSessionDate(iso: string, locale: string | undefined): string {
-  return formatShortDate(iso, locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatShortDate(iso, locale);
 }
 
 function formatTimeOnApp(

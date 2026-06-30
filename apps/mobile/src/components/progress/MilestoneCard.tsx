@@ -84,10 +84,7 @@ export function MilestoneCard({
   const config = MILESTONE_COPY[milestone.milestoneType] as
     | (typeof MILESTONE_COPY)[MilestoneRecord['milestoneType']]
     | undefined;
-  const createdAtLabel = formatShortDate(milestone.createdAt, i18n?.language, {
-    month: 'short',
-    day: 'numeric',
-  });
+  const createdAtLabel = formatShortDate(milestone.createdAt, i18n?.language);
 
   if (!config) {
     return (

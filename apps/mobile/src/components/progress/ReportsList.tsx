@@ -46,10 +46,7 @@ function formatDateOnly(
   options: Intl.DateTimeFormatOptions,
 ): string {
   const dateOnly = /^\d{4}-\d{2}$/.test(isoDate) ? `${isoDate}-01` : isoDate;
-  return formatShortDate(`${dateOnly}T00:00:00Z`, locale, {
-    ...options,
-    timeZone: 'UTC',
-  });
+  return formatShortDate(`${dateOnly}T00:00:00Z`, locale);
 }
 
 /**

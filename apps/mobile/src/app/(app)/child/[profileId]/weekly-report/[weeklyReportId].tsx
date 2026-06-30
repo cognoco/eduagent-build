@@ -38,17 +38,8 @@ function formatWeeklyReportRange(
   if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
-  const startLabel = formatShortDate(start, locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-  const endLabel = formatShortDate(end, locale, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  const startLabel = formatShortDate(start.toISOString(), locale);
+  const endLabel = formatShortDate(end.toISOString(), locale);
   return `${startLabel} – ${endLabel}`;
 }
 

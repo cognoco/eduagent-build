@@ -27,11 +27,7 @@ export function useRelativeDate(): (iso: string) => string {
       case 'date': {
         const d = new Date(part.iso);
         const includeYear = d.getFullYear() !== new Date().getFullYear();
-        return formatShortDate(part.iso, i18n?.language || undefined, {
-          month: 'short',
-          day: 'numeric',
-          ...(includeYear ? { year: 'numeric' } : {}),
-        });
+        return formatShortDate(part.iso, i18n?.language || undefined);
       }
     }
   };

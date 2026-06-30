@@ -17,26 +17,14 @@ export function formatReportDate(
     const reportMonth = /^\d{4}-\d{2}$/.test(report.report.reportMonth)
       ? `${report.report.reportMonth}-01`
       : report.report.reportMonth;
-    return formatShortDate(`${reportMonth}T00:00:00Z`, locale, {
-      month: 'long',
-      timeZone: 'UTC',
-      year: 'numeric',
-    });
+    return formatShortDate(`${reportMonth}T00:00:00Z`, locale);
   }
 
   const start = new Date(`${report.report.reportWeek}T00:00:00Z`);
   const end = new Date(start);
   end.setUTCDate(start.getUTCDate() + 6);
-  const startLabel = formatShortDate(start, locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-  const endLabel = formatShortDate(end, locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
+  const startLabel = formatShortDate(start.toISOString(), locale);
+  const endLabel = formatShortDate(end.toISOString(), locale);
   return `${startLabel} - ${endLabel}`;
 }
 

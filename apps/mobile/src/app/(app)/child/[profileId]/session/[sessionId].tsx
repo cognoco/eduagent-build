@@ -29,11 +29,7 @@ try {
 }
 
 function formatDate(iso: string, locale: string | undefined): string {
-  return formatShortDate(iso, locale, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatShortDate(iso, locale);
 }
 
 export default function SessionDetailScreen() {

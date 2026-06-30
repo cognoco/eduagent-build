@@ -13,9 +13,6 @@ export function formatSourceLine(
   note: NoteResponse,
   locale: string | undefined,
 ): string {
-  const monthDay = formatShortDate(note.createdAt, locale, {
-    month: 'short',
-    day: 'numeric',
-  });
+  const monthDay = formatShortDate(note.createdAt, locale);
   return note.sessionId ? `From session · ${monthDay}` : `Note · ${monthDay}`;
 }

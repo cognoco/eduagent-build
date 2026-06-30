@@ -52,7 +52,36 @@ describe('formatMediumDateTime (#11 Hermes ICU safety)', () => {
 });
 
 describe('formatShortDate', () => {
+  const ISO = '2026-05-28T15:30:00.000Z';
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('returns the raw value for an unparseable date', () => {
     expect(formatShortDate('not-a-date', 'en')).toBe('not-a-date');
+  });
+
+  it('uses the caller locale with a medium date style', () => {
+    const spy = jest.spyOn(Intl, 'DateTimeFormat');
+
+    const out = formatShortDate(ISO, 'nb');
+
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(0);
+    expect(spy).toHaveBeenCalledWith('nb', { dateStyle: 'medium' });
+  });
+
+  it('ignores stale caller-supplied date options and always uses medium date style', () => {
+    const spy = jest.spyOn(Intl, 'DateTimeFormat');
+    const callWithStaleOptions = formatShortDate as unknown as (
+      iso: string,
+      locale?: string,
+      options?: Intl.DateTimeFormatOptions,
+    ) => string;
+
+    callWithStaleOptions(ISO, 'en', { dateStyle: 'full' });
+
+    expect(spy).toHaveBeenCalledWith('en', { dateStyle: 'medium' });
   });
 });

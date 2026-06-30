@@ -101,10 +101,7 @@ function subtitleForKind(
 }
 
 function formatInlineDate(iso: string, locale: string | undefined): string {
-  return formatShortDate(iso, locale, {
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatShortDate(iso, locale);
 }
 
 function normalizeSessionType(type: string, t: TFunction): string {

@@ -13,6 +13,21 @@ import { useTranslation } from 'react-i18next';
 import { ReportsList } from '../../../../components/progress/ReportsList';
 import { formatShortDate } from '../../../../lib/format-datetime';
 
+function formatLongUtcDate(iso: string, locale?: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(date);
+  } catch {
+    return formatShortDate(iso, locale);
+  }
+}
+
 /** Returns the formatted next report date and a human-friendly time context. */
 export function getNextReportInfo(
   now = new Date(),
@@ -36,11 +51,7 @@ export function getNextReportInfo(
   const daysUntil = Math.ceil(
     (nextRun.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
   );
-  const formattedDate = formatShortDate(nextRun, locale, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const formattedDate = formatLongUtcDate(nextRun.toISOString(), locale);
 
   const timeContext =
     daysUntil <= 3
@@ -59,17 +70,8 @@ function formatReportWeek(
   if (Number.isNaN(start.getTime())) return fallback;
   const end = new Date(start.getTime());
   end.setUTCDate(end.getUTCDate() + 6);
-  const startLabel = formatShortDate(start, locale, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-  const endLabel = formatShortDate(end, locale, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+  const startLabel = formatShortDate(start.toISOString(), locale);
+  const endLabel = formatShortDate(end.toISOString(), locale);
   return `${startLabel} – ${endLabel}`;
 }
 
