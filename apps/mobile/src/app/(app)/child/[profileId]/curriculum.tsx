@@ -63,7 +63,6 @@ const SubjectRow = memo(function SubjectRow({
           <Text className="mt-1 text-caption text-text-secondary">
             {t('parentView.index.subjectRawInputAudit', {
               rawInput,
-              defaultValue: `Started from: ${rawInput}`,
             })}
           </Text>
         ) : null}
@@ -105,7 +104,6 @@ const SubjectRow = memo(function SubjectRow({
       accessibilityRole="button"
       accessibilityLabel={t('parentView.index.openSubjectProgress', {
         subject: subject.name,
-        defaultValue: `Open ${subject.name} progress`,
       })}
       testID={`child-curriculum-subject-${id}`}
     >
@@ -129,15 +127,10 @@ function NotLinkedEmptyState({
       testID="child-curriculum-not-linked"
     >
       <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
-        {t('parentView.index.curriculumNotAvailableTitle', {
-          defaultValue: "This child's curriculum is not available",
-        })}
+        {t('parentView.index.curriculumNotAvailableTitle')}
       </Text>
       <Text className="mb-6 text-center text-body text-text-secondary">
-        {t('parentView.index.curriculumNotAvailableBody', {
-          defaultValue:
-            'You can only review curriculum for children linked to your family account.',
-        })}
+        {t('parentView.index.curriculumNotAvailableBody')}
       </Text>
       <Pressable
         onPress={onPress}
@@ -289,14 +282,11 @@ export default function ChildCurriculumScreen(): React.ReactElement {
       </Pressable>
       <View className="flex-1">
         <Text className="text-h2 font-bold text-text-primary">
-          {t('parentView.index.curriculumTitle', {
-            defaultValue: 'Curriculum',
-          })}
+          {t('parentView.index.curriculumTitle')}
         </Text>
         <Text className="mt-1 text-body-sm text-text-secondary">
           {t('parentView.index.curriculumSubtitle', {
             name: childName,
-            defaultValue: `Browse ${childName}'s subjects and topics`,
           })}
         </Text>
       </View>
@@ -340,15 +330,10 @@ export default function ChildCurriculumScreen(): React.ReactElement {
             testID="child-curriculum-empty"
           >
             <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.subjects.noTopicsYetTitle', {
-                defaultValue: 'No lesson topics yet',
-              })}
+              {t('parentView.subjects.noTopicsYetTitle')}
             </Text>
             <Text className="mt-2 text-body-sm text-text-secondary">
-              {t('parentView.subjects.noTopicsYetBody', {
-                defaultValue:
-                  'Sessions may still exist before lesson-level progress is ready.',
-              })}
+              {t('parentView.subjects.noTopicsYetBody')}
             </Text>
           </View>
         </View>

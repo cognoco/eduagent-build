@@ -885,9 +885,7 @@ export function ParentHomeScreen({
             className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"
-            accessibilityLabel={t('home.parent.accountLink', {
-              defaultValue: 'Open account',
-            })}
+            accessibilityLabel={t('home.parent.accountLink')}
             testID="parent-home-account-avatar"
           >
             <Text className="text-body font-bold text-primary">

@@ -260,7 +260,6 @@ function buildSubjectMentorNote({
       nextStep: t('parentView.index.subjectSessionNextStep', {
         name: childName,
         subject: subject.name,
-        defaultValue: `A short follow-up in ${subject.name} would help ${childName} reconnect with it.`,
       }),
     };
   }
@@ -271,12 +270,8 @@ function buildSubjectMentorNote({
         name: childName,
         subject: subject.name,
         rawInput,
-        defaultValue: `This started from "${rawInput}", so ${childName} may still be finding the right shape for ${subject.name}.`,
       }),
-      nextStep: t('parentView.index.subjectRawNextStep', {
-        defaultValue:
-          'One small session can turn that broad interest into a concrete topic.',
-      }),
+      nextStep: t('parentView.index.subjectRawNextStep'),
     };
   }
 
@@ -284,12 +279,8 @@ function buildSubjectMentorNote({
     summary: t('parentView.index.subjectQuietSummary', {
       name: childName,
       subject: subject.name,
-      defaultValue: `${subject.name} is ready when ${childName} wants to return to it.`,
     }),
-    nextStep: t('parentView.index.subjectQuietNextStep', {
-      defaultValue:
-        'Start with one easy question or topic so the restart feels light.',
-    }),
+    nextStep: t('parentView.index.subjectQuietNextStep'),
   };
 }
 
@@ -384,28 +375,12 @@ function ProgressNudgeCard({
   const title = t(titleKey, {
     name: childName,
     focus: action.focusName,
-    defaultValue:
-      recency === 'fresh'
-        ? `Ask about ${action.focusName} while it is fresh`
-        : recency === 'recent'
-          ? `Keep ${action.focusName} warm`
-          : recency === 'stale'
-            ? `Help ${childName} ease back into ${action.focusName}`
-            : `Learn alongside ${childName}`,
   });
   const subtitle = t(subtitleKey, {
     name: childName,
     focus: action.focusName,
     subject: action.subjectName,
     time: action.lastSessionLabel,
-    defaultValue:
-      recency === 'fresh'
-        ? `${childName} studied ${action.focusName} ${action.lastSessionLabel}. Try a quick pass yourself, then ask what clicked.`
-        : recency === 'recent'
-          ? `${childName} last touched ${action.focusName} ${action.lastSessionLabel}. Open ${action.subjectName}, take a quick look yourself, then pick one follow-up question.`
-          : recency === 'stale'
-            ? `Last session was ${action.lastSessionLabel}. Open ${action.subjectName} to find one quick review or next step you can do together.`
-            : `Open ${action.subjectName} to see what is ready, then try a small lesson yourself so you can help.`,
   });
 
   return (
@@ -430,7 +405,6 @@ function ProgressNudgeCard({
           <Text className="text-body-sm font-semibold text-primary mt-3">
             {t('parentView.index.openProgressNudgeAction', {
               subject: action.subjectName,
-              defaultValue: `Open ${action.subjectName}`,
             })}
           </Text>
         </View>
@@ -521,7 +495,6 @@ function SubjectCard({
           >
             {t('parentView.index.subjectRawInputAudit', {
               rawInput,
-              defaultValue: `Your child searched for "${rawInput}"`,
             })}
           </Text>
         ) : null}
@@ -550,7 +523,6 @@ function SubjectCard({
       accessibilityRole="button"
       accessibilityLabel={t('parentView.index.openSubjectProgress', {
         subject: subject.name,
-        defaultValue: `Open ${subject.name} progress`,
       })}
       testID={`subject-card-${subjectId}`}
     >
@@ -618,19 +590,14 @@ function ConsentManagementSection({
     platformAlert(
       t('parentView.index.withdrawConsentConfirmTitle', {
         childName,
-        defaultValue: `Withdraw consent for ${childName}?`,
       }),
       t('parentView.index.withdrawConsentBody', {
         childName,
-        defaultValue:
-          'Learning access will pause and account deletion will be scheduled. You can cancel during the grace period.',
       }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('parentView.index.confirmWithdrawConsent', {
-            defaultValue: 'Withdraw',
-          }),
+          text: t('parentView.index.confirmWithdrawConsent'),
           style: 'destructive',
           onPress: runWithdraw,
         },
@@ -658,14 +625,11 @@ function ConsentManagementSection({
       testID="consent-section"
     >
       <Text className="text-body font-semibold text-text-primary">
-        {t('parentView.index.consentTitle', {
-          defaultValue: 'Consent',
-        })}
+        {t('parentView.index.consentTitle')}
       </Text>
       <Text className="text-body-sm text-text-secondary mt-1">
         {t('parentView.index.consentDescription', {
           name: childName,
-          defaultValue: `Manage parental consent for ${childName}.`,
         })}
       </Text>
 
@@ -699,9 +663,7 @@ function ConsentManagementSection({
           testID="consent-status-error"
         >
           <Text className="text-body-sm text-danger">
-            {t('parentView.index.consentStatusError', {
-              defaultValue: 'Could not load consent status. Please try again.',
-            })}
+            {t('parentView.index.consentStatusError')}
           </Text>
           <Pressable
             onPress={() => void consent.refetch()}
@@ -729,28 +691,21 @@ function ConsentManagementSection({
           testID="grace-period-banner"
         >
           <Text className="text-body font-semibold text-warning">
-            {t('parentView.index.deletionPending', {
-              defaultValue: 'Deletion pending',
-            })}
+            {t('parentView.index.deletionPending')}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
             {daysRemaining > 0
               ? t('parentView.index.deletionGraceDays', {
                   count: daysRemaining,
                 })
-              : t('parentView.index.deletionGraceFallback', {
-                  defaultValue:
-                    'Deletion is scheduled. Try cancelling now if this was a mistake.',
-                })}
+              : t('parentView.index.deletionGraceFallback')}
           </Text>
           <Pressable
             onPress={handleRestore}
             disabled={restoreConsent.isPending}
             className="bg-warning rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
             accessibilityRole="button"
-            accessibilityLabel={t('parentView.index.cancelDeletion', {
-              defaultValue: 'Cancel deletion',
-            })}
+            accessibilityLabel={t('parentView.index.cancelDeletion')}
             testID="cancel-deletion-button"
           >
             {restoreConsent.isPending ? (
@@ -760,9 +715,7 @@ function ConsentManagementSection({
               />
             ) : (
               <Text className="text-body font-semibold text-text-inverse">
-                {t('parentView.index.cancelDeletion', {
-                  defaultValue: 'Cancel deletion',
-                })}
+                {t('parentView.index.cancelDeletion')}
               </Text>
             )}
           </Pressable>
@@ -773,9 +726,7 @@ function ConsentManagementSection({
           disabled={revokeConsent.isPending}
           className="border border-danger rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-4"
           accessibilityRole="button"
-          accessibilityLabel={t('parentView.index.withdrawConsent', {
-            defaultValue: 'Withdraw consent',
-          })}
+          accessibilityLabel={t('parentView.index.withdrawConsent')}
           testID="withdraw-consent-button"
         >
           {revokeConsent.isPending ? (
@@ -785,9 +736,7 @@ function ConsentManagementSection({
             />
           ) : (
             <Text className="text-body font-semibold text-danger">
-              {t('parentView.index.withdrawConsent', {
-                defaultValue: 'Withdraw consent',
-              })}
+              {t('parentView.index.withdrawConsent')}
             </Text>
           )}
         </Pressable>
@@ -1064,11 +1013,8 @@ export default function ChildDetailScreen(): React.ReactElement {
             {lastSessionLabel
               ? t('parentView.index.lastSessionAgo', {
                   time: lastSessionLabel,
-                  defaultValue: `Last session ${lastSessionLabel}`,
                 })
-              : t('parentView.index.noSessionsYet', {
-                  defaultValue: 'No sessions yet',
-                })}
+              : t('parentView.index.noSessionsYet')}
           </Text>
         </View>
       </View>
@@ -1089,14 +1035,11 @@ export default function ChildDetailScreen(): React.ReactElement {
         {!showSettingsOnly && sortedSubjects.length > 0 ? (
           <View className="mt-6" testID="child-subjects-section">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
-              {t('parentView.index.subjects', {
-                defaultValue: 'Subjects',
-              })}
+              {t('parentView.index.subjects')}
             </Text>
             <Text className="text-body-sm text-text-secondary mb-1">
               {t('parentView.index.subjectsDescription', {
                 name: childName,
-                defaultValue: `${childName}'s active subjects, with the most recent activity first.`,
               })}
             </Text>
             {sortedSubjects.map((subject, index) => (
@@ -1133,9 +1076,7 @@ export default function ChildDetailScreen(): React.ReactElement {
                 subtitle={
                   activeAccommodation
                     ? `${activeAccommodation.title} - ${activeAccommodation.description}`
-                    : t('parentView.index.noLearningPreferenceSet', {
-                        defaultValue: 'No learning preference set',
-                      })
+                    : t('parentView.index.noLearningPreferenceSet')
                 }
                 onPress={() =>
                   router.push(
@@ -1151,7 +1092,6 @@ export default function ChildDetailScreen(): React.ReactElement {
               title={t('parentView.index.mentorMemoryTitleFallback')}
               subtitle={t('parentView.index.manageMentorMemoryForChild', {
                 name: childName,
-                defaultValue: `Manage what the mentor remembers about ${childName}`,
               })}
               onPress={() =>
                 router.push({
@@ -1164,12 +1104,9 @@ export default function ChildDetailScreen(): React.ReactElement {
 
             {joinedLabel ? (
               <InfoRow
-                label={t('parentView.index.profileDetails', {
-                  defaultValue: 'Profile details',
-                })}
+                label={t('parentView.index.profileDetails')}
                 value={t('parentView.index.childProfileJoined', {
                   date: joinedLabel,
-                  defaultValue: `Added ${joinedLabel}`,
                 })}
                 testID="child-profile-details"
               />

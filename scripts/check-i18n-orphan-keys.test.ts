@@ -6,6 +6,7 @@ import {
   computeOrphans,
   flatten,
 } from './check-i18n-orphan-keys';
+import type { DefaultValueMisuse } from './check-i18n-orphan-keys';
 
 function makeProject(files: Record<string, string>): Project {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -336,5 +337,64 @@ describe('flatten (preserved helper)', () => {
     const keys = flatten({ a: { b: 'x' }, c: 'y' });
     expect(keys.has('a.b')).toBe(true);
     expect(keys.has('c')).toBe(true);
+  });
+});
+
+describe('analyzeProject — defaultValue misuse guard', () => {
+  it('flags a t() call with a string-literal defaultValue', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+        "t('some.key', { defaultValue: 'English fallback' });",
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    const hits: DefaultValueMisuse[] = result.defaultValueMisuse;
+    expect(hits).toHaveLength(1);
+    expect(hits[0].key).toBe('some.key');
+    expect(hits[0].line).toBe(2);
+  });
+
+  it('does NOT flag a t() call with no options object', () => {
+    const project = makeProject({
+      'a.tsx': ['const { t } = useTranslation();', "t('some.key');"].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(0);
+  });
+
+  it('does NOT flag a t() call with options but no defaultValue', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+        "t('some.key', { count: 1 });",
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(0);
+  });
+
+  it('does NOT flag a t() call where defaultValue is a non-string (identifier)', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+        "t('some.key', { defaultValue: someVar });",
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(0);
+  });
+
+  it('flags a t() call with a no-substitution template literal defaultValue', () => {
+    const project = makeProject({
+      'a.tsx': [
+        'const { t } = useTranslation();',
+
+        't(`some.key`, { defaultValue: `English fallback` });',
+      ].join('\n'),
+    });
+    const result = analyzeProject(project);
+    expect(result.defaultValueMisuse).toHaveLength(1);
+    expect(result.defaultValueMisuse[0].key).toBe('some.key');
   });
 });

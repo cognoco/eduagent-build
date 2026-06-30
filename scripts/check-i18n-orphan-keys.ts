@@ -85,6 +85,13 @@ interface PrefixMarker {
   suffix: string;
 }
 
+interface DefaultValueMisuse {
+  file: string;
+  line: number;
+  key: string;
+  snippet: string;
+}
+
 interface Analysis {
   staticKeys: Set<string>;
   staticRefs: Array<{ file: string; line: number; key: string }>;
@@ -92,6 +99,7 @@ interface Analysis {
   dynamicCallSites: CallSite[];
   multiVarViolations: CallSite[];
   misuse: NamespaceMisuse[];
+  defaultValueMisuse: DefaultValueMisuse[];
 }
 
 const PLURAL_SUFFIXES = ['_zero', '_one', '_two', '_few', '_many', '_other'];
@@ -233,6 +241,7 @@ function analyzeSourceFile(sf: SourceFile): Analysis {
     dynamicCallSites: [],
     multiVarViolations: [],
     misuse: [],
+    defaultValueMisuse: [],
   };
 
   sf.forEachDescendant((node) => {
@@ -283,6 +292,36 @@ function analyzeSourceFile(sf: SourceFile): Analysis {
     if (!arg0) return; // t() with no args — not a key lookup.
 
     classifyArg(arg0, { node, file, line, lines, analysis });
+
+    // Detect `t('key', { defaultValue: 'literal' })` — silently renders English
+    // to every non-English locale when the key is absent from a translation file.
+    const arg1 = node.getArguments()[1];
+    if (arg1 && Node.isObjectLiteralExpression(arg1)) {
+      for (const prop of arg1.getProperties()) {
+        if (!Node.isPropertyAssignment(prop)) continue;
+        if (prop.getName() !== 'defaultValue') continue;
+        const init = prop.getInitializer();
+        if (!init) continue;
+        const val = unwrapArg(init);
+        if (
+          Node.isStringLiteral(val) ||
+          Node.isNoSubstitutionTemplateLiteral(val)
+        ) {
+          const unwrappedKey = unwrapArg(arg0);
+          const keyText =
+            Node.isStringLiteral(unwrappedKey) ||
+            Node.isNoSubstitutionTemplateLiteral(unwrappedKey)
+              ? unwrappedKey.getLiteralText()
+              : arg0.getText().slice(0, 60);
+          analysis.defaultValueMisuse.push({
+            file,
+            line,
+            key: keyText,
+            snippet: node.getText().slice(0, 80),
+          });
+        }
+      }
+    }
   });
 
   return analysis;
@@ -408,6 +447,7 @@ function mergeAnalysis(target: Analysis, src: Analysis): void {
   target.dynamicCallSites.push(...src.dynamicCallSites);
   target.multiVarViolations.push(...src.multiVarViolations);
   target.misuse.push(...src.misuse);
+  target.defaultValueMisuse.push(...src.defaultValueMisuse);
 }
 
 function analyzeProject(project: Project): Analysis {
@@ -418,6 +458,7 @@ function analyzeProject(project: Project): Analysis {
     dynamicCallSites: [],
     multiVarViolations: [],
     misuse: [],
+    defaultValueMisuse: [],
   };
   for (const sf of project.getSourceFiles()) {
     mergeAnalysis(merged, analyzeSourceFile(sf));
@@ -546,6 +587,21 @@ function main(): void {
     );
   }
 
+  if (analysis.defaultValueMisuse.length > 0) {
+    failed = true;
+    console.error(
+      `Found ${analysis.defaultValueMisuse.length} t() call(s) with a defaultValue string literal:\n`,
+    );
+    for (const d of analysis.defaultValueMisuse) {
+      console.error(`  ${rel(d.file)}:${d.line} — t('${d.key}')`);
+    }
+    console.error(
+      '\nThe defaultValue option silently renders English to every non-English locale\n' +
+        'when the key is missing from a translation file. Add the key to\n' +
+        'apps/mobile/src/i18n/locales/en.json and remove the defaultValue.\n',
+    );
+  }
+
   if (orphans.length > 0) {
     failed = true;
     console.error(`Found ${orphans.length} orphan t() key(s):\n`);
@@ -621,4 +677,11 @@ export {
   resolveKey,
   flatten,
 };
-export type { Analysis, Orphan, PrefixMarker, CallSite, NamespaceMisuse };
+export type {
+  Analysis,
+  Orphan,
+  PrefixMarker,
+  CallSite,
+  NamespaceMisuse,
+  DefaultValueMisuse,
+};

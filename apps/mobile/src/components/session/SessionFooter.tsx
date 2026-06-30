@@ -91,9 +91,7 @@ export function SessionFooter({
       {showNoteInput && topicId ? (
         <View className="px-4 mb-2">
           <NoteInput
-            placeholder={t('session.notePrompt.summaryPlaceholder', {
-              defaultValue: 'Summarize this in your own words...',
-            })}
+            placeholder={t('session.notePrompt.summaryPlaceholder')}
             onSave={(content) => {
               createNote.mutate(
                 {
