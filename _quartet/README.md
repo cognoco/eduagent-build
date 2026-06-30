@@ -45,6 +45,7 @@ _quartet/
   examples/            worked references (e.g. a real executor dispatch brief)
   working/             ── WORKING STATE (live instances; relocation TBD)
     program/  lanes/
+  _quartet-wip/        ── META (NOT machinery): artifacts from building/auditing Quartet — audit.md, findings.md
 ```
 
 ## Bootstrap — "recreate its operational self"

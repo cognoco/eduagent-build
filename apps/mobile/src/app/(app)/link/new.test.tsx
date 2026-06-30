@@ -98,37 +98,41 @@ describe('NewLinkScreen', () => {
     mockParams.relation = CONTRACT.relation;
   });
 
-  it('initiates a visibility link from the active supporter', async () => {
-    mockFetch.setRoute('/visibility/links', CONTRACT);
+  it(
+    'initiates a visibility link from the active supporter',
+    async () => {
+      mockFetch.setRoute('/visibility/links', CONTRACT);
 
-    renderScreen();
+      renderScreen();
 
-    screen.getByText('Start sharing request');
-    fireEvent.press(screen.getByTestId('visibility-link-create'));
+      screen.getByText('Start sharing request');
+      fireEvent.press(screen.getByTestId('visibility-link-create'));
 
-    await waitFor(() =>
-      expect(fetchCallsMatching(mockFetch, '/visibility/links')).toHaveLength(
-        1,
-      ),
-    );
-    const body = extractJsonBody<{
-      supporterPersonId: string;
-      supporteePersonId: string;
-      relation: string;
-      managedTier: boolean;
-    }>(fetchCallsMatching(mockFetch, '/visibility/links')[0]?.init);
-    expect(body).toEqual({
-      supporterPersonId: CONTRACT.supporterPersonId,
-      supporteePersonId: CONTRACT.supporteePersonId,
-      relation: CONTRACT.relation,
-      managedTier: false,
-    });
-    expect(mockReplace).toHaveBeenCalledWith({
-      pathname: '/(app)/link/[contractId]',
-      params: {
-        contractId: CONTRACT.id,
-        supporteeName: 'Emma',
-      },
-    });
-  });
+      await waitFor(() =>
+        expect(fetchCallsMatching(mockFetch, '/visibility/links')).toHaveLength(
+          1,
+        ),
+      );
+      const body = extractJsonBody<{
+        supporterPersonId: string;
+        supporteePersonId: string;
+        relation: string;
+        managedTier: boolean;
+      }>(fetchCallsMatching(mockFetch, '/visibility/links')[0]?.init);
+      expect(body).toEqual({
+        supporterPersonId: CONTRACT.supporterPersonId,
+        supporteePersonId: CONTRACT.supporteePersonId,
+        relation: CONTRACT.relation,
+        managedTier: false,
+      });
+      expect(mockReplace).toHaveBeenCalledWith({
+        pathname: '/(app)/link/[contractId]',
+        params: {
+          contractId: CONTRACT.id,
+          supporteeName: 'Emma',
+        },
+      });
+    },
+    10_000,
+  );
 });

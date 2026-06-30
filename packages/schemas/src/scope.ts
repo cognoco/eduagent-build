@@ -66,6 +66,16 @@ export const supporterScopeListSchema = z.discriminatedUnion('shape', [
 ]);
 export type SupporterScopeList = z.infer<typeof supporterScopeListSchema>;
 
+export const supporteeStructuralTopicProgressStateSchema = z.enum([
+  'not-started',
+  'learning',
+  'review-due',
+  'mastered',
+]);
+export type SupporteeStructuralTopicProgressState = z.infer<
+  typeof supporteeStructuralTopicProgressStateSchema
+>;
+
 export const supporteeStructuralTopicSchema = z.strictObject({
   id: z.string().uuid(),
   title: z.string(),
@@ -74,6 +84,9 @@ export const supporteeStructuralTopicSchema = z.strictObject({
   sortOrder: z.number().int(),
   estimatedMinutes: z.number().int(),
   skipped: z.boolean(),
+  progressState: supporteeStructuralTopicProgressStateSchema,
+  nextReviewAt: z.string().datetime().nullable(),
+  masteredAt: z.string().datetime().nullable(),
 });
 export type SupporteeStructuralTopic = z.infer<
   typeof supporteeStructuralTopicSchema
