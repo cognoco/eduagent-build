@@ -131,6 +131,9 @@ describe('SubjectsBrowse', () => {
     );
 
     screen.getByText('No subjects yet');
+    screen.getByTestId('subjects-browse-empty-book-animation', {
+      includeHiddenElements: true,
+    });
     fireEvent.press(screen.getByTestId('subjects-browse-create'));
 
     expect(onCreateSubject).toHaveBeenCalledTimes(1);
