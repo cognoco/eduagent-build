@@ -2,43 +2,16 @@ import {
   ledgerKindParamsSchema,
   ledgerKindSchema,
   ledgerParamsSchema,
-  ledgerTemplateKeySchema,
-  ledgerVisibilitySchema,
   parseLedgerParams,
 } from './activity-ledger.js';
 
 describe('activity ledger schemas', () => {
-  it('defines the S0 ledger kind set', () => {
+  it('defines the written ledger kind set (derive-on-read kinds pruned per MMT-ADR-0022)', () => {
     expect(ledgerKindSchema.options).toEqual([
       'session_filed',
-      'topic_mastered',
-      'retention_due',
-      'needs_deepening_added',
-      'recap_ready',
-      'snapshot_ready',
       'milestone_reached',
       'reward_receipt',
     ]);
-  });
-
-  it('defines the ledger visibility set', () => {
-    expect(ledgerVisibilitySchema.options).toEqual([
-      'self',
-      'supporter',
-      'both',
-    ]);
-  });
-
-  it('keeps template keys aligned to ledger kinds', () => {
-    expect(ledgerTemplateKeySchema.options).toHaveLength(
-      ledgerKindSchema.options.length,
-    );
-
-    for (const key of ledgerTemplateKeySchema.options) {
-      expect(key).toMatch(/^ledger\.[a-z_]+\.[a-z_]+$/);
-      const [, kind] = key.split('.');
-      expect(ledgerKindSchema.options).toContain(kind);
-    }
   });
 
   describe('[WI-992] ledgerKindParamsSchema — per-kind UUID validation', () => {
@@ -63,10 +36,10 @@ describe('activity ledger schemas', () => {
       ).toBe(true);
     });
 
-    it('rejects topic_mastered with a non-uuid subjectId', () => {
+    it('rejects milestone_reached with a non-uuid subjectId', () => {
       expect(
         ledgerKindParamsSchema.safeParse({
-          kind: 'topic_mastered',
+          kind: 'milestone_reached',
           subjectId: 'not-a-uuid',
         }).success,
       ).toBe(false);

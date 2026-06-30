@@ -716,6 +716,8 @@ describe('retention routes', () => {
       (getTeachingPreference as jest.Mock).mockResolvedValue({
         subjectId: SUBJECT_ID,
         method: 'visual_diagrams',
+        analogyDomain: null,
+        nativeLanguage: null,
       });
 
       const res = await app.request(
@@ -751,6 +753,8 @@ describe('retention routes', () => {
       (setTeachingPreference as jest.Mock).mockResolvedValue({
         subjectId: SUBJECT_ID,
         method: 'visual_diagrams',
+        analogyDomain: null,
+        nativeLanguage: null,
       });
 
       const res = await app.request(
@@ -852,6 +856,7 @@ describe('retention routes', () => {
         subjectId: SUBJECT_ID,
         method: 'step_by_step',
         analogyDomain: 'cooking',
+        nativeLanguage: null,
       });
 
       const res = await app.request(
@@ -879,6 +884,7 @@ describe('retention routes', () => {
         subjectId: SUBJECT_ID,
         method: 'step_by_step',
         analogyDomain: null,
+        nativeLanguage: null,
       });
 
       const res = await app.request(

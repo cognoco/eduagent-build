@@ -1,5 +1,5 @@
 {
-  "id": "0403cbc5-24b2-43dc-8725-a6ed2edc585e",
+  "id": "edef1af6-727d-440d-a772-cb360f01b9d5",
   "prevId": "4e0dd919-64ca-4fda-a07b-f442b25ccb14",
   "version": "7",
   "dialect": "postgresql",
@@ -32,26 +32,12 @@
           "primaryKey": false,
           "notNull": true
         },
-        "template_key": {
-          "name": "template_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "params": {
           "name": "params",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "visibility": {
-          "name": "visibility",
-          "type": "ledger_visibility",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'self'"
         },
         "created_at": {
           "name": "created_at",
@@ -5205,18 +5191,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "birth_month": {
-          "name": "birth_month",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "birth_day": {
-          "name": "birth_day",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "birth_year_set_by": {
           "name": "birth_year_set_by",
           "type": "uuid",
@@ -5336,18 +5310,6 @@
         "profiles_default_app_context_check": {
           "name": "profiles_default_app_context_check",
           "value": "\"profiles\".\"default_app_context\" IS NULL OR \"profiles\".\"default_app_context\" IN ('study','family')"
-        },
-        "profiles_birth_month_range_check": {
-          "name": "profiles_birth_month_range_check",
-          "value": "\"profiles\".\"birth_month\" IS NULL OR (\"profiles\".\"birth_month\" BETWEEN 1 AND 12)"
-        },
-        "profiles_birth_day_range_check": {
-          "name": "profiles_birth_day_range_check",
-          "value": "\"profiles\".\"birth_day\" IS NULL OR (\"profiles\".\"birth_day\" BETWEEN 1 AND 31)"
-        },
-        "profiles_birth_month_day_pairwise_check": {
-          "name": "profiles_birth_month_day_pairwise_check",
-          "value": "(\"profiles\".\"birth_month\" IS NULL) = (\"profiles\".\"birth_day\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -11882,11 +11844,6 @@
     }
   },
   "enums": {
-    "public.ledger_visibility": {
-      "name": "ledger_visibility",
-      "schema": "public",
-      "values": ["self", "supporter", "both"]
-    },
     "public.analogy_domain": {
       "name": "analogy_domain",
       "schema": "public",

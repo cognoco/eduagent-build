@@ -245,6 +245,7 @@ export const teachingPreferenceSchema = z
   .object({
     subjectId: z.string().uuid(),
     method: teachingMethodSchema,
+    // Tri-state request field (set / null=clear / absent=unchanged) — carve-out from canon; see AGENTS.md → Known Exceptions (WI-1160).
     analogyDomain: analogyDomainSchema.nullable().optional(),
   })
   .strict();
@@ -432,8 +433,8 @@ export type NeedsDeepeningResponse = z.infer<
 export const teachingPreferenceResponseDataSchema = z.object({
   subjectId: z.string().uuid(),
   method: teachingMethodSchema,
-  analogyDomain: analogyDomainSchema.nullable().optional(),
-  nativeLanguage: z.string().nullable().optional(),
+  analogyDomain: analogyDomainSchema.nullable(),
+  nativeLanguage: z.string().nullable(),
 });
 
 /** GET /subjects/:subjectId/teaching-preference
