@@ -514,4 +514,41 @@ describe('useAllBooks', () => {
     expect(result.current.hasNextPage).toBe(false);
     expect(result.current.isFetchingNextPage).toBe(false);
   });
+
+  it('returns stable refetch/fetchNextPage + return object across re-renders once settled [WI-964]', async () => {
+    // refetch/fetchNextPage are useCallback'd over referentially-stable RQ
+    // methods and the return object is useMemo'd, so once the query settles a
+    // parent re-render must not mint new callbacks or a new return object —
+    // consumers that destructure a callback should not re-run effects.
+    mockFetch.mockResolvedValueOnce(
+      makeLibraryBooksResponse(
+        [
+          {
+            subjectId: 's1',
+            subjectName: 'Math',
+            books: [{ id: 'b1', title: 'Algebra', topicsGenerated: true }],
+          },
+        ],
+        null, // last page
+      ),
+    );
+
+    const { result, rerender } = renderHook(() => useAllBooks(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isFullyLoaded).toBe(true);
+    });
+
+    const firstObject = result.current;
+    const firstRefetch = result.current.refetch;
+    const firstFetchNextPage = result.current.fetchNextPage;
+
+    rerender(undefined);
+
+    expect(result.current).toBe(firstObject);
+    expect(result.current.refetch).toBe(firstRefetch);
+    expect(result.current.fetchNextPage).toBe(firstFetchNextPage);
+  });
 });

@@ -13,6 +13,7 @@
 // evaluateChallengeReadiness() returned eligible.
 // ---------------------------------------------------------------------------
 
+import { useCallback, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-expo';
 import type { ChallengeRoundSessionState } from '@eduagent/schemas';
@@ -68,7 +69,7 @@ export function useChallengeRound(opts: {
   const { activeProfile } = useProfile();
   const createNote = useCreateNote(opts.subjectId, opts.bookId);
 
-  const accept = useMutation({
+  const acceptMutation = useMutation({
     mutationFn: async () => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
@@ -81,7 +82,7 @@ export function useChallengeRound(opts: {
     },
   });
 
-  const decline = useMutation({
+  const declineMutation = useMutation({
     mutationFn: async (dontAskAgain: boolean) => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
@@ -94,7 +95,7 @@ export function useChallengeRound(opts: {
     },
   });
 
-  const abort = useMutation({
+  const abortMutation = useMutation({
     mutationFn: async () => {
       const ids = requireChallengeIds(opts);
       const token = await getToken();
@@ -107,24 +108,37 @@ export function useChallengeRound(opts: {
     },
   });
 
-  return {
-    accept: () => {
-      return accept.mutateAsync();
-    },
-    decline: (dontAskAgain = false) => {
-      return decline.mutateAsync(dontAskAgain);
-    },
-    abort: () => {
-      return abort.mutateAsync();
-    },
-    saveNote: (content: string) => {
-      const ids = requireChallengeIds(opts);
-      return createNote.mutateAsync({
+  // [WI-964] Stable return identity: mutateAsync is a referentially-stable RQ
+  // method, so these callbacks (and the memoized return object) keep their
+  // identity across renders. saveNote depends on the destructured sessionId/
+  // topicId primitives, not the fresh `opts` literal, so it stays stable too.
+  const { sessionId, topicId } = opts;
+  const { mutateAsync: acceptMutate } = acceptMutation;
+  const { mutateAsync: declineMutate } = declineMutation;
+  const { mutateAsync: abortMutate } = abortMutation;
+  const { mutateAsync: createNoteMutate } = createNote;
+
+  const accept = useCallback(() => acceptMutate(), [acceptMutate]);
+  const decline = useCallback(
+    (dontAskAgain = false) => declineMutate(dontAskAgain),
+    [declineMutate],
+  );
+  const abort = useCallback(() => abortMutate(), [abortMutate]);
+  const saveNote = useCallback(
+    (content: string) => {
+      const ids = requireChallengeIds({ sessionId, topicId });
+      return createNoteMutate({
         topicId: ids.topicId,
         sessionId: ids.sessionId,
         content,
       });
     },
-    skipNote: () => Promise.resolve(),
-  };
+    [createNoteMutate, sessionId, topicId],
+  );
+  const skipNote = useCallback(() => Promise.resolve(), []);
+
+  return useMemo(
+    () => ({ accept, decline, abort, saveNote, skipNote }),
+    [accept, decline, abort, saveNote, skipNote],
+  );
 }

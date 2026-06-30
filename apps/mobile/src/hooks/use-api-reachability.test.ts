@@ -195,4 +195,27 @@ describe('useApiReachability', () => {
 
     consoleErrorSpy.mockRestore();
   });
+
+  it('returns a referentially stable object + recheck across re-renders once settled [WI-964]', async () => {
+    // recheck (checkHealth) is useCallback([]) and the return object is
+    // useMemo'd over [isApiReachable, isChecked, checkHealth], so once the
+    // mount-time check settles, a parent re-render must not mint a new object
+    // or a new recheck — consumers depending on either identity must not re-run
+    // their effects.
+    mockFetch.mockResolvedValue({ ok: true } as Response);
+
+    const { result, rerender } = renderHook(() => useApiReachability());
+
+    await waitFor(() => {
+      expect(result.current.isChecked).toBe(true);
+    });
+
+    const firstObject = result.current;
+    const firstRecheck = result.current.recheck;
+
+    rerender(undefined);
+
+    expect(result.current).toBe(firstObject);
+    expect(result.current.recheck).toBe(firstRecheck);
+  });
 });
