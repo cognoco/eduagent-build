@@ -3,7 +3,6 @@
 // ---------------------------------------------------------------------------
 
 import {
-  useQuery,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -73,23 +72,15 @@ export function useBookNotes(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<BookNotesResponse>({
     queryKey: ['book-notes', subjectId, bookId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      if (!subjectId || !bookId)
-        throw new Error('subjectId and bookId are required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].books[
-          ':bookId'
-        ].notes.$get({ param: { subjectId, bookId } }, { init: { signal } });
-        await assertOk(res);
-        return (await res.json()) as BookNotesResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!bookId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].books[':bookId'].notes.$get(
+        { param: { subjectId: subjectId ?? '', bookId: bookId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!subjectId && !!bookId,
   });
 }
 
@@ -111,30 +102,22 @@ export function useGetTopicNote(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{
+    note: {
+      id: string;
+      topicId: string;
+      content: string;
+      updatedAt: string;
+    } | null;
+  }>({
     queryKey: ['topic-note', subjectId, topicId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId are required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[
-          ':topicId'
-        ].note.$get({ param: { subjectId, topicId } }, { init: { signal } });
-        await assertOk(res);
-        return (await res.json()) as {
-          note: {
-            id: string;
-            topicId: string;
-            content: string;
-            updatedAt: string;
-          } | null;
-        };
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].topics[':topicId'].note.$get(
+        { param: { subjectId: subjectId ?? '', topicId: topicId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!subjectId && !!topicId,
   });
 }
 
@@ -146,22 +129,10 @@ export function useNoteTopicIds(): UseQueryResult<{ topicIds: string[] }> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ topicIds: string[] }>({
     queryKey: ['note-topic-ids', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.notes['topic-ids'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as { topicIds: string[] };
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.notes['topic-ids'].$get({}, { init: { signal } }),
+    select: (json) => json,
   });
 }
 
@@ -201,23 +172,15 @@ export function useTopicNotes(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<TopicNotesResponse>({
     queryKey: ['topic-notes', subjectId, topicId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      if (!subjectId || !topicId)
-        throw new Error('subjectId and topicId required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[
-          ':topicId'
-        ].notes.$get({ param: { subjectId, topicId } }, { init: { signal } });
-        await assertOk(res);
-        return (await res.json()) as TopicNotesResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].topics[':topicId'].notes.$get(
+        { param: { subjectId: subjectId ?? '', topicId: topicId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!subjectId && !!topicId,
   });
 }
 

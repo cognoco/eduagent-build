@@ -25,6 +25,7 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 // ---------------------------------------------------------------------------
 // Types — prefer imports from @eduagent/schemas; local only for API-specific shapes
@@ -78,20 +79,10 @@ export function useSubscription(): UseQueryResult<SubscriptionData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ subscription: SubscriptionData }, SubscriptionData>({
     queryKey: queryKeys.subscription(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subscription.$get({}, { init: { signal } });
-        const okRes = await assertOk(res);
-        const data = subscriptionResponseSchema.parse(await okRes.json());
-        return data.subscription;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.subscription.$get({}, { init: { signal } }),
+    select: (json) => subscriptionResponseSchema.parse(json).subscription,
   });
 }
 
@@ -99,17 +90,10 @@ export function useUsage(): UseQueryResult<UsageData> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ usage: UsageData }, UsageData>({
     queryKey: queryKeys.usage(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        return await fetchUsageData(client, signal);
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.usage.$get({}, { init: { signal } }),
+    select: (json) => usageResponseSchema.parse(json).usage,
   });
 }
 

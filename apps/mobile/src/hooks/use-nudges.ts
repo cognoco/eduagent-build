@@ -1,6 +1,5 @@
 import {
   useMutation,
-  useQuery,
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
@@ -11,28 +10,17 @@ import { nudgeListResponseSchema } from '@eduagent/schemas';
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
+import { useApiQuery } from './use-api-query';
 
 export function useUnreadNudges(): UseQueryResult<Nudge[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<unknown, Nudge[]>({
     queryKey: ['nudges', 'unread', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.nudges.$get(
-          { query: { unread: 'true' } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return nudgeListResponseSchema.parse(await res.json()).nudges;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.nudges.$get({ query: { unread: 'true' } }, { init: { signal } }),
+    select: (json) => nudgeListResponseSchema.parse(json).nudges,
   });
 }
 

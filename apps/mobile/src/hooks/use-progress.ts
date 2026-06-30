@@ -48,6 +48,7 @@ import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
 import { Sentry } from '../lib/sentry';
 import { useNavigationDataScopeContract } from './use-navigation-contract';
+import { useApiQuery } from './use-api-query';
 
 export interface NextReviewTopic {
   topicId: string;
@@ -109,25 +110,17 @@ export function useSubjectProgress(
   subjectId: string,
 ): UseQueryResult<SubjectProgress> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ progress: SubjectProgress }, SubjectProgress>({
     queryKey: queryKeys.progress.subject(mode, subjectId, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].progress.$get(
-          { param: { subjectId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { progress: SubjectProgress };
-        return data.progress;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].progress.$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.progress,
+    enabled: !!subjectId,
   });
 }
 
@@ -154,48 +147,23 @@ export interface OverallProgressResponse {
 
 export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery<OverallProgressResponse>({
+  return useApiQuery<OverallProgressResponse>({
     queryKey: queryKeys.progress.overview(mode, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress.overview.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as OverallProgressResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.progress.overview.$get({}, { init: { signal } }),
+    select: (json) => json,
   });
 }
 
 export function useContinueSuggestion() {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ suggestion: unknown }, unknown>({
     queryKey: queryKeys.progress.continue(mode, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress.continue.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.suggestion;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client.progress.continue.$get({}, { init: { signal } }),
+    select: (json) => json.suggestion,
   });
 }
 
@@ -283,27 +251,21 @@ export function useResumeNudge() {
 
 export function useActiveSessionForTopic(topicId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ sessionId: string } | null>({
     queryKey: queryKeys.progress.activeSessionForTopic(
       mode,
       topicId,
       profileId,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress.topic[':topicId'][
-          'active-session'
-        ].$get({ param: { topicId: topicId ?? '' } }, { init: { signal } });
-        await assertOk(res);
-        return (await res.json()) as { sessionId: string } | null;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!topicId,
+    fetch: (signal) =>
+      client.progress.topic[':topicId']['active-session'].$get(
+        { param: { topicId: topicId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!topicId,
   });
 }
 
@@ -315,79 +277,50 @@ export function useResolveTopicSubject(
   attempt?: number,
 ) {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{
+    subjectId: string;
+    subjectName: string;
+    topicTitle: string;
+  }>({
     queryKey: queryKeys.progress.resolveTopicSubject(
       mode,
       topicId,
       profileId,
       attempt,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.topics[':topicId'].resolve.$get(
-          { param: { topicId: topicId ?? '' } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as {
-          subjectId: string;
-          subjectName: string;
-          topicTitle: string;
-        };
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!topicId,
+    fetch: (signal) =>
+      client.topics[':topicId'].resolve.$get(
+        { param: { topicId: topicId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!topicId,
   });
 }
 
 export function useReviewSummary(): UseQueryResult<ReviewSummary> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<ReviewSummary>({
     queryKey: queryKeys.progress.reviewSummary(mode, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress['review-summary'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as ReviewSummary;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.progress['review-summary'].$get({}, { init: { signal } }),
+    select: (json) => json,
   });
 }
 
 export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<OverdueTopicsResponse>({
     queryKey: queryKeys.progress.overdueTopics(mode, profileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress['overdue-topics'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as OverdueTopicsResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.progress['overdue-topics'].$get({}, { init: { signal } }),
+    select: (json) => json,
   });
 }
 
@@ -396,32 +329,22 @@ export function useTopicProgress(
   topicId: string,
 ): UseQueryResult<TopicProgress> {
   const client = useApiClient();
-  const { activeProfile, mode, profileId } = useSelfProgressNavigationScope();
+  const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ topic: TopicProgress }, TopicProgress>({
     queryKey: queryKeys.progress.topicProgress(
       mode,
       subjectId,
       topicId,
       profileId,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[
-          ':topicId'
-        ].progress.$get(
-          { param: { subjectId, topicId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { topic: TopicProgress };
-        return data.topic;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].topics[':topicId'].progress.$get(
+        { param: { subjectId, topicId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.topic,
+    enabled: !!subjectId && !!topicId,
   });
 }
 
@@ -714,32 +637,21 @@ export function useChildInventory(
   options?: { enabled?: boolean },
 ): UseQueryResult<KnowledgeInventory | null> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const { mode, canAccessFamilyChildData } = useProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<
+    { inventory: KnowledgeInventory | null },
+    KnowledgeInventory | null
+  >({
     queryKey: queryKeys.dashboard.childInventory(mode, childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[
-          ':profileId'
-        ].inventory.$get(
-          { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          inventory: KnowledgeInventory | null;
-        };
-        return data.inventory;
-      } finally {
-        cleanup();
-      }
-    },
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].inventory.$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.inventory,
     enabled:
       (options?.enabled ?? true) &&
-      !!activeProfile &&
       canAccessFamilyChildData &&
       !!childProfileId,
   });
@@ -792,26 +704,20 @@ export function useChildReports(
   childProfileId: string | undefined,
 ): UseQueryResult<MonthlyReportSummary[]> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const { mode, canAccessFamilyChildData } = useProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<
+    { reports: MonthlyReportSummary[] },
+    MonthlyReportSummary[]
+  >({
     queryKey: queryKeys.dashboard.childReports(mode, childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].reports.$get(
-          { param: { profileId: childProfileId ?? '' } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { reports: MonthlyReportSummary[] };
-        return data.reports;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].reports.$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.reports,
+    enabled: canAccessFamilyChildData && !!childProfileId,
   });
 }
 
@@ -820,43 +726,29 @@ export function useChildReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<MonthlyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const { mode, canAccessFamilyChildData } = useProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<
+    { report: MonthlyReportRecord | null },
+    MonthlyReportRecord | null
+  >({
     queryKey: queryKeys.dashboard.childReportDetail(
       mode,
       childProfileId,
       reportId,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].reports[
-          ':reportId'
-        ].$get(
-          {
-            param: {
-              profileId: childProfileId ?? '',
-              reportId: reportId ?? '',
-            },
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].reports[':reportId'].$get(
+        {
+          param: {
+            profileId: childProfileId ?? '',
+            reportId: reportId ?? '',
           },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          report: MonthlyReportRecord | null;
-        };
-        return data.report;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled:
-      !!activeProfile &&
-      canAccessFamilyChildData &&
-      !!childProfileId &&
-      !!reportId,
+        },
+        { init: { signal } },
+      ),
+    select: (json) => json.report,
+    enabled: canAccessFamilyChildData && !!childProfileId && !!reportId,
   });
 }
 
@@ -1003,43 +895,31 @@ export function useChildWeeklyReportDetail(
   reportId: string | undefined,
 ): UseQueryResult<WeeklyReportRecord | null> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useProgressNavigationScope();
+  const { mode, canAccessFamilyChildData } = useProgressNavigationScope();
 
-  return useQuery({
+  return useApiQuery<
+    { report: WeeklyReportRecord | null },
+    WeeklyReportRecord | null
+  >({
     queryKey: queryKeys.dashboard.childWeeklyReportDetail(
       mode,
       childProfileId,
       reportId,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'][
-          'weekly-reports'
-        ][':reportId'].$get(
-          {
-            param: {
-              profileId: childProfileId ?? '',
-              reportId: reportId ?? '',
-            },
+    fetch: (signal) =>
+      client.dashboard.children[':profileId']['weekly-reports'][
+        ':reportId'
+      ].$get(
+        {
+          param: {
+            profileId: childProfileId ?? '',
+            reportId: reportId ?? '',
           },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          report: WeeklyReportRecord | null;
-        };
-        return data.report;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled:
-      !!activeProfile &&
-      canAccessFamilyChildData &&
-      !!childProfileId &&
-      !!reportId,
+        },
+        { init: { signal } },
+      ),
+    select: (json) => json.report,
+    enabled: canAccessFamilyChildData && !!childProfileId && !!reportId,
   });
 }
 

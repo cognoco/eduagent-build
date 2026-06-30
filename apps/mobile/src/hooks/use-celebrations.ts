@@ -1,6 +1,5 @@
 import {
   useMutation,
-  useQuery,
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
@@ -9,7 +8,7 @@ import type { PendingCelebration } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { assertOk } from '../lib/assert-ok';
-import { combinedSignal } from '../lib/query-timeout';
+import { useApiQuery } from './use-api-query';
 
 export function usePendingCelebrations(options?: {
   profileId?: string;
@@ -20,29 +19,24 @@ export function usePendingCelebrations(options?: {
   const targetProfileId = options?.profileId ?? activeProfile?.id;
   const viewer = options?.viewer ?? 'child';
 
-  return useQuery({
+  return useApiQuery<
+    { pendingCelebrations: PendingCelebration[] },
+    PendingCelebration[]
+  >({
     queryKey: ['celebrations', 'pending', targetProfileId, viewer],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.celebrations.pending.$get(
-          { query: { viewer } },
-          {
-            init: {
-              signal,
-              headers: targetProfileId
-                ? { 'X-Profile-Id': targetProfileId }
-                : undefined,
-            },
+    fetch: (signal) =>
+      client.celebrations.pending.$get(
+        { query: { viewer } },
+        {
+          init: {
+            signal,
+            headers: targetProfileId
+              ? { 'X-Profile-Id': targetProfileId }
+              : undefined,
           },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.pendingCelebrations as PendingCelebration[];
-      } finally {
-        cleanup();
-      }
-    },
+        },
+      ),
+    select: (json) => json.pendingCelebrations,
     enabled: !!targetProfileId,
   });
 }
