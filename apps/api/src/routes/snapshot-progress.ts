@@ -22,7 +22,6 @@ import {
   refreshProgressSnapshot,
 } from '../services/snapshot-aggregation';
 import { checkAndLogRateLimit } from '../services/settings';
-import { isIdentityV2Enabled } from '../config';
 import { withProfile } from '../route-utils/route-context';
 
 type SnapshotProgressRouteEnv = {
@@ -102,7 +101,6 @@ export const snapshotProgressRoutes = new Hono<SnapshotProgressRouteEnv>()
       'progress_refresh',
       { hours: 1, maxCount: 10 },
       {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
         callerPersonId: c.get('callerPersonId'),
       },
     );

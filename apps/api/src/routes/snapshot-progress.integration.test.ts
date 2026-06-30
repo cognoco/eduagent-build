@@ -52,10 +52,6 @@ const TEST_ENV = buildIntegrationEnv();
 const AUTH_USER_ID = 'integration-snapshot-progress-user';
 const AUTH_EMAIL = 'integration-snapshot-progress@integration.test';
 
-function isIdentityV2Enabled(): boolean {
-  return process.env.IDENTITY_V2_ENABLED === 'true';
-}
-
 const nativeFetch = globalThis.fetch;
 installFetchInterceptor();
 mockClerkJWKS();
@@ -108,63 +104,46 @@ async function clearProgressSnapshots(profileId: string): Promise<void> {
 // [F-144] Creates a second profile on the SAME account — the first profile is
 // the owner, so the second is a non-owner child. Used to exercise the proxy
 // (X-Profile-Id = child, authed as owner) path on GET /progress/milestones.
+// [WI-867] Flag collapsed — always uses v2 identity graph (person/membership/guardianship).
 async function createChildProfile(owner: {
   id: string;
   accountId: string;
 }): Promise<{ id: string }> {
-  if (isIdentityV2Enabled()) {
-    const db = createIntegrationDb();
-    const childId = generateUUIDv7();
-    const birthYear = new Date().getFullYear() - 14;
+  const db = createIntegrationDb();
+  const childId = generateUUIDv7();
+  const birthYear = new Date().getFullYear() - 14;
 
-    await db
-      .insert(accounts)
-      .values({
-        id: owner.accountId,
-        clerkUserId: AUTH_USER_ID,
-        email: AUTH_EMAIL,
-      })
-      .onConflictDoNothing();
-    await db.insert(person).values({
-      id: childId,
-      displayName: 'Snapshot Progress Child',
-      birthDate: `${birthYear}-01-01`,
-      residenceJurisdiction: 'US',
-    });
-    await db.insert(membership).values({
-      personId: childId,
-      organizationId: owner.accountId,
-      roles: ['learner'],
-    });
-    await db.insert(guardianship).values({
-      guardianPersonId: owner.id,
-      chargePersonId: childId,
-    });
-    await db.insert(profiles).values({
-      id: childId,
-      accountId: owner.accountId,
-      displayName: 'Snapshot Progress Child',
-      birthYear,
-      isOwner: false,
-    });
-    return { id: childId };
-  }
-
-  const profile = await createProfileViaRoute({
-    app,
-    env: TEST_ENV,
-    user: { userId: AUTH_USER_ID, email: AUTH_EMAIL },
+  await db
+    .insert(accounts)
+    .values({
+      id: owner.accountId,
+      clerkUserId: AUTH_USER_ID,
+      email: AUTH_EMAIL,
+    })
+    .onConflictDoNothing();
+  await db.insert(person).values({
+    id: childId,
     displayName: 'Snapshot Progress Child',
-    birthYear: new Date().getFullYear() - 14,
-    kind: 'child',
-    // [WI-1153] Pass the owner's profile id so the route receives X-Profile-Id
-    // (resolvedVia:'explicit-header'); without it the Issue-901 guard
-    // (services/profile.ts assertProfileCreationAllowed) rejects the
-    // auto-resolved owner identity with 403 on a fresh DB.
-    actingProfileId: owner.id,
+    birthDate: `${birthYear}-01-01`,
+    residenceJurisdiction: 'US',
   });
-  expect(profile.isOwner).toBe(false);
-  return { id: profile.id };
+  await db.insert(membership).values({
+    personId: childId,
+    organizationId: owner.accountId,
+    roles: ['learner'],
+  });
+  await db.insert(guardianship).values({
+    guardianPersonId: owner.id,
+    chargePersonId: childId,
+  });
+  await db.insert(profiles).values({
+    id: childId,
+    accountId: owner.accountId,
+    displayName: 'Snapshot Progress Child',
+    birthYear,
+    isOwner: false,
+  });
+  return { id: childId };
 }
 
 // Seeds a progress snapshot whose totalSessions is past the lower backfill

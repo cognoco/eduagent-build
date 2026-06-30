@@ -322,48 +322,19 @@ describe('dailySnapshotRefresh', () => {
       day: SNAPSHOT_DAY,
     });
 
+    // [WI-867] v2 always: refreshProgressSnapshot called with no opts (flag collapsed)
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
       PROFILE_ID,
-      // [CUT-B1] the refresh now carries the identity-cutover flag (false in
-      // the flag-off legacy path the test exercises).
-      { identityV2Enabled: false },
     );
+    // [WI-867] v2 always: liveness always reads person table
+    expect(mockSnapshotDb.query.person.findFirst).toHaveBeenCalled();
     expect(result).toEqual({
       status: 'completed',
       profileId: PROFILE_ID,
       snapshotDate: '2026-04-19',
       milestones: 2,
     });
-  });
-
-  it('[CUT-B1] Identity-V2-on: liveness reads person and the refresh carries { identityV2Enabled: true }', async () => {
-    const prev = process.env.IDENTITY_V2_ENABLED;
-    process.env.IDENTITY_V2_ENABLED = 'true';
-    try {
-      mockRefreshProgressSnapshot.mockResolvedValue({
-        snapshotDate: '2026-04-19',
-        milestones: [{ id: 'm1' }],
-        metrics: {},
-      });
-
-      const { result } = await executeRefreshSteps({
-        profileId: PROFILE_ID,
-        day: SNAPSHOT_DAY,
-      });
-
-      // Liveness was checked on the person table, not profiles.
-      expect(mockSnapshotDb.query.person.findFirst).toHaveBeenCalled();
-      // The refresh carries the v2 flag.
-      expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
-        mockSnapshotDb,
-        PROFILE_ID,
-        { identityV2Enabled: true },
-      );
-      expect((result as { status: string }).status).toBe('completed');
-    } finally {
-      process.env.IDENTITY_V2_ENABLED = prev;
-    }
   });
 
   it('returns skipped status when profile does not exist', async () => {

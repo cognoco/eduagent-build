@@ -51,7 +51,6 @@ import {
   setNativeLanguage,
 } from '../services/retention-data';
 import { forbidden, notFound, NotFoundError } from '../errors';
-import { isIdentityV2Enabled } from '../config';
 
 type SettingsRouteEnv = {
   Bindings: {
@@ -101,7 +100,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         accountId,
         body,
         {
-          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           callerPersonId: c.get('callerPersonId'),
         },
       );
@@ -123,9 +121,7 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         assertOwnerProfile(c);
       }
       const celebrationLevel = query.childProfileId
-        ? await getChildCelebrationLevel(db, profileId, query.childProfileId, {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-          })
+        ? await getChildCelebrationLevel(db, profileId, query.childProfileId)
         : await getCelebrationLevel(db, profileId);
       return c.json(
         getCelebrationLevelResponseSchema.parse({ celebrationLevel }),
@@ -155,11 +151,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
             profileId,
             body.childProfileId,
             body.celebrationLevel,
-            {
-              identityV2Enabled: isIdentityV2Enabled(
-                c.env?.IDENTITY_V2_ENABLED,
-              ),
-            },
           )
         : await upsertCelebrationLevel(
             db,
@@ -167,9 +158,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
             accountId,
             body.celebrationLevel,
             {
-              identityV2Enabled: isIdentityV2Enabled(
-                c.env?.IDENTITY_V2_ENABLED,
-              ),
               callerPersonId: c.get('callerPersonId'),
             },
           );
@@ -208,7 +196,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           accountId,
           body.value,
           {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             callerPersonId: c.get('callerPersonId'),
           },
         );
@@ -235,7 +222,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         profileId,
         accountId,
         {
-          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           callerPersonId: c.get('callerPersonId'),
         },
       );
@@ -268,7 +254,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
           accountId,
           body.value,
           {
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             callerPersonId: c.get('callerPersonId'),
           },
         );
@@ -296,7 +281,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
       const accountId = requireAccount(c.get('account')).id;
       const body = c.req.valid('json');
       await registerPushToken(db, profileId, accountId, body.token, {
-        identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
         callerPersonId: c.get('callerPersonId'),
       });
       return c.json(
@@ -329,7 +313,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         emailFrom: c.env.EMAIL_FROM,
       },
       apiOrigin,
-      { identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED) },
     );
     return c.json(notifyParentSubscribeResponseSchema.parse(result));
   })
