@@ -3962,7 +3962,6 @@
     "emptyTitle": "Ingen emner ennå",
     "emptyMessage": "Opprett et emne for å begynne å bygge læringskartet ditt.",
     "createSubject": "Opprett emne",
-    "openSubject": "Åpne emne",
     "subjectProgress": "{{mastered}} mestret, {{learning}} lærer, {{total}} temaer",
     "reviewsDue": "{{count}} repetisjoner forfaller",
     "errorTitle": "Vi kunne ikke laste inn emner",
@@ -3971,7 +3970,8 @@
     "sectionPaused": "Satt på pause",
     "sectionArchived": "Arkivert",
     "bookCount_one": "{{count}} bok",
-    "bookCount_other": "{{count}} bøker"
+    "bookCount_other": "{{count}} bøker",
+    "openSubjectNamed": "Åpne {{subject}}"
   },
   "subjectHub": {
     "loading": "Laster inn emne ...",

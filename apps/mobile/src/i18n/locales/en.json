@@ -3061,7 +3061,7 @@
     "emptyTitle": "No subjects yet",
     "emptyMessage": "Create a subject to start building your learning map.",
     "createSubject": "Create subject",
-    "openSubject": "Open subject",
+    "openSubjectNamed": "Open {{subject}}",
     "errorTitle": "We could not load subjects",
     "errorMessage": "Try again, or come back in a moment.",
     "subjectProgress": "{{mastered}} mastered, {{learning}} learning, {{total}} topics",

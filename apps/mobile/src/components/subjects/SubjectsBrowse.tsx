@@ -141,7 +141,12 @@ export function SubjectsBrowse({
                       <Pressable
                         key={subject.subjectId}
                         accessibilityRole="button"
-                        accessibilityLabel={t('subjectsBrowse.openSubject')}
+                        accessibilityLabel={t(
+                          'subjectsBrowse.openSubjectNamed',
+                          {
+                            subject: subject.subjectName,
+                          },
+                        )}
                         className="rounded-card bg-coaching-card p-4"
                         onPress={() => onOpenSubject(subject.subjectId)}
                         testID={`subjects-browse-row-${subject.subjectId}`}

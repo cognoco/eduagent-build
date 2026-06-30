@@ -3962,7 +3962,6 @@
     "emptyTitle": "Noch keine Fächer",
     "emptyMessage": "Erstelle ein Fach, um deine Lernlandkarte aufzubauen.",
     "createSubject": "Fach erstellen",
-    "openSubject": "Fach öffnen",
     "subjectProgress": "{{mastered}} gemeistert, {{learning}} lernend, {{total}} Themen",
     "reviewsDue": "{{count}} fällige Wiederholungen",
     "errorTitle": "Wir konnten die Themen nicht laden",
@@ -3971,7 +3970,8 @@
     "sectionPaused": "Pausiert",
     "sectionArchived": "Archiviert",
     "bookCount_one": "{{count}} Buch",
-    "bookCount_other": "{{count}} Bücher"
+    "bookCount_other": "{{count}} Bücher",
+    "openSubjectNamed": "{{subject}} öffnen"
   },
   "subjectHub": {
     "loading": "Lade Fach ...",

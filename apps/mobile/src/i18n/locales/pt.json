@@ -3962,7 +3962,6 @@
     "emptyTitle": "Nenhuma matéria ainda",
     "emptyMessage": "Crie uma matéria para começar a construir seu mapa de aprendizado.",
     "createSubject": "Criar matéria",
-    "openSubject": "Abrir matéria",
     "subjectProgress": "{{mastered}} dominados, {{learning}} aprendendo, {{total}} tópicos",
     "reviewsDue": "{{count}} revisões pendentes",
     "errorTitle": "Não foi possível carregar as matérias",
@@ -3971,7 +3970,8 @@
     "sectionPaused": "Pausados",
     "sectionArchived": "Arquivados",
     "bookCount_one": "{{count}} livro",
-    "bookCount_other": "{{count}} livros"
+    "bookCount_other": "{{count}} livros",
+    "openSubjectNamed": "Abrir {{subject}}"
   },
   "subjectHub": {
     "loading": "Carregando matéria...",

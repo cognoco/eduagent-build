@@ -17,7 +17,7 @@ jest.mock('react-i18next', () => ({
         'subjectsBrowse.subjectProgress': `${opts?.mastered} mastered · ${opts?.learning} learning · ${opts?.total} topics`,
         'subjectsBrowse.reviewsDue': `${opts?.count} due`,
         'subjectsBrowse.bookCount': `${opts?.count} books`,
-        'subjectsBrowse.openSubject': 'Open subject',
+        'subjectsBrowse.openSubjectNamed': `Open ${opts?.subject}`,
         'subjectsBrowse.sectionActive': 'Active',
         'subjectsBrowse.sectionPaused': 'Paused',
         'subjectsBrowse.sectionArchived': 'Archived',
@@ -79,6 +79,27 @@ describe('SubjectsBrowse', () => {
     );
 
     expect(onOpenSubject).toHaveBeenCalledWith(SPANISH.subjectId);
+  });
+
+  it('gives each subject row a subject-specific accessible name (WI-1132)', () => {
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+    );
+
+    // Screen readers must announce distinct names per row, not a generic
+    // "Open subject" repeated for every row (review-rejection regression).
+    const spanishRow = screen.getByLabelText('Open Spanish');
+    const algebraRow = screen.getByLabelText('Open Algebra');
+    expect(spanishRow.props.testID).toBe(
+      `subjects-browse-row-${SPANISH.subjectId}`,
+    );
+    expect(algebraRow.props.testID).toBe(
+      `subjects-browse-row-${ALGEBRA.subjectId}`,
+    );
   });
 
   it('filters by search and clearing search restores the full list', () => {

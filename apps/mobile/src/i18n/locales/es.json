@@ -3962,7 +3962,6 @@
     "emptyTitle": "Aún no hay temas",
     "emptyMessage": "Crea un tema para empezar a construir tu mapa de aprendizaje.",
     "createSubject": "Crear tema",
-    "openSubject": "Abrir tema",
     "subjectProgress": "{{mastered}} dominados, {{learning}} en aprendizaje, {{total}} temas",
     "reviewsDue": "{{count}} repasos pendientes",
     "errorTitle": "No pudimos cargar las materias",
@@ -3971,7 +3970,8 @@
     "sectionPaused": "En pausa",
     "sectionArchived": "Archivado",
     "bookCount_one": "{{count}} libro",
-    "bookCount_other": "{{count}} libros"
+    "bookCount_other": "{{count}} libros",
+    "openSubjectNamed": "Abrir {{subject}}"
   },
   "subjectHub": {
     "loading": "Cargando tema...",
