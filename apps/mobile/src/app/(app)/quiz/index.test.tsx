@@ -275,15 +275,19 @@ describe('QuizIndexScreen', () => {
       mockFetch.setRoute('/quiz/stats', [
         {
           activityType: 'capitals',
+          languageCode: null,
           bestScore: 8,
           bestTotal: 10,
           roundsPlayed: 5,
+          totalXp: 0,
         },
         {
           activityType: 'guess_who',
+          languageCode: null,
           bestScore: 4,
           bestTotal: 5,
           roundsPlayed: 2,
+          totalXp: 0,
         },
       ]);
       render(<QuizIndexScreen />, { wrapper: Wrapper });
@@ -309,6 +313,7 @@ describe('QuizIndexScreen', () => {
           bestScore: 2,
           bestTotal: 6,
           roundsPlayed: 1,
+          totalXp: 0,
         },
       ]);
       mockFetch.setRoute('/subjects', {
@@ -338,6 +343,7 @@ describe('QuizIndexScreen', () => {
           bestScore: 5,
           bestTotal: 6,
           roundsPlayed: 3,
+          totalXp: 0,
         },
       ]);
       mockFetch.setRoute('/subjects', {

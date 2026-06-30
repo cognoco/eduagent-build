@@ -130,6 +130,7 @@ describe('useRequestConsent', () => {
         JSON.stringify({
           message: 'Consent request sent to parent',
           consentType: 'GDPR',
+          emailStatus: 'sent',
         }),
         { status: 200 },
       ),

@@ -15,8 +15,17 @@ import type {
   QuizStats,
   RecentRound,
 } from '@eduagent/schemas';
+import {
+  completeRoundResponseSchema,
+  questionCheckResponseSchema,
+  quizRoundResponseSchema,
+  quizStatsListResponseSchema,
+  recentRoundSchema,
+} from '@eduagent/schemas';
+import { z } from 'zod';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
+import { parseJson } from '../lib/parse-json';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 
@@ -35,7 +44,7 @@ export function useGenerateRound(): UseMutationResult<
     mutationFn: async (input) => {
       const res = await client.quiz.rounds.$post({ json: input });
       await assertOk(res);
-      return (await res.json()) as QuizRoundResponse;
+      return parseJson(res, quizRoundResponseSchema, 'POST /quiz/rounds');
     },
   });
 }
@@ -61,7 +70,7 @@ export function useFetchRound(
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as QuizRoundResponse;
+        return parseJson(res, quizRoundResponseSchema, 'GET /quiz/rounds/:id');
       } finally {
         cleanup();
       }
@@ -106,7 +115,7 @@ export function useCheckAnswer(): UseMutationResult<
         },
       });
       await assertOk(res);
-      return (await res.json()) as QuestionCheckResponse;
+      return parseJson(res, questionCheckResponseSchema, 'POST /quiz/rounds/:id/check');
     },
   });
 }
@@ -126,7 +135,7 @@ export function useCompleteRound(): UseMutationResult<
         json: { results },
       });
       await assertOk(res);
-      return (await res.json()) as CompleteRoundResponse;
+      return parseJson(res, completeRoundResponseSchema, 'POST /quiz/rounds/:id/complete');
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['quiz-recent'] });
@@ -156,7 +165,7 @@ export function useRecentRounds(): UseQueryResult<RecentRound[]> {
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as RecentRound[];
+        return parseJson(res, z.array(recentRoundSchema), 'GET /quiz/rounds/recent');
       } finally {
         cleanup();
       }
@@ -186,7 +195,7 @@ export function useRoundDetail(
           { init: { signal } },
         );
         await assertOk(res);
-        return (await res.json()) as QuizRoundResponse;
+        return parseJson(res, quizRoundResponseSchema, 'GET /quiz/rounds/:id (detail)');
       } finally {
         cleanup();
       }
@@ -208,7 +217,7 @@ export function useQuizStats(): UseQueryResult<QuizStats[]> {
       try {
         const res = await client.quiz.stats.$get({}, { init: { signal } });
         await assertOk(res);
-        return (await res.json()) as QuizStats[];
+        return parseJson(res, quizStatsListResponseSchema, 'GET /quiz/stats');
       } finally {
         cleanup();
       }

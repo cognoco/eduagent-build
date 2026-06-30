@@ -61,8 +61,10 @@ function createSharedWrapper() {
 // Shared fixtures
 // ---------------------------------------------------------------------------
 
+const MOCK_ROUND_ID = 'bb0e8400-e29b-41d4-a716-446655440001';
+
 const mockRound = {
-  id: 'round-1',
+  id: MOCK_ROUND_ID,
   activityType: 'vocabulary' as const,
   theme: 'Nature',
   questions: [] as import('@eduagent/schemas').QuizRoundResponse['questions'],
@@ -101,7 +103,7 @@ describe('useGenerateRound', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data?.id).toBe('round-1');
+    expect(result.current.data?.id).toBe(MOCK_ROUND_ID);
   });
 
   it('propagates API errors', async () => {
@@ -179,7 +181,7 @@ describe('useFetchRound', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.id).toBe('round-1');
+    expect(result.current.data?.id).toBe(MOCK_ROUND_ID);
   });
 
   it('is disabled when roundId is null — no fetch fires', async () => {
@@ -337,9 +339,12 @@ describe('useCompleteRound', () => {
   it('POSTs results to /quiz/rounds/:id/complete and returns the response', async () => {
     const completeResponse = {
       roundId: 'round-1',
-      score: 80,
+      score: 8,
+      total: 10,
       xpEarned: 50,
-      streakUpdated: true,
+      celebrationTier: 'great' as const,
+      droppedResults: 0,
+      questionResults: [],
     };
 
     mockFetch.mockResolvedValueOnce(
@@ -374,7 +379,15 @@ describe('useCompleteRound', () => {
   it('invalidates quiz-recent, quiz-stats, progress, and streak after completion', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ roundId: 'round-1', score: 80, xpEarned: 50 }),
+        JSON.stringify({
+          roundId: 'round-1',
+          score: 8,
+          total: 10,
+          xpEarned: 50,
+          celebrationTier: 'great',
+          droppedResults: 0,
+          questionResults: [],
+        }),
         { status: 200 },
       ),
     );
@@ -434,16 +447,22 @@ describe('useRecentRounds', () => {
   it('fetches and returns recent rounds', async () => {
     const mockRecent = [
       {
-        id: 'round-1',
+        id: 'bb0e8400-e29b-41d4-a716-446655440001',
         activityType: 'vocabulary',
-        score: 80,
-        completedAt: '2026-05-01T10:00:00Z',
+        theme: 'Nature',
+        score: 8,
+        total: 10,
+        xpEarned: 50,
+        completedAt: '2026-05-01T10:00:00.000Z',
       },
       {
-        id: 'round-2',
+        id: 'bb0e8400-e29b-41d4-a716-446655440002',
         activityType: 'vocabulary',
-        score: 60,
-        completedAt: '2026-04-30T10:00:00Z',
+        theme: 'Space',
+        score: 6,
+        total: 10,
+        xpEarned: 30,
+        completedAt: '2026-04-30T10:00:00.000Z',
       },
     ];
 
@@ -460,7 +479,9 @@ describe('useRecentRounds', () => {
     });
 
     expect(result.current.data).toHaveLength(2);
-    expect(result.current.data?.[0]?.id).toBe('round-1');
+    expect(result.current.data?.[0]?.id).toBe(
+      'bb0e8400-e29b-41d4-a716-446655440001',
+    );
   });
 
   it('propagates API errors into error state', async () => {
@@ -505,7 +526,7 @@ describe('useRoundDetail', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.id).toBe('round-1');
+    expect(result.current.data?.id).toBe(MOCK_ROUND_ID);
   });
 
   it('is disabled when roundId is undefined — no fetch fires', async () => {
@@ -545,7 +566,7 @@ describe('useRoundDetail', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.id).toBe('round-1');
+    expect(result.current.data?.id).toBe(MOCK_ROUND_ID);
 
     // A second hook instance mounted on the SAME wrapper (same QueryClient) should
     // read from cache — staleTime=60s means no background refetch fires.
@@ -561,7 +582,7 @@ describe('useRoundDetail', () => {
 
     // staleTime=60s: no additional fetch fired for the same key
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(result2.current.data?.id).toBe('round-1');
+    expect(result2.current.data?.id).toBe(MOCK_ROUND_ID);
 
     sharedQc.clear();
   });
