@@ -1,10 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { NowCard, NowResponse, ScopeDescriptor } from '@eduagent/schemas';
+import { fireEvent, screen } from '@testing-library/react-native';
+import type {
+  NowCard,
+  NowResponse,
+  ScopeDescriptor,
+  SharedRecord,
+} from '@eduagent/schemas';
+
+import { renderScreen } from '../../test-utils/screen-render';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
+const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
+const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
 const mockPush = jest.fn();
 const mockNowRefetch = jest.fn();
+let cleanupRender: (() => void) | undefined;
 let mockNowFeed: {
   data: NowResponse | undefined;
   fallbackFeed: NowResponse | null;
@@ -55,64 +65,41 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
-  () => {
-    const { Text, View } = require('react-native');
-    return {
-      SupportHubMentorTab: ({
-        activePersonScope,
-        personScopes,
-        onOpenPersonScope,
-        onOpenSubjects,
-        onOpenJournal,
-      }: {
-        activePersonScope?: { displayName: string };
-        personScopes: PersonScope[];
-        onOpenPersonScope?: (scope: PersonScope) => void;
-        onOpenSubjects?: (scope: PersonScope) => void;
-        onOpenJournal?: (scope: PersonScope) => void;
-      }) => (
-        <View
-          testID={
-            activePersonScope
-              ? 'person-scope-mentor-tab'
-              : 'support-hub-mentor-tab'
-          }
-        >
-          {activePersonScope ? (
-            <Text>{activePersonScope.displayName}</Text>
-          ) : null}
-          {personScopes.map((scope) => (
-            <View key={scope.edgeId}>
-              <Text>{scope.displayName}</Text>
-              <Text
-                testID={`support-hub-mentor-open-${scope.personId}`}
-                onPress={() => onOpenPersonScope?.(scope)}
-              >
-                Mentor
-              </Text>
-              <Text
-                testID={`support-hub-subjects-open-${scope.personId}`}
-                onPress={() => onOpenSubjects?.(scope)}
-              >
-                Subjects
-              </Text>
-              <Text
-                testID={`support-hub-journal-open-${scope.personId}`}
-                onPress={() => onOpenJournal?.(scope)}
-              >
-                Journal
-              </Text>
-            </View>
-          ))}
-        </View>
-      ),
-    };
-  },
-);
-
 const MentorScreen = require('./mentor').default;
+
+const SHARED_RECORD: SharedRecord = {
+  supportershipId: EDGE_ID,
+  generatedAt: '2026-06-30T12:00:00.000Z',
+  factIds: ['fact-1'],
+  supporterView: {
+    audience: 'supporter',
+    factIds: ['fact-1'],
+    headline: 'Emma has 1 shareable update.',
+    facts: [
+      {
+        id: 'fact-1',
+        kind: 'effort',
+        title: 'Practiced fractions',
+        detail: 'Completed the review set.',
+        source: 'session',
+      },
+    ],
+  },
+  supporteeView: {
+    audience: 'supportee',
+    factIds: ['fact-1'],
+    headline: 'Your supporter can see 1 shareable update.',
+    facts: [
+      {
+        id: 'fact-1',
+        kind: 'effort',
+        title: 'Practiced fractions',
+        detail: 'Completed the review set.',
+        source: 'session',
+      },
+    ],
+  },
+};
 
 function card(overrides: Partial<NowCard> = {}): NowCard {
   return {
@@ -138,7 +125,21 @@ function feed(cards: NowCard[], overflowCount = 0): NowResponse {
   };
 }
 
+function renderMentorScreen(): void {
+  const rendered = renderScreen(<MentorScreen />, {
+    routes: {
+      [`/visibility/reports/${PERSON_ID}/shared-record`]: SHARED_RECORD,
+    },
+  });
+  cleanupRender = rendered.cleanup;
+}
+
 describe('MentorScreen', () => {
+  afterEach(() => {
+    cleanupRender?.();
+    cleanupRender = undefined;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockSubjectsCount = 1;
@@ -156,8 +157,8 @@ describe('MentorScreen', () => {
       availableScopes: [
         {
           kind: 'person',
-          personId: '550e8400-e29b-41d4-a716-446655440101',
-          edgeId: '550e8400-e29b-41d4-a716-446655440201',
+          personId: PERSON_ID,
+          edgeId: EDGE_ID,
           displayName: 'Emma',
         },
       ],
@@ -166,7 +167,7 @@ describe('MentorScreen', () => {
   });
 
   it('renders the feed stack, on-track badge, and inline ask affordances', () => {
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByTestId('mentor-screen');
     screen.getByTestId('now-card-stack');
@@ -187,7 +188,7 @@ describe('MentorScreen', () => {
       data: feed([]),
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     expect(screen.queryByTestId('now-empty-card')).toBeNull();
     expect(screen.queryByTestId('now-card-stack')).toBeNull();
@@ -201,7 +202,7 @@ describe('MentorScreen', () => {
       activeScope: { kind: 'supporter-hub' },
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByTestId('support-hub-mentor-tab');
     expect(screen.queryByTestId('mentor-screen')).toBeNull();
@@ -214,7 +215,7 @@ describe('MentorScreen', () => {
     };
     const emmaScope = mockScopeContext.availableScopes[0]!;
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.press(
       screen.getByTestId(`support-hub-mentor-open-${emmaScope.personId}`),
@@ -239,13 +240,13 @@ describe('MentorScreen', () => {
       ...mockScopeContext,
       activeScope: {
         kind: 'person',
-        personId: '550e8400-e29b-41d4-a716-446655440101',
-        edgeId: '550e8400-e29b-41d4-a716-446655440201',
+        personId: PERSON_ID,
+        edgeId: EDGE_ID,
         displayName: 'Emma',
       },
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByTestId('person-scope-mentor-tab');
     expect(screen.getAllByText('Emma').length).toBeGreaterThan(0);
@@ -257,7 +258,7 @@ describe('MentorScreen', () => {
     // 2026-06-15 is a Monday; 18:00 local = weekday evening.
     jest.setSystemTime(new Date(2026, 5, 15, 18, 0, 0));
     try {
-      render(<MentorScreen />);
+      renderMentorScreen();
 
       const prompt = screen.getByTestId('mentor-homework-prompt');
       fireEvent.press(prompt);
@@ -276,7 +277,7 @@ describe('MentorScreen', () => {
     // 2026-06-13 is a Saturday afternoon.
     jest.setSystemTime(new Date(2026, 5, 13, 15, 0, 0));
     try {
-      render(<MentorScreen />);
+      renderMentorScreen();
       expect(screen.queryByTestId('mentor-homework-prompt')).toBeNull();
     } finally {
       jest.useRealTimers();
@@ -290,14 +291,14 @@ describe('MentorScreen', () => {
       data: feed([]),
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByTestId('mentor-cold-start-card');
     expect(screen.queryByTestId('now-card-stack')).toBeNull();
   });
 
   it('pushes deterministic route phrases through the closed now deep-link mapper', () => {
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.changeText(
       screen.getByTestId('mentor-bar-input'),
@@ -309,7 +310,7 @@ describe('MentorScreen', () => {
   });
 
   it('carries a mentor-intent question into the session as rawInput (does not drop the typed text) [T25]', () => {
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.changeText(
       screen.getByTestId('mentor-bar-input'),
@@ -337,7 +338,7 @@ describe('MentorScreen', () => {
       isSlowFallback: true,
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByTestId('mentor-feed-fallback');
     screen.getByTestId('now-card-stack');
@@ -352,7 +353,7 @@ describe('MentorScreen', () => {
       isSlowFallback: true,
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     // Cached cards still render...
     screen.getByTestId('now-card-stack');
@@ -373,7 +374,7 @@ describe('MentorScreen', () => {
       isSlowFallback: true,
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.press(screen.getByTestId('continue-fallback-card'));
 
@@ -391,14 +392,14 @@ describe('MentorScreen', () => {
       isError: true,
     };
 
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.press(screen.getByTestId('mentor-feed-retry'));
     expect(mockNowRefetch).toHaveBeenCalledTimes(1);
   });
 
   it('keeps light practice discoverable on a thin feed', () => {
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     fireEvent.press(screen.getByTestId('light-practice-capitals'));
 
@@ -409,7 +410,7 @@ describe('MentorScreen', () => {
   });
 
   it('advances the anchor arc and shows the mentor celebration when a card is completed', () => {
-    render(<MentorScreen />);
+    renderMentorScreen();
 
     screen.getByText('Ready to pick back up');
     fireEvent.press(screen.getByTestId('now-card-complete'));
