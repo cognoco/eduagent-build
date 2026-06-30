@@ -337,6 +337,7 @@ describe('SubjectsBrowse', () => {
         onOpenSubject={jest.fn()}
         onCreateSubject={jest.fn()}
       />,
+      { wrapper },
     );
 
     // Each row must announce the subject name so screen readers can distinguish them.
