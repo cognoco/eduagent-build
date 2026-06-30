@@ -4,6 +4,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   person,
+  retentionCards,
   subjects,
   supportership,
   type Database,
@@ -13,6 +14,7 @@ import {
   type SupporteeStructuralBook,
   type SupporteeStructuralSubject,
   type SupporteeStructuralSubjectsResponse,
+  type SupporteeStructuralTopicProgressState,
 } from '@eduagent/schemas';
 
 import { ForbiddenError } from '../errors';
@@ -33,7 +35,24 @@ type StructuralRow = {
   topicSortOrder: number | null;
   estimatedMinutes: number | null;
   skipped: boolean | null;
+  topicNextReviewAt: Date | null;
+  topicMasteredAt: Date | null;
 };
+
+function toIso(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+function deriveProgressState(
+  row: StructuralRow,
+): SupporteeStructuralTopicProgressState {
+  if (row.topicMasteredAt) return 'mastered';
+  if (row.topicNextReviewAt && row.topicNextReviewAt.getTime() <= Date.now()) {
+    return 'review-due';
+  }
+  if (row.topicNextReviewAt) return 'learning';
+  return 'not-started';
+}
 
 function mapStructuralRows(
   personId: string,
@@ -95,6 +114,9 @@ function mapStructuralRows(
       sortOrder: row.topicSortOrder,
       estimatedMinutes: row.estimatedMinutes,
       skipped: row.skipped,
+      progressState: deriveProgressState(row),
+      nextReviewAt: toIso(row.topicNextReviewAt),
+      masteredAt: toIso(row.topicMasteredAt),
     });
   }
 
@@ -151,10 +173,19 @@ export async function readSupporteeStructuralSubjects(
       topicSortOrder: curriculumTopics.sortOrder,
       estimatedMinutes: curriculumTopics.estimatedMinutes,
       skipped: curriculumTopics.skipped,
+      topicNextReviewAt: retentionCards.nextReviewAt,
+      topicMasteredAt: retentionCards.masteredAt,
     })
     .from(subjects)
     .leftJoin(curriculumBooks, eq(curriculumBooks.subjectId, subjects.id))
     .leftJoin(curriculumTopics, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .leftJoin(
+      retentionCards,
+      and(
+        eq(retentionCards.topicId, curriculumTopics.id),
+        eq(retentionCards.profileId, subjects.profileId),
+      ),
+    )
     .where(eq(subjects.profileId, supporteePersonId))
     .orderBy(
       asc(subjects.name),

@@ -119,6 +119,7 @@ flowchart TD
   Scope -- supporter-hub --> People[Supported people list]
   People --> PersonScope[Switch to person scope]
   Scope -- person --> Mask[Structural subject mask]
+  Mask --> MaskedHub[Masked read-only Subject Hub]
 ```
 
 **Code anchors:** `subjects.tsx:15-65`, `SubjectsBrowse.tsx:19-185`, `subject-hub/[subjectId]/index.tsx:35-319`, `use-subject-hub.ts:228-553`, `PersonScopeStructuralSubjects.tsx:18-83`.
@@ -166,7 +167,7 @@ flowchart TD
 | First V2 Mentor session closes | In-thread first-session wrap-up. | `isV2MentorEntry && isFirstSession`. | Replaces separate exit funnel before S6 deletes it. | `CODE`: `session/index.tsx:1068`, `:1424`; S6 deletion remains `PLAN`. |
 | Subject row pressed | Subject Hub | `SubjectsBrowse` calls `onOpenSubject(subjectId)`. | Browse leads to the persistent subject workspace. | `CODE`: `SubjectsBrowse.tsx:146`, `subjects.tsx:59-64`. |
 | Subject Hub Next-up pressed | Resume, review, or topic. | `nextUp.kind` controls route. | One next action per subject. | `CODE`: `subject-hub/[subjectId]/index.tsx:162-178`, `use-subject-hub.ts:228-276`. |
-| Person scope Subjects opened | Structural masked subject list. | Fetch `GET /scopes/:personId/subjects`. | Supporter sees only shareable structure. | `CODE/PARTIAL`: `PersonScopeStructuralSubjects.tsx:26-33`, `scopes.ts:25-35`. |
+| Person scope Subjects opened | Structural masked subject list; tapping a subject opens a masked read-only Subject Hub backed by the same structural response. | Fetch `GET /scopes/:personId/subjects`, then local subject selection adapts the masked data into `SubjectHub` with `canStudy=false`. | Supporter sees only shareable structure plus safe due-review/mastery signals. | `CODE`: `PersonScopeStructuralSubjects.tsx`, `scopes.ts:25-35`, `supporter-structural-mask.ts`. |
 | Supporter Journal opened | API-backed shared-record projections. | Mobile fetches `GET /visibility/reports/:personId/shared-record`; API projects weekly report, recap-presence, and milestone facts through `projectSharedRecord`. | Visibility contract record with reportable facts only. | `CODE`: `SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx`, `use-shared-record.ts`, `visibility.ts`, `shared-record-read-model.ts`. |
 | Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
 
@@ -175,7 +176,7 @@ flowchart TD
 | Gap | User-visible risk | Owner phase |
 |---|---|---|
 | Support hub is still mostly list/placeholder UI. | Parent/supporter cannot yet answer the full "what should I do now?" job from V2 alone. | S4 |
+| Person-scope Subjects masked Subject Hub drill-in now exists; keep reviewing privacy copy and masked aggregate language during publish-readiness QA. | Supporters can inspect masked structure, but QA still needs end-to-end product review before V2 publish. | S4/S5 |
 | Shared-record Journal data depends on available report/recap/milestone rows. | Supporters see honest empty state until reportable facts exist; private notes/chat text stay outside the record. | S5 |
-| Person-scope Subjects has no masked Subject Hub drill-in. | Supporters can see a structural list but cannot inspect masked learning structure deeply. | S4/S5 |
 | Visibility ceremony screens are missing. | Link/accept/revoke/trust-contract flows are API-backed but not mobile-complete. | S5 |
 | S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
