@@ -1,9 +1,8 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import type { BookSuggestionsResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
-import { assertOk } from '../lib/assert-ok';
+import { useApiQuery } from './use-api-query';
 
 // [WI-258] Top-up generation was split from the GET endpoint into a
 // dedicated POST /subjects/:subjectId/book-suggestions/topup so the
@@ -19,27 +18,21 @@ export function useBookSuggestions(
   const { activeProfile } = useProfile();
   const topup = options?.topup ?? false;
 
-  return useQuery({
+  return useApiQuery<BookSuggestionsResponse>({
     queryKey: ['book-suggestions', subjectId, activeProfile?.id, topup],
-    queryFn: async ({ signal: querySignal }) => {
-      if (!subjectId) throw new Error('subjectId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = topup
-          ? await client.subjects[':subjectId']['book-suggestions'].topup.$post(
-              { param: { subjectId } },
-              { init: { signal } },
-            )
-          : await client.subjects[':subjectId']['book-suggestions'].$get(
-              { param: { subjectId } },
-              { init: { signal } },
-            );
-        await assertOk(res);
-        return (await res.json()) as BookSuggestionsResponse;
-      } finally {
-        cleanup();
-      }
+    fetch: (signal) => {
+      const sid = subjectId ?? '';
+      return topup
+        ? client.subjects[':subjectId']['book-suggestions'].topup.$post(
+            { param: { subjectId: sid } },
+            { init: { signal } },
+          )
+        : client.subjects[':subjectId']['book-suggestions'].$get(
+            { param: { subjectId: sid } },
+            { init: { signal } },
+          );
     },
-    enabled: !!activeProfile && !!subjectId,
+    select: (json) => json,
+    enabled: !!subjectId,
   });
 }

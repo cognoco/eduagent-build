@@ -2,6 +2,8 @@
 
 **Status:** Proposed · 2026-06-20 · **Scope:** Mobile app shell navigation and relationship-lens data access · **Deciders:** Architecture sign-off pending · **Builds on:** MMT-ADR-0000 (decisions layer), MMT-ADR-0007 (Person identity model), MMT-ADR-0008 (guardianship operation is distinct from everyday visibility)
 
+> **Re-vet 2026-06-30:** **DEMOTE FROM CANON / KEEP PROPOSED.** This file has no human Architecture sign-off and therefore does not promote any rule into `architecture.md`. The corresponding proposed section was removed from `architecture.md`; if the scope-chip model is accepted later, the acceptance change-set must amend canon in lockstep.
+
 ## Context
 
 The mobile shell currently exposes audience state through a mix of tab shapes, mode switching, and parent-proxy behavior. That matrix was useful while the app still used profile-shaped parent/learner modes, but it does not match the identity model where a signed-in human can have multiple relationship lenses at once: their own learning, a Support hub, and one named person-scope per active supportership edge.
@@ -36,5 +38,5 @@ The V2 app shell uses a **relationship scope chip** as the primary scope selecto
 
 ## Links
 
-- **Canon (lockstep):** `docs/architecture.md` -> "Scope Chip Relationship Lens (proposed)" under "Key Structural Decisions".
+- **Canon:** none while this ADR is Proposed. Acceptance must land the canon line in the same change-set.
 - **Related implementation surfaces:** `packages/schemas/src/scope.ts`, `apps/api/src/services/scope-resolution.ts`, `apps/mobile/src/lib/scope-context.tsx`, `apps/mobile/src/components/chrome/ScopeChip.tsx`.

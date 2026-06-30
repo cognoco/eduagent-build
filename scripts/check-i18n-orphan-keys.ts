@@ -159,6 +159,7 @@ function resolveKey(key: string, defaultNs: string | null): string {
 
 const NOT_T_DIRECTIVE = /\/\/\s*i18n-not-t:\s*(\S+)/;
 const ALLOW_MULTI_VAR = 'i18n-allow-multi-var';
+const ALLOW_DEFAULT_VALUE = 'i18n-allow-default-value';
 
 // First-10-lines `// i18n-not-t: <ident>` directives remove identifiers from
 // the per-file t-call set. One identifier per directive; multiple directives
@@ -293,33 +294,36 @@ function analyzeSourceFile(sf: SourceFile): Analysis {
 
     classifyArg(arg0, { node, file, line, lines, analysis });
 
-    // Detect `t('key', { defaultValue: 'literal' })` — silently renders English
-    // to every non-English locale when the key is absent from a translation file.
+    // Detect `t('key', { defaultValue: ... })` — silently renders fallback
+    // text/enum values to users when the key is absent from a translation file.
     const arg1 = node.getArguments()[1];
     if (arg1 && Node.isObjectLiteralExpression(arg1)) {
       for (const prop of arg1.getProperties()) {
         if (!Node.isPropertyAssignment(prop)) continue;
         if (prop.getName() !== 'defaultValue') continue;
+        const propLine = prop.getStartLineNumber();
+        const callLineText = lines[line - 1] ?? '';
+        const propLineText = lines[propLine - 1] ?? '';
+        if (
+          callLineText.includes(ALLOW_DEFAULT_VALUE) ||
+          propLineText.includes(ALLOW_DEFAULT_VALUE)
+        ) {
+          continue;
+        }
         const init = prop.getInitializer();
         if (!init) continue;
-        const val = unwrapArg(init);
-        if (
-          Node.isStringLiteral(val) ||
-          Node.isNoSubstitutionTemplateLiteral(val)
-        ) {
-          const unwrappedKey = unwrapArg(arg0);
-          const keyText =
-            Node.isStringLiteral(unwrappedKey) ||
-            Node.isNoSubstitutionTemplateLiteral(unwrappedKey)
-              ? unwrappedKey.getLiteralText()
-              : arg0.getText().slice(0, 60);
-          analysis.defaultValueMisuse.push({
-            file,
-            line,
-            key: keyText,
-            snippet: node.getText().slice(0, 80),
-          });
-        }
+        const unwrappedKey = unwrapArg(arg0);
+        const keyText =
+          Node.isStringLiteral(unwrappedKey) ||
+          Node.isNoSubstitutionTemplateLiteral(unwrappedKey)
+            ? unwrappedKey.getLiteralText()
+            : arg0.getText().slice(0, 60);
+        analysis.defaultValueMisuse.push({
+          file,
+          line,
+          key: keyText,
+          snippet: node.getText().slice(0, 80),
+        });
       }
     }
   });
@@ -590,15 +594,16 @@ function main(): void {
   if (analysis.defaultValueMisuse.length > 0) {
     failed = true;
     console.error(
-      `Found ${analysis.defaultValueMisuse.length} t() call(s) with a defaultValue string literal:\n`,
+      `Found ${analysis.defaultValueMisuse.length} t() call(s) with defaultValue:\n`,
     );
     for (const d of analysis.defaultValueMisuse) {
       console.error(`  ${rel(d.file)}:${d.line} — t('${d.key}')`);
     }
     console.error(
-      '\nThe defaultValue option silently renders English to every non-English locale\n' +
-        'when the key is missing from a translation file. Add the key to\n' +
-        'apps/mobile/src/i18n/locales/en.json and remove the defaultValue.\n',
+      '\nThe defaultValue option silently renders fallback text or enum values when\n' +
+        'the key is missing from a translation file. Add the key to\n' +
+        'apps/mobile/src/i18n/locales/en.json and remove the defaultValue, or add\n' +
+        '// i18n-allow-default-value: <reason> for an intentional exception.\n',
     );
   }
 

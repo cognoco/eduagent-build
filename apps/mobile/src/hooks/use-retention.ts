@@ -4,12 +4,16 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { RetentionCardResponse } from '@eduagent/schemas';
+import type {
+  RetentionCardResponse,
+  SubjectRetentionResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 // ---------------------------------------------------------------------------
 // Recall test + relearn response types (mirror API route wrappers)
@@ -42,26 +46,21 @@ interface TeachingPreference {
   nativeLanguage: string | null;
 }
 
-export function useRetentionTopics(subjectId: string) {
+export function useRetentionTopics(
+  subjectId: string,
+): UseQueryResult<SubjectRetentionResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<SubjectRetentionResponse>({
     queryKey: queryKeys.retention.subject(subjectId, activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].retention.$get(
-          { param: { subjectId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return await res.json();
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].retention.$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      ),
+    select: (json) => json,
+    enabled: !!subjectId,
   });
 }
 
@@ -71,25 +70,18 @@ export function useTopicRetention(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { card: RetentionCardResponse | null },
+    RetentionCardResponse | null
+  >({
     queryKey: queryKeys.retention.topic(topicId, activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.topics[':topicId'].retention.$get(
-          { param: { topicId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          card: RetentionCardResponse | null;
-        };
-        return data.card;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!topicId,
+    fetch: (signal) =>
+      client.topics[':topicId'].retention.$get(
+        { param: { topicId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.card,
+    enabled: !!topicId,
   });
 }
 
@@ -198,26 +190,20 @@ export function useTeachingPreference(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { preference: TeachingPreference | null },
+    TeachingPreference | null
+  >({
     queryKey: queryKeys.retention.teachingPreference(
       subjectId,
       activeProfile?.id,
     ),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'][
-          'teaching-preference'
-        ].$get({ param: { subjectId: subjectId ?? '' } }, { init: { signal } });
-        await assertOk(res);
-        const data = (await res.json()) as {
-          preference: TeachingPreference | null;
-        };
-        return data.preference;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    fetch: (signal) =>
+      client.subjects[':subjectId']['teaching-preference'].$get(
+        { param: { subjectId: subjectId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.preference,
+    enabled: !!subjectId,
   });
 }

@@ -1,6 +1,5 @@
 import {
   useMutation,
-  useQuery,
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
@@ -16,8 +15,8 @@ import {
 import { assertOk } from '../lib/assert-ok';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { useActiveProfileRoleState } from './use-active-profile-role';
+import { useApiQuery } from './use-api-query';
 
 function childCapNotificationsQueryKey(profileId: string | undefined) {
   return ['child-cap-notifications', profileId];
@@ -30,22 +29,15 @@ export function useChildCapNotifications(): UseQueryResult<
   const { activeProfile } = useProfile();
   const activeProfileRole = useActiveProfileRoleState();
 
-  return useQuery({
+  return useApiQuery<
+    { notifications: ChildCapNotification[] },
+    ChildCapNotification[]
+  >({
     queryKey: childCapNotificationsQueryKey(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.notifications['child-cap'].$get(
-          {},
-          { init: { signal } },
-        );
-        const okRes = await assertOk(res);
-        return childCapNotificationsResponseSchema.parse(await okRes.json())
-          .notifications;
-      } finally {
-        cleanup();
-      }
-    },
+    fetch: (signal) =>
+      client.notifications['child-cap'].$get({}, { init: { signal } }),
+    select: (json) =>
+      childCapNotificationsResponseSchema.parse(json).notifications,
     enabled: activeProfileRole.role === 'owner',
   });
 }

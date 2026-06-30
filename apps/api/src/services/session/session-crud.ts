@@ -77,6 +77,7 @@ import { escapeXml } from '../llm/sanitize';
 import { createLogger } from '../logger';
 import { paginateRows } from '../pagination';
 import { addBreadcrumb, captureException } from '../sentry';
+import { sleep } from '../sleep';
 import type { TimedEvent } from './session-context-builders';
 import { findOwnedCurriculumTopics } from '../curriculum-topic-ownership';
 import { FILING_CONFIG } from '../../config/filing';
@@ -343,10 +344,6 @@ class MatcherTimeoutError extends Error {
     super('Topic intent matcher timed out');
     this.name = 'MatcherTimeoutError';
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function withTimeout<T>(

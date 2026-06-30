@@ -19,6 +19,19 @@ describe('MentorCelebration', () => {
     expect(onMarkSeen).toHaveBeenCalledWith('event-1');
   });
 
+  it('keeps an exit animation on the removable celebration surface', () => {
+    const { getByTestId } = render(
+      <MentorCelebration
+        eventId="event-1"
+        messageKey="mentorHome.celebration.ownChoice"
+        seenEventIds={new Set()}
+      />,
+    );
+
+    expect(getByTestId('mentor-celebration').props.exiting).toBeTruthy();
+    expect(getByTestId('mentor-celebration').props.collapsable).toBe(false);
+  });
+
   it('does not retrigger celebratory styling for an already seen event', () => {
     const { queryByTestId, getByTestId } = render(
       <MentorCelebration

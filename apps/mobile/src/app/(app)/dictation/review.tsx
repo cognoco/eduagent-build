@@ -44,6 +44,7 @@ export default function DictationReviewScreen(): React.ReactElement {
   const allCorrected = completedCount >= mistakes.length;
 
   const handleSubmitCorrection = () => {
+    if (!typedSentence.trim()) return;
     // Accept whatever they type — the value is in the rewriting act
     setCompletedCount((prev) => prev + 1);
     setTypedSentence('');
@@ -282,6 +283,9 @@ export default function DictationReviewScreen(): React.ReactElement {
           textAlignVertical="top"
           autoCorrect={false}
           autoCapitalize="none"
+          onSubmitEditing={handleSubmitCorrection}
+          returnKeyType="done"
+          blurOnSubmit
           placeholder={t('dictation.review.typeCorrectedPlaceholder')}
           placeholderTextColor={colors.textSecondary}
           accessibilityLabel={t('dictation.review.typeCorrectedLabel')}

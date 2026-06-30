@@ -1,6 +1,5 @@
 import {
   useMutation,
-  useQuery,
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
@@ -19,9 +18,9 @@ import {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { parseJson } from '../lib/parse-json';
+import { useApiQuery } from './use-api-query';
 
 export function useRequestConsent(): UseMutationResult<
   ConsentRequestResult,
@@ -37,7 +36,11 @@ export function useRequestConsent(): UseMutationResult<
     ): Promise<ConsentRequestResult> => {
       const res = await client.consent.request.$post({ json: input });
       await assertOk(res);
-      return parseJson(res, consentRequestResultSchema, 'POST /consent/request');
+      return parseJson(
+        res,
+        consentRequestResultSchema,
+        'POST /consent/request',
+      );
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -103,22 +106,11 @@ export function useConsentStatus(): UseQueryResult<ConsentStatusData> {
   // doesn't flash the previous profile's consent state.
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<ConsentStatusData>({
     queryKey: ['consent-status', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }): Promise<ConsentStatusData> => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.consent['my-status'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return parseJson(res, myConsentStatusSchema, 'GET /consent/my-status');
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile?.id,
+    fetch: (signal) =>
+      client.consent['my-status'].$get({}, { init: { signal } }),
+    select: (json) => myConsentStatusSchema.parse(json),
   });
 }
 
@@ -162,30 +154,20 @@ export function useChildConsentStatus(
   childProfileId: string | undefined,
 ): UseQueryResult<ChildConsentData> {
   const client = useApiClient();
+  // [BUG-164] Include parent identity (activeProfile?.id) so the same
+  // childProfileId fetched under two different parent accounts on a
+  // shared device does not collide. The server scopes the response by
+  // the requesting parent, so the cache key must mirror that scope.
   const { activeProfile } = useProfile();
 
-  return useQuery({
-    // [BUG-164] Include parent identity (activeProfile?.id) so the same
-    // childProfileId fetched under two different parent accounts on a
-    // shared device does not collide. The server scopes the response by
-    // the requesting parent, so the cache key must mirror that scope.
+  return useApiQuery<ChildConsentData>({
     queryKey: ['consent', 'child', childProfileId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }): Promise<ChildConsentData> => {
-      if (!childProfileId) {
-        throw new Error('childProfileId is required to fetch consent status');
-      }
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.consent[':childProfileId'].status.$get(
-          { param: { childProfileId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return parseJson(res, childConsentStatusSchema, 'GET /consent/:childProfileId/status');
-      } finally {
-        cleanup();
-      }
-    },
+    fetch: (signal) =>
+      client.consent[':childProfileId'].status.$get(
+        { param: { childProfileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => childConsentStatusSchema.parse(json),
     enabled: !!childProfileId && activeProfile?.isOwner === true,
   });
 }
@@ -214,7 +196,11 @@ export function useRevokeConsent(
         param: { childProfileId },
       });
       await assertOk(res);
-      return parseJson(res, consentActionResultSchema, 'PUT /consent/:childProfileId/revoke');
+      return parseJson(
+        res,
+        consentActionResultSchema,
+        'PUT /consent/:childProfileId/revoke',
+      );
     },
     onSuccess: async () => {
       // Consent changes affect all child-related data

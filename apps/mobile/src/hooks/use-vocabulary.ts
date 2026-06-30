@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   Vocabulary,
   VocabularyCreateInput,
@@ -6,31 +6,23 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
+import { useApiQuery } from './use-api-query';
 
 export function useVocabulary(subjectId: string) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ vocabulary: Vocabulary[] }, Vocabulary[]>({
     queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].vocabulary.$get(
-          { param: { subjectId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { vocabulary: Vocabulary[] };
-        return data.vocabulary;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].vocabulary.$get(
+        { param: { subjectId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.vocabulary,
+    enabled: !!subjectId,
   });
 }
 

@@ -10,6 +10,8 @@ status: deferred
 
 > **STATUS (2026-06-27):** TODO — not started. All deletion targets still present (`more/`, `library.tsx`, `ModeSwitcher`, `legacy-navigation-contract.ts`, `child/` proxy routes). Gate (a) P3 park-and-return evals — MET via S3. Gate (b) §13.1 V0-retirement product ruling — NOT made (owner decision pending). Gate (c) S1–S4 heir completeness — BLOCKED on S4 missing cold-start/co-learning surfaces and S5 missing linking-ceremony screens. Requires explicit human confirmation before any destructive step.
 
+> **ADR governance correction (2026-06-30, WI-752):** S6 remains deferred and contradiction-checked against corrected canon. `MMT-ADR-0024` is still Proposed, so any deletion that depends on the scope-chip model requires that ADR to be accepted and promoted first; the existing destructive gates and explicit human irreversibility confirmation still apply. S5 visibility/tier ADRs (`MMT-ADR-0027`/`0028`) stand as amended Architecture decisions, but their missing mobile screens and break-tests still block heir parity.
+
 > ## ⛔ DEFERRED — DO NOT EXECUTE WITHOUT EXPLICIT HUMAN CONFIRMATION
 >
 > **S6 is the irreversible phase. It is DEFERRED and must never be started by an agent autonomously.**

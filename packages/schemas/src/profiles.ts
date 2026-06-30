@@ -56,7 +56,20 @@ export const birthYearSchema = z
     message: `birthYear must correspond to a minimum age of ${PROFILE_MINIMUM_AGE}`,
   });
 
-export const profileCreateSchema = z
+function isValidBirthDate(
+  birthYear: number,
+  birthMonth: number,
+  birthDay: number,
+): boolean {
+  const date = new Date(Date.UTC(birthYear, birthMonth - 1, birthDay));
+  return (
+    date.getUTCFullYear() === birthYear &&
+    date.getUTCMonth() + 1 === birthMonth &&
+    date.getUTCDate() === birthDay
+  );
+}
+
+const profileCreateObjectSchema = z
   .object({
     displayName: z.string().min(1).max(50),
     birthYear: birthYearSchema,
@@ -81,6 +94,34 @@ export const profileCreateSchema = z
   })
   .strict();
 
+export const profileCreateSchema = profileCreateObjectSchema.superRefine(
+  (data, ctx) => {
+    const hasBirthMonth = data.birthMonth != null;
+    const hasBirthDay = data.birthDay != null;
+
+    if (hasBirthMonth !== hasBirthDay) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [hasBirthMonth ? 'birthDay' : 'birthMonth'],
+        message: 'birthMonth and birthDay must be provided together',
+      });
+      return;
+    }
+
+    if (
+      hasBirthMonth &&
+      hasBirthDay &&
+      !isValidBirthDate(data.birthYear, data.birthMonth!, data.birthDay!)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['birthDay'],
+        message: 'birthMonth and birthDay must form a real calendar date',
+      });
+    }
+  },
+);
+
 export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 
 // Mirrors profileCreateSchema minus birthYear/location/birthMonth/birthDay.
@@ -89,8 +130,8 @@ export type ProfileCreateInput = z.infer<typeof profileCreateSchema>;
 // patchable via the dedicated single-field onboarding endpoints below, add a
 // parallel onboarding*PatchSchema. Keep these in sync.
 // NOTE: birthMonth/birthDay are create-only (used for exact age calculation at
-// creation, never persisted); they must not appear in PATCH payloads.
-export const profileUpdateSchema = profileCreateSchema
+// creation and persisted for exact age reads); they must not appear in PATCH payloads.
+export const profileUpdateSchema = profileCreateObjectSchema
   .partial()
   .omit({
     birthYear: true,

@@ -5,6 +5,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useApiQuery } from './use-api-query';
 import type {
   CuratedMemoryView,
   DashboardChild,
@@ -158,27 +159,17 @@ export function useChildDetail(
   childProfileId: string | undefined,
 ): UseQueryResult<DashboardChild | null> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useDashboardNavigationScope();
+  const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ child: DashboardChild | null }, DashboardChild | null>({
     queryKey: queryKeys.dashboard.childDetail(mode, childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      if (!childProfileId) throw new Error('childProfileId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].$get(
-          { param: { profileId: childProfileId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.child;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
+    enabled: canAccessFamilyChildData && !!childProfileId,
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.child,
   });
 }
 
@@ -187,60 +178,38 @@ export function useChildSubjectTopics(
   subjectId: string | undefined,
 ): UseQueryResult<TopicProgress[]> {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useDashboardNavigationScope();
+  const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ topics: TopicProgress[] }, TopicProgress[]>({
     queryKey: queryKeys.dashboard.childSubject(mode, childProfileId, subjectId),
-    queryFn: async ({ signal: querySignal }) => {
-      if (!childProfileId) throw new Error('childProfileId is required');
-      if (!subjectId) throw new Error('subjectId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].subjects[
-          ':subjectId'
-        ].$get(
-          { param: { profileId: childProfileId, subjectId: subjectId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.topics;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled:
-      !!activeProfile &&
-      canAccessFamilyChildData &&
-      !!childProfileId &&
-      !!subjectId,
+    enabled: canAccessFamilyChildData && !!childProfileId && !!subjectId,
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].subjects[':subjectId'].$get(
+        {
+          param: {
+            profileId: childProfileId ?? '',
+            subjectId: subjectId ?? '',
+          },
+        },
+        { init: { signal } },
+      ),
+    select: (json) => json.topics,
   });
 }
 
 export function useChildSessions(childProfileId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useDashboardNavigationScope();
+  const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ sessions: unknown[] }, unknown[]>({
     queryKey: queryKeys.dashboard.childSessions(mode, childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      if (!childProfileId) throw new Error('childProfileId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].sessions.$get(
-          { param: { profileId: childProfileId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.sessions;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
+    enabled: canAccessFamilyChildData && !!childProfileId,
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].sessions.$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.sessions,
   });
 }
 
@@ -292,26 +261,16 @@ export function useChildSessionDetail(
 
 export function useChildMemory(childProfileId: string | undefined) {
   const client = useApiClient();
-  const { activeProfile, mode, canAccessFamilyChildData } =
-    useDashboardNavigationScope();
+  const { mode, canAccessFamilyChildData } = useDashboardNavigationScope();
 
-  return useQuery({
+  return useApiQuery<{ memory: CuratedMemoryView }, CuratedMemoryView>({
     queryKey: queryKeys.dashboard.childMemory(mode, childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      if (!childProfileId) throw new Error('childProfileId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'].memory.$get(
-          { param: { profileId: childProfileId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.memory as CuratedMemoryView;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && canAccessFamilyChildData && !!childProfileId,
+    enabled: canAccessFamilyChildData && !!childProfileId,
+    fetch: (signal) =>
+      client.dashboard.children[':profileId'].memory.$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.memory,
   });
 }

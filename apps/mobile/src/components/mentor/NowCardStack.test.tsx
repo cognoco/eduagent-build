@@ -57,6 +57,28 @@ describe('NowCardStack', () => {
     expect(queryByTestId('now-overflow-entry')).toBeNull();
   });
 
+  it('puts entry and exit animations on the keyed card slots', () => {
+    const { getByTestId } = render(
+      <NowCardStack
+        feed={feed([
+          card('unfinished_session', 'topic-1'),
+          card('retention_due', 'topic-2'),
+        ])}
+        dismissedKeys={new Set()}
+        onContinue={jest.fn()}
+        onDecline={jest.fn()}
+        onShowOverflow={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('now-card-slot-anchor').props.entering).toBeTruthy();
+    expect(getByTestId('now-card-slot-anchor').props.exiting).toBeTruthy();
+    expect(getByTestId('now-card-slot-anchor').props.collapsable).toBe(false);
+    expect(getByTestId('now-card-slot-module-0').props.entering).toBeTruthy();
+    expect(getByTestId('now-card-slot-module-0').props.exiting).toBeTruthy();
+    expect(getByTestId('now-card-slot-module-0').props.collapsable).toBe(false);
+  });
+
   it('renders overflow count and calls the overflow handler', () => {
     const onShowOverflow = jest.fn();
     const { getByTestId, getByText } = render(

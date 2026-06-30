@@ -4,6 +4,8 @@
 
 > **Proposal, not yet accepted.** Per the lockstep rule (MMT-ADR-0000 §II.2 / `docs/adr/README.md`), the canon edits this would imply (`architecture.md` → "Freeform Ask Anything — narrower persistence path"; `PRD.md` → "Ask Anything / Freeform Persistence Boundary") land **in the same change-set as acceptance**, never at proposal time. This file records the *why* and the open implementation fork so the decision can be ruled deliberately rather than smuggled into a bugfix.
 
+> **Re-vet 2026-06-30:** **KEEP PROPOSED / AMEND.** This remains a proposal because no acceptance sign-off or mechanism choice exists. The product-shell spec and S1 task are context pointers only; they do not supply the authority for the ADR. The architectural spine is the turn-1 subject commitment risk plus ADR-0021's persistence boundary.
+
 ## Context
 
 MMT-ADR-0021 ruled that a freeform Ask-Anything session is a **narrower persistence path**: it does not mint a topic mid-chat, and it auto-files into the Library only once the conversation is *sustained* (`FILING_CONFIG.minFreeformExchanges`, currently 5). That deferral applies to the **topic** layer. It deliberately kept the **subject** required up front — ADR-0021 Decision 3 states the system "may resolve or ask for the subject so events carry a `subjectId`", because `session_events.subjectId` and `learning_sessions.subjectId` are `NOT NULL` (`packages/database/src/schema/sessions.ts`), and `ensureSession` returns `null` without one (`apps/mobile/src/components/session/use-session-streaming.ts:342`).
@@ -12,7 +14,7 @@ The consequence is a **turn-1 subject commitment**: a freeform / V2-mentor turn 
 
 - Real instance (2026-06-19): a learner asked about **"analysis"** and the classifier committed the session to **English** — when they meant mathematical analysis. "analysis" is inherently cross-subject (literary analysis vs mathematical analysis); no classifier confidence threshold makes it reliably right at turn 1.
 
-The V2 *mentor-is-the-app* direction (`docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §3.1) rules that "the first subject is created through the first conversation, not a setup form", and that "'what subject is it?' first = the failure mode". A turn-1 commitment fights that principle structurally: the commitment is forced before the conversation exists. The near-term S1 fix (`T25`, eager subject + kill the grid gate + always-visible override) reduces the harm but cannot eliminate a *confident* mis-commit — the override chip is the only catch. The robust answer, repeatedly identified, is **not a stronger guesser** but to let the conversation clarify the subject before committing.
+A turn-1 commitment fights the desired conversation-first cold-start structurally: the commitment is forced before the conversation exists. A near-term implementation can reduce the harm with eager subject creation, no grid gate, and an always-visible override, but it cannot eliminate a *confident* mis-commit — the override chip is the only catch. The robust answer is **not a stronger guesser** but to let the conversation clarify the subject before committing.
 
 ## Decision (proposed)
 
@@ -34,7 +36,7 @@ The DB invariant (`subjectId NOT NULL`) is the obstacle, and there are two ways 
 ## Consequences
 
 - **Eliminates the turn-1 mis-commit class** ("analysis" → English): the mentor's first conversational reply resolves genuine ambiguity, instead of a client-side classifier committing blind.
-- **Truest realization of spec §3.1** — onboarding is the conversation; the first subject is a *product* of it, not a precondition.
+- **Conversation-first cold start** — onboarding is the conversation; the first subject is a *product* of it, not a precondition.
 - **Cost: it amends ADR-0021's "subject required" invariant** and touches the shared session pipeline (M1 migration + null-handling sweep, or M2 draft lifecycle). This is exactly why it is an ADR-class decision, not a bugfix detail.
 - **Bookmarks in the opening turns** — ADR-0021 made freeform bookmarks subject-backed but topicless. Under deferral a bookmark created before crystallization has no subject yet; either defer bookmark persistence to crystallization or attach retroactively. Must be resolved in the chosen mechanism.
 - **Safety + metering must not leak.** The conversational path still owes the safety tripwire and metering (`session/index.tsx`); a subjectless opening must not become an unmetered, un-tripwired chat loophole.
@@ -56,7 +58,7 @@ The DB invariant (`subjectId NOT NULL`) is the obstacle, and there are two ways 
 ## Links
 
 - **Amends:** `docs/adr/MMT-ADR-0021-freeform-library-filing-threshold.md` (Decision 3 — "subject is required up front").
-- **Near-term fix:** S1 plan `docs/plans/v2-plan/2026-06-10-s1-mentor-home.md` → `T25` (eager subject, no grid gate, override).
-- **Driving spec:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §3.1 (cold start — first subject through the conversation).
+- **Contextual rollout pointer, not authority:** S1 plan `docs/plans/v2-plan/2026-06-10-s1-mentor-home.md` → `T25` (eager subject, no grid gate, override).
+- **Contextual product pointer, not authority:** `docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md` §3.1 (cold start — first subject through the conversation).
 - **Canon (lockstep at acceptance, not now):** `architecture.md` → "Freeform Ask Anything — narrower persistence path"; `PRD.md` → "Ask Anything / Freeform Persistence Boundary".
 - **Operational owner of any threshold:** `apps/api/src/config/filing.ts` (`FILING_CONFIG`).

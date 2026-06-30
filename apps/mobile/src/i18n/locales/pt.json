@@ -3974,7 +3974,8 @@
     "sectionPaused": "Pausados",
     "sectionArchived": "Arquivados",
     "bookCount_one": "{{count}} livro",
-    "bookCount_other": "{{count}} livros"
+    "bookCount_other": "{{count}} livros",
+    "searching": "A pesquisar..."
   },
   "subjectHub": {
     "loading": "Carregando matéria...",

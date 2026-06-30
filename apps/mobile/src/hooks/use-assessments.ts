@@ -1,5 +1,4 @@
 import {
-  useQuery,
   useMutation,
   useQueryClient,
   type UseQueryResult,
@@ -13,8 +12,8 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { useApiQuery } from './use-api-query';
 
 export const assessmentEligibleTopicsQueryKey = ['assessments', 'eligible'];
 
@@ -24,23 +23,15 @@ export function useAssessment(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ assessment: Assessment }, Assessment>({
     queryKey: ['assessment', assessmentId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.assessments[':assessmentId'].$get(
-          { param: { assessmentId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { assessment: Assessment };
-        return data.assessment;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!assessmentId,
+    fetch: (signal) =>
+      client.assessments[':assessmentId'].$get(
+        { param: { assessmentId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.assessment,
+    enabled: !!assessmentId,
   });
 }
 
@@ -51,27 +42,18 @@ export function useActiveAssessment(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { assessment: AssessmentRecord | null },
+    AssessmentRecord | null
+  >({
     queryKey: ['assessment', 'active', subjectId, topicId, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.subjects[':subjectId'].topics[
-          ':topicId'
-        ].assessments.active.$get(
-          { param: { subjectId, topicId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          assessment: AssessmentRecord | null;
-        };
-        return data.assessment;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!subjectId && !!topicId,
+    fetch: (signal) =>
+      client.subjects[':subjectId'].topics[':topicId'].assessments.active.$get(
+        { param: { subjectId, topicId } },
+        { init: { signal } },
+      ),
+    select: (json) => json.assessment,
+    enabled: !!subjectId && !!topicId,
   });
 }
 
@@ -107,25 +89,14 @@ export function useAssessmentEligibleTopics(): UseQueryResult<
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<
+    { topics: AssessmentEligibleTopic[] },
+    AssessmentEligibleTopic[]
+  >({
     queryKey: [...assessmentEligibleTopicsQueryKey, activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.retention['assessment-eligible'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as {
-          topics: AssessmentEligibleTopic[];
-        };
-        return data.topics;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) =>
+      client.retention['assessment-eligible'].$get({}, { init: { signal } }),
+    select: (json) => json.topics,
   });
 }
 

@@ -1,7 +1,6 @@
 import {
   useInfiniteQuery,
   useMutation,
-  useQuery,
   useQueryClient,
   type InfiniteData,
   type UseInfiniteQueryResult,
@@ -18,6 +17,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { useApiQuery } from './use-api-query';
 
 export function useBookmarks(options?: {
   subjectId?: string;
@@ -69,23 +69,15 @@ export function useSessionBookmarks(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<SessionBookmarkListResponse, SessionBookmark[]>({
     queryKey: ['session-bookmarks', activeProfile?.id, sessionId],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.bookmarks.session.$get(
-          { query: { sessionId: sessionId ?? '' } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as SessionBookmarkListResponse;
-        return data.bookmarks;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile && !!sessionId,
+    fetch: (signal) =>
+      client.bookmarks.session.$get(
+        { query: { sessionId: sessionId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.bookmarks,
+    enabled: !!sessionId,
   });
 }
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
+  FadeOut,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -69,6 +70,8 @@ export function MentorCelebration({
     <Animated.View
       testID="mentor-celebration"
       style={animatedStyle}
+      exiting={reduceMotion ? undefined : FadeOut.duration(200)}
+      collapsable={false}
       className="rounded-xl border border-accent bg-surface p-3"
     >
       <Text className="font-semibold text-text-primary">{t(messageKey)}</Text>

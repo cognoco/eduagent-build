@@ -1,6 +1,5 @@
 import {
   useMutation,
-  useQuery,
   useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
@@ -12,8 +11,8 @@ import type {
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
-import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { useApiQuery } from './use-api-query';
 
 interface ToggleCollectionInput {
   childProfileId: string;
@@ -57,23 +56,10 @@ export function useLearnerProfile(): UseQueryResult<LearningProfile> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ profile: LearningProfile }, LearningProfile>({
     queryKey: learnerProfileKey(activeProfile?.id),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client['learner-profile'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { profile: LearningProfile };
-        return data.profile;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
+    fetch: (signal) => client['learner-profile'].$get({}, { init: { signal } }),
+    select: (json) => json.profile,
   });
 }
 
@@ -83,25 +69,15 @@ export function useChildLearnerProfile(
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useQuery({
+  return useApiQuery<{ profile: LearningProfile }, LearningProfile>({
     queryKey: learnerProfileKey(childProfileId),
-    queryFn: async ({ signal: querySignal }) => {
-      if (!childProfileId) throw new Error('childProfileId is required');
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client['learner-profile'][':profileId'].$get(
-          { param: { profileId: childProfileId } },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { profile: LearningProfile };
-        return data.profile;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled:
-      !!activeProfile && activeProfile.isOwner === true && !!childProfileId,
+    fetch: (signal) =>
+      client['learner-profile'][':profileId'].$get(
+        { param: { profileId: childProfileId ?? '' } },
+        { init: { signal } },
+      ),
+    select: (json) => json.profile,
+    enabled: activeProfile?.isOwner === true && !!childProfileId,
   });
 }
 

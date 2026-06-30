@@ -22,6 +22,7 @@ export interface NowCardProps {
   onCompleted?: (card: NowCardData) => void;
   /** Stagger delay (ms) for the entering animation; set by NowCardStack. */
   enterDelayMs?: number;
+  animate?: boolean;
 }
 
 const CARD_COPY_KEYS: Partial<
@@ -92,6 +93,7 @@ export function NowCard({
   onDecline,
   onCompleted,
   enterDelayMs = 0,
+  animate = true,
 }: NowCardProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -103,9 +105,11 @@ export function NowCard({
     <Animated.View
       testID={`now-card-${card.kind}`}
       entering={
-        reduceMotion ? undefined : FadeIn.delay(enterDelayMs).duration(300)
+        animate && !reduceMotion
+          ? FadeIn.delay(enterDelayMs).duration(300)
+          : undefined
       }
-      exiting={reduceMotion ? undefined : FadeOut.duration(200)}
+      exiting={animate && !reduceMotion ? FadeOut.duration(200) : undefined}
       className={isAnchor ? 'rounded-2xl p-4' : 'rounded-xl p-3'}
       style={{
         backgroundColor: isAnchor ? colors.primarySoft : colors.surface,

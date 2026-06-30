@@ -442,6 +442,39 @@ describe('POST /v1/profiles', () => {
     expect(getOwnerProfileV2Mock).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when birthMonth is provided without birthDay', async () => {
+    const res = await makeApp().request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Alex',
+        birthYear: 2000,
+        birthMonth: 5,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(getOwnerProfileV2Mock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when birthMonth and birthDay do not form a calendar date', async () => {
+    const res = await makeApp().request('/v1/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        displayName: 'Alex',
+        birthYear: 2000,
+        birthMonth: 2,
+        birthDay: 31,
+        location: 'EU',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(getOwnerProfileV2Mock).not.toHaveBeenCalled();
+  });
+
   // [WI-867] CUT: 402 (ProfileLimitError) and 400 (ProfileValidationError) from
   // createProfileWithLimitCheck no longer reachable for non-child owner-replay path.
   // Coverage moves to createChildProfileV2 error paths (tested in [WI-811] block below).
