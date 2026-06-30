@@ -1,5 +1,11 @@
 import { memo, useMemo } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -15,7 +21,6 @@ import {
 } from '../../../../lib/navigation';
 import { firstParam } from '../../../../lib/route-params';
 import { useThemeColors } from '../../../../lib/theme';
-import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
 
 type DashboardSubject = DashboardChild['subjects'][number];
 
@@ -62,9 +67,7 @@ const SubjectRow = memo(function SubjectRow({
           </Text>
         ) : null}
         <Text className="mt-2 text-caption font-semibold text-primary">
-          {t(`parentView.retention.${subject.retentionStatus}.label`, {
-            defaultValue: subject.retentionStatus,
-          })}
+          {t(`parentView.retention.${subject.retentionStatus}.label`)}
         </Text>
       </View>
       {id ? (
@@ -215,39 +218,52 @@ export default function ChildCurriculumScreen(): React.ReactElement {
 
   if (childQuery.isLoading && !child) {
     return (
-      <TimeoutLoader
-        isLoading
-        primaryAction={{
-          label: t('common.tryAgain'),
-          onPress: () => void childQuery.refetch(),
-        }}
-        secondaryAction={{
-          label: t('common.back'),
-          onPress: () => goBackOrReplace(router, backHref),
-        }}
+      <View
+        className="flex-1 items-center justify-center bg-background px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="child-curriculum-loading"
-      />
+      >
+        <ActivityIndicator accessibilityLabel={t('common.loading')} />
+      </View>
     );
   }
 
   if (childQuery.isError && !child) {
     return (
-      <ErrorFallback
-        variant="centered"
-        title={t('parentView.subjects.couldNotLoadTopics')}
-        message={t('parentView.subjects.somethingWentWrong')}
-        primaryAction={{
-          label: t('common.tryAgain'),
-          onPress: () => void childQuery.refetch(),
-          testID: 'child-curriculum-retry',
-        }}
-        secondaryAction={{
-          label: t('common.back'),
-          onPress: () => goBackOrReplace(router, backHref),
-          testID: 'child-curriculum-error-back',
-        }}
+      <View
+        className="flex-1 items-center justify-center bg-background px-6"
+        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
         testID="child-curriculum-error"
-      />
+      >
+        <Text className="mb-2 text-center text-h3 font-semibold text-text-primary">
+          {t('parentView.subjects.couldNotLoadTopics')}
+        </Text>
+        <Text className="mb-6 text-center text-body text-text-secondary">
+          {t('parentView.subjects.somethingWentWrong')}
+        </Text>
+        <Pressable
+          onPress={() => void childQuery.refetch()}
+          className="min-h-[48px] items-center justify-center rounded-button bg-primary px-6 py-3"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.tryAgain')}
+          testID="child-curriculum-retry"
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('common.tryAgain')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => goBackOrReplace(router, backHref)}
+          className="mt-3 min-h-[44px] items-center justify-center px-6 py-3"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          testID="child-curriculum-error-back"
+        >
+          <Text className="text-body font-semibold text-primary">
+            {t('common.back')}
+          </Text>
+        </Pressable>
+      </View>
     );
   }
 
