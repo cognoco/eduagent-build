@@ -32,7 +32,11 @@ import type {
   ProfileUpdateInput,
   Profile,
 } from '@eduagent/schemas';
-import { computeAgeBracket, ForbiddenError } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  PARENT_ACCOUNT_MINIMUM_AGE,
+  ForbiddenError,
+} from '@eduagent/schemas';
 export type ProfileValidationCode = 'CHILD_AGE_VIOLATION';
 
 export class ProfileValidationError extends Error {
@@ -49,6 +53,7 @@ export class ProfileValidationError extends Error {
 import {
   getConsentStatus,
   checkConsentRequiredFromDate,
+  calculateAgeFromParts,
   createPendingConsentState,
   createGrantedConsentState,
 } from './consent';
@@ -403,8 +408,10 @@ export async function createProfile(
   const birthYear = input.birthYear;
 
   // Pre-compute consent check using full date when available (WI-297).
-  // birthMonth/birthDay are NOT persisted — used only for precise age calculation
-  // at creation time to prevent year-only overestimation from bypassing the age gate.
+  // [WI-367] birthMonth/birthDay are now ALSO persisted (below) so post-hoc age
+  // reads (consent-revocation COPPA boundary, add-child adult gate) can compute
+  // exact age instead of year-only. They remain create-only/immutable — the
+  // update schema omits them.
   const consentCheck = checkConsentRequiredFromDate(
     birthYear,
     input.birthMonth,
@@ -427,6 +434,10 @@ export async function createProfile(
       displayName: input.displayName,
       avatarUrl: input.avatarUrl ?? null,
       birthYear,
+      // [WI-367] Persist full birth date when supplied (both-or-neither; the DB
+      // pairwise CHECK enforces it). NULL → exact-age callers fall back to year.
+      birthMonth: input.birthMonth ?? null,
+      birthDay: input.birthDay ?? null,
       location: input.location ?? null,
       isOwner: isOwner ?? false,
       // i18n Phase 1 — close the first-render race. When omitted, Drizzle
@@ -541,7 +552,11 @@ export async function createProfileWithLimitCheck(
     // UX barrier; this is the server-side enforcement fallback.
     if (adultOwnerGateEnabled && !isFirstProfile) {
       const ownerRow = await txDb
-        .select({ birthYear: profiles.birthYear })
+        .select({
+          birthYear: profiles.birthYear,
+          birthMonth: profiles.birthMonth,
+          birthDay: profiles.birthDay,
+        })
         .from(profiles)
         .where(
           and(
@@ -552,9 +567,19 @@ export async function createProfileWithLimitCheck(
         )
         .limit(1);
       const ownerBirthYear = ownerRow[0]?.birthYear;
+      // [WI-367] Exact-age authorization gate. Uses persisted full-date parts
+      // when present, year-only fallback otherwise (calculateAgeFromParts). This
+      // replaces `computeAgeBracket` — which AGENTS.md bans for feature gating
+      // because its year-only overestimate could let a 17-year-old (birthday not
+      // yet passed) add a child — and aligns with the v2 twin
+      // (child-profile-v2.ts), which already uses an exact age check.
       if (
         ownerBirthYear == null ||
-        computeAgeBracket(ownerBirthYear) !== 'adult'
+        calculateAgeFromParts(
+          ownerBirthYear,
+          ownerRow[0]?.birthMonth ?? undefined,
+          ownerRow[0]?.birthDay ?? undefined,
+        ) < PARENT_ACCOUNT_MINIMUM_AGE
       ) {
         throw new ForbiddenError(
           'Account holder must be 18 or older to add a child profile.',

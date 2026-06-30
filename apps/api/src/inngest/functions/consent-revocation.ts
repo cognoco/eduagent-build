@@ -5,7 +5,7 @@ import { inngest } from '../client';
 import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
 import { sql } from 'drizzle-orm';
 import {
-  calculateAge,
+  calculateAgeFromParts,
   getFamilyOwnerProfileId,
   isConsentRevocationGenerationCurrent,
   getProfileForConsentRevocation,
@@ -251,13 +251,24 @@ export const consentRevocation = inngest.createFunction(
       // A vanished profile (deleted between steps) conservatively routes to
       // the delete branch, where the consent-generation guard no-ops safely.
       const profile = await loadChildForRevocation(db);
-      const age = profile ? calculateAge(profile.birthYear) : null;
+      // [WI-367] Exact age when full-date parts are persisted; falls back to
+      // year-diff when month/day are null (legacy rows, or the v2 `01-01`
+      // year-only sentinel). This makes the COPPA boundary precise without
+      // changing behavior for any existing year-only row.
+      const age = profile
+        ? calculateAgeFromParts(
+            profile.birthYear,
+            profile.birthMonth ?? undefined,
+            profile.birthDay ?? undefined,
+          )
+        : null;
       return {
         ownerProfileId,
         preference,
-        // 'never' = never archive, so it always hard-deletes. With only
-        // birthYear granularity, age 13 is treated conservatively as under
-        // the COPPA boundary because the birthday may not have happened yet.
+        // 'never' = never archive, so it always hard-deletes. age <= 13 routes
+        // to delete (COPPA). With full-date precision this is exact; when only
+        // birthYear is known it stays conservative (the birthday may not have
+        // happened yet), which over-deletes in the COPPA-protective direction.
         action:
           age === null || age <= 13 || preference === 'never'
             ? ('delete' as const)

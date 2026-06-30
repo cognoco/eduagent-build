@@ -28,7 +28,8 @@ import { createProfileWithLimitCheck, ProfileLimitError } from './profile';
 import { createSubscription } from './billing';
 import { getTierConfig } from './subscription';
 import type { ProfileCreateInput } from '@eduagent/schemas';
-import { ForbiddenError } from '@eduagent/schemas';
+import { ForbiddenError, PARENT_ACCOUNT_MINIMUM_AGE } from '@eduagent/schemas';
+import { calculateAgeFromParts } from './consent';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -69,6 +70,9 @@ const OPT_C_PREFIX = 'integration-profile-optc';
 const OPT_C_UNDERAGE_EMAIL = `${OPT_C_PREFIX}-underage@integration.test`;
 const OPT_C_ADULT18_EMAIL = `${OPT_C_PREFIX}-adult18@integration.test`;
 const OPT_C_FLAG_OFF_EMAIL = `${OPT_C_PREFIX}-flagoff@integration.test`;
+// [WI-367] owner who is 18 by year-diff but 17 by exact birth date
+const OPT_C_EXACT17_EMAIL = `${OPT_C_PREFIX}-exact17@integration.test`;
+const WI367_PERSIST_EMAIL = `${OPT_C_PREFIX}-persist-fulldate@integration.test`;
 const CURRENT_YEAR = new Date().getFullYear();
 const OPT_C_UNDERAGE_OWNER_BIRTH_YEAR = CURRENT_YEAR - 13;
 const OPT_C_ADULT_BOUNDARY_BIRTH_YEAR = CURRENT_YEAR - 18;
@@ -92,6 +96,8 @@ async function seedOwnerAccount(
   email: string,
   clerkUserId: string,
   ownerBirthYear: number,
+  ownerBirthMonth?: number,
+  ownerBirthDay?: number,
 ) {
   const db = createIntegrationDb();
   const [account] = await db
@@ -117,6 +123,8 @@ async function seedOwnerAccount(
     accountId: account!.id,
     displayName: 'Owner',
     birthYear: ownerBirthYear,
+    birthMonth: ownerBirthMonth ?? null,
+    birthDay: ownerBirthDay ?? null,
     isOwner: true,
   });
 
@@ -166,6 +174,8 @@ async function cleanup() {
       OPT_C_UNDERAGE_EMAIL,
       OPT_C_ADULT18_EMAIL,
       OPT_C_FLAG_OFF_EMAIL,
+      OPT_C_EXACT17_EMAIL,
+      WI367_PERSIST_EMAIL,
     ]),
   });
   const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
@@ -373,10 +383,12 @@ legacyDescribe(
       ).rejects.toBeInstanceOf(ForbiddenError);
     });
 
-    it('[OPT-C boundary] allows child creation when owner is exactly 18', async () => {
-      // Note: computeAgeBracket uses currentYear - birthYear (overestimates by up to
-      // 11 months for users whose birthday hasn't occurred yet). At the boundary,
-      // the rule accepts — consistent with the mobile client gate behaviour.
+    it('[OPT-C boundary] allows child creation when owner is exactly 18 (year-only)', async () => {
+      // [WI-367] The gate now uses calculateAgeFromParts; with NO month/day
+      // persisted it falls back to year-diff (currentYear - birthYear), so a
+      // year-only owner at the 18 boundary is still accepted — identical to the
+      // prior computeAgeBracket behaviour. The exact-date divergence is covered
+      // by the [WI-367 exact-age] test below.
       const { accountId } = await seedOwnerAccount(
         OPT_C_ADULT18_EMAIL,
         `${OPT_C_PREFIX}-adult18-user`,
@@ -384,7 +396,7 @@ legacyDescribe(
       );
       const db = createIntegrationDb();
 
-      // Gate ON. Owner age = 18 → 'adult' → must succeed.
+      // Gate ON. Owner year-diff age = 18 → must succeed.
       await expect(
         createProfileWithLimitCheck(
           db,
@@ -393,6 +405,94 @@ legacyDescribe(
           { adultOwnerGateEnabled: true },
         ),
       ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
+    it('[WI-367 exact-age] rejects when owner is 18 by year-diff but 17 by exact birth date', async () => {
+      // Real wall-clock. Owner born CURRENT_YEAR-18 (year-diff age 18, which the
+      // pre-WI-367 year-only gate accepted as 'adult'). Give them a birthday
+      // strictly LATER this UTC year so they have NOT yet turned 18 → exact age
+      // 17 → the gate must now REJECT. Every calendar day except Dec 31 admits a
+      // later-in-year date; on Dec 31 no such date exists (everyone born that
+      // year has had their birthday), so the gate correctly allows. We assert
+      // against the exact age the real helper computes — correct on every day,
+      // proving rejection on the other 364.
+      const now = new Date();
+      const birthYear = now.getUTCFullYear() - PARENT_ACCOUNT_MINIMUM_AGE;
+      const tomorrow = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+      );
+      const laterThisYear = tomorrow.getUTCFullYear() === now.getUTCFullYear();
+      const birthMonth = tomorrow.getUTCMonth() + 1;
+      const birthDay = tomorrow.getUTCDate();
+      const exactAge = calculateAgeFromParts(birthYear, birthMonth, birthDay);
+
+      const { accountId } = await seedOwnerAccount(
+        OPT_C_EXACT17_EMAIL,
+        `${OPT_C_PREFIX}-exact17-user`,
+        birthYear,
+        laterThisYear ? birthMonth : undefined,
+        laterThisYear ? birthDay : undefined,
+      );
+      const db = createIntegrationDb();
+
+      const attempt = createProfileWithLimitCheck(
+        db,
+        accountId,
+        { displayName: 'Child', birthYear: OPT_C_ALLOWED_CHILD_BIRTH_YEAR },
+        { adultOwnerGateEnabled: true },
+      );
+
+      if (laterThisYear && exactAge < PARENT_ACCOUNT_MINIMUM_AGE) {
+        await expect(attempt).rejects.toMatchObject({
+          name: 'ForbiddenError',
+          apiCode: 'ADULT_OWNER_REQUIRED',
+        });
+      } else {
+        await expect(attempt).resolves.toMatchObject({
+          id: expect.any(String),
+        });
+      }
+    });
+
+    it('[WI-367 persistence] stores birth_month / birth_day on the created profile', async () => {
+      // Round-trip: the full birth date supplied at create is persisted to the
+      // new nullable columns (the core deliverable). Owner is a first profile so
+      // the adult-owner gate is skipped; assert the columns on the owner row.
+      const db = createIntegrationDb();
+      const [account] = await db
+        .insert(accounts)
+        .values({
+          clerkUserId: `${OPT_C_PREFIX}-persist-user`,
+          email: WI367_PERSIST_EMAIL,
+        })
+        .returning();
+      const familyConfig = getTierConfig('family');
+      await createSubscription(
+        db,
+        account!.id,
+        'family',
+        familyConfig.monthlyQuota,
+        {
+          status: 'active',
+        },
+      );
+
+      const created = await createProfileWithLimitCheck(db, account!.id, {
+        displayName: 'Owner',
+        birthYear: CURRENT_YEAR - 30,
+        birthMonth: 7,
+        birthDay: 22,
+      });
+
+      const row = await db.query.profiles.findFirst({
+        where: eq(profiles.id, created.id),
+        columns: { birthYear: true, birthMonth: true, birthDay: true },
+      });
+      expect(row).toMatchObject({
+        birthYear: CURRENT_YEAR - 30,
+        birthMonth: 7,
+        birthDay: 22,
+      });
     });
 
     it('[OPT-C flag-off] allows child creation regardless of owner age when gate is disabled', async () => {

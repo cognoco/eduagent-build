@@ -372,6 +372,9 @@ export async function createIdentityGraph(
             displayName: input.displayName,
             avatarUrl: input.avatarUrl ?? null,
             birthYear: input.birthYear,
+            // [WI-367] Mirror full-date precision onto the legacy bridge row.
+            birthMonth: input.birthMonth ?? null,
+            birthDay: input.birthDay ?? null,
             location: input.location ?? null,
             isOwner: true,
             hasPremiumLlm: false,

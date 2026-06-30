@@ -1200,11 +1200,20 @@ export async function getProfileForConsentRevocation(
 ): Promise<{
   displayName: string;
   birthYear: number;
+  // [WI-367] full-date components for exact-age COPPA boundary; null = unknown.
+  birthMonth: number | null;
+  birthDay: number | null;
   archivedAt: Date | null;
 } | null> {
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
-    columns: { displayName: true, birthYear: true, archivedAt: true },
+    columns: {
+      displayName: true,
+      birthYear: true,
+      birthMonth: true,
+      birthDay: true,
+      archivedAt: true,
+    },
   });
 
   return profile ?? null;

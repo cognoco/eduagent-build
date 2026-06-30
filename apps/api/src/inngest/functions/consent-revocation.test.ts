@@ -467,6 +467,63 @@ describe('consentRevocation', () => {
     expect(deleteSql).toContain('responded_at');
   });
 
+  // [WI-367] When the full birth date is persisted, the COPPA hard-delete
+  // boundary uses EXACT age, not the year-only overestimate. Clock is faked to
+  // 2026-01-15 (beforeEach). A child born 2012-06-15 is year-diff 14 (which the
+  // year-only path archives, see the "age 14 → archive" suite) but EXACTLY 13 on
+  // 2026-01-15 (birthday not yet passed) → must hard-delete (the COPPA-protective
+  // direction). This is the precision the year-only path could not express.
+  it('hard-deletes when full-date exact age is 13 though year-only age is 14', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      birthMonth: 6,
+      birthDay: 15,
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-13',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'deleted',
+      childProfileId: 'child-exact-13',
+    });
+    const deleteSql = findProfileDeleteSql();
+    expect(deleteSql).toBeDefined();
+    expect(deleteSql).toContain('child-exact-13');
+  });
+
+  // [WI-367] Companion: same birthYear (2012) but a birthday already passed by
+  // the faked clock (2012-01-01 → exact age 14) archives, matching the year-only
+  // path — proving the exact path only diverges when the birthday is genuinely
+  // not yet passed, not for every full-date row.
+  it('archives when full-date exact age is 14 (birthday already passed)', async () => {
+    mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      birthMonth: 1,
+      birthDay: 1,
+      archivedAt: null,
+    });
+
+    const { result } = await executeRevocation({
+      childProfileId: 'child-exact-14',
+      parentProfileId: 'parent-001',
+      revokedAt: '2026-01-15T00:00:00.000Z',
+    });
+
+    expect(result).toEqual({
+      status: 'archived',
+      childProfileId: 'child-exact-14',
+    });
+  });
+
   describe('[BUG-699-FOLLOWUP] 24h push dedup', () => {
     it('skips notify-child push when a consent_expired notification was logged for the child in last 24h', async () => {
       // Warning allowed; child dedups; parent allowed.
