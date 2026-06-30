@@ -1,20 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { ProfileCreateInput } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { assertOk } from '../lib/assert-ok';
 import type { Profile } from '../lib/profile';
-
-/**
- * Body shape for the POST /profiles endpoint. Matches the fields the
- * create-profile screen assembles before calling the API.
- */
-interface CreateProfileBody {
-  displayName: string;
-  birthYear: number;
-  birthMonth: number;
-  birthDay: number;
-  conversationLanguage?: string;
-  kind?: 'child';
-}
 
 /**
  * Wraps the raw `client.profiles.$post()` call in a TanStack `useMutation`.
@@ -35,7 +23,7 @@ export function useCreateProfile() {
       body,
       signal,
     }: {
-      body: CreateProfileBody;
+      body: ProfileCreateInput;
       signal?: AbortSignal;
     }) => {
       const res = await client.profiles.$post(
