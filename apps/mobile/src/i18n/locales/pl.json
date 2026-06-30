@@ -1219,7 +1219,9 @@
       "surpriseMe": "Zaskocz mnie",
       "surpriseMeSubtitle": "Ćwicz z nowym dyktandem",
       "loadingTitle": "Finding your next review...",
-      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
+      "viewPastDictations": "Poprzednie dyktanda",
+      "viewPastDictationsSubtitle": "Zobacz, co udało Ci się poćwiczyć"
     },
     "complete": {
       "noSessionTitle": "Brak dyktanda do ukończenia",
@@ -1309,6 +1311,23 @@
       "preparing": "Przygotowywanie...",
       "takingLonger": "Trwa to dłużej niż zwykle — możesz anulować i spróbować ponownie.",
       "cancelPreparing": "Anuluj przygotowywanie dyktanda"
+    },
+    "history": {
+      "title": "Poprzednie dyktanda",
+      "back": "Wróć",
+      "loading": "Wczytywanie Twoich dyktand…",
+      "errorTitle": "Nie udało się wczytać Twoich dyktand",
+      "retry": "Spróbuj ponownie",
+      "empty": "Jeszcze brak dyktand. Ukończ jedno, a pojawi się tutaj.",
+      "modeHomework": "Z Twojego tekstu",
+      "modeSurprise": "Dyktando-niespodzianka",
+      "scoreLabel": "{{correct}} z {{total}} poprawnie",
+      "sentenceCountLabel_one": "{{count}} zdanie",
+      "sentenceCountLabel_few": "{{count}} zdania",
+      "sentenceCountLabel_many": "{{count}} zdań",
+      "sentenceCountLabel_other": "{{count}} zdań",
+      "sentencesHeading": "Przećwiczone zdania",
+      "noSentences": "Tekst tego dyktanda nie został zapisany."
     }
   },
   "library": {

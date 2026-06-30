@@ -1,0 +1,1 @@
+ALTER TABLE "dictation_results" ADD COLUMN "sentences" jsonb;

@@ -1,13 +1,21 @@
-import { useMutation } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import type {
   PrepareHomeworkInput,
   PrepareHomeworkOutput,
   GenerateDictationOutput,
   DictationReviewInput,
   DictationReviewResult,
+  DictationHistory,
+  DictationResult,
   RecordDictationResultInput as SchemaRecordDictationResultInput,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { useProfile } from '../lib/profile';
+import { useApiQuery } from './use-api-query';
 import { assertOk } from '../lib/assert-ok';
 import { createTimeoutSignal } from '../lib/query-timeout';
 
@@ -103,6 +111,8 @@ export function useReviewDictation() {
 
 export function useRecordDictationResult() {
   const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
 
   return useMutation({
     mutationFn: async (input: RecordDictationResultInput): Promise<void> => {
@@ -119,5 +129,26 @@ export function useRecordDictationResult() {
         cleanup();
       }
     },
+    onSuccess: () => {
+      // [WI-902] A newly recorded result becomes a history entry — refresh it.
+      void queryClient.invalidateQueries({
+        queryKey: ['dictation-history', activeProfile?.id],
+      });
+    },
+  });
+}
+
+// [WI-902] Recent dictation history (newest first), each entry carrying its
+// persisted source sentences. Profile-scoped query key so a profile switch
+// never serves another learner's cached history.
+export function useDictationHistory(): UseQueryResult<DictationResult[]> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useApiQuery<DictationHistory, DictationResult[]>({
+    queryKey: ['dictation-history', activeProfile?.id],
+    fetch: (signal) =>
+      client.dictation.history.$get(undefined, { init: { signal } }),
+    select: (json) => json.entries,
   });
 }

@@ -107,6 +107,14 @@ export const recordDictationResultInputSchema = z
     mode: dictationModeSchema,
     reviewed: z.boolean().optional().default(false),
     subjectId: z.string().uuid().nullish(),
+    // [WI-902] Source sentence texts of the exercise, persisted so the learner
+    // can review the full text in their dictation history. Optional: old
+    // clients omit it (history falls back to a count summary). Capped to the
+    // same per-sentence/count budget as the review path.
+    sentences: z
+      .array(z.string().max(DICTATION_REVIEW_MAX_SENTENCE_TEXT_CHARS))
+      .max(DICTATION_REVIEW_MAX_SENTENCES)
+      .optional(),
   })
   .strict();
 export type RecordDictationResultInput = z.infer<
@@ -154,6 +162,9 @@ export const dictationResultSchema = z.object({
   mistakeCount: z.number().int().nonnegative().nullable(),
   mode: dictationModeSchema,
   reviewed: z.boolean(),
+  // [WI-902] Persisted source sentence texts. Null for rows recorded before
+  // full-text persistence (or by clients that omit it).
+  sentences: z.array(z.string()).nullable(),
 });
 export type DictationResult = z.infer<typeof dictationResultSchema>;
 
@@ -173,3 +184,14 @@ export const dictationStreakSchema = z.object({
   lastDate: z.string().date().nullable(),
 });
 export type DictationStreak = z.infer<typeof dictationStreakSchema>;
+
+// --- dictation history response ---
+
+// [WI-902] Recent dictation sessions, newest first, each carrying its persisted
+// source `sentences` (null for pre-persistence rows). Powers the mobile
+// dictation-history surface so learners can review the full text of past
+// exercises, not just aggregate counts.
+export const dictationHistorySchema = z.object({
+  entries: z.array(dictationResultSchema),
+});
+export type DictationHistory = z.infer<typeof dictationHistorySchema>;

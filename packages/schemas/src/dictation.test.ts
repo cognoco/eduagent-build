@@ -500,6 +500,8 @@ describe('dictationResultSchema', () => {
     mistakeCount: 1,
     mode: 'homework',
     reviewed: false,
+    // [WI-902] sentences is required (nullable); null = pre-persistence row
+    sentences: null,
   };
 
   it('accepts a valid dictation result', () => {
@@ -566,6 +568,7 @@ describe('recordDictationResultResponseSchema', () => {
       mistakeCount: 0,
       mode: 'surprise',
       reviewed: true,
+      sentences: ['Hello world.', 'Second sentence.'],
     };
     const parsed = recordDictationResultResponseSchema.parse({
       result: validResult,

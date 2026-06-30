@@ -1269,7 +1269,24 @@
       "iHaveAText": "I have a text",
       "iHaveATextSubtitle": "Type or paste your own text",
       "surpriseMe": "Surprise me",
-      "surpriseMeSubtitle": "Practice with a new dictation"
+      "surpriseMeSubtitle": "Practice with a new dictation",
+      "viewPastDictations": "Past dictations",
+      "viewPastDictationsSubtitle": "Look back at what you practised"
+    },
+    "history": {
+      "title": "Past dictations",
+      "back": "Go back",
+      "loading": "Loading your dictations…",
+      "errorTitle": "Couldn't load your dictations",
+      "retry": "Try again",
+      "empty": "No dictations yet. Finish one and it will appear here.",
+      "modeHomework": "From your text",
+      "modeSurprise": "Surprise dictation",
+      "scoreLabel": "{{correct}} of {{total}} correct",
+      "sentenceCountLabel_one": "{{count}} sentence",
+      "sentenceCountLabel_other": "{{count}} sentences",
+      "sentencesHeading": "What you practised",
+      "noSentences": "The text for this dictation wasn't saved."
     },
     "complete": {
       "noSessionTitle": "No dictation to finish",

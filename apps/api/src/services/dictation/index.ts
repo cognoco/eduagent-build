@@ -6,6 +6,7 @@ export type { DictationReviewResult } from './review';
 export {
   recordDictationResult,
   getDictationStreak,
+  getDictationHistory,
   fetchGenerateContext,
 } from './result';
 export type { RecordResultInput, StreakResult } from './result';
