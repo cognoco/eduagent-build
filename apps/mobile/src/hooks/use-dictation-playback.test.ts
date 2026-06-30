@@ -9,6 +9,8 @@ import {
 import * as Speech from 'expo-speech';
 import { useTranslation } from 'react-i18next';
 import {
+  computeChunkPauseMs,
+  computeSentencePauseMs,
   getDictationVoiceLanguageName,
   type PlaybackControls,
   useDictationPlayback,
@@ -163,6 +165,72 @@ describe('splitIntoChunks', () => {
 
   it('handles empty text', () => {
     expect(splitIntoChunks('', 3)).toEqual(['']);
+  });
+});
+
+// [WI-904] Writing-pause model. The gap after a chunk is the sum of each word's
+// estimated handwriting cost (a per-word floor plus a per-letter budget — so
+// short function words like "I"/"am" cost little and long content words cost
+// more), scaled by an age multiplier (younger learners write slower → longer
+// budget). Pure, deterministic, and the surface the on-device feel is tuned
+// against.
+describe('computeChunkPauseMs (writing-pause model)', () => {
+  it('sums per-word writing cost: base 1200 + 360/letter at normal/adult', () => {
+    // The(3)=2280 + little(6)=3360 + rabbit(6)=3360 = 9000
+    expect(computeChunkPauseMs('The little rabbit', 'normal', 'adult')).toBe(
+      9000,
+    );
+  });
+
+  it('charges short words far less than long words', () => {
+    const short = computeChunkPauseMs('I', 'normal', 'adult'); // 1200 + 360 = 1560
+    const long = computeChunkPauseMs('extraordinary', 'normal', 'adult'); // 1200 + 13*360 = 5880
+    expect(short).toBe(1560);
+    expect(long).toBe(5880);
+    expect(short).toBeLessThan(long);
+  });
+
+  it('ignores punctuation when measuring word length', () => {
+    expect(computeChunkPauseMs('rabbit.', 'normal', 'adult')).toBe(
+      computeChunkPauseMs('rabbit', 'normal', 'adult'),
+    );
+    expect(computeChunkPauseMs('rabbit', 'normal', 'adult')).toBe(3360);
+  });
+
+  it('scales the budget up for younger learners (child > adolescent > adult)', () => {
+    const chunk = 'The little rabbit';
+    const adult = computeChunkPauseMs(chunk, 'normal', 'adult');
+    const adolescent = computeChunkPauseMs(chunk, 'normal', 'adolescent');
+    const child = computeChunkPauseMs(chunk, 'normal', 'child');
+    expect(adult).toBe(9000); // * 1.0
+    expect(adolescent).toBe(10800); // * 1.2
+    expect(child).toBe(13050); // * 1.45
+    expect(adult).toBeLessThan(adolescent);
+    expect(adolescent).toBeLessThan(child);
+  });
+
+  it('slows articulation pace also widens the gap (slow > normal > fast)', () => {
+    const chunk = 'The little rabbit';
+    const slow = computeChunkPauseMs(chunk, 'slow', 'adult');
+    const normal = computeChunkPauseMs(chunk, 'normal', 'adult');
+    const fast = computeChunkPauseMs(chunk, 'fast', 'adult');
+    expect(fast).toBeLessThan(normal);
+    expect(normal).toBeLessThan(slow);
+  });
+
+  it('returns 0 for an empty chunk', () => {
+    expect(computeChunkPauseMs('   ', 'normal', 'adult')).toBe(0);
+  });
+});
+
+describe('computeSentencePauseMs', () => {
+  it('returns the per-pace sentence pause at the adult baseline', () => {
+    expect(computeSentencePauseMs('normal', 'adult')).toBe(4000);
+  });
+
+  it('scales the sentence pause up for younger learners', () => {
+    expect(computeSentencePauseMs('normal', 'child')).toBe(5800); // 4000 * 1.45
+    expect(computeSentencePauseMs('normal', 'adolescent')).toBe(4800); // 4000 * 1.2
   });
 });
 
@@ -1166,12 +1234,13 @@ describe('useDictationPlayback', () => {
   });
 
   // -------------------------------------------------------------------------
-  // [WI-904] Lengthen the pauses between chunks/sentences so the default
-  // ('normal') pace gives learners enough time to write. Articulation rate is
-  // intentionally unchanged — only the gaps grow. The old 'slow' pause budget
-  // becomes the new 'normal'.
+  // [WI-904] The writing pause after a chunk is modelled on the handwriting
+  // cost of the just-spoken text (per-word length × age), surfaced by
+  // computeChunkPauseMs. These tests assert the driver honours that exact
+  // budget rather than a flat per-word constant — and that the age multiplier
+  // passed in config actually reaches the timer.
   // -------------------------------------------------------------------------
-  it('[WI-904] normal pace waits longer between chunks than the old 2000ms/word', async () => {
+  it('[WI-904] waits exactly computeChunkPauseMs before the next chunk', async () => {
     let capturedOnDone: (() => void) | undefined;
     mockSpeak.mockImplementation((_text, options) => {
       capturedOnDone = options?.onDone;
@@ -1192,23 +1261,78 @@ describe('useDictationPlayback', () => {
       jest.advanceTimersByTime(4000); // past countdown
     });
 
-    // Complete chunk 0 ("The little rabbit", 3 words) → enter the writing pause
+    // Complete chunk 0 ("The little rabbit") → enter the writing pause.
     act(() => {
       capturedOnDone?.();
     });
     expect(result.current.state).toBe('waiting');
 
+    // The pause must be the handwriting budget for the chunk just spoken — no
+    // age bracket passed, so the adult (×1.0) baseline applies.
+    const pause = computeChunkPauseMs('The little rabbit', 'normal', 'adult');
     mockSpeak.mockClear();
-    // Old normal pause was 3 × 2000 = 6000ms. The new normal pause is longer,
-    // so nothing should have advanced at the old boundary.
     act(() => {
-      jest.advanceTimersByTime(6000);
+      jest.advanceTimersByTime(pause - 1);
     });
     expect(mockSpeak).not.toHaveBeenCalled();
 
-    // New normal pause is 3 × 3000 = 9000ms — advancing the remainder fires it.
     act(() => {
-      jest.advanceTimersByTime(3000);
+      jest.advanceTimersByTime(1);
+    });
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'ran through the',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  it('[WI-904] a younger learner waits longer for the same chunk (age multiplier reaches the timer)', async () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: LONG_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'en',
+        chunkSize: 3,
+        ageBracket: 'child',
+      }),
+    );
+
+    await startPlayback(result);
+    act(() => {
+      jest.advanceTimersByTime(4000); // past countdown
+    });
+    act(() => {
+      capturedOnDone?.();
+    });
+    expect(result.current.state).toBe('waiting');
+
+    const adultPause = computeChunkPauseMs(
+      'The little rabbit',
+      'normal',
+      'adult',
+    );
+    const childPause = computeChunkPauseMs(
+      'The little rabbit',
+      'normal',
+      'child',
+    );
+    expect(childPause).toBeGreaterThan(adultPause);
+
+    // At the adult boundary the child is still writing — nothing has advanced.
+    mockSpeak.mockClear();
+    act(() => {
+      jest.advanceTimersByTime(adultPause);
+    });
+    expect(mockSpeak).not.toHaveBeenCalled();
+
+    // Advancing to the (longer) child budget fires the next chunk.
+    act(() => {
+      jest.advanceTimersByTime(childPause - adultPause);
     });
     expect(mockSpeak).toHaveBeenCalledWith(
       'ran through the',

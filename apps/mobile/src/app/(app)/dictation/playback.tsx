@@ -40,6 +40,8 @@ export default function PlaybackScreen(): React.ReactElement {
     punctuationReadAloud: prefs.punctuationReadAloud,
     language: data?.language ?? 'en',
     chunkSize,
+    // [WI-904] Scales the writing-pause budget by age (younger → longer).
+    ageBracket,
   });
 
   // RF-08: Guard prevents auto-start from re-triggering on re-renders.

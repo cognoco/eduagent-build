@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
-import type { DictationPace, DictationSentence } from '@eduagent/schemas';
+import type {
+  AgeBracket,
+  DictationPace,
+  DictationSentence,
+} from '@eduagent/schemas';
 
 export type PlaybackState =
   | 'idle'
@@ -24,6 +28,11 @@ export interface PlaybackConfig {
   language: string;
   /** Words per spoken chunk. Young children get 2-3, older learners 4-5. Defaults to 3. */
   chunkSize?: number;
+  /**
+   * [WI-904] Learner age bracket — scales the writing-pause budget (younger →
+   * longer). Defaults to `adult` (the neutral 1.0 multiplier) when omitted.
+   */
+  ageBracket?: AgeBracket;
 }
 
 export interface PlaybackControls {
@@ -42,20 +51,78 @@ export interface PlaybackControls {
 
 type VoiceAvailabilityResult = boolean | Promise<boolean>;
 
-// [WI-904] The gaps between chunks/sentences (writing time) were too short:
-// learners reported the default 'normal' pace felt rushed. The pauses are
-// lengthened by one notch — the old 'slow' pause budget is now 'normal' — while
-// the articulation `rate` is left unchanged (the words are NOT drawn out, only
-// the silence between them grows). `chunkPausePerWord` is multiplied by the
-// chunk's word count to size the writing pause.
+// [WI-904] Writing-pause model. Learners reported the gaps between chunks were
+// too short even at the default pace. The articulation `rate` is left unchanged
+// (words are NOT drawn out, only the silence between them grows); the gap is now
+// modelled on how long the just-spoken text takes to write by hand rather than a
+// flat per-word constant. Each word costs `baseWordMs` (a floor, so even a
+// one-letter word gets a beat) plus `perCharMs` per letter — so "I"/"am" cost
+// little while "extraordinary" costs a lot. The chunk gap is the sum of its
+// words' costs; the sentence gap is `sentencePause`. Both are then scaled by an
+// age multiplier (see AGE_PAUSE_MULTIPLIER). These constants are tuned by feel
+// on-device — nudge `baseWordMs`/`perCharMs`/`sentencePause` to make the whole
+// pace slower or faster without touching the model.
 const PACE_CONFIG: Record<
   DictationPace,
-  { rate: number; chunkPausePerWord: number; sentencePause: number }
+  { rate: number; baseWordMs: number; perCharMs: number; sentencePause: number }
 > = {
-  slow: { rate: 0.5, chunkPausePerWord: 4000, sentencePause: 5500 },
-  normal: { rate: 0.6, chunkPausePerWord: 3000, sentencePause: 4000 },
-  fast: { rate: 0.75, chunkPausePerWord: 2000, sentencePause: 3000 },
+  slow: { rate: 0.5, baseWordMs: 1900, perCharMs: 580, sentencePause: 5500 },
+  normal: { rate: 0.6, baseWordMs: 1200, perCharMs: 360, sentencePause: 4000 },
+  fast: { rate: 0.75, baseWordMs: 720, perCharMs: 220, sentencePause: 3000 },
 };
+
+// [WI-904] Younger learners write more slowly, so they need a longer writing
+// budget for the same text. The multiplier widens both the chunk gap and the
+// sentence gap. `adult` is the baseline; `adolescent` (the 13–17 launch cohort)
+// and `child` (the deferred sub-13 ungating cohort) get progressively more time.
+// Note: chunk *grouping* (how often we pause) is still LLM-driven for 12+; the
+// finer "two-word breath group" re-chunking the 10–12 cohort wants is a tracked
+// follow-up gated on that ungating — see the WI-904 completion summary.
+const AGE_PAUSE_MULTIPLIER: Record<AgeBracket, number> = {
+  child: 1.45,
+  adolescent: 1.2,
+  adult: 1.0,
+};
+
+// Letters/numbers only — punctuation is not written stroke-for-stroke at the
+// pace of a letter, so it does not count toward the handwriting budget.
+function wordWritingCostMs(
+  word: string,
+  baseWordMs: number,
+  perCharMs: number,
+): number {
+  const letters = word.replace(/[^\p{L}\p{N}]/gu, '').length;
+  return baseWordMs + perCharMs * letters;
+}
+
+/**
+ * The writing pause (ms) after speaking `chunkText`: the sum of each word's
+ * estimated handwriting cost, scaled by the learner's age multiplier.
+ * Pure and deterministic — the surface the on-device pace is tuned against.
+ */
+export function computeChunkPauseMs(
+  chunkText: string,
+  pace: DictationPace,
+  ageBracket: AgeBracket,
+): number {
+  const { baseWordMs, perCharMs } = PACE_CONFIG[pace];
+  const words = chunkText.split(/\s+/).filter(Boolean);
+  const raw = words.reduce(
+    (sum, word) => sum + wordWritingCostMs(word, baseWordMs, perCharMs),
+    0,
+  );
+  return Math.round(raw * AGE_PAUSE_MULTIPLIER[ageBracket]);
+}
+
+/** The pause (ms) at a sentence boundary, age-scaled like the chunk pause. */
+export function computeSentencePauseMs(
+  pace: DictationPace,
+  ageBracket: AgeBracket,
+): number {
+  return Math.round(
+    PACE_CONFIG[pace].sentencePause * AGE_PAUSE_MULTIPLIER[ageBracket],
+  );
+}
 
 // 3-second countdown before first sentence
 const COUNTDOWN_MS = 3500;
@@ -302,9 +369,6 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
         onDone: () => {
           if (stateRef.current === 'paused') return;
 
-          // RF-02: Read pace config fresh — user may have changed pace mid-speech
-          const paceConfig = PACE_CONFIG[configRef.current.pace];
-
           const isLastChunk = chunkIndex >= chunks.length - 1;
           const isLastSentence =
             sentenceIndex >= configRef.current.sentences.length - 1;
@@ -316,6 +380,11 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
 
           setState('waiting');
 
+          // RF-02: Read pace + age fresh so a mid-playback config change is
+          // picked up on the next chunk boundary.
+          const pace = configRef.current.pace;
+          const ageBracket = configRef.current.ageBracket ?? 'adult';
+
           if (isLastChunk) {
             // Sentence boundary — longer pause, advance to next sentence
             const nextSentenceIndex = sentenceIndex + 1;
@@ -326,14 +395,16 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
             nextActionRef.current = action;
             pauseTimerRef.current = setTimeout(
               action,
-              paceConfig.sentencePause,
+              computeSentencePauseMs(pace, ageBracket),
             );
           } else {
-            // Chunk boundary — writing pause proportional to chunk word count
-            const chunkWordCount = (chunks[chunkIndex] ?? '')
-              .split(/\s+/)
-              .filter(Boolean).length;
-            const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
+            // Chunk boundary — writing pause modelled on the handwriting cost of
+            // the just-spoken chunk (word length × age), not a flat per-word constant.
+            const chunkPause = computeChunkPauseMs(
+              chunks[chunkIndex] ?? '',
+              pace,
+              ageBracket,
+            );
             const nextChunkIndex = chunkIndex + 1;
             const action = () => {
               speakChunkRef.current(sentenceIndex, nextChunkIndex);
