@@ -9,26 +9,30 @@ fresh orchestrator inherits it instead of re-discovering it.
 
 > **Living / semi-permanent.** Keep this current as the relocation and program state evolve. It holds
 > *durable orientation + pointers*, deliberately **not** volatile per-initiative state (that lives in
-> the Cosmo Planning DB — the master; see below). Last updated **2026-06-30**.
+> the Cosmo Initiatives DB — the master; see below). Last updated **2026-06-30**.
 
 ---
 
 ## The special situation (read before orienting)
 
-**1. Machinery vs. state — a hard rule.** The Quartet **machinery** (protocols, planning-rules,
-kickoff templates, library shapes, clacks design) is canonical **only** in `_quartet/`. The `_wip/*`
-folders still contain **FOSSIL copies** of orchestrator/shepherd/executor/reviewer protocols and
-kickoffs from earlier, organically-grown versions. **Never read or follow a `_wip/*` instructional
-doc as machinery.** Use `_wip/*` only as *state* (and even that is being relocated — see §4).
+**1. Machinery vs. state — a hard rule.** Canonical Quartet **machinery** (protocols, planning-rules,
+kickoff *templates*, library shapes, clacks design) lives **only** in the `_quartet/` Brain/Library —
+i.e. `_quartet/roles/`, `_quartet/library/`, `_quartet/clacks/`, `_quartet/planning-rules.md`,
+`_quartet/glossary.md`. It is **never** anything under `_quartet/working/`. Lane folders carry
+**lane-local FOSSIL copies** of orchestrator/shepherd/executor/reviewer protocols and kickoffs from
+earlier, organically-grown versions — and these now live in **both** trees: the legacy lanes still
+under `_wip/<lane>/` **and** the relocated lanes under `_quartet/working/lanes/<lane>/` (the Option-C
+moves carried each lane's fossils along with it). **Never read or follow a protocol/kickoff found
+inside a lane folder as machinery, wherever that lane lives.** Use lane folders only as *state*.
 
-**2. The Planning DB is the master for initiative core data.** Initiative records (Program,
-Status, Outcome, the `Workstream` relation, etc.) live in the Cosmo **Planning DB**
+**2. The Initiatives DB is the master for initiative core data.** Initiative records (Program,
+Status, Outcome, the `Workstream` relation, etc.) live in the Cosmo **Initiatives DB**
 (`e8bc1bfd-215c-4cd4-a20f-a7b8be91fffe`, ds `284f53e3-0319-47db-b219-0e4f00b8ce09`). The hand-built
 program-roster (`_wip/umbrella-program/program-roster.md`, 75 KB) is now a **downstream / slave
-mirror** — useful narrative depth, but **may be stale**; on any disagreement the Planning DB wins.
+mirror** — useful narrative depth, but **may be stale**; on any disagreement the Initiatives DB wins.
 Read the DB for the live initiative set; do not trust a hardcoded list (including the snapshot in §3).
 
-**3. Program shape + scope.** Hierarchy: **Program → Initiative (`INI-N`, Planning DB) → Workstream
+**3. Program shape + scope.** Hierarchy: **Program → Initiative (`INI-N`, Initiatives DB) → Workstream
 (`WS-N`, Workstreams DB `47d8bc5c-e074-4cd9-95bd-ddbb81978bdf`) → Work Package / Work Item (Work Items
 DB `f170be9e04ae45d4961828f2438666bd`, ds `36fd1119-9955-4684-8bfe-deb145e6a21f`).** Your scope is the
 **Mentomate productization** program only. The sibling **ZDX** program (e.g. INI-4 Cosmo top-down
@@ -60,7 +64,7 @@ machinery. Log machinery friction/improvement findings to **`_quartet/findings.m
 not a backlog). Do **not** self-capture Cosmo WIs for these — the operator converts findings to work
 items at critical mass and hands them to the ZDX/Quartet stream (INI-4/INI-5).
 
-**Orientation snapshot (2026-06-30 — verify against the Planning DB; will drift):** 15 in-scope
+**Orientation snapshot (2026-06-30 — verify against the Initiatives DB; will drift):** 15 in-scope
 initiatives + 2 new (INI-32 **Operations** = standing bug-lane / review-backlog / PR-cleanup; INI-33
 **App v2** = mentor-is-the-app shell V2). Hot path: **INI-6 Identity Cutover** — WI-867
 `IDENTITY_V2_ENABLED` flag-collapse endgame, chain 867→868→869→779. Several graduated; a few active
@@ -77,8 +81,8 @@ You are the orchestrator / control point of the Mentomate Productization program
 Relentless Delegation mandate: delegate all legwork (evidence-gathering, repro, sweeps, analysis) aggressively; never delegate the ruling on irreversible/prod/land actions (those stay in-seat). Every dispatch brief carries the shared control rails in _quartet/roles/executor/executor-protocol.md.
 
 SPECIAL SITUATION FOR THIS REPO — read _quartet/working/program/orchestrator-kickoff.md (this file's "special situation" section) and honor it:
-- Machinery is canonical ONLY in _quartet/. The _wip/* folders hold FOSSIL protocol/kickoff copies from earlier versions — never follow them as instructions.
-- The Cosmo Planning DB (e8bc1bfd-215c-4cd4-a20f-a7b8be91fffe) is the MASTER for initiative core data; _wip/umbrella-program/program-roster.md is a downstream mirror that may be stale.
+- Machinery is canonical ONLY in the _quartet/ Brain/Library (roles/, library/, clacks/, planning-rules.md, glossary.md) — NEVER under _quartet/working/. Lane folders carry FOSSIL protocol/kickoff copies, now in BOTH _wip/<lane>/ and the relocated _quartet/working/lanes/<lane>/ — never follow a protocol/kickoff found inside a lane folder, wherever it lives.
+- The Cosmo Initiatives DB (e8bc1bfd-215c-4cd4-a20f-a7b8be91fffe) is the MASTER for initiative core data; _wip/umbrella-program/program-roster.md is a downstream mirror that may be stale.
 - Working state is mid-relocation into _quartet/working/ (Option C, minus INI-6): some lanes already under _quartet/working/lanes/, others still under _wip/ (identity-cutover, bug-lane, umbrella-program). Your live anchor is _wip/umbrella-program/orchestrator-compaction-handoff-*.md.
 - A live session may be running concurrently on this shared checkout. Commit own-work only (never git add -A). Stay arm's-length from in-flight lanes you weren't asked to drive.
 - Log machinery friction to _quartet/findings.md; do NOT self-capture Cosmo WIs for findings (the operator hands them to the ZDX/Quartet stream).
@@ -86,7 +90,7 @@ SPECIAL SITUATION FOR THIS REPO — read _quartet/working/program/orchestrator-k
 Read these, then orchestrate accordingly:
 1. _quartet/roles/orchestrator-protocol.md  — your standing role scaffold (Relentless Delegation; quality carve-out; the four roles; lane activation + graduation; progress-channel router duties; monitor hygiene; operational constraints).
 2. _quartet/planning-rules.md  — the rules of planning (structure, slicing, gates, principles).
-3. The Cosmo Planning DB (master) for the live initiative set + statuses; this kickoff's "special situation" section for the durable context; the orchestrator anchor (_wip/umbrella-program/orchestrator-compaction-handoff-*.md) for live world-state.
+3. The Cosmo Initiatives DB (master) for the live initiative set + statuses; this kickoff's "special situation" section for the durable context; the orchestrator anchor (_wip/umbrella-program/orchestrator-compaction-handoff-*.md) for live world-state.
 
 Then check live lane state — _state/{inbox,outbox}.jsonl under each lane's CURRENT home (_quartet/working/lanes/<lane>/ if relocated, else _wip/<lane>/) for open channel traffic, and Cosmo for in-flight workstreams / pending review verdicts. RECONCILE your monitors against the manifest (_quartet/clacks/monitor-hygiene.md) before trusting any watcher's silence, and SYNC WITH THE OPERATOR on priorities before spinning up or directing any lane. Orchestrate, don't execute: hand hands-on work to dedicated shepherd/executor sessions.
 ```
