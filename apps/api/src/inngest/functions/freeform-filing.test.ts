@@ -101,19 +101,16 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const mockGetSessionTranscript = jest.fn();
-jest.mock(
-  '../../services/session' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session',
-    ) as typeof import('../../services/session');
-    return {
-      ...actual,
-      getSessionTranscript: (...args: unknown[]) =>
-        mockGetSessionTranscript(...args),
-    };
-  },
-);
+jest.mock('../../services/session', () => {
+  const actual = jest.requireActual(
+    '../../services/session',
+  ) as typeof import('../../services/session');
+  return {
+    ...actual,
+    getSessionTranscript: (...args: unknown[]) =>
+      mockGetSessionTranscript(...args),
+  };
+});
 
 const mockBuildLibraryIndex = jest.fn().mockResolvedValue({ shelves: [] });
 const mockFileToLibrary = jest.fn().mockResolvedValue({
@@ -134,7 +131,7 @@ const mockResolveFilingResult = jest.fn().mockResolvedValue({
   isNew: { shelf: false, book: false, chapter: false },
 });
 
-jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/filing', () => {
   const actual = jest.requireActual(
     '../../services/filing',
   ) as typeof import('../../services/filing');
@@ -149,7 +146,7 @@ jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
     '../../services/llm',
   ) as typeof import('../../services/llm');

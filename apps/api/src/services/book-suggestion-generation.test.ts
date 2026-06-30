@@ -5,7 +5,7 @@
 import { jest } from '@jest/globals';
 
 const routeAndCallMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,
@@ -14,7 +14,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
-jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./logger', () => {
   const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,

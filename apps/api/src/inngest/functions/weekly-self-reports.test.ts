@@ -118,54 +118,45 @@ jest.mock(
   },
 );
 
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/snapshot-aggregation',
-    ) as typeof import('../../services/snapshot-aggregation');
-    return {
-      ...actual,
-      filterProgressMetricsToActiveSubjects: (
-        db: unknown,
-        profileId: unknown,
-        metrics: unknown,
-      ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
-      getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-        mockGetLatestSnapshotOnOrBefore(...args),
-    };
-  },
-);
+jest.mock('../../services/snapshot-aggregation', () => {
+  const actual = jest.requireActual(
+    '../../services/snapshot-aggregation',
+  ) as typeof import('../../services/snapshot-aggregation');
+  return {
+    ...actual,
+    filterProgressMetricsToActiveSubjects: (
+      db: unknown,
+      profileId: unknown,
+      metrics: unknown,
+    ) => mockFilterProgressMetricsToActiveSubjects(db, profileId, metrics),
+    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+      mockGetLatestSnapshotOnOrBefore(...args),
+  };
+});
 
-jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/practice-activity-summary',
-    ) as typeof import('../../services/practice-activity-summary');
-    return {
-      ...actual,
-      getPracticeActivitySummary: (...args: unknown[]) =>
-        mockGetPracticeActivitySummary(...args),
-    };
-  },
-);
+jest.mock('../../services/practice-activity-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/practice-activity-summary',
+  ) as typeof import('../../services/practice-activity-summary');
+  return {
+    ...actual,
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  };
+});
 
-jest.mock(
-  '../../services/weekly-report' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/weekly-report',
-    ) as typeof import('../../services/weekly-report');
-    return {
-      ...actual,
-      generateWeeklyReportData: (...args: unknown[]) =>
-        mockGenerateWeeklyReportData(...args),
-    };
-  },
-);
+jest.mock('../../services/weekly-report', () => {
+  const actual = jest.requireActual(
+    '../../services/weekly-report',
+  ) as typeof import('../../services/weekly-report');
+  return {
+    ...actual,
+    generateWeeklyReportData: (...args: unknown[]) =>
+      mockGenerateWeeklyReportData(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -175,7 +166,7 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -185,7 +176,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,

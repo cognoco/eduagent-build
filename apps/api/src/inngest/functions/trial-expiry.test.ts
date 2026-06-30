@@ -40,7 +40,7 @@ jest.mock(
 // jest.requireActual for createFunction so the function-definition shape
 // stays identical to production.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -55,7 +55,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -99,38 +99,32 @@ jest.mock(
 // trial: all exports are pure functions / constants — use real code.
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 // [BUG-117] checkAndLogRateLimitInternal gates dedup atomically (advisory
 // lock + read + insert in a single transaction). Default false = not limited
 // = caller may send. Individual tests override to true to simulate a prior
 // send (retry path) or a concurrent send winning the lock.
 const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      checkAndLogRateLimitInternal: (...args: unknown[]) =>
-        mockCheckAndLogRateLimitInternal(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
+  };
+});
 
 // [CUT-B3 / WI-693] findOwnerPersonId: db.select().from(person).innerJoin(membership) — UNSEEDABLE.
 // Callee: sendTrialNotificationToAccountOwner (called from trial-notification-send, NOT from the

@@ -4,7 +4,7 @@ const mockGenerateAndStoreLlmSummary = jest.fn();
 const mockGenerateLearnerRecap = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -14,49 +14,40 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/summaries' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/summaries',
-    ) as typeof import('../../services/summaries');
-    return {
-      ...actual,
-      createPendingSessionSummary: (...args: unknown[]) =>
-        mockCreatePendingSessionSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/summaries', () => {
+  const actual = jest.requireActual(
+    '../../services/summaries',
+  ) as typeof import('../../services/summaries');
+  return {
+    ...actual,
+    createPendingSessionSummary: (...args: unknown[]) =>
+      mockCreatePendingSessionSummary(...args),
+  };
+});
 
-jest.mock(
-  '../../services/session-llm-summary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session-llm-summary',
-    ) as typeof import('../../services/session-llm-summary');
-    return {
-      ...actual,
-      generateAndStoreLlmSummary: (...args: unknown[]) =>
-        mockGenerateAndStoreLlmSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/session-llm-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/session-llm-summary',
+  ) as typeof import('../../services/session-llm-summary');
+  return {
+    ...actual,
+    generateAndStoreLlmSummary: (...args: unknown[]) =>
+      mockGenerateAndStoreLlmSummary(...args),
+  };
+});
 
-jest.mock(
-  '../../services/session-recap' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session-recap',
-    ) as typeof import('../../services/session-recap');
-    return {
-      ...actual,
-      generateLearnerRecap: (...args: unknown[]) =>
-        mockGenerateLearnerRecap(...args),
-    };
-  },
-);
+jest.mock('../../services/session-recap', () => {
+  const actual = jest.requireActual(
+    '../../services/session-recap',
+  ) as typeof import('../../services/session-recap');
+  return {
+    ...actual,
+    generateLearnerRecap: (...args: unknown[]) =>
+      mockGenerateLearnerRecap(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');

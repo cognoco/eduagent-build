@@ -13,7 +13,7 @@ import { parseExchangeEnvelope, emitCrisisRedirectEvent } from './exchanges';
 // Inngest dispatch surface — external boundary, mocked so tests can assert
 // escalation without a real Inngest client (same pattern as account.test.ts).
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

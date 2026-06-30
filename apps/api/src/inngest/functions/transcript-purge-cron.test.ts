@@ -4,7 +4,7 @@ const mockGetStepVoyageApiKey = jest.fn();
 const mockPurgeSessionTranscript = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -16,21 +16,18 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/transcript-purge' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/transcript-purge',
-    ) as typeof import('../../services/transcript-purge');
-    return {
-      ...actual,
-      purgeSessionTranscript: (...args: unknown[]) =>
-        mockPurgeSessionTranscript(...args),
-    };
-  },
-);
+jest.mock('../../services/transcript-purge', () => {
+  const actual = jest.requireActual(
+    '../../services/transcript-purge',
+  ) as typeof import('../../services/transcript-purge');
+  return {
+    ...actual,
+    purgeSessionTranscript: (...args: unknown[]) =>
+      mockPurgeSessionTranscript(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');

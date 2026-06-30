@@ -1,4 +1,4 @@
-jest.mock('./parking-lot' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./parking-lot', () => {
   const actual = jest.requireActual(
     './parking-lot',
   ) as typeof import('./parking-lot');

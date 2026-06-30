@@ -9,7 +9,7 @@
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/llm', () => {
   const actual = jest.requireActual(
     '../../services/llm',
   ) as typeof import('../../services/llm');
@@ -19,18 +19,15 @@ jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/llm/sanitize' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/llm/sanitize',
-    ) as typeof import('../../services/llm/sanitize');
-    return {
-      ...actual,
-      sanitizeXmlValue: (s: string) => s,
-    };
-  },
-);
+jest.mock('../../services/llm/sanitize', () => {
+  const actual = jest.requireActual(
+    '../../services/llm/sanitize',
+  ) as typeof import('../../services/llm/sanitize');
+  return {
+    ...actual,
+    sanitizeXmlValue: (s: string) => s,
+  };
+});
 
 const mockDb = {
   query: {
@@ -49,7 +46,7 @@ const mockDb = {
   insert: jest.fn(),
 };
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -64,7 +61,7 @@ import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { seedConsentState } from '../../test-utils/consent-seed';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
