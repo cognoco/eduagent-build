@@ -21,7 +21,8 @@ interface TopicDetailSheetProps {
   // Topic-scoped note authoring (felt-knowing loop Flow 1). When wired, the notes
   // section renders writable, bound to THIS focused topic; the subject-level mount
   // never wires it (no focused topic to bind to). `content` is the trimmed draft.
-  onAddNote?: (topicId: string, content: string) => void;
+  onAddNote?: (topicId: string, content: string) => void | Promise<void>;
+  isAddingNote?: boolean;
 }
 
 const STATE_KEY: Record<HubTopicState, TranslateKey> = {
@@ -42,6 +43,7 @@ export function TopicDetailSheet({
   onReviewTopic,
   onSeeFullTopic,
   onAddNote,
+  isAddingNote = false,
 }: TopicDetailSheetProps): React.ReactElement | null {
   const { t } = useTranslation();
   if (!topic) return null;
@@ -112,6 +114,7 @@ export function TopicDetailSheet({
               notes={notes}
               canStudy={canStudy}
               emptyMessage={t('subjectHub.notes.emptyTopic')}
+              isAddingNote={isAddingNote}
               onAddNote={
                 onAddNote
                   ? (content) => onAddNote(topic.topic.id, content)
