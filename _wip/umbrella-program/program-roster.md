@@ -95,7 +95,8 @@ backlog 20–29), mirroring the harness tracker's increment convention.
   historical record.
 - **Activate-when:** — (active)
 
-### PRG-02 · Harness Hygiene — `graduated` (2026-06-11)
+### PRG-02 · Harness Hygiene — `parked` (Mentomate)
+> **Current status per the Initiatives DB (master): `Parked`, program = Mentomate productization (INI-2) — residue batch pending.** The `graduated (2026-06-11)` framing in this row's body is the historical record of the 06-11 exit-gate event; it is superseded as the initiative's *current* status. (This roster is a downstream mirror — on disagreement the Initiatives DB wins.)
 - **Outcome:** eduagent-build's dev-execution harness (commit → pre-commit →
   pre-push → CI → review → merge tail) rewired and ZDX/cosmo-skill-backed to
   replacement-parity (80/20), so PRG-01 Phase P can begin on a trustworthy
