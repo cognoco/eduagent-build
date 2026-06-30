@@ -15,6 +15,7 @@ describe('TopicStatusRow', () => {
         title="Linear Equations"
         chapterName="Grand Overview"
         sessionCount={4}
+        topicId="topic-continue"
         onPress={onPress}
         testID="row-continue"
       />,
@@ -23,6 +24,7 @@ describe('TopicStatusRow', () => {
     getByText('4 sessions');
     fireEvent.press(getByTestId('row-continue'));
     expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onPress).toHaveBeenCalledWith('topic-continue');
   });
 
   it('renders a started row with chapter and session count', () => {
@@ -32,6 +34,7 @@ describe('TopicStatusRow', () => {
         title="Photosynthesis"
         chapterName="Green Factories"
         sessionCount={3}
+        topicId="topic-photosynthesis"
         onPress={onPress}
       />,
     );
@@ -47,6 +50,7 @@ describe('TopicStatusRow', () => {
         state="up-next"
         title="Cell Division"
         chapterName="Biology Basics"
+        topicId="topic-cell-division"
         onPress={onPress}
         testID="row-up-next"
       />,
@@ -62,6 +66,7 @@ describe('TopicStatusRow', () => {
         variant="hero"
         title="Cell Division"
         chapterName="Biology Basics"
+        topicId="topic-cell-division-hero"
         onPress={onPress}
         testID="row-up-next-hero"
       />,
@@ -76,6 +81,7 @@ describe('TopicStatusRow', () => {
         state="done"
         title="Algebra Basics"
         chapterName="Chapter 1"
+        topicId="topic-algebra"
         onPress={onPress}
       />,
     );
@@ -91,6 +97,7 @@ describe('TopicStatusRow', () => {
         title="Topic"
         chapterName="Chapter"
         sessionCount={1}
+        topicId="topic-singular"
         onPress={onPress}
       />,
     );

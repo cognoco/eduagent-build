@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
@@ -15,7 +16,10 @@ interface TopicStatusRowProps {
   relevance?: TopicRelevance;
   sourceChildProfileId?: string | null;
   createdAt?: string | Date | null;
-  onPress: () => void;
+  /** Topic id, passed back to onPress so the handler can stay referentially
+   *  stable at the call site (lets React.memo skip unchanged rows). */
+  topicId: string;
+  onPress: (topicId: string) => void;
   testID?: string;
 }
 
@@ -35,7 +39,7 @@ const STATE_I18N_KEY = {
   later: 'library.topicStatusRow.stateLater',
 } as const;
 
-export function TopicStatusRow({
+export const TopicStatusRow = memo(function TopicStatusRow({
   state,
   variant,
   title,
@@ -44,6 +48,7 @@ export function TopicStatusRow({
   relevance,
   sourceChildProfileId,
   createdAt,
+  topicId,
   onPress,
   testID,
 }: TopicStatusRowProps) {
@@ -143,7 +148,7 @@ export function TopicStatusRow({
   return (
     <Pressable
       testID={testID}
-      onPress={onPress}
+      onPress={() => onPress(topicId)}
       className="mb-2 rounded-card"
       style={[
         containerStyle,
@@ -239,4 +244,4 @@ export function TopicStatusRow({
       </View>
     </Pressable>
   );
-}
+});
