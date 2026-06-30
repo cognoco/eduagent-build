@@ -25,6 +25,7 @@ import type {
   ReportPracticeSummary,
   ChildSessionsPageResponse,
   ChildSession,
+  ContinueSuggestionResponse,
   SubjectProgress,
   TopicProgress,
   WeeklyReportRecord,
@@ -156,11 +157,16 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   });
 }
 
-export function useContinueSuggestion() {
+export function useContinueSuggestion(): UseQueryResult<
+  ContinueSuggestionResponse['suggestion']
+> {
   const client = useApiClient();
   const { mode, profileId } = useSelfProgressNavigationScope();
 
-  return useApiQuery<{ suggestion: unknown }, unknown>({
+  return useApiQuery<
+    ContinueSuggestionResponse,
+    ContinueSuggestionResponse['suggestion']
+  >({
     queryKey: queryKeys.progress.continue(mode, profileId),
     fetch: (signal) => client.progress.continue.$get({}, { init: { signal } }),
     select: (json) => json.suggestion,

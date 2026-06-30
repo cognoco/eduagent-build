@@ -4,7 +4,10 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import type { RetentionCardResponse } from '@eduagent/schemas';
+import type {
+  RetentionCardResponse,
+  SubjectRetentionResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -43,11 +46,13 @@ interface TeachingPreference {
   nativeLanguage: string | null;
 }
 
-export function useRetentionTopics(subjectId: string) {
+export function useRetentionTopics(
+  subjectId: string,
+): UseQueryResult<SubjectRetentionResponse> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
-  return useApiQuery<unknown>({
+  return useApiQuery<SubjectRetentionResponse>({
     queryKey: queryKeys.retention.subject(subjectId, activeProfile?.id),
     fetch: (signal) =>
       client.subjects[':subjectId'].retention.$get(
