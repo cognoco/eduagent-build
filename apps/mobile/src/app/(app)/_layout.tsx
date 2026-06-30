@@ -68,6 +68,7 @@ const FULL_SCREEN_ROUTES = new Set([
   'dictation',
   'quiz',
   'practice',
+  'link',
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
@@ -94,6 +95,7 @@ export const HIDDEN_TAB_ROUTES = [
   'dictation',
   'quiz',
   'practice',
+  'link',
   'shelf',
   'subject',
   'subject-hub',
@@ -113,6 +115,7 @@ const ACCOUNT_AVATAR_HIDDEN_PATHS = [
   '/dictation',
   '/quiz',
   '/practice',
+  '/link',
   '/shelf',
 ] as const;
 

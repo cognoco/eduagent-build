@@ -4248,6 +4248,32 @@
       "title": "Explicación opcional",
       "fill": "Completar respuesta",
       "dismiss": "Descartar"
+    },
+    "link": {
+      "title": "Revisar uso compartido",
+      "message": "Ambas personas aceptan el mismo acuerdo antes de que se comparta nada.",
+      "createTitle": "Iniciar solicitud de uso compartido",
+      "createMessage": "Pídele a {{supporteeName}} que revise exactamente lo que puede ver un mentor.",
+      "createSummaryTitle": "Antes de que alguien acepte",
+      "createAction": "Crear solicitud de uso compartido",
+      "creating": "Creando solicitud...",
+      "createErrorTitle": "No se pudo crear la solicitud de uso compartido",
+      "loading": "Cargando acuerdo de uso compartido",
+      "missingTitle": "Falta el enlace para compartir",
+      "missingMessage": "Ábrelo de nuevo desde la invitación de mentor.",
+      "missingCreateParams": "No pudimos identificar a ambas personas para esta solicitud.",
+      "errorTitle": "No se pudo cargar el uso compartido",
+      "errorMessage": "Inténtalo de nuevo en un momento.",
+      "acceptErrorTitle": "No se pudo aceptar el uso compartido",
+      "reviewTitle": "Uso compartido activo",
+      "reviewMessage": "Puedes revisar este acuerdo aquí en cualquier momento.",
+      "activeTitle": "Uso compartido activo",
+      "activeMessage": "Puedes revisar este acuerdo aquí en cualquier momento.",
+      "revoke": "Dejar de compartir",
+      "revoking": "Finalizando uso compartido...",
+      "revoked": "El uso compartido está finalizando. El mentor verá un aviso.",
+      "revokeErrorTitle": "No se pudo dejar de compartir",
+      "missingActor": "No pudimos identificar a la persona activa."
     }
   }
 }

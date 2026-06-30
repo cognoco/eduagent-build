@@ -168,6 +168,8 @@ flowchart TD
 | Subject Hub Next-up pressed | Resume, review, or topic. | `nextUp.kind` controls route. | One next action per subject. | `CODE`: `subject-hub/[subjectId]/index.tsx:162-178`, `use-subject-hub.ts:228-276`. |
 | Person scope Subjects opened | Structural masked subject list. | Fetch `GET /scopes/:personId/subjects`. | Supporter sees only shareable structure. | `CODE/PARTIAL`: `PersonScopeStructuralSubjects.tsx:26-33`, `scopes.ts:25-35`. |
 | Supporter Journal opened | API-backed shared-record projections. | Mobile fetches `GET /visibility/reports/:personId/shared-record`; API projects weekly report, recap-presence, and milestone facts through `projectSharedRecord`. | Visibility contract record with reportable facts only. | `CODE`: `SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx`, `use-shared-record.ts`, `visibility.ts`, `shared-record-read-model.ts`. |
+| Start support sharing request | Link ceremony create screen. | `/link/new` receives `supporteePersonId` + relation, then posts `POST /visibility/links`. | A supporter can create the pending visibility contract before either side accepts. | `CODE`: `app/(app)/link/new.tsx`, `visibility.ts`, `linking-ceremony.ts`. |
+| Open support sharing agreement | Link ceremony contract screen. | `/link/[contractId]` fetches `GET /visibility/links/:id/contract`, derives active side from the signed-in person, then posts accept/revoke as allowed. | Both sides review the same trust contract; accepted supportees can end sharing. | `CODE`: `app/(app)/link/[contractId].tsx`, `ContractCard.tsx`, `visibility.ts`, `supportership-revocation.ts`. |
 | Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
 
 ## Current Gaps To Review Before Calling V2 Complete
@@ -177,5 +179,5 @@ flowchart TD
 | Support hub is still mostly list/placeholder UI. | Parent/supporter cannot yet answer the full "what should I do now?" job from V2 alone. | S4 |
 | Shared-record Journal data depends on available report/recap/milestone rows. | Supporters see honest empty state until reportable facts exist; private notes/chat text stay outside the record. | S5 |
 | Person-scope Subjects has no masked Subject Hub drill-in. | Supporters can see a structural list but cannot inspect masked learning structure deeply. | S4/S5 |
-| Visibility ceremony screens are missing. | Link/accept/revoke/trust-contract flows are API-backed but not mobile-complete. | S5 |
+| Visibility ceremony depends on upstream anchors. | Link/accept/revoke/trust-contract flows now have mobile routes; remaining work is wiring S4 cold-start/Approve anchors into `/link/new` or existing contract IDs. | S4/S5 |
 | S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
