@@ -27,8 +27,9 @@ const mockInngestSend = jest
   .fn<Promise<unknown>, [unknown]>()
   .mockResolvedValue(undefined);
 jest.mock(
+  // gc1-allow: external boundary — no real Inngest client in unit-test env
   '../../inngest/client',
-  /* gc1-allow: external boundary — no real Inngest client in unit-test env */ () => {
+  () => {
     const actual = jest.requireActual(
       '../../inngest/client',
     ) as typeof import('../../inngest/client');
@@ -41,8 +42,9 @@ jest.mock(
 
 const mockCaptureException = jest.fn();
 jest.mock(
+  // gc1-allow: external boundary — Sentry not initialised in unit-test env
   '../sentry',
-  /* gc1-allow: external boundary — Sentry not initialised in unit-test env */ () => {
+  () => {
     const actual = jest.requireActual(
       '../sentry',
     ) as typeof import('../sentry');
@@ -95,7 +97,7 @@ describe('[WI-1166] createIdentityGraph — LOGIN_EMAIL_UNIQUE race null-clerkUs
 
   // ── Null re-read (the bug path) ──────────────────────────────────────
 
-  it('[BREAK] race branch with undefined re-read still throws ConflictError (block always active)', async () => {
+  it('race branch with undefined re-read always throws ConflictError (invariant — holds before and after fix)', async () => {
     // The loser of the concurrent race: transaction throws 23505
     // login_email_unique, the post-race re-read returns undefined (row deleted
     // between the 23505 and the re-read — an unusual but real edge case).
