@@ -189,25 +189,28 @@ async function refuseReclaim(args: {
       },
     },
   );
-  await safeSend(
-    () =>
-      inngest.send({
-        // orphan-allow: observability-only marker — the reclaim attempt is
-        // already BLOCKED in-line (ConflictError below) and escalated via
-        // logger.warn + captureException. The Inngest event is a queryable
-        // audit signal for the future out-of-band reclaim flow; no automated
-        // handler is intended (mirrors account.ts).
-        name: 'app/account.reclaim_attempt',
-        data: {
-          incomingClerkUserId: args.incomingClerkUserId,
-          existingClerkUserId: args.existingClerkUserId,
-          emailHash,
-          timestamp: new Date().toISOString(),
-        },
-      }),
-    'account.reclaim_attempt',
-    { incomingClerkUserId: args.incomingClerkUserId, emailHash },
-  );
+  // Only dispatch the notification event when we have the existing user's
+  // clerkUserId — the handler (account-reclaim-attempt.ts) requires it to
+  // look up the account and send the security email. In the concurrent-race
+  // edge case where the post-23505 re-read returns undefined (the winning
+  // row disappeared between the 23505 and the re-read), skip the dispatch;
+  // the ConflictError below still blocks the reclaim attempt.
+  if (args.existingClerkUserId !== null) {
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/account.reclaim_attempt',
+          data: {
+            incomingClerkUserId: args.incomingClerkUserId,
+            existingClerkUserId: args.existingClerkUserId,
+            emailHash,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'account.reclaim_attempt',
+      { incomingClerkUserId: args.incomingClerkUserId, emailHash },
+    );
+  }
   throw new ConflictError(
     'An account with this email already exists. Contact support to recover access.',
   );
