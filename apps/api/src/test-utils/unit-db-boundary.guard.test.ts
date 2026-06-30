@@ -93,6 +93,15 @@ function fileDirectDbSetupViolations(file: string): Violation[] {
 }
 
 describe('API unit tests - real database boundary guard', () => {
+  it('does not load integration database setup in the unit Jest config', () => {
+    const config = readFileSync(
+      resolve(REPO_ROOT, 'apps/api/jest.config.cjs'),
+      'utf8',
+    );
+
+    expect(config).not.toContain('tests/integration/api-setup.ts');
+  });
+
   it('keeps real database setup in integration tests only', () => {
     const violations = listApiUnitTests().flatMap(fileDirectDbSetupViolations);
 

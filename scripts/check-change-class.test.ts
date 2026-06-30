@@ -298,4 +298,15 @@ describe('check-change-class.sh', () => {
     expect(command).toContain('**/src/**/*.test.ts');
     expect(command).toContain('\\.integration\\.test\\.ts$');
   });
+
+  it('runs API integration tests with the API integration Jest config', () => {
+    const packageJson = JSON.parse(
+      readFileSync(join(__dirname, '..', 'package.json'), 'utf8'),
+    );
+
+    const command = packageJson.scripts['test:api:integration'];
+    expect(command).toContain('apps/api/jest.integration.config.cjs');
+    expect(command).not.toContain('apps/api/jest.config.cjs');
+    expect(command).not.toContain('C:/Tools/doppler');
+  });
 });
