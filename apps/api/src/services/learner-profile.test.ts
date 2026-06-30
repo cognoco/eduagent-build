@@ -24,6 +24,7 @@ import {
 import type { Database } from '@eduagent/database';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 import * as sentry from './sentry';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
@@ -2274,7 +2275,7 @@ describe('[F-074 / WI-579] analyzeSessionTranscript parse failure leaks no conte
 // legacy rows with null/scalar entries must degrade instead of throwing.
 // ---------------------------------------------------------------------------
 describe('listStruggleTopicNames', () => {
-  const PROFILE_ID = '00000000-0000-4000-8000-00000000aaaa';
+  const PROFILE_ID = TEST_PROFILE_ID;
 
   function makeDb(strugglesRow: unknown): Database {
     return {

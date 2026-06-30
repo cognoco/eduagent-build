@@ -8,6 +8,15 @@ import {
 } from '../../test-utils/database-module';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { NonRetriableError } from 'inngest';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_SESSION_ID,
+  TEST_SESSION_ID_2,
+  TEST_TOPIC_ID,
+  TEST_SUBJECT_ID,
+  TEST_ACCOUNT_ID,
+} from '@eduagent/test-utils';
 
 const col = (name: string) => ({ name });
 // Joinable terminal: supports both direct .where()/.limit() (no joins)
@@ -164,15 +173,15 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: 
 // Default fixture UUIDs used across all tests via createEventData().
 // Must satisfy z.string().uuid() — the filing-timed-out event schema
 // (and other event schemas) tightened to UUID-only after FILING-TIMEOUT-OBS.
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const SESSION_ID = '00000000-0000-4000-8000-000000000002';
-const TOPIC_ID = '00000000-0000-4000-8000-000000000003';
-const SUBJECT_ID = '00000000-0000-4000-8000-000000000004';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
 
 // Separate UUIDs used in the BUG-852 wait-for-filing timeout tests so
 // assertions on those specific values remain distinct from the defaults above.
-const validProfileId = '00000000-0000-4000-8000-000000000011';
-const validSessionId = '00000000-0000-4000-8000-000000000012';
+const validProfileId = TEST_PROFILE_ID_2;
+const validSessionId = TEST_SESSION_ID_2;
 
 const mockStoreSessionEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockExtractSessionContent = jest
@@ -1826,7 +1835,7 @@ describe('sessionCompleted', () => {
     // [F-128] Billing path tests — require a DB mock that returns a profile
     // row with accountId so the quota gate runs. Override createDatabase in
     // these tests to return a chainable mock that resolves the profiles select.
-    const ACCOUNT_ID = '00000000-0000-4000-8000-000000000099';
+    const ACCOUNT_ID = TEST_ACCOUNT_ID;
 
     function makeDbWithProfile() {
       let selectCallCount = 0;

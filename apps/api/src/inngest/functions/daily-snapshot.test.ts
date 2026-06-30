@@ -7,6 +7,7 @@ import {
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
 const col = (name: string) => ({ name });
 
@@ -14,8 +15,8 @@ const col = (name: string) => ({ name });
 // Valid UUID + date constants (snapshotRefreshEventSchema validates profileId
 // as UUID and day as YYYY-MM-DD — non-UUID profileId strings will throw).
 // ---------------------------------------------------------------------------
-const PROFILE_ID = 'dddddddd-0000-4000-8000-000000000001';
-const PROFILE_ID_MISSING = 'dddddddd-0000-4000-8000-000000000002';
+const PROFILE_ID = TEST_PROFILE_ID;
+const PROFILE_ID_MISSING = TEST_PROFILE_ID_2;
 const SNAPSHOT_DAY = '2026-04-19';
 
 const mockSnapshotDb = createTransactionalMockDb({

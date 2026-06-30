@@ -2,6 +2,11 @@ import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { subjectRetryCurriculum } from './subject-retry-curriculum';
 import { seedConsentState } from '../../test-utils/consent-seed';
+import {
+  TEST_PROFILE_ID,
+  TEST_SUBJECT_ID,
+  TEST_BOOK_ID,
+} from '@eduagent/test-utils';
 
 const mockGetStepDatabase = jest.fn();
 const mockGenerateBookTopics = jest.fn();
@@ -66,9 +71,9 @@ jest.mock(
 
 const handler = (subjectRetryCurriculum as any).fn;
 
-const PROFILE_ID = 'a0000000-0000-4000-8000-000000000001';
-const SUBJECT_ID = 'a0000000-0000-4000-8000-000000000002';
-const BOOK_ID = 'a0000000-0000-4000-8000-000000000003';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const BOOK_ID = TEST_BOOK_ID;
 
 function validPayload(overrides?: Record<string, unknown>) {
   return {

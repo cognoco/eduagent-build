@@ -19,15 +19,20 @@
  */
 import { inngest } from '../../inngest/client';
 import { maybeDispatchReviewCalibration } from './session-exchange';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_TOPIC_ID,
+} from '@eduagent/test-utils';
 
 // A "known minor identifier" in the bundle-AC sense: raw learner free-text and
 // a topic title that must never reach the third-party event store.
 const LEARNER_SENTINEL = 'MiloJanssenDrammen-answer';
 const TOPIC_SENTINEL = 'Photosynthesis-Milo-title';
 const LEARNER_MESSAGE_EVENT_ID = '00000000-0000-4000-8000-0000000000aa';
-const SESSION_ID = '00000000-0000-4000-8000-0000000000bb';
-const PROFILE_ID = '00000000-0000-4000-8000-0000000000cc';
-const TOPIC_ID = '00000000-0000-4000-8000-0000000000dd';
+const SESSION_ID = TEST_SESSION_ID;
+const PROFILE_ID = TEST_PROFILE_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
 
 // Minimal chainable stub for the `db` the dispatcher receives. `transaction`
 // invokes the callback with a `tx` whose select returns a metadata row with no
