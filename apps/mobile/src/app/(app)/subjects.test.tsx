@@ -46,6 +46,17 @@ jest.mock(
   }),
 );
 
+jest.mock('../../hooks/use-library-search', () => ({
+  ...jest.requireActual('../../hooks/use-library-search'),
+  useLibrarySearch: () => ({
+    data: undefined,
+    isLoading: false,
+    isFetching: false,
+    isError: false,
+    refetch: jest.fn(),
+  }),
+}));
+
 jest.mock(
   '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
   () => {
