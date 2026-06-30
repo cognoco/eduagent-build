@@ -181,6 +181,29 @@ describe('matchBarIntent — NL name-index path', () => {
     });
   });
 
+  // ── Topic-subject ownership guard: no cross-subject (subjectId,topicId) ──
+
+  it('does not pair a topic with a subject it does not belong to [topic-ownership-guard]', () => {
+    // "vocabulary" is a French topic; "maths" is the resolved subject. The
+    // resolver must NOT emit retention.review with subjectId:'sub-maths' +
+    // topicId:'topic-vocab' (an invalid pair). It drops the mismatched topic
+    // and falls back to the subject-only hub jump.
+    const result = matchBarIntent('review maths vocabulary', {
+      subjects: [{ id: 'sub-maths', name: 'Maths' }],
+      topics: [
+        { id: 'topic-vocab', name: 'Vocabulary', subjectId: 'sub-french' },
+      ],
+    });
+    expect(result).toEqual({
+      kind: 'jump',
+      deepLink: {
+        route: 'subject.hub',
+        params: { subjectId: 'sub-maths' },
+        chain: [],
+      },
+    });
+  });
+
   // ── Backward compat: no nameIndex → NL path disabled ──────────────────
 
   it('returns uncertain without nameIndex when no literal ID follows keyword', () => {

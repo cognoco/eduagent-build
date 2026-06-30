@@ -68,6 +68,8 @@ function resolveNameInText<T extends { id: string; name: string }>(
   const matches = items.filter((item) => {
     const name = normalized(item.name);
     if (!name) return false;
+    // One RegExp compiled per item per call. `items` is the user's own subject
+    // or topic list (bounded by tens), so this stays trivial; no need to hoist.
     return new RegExp(`\\b${escapeRegex(name)}\\b`).test(text);
   });
   if (matches.length === 0) return 'not-found';
@@ -108,8 +110,19 @@ function resolveByNameIndex(
   }
 
   const subject = subjectResult === 'not-found' ? null : subjectResult;
-  const topic = topicResult === 'not-found' ? null : topicResult;
+  const rawTopic = topicResult === 'not-found' ? null : topicResult;
 
+  // A topic only counts as paired with the subject when it actually belongs to
+  // it. "review maths vocabulary" where vocabulary is a French topic must not
+  // emit an invalid (maths, frenchTopic) pair — drop the mismatched topic and
+  // let the subject-only branch handle the subject jump (or fall through).
+  const topic =
+    rawTopic && subject && rawTopic.subjectId !== subject.id ? null : rawTopic;
+
+  // NOTE: the topic-paired routes below (retention.review / challenge.start) are
+  // currently unreachable from mentor.tsx, which only passes `subjects` (topics
+  // are intentionally deferred at that call site). The path is provisional, kept
+  // ready for when the call site supplies a topic index.
   // Both subject and topic resolved: attempt full two-param routes first
   if (subject && topic) {
     if (/\b(review|practice)\b/.test(value)) {
