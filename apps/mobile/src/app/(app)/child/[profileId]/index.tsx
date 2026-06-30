@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ErrorFallback } from '../../../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../../../components/common';
 import { RecentSessionsList } from '../../../../components/progress';
 import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
@@ -966,16 +966,18 @@ export default function ChildDetailScreen(): React.ReactElement {
 
   if (isChildIdentityLoading) {
     return (
-      <View
-        className="flex-1 bg-background items-center justify-center"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      <TimeoutLoader
+        isLoading
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => void refetch(),
+        }}
+        secondaryAction={{
+          label: t('parentView.index.backToDashboard'),
+          onPress: () => router.replace(FAMILY_HOME_PATH as Href),
+        }}
         testID="child-profile-loading"
-      >
-        <ActivityIndicator
-          size="large"
-          accessibilityLabel={t('common.loading')}
-        />
-      </View>
+      />
     );
   }
 
