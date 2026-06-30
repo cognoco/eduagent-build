@@ -4073,9 +4073,7 @@
       "memory": "Gedächtnis",
       "memorySubtitle": "Sieh und verwalte, woran sich dein Mentor erinnert.",
       "sessions": "Sitzungen",
-      "sessionsSubtitle": "Überprüfe Zusammenfassungen letzter Sitzungen.",
-      "practice": "Übung",
-      "practiceSubtitle": "Öffne den Übungs-Hub oder sieh dir deine bisherigen Aktivitäten an."
+      "sessionsSubtitle": "Überprüfe Zusammenfassungen letzter Sitzungen."
     },
     "moments": {
       "title": "Letzte Momente",
@@ -4111,21 +4109,6 @@
       "filterAll": "Alle",
       "filterMine": "Meine Notizen",
       "filterMentor": "Lesezeichen"
-    },
-    "practice": {
-      "openHub": "Übungs-Hub öffnen",
-      "pastActivityTitle": "Meine bisherigen Aktivitäten",
-      "empty": "Deine Quizze, Wiederholungen, Bewertungen und Übungen erscheinen hier.",
-      "error": "Wir konnten deine vergangenen Aktivitäten nicht laden.",
-      "type": {
-        "all": "Alle",
-        "quiz": "Quiz",
-        "review": "Wiederholung",
-        "assessment": "Bewertung",
-        "dictation": "Diktat",
-        "recitation": "Sprechübung",
-        "fluency_drill": "Flüssigkeitsübung"
-      }
     }
   },
   "accountAdmin": {

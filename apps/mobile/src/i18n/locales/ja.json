@@ -4073,9 +4073,7 @@
       "memory": "記憶",
       "memorySubtitle": "メンターが記憶している内容を確認・管理します。",
       "sessions": "セッション",
-      "sessionsSubtitle": "最近のセッションの概要を確認できます。",
-      "practice": "練習",
-      "practiceSubtitle": "練習ハブを開いたり、過去のアクティビティを確認したりできます。"
+      "sessionsSubtitle": "最近のセッションの概要を確認できます。"
     },
     "moments": {
       "title": "最近のモーメント",
@@ -4111,21 +4109,6 @@
       "filterAll": "すべて",
       "filterMine": "自分のノート",
       "filterMentor": "ブックマーク"
-    },
-    "practice": {
-      "openHub": "練習ハブを開く",
-      "pastActivityTitle": "過去のアクティビティ",
-      "empty": "クイズ、復習、アセスメント、ドリルがここに表示されます。",
-      "error": "過去のアクティビティを読み込めませんでした。",
-      "type": {
-        "all": "すべて",
-        "quiz": "クイズ",
-        "review": "復習",
-        "assessment": "アセスメント",
-        "dictation": "ディクテーション",
-        "recitation": "音読",
-        "fluency_drill": "流暢さドリル"
-      }
     }
   },
   "accountAdmin": {

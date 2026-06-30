@@ -4073,9 +4073,7 @@
       "memory": "Minne",
       "memorySubtitle": "Se og administrer hva mentoren din husker.",
       "sessions": "Økter",
-      "sessionsSubtitle": "Se gjennom nylige øktsammendrag.",
-      "practice": "Øving",
-      "practiceSubtitle": "Åpne øvingssenteret eller se gjennom tidligere aktivitet."
+      "sessionsSubtitle": "Se gjennom nylige øktsammendrag."
     },
     "moments": {
       "title": "Nylige øyeblikk",
@@ -4111,21 +4109,6 @@
       "filterAll": "Alle",
       "filterMine": "Mine notater",
       "filterMentor": "Bokmerker"
-    },
-    "practice": {
-      "openHub": "Åpne øvingssenter",
-      "pastActivityTitle": "Min tidligere aktivitet",
-      "empty": "Dine quizer, repetisjoner, vurderinger og øvelser vil vises her.",
-      "error": "Vi kunne ikke laste inn din tidligere aktivitet.",
-      "type": {
-        "all": "Alle",
-        "quiz": "Quiz",
-        "review": "Repetisjon",
-        "assessment": "Vurdering",
-        "dictation": "Diktat",
-        "recitation": "Resitasjon",
-        "fluency_drill": "Flytøvelse"
-      }
     }
   },
   "accountAdmin": {
