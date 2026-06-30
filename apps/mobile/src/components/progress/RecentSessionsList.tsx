@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { UseQueryResult } from '@tanstack/react-query';
-import type { ChildSession } from '@eduagent/schemas';
+import type { ChildSession, LearningResumeTarget } from '@eduagent/schemas';
 import { ErrorFallback } from '../common';
 import { EmptyStateCard } from '../common/EmptyStateCard';
 import { useProfile } from '../../lib/profile';
@@ -10,7 +10,11 @@ import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 import { useDurationLabel } from '../../hooks/use-time-format';
 import { formatShortDate } from '../../lib/format-datetime';
-import { FAMILY_HOME_PATH, goBackOrReplace } from '../../lib/navigation';
+import {
+  FAMILY_HOME_PATH,
+  goBackOrReplace,
+  pushLearningResumeTarget,
+} from '../../lib/navigation';
 
 type ReportingComponentProps = {
   profileId: string;
@@ -24,6 +28,20 @@ function formatSessionDate(iso: string, locale: string | undefined): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function sessionToResumeTarget(session: ChildSession): LearningResumeTarget {
+  return {
+    subjectId: session.subjectId,
+    subjectName: session.subjectName ?? session.displayTitle,
+    topicId: session.topicId,
+    topicTitle: session.topicTitle,
+    sessionId: session.sessionId,
+    resumeFromSessionId: null,
+    resumeKind: 'paused_session',
+    lastActivityAt: session.startedAt,
+    reason: 'recent_session',
+  };
 }
 
 export function RecentSessionsList({
@@ -66,7 +84,7 @@ export function RecentSessionsList({
   const errorEscapeAction = isActiveProfile
     ? {
         label: t('common.goHome'),
-        onPress: () => router.push('/(app)/home'),
+        onPress: () => router.push('/(app)/home' as Href),
       }
     : {
         label: t('common.goHome'),
@@ -111,6 +129,11 @@ export function RecentSessionsList({
           <Pressable
             key={session.sessionId}
             onPress={() => {
+              if (isActiveProfile) {
+                pushLearningResumeTarget(router, sessionToResumeTarget(session));
+                return;
+              }
+
               router.push(
                 buildSessionDetailHref({
                   sessionId: session.sessionId,

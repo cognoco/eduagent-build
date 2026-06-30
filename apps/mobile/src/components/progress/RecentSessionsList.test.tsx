@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { RecentSessionsList } from './RecentSessionsList';
+import { pushLearningResumeTarget } from '../../lib/navigation';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -16,6 +17,14 @@ const mockRouter = {
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
 }));
+
+jest.mock('../../lib/navigation', () => {
+  const actual = jest.requireActual('../../lib/navigation');
+  return {
+    ...actual,
+    pushLearningResumeTarget: jest.fn(),
+  };
+});
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -65,6 +74,10 @@ const { useActiveProfileRole } = jest.requireMock(
 ) as {
   useActiveProfileRole: jest.Mock;
 };
+const mockPushLearningResumeTarget =
+  pushLearningResumeTarget as jest.MockedFunction<
+    typeof pushLearningResumeTarget
+  >;
 
 function makeQuery(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -164,6 +177,62 @@ describe('RecentSessionsList', () => {
     // Asserting "1m" proves we prefer durationSeconds, not wallClockSeconds.
     screen.getByText('1m');
     expect(screen.queryByText('10m')).toBeNull();
+  });
+
+  it('uses the resume-target helper when opening an active-profile recent session', () => {
+    useProfile.mockReturnValue({
+      activeProfile: {
+        id: 'self-profile',
+        displayName: 'Alex',
+      },
+    });
+
+    render(
+      <RecentSessionsList
+        profileId="self-profile"
+        sessionsQuery={
+          makeQuery({
+            data: [
+              {
+                sessionId: '11111111-1111-4111-8111-111111111111',
+                subjectId: '22222222-2222-4222-8222-222222222222',
+                subjectName: 'Math',
+                topicId: '33333333-3333-4333-8333-333333333333',
+                topicTitle: 'Fractions',
+                sessionType: 'practice',
+                startedAt: '2026-05-29T10:00:00Z',
+                durationSeconds: 60,
+                wallClockSeconds: 600,
+                displaySummary: null,
+                highlight: null,
+              },
+            ],
+          }) as never
+        }
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByTestId('session-card-11111111-1111-4111-8111-111111111111'),
+    );
+
+    expect(mockPushLearningResumeTarget).toHaveBeenCalledWith(mockRouter, {
+      subjectId: '22222222-2222-4222-8222-222222222222',
+      subjectName: 'Math',
+      topicId: '33333333-3333-4333-8333-333333333333',
+      topicTitle: 'Fractions',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      resumeFromSessionId: null,
+      resumeKind: 'paused_session',
+      lastActivityAt: '2026-05-29T10:00:00Z',
+      reason: 'recent_session',
+    });
+    expect(mockPush).not.toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: '11111111-1111-4111-8111-111111111111',
+      },
+    });
   });
 
   it('offers an escape hatch alongside retry when loading recent sessions fails', () => {
