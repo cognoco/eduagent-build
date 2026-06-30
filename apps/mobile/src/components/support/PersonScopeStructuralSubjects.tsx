@@ -91,17 +91,15 @@ function buildMaskedHubData(
       topics: [...topics].sort((a, b) => a.topic.sortOrder - b.topic.sortOrder),
     }),
   );
-  const dueReviewTopic =
-    activeTopics.find(({ topic }) => topic.progressState === 'review-due')
-      ?.topic ?? null;
-  const nextUp: HubNextUp = dueReviewTopic
+  const dueReviewEntry = activeTopics.find(
+    ({ topic }) => topic.progressState === 'review-due',
+  );
+  const nextUp: HubNextUp = dueReviewEntry
     ? {
         kind: 'review-due',
-        topicId: dueReviewTopic.id,
-        bookId:
-          activeTopics.find(({ topic }) => topic.id === dueReviewTopic.id)?.book
-            .id ?? null,
-        topicTitle: dueReviewTopic.title,
+        topicId: dueReviewEntry.topic.id,
+        bookId: dueReviewEntry.book.id,
+        topicTitle: dueReviewEntry.topic.title,
       }
     : {
         kind: 'none',

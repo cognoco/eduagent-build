@@ -37,7 +37,6 @@ type StructuralRow = {
   skipped: boolean | null;
   topicNextReviewAt: Date | null;
   topicMasteredAt: Date | null;
-  topicProgressState?: SupporteeStructuralTopicProgressState | null;
 };
 
 function toIso(value: Date | null): string | null {
@@ -47,7 +46,6 @@ function toIso(value: Date | null): string | null {
 function deriveProgressState(
   row: StructuralRow,
 ): SupporteeStructuralTopicProgressState {
-  if (row.topicProgressState) return row.topicProgressState;
   if (row.topicMasteredAt) return 'mastered';
   if (row.topicNextReviewAt && row.topicNextReviewAt.getTime() <= Date.now()) {
     return 'review-due';

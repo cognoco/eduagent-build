@@ -84,11 +84,9 @@ export const supporteeStructuralTopicSchema = z.strictObject({
   sortOrder: z.number().int(),
   estimatedMinutes: z.number().int(),
   skipped: z.boolean(),
-  progressState: supporteeStructuralTopicProgressStateSchema
-    .optional()
-    .default('not-started'),
-  nextReviewAt: z.string().datetime().nullable().optional().default(null),
-  masteredAt: z.string().datetime().nullable().optional().default(null),
+  progressState: supporteeStructuralTopicProgressStateSchema,
+  nextReviewAt: z.string().datetime().nullable(),
+  masteredAt: z.string().datetime().nullable(),
 });
 export type SupporteeStructuralTopic = z.infer<
   typeof supporteeStructuralTopicSchema
