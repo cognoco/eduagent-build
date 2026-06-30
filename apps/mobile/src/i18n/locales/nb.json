@@ -4175,12 +4175,24 @@
   "supportHub": {
     "mentor": {
       "title": "Støttesenter",
-      "subtitle": "Et kontrollpanel for elevene du støtter.",
+      "subtitle": "Delte signaler og neste steg for elevene du støtter.",
       "empty": "Legg til en elev for å se støttebehov her.",
-      "openPerson": "Åpne {{name}}",
-      "personHint": "Åpne denne elevens støttevisning.",
       "personTitle": "{{name}}",
-      "personSubtitle": "Støttesignaler for denne eleven."
+      "personSubtitle": "Støttesignaler for denne eleven.",
+      "loadingHeadline": "Sjekker delte oppdateringer ...",
+      "structuralOnly": "Bare delbare læringssignaler vises her.",
+      "emptyCardTitle": "Ingen delbare oppdateringer ennå",
+      "emptyCardMessage": "Når {{name}} har en delt økt eller rapport, vil den vises her.",
+      "errorTitle": "Kunne ikke laste inn delte oppdateringer",
+      "errorMessage": "Prøv igjen om et øyeblikk.",
+      "actionMentor": "Mentorvisning",
+      "actionSubjects": "Fag",
+      "actionJournal": "Logg",
+      "factKind": {
+        "mastery": "Mestring",
+        "effort": "Innsats",
+        "observable_engagement": "Engasjement"
+      }
     },
     "subjects": {
       "title": "Fag",

@@ -4337,12 +4337,24 @@
   "supportHub": {
     "mentor": {
       "title": "Centrum wsparcia",
-      "subtitle": "Panel kontrolny dla uczniów, których wspierasz.",
+      "subtitle": "Udostępnione sygnały i kolejne kroki dla uczniów, których wspierasz.",
       "empty": "Dodaj ucznia, aby zobaczyć tutaj potrzeby wsparcia.",
-      "openPerson": "Otwórz {{name}}",
-      "personHint": "Otwórz widok wsparcia dla tego ucznia.",
       "personTitle": "{{name}}",
-      "personSubtitle": "Sygnały wsparcia dla tego ucznia."
+      "personSubtitle": "Sygnały wsparcia dla tego ucznia.",
+      "loadingHeadline": "Sprawdzanie udostępnionych aktualizacji...",
+      "structuralOnly": "Wyświetlane są tu tylko udostępniane sygnały dotyczące nauki.",
+      "emptyCardTitle": "Brak udostępnionych aktualizacji",
+      "emptyCardMessage": "Gdy {{name}} udostępni sesję lub raport, pojawią się one tutaj.",
+      "errorTitle": "Nie udało się wczytać udostępnionych aktualizacji",
+      "errorMessage": "Spróbuj ponownie za chwilę.",
+      "actionMentor": "Widok mentora",
+      "actionSubjects": "Przedmioty",
+      "actionJournal": "Dziennik",
+      "factKind": {
+        "mastery": "Opanowanie",
+        "effort": "Wysiłek",
+        "observable_engagement": "Zaangażowanie"
+      }
     },
     "subjects": {
       "title": "Przedmioty",

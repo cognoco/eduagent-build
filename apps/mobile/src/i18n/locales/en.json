@@ -3929,12 +3929,24 @@
   "supportHub": {
     "mentor": {
       "title": "Support hub",
-      "subtitle": "A cockpit for the learners you support.",
+      "subtitle": "Shared signals and next steps for the learners you support.",
       "empty": "Add a learner to see support needs here.",
-      "openPerson": "Open {{name}}",
-      "personHint": "Open this learner's support view.",
       "personTitle": "{{name}}",
-      "personSubtitle": "Support signals for this learner."
+      "personSubtitle": "Support signals for this learner.",
+      "loadingHeadline": "Checking shared updates...",
+      "structuralOnly": "Only shareable learning signals are shown here.",
+      "emptyCardTitle": "No shareable updates yet",
+      "emptyCardMessage": "When {{name}} has a shared session or report, it will show up here.",
+      "errorTitle": "Couldn't load shared updates",
+      "errorMessage": "Try again in a moment.",
+      "actionMentor": "Mentor view",
+      "actionSubjects": "Subjects",
+      "actionJournal": "Journal",
+      "factKind": {
+        "mastery": "Mastery",
+        "effort": "Effort",
+        "observable_engagement": "Engagement"
+      }
     },
     "subjects": {
       "title": "Subjects",

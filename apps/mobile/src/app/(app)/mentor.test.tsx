@@ -73,8 +73,32 @@ jest.mock(
     return {
       SupportHubMentorTab: ({
         activePersonScope,
+        personScopes,
+        onOpenPersonScope,
+        onOpenSubjects,
+        onOpenJournal,
       }: {
         activePersonScope?: { displayName: string };
+        personScopes: Array<{
+          personId: string;
+          edgeId: string;
+          displayName: string;
+        }>;
+        onOpenPersonScope?: (scope: {
+          personId: string;
+          edgeId: string;
+          displayName: string;
+        }) => void;
+        onOpenSubjects?: (scope: {
+          personId: string;
+          edgeId: string;
+          displayName: string;
+        }) => void;
+        onOpenJournal?: (scope: {
+          personId: string;
+          edgeId: string;
+          displayName: string;
+        }) => void;
       }) => (
         <View
           testID={
@@ -86,6 +110,29 @@ jest.mock(
           {activePersonScope ? (
             <Text>{activePersonScope.displayName}</Text>
           ) : null}
+          {personScopes.map((scope) => (
+            <View key={scope.edgeId}>
+              <Text>{scope.displayName}</Text>
+              <Text
+                testID={`support-hub-mentor-open-${scope.personId}`}
+                onPress={() => onOpenPersonScope?.(scope)}
+              >
+                Mentor
+              </Text>
+              <Text
+                testID={`support-hub-subjects-open-${scope.personId}`}
+                onPress={() => onOpenSubjects?.(scope)}
+              >
+                Subjects
+              </Text>
+              <Text
+                testID={`support-hub-journal-open-${scope.personId}`}
+                onPress={() => onOpenJournal?.(scope)}
+              >
+                Journal
+              </Text>
+            </View>
+          ))}
         </View>
       ),
     };
@@ -187,6 +234,33 @@ describe('MentorScreen', () => {
     expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
+  it('routes Support hub cockpit actions through the selected person scope', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+    const [emmaScope] = mockScopeContext.availableScopes;
+
+    render(<MentorScreen />);
+
+    fireEvent.press(
+      screen.getByTestId(`support-hub-mentor-open-${emmaScope.personId}`),
+    );
+    expect(mockScopeContext.setActiveScope).toHaveBeenCalledWith(emmaScope);
+
+    fireEvent.press(
+      screen.getByTestId(`support-hub-subjects-open-${emmaScope.personId}`),
+    );
+    expect(mockScopeContext.setActiveScope).toHaveBeenCalledWith(emmaScope);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/subjects');
+
+    fireEvent.press(
+      screen.getByTestId(`support-hub-journal-open-${emmaScope.personId}`),
+    );
+    expect(mockScopeContext.setActiveScope).toHaveBeenCalledWith(emmaScope);
+    expect(mockPush).toHaveBeenCalledWith('/(app)/journal');
+  });
+
   it('renders the person-scope Mentor variant without loading the Me feed', () => {
     mockScopeContext = {
       ...mockScopeContext,
@@ -201,7 +275,7 @@ describe('MentorScreen', () => {
     render(<MentorScreen />);
 
     screen.getByTestId('person-scope-mentor-tab');
-    screen.getByText('Emma');
+    expect(screen.getAllByText('Emma').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('mentor-screen')).toBeNull();
   });
 
