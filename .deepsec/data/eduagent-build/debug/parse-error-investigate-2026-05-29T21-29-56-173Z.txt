@@ -1,9 +1,0 @@
-# deepsec parse-failure debug dump
-# phase: investigate
-# agentType: claude-agent-sdk
-# timestamp: 2026-05-29T21:29:56.173Z
-# error: Error: Agent produced output that wasn't a parseable JSON findings array: Unexpected token 'Y', "You've hit"... is not valid JSON. First 400 chars: You've hit your session limit · resets 2:10am (Europe/Oslo)
-# batch (1 files):
-  - apps/api/src/services/challenge-round/verification.ts
-# --- raw agent output begins on next line ---
-You've hit your session limit · resets 2:10am (Europe/Oslo)

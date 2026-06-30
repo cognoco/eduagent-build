@@ -1,2 +1,0 @@
-CREATE INDEX "profile_quota_usage_profile_id_idx" ON "profile_quota_usage" USING btree ("profile_id");--> statement-breakpoint
-CREATE INDEX "top_up_credits_profile_id_idx" ON "top_up_credits" USING btree ("profile_id");

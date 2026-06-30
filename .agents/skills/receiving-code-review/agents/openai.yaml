@@ -1,6 +1,0 @@
-interface:
-  display_name: "Receiving Code Review"
-  short_description: "Technical rigor over performative agreement when receiving review feedback"
-  default_prompt: "Use $receiving-code-review when responding to review feedback. Verify before implementing; push back with reasoning when needed."
-policy:
-  allow_implicit_invocation: true

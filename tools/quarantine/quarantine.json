@@ -1,5 +1,0 @@
-{
-  "version": 1,
-  "comment": "Flaky-test quarantine registry (WI-536). Each entry skips ONE flaky test file from the PR gate (Jest or Playwright) while a non-gating report lane keeps running it so the flakiness stays visible. Every entry MUST carry an owner and a Cosmo WI-NN tracking ID so it cannot rot silently. Validate: node tools/quarantine/validate.cjs. Docs: docs/testing/flaky-quarantine.md",
-  "entries": []
-}

@@ -1,6 +1,0 @@
-.claude/worktrees/
-.worktrees/
-# Agent-skill trees hold vendor SKILL templates (package.json/vite.config/etc.)
-# that Nx inference would otherwise pick up as phantom workspace projects.
-.agents/
-.claude/

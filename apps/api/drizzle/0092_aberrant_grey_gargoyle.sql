@@ -1,2 +1,0 @@
-CREATE INDEX "consent_states_profile_requested_idx" ON "consent_states" USING btree ("profile_id","requested_at");--> statement-breakpoint
-CREATE INDEX "consent_states_token_idx" ON "consent_states" USING btree ("consent_token") WHERE "consent_states"."consent_token" IS NOT NULL;

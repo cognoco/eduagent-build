@@ -1,1 +1,0 @@
-ALTER TABLE "curriculum_books" ADD COLUMN "retry_in_flight" boolean DEFAULT false NOT NULL;

@@ -1,6 +1,0 @@
-#!/usr/bin/env sh
-# Blocking pre-push validation — runs tsc + surgical tests + change-class
-# checks on the push delta. Catches cross-file breakage that per-commit
-# hooks miss. Skip with: git push --no-verify
-
-bash scripts/pre-push-tests.sh

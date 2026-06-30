@@ -1,8 +1,0 @@
-=== commit-skill run start=2026-05-30T23:35:42+02:00 args=Commit\ ALL\ .deepsec/\ working\ changes\ \(user\ explicitly\ wants\ everything\ in\ .deepsec/\ committed\ and\ added\ to\ PR\ \#625\).\ Stage\ tracked\ +\ untracked:\ .deepsec/package.json,\ .deepsec/pnpm-lock.yaml,\ .deepsec/data/eduagent-build/tech.json,\ .deepsec/data/eduagent-build/debug/,\ .deepsec/data/eduagent-build/error-files.manifest.json,\ .deepsec/findings/,\ .deepsec/.claude/.\ Currently\ on\ branch\ docs/local-audit-docs-backlog\ \(the\ PR\ \#625\ branch\).\ NOTE:\ this\ orchestration\ machine\ lacks\ a\ full\ app\ dev\ env\ \(missing\ ts-morph,\ Node\ v24\ vs\ required\ 22.x\),\ so\ pre-commit/pre-push\ hooks\ cannot\ execute\ the\ i18n/lint\ guards\ —\ the\ changes\ are\ deepsec\ scan\ data/JSON\ only\ \(no\ app\ code\),\ and\ CI\ validates\ on\ the\ PR.\ Use\ the\ repo\'s\ sanctioned\ skip\ mechanisms\ if\ hooks\ fail\ on\ the\ env\ gap\ \(SKIP_PRE_PUSH=1\ for\ push\)\;\ do\ not\ spend\ time\ fixing\ the\ dev\ env.\ Push\ to\ origin/docs/local-audit-docs-backlog\ when\ done\ so\ it\ lands\ on\ PR\ \#625. ===
-[2026-05-30T23:35:45+02:00] step=scope
-[2026-05-30T23:36:00+02:00] step=snapshot
-[2026-05-30T23:36:06+02:00] step=safety-check
-[2026-05-30T23:36:22+02:00] step=stage
-[2026-05-30T23:36:49+02:00] step=xref-scan
-[2026-05-30T23:36:59+02:00] step=draft
-[2026-05-30T23:37:17+02:00] step=commit

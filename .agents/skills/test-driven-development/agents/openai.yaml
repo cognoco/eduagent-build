@@ -1,6 +1,0 @@
-interface:
-  display_name: "Test-Driven Development"
-  short_description: "Red-green-refactor; no production code without a failing test first"
-  default_prompt: "Use $test-driven-development for any feature, bugfix, refactor, or behavior change. Write the test first, watch it fail, write minimal code to pass."
-policy:
-  allow_implicit_invocation: true

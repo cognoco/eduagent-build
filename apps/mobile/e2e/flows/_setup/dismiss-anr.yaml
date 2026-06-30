@@ -1,4 +1,0 @@
-# Dismiss "App isn't responding" ANR dialog by tapping "Wait"
-appId: com.mentomate.app
----
-- tapOn: "Wait"

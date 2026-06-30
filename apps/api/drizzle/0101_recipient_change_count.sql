@@ -1,1 +1,0 @@
-ALTER TABLE "consent_states" ADD COLUMN "recipient_change_count" integer DEFAULT 0 NOT NULL;

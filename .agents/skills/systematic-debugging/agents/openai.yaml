@@ -1,6 +1,0 @@
-interface:
-  display_name: "Systematic Debugging"
-  short_description: "Root cause investigation before fixes; question architecture after 3 failed attempts"
-  default_prompt: "Use $systematic-debugging for any bug, test failure, or unexpected behavior. Phase 1 (root cause) is mandatory before proposing fixes."
-policy:
-  allow_implicit_invocation: true

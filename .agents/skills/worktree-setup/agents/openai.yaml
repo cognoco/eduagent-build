@@ -1,6 +1,0 @@
-interface:
-  display_name: "Worktree Setup"
-  short_description: "Create an isolated worktree at .worktrees/<branch> with pnpm install + Doppler env:sync"
-  default_prompt: "Use $worktree-setup to create an isolated worktree for parallel or autonomous work. Pass a branch name (e.g. WI-78) or a short kebab-case slug."
-policy:
-  allow_implicit_invocation: true

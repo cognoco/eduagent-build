@@ -1,7 +1,0 @@
-What was done: Corrected the filename of migration 0125's drizzle meta snapshot so it follows the repository convention, restoring the required `main` CI check that had been reding on every pull request.
-
-What changed: Renamed `apps/api/drizzle/meta/0125_rls_concepts_concept_mastery_policy.json` to `apps/api/drizzle/meta/0125_snapshot.json` with a pure rename (file content unchanged). The snapshot discovery in `packages/database/src/drizzle-meta-coverage.test.ts` only recognises the `NNNN_snapshot.json` form, so the non-standard name was invisible and the latest-journal-entry-has-a-matching-snapshot assertion failed; the rename makes the existing, chain-correct snapshot discoverable. No migration SQL or schema content was touched, and the migration-immutability guard explicitly excludes the `meta` directory.
-
-Verification: `nx run @eduagent/database:test` is green (twenty-seven suites, two hundred ninety-nine tests) where it previously failed one; the pull request landed as a squash merge and the required `main` check passed on it; the renamed snapshot is confirmed present on the default branch.
-
-Caveats / Follow-ups: the systemic gap that let the original mistake merge — the change-class router did not run the database-package suite on the migration-adding diff — is captured as a separate prevention item with a red-green regression requirement, so a future migration added without a matching snapshot reds a required check on its own pull request.

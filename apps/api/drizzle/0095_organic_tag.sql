@@ -1,1 +1,0 @@
-ALTER TYPE "public"."notification_type" ADD VALUE 'support_outbox_spillover';

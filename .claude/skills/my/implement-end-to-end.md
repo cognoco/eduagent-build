@@ -1,2 +1,0 @@
-Create a worktree and use subagents when possible. After you are done use the /review skill and only after the implementation is approved archive the spec and the plan. Create a PR and watch
-  it until it is green. Hard rule - before you implement have a deep understanding of the code. Almost everything exists already and the rule is to reuse not to rebuild if possible. 

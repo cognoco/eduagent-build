@@ -1,6 +1,0 @@
-{
-  "tags": ["github-actions", "node"],
-  "sentinels": ["package.json"],
-  "detectedAt": "2026-05-30T02:52:08.841Z",
-  "rootPath": "/Users/vetinari/nexus/_dev/eduagent-build"
-}

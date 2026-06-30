@@ -1,2 +1,0 @@
-ALTER TABLE "subscriptions" ADD COLUMN "last_stripe_event_id" text;--> statement-breakpoint
-CREATE UNIQUE INDEX "subscriptions_account_stripe_event_id_idx" ON "subscriptions" USING btree ("account_id","last_stripe_event_id") WHERE "subscriptions"."last_stripe_event_id" IS NOT NULL;

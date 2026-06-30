@@ -1,1 +1,0 @@
-ALTER TABLE "xp_ledger" ADD COLUMN "reflection_multiplier_applied" boolean DEFAULT false NOT NULL;

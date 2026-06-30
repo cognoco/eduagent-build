@@ -1,1 +1,0 @@
-ALTER TYPE "public"."notification_type" ADD VALUE 'session_filing_failed';
