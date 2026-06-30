@@ -9,7 +9,12 @@ import {
 } from '@eduagent/database';
 import { subjectCurriculumRetryRequestedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
-import { getStepDatabase, isIdentityV2EnabledInStep } from '../helpers';
+import {
+  closeStepDatabases,
+  getStepDatabase,
+  isIdentityV2EnabledInStep,
+  runWithStepDatabaseScope,
+} from '../helpers';
 import { parseConversationLanguage } from '../../services/llm';
 import { generateBookTopics } from '../../services/book-generation';
 import { markBookFailed, persistBookTopics } from '../../services/curriculum';
@@ -76,34 +81,40 @@ export const subjectRetryCurriculum = inngest.createFunction(
         return { status: 'skipped', reason: 'invalid_payload' as const };
       }
       const { profileId, subjectId, bookId } = parsed.data;
-      const db = getStepDatabase();
-      const book = await db.query.curriculumBooks.findFirst({
-        where: and(
-          eq(curriculumBooks.id, bookId),
-          eq(curriculumBooks.subjectId, subjectId),
-        ),
+      return runWithStepDatabaseScope(async () => {
+        try {
+          const db = getStepDatabase();
+          const book = await db.query.curriculumBooks.findFirst({
+            where: and(
+              eq(curriculumBooks.id, bookId),
+              eq(curriculumBooks.subjectId, subjectId),
+            ),
+          });
+          // Ownership is established by the parent-chain check in the main flow
+          // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
+          // onFailure operates on that same owner-verified event payload.
+          if (book && !book.topicsGenerated && book.failedAt === null) {
+            // The pre-read above avoids re-stamping an existing failure; the
+            // shared writer carries the atomic `topicsGenerated = false` guard so
+            // the write can never race a concurrent success.
+            await markBookFailed(db, subjectId, bookId, 'generation_error');
+          }
+          captureException(
+            error instanceof Error ? error : new Error(String(error)),
+            {
+              profileId,
+              extra: {
+                site: 'subjectRetryCurriculum.onFailure',
+                subjectId,
+                bookId,
+              },
+            },
+          );
+          return { status: 'failed' as const, subjectId, bookId };
+        } finally {
+          await closeStepDatabases();
+        }
       });
-      // Ownership is established by the parent-chain check in the main flow
-      // (loadBook verifies subjects.profileId) per the `@inngest-admin` header;
-      // onFailure operates on that same owner-verified event payload.
-      if (book && !book.topicsGenerated && book.failedAt === null) {
-        // The pre-read above avoids re-stamping an existing failure; the
-        // shared writer carries the atomic `topicsGenerated = false` guard so
-        // the write can never race a concurrent success.
-        await markBookFailed(db, subjectId, bookId, 'generation_error');
-      }
-      captureException(
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          profileId,
-          extra: {
-            site: 'subjectRetryCurriculum.onFailure',
-            subjectId,
-            bookId,
-          },
-        },
-      );
-      return { status: 'failed' as const, subjectId, bookId };
     },
   },
   { event: 'app/subject.curriculum-retry-requested' },

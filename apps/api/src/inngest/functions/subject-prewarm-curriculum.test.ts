@@ -93,6 +93,29 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
+const mockGetStepDatabase = jest.fn();
+const mockRunWithStepDatabaseScope = jest.fn(
+  async <T>(callback: () => Promise<T>) => callback(),
+);
+const mockCloseStepDatabases = jest.fn().mockResolvedValue(undefined);
+
+// GC6: real module via requireActual; override the step DB accessors the
+// Inngest runtime would otherwise require (DB binding) + pin the cutover flag
+// to the legacy path these tests exercise.
+jest.mock('../helpers' /* gc1-allow: Inngest step DB boundary */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockGetStepDatabase(),
+    runWithStepDatabaseScope: (callback: () => Promise<unknown>) =>
+      mockRunWithStepDatabaseScope(callback),
+    closeStepDatabases: () => mockCloseStepDatabases(),
+    isIdentityV2EnabledInStep: () => false,
+  };
+});
+
 const generatedTopics = {
   topics: [
     {
@@ -214,6 +237,11 @@ describe('subjectPrewarmCurriculum', () => {
     updateWhere.mockReset().mockResolvedValue(undefined);
     updateSet.mockReset().mockReturnValue({ where: updateWhere });
     mockDb.update.mockReset().mockReturnValue({ set: updateSet });
+    mockGetStepDatabase.mockReturnValue(mockDb);
+    mockRunWithStepDatabaseScope.mockImplementation(
+      async <T>(callback: () => Promise<T>) => callback(),
+    );
+    mockCloseStepDatabases.mockResolvedValue(undefined);
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   });
 
@@ -608,6 +636,20 @@ describe('subjectPrewarmCurriculum', () => {
         await callOnFailure();
 
         expect(mockDb.update).not.toHaveBeenCalled();
+      });
+
+      it('wraps DB writes in runWithStepDatabaseScope and closes step databases', async () => {
+        // Regression guard: onFailure must scope and release the DB handle so
+        // connection leaks cannot occur on terminal failures (mirrors
+        // auto-file-session.ts and topic-probe-extract.ts onFailure pattern).
+        mockDb.query.curriculumBooks.findFirst.mockResolvedValue(
+          createBook({ topicsGenerated: false, failedAt: null }),
+        );
+
+        await callOnFailure();
+
+        expect(mockRunWithStepDatabaseScope).toHaveBeenCalled();
+        expect(mockCloseStepDatabases).toHaveBeenCalled();
       });
     });
   });
