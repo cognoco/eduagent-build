@@ -1741,6 +1741,7 @@
     "ctaStartStudying": "Start studying",
     "ctaPracticeAgain": "Practice again",
     "ctaReview": "Review this topic",
+    "ctaStartChallenge": "Start challenge",
     "resolveTimeoutTitle": "Taking too long to open this topic",
     "resolveTimeoutMessage": "Check your connection and try again.",
     "a11yRetryTopic": "Retry loading topic",

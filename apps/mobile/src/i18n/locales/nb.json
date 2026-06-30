@@ -1659,7 +1659,8 @@
     "addFirstNoteSummary": "Legg til ditt første notat for dette emnet",
     "loadingBookmarks": "Laster inn lagrede forklaringer ...",
     "loadingSessions": "Laster inn økter ...",
-    "noSessionsSummary": "Ingen økter ennå"
+    "noSessionsSummary": "Ingen økter ennå",
+    "ctaStartChallenge": "Start utfordring"
   },
   "subject": {
     "settings": {
