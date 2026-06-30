@@ -19,7 +19,6 @@ import {
   buildIntegrationEnv,
   cleanupAccounts,
   createIntegrationDb,
-  isIdentityV2Enabled,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
 import {
@@ -94,41 +93,21 @@ async function createFamilyLink(
 
 async function readConversationLanguage(profileId: string): Promise<string> {
   const db = createIntegrationDb();
-  // [WI-1145] The PATCH /onboarding/language route is flag-honoring (dispatches to
-  // the v2 `person` writer on flag-on, the legacy `profiles` writer on flag-off —
-  // onboarding.ts), and the create route dual-writes both stores, so read the store
-  // the PATCH actually wrote: v2 `person` on flag-on, legacy `profiles` on flag-off.
-  if (isIdentityV2Enabled()) {
-    const [profile] = await db
-      .select({ conversationLanguage: person.conversationLanguage })
-      .from(person)
-      .where(eq(person.id, profileId));
-    return profile!.conversationLanguage;
-  }
-
+  // [WI-867] PATCH /onboarding/language always writes v2 person (flag collapsed).
   const [profile] = await db
-    .select({ conversationLanguage: profiles.conversationLanguage })
-    .from(profiles)
-    .where(eq(profiles.id, profileId));
+    .select({ conversationLanguage: person.conversationLanguage })
+    .from(person)
+    .where(eq(person.id, profileId));
   return profile!.conversationLanguage;
 }
 
 async function readPronouns(profileId: string): Promise<string | null> {
   const db = createIntegrationDb();
-  // [WI-1145] Flag-honoring read mirror of the PATCH /onboarding/pronouns writer
-  // (v2 `person` on flag-on, legacy `profiles` on flag-off — onboarding.ts).
-  if (isIdentityV2Enabled()) {
-    const [profile] = await db
-      .select({ pronouns: person.pronouns })
-      .from(person)
-      .where(eq(person.id, profileId));
-    return profile!.pronouns;
-  }
-
+  // [WI-867] PATCH /onboarding/pronouns always writes v2 person (flag collapsed).
   const [profile] = await db
-    .select({ pronouns: profiles.pronouns })
-    .from(profiles)
-    .where(eq(profiles.id, profileId));
+    .select({ pronouns: person.pronouns })
+    .from(person)
+    .where(eq(person.id, profileId));
   return profile!.pronouns;
 }
 
