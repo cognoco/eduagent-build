@@ -1275,7 +1275,6 @@ async function writeMilestoneLedgerMoments(
       profileId,
       actorJob: 'snapshot-aggregation',
       kind: 'milestone_reached',
-      templateKey: 'ledger.milestone_reached.default',
       params: buildMilestoneLedgerParams(milestone),
     });
   }
