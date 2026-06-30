@@ -187,7 +187,7 @@ jest.mock(
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { HIDDEN_TAB_ROUTES } = require('./_layout');
+const { FULL_SCREEN_ROUTES, HIDDEN_TAB_ROUTES } = require('./_layout');
 const {
   computeModeVisibleTabs,
   computeVisibleTabs,
@@ -1480,6 +1480,8 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
       'homework',
       'dictation',
       'practice',
+      'link/new',
+      'link/[contractId]',
       'vocabulary',
       'topic',
       'my-notes',
@@ -1492,6 +1494,14 @@ describe('HIDDEN_TAB_ROUTES — tab-bar leak guard (QA-07 / Bug 763)', () => {
     const hidden = new Set<string>(HIDDEN_TAB_ROUTES);
     for (const tab of ['home', 'own-learning', 'library', 'progress', 'more']) {
       expect(hidden.has(tab)).toBe(false);
+    }
+  });
+});
+
+describe('FULL_SCREEN_ROUTES — nested ceremony route guard', () => {
+  it('hides chrome for every visibility link ceremony screen', () => {
+    for (const route of ['link', 'link/new', 'link/[contractId]']) {
+      expect(FULL_SCREEN_ROUTES.has(route)).toBe(true);
     }
   });
 });

@@ -24,10 +24,14 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 function deriveAudience(
   contract: VisibilityContract,
   activePersonId: string | undefined,
-): RenderAudience {
-  return activePersonId === contract.supporterPersonId
-    ? 'supporter'
-    : 'supportee';
+): RenderAudience | 'unknown' {
+  if (activePersonId === contract.supporterPersonId) {
+    return 'supporter';
+  }
+  if (activePersonId === contract.supporteePersonId) {
+    return 'supportee';
+  }
+  return 'unknown';
 }
 
 export default function LinkContractScreen(): React.ReactElement {
@@ -150,13 +154,20 @@ export default function LinkContractScreen(): React.ReactElement {
 
   const contract = contractQuery.data;
   const audience = deriveAudience(contract, activeProfile?.id);
+  const actionableAudience: RenderAudience | undefined =
+    audience === 'unknown' ? undefined : audience;
+  const cardAudience: RenderAudience =
+    audience === 'supporter' ? 'supporter' : 'supportee';
   const accepted =
     audience === 'supporter'
       ? Boolean(contract.supporterAcceptedAt)
-      : Boolean(contract.supporteeAcceptedAt);
+      : audience === 'supportee'
+        ? Boolean(contract.supporteeAcceptedAt)
+        : true;
   const active =
     contract.status === 'accepted' || contract.status === 'restamped';
   const canRevoke = active && audience === 'supportee';
+  const canAccept = actionableAudience !== undefined && !accepted;
 
   return (
     <ScrollView
@@ -179,13 +190,17 @@ export default function LinkContractScreen(): React.ReactElement {
       </View>
       <ContractCard
         contract={contract}
-        audience={audience}
+        audience={cardAudience}
         supporteeName={supporteeName}
         supporterName={supporterName}
         onAccept={
-          accepted
-            ? undefined
-            : () => acceptMutation.mutate({ contract, audience })
+          canAccept && actionableAudience
+            ? () =>
+                acceptMutation.mutate({
+                  contract,
+                  audience: actionableAudience,
+                })
+            : undefined
         }
       />
       {acceptMutation.isError ? (

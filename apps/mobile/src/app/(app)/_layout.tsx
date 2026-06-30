@@ -60,7 +60,7 @@ initNotificationHandler();
 // shell (study / family / V0-guardian) was rendering the activity inside the
 // host tab bar, making the audience scope ambiguous. Adding it here collapses
 // the tab bar (height: 0) the same way quiz/homework/dictation already do.
-const FULL_SCREEN_ROUTES = new Set([
+export const FULL_SCREEN_ROUTES = new Set([
   'account',
   'onboarding',
   'session',
@@ -69,6 +69,8 @@ const FULL_SCREEN_ROUTES = new Set([
   'quiz',
   'practice',
   'link',
+  'link/new',
+  'link/[contractId]',
   'shelf',
   'shelf/[subjectId]',
   'shelf/[subjectId]/book/[bookId]',
@@ -96,6 +98,8 @@ export const HIDDEN_TAB_ROUTES = [
   'quiz',
   'practice',
   'link',
+  'link/new',
+  'link/[contractId]',
   'shelf',
   'subject',
   'subject-hub',

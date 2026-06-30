@@ -174,4 +174,26 @@ describe('LinkContractScreen', () => {
       expect(fetchCallsMatching(mockFetch, '/revoke')).toHaveLength(1),
     );
   });
+
+  it('does not expose agreement actions to a non-party viewer', async () => {
+    mockActiveProfileId = '00000000-0000-4000-8000-000000000099';
+    mockFetch.setRoute('/visibility/links/', (url: string) => {
+      if (url.endsWith('/contract')) {
+        return {
+          ...CONTRACT,
+          status: 'accepted',
+          supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
+          supporteeAcceptedAt: '2026-06-20T12:02:00.000Z',
+        };
+      }
+      return {};
+    });
+
+    renderScreen();
+
+    await screen.findByTestId('visibility-contract-card');
+
+    expect(screen.queryByTestId('visibility-contract-accept')).toBeNull();
+    expect(screen.queryByTestId('visibility-contract-revoke')).toBeNull();
+  });
 });
