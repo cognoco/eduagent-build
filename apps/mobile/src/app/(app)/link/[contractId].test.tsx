@@ -17,8 +17,8 @@ jest.mock(
   () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock(
-  '../../../lib/format-api-error' /* gc1-allow: route test isolates fallback copy; formatter has direct unit coverage */,
+jest.mock( /* gc1-allow: route test isolates fallback copy; formatter has direct unit coverage */
+  '../../../lib/format-api-error',
   () => ({
     formatApiError: (error: Error) => error.message,
   }),
@@ -38,8 +38,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ back: mockBack, replace: mockReplace }),
 }));
 
-jest.mock(
-  '../../../lib/profile' /* gc1-allow: route test controls active person identity for supporter/supportee branches */,
+jest.mock( /* gc1-allow: route test controls active person identity for supporter/supportee branches */
+  '../../../lib/profile',
   () => ({
     useProfile: () => ({
       activeProfile: { id: mockActiveProfileId },
@@ -49,8 +49,8 @@ jest.mock(
 
 const mockFetch = createRoutedMockFetch();
 
-jest.mock(
-  '../../../lib/api-client' /* gc1-allow: transport-boundary test uses routed Hono fetch mock */,
+jest.mock( /* gc1-allow: transport-boundary test uses routed Hono fetch mock */
+  '../../../lib/api-client',
   () => {
     const {
       mockApiClientFactory,
