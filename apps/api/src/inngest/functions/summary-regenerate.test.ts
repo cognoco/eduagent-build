@@ -4,7 +4,7 @@ const mockGenerateAndStoreLlmSummary = jest.fn();
 const mockGenerateLearnerRecap = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -14,49 +14,40 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/summaries' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/summaries',
-    ) as typeof import('../../services/summaries');
-    return {
-      ...actual,
-      createPendingSessionSummary: (...args: unknown[]) =>
-        mockCreatePendingSessionSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/summaries', () => {
+  const actual = jest.requireActual(
+    '../../services/summaries',
+  ) as typeof import('../../services/summaries');
+  return {
+    ...actual,
+    createPendingSessionSummary: (...args: unknown[]) =>
+      mockCreatePendingSessionSummary(...args),
+  };
+});
 
-jest.mock(
-  '../../services/session-llm-summary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session-llm-summary',
-    ) as typeof import('../../services/session-llm-summary');
-    return {
-      ...actual,
-      generateAndStoreLlmSummary: (...args: unknown[]) =>
-        mockGenerateAndStoreLlmSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/session-llm-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/session-llm-summary',
+  ) as typeof import('../../services/session-llm-summary');
+  return {
+    ...actual,
+    generateAndStoreLlmSummary: (...args: unknown[]) =>
+      mockGenerateAndStoreLlmSummary(...args),
+  };
+});
 
-jest.mock(
-  '../../services/session-recap' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session-recap',
-    ) as typeof import('../../services/session-recap');
-    return {
-      ...actual,
-      generateLearnerRecap: (...args: unknown[]) =>
-        mockGenerateLearnerRecap(...args),
-    };
-  },
-);
+jest.mock('../../services/session-recap', () => {
+  const actual = jest.requireActual(
+    '../../services/session-recap',
+  ) as typeof import('../../services/session-recap');
+  return {
+    ...actual,
+    generateLearnerRecap: (...args: unknown[]) =>
+      mockGenerateLearnerRecap(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -73,12 +64,18 @@ import {
   learnerRecapRegenerate,
 } from './summary-regenerate';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_SUBJECT_ID,
+  TEST_TOPIC_ID,
+} from '@eduagent/test-utils';
 
 // Use valid v4 UUIDs — summaryEventPayloadSchema validates uuid format (RFC 4122)
-const PROFILE_ID = 'a1b2c3d4-e5f6-4111-8111-a1b2c3d4e5f6';
-const SESSION_ID = 'b2c3d4e5-f6a1-4222-8222-b2c3d4e5f6a1';
-const SUBJECT_ID = 'c3d4e5f6-a1b2-4333-8333-c3d4e5f6a1b2';
-const TOPIC_ID = 'd4e5f6a1-b2c3-4444-8444-d4e5f6a1b2c3';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
 const SUMMARY_ID = 'e5f6a1b2-c3d4-4555-8555-e5f6a1b2c3d4';
 const TIMESTAMP = '2026-01-01T00:00:00.000Z';
 

@@ -29,19 +29,16 @@ jest.mock('../../services/sentry' /* gc1-allow: external boundary */, () => {
 const mockBuildBackfillRowsForProfile = jest
   .fn()
   .mockReturnValue({ rows: [], malformed: [] });
-jest.mock(
-  '../../services/memory/backfill-mapping' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/memory/backfill-mapping',
-    ) as typeof import('../../services/memory/backfill-mapping');
-    return {
-      ...actual,
-      buildBackfillRowsForProfile: (...args: unknown[]) =>
-        mockBuildBackfillRowsForProfile(...args),
-    };
-  },
-);
+jest.mock('../../services/memory/backfill-mapping', () => {
+  const actual = jest.requireActual(
+    '../../services/memory/backfill-mapping',
+  ) as typeof import('../../services/memory/backfill-mapping');
+  return {
+    ...actual,
+    buildBackfillRowsForProfile: (...args: unknown[]) =>
+      mockBuildBackfillRowsForProfile(...args),
+  };
+});
 
 const col = (name: string) => ({ name });
 const mockDb: Record<string, any> = {
@@ -77,7 +74,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: prevents real DB import in unit tests
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');

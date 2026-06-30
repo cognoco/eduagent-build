@@ -14,20 +14,17 @@
 const mockClassifySubject = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
-  '../../services/subject-classify' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/subject-classify',
-    ) as typeof import('../../services/subject-classify');
-    return {
-      ...actual,
-      classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
-    };
-  },
-);
+jest.mock('../../services/subject-classify', () => {
+  const actual = jest.requireActual(
+    '../../services/subject-classify',
+  ) as typeof import('../../services/subject-classify');
+  return {
+    ...actual,
+    classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
+  };
+});
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -42,7 +39,7 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,

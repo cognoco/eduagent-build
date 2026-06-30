@@ -16,7 +16,7 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -26,7 +26,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -42,7 +42,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/logger', () => {
   const actual = jest.requireActual(
     '../../services/logger',
   ) as typeof import('../../services/logger');
@@ -59,13 +59,14 @@ jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
 // Import AFTER mocks are set up
 import { filingCompletedObserve } from './filing-completed-observe';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const SESSION_ID = '00000000-0000-4000-8000-000000000002';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
 
 function makeEvent(overrides: Partial<Record<string, unknown>> = {}) {
   return {

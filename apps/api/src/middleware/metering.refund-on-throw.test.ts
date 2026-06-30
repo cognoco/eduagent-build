@@ -37,7 +37,7 @@ const mockGetEffectiveAccessForSubscription = jest.fn();
 const mockGetOrProvisionProfileQuotaUsage = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
-jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/billing', () => {
   const actual = jest.requireActual(
     '../services/billing',
   ) as typeof import('../services/billing');

@@ -12,21 +12,17 @@ import type { Database } from '@eduagent/database';
 const mockCloseStaleSessions = jest.fn();
 const mockAbandonStaleQuizRounds = jest.fn();
 
-jest.mock(
-  '../../services/session' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/session',
-    ) as typeof import('../../services/session');
-    return {
-      ...actual,
-      closeStaleSessions: (...args: unknown[]) =>
-        mockCloseStaleSessions(...args),
-    };
-  },
-);
+jest.mock('../../services/session', () => {
+  const actual = jest.requireActual(
+    '../../services/session',
+  ) as typeof import('../../services/session');
+  return {
+    ...actual,
+    closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
+  };
+});
 
-jest.mock('../../services/quiz' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/quiz', () => {
   const actual = jest.requireActual(
     '../../services/quiz',
   ) as typeof import('../../services/quiz');
@@ -39,7 +35,7 @@ jest.mock('../../services/quiz' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -50,7 +46,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, ...mockInngestTransport.module };
 });

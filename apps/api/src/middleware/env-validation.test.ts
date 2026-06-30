@@ -1,4 +1,4 @@
-jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../config', () => {
   const actual = jest.requireActual('../config') as typeof import('../config');
   return {
     ...actual,

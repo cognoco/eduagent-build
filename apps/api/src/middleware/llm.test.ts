@@ -1,4 +1,4 @@
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/llm', () => {
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');
@@ -8,31 +8,25 @@ jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../services/llm/providers/gemini' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/llm/providers/gemini',
-    ) as typeof import('../services/llm/providers/gemini');
-    return {
-      ...actual,
-      createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
-    };
-  },
-);
+jest.mock('../services/llm/providers/gemini', () => {
+  const actual = jest.requireActual(
+    '../services/llm/providers/gemini',
+  ) as typeof import('../services/llm/providers/gemini');
+  return {
+    ...actual,
+    createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
+  };
+});
 
-jest.mock(
-  '../services/llm/providers/openai' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../services/llm/providers/openai',
-    ) as typeof import('../services/llm/providers/openai');
-    return {
-      ...actual,
-      createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
-    };
-  },
-);
+jest.mock('../services/llm/providers/openai', () => {
+  const actual = jest.requireActual(
+    '../services/llm/providers/openai',
+  ) as typeof import('../services/llm/providers/openai');
+  return {
+    ...actual,
+    createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
+  };
+});
 
 import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';

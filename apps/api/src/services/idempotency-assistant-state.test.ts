@@ -5,7 +5,7 @@ const mockCaptureException = jest.fn();
 const mockLoggerWarn = jest.fn();
 const mockInngestSend = jest.fn();
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,
@@ -13,7 +13,7 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
     addBreadcrumb: jest.fn(),
   };
 });
-jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./logger', () => {
   const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,
@@ -25,7 +25,7 @@ jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
     }),
   };
 });
-jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../inngest/client', () => {
   const actual = jest.requireActual(
     '../inngest/client',
   ) as typeof import('../inngest/client');

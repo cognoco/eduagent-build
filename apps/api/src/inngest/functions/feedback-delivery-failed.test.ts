@@ -26,20 +26,17 @@ const mockGetStepSupportEmail = jest.fn();
 const mockGetStepDatabase = jest.fn();
 const mockLoggerWarn = jest.fn();
 
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');
@@ -49,7 +46,7 @@ jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/logger', () => {
   const actual = jest.requireActual(
     '../../services/logger',
   ) as typeof import('../../services/logger');
@@ -64,7 +61,7 @@ jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -83,7 +80,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -622,7 +619,7 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
     // Mock client/createFunction once for this isolated import so we don't
     // collide with the test module's mocks above.
     jest.isolateModules(() => {
-      jest.doMock('../client' /* gc1-allow: pattern-a conversion */, () => {
+      jest.doMock('../client', () => {
         const actual = jest.requireActual(
           '../client',
         ) as typeof import('../client');

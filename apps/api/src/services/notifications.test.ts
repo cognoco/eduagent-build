@@ -26,7 +26,7 @@ const mockLogNotification = jest.fn();
 const mockCheckAndLogRateLimitInternal = jest.fn();
 const mockIsPushEnabled = jest.fn().mockResolvedValue(true);
 
-jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./settings', () => {
   const actual = jest.requireActual(
     './settings',
   ) as typeof import('./settings');

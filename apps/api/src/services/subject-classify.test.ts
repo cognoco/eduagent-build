@@ -2,7 +2,7 @@
 // Subject Classification — Tests (Story 10.20)
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,
@@ -10,7 +10,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./subject' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./subject', () => {
   const actual = jest.requireActual('./subject') as typeof import('./subject');
   return {
     ...actual,
@@ -18,7 +18,7 @@ jest.mock('./subject' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,

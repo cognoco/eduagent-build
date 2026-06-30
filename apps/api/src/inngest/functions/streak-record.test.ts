@@ -1,6 +1,7 @@
 import { NonRetriableError } from 'inngest';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { streakRecord } from './streak-record';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 const mockGetStepDatabase = jest.fn();
 const mockRecordSessionActivity = jest.fn();
@@ -31,7 +32,7 @@ jest.mock(
 
 const handler = (streakRecord as any).fn;
 
-const PROFILE_ID = 'a0000000-0000-4000-8000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 
 function validPayload(overrides?: Record<string, unknown>) {
   return {

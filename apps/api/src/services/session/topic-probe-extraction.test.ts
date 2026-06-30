@@ -6,12 +6,12 @@
 // mocked here so we can assert captureException escalations fire.
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../llm', () => {
   const actual = jest.requireActual('../llm') as typeof import('../llm');
   return { ...actual, routeAndCall: jest.fn() };
 });
 
-jest.mock('../sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../sentry', () => {
   const actual = jest.requireActual('../sentry') as typeof import('../sentry');
   return {
     ...actual,

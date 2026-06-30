@@ -7,6 +7,13 @@ import {
   declineChallengeRound,
 } from './route-actions';
 import { getSession, persistSessionMetadata } from '../session/session-crud';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_SESSION_ID,
+  TEST_TOPIC_ID,
+  TEST_TOPIC_ID_2,
+} from '@eduagent/test-utils';
 
 jest.mock(
   '../session/session-crud' /* gc1-allow: route-action unit test isolates session CRUD; integration tests cover scoped persistence */,
@@ -16,11 +23,11 @@ jest.mock(
   }),
 );
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const OTHER_PROFILE_ID = '00000000-0000-4000-8000-000000000002';
-const SESSION_ID = '00000000-0000-4000-8000-000000000101';
-const TOPIC_ID = '00000000-0000-4000-8000-000000000201';
-const OTHER_TOPIC_ID = '00000000-0000-4000-8000-000000000202';
+const PROFILE_ID = TEST_PROFILE_ID;
+const OTHER_PROFILE_ID = TEST_PROFILE_ID_2;
+const SESSION_ID = TEST_SESSION_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
+const OTHER_TOPIC_ID = TEST_TOPIC_ID_2;
 
 const mockGetSession = getSession as jest.MockedFunction<typeof getSession>;
 const mockPersistSessionMetadata =

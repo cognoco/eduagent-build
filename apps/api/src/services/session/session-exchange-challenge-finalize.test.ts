@@ -59,6 +59,12 @@ import type {
 import { finalizeChallengeRoundIfReady } from './session-exchange';
 import { captureException } from '../sentry';
 import { inngest } from '../../inngest/client';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_TOPIC_ID,
+  TEST_SUBJECT_ID,
+} from '@eduagent/test-utils';
 
 const mockCaptureException = captureException as jest.MockedFunction<
   typeof captureException
@@ -114,10 +120,10 @@ interface FakeDbState {
   topicNotOwned?: boolean;
 }
 
-const SUBJECT_ID = '00000000-0000-4000-8000-000000000001';
-const TOPIC_ID = '00000000-0000-4000-8000-000000000002';
-const SESSION_ID = '00000000-0000-4000-8000-000000000003';
-const PROFILE_ID = '00000000-0000-4000-8000-000000000004';
+const SUBJECT_ID = TEST_SUBJECT_ID;
+const TOPIC_ID = TEST_TOPIC_ID;
+const SESSION_ID = TEST_SESSION_ID;
+const PROFILE_ID = TEST_PROFILE_ID;
 const ANSWER_EVENT_ID = '00000000-0000-4000-8000-000000000005';
 
 function makeSession(metadata: Record<string, unknown>): LearningSession {
