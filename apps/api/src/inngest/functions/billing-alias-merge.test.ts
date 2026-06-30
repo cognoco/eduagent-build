@@ -136,15 +136,9 @@ describe('billingAliasMerge worker — identity-v2 routing [WI-1057]', () => {
     return handler({ event: { data: validEventData() }, step: runner.step });
   }
 
-  it('flag-off → legacy mergeAliasedSubscription (subscriptions table)', async () => {
-    setIdentityV2Enabled('false');
-    await run();
-    expect(legacySpy).toHaveBeenCalledTimes(1);
-    expect(v2Spy).not.toHaveBeenCalled();
-  });
+  // [WI-867] flag-off test deleted — v2 is always active.
 
-  it('flag-on → mergeAliasedSubscriptionV2 (subscription table twin)', async () => {
-    setIdentityV2Enabled('true');
+  it('[WI-867] always calls mergeAliasedSubscriptionV2 (v2 collapsed)', async () => {
     await run();
     expect(v2Spy).toHaveBeenCalledTimes(1);
     expect(legacySpy).not.toHaveBeenCalled();

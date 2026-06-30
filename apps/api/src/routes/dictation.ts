@@ -35,7 +35,6 @@ import { getLearningProfile } from '../services/learner-profile';
 import { checkAndLogRateLimit } from '../services/settings';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
-import { isIdentityV2Enabled } from '../config';
 import { calculateAge } from '../services/age-utils';
 
 const logger = createLogger();
@@ -249,7 +248,6 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         'dictation_review',
         { hours: 1 / 60, maxCount: 10 },
         {
-          identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           callerPersonId: c.get('callerPersonId'),
         },
       );

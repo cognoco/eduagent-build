@@ -179,12 +179,9 @@ export async function listRecapsForParent(
   options: {
     childProfileId?: string;
     limit?: number;
-    identityV2Enabled?: boolean;
   } = {},
 ): Promise<RecapListItem[]> {
-  const children = await getChildrenForParent(db, parentProfileId, {
-    identityV2Enabled: options.identityV2Enabled,
-  });
+  const children = await getChildrenForParent(db, parentProfileId);
   const selectedChildren = options.childProfileId
     ? children.filter((child) => child.profileId === options.childProfileId)
     : children;
@@ -210,9 +207,6 @@ export async function listRecapsForParent(
           db,
           parentProfileId,
           child.profileId,
-          // [WI-821] Forward identityV2Enabled so assertParentAccess reads
-          // guardianship (not family_links) and person (not profiles) under v2.
-          { identityV2Enabled: options.identityV2Enabled },
         );
         return { child, sessions };
       } catch (err) {
@@ -348,11 +342,8 @@ export async function getRecapForParent(
   db: Database,
   parentProfileId: string,
   recapId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<RecapListItem | null> {
-  const children = await getChildrenForParent(db, parentProfileId, {
-    identityV2Enabled: opts?.identityV2Enabled,
-  });
+  const children = await getChildrenForParent(db, parentProfileId);
 
   // [L7-F2] Parallelize per-child lookups instead of awaiting in series. A
   // single-query refactor (fetch session by recapId, then assert membership
@@ -372,7 +363,6 @@ export async function getRecapForParent(
           parentProfileId,
           child.profileId,
           recapId,
-          { identityV2Enabled: opts?.identityV2Enabled },
         );
       } catch (err) {
         if (err instanceof ForbiddenError) return null;

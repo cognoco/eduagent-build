@@ -403,18 +403,14 @@ describe('[BREAK] daily-reminder-scan fan-out event shape', () => {
 });
 
 // ---------------------------------------------------------------------------
-// [WI-777] Identity-V2 wiring guard (CUT-B2).
+// [WI-777 / WI-867] Identity-V2 wiring guard (CUT-B2, flag collapsed).
 //
-// The find-streak-profiles step branches on isIdentityV2EnabledInStep():
-//   - v2:     SELECT … FROM person  (person × membership × organization +
-//             consentGateSatisfiedSql; no consentStates subquery)
-//   - legacy: SELECT … FROM profiles (profiles × accounts × consentStates)
-// The runResults-based tests above bypass the step body, so they cannot see
-// this branch. These tests run the real find-streak-profiles query against a
-// chainable DB stub and assert the correct query root per flag — guarding the
-// v2 wiring against regression before WP-FLAG drops the legacy tables. The DB
-// module is NOT mocked here, so `person` / `profiles` / `consentStates` are the
-// real Drizzle table objects the source passes to `.from(...)`.
+// The find-streak-profiles step always uses the v2 path (flag collapsed in
+// WI-867): SELECT … FROM person (person × membership × organization +
+// consentGateSatisfiedSql; no consentStates subquery). The tests below assert
+// that `person` is always the query root regardless of flag state.
+// The DB module is NOT mocked here, so `person` / `profiles` / `consentStates`
+// are the real Drizzle table objects the source passes to `.from(...)`.
 // ---------------------------------------------------------------------------
 
 function buildChainableDb(

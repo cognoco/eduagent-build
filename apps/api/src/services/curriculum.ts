@@ -66,7 +66,6 @@ import {
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { createLogger } from './logger';
 import { buildFallbackBookTopics } from './book-generation-fallbacks';
-import { getProfileAge } from './profile';
 import { getPersonAge } from './identity-v2/helpers';
 
 const logger = createLogger();
@@ -1486,9 +1485,6 @@ export async function repairIncompleteBookGenerationClaim(
       error: unknown,
       context?: { profileId?: string; extra?: Record<string, unknown> },
     ) => void;
-    // [WI-586 flip-safety] when true, learner age is read from `person` (v2)
-    // instead of the soon-to-be-dropped `profiles` table (legacy).
-    identityV2Enabled: boolean;
   },
 ): Promise<IncompleteBookGenerationClaimRepairResult> {
   const activeTopicCount = existing.topics.filter(
@@ -1505,13 +1501,8 @@ export async function repairIncompleteBookGenerationClaim(
     return { status: 'in_progress' };
   }
 
-  // [WI-586 flip-safety] v2 reads learner age from `person`; flag-off legacy
-  // reads `profiles` (dropped post-#8). `identityV2Enabled` is destructured out
-  // so it does not leak into the expandExistingBookTopics deps.
-  const { identityV2Enabled, ...expandDeps } = deps;
-  const learnerAge = identityV2Enabled
-    ? await getPersonAge(db, profileId)
-    : await getProfileAge(db, profileId);
+  // [WI-867] v2 always: learner age from `person`.
+  const learnerAge = await getPersonAge(db, profileId);
   const book = await expandExistingBookTopics(
     db,
     profileId,
@@ -1519,7 +1510,7 @@ export async function repairIncompleteBookGenerationClaim(
     bookId,
     existing,
     priorKnowledge,
-    { learnerAge, ...expandDeps },
+    { learnerAge, ...deps },
   );
   return { status: 'repaired', book };
 }

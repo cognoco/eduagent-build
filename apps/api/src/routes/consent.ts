@@ -35,7 +35,6 @@ import {
   assertOwnerProfile,
   assertOwnerAndParentAccess,
 } from '../services/family-access';
-import { isIdentityV2Enabled } from '../config';
 import {
   requestConsentV2,
   resendConsentV2,
@@ -153,9 +152,7 @@ async function assertCanRequestConsentForChild<E extends ConsentRouteEnv>(
   // assertOwnerAndParentAccess throws ForbiddenError (→ 403) for a non-owner
   // profile or an owner with no link to this child (IDOR).
   // [WI-786] Flag-gated: flag-on resolves via guardianship, flag-off via family_links.
-  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId, {
-    identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
-  });
+  await assertOwnerAndParentAccess(c, db, activeProfileId, childProfileId);
 }
 
 type ConsentRouteEnv = {

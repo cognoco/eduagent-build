@@ -221,9 +221,7 @@ const TEST_ENV = {
   ...BASE_AUTH_ENV,
   DATABASE_URL: 'postgresql://test:test@localhost/test',
 };
-// [WI-774] Flag-on env: drives the identity-v2 path through the real account +
-// profile-scope middleware (v2 resolvers mocked above) so the route arms the
-// write guard with identityV2Enabled:true + the resolved callerPersonId.
+// [WI-867] Retained: verifies callerPersonId is always threaded (v2 always active).
 const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
 const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
@@ -433,19 +431,18 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      // [WI-867] Post-collapse: resolveIdentityV2 always runs → callerPersonId always set.
-      // RED-FLIP: remove callerPersonId and this assertion fails → proves the write guard is wired.
+      // [WI-867] Post-collapse: callerPersonId always set (resolveIdentityV2 always runs).
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
       // Family-link check is not required for self-scoped routes.
       expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
 
-    it('[WI-774] flag-on arms the v2 write guard on DELETE /learner-profile/all', async () => {
+    it('[WI-867] callerPersonId is threaded on DELETE /learner-profile/all (v2 always active)', async () => {
       const res = await app.request(
         '/v1/learner-profile/all',
         { method: 'DELETE', headers: PARENT_HEADERS },
@@ -453,15 +450,12 @@ describe('learner-profile routes', () => {
       );
 
       expect(res.status).toBe(200);
-      // Under flag-on the route must pass identityV2Enabled:true AND the
-      // authenticated callerPersonId (resolveIdentityV2 → PARENT_PROFILE_ID). A
-      // wrong env-binding name or context key would silently leave the guard
-      // un-armed on the live staging path.
+      // [WI-867] callerPersonId must always be threaded from resolveIdentityV2 (flag collapsed).
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: true, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -483,7 +477,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
       expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
@@ -513,7 +507,7 @@ describe('learner-profile routes', () => {
         'dinosaurs',
         true,
         undefined,
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -552,7 +546,7 @@ describe('learner-profile routes', () => {
         PARENT_PROFILE_ID,
         'test-account-id',
         'short-burst',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
       expect(mockFindGuardianship).not.toHaveBeenCalled();
     });
@@ -789,7 +783,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -810,7 +804,7 @@ describe('learner-profile routes', () => {
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
   });
@@ -999,7 +993,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
 
@@ -1020,7 +1014,7 @@ describe('learner-profile routes', () => {
         ADULT_NON_OWNER_PROFILE_ID,
         'test-account-id',
         'granted',
-        { identityV2Enabled: false, callerPersonId: PARENT_PROFILE_ID },
+        { callerPersonId: PARENT_PROFILE_ID },
       );
     });
   });

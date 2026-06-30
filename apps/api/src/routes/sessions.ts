@@ -94,7 +94,6 @@ import {
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
   isMemoryFactsRelevanceEnabled,
-  isIdentityV2Enabled,
   isJudgeFrameworkEnabled,
 } from '../config';
 import { FILING_CONFIG } from '../config/filing';
@@ -284,7 +283,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           input,
           {
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
           },
         );
         // [L8-F11] Validate response shape against the public contract.
@@ -572,7 +570,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -769,7 +766,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             challengeRoundRuntimeEnabled,
             reviewCallbackOpenerEnabled,
             judgeFrameworkEnabled,
-            identityV2Enabled: isIdentityV2Enabled(c.env?.IDENTITY_V2_ENABLED),
             challengeRoundGraderEnabled: isChallengeRoundGraderEnabled(
               c.env?.CHALLENGE_ROUND_GRADER_ENABLED,
             ),
@@ -844,9 +840,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                     challengeRoundRuntimeEnabled,
                     reviewCallbackOpenerEnabled,
                     judgeFrameworkEnabled,
-                    identityV2Enabled: isIdentityV2Enabled(
-                      c.env?.IDENTITY_V2_ENABLED,
-                    ),
                   },
                 );
                 const eventType = chunkCount === 0 ? 'chunk' : 'replace';
@@ -1185,9 +1178,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 challengeRoundRuntimeEnabled,
                 reviewCallbackOpenerEnabled,
                 judgeFrameworkEnabled,
-                identityV2Enabled: isIdentityV2Enabled(
-                  c.env?.IDENTITY_V2_ENABLED,
-                ),
               },
             );
             return streamSSEUtf8(c, async (sseStream) => {

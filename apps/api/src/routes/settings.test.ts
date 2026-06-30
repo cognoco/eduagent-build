@@ -192,9 +192,7 @@ const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
   ...BASE_AUTH_ENV,
 };
-// [WI-774] Flag-on env: exercises the identity-v2 path through the real account
-// + profile-scope middleware (with the v2 resolvers mocked above), so the route
-// arms the write guard with identityV2Enabled:true + a real callerPersonId.
+// [WI-867] Retained to verify callerPersonId is always threaded (v2 always active).
 const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
 beforeAll(() => {
@@ -318,7 +316,7 @@ describe('settings routes', () => {
       'profile-1',
       'test-account-id',
       true,
-      { identityV2Enabled: false, callerPersonId: 'person-test-id' },
+      { callerPersonId: 'person-test-id' },
     );
   });
 
@@ -394,7 +392,7 @@ describe('settings routes', () => {
     expect(mockUpsertNotificationPrefs).toHaveBeenCalled();
   });
 
-  it('[WI-774] flag-on arms the v2 write guard: passes identityV2Enabled:true + the resolved callerPersonId', async () => {
+  it('[WI-867] callerPersonId is always threaded into write guard (v2 always active)', async () => {
     const res = await app.request(
       '/v1/settings/notifications',
       {
@@ -410,16 +408,13 @@ describe('settings routes', () => {
     );
 
     expect(res.status).toBe(200);
-    // The route reads IDENTITY_V2_ENABLED from c.env and callerPersonId from the
-    // account middleware (resolveIdentityV2 → person-test-id). A wrong env-binding
-    // name or context-variable key would silently leave the guard un-armed under
-    // flag-on (the live staging path), so assert the exact opts shape.
+    // [WI-867] callerPersonId must always be threaded from resolveIdentityV2 (flag collapsed).
     expect(mockUpsertNotificationPrefs).toHaveBeenCalledWith(
       expect.anything(),
       'profile-1',
       'test-account-id',
       expect.objectContaining({ reviewReminders: true }),
-      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+      { callerPersonId: 'person-test-id' },
     );
   });
 

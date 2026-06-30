@@ -82,7 +82,7 @@ describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
     return app;
   }
 
-  it('flag-on arms the v2 rate-limit guard: identityV2Enabled:true + callerPersonId', async () => {
+  it('[WI-867] callerPersonId is always threaded into rate-limit guard (v2 always active)', async () => {
     mockCheckAndLogRateLimit.mockResolvedValue(false);
     await makeV2App().request(
       '/progress/refresh',
@@ -90,15 +90,14 @@ describe('[WI-774] snapshot-progress flag-on rate-limit threading', () => {
       { IDENTITY_V2_ENABLED: 'true' },
     );
 
-    // A wrong env-binding name or context key would leave the guard un-armed on
-    // the live (staging, flag-on) path — assert the exact identity opts shape.
+    // [WI-867] callerPersonId must always be threaded from resolveIdentityV2 (flag collapsed).
     expect(mockCheckAndLogRateLimit).toHaveBeenCalledWith(
       expect.anything(),
       'a0000000-0000-4000-a000-000000000001',
       'test-account-id',
       'progress_refresh',
       { hours: 1, maxCount: 10 },
-      { identityV2Enabled: true, callerPersonId: 'person-test-id' },
+      { callerPersonId: 'person-test-id' },
     );
   });
 });

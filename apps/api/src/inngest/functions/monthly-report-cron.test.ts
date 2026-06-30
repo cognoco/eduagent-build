@@ -896,15 +896,12 @@ describe('monthlyReportCron', () => {
     });
 
     // -----------------------------------------------------------------------
-    // [WI-777] Identity-V2 wiring guard (CUT-B2).
+    // [WI-777 / WI-867] Identity-V2 wiring guard (CUT-B2, flag collapsed).
     //
-    // find-report-pairs branches on isIdentityV2EnabledInStep():
-    //   - v2:     derives pairs from select().from(guardianship) (canonical
-    //             consent-authority edge) + db.query.person.findMany active
-    //             filter
-    //   - legacy: select().from(familyLinks) + db.query.profiles.findMany
-    // These tests assert the correct edge table is read per flag, guarding the
-    // v2 wiring against regression before WP-FLAG drops the legacy tables.
+    // find-report-pairs always uses the v2 path (flag collapsed in WI-867):
+    // derives pairs from select().from(guardianship) + db.query.person.findMany.
+    // The test below guards the v2 wiring against regression (legacy familyLinks
+    // path is dead but seeded to make regressions observable).
     // -----------------------------------------------------------------------
     it('[WI-777] flag-on: derives pairs from guardianship, not familyLinks', async () => {
       const prev = process.env['IDENTITY_V2_ENABLED'];
