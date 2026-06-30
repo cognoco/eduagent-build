@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -40,7 +40,7 @@ function slug(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function TopicRow({
+const TopicRow = memo(function TopicRow({
   hubTopic,
   onOpenTopic,
 }: {
@@ -79,9 +79,9 @@ function TopicRow({
       </View>
     </Pressable>
   );
-}
+});
 
-export function SubjectHubChapterSection({
+export const SubjectHubChapterSection = memo(function SubjectHubChapterSection({
   chapter,
   defaultExpanded = false,
   onOpenTopic,
@@ -129,4 +129,4 @@ export function SubjectHubChapterSection({
         : null}
     </View>
   );
-}
+});
