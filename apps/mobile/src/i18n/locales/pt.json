@@ -4034,6 +4034,13 @@
       "title": "Escolha o seu primeiro livro",
       "message": "Escolha um livro para começar a estudar esta disciplina.",
       "cta": "Procurar livros"
+    },
+    "manage": {
+      "open": "Gerir",
+      "accessibilityLabel": "Gerir disciplina",
+      "title": "Gerir disciplina",
+      "description": "Pausa esta disciplina para a ocultar da aprendizagem ativa, ou arquiva-a até a restaurares.",
+      "close": "Fechar"
     }
   },
   "journal": {

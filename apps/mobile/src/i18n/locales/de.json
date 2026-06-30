@@ -4034,6 +4034,13 @@
       "title": "Wähle dein erstes Buch",
       "message": "Wähle ein Buch, um mit dem Lernen dieses Fachs zu beginnen.",
       "cta": "Bücher durchsuchen"
+    },
+    "manage": {
+      "open": "Verwalten",
+      "accessibilityLabel": "Fach verwalten",
+      "title": "Fach verwalten",
+      "description": "Pausiere dieses Fach, um es aus dem aktiven Lernen auszublenden, oder archiviere es, bis du es wiederherstellst.",
+      "close": "Schließen"
     }
   },
   "journal": {

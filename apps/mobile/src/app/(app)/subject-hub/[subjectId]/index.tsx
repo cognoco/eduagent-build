@@ -1,7 +1,8 @@
-import { useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import type { Subject } from '@eduagent/schemas';
 
 import {
   EmptyStateCard,
@@ -10,12 +11,15 @@ import {
 } from '../../../../components/common';
 import {
   SubjectHub,
+  SubjectHubManageSheet,
   SubjectHubPreparing,
   type HubNextUp,
 } from '../../../../components/subject-hub';
 import { useSubjectHub } from '../../../../hooks/use-subject-hub';
 import { useRetryCurriculum } from '../../../../hooks/use-books';
+import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
+import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
 import {
   goBackOrReplace,
   pushLearningResumeTarget,
@@ -62,6 +66,49 @@ export default function SubjectHubRoute(): React.ReactElement {
       );
     },
     [createNoteMutate, t],
+  );
+
+  // WI-1119: in-context subject management on the hub. Gate on proxy scope — a
+  // supporter-proxy session is read-only over the child's subjects, mirroring
+  // Library's `canWrite = !navigationContract.isParentProxy`. (canStudy is not
+  // used: buildSubjectHubData hardcodes it true, so it can't gate the proxy.)
+  const navigationContract = useNavigationContract();
+  const canManage = !navigationContract.isParentProxy;
+  const [manageOpen, setManageOpen] = useState(false);
+  // includeInactive so a deep-linked paused/archived subject still resolves its
+  // status; defaults to 'active' (the common hub-entry path) until loaded.
+  const subjectsQuery = useSubjects({
+    includeInactive: true,
+    enabled: canManage && !!subjectId,
+  });
+  const subjectStatus: Subject['status'] =
+    subjectsQuery.data?.find((subject) => subject.id === subjectId)?.status ??
+    'active';
+  // Don't expose the manage entry until the status is actually known — opening
+  // the sheet on the 'active' fallback would show the wrong action set for a
+  // deep-linked paused/archived subject (pause+archive instead of resume/restore).
+  const manageReady = canManage && !!subjectsQuery.data;
+  const updateSubject = useUpdateSubject();
+
+  const handleChangeStatus = useCallback(
+    (status: Subject['status']) => {
+      if (!subjectId || updateSubject.isPending) return;
+      // Classify-then-format at this boundary: pass the raw error to
+      // formatApiError so the screen never parses HTTP status codes itself
+      // (UX Resilience Rules), matching Library's manage-error path.
+      updateSubject.mutate(
+        { subjectId, status },
+        {
+          onError: (err: unknown) =>
+            platformAlert(
+              t('library.manage.updateErrorTitle'),
+              formatApiError(err),
+            ),
+          onSuccess: () => setManageOpen(false),
+        },
+      );
+    },
+    [subjectId, updateSubject, t],
   );
 
   const goBack = useCallback(() => {
@@ -246,6 +293,21 @@ export default function SubjectHubRoute(): React.ReactElement {
         />
       ) : hubData ? (
         <View className="flex-1" testID="subject-hub-screen">
+          {manageReady ? (
+            <View className="flex-row justify-end px-5 pt-3">
+              <Pressable
+                testID="subject-hub-manage"
+                accessibilityRole="button"
+                accessibilityLabel={t('subjectHub.manage.accessibilityLabel')}
+                onPress={() => setManageOpen(true)}
+                className="min-h-[40px] justify-center rounded-button px-3"
+              >
+                <Text className="text-body-sm font-semibold text-primary">
+                  {t('subjectHub.manage.open')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           <SubjectHub
             data={hubData}
             onNextUpPress={handleNextUp}
@@ -253,6 +315,16 @@ export default function SubjectHubRoute(): React.ReactElement {
             onReviewTopic={handleReviewTopic}
             onAddNote={handleAddNote}
           />
+          {canManage ? (
+            <SubjectHubManageSheet
+              visible={manageOpen}
+              subjectName={hubData.subjectName}
+              status={subjectStatus}
+              isSaving={updateSubject.isPending}
+              onClose={() => setManageOpen(false)}
+              onChangeStatus={handleChangeStatus}
+            />
+          ) : null}
         </View>
       ) : null}
     </QueryStateView>

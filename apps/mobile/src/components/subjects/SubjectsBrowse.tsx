@@ -127,51 +127,69 @@ export function SubjectsBrowse({
               </Pressable>
             </View>
           ) : (
-            groups.map((group) => (
-              <View key={group.status} className="mt-5">
-                <Text
-                  testID={`subjects-browse-section-${group.status}`}
-                  className="text-caption font-semibold uppercase text-text-secondary"
-                >
-                  {sectionLabel(group.status)}
-                </Text>
-                <View className="mt-3 gap-3">
-                  {group.items.map((subject) => (
-                    <Pressable
-                      key={subject.subjectId}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('subjectsBrowse.openSubject')}
-                      className="rounded-card bg-coaching-card p-4"
-                      onPress={() => onOpenSubject(subject.subjectId)}
-                      testID={`subjects-browse-row-${subject.subjectId}`}
-                    >
-                      <Text className="text-h3 font-semibold text-text-primary">
-                        {subject.subjectName}
-                      </Text>
-                      <Text className="mt-1 text-body text-text-secondary">
-                        {t('subjectsBrowse.subjectProgress', {
-                          mastered: subject.mastered,
-                          learning: subject.learning,
-                          total: subject.total,
-                        })}
-                      </Text>
-                      <Text className="mt-1 text-caption text-text-secondary">
-                        {t('subjectsBrowse.bookCount', {
-                          count: subject.books.length,
-                        })}
-                      </Text>
-                      {subject.dueReviews > 0 ? (
-                        <Text className="mt-2 text-caption font-semibold text-warning">
-                          {t('subjectsBrowse.reviewsDue', {
-                            count: subject.dueReviews,
+            <>
+              {groups.map((group) => (
+                <View key={group.status} className="mt-5">
+                  <Text
+                    testID={`subjects-browse-section-${group.status}`}
+                    className="text-caption font-semibold uppercase text-text-secondary"
+                  >
+                    {sectionLabel(group.status)}
+                  </Text>
+                  <View className="mt-3 gap-3">
+                    {group.items.map((subject) => (
+                      <Pressable
+                        key={subject.subjectId}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('subjectsBrowse.openSubject')}
+                        className="rounded-card bg-coaching-card p-4"
+                        onPress={() => onOpenSubject(subject.subjectId)}
+                        testID={`subjects-browse-row-${subject.subjectId}`}
+                      >
+                        <Text className="text-h3 font-semibold text-text-primary">
+                          {subject.subjectName}
+                        </Text>
+                        <Text className="mt-1 text-body text-text-secondary">
+                          {t('subjectsBrowse.subjectProgress', {
+                            mastered: subject.mastered,
+                            learning: subject.learning,
+                            total: subject.total,
                           })}
                         </Text>
-                      ) : null}
-                    </Pressable>
-                  ))}
+                        <Text className="mt-1 text-caption text-text-secondary">
+                          {t('subjectsBrowse.bookCount', {
+                            count: subject.books.length,
+                          })}
+                        </Text>
+                        {subject.dueReviews > 0 ? (
+                          <Text className="mt-2 text-caption font-semibold text-warning">
+                            {t('subjectsBrowse.reviewsDue', {
+                              count: subject.dueReviews,
+                            })}
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
-            ))
+              ))}
+              {/* Add-subject affordance on the populated path: without it a
+                  learner with ≥1 subject has no way to start a second one
+                  without going back through onboarding (WI-1119). Same
+                  testID/handler as the empty state — only one branch renders
+                  per state, so it is never a dup. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('subjectsBrowse.createSubject')}
+                className="mt-4 min-h-[48px] justify-center rounded-card border border-border bg-surface px-4"
+                onPress={onCreateSubject}
+                testID="subjects-browse-create"
+              >
+                <Text className="text-center text-body font-semibold text-primary">
+                  {t('subjectsBrowse.createSubject')}
+                </Text>
+              </Pressable>
+            </>
           )}
         </>
       )}
