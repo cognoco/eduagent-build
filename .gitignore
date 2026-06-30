@@ -210,6 +210,12 @@ apps/mobile/e2e/scripts/run-logs/**/*.log
 # Codex tool logs (local-only)
 .codex/
 
+# Codex re-execution scratch (pre-edit .base snapshots + .patch diffs; regenerable)
+.codex-tmp/
+
+# Cosmo run artifacts (workitem.json + completion-summary.md per run; regenerable)
+.cosmo-runs/
+
 # BMAD working artifacts (scratch specs, test designs — canonical docs live in docs/)
 _bmad-output/
 
