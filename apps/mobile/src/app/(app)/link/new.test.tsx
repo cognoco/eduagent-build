@@ -17,13 +17,6 @@ jest.mock(
   () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock( /* gc1-allow: route test isolates fallback copy; formatter has direct unit coverage */
-  '../../../lib/format-api-error',
-  () => ({
-    formatApiError: (error: Error) => error.message,
-  }),
-);
-
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockParams: Record<string, string> = {

@@ -88,6 +88,7 @@ export default function LinkContractScreen(): React.ReactElement {
 
   const revokeMutation = useMutation({
     mutationFn: async (contract: VisibilityContract) => {
+      // Revoke is keyed by the supportership edge, not the visibility contract.
       const res = await client.visibility.links[':id'].revoke.$post({
         param: { id: contract.supportershipId },
       });

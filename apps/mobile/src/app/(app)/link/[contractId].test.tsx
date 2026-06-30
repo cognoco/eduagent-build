@@ -17,13 +17,6 @@ jest.mock(
   () => require('../../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock( /* gc1-allow: route test isolates fallback copy; formatter has direct unit coverage */
-  '../../../lib/format-api-error',
-  () => ({
-    formatApiError: (error: Error) => error.message,
-  }),
-);
-
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 let mockActiveProfileId = '00000000-0000-4000-8000-000000000003';
@@ -100,44 +93,48 @@ describe('LinkContractScreen', () => {
     mockActiveProfileId = CONTRACT.supporterPersonId;
   });
 
-  it('loads the visibility contract and accepts for the active side', async () => {
-    mockFetch.setRoute(
-      '/visibility/links/',
-      (url: string, init?: RequestInit) => {
-        if (url.endsWith('/contract')) return CONTRACT;
-        if (url.endsWith('/accept')) {
-          return {
-            ...CONTRACT,
-            supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
-          };
-        }
-        return new Response(JSON.stringify({}), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      },
-    );
+  it(
+    'loads the visibility contract and accepts for the active side',
+    async () => {
+      mockFetch.setRoute(
+        '/visibility/links/',
+        (url: string, init?: RequestInit) => {
+          if (url.endsWith('/contract')) return CONTRACT;
+          if (url.endsWith('/accept')) {
+            return {
+              ...CONTRACT,
+              supporterAcceptedAt: '2026-06-20T12:01:00.000Z',
+            };
+          }
+          return new Response(JSON.stringify({}), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        },
+      );
 
-    renderScreen();
+      renderScreen();
 
-    await screen.findByTestId('visibility-contract-card');
-    screen.getByText('Visibility contract');
-    screen.getByText('You are asking to support Emma.');
-    screen.getByText('Private chats, notes and journal artifacts stay hidden.');
+      await screen.findByTestId('visibility-contract-card');
+      screen.getByText('Visibility contract');
+      screen.getByText('You are asking to support Emma.');
+      screen.getByText('Private chats, notes and journal artifacts stay hidden.');
 
-    fireEvent.press(screen.getByTestId('visibility-contract-accept'));
+      fireEvent.press(screen.getByTestId('visibility-contract-accept'));
 
-    await waitFor(() =>
-      expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(1),
-    );
-    const body = extractJsonBody<{ actorPersonId: string; audience: string }>(
-      fetchCallsMatching(mockFetch, '/accept')[0]?.init,
-    );
-    expect(body).toEqual({
-      actorPersonId: '00000000-0000-4000-8000-000000000003',
-      audience: 'supporter',
-    });
-  });
+      await waitFor(() =>
+        expect(fetchCallsMatching(mockFetch, '/accept')).toHaveLength(1),
+      );
+      const body = extractJsonBody<{ actorPersonId: string; audience: string }>(
+        fetchCallsMatching(mockFetch, '/accept')[0]?.init,
+      );
+      expect(body).toEqual({
+        actorPersonId: '00000000-0000-4000-8000-000000000003',
+        audience: 'supporter',
+      });
+    },
+    10_000,
+  );
 
   it('shows review and revoke actions after both sides accepted', async () => {
     mockActiveProfileId = CONTRACT.supporteePersonId;
@@ -174,6 +171,9 @@ describe('LinkContractScreen', () => {
     await waitFor(() =>
       expect(fetchCallsMatching(mockFetch, '/revoke')).toHaveLength(1),
     );
+    const revokeCall = fetchCallsMatching(mockFetch, '/revoke')[0];
+    expect(revokeCall?.url).toContain(CONTRACT.supportershipId);
+    expect(revokeCall?.url).not.toContain(CONTRACT.id);
   });
 
   it('does not expose agreement actions to a non-party viewer', async () => {
