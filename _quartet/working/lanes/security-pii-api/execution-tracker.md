@@ -5,6 +5,10 @@
 > `_wip/umbrella-program/activation-planning.md` §2 PRG-10. Full finding text:
 > `docs/audit/2026-05-29-full-audit/L-gap-delta.md` (label `security-pii-api`).
 
+> **STATUS: GRADUATED / CLOSED — 2026-06-30.** All 27 findings remediated; lane complete.
+> Lifecycle of record is in Cosmo (the master): WS-14 → Closed, INI-10 → Graduated. This
+> tracker is now a historical record — the "spawn pending kickoff" note below is spent.
+
 **Activated:** 2026-06-13 (sixth run of the §2.1 recipe; first parallel activation
 *after* the IF cutover went live) · **Operator:** Jorn · **Shepherd:** PRG-10 shepherd
 session (spawn pending kickoff) · **Cosmo Workstream:** "API Security & PII"
