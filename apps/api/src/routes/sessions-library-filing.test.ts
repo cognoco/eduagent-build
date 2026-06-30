@@ -97,7 +97,8 @@ jest.mock('../services/identity-v2/helpers', () => {
 });
 
 jest.mock(
-  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
+  // gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests
+  '../services/identity-v2/identity-resolve',
   () => ({
     resolveIdentityV2: jest.fn().mockResolvedValue({
       account: {
