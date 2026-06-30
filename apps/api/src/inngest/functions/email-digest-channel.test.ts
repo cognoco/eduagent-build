@@ -70,7 +70,7 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 // prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
+jest.mock(
   '../../services/notifications',
   () => {
     const actual = jest.requireActual('../../services/notifications') as typeof import('../../services/notifications');
@@ -90,7 +90,7 @@ jest.mock( // gc1-allow: pattern-a conversion
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/settings',
   () => {
     const actual = jest.requireActual('../../services/settings') as typeof import('../../services/settings');
@@ -107,7 +107,7 @@ const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/snapshot-aggregation',
   () => {
     const actual = jest.requireActual('../../services/snapshot-aggregation') as typeof import('../../services/snapshot-aggregation');
@@ -131,7 +131,7 @@ const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/weekly-report',
   () => {
     const actual = jest.requireActual('../../services/weekly-report') as typeof import('../../services/weekly-report');
@@ -151,7 +151,7 @@ const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/practice-activity-summary',
   () => {
     const actual = jest.requireActual('../../services/practice-activity-summary') as typeof import('../../services/practice-activity-summary');
@@ -289,7 +289,7 @@ function buildMockDb(
 }
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -736,7 +736,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 });
 
 // prettier-ignore
-jest.mock( /* gc1-allow: pattern-a conversion */
+jest.mock(
   '../../services/monthly-report',
   () => {
     const actual = jest.requireActual('../../services/monthly-report') as typeof import('../../services/monthly-report');

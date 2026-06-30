@@ -10,7 +10,7 @@ import { BadRequestError, ConflictError } from '@eduagent/schemas';
 // [CR-2026-05-19-M1] Sentry external-boundary mock — proves captureException
 // fires on mastery upsert failure. Sentry is an external boundary (Sentry SDK).
 const mockCaptureException = jest.fn();
-jest.mock('../sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../sentry', () => {
   const actual = jest.requireActual('../sentry') as typeof import('../sentry');
   return {
     ...actual,

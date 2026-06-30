@@ -1,7 +1,7 @@
 const mockRouteAndCall = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,
@@ -9,7 +9,7 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as Record<string, unknown>;
   return {
     ...actual,

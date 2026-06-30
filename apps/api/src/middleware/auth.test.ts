@@ -7,7 +7,7 @@ import { BASE_AUTH_ENV } from '../test-utils/test-env';
 // Mock sentry + logger — external observability boundaries
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/sentry', () => {
   const actual = jest.requireActual(
     '../services/sentry',
   ) as typeof import('../services/sentry');
@@ -18,7 +18,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../services/logger', () => {
   const actual = jest.requireActual(
     '../services/logger',
   ) as typeof import('../services/logger');
@@ -55,7 +55,7 @@ const loggerMock = (
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./jwt' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./jwt', () => {
   const actual = jest.requireActual('./jwt') as typeof import('./jwt');
   return {
     ...actual,

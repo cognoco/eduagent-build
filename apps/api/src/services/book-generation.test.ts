@@ -1,6 +1,6 @@
 const mockRouteAndCall = jest.fn();
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,

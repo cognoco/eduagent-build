@@ -26,7 +26,7 @@ jest.mock(
 
 // [GC6] requireActual + targeted override — the only seam this suite needs is
 // findAccountByClerkId; everything else in ../account runs real.
-jest.mock('../account' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../account', () => {
   const actual = jest.requireActual(
     '../account',
   ) as typeof import('../account');
@@ -40,18 +40,15 @@ jest.mock('../account' /* gc1-allow: pattern-a conversion */, () => {
 // KV + the DB, neither of which is wired in these handler unit tests (mockDb is
 // `{}`), so the dispatch is overridden — but via the canonical requireActual
 // seam rather than a blanket internal mock.
-jest.mock(
-  '../safe-refresh-kv-cache' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../safe-refresh-kv-cache',
-    ) as typeof import('../safe-refresh-kv-cache');
-    return {
-      ...actual,
-      safeRefreshKvCache: jest.fn().mockResolvedValue(undefined),
-    };
-  },
-);
+jest.mock('../safe-refresh-kv-cache', () => {
+  const actual = jest.requireActual(
+    '../safe-refresh-kv-cache',
+  ) as typeof import('../safe-refresh-kv-cache');
+  return {
+    ...actual,
+    safeRefreshKvCache: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 jest.mock('../safe-non-core' /* gc1-allow: external boundary */, () => ({
   safeSend: jest.fn().mockResolvedValue(undefined),

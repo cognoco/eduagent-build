@@ -28,7 +28,7 @@ import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
-jest.mock('./llm/router' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm/router', () => {
   const actual = jest.requireActual(
     './llm/router',
   ) as typeof import('./llm/router');

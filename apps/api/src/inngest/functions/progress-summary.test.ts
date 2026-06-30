@@ -25,7 +25,7 @@ const mockGenerateProgressSummary = jest.fn();
 const mockUpsertProgressSummary = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -35,7 +35,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -47,41 +47,35 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/snapshot-aggregation',
-    ) as typeof import('../../services/snapshot-aggregation');
-    return {
-      ...actual,
-      buildKnowledgeInventory: (...args: unknown[]) =>
-        mockBuildKnowledgeInventory(...args),
-    };
-  },
-);
+jest.mock('../../services/snapshot-aggregation', () => {
+  const actual = jest.requireActual(
+    '../../services/snapshot-aggregation',
+  ) as typeof import('../../services/snapshot-aggregation');
+  return {
+    ...actual,
+    buildKnowledgeInventory: (...args: unknown[]) =>
+      mockBuildKnowledgeInventory(...args),
+  };
+});
 
-jest.mock(
-  '../../services/progress-summary' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/progress-summary',
-    ) as typeof import('../../services/progress-summary');
-    return {
-      ...actual,
-      deterministicProgressSummaryFallback: (childName: string) =>
-        `Fallback summary for ${childName}.`,
-      findLatestCompletedLearningSession: (...args: unknown[]) =>
-        mockFindLatestCompletedLearningSession(...args),
-      generateProgressSummary: (...args: unknown[]) =>
-        mockGenerateProgressSummary(...args),
-      upsertProgressSummary: (...args: unknown[]) =>
-        mockUpsertProgressSummary(...args),
-    };
-  },
-);
+jest.mock('../../services/progress-summary', () => {
+  const actual = jest.requireActual(
+    '../../services/progress-summary',
+  ) as typeof import('../../services/progress-summary');
+  return {
+    ...actual,
+    deterministicProgressSummaryFallback: (childName: string) =>
+      `Fallback summary for ${childName}.`,
+    findLatestCompletedLearningSession: (...args: unknown[]) =>
+      mockFindLatestCompletedLearningSession(...args),
+    generateProgressSummary: (...args: unknown[]) =>
+      mockGenerateProgressSummary(...args),
+    upsertProgressSummary: (...args: unknown[]) =>
+      mockUpsertProgressSummary(...args),
+  };
+});
 
-jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/sentry', () => {
   const actual = jest.requireActual(
     '../../services/sentry',
   ) as typeof import('../../services/sentry');

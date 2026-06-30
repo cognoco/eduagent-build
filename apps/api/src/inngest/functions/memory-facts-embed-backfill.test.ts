@@ -37,7 +37,7 @@ const mockDb: Record<string, any> = {
   execute: jest.fn().mockResolvedValue(undefined),
 };
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');

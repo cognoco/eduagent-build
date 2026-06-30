@@ -1,7 +1,7 @@
 import { safeSend } from './safe-non-core';
 
 const mockCaptureException = jest.fn();
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,
@@ -10,7 +10,7 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 const mockLoggerError = jest.fn();
-jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./logger', () => {
   const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,

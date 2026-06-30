@@ -22,7 +22,7 @@ const mockGetChildSessions = jest.fn();
 const mockGetChildSessionDetail = jest.fn();
 const mockListProfileSessions = jest.fn();
 
-jest.mock('./dashboard' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./dashboard', () => {
   const actual = jest.requireActual(
     './dashboard',
   ) as typeof import('./dashboard');

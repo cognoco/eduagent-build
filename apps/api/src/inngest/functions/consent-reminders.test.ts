@@ -26,7 +26,7 @@ const mockFormatConsentReminderEmail = jest.fn(
 // so the requestedAt-window suppression remains test-controllable.
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -53,22 +53,19 @@ jest.mock(
   },
 );
 
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-      formatConsentReminderEmail: (...args: unknown[]) =>
-        mockFormatConsentReminderEmail(
-          ...(args as [string, string, number, string]),
-        ),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatConsentReminderEmail: (...args: unknown[]) =>
+      mockFormatConsentReminderEmail(
+        ...(args as [string, string, number, string]),
+      ),
+  };
+});
 
 jest.mock(
   '../../services/identity-v2/deletion-v2' /* gc1-allow: write fn — deletePersonIfNoConsentV2 performs an atomic .delete() guarded by a no-consent subquery, not exercisable on the unit Proxy mock-db; no consent-reminders integration twin exists yet — coverage gap tracked WI-905 */,

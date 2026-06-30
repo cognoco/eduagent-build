@@ -16,7 +16,7 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../helpers', () => {
   const actual = jest.requireActual(
     '../helpers',
   ) as typeof import('../helpers');
@@ -26,7 +26,7 @@ jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return {
     ...actual,
@@ -42,7 +42,7 @@ jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../../services/logger', () => {
   const actual = jest.requireActual(
     '../../services/logger',
   ) as typeof import('../../services/logger');

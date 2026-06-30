@@ -1,4 +1,4 @@
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./llm', () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
   return {
     ...actual,
@@ -8,14 +8,14 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockCaptureException = jest.fn();
 const mockLoggerWarn = jest.fn();
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./sentry', () => {
   const actual = jest.requireActual('./sentry') as typeof import('./sentry');
   return {
     ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   };
 });
-jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./logger', () => {
   const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,

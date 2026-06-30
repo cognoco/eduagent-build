@@ -22,7 +22,7 @@ jest.mock(
 );
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client', () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
@@ -100,55 +100,46 @@ jest.mock(
 );
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
-  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notifications',
-    ) as typeof import('../../services/notifications');
-    return {
-      ...actual,
-      sendPushNotification: (...args: unknown[]) =>
-        mockSendPushNotification(...args),
-    };
-  },
-);
+jest.mock('../../services/notifications', () => {
+  const actual = jest.requireActual(
+    '../../services/notifications',
+  ) as typeof import('../../services/notifications');
+  return {
+    ...actual,
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  };
+});
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
-jest.mock(
-  '../../services/settings' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/settings',
-    ) as typeof import('../../services/settings');
-    return {
-      ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
-      getWithdrawalArchivePreference: (...args: unknown[]) =>
-        mockGetWithdrawalArchivePreference(...args),
-    };
-  },
-);
+jest.mock('../../services/settings', () => {
+  const actual = jest.requireActual(
+    '../../services/settings',
+  ) as typeof import('../../services/settings');
+  return {
+    ...actual,
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+    getWithdrawalArchivePreference: (...args: unknown[]) =>
+      mockGetWithdrawalArchivePreference(...args),
+  };
+});
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue('notice-001');
 const mockGetPendingNoticeChildName = jest.fn().mockResolvedValue('Emma');
-jest.mock(
-  '../../services/notices' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/notices',
-    ) as typeof import('../../services/notices');
-    return {
-      ...actual,
-      recordPendingNotice: (...args: unknown[]) =>
-        mockRecordPendingNotice(...args),
-      getPendingNoticeChildName: (...args: unknown[]) =>
-        mockGetPendingNoticeChildName(...args),
-    };
-  },
-);
+jest.mock('../../services/notices', () => {
+  const actual = jest.requireActual(
+    '../../services/notices',
+  ) as typeof import('../../services/notices');
+  return {
+    ...actual,
+    recordPendingNotice: (...args: unknown[]) =>
+      mockRecordPendingNotice(...args),
+    getPendingNoticeChildName: (...args: unknown[]) =>
+      mockGetPendingNoticeChildName(...args),
+  };
+});
 
 import { consentRevocation } from './consent-revocation';
 

@@ -16,7 +16,7 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('./evaluate' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('./evaluate', () => {
   const actual = jest.requireActual(
     './evaluate',
   ) as typeof import('./evaluate');
