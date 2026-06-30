@@ -18,7 +18,6 @@ jest.mock('./llm', () => {
 import {
   GeminiOcrProvider,
   StubOcrProvider,
-  createOcrProvider,
   getOcrProvider,
   setOcrProvider,
   resetOcrProvider,
@@ -69,19 +68,14 @@ describe('StubOcrProvider', () => {
   });
 });
 
-describe('createOcrProvider', () => {
-  it('returns StubOcrProvider by default', () => {
-    const provider = createOcrProvider();
+describe('OcrProvider constructors', () => {
+  it('StubOcrProvider is directly instantiable', () => {
+    const provider = new StubOcrProvider();
     expect(provider).toBeInstanceOf(StubOcrProvider);
   });
 
-  it('returns StubOcrProvider for unknown type', () => {
-    const provider = createOcrProvider('unknown');
-    expect(provider).toBeInstanceOf(StubOcrProvider);
-  });
-
-  it('returns GeminiOcrProvider when requested', () => {
-    const provider = createOcrProvider('gemini');
+  it('GeminiOcrProvider is directly instantiable', () => {
+    const provider = new GeminiOcrProvider();
     expect(provider).toBeInstanceOf(GeminiOcrProvider);
   });
 });

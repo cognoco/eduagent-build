@@ -1,11 +1,8 @@
 import { addBreadcrumb, captureException } from './sentry';
+import { sleep } from './sleep';
 
 const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
 const TRANSIENT_DB_RETRY_DELAY_MS = 300;
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 export function isTransientDatabaseError(error: unknown): boolean {
   const message =
@@ -101,7 +98,7 @@ export async function withTransientDatabaseRetry<T>(
           maxAttempts: TRANSIENT_DB_RETRY_ATTEMPTS + 1,
         },
       );
-      await delay(TRANSIENT_DB_RETRY_DELAY_MS * (attempt + 1));
+      await sleep(TRANSIENT_DB_RETRY_DELAY_MS * (attempt + 1));
     }
   }
 
