@@ -340,6 +340,16 @@ describe('SessionMessageActions arePropsEqual (React.memo comparator) [WI-964]',
         consumedQuickChipMessageId: 'ai-1',
       }),
     ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        quotaError: {
+          type: 'daily',
+          limit: 10,
+          resetAt: '2026-01-01',
+        } as any,
+      }),
+    ).toBe(false);
   });
 
   it('re-renders when a callback identity changes', () => {
@@ -353,6 +363,18 @@ describe('SessionMessageActions arePropsEqual (React.memo comparator) [WI-964]',
       arePropsEqual(defaultProps, {
         ...defaultProps,
         handleQuickChip: jest.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        onToggleBookmark: jest.fn(),
+      }),
+    ).toBe(false);
+    expect(
+      arePropsEqual(defaultProps, {
+        ...defaultProps,
+        handleReconnect: jest.fn(),
       }),
     ).toBe(false);
   });
