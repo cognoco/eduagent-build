@@ -24,6 +24,7 @@ import { formatShortDate } from '../lib/format-datetime';
 import { platformAlert } from '../lib/platform-alert';
 import { signOutWithCleanup } from '../lib/sign-out';
 import { useHasLinkedChildren, useProfile } from '../lib/profile';
+import { Button } from '../components/common';
 
 // [BUG-910] The exact phrase a user must type to confirm. Kept as a constant
 // so tests and accessibility labels stay in sync.
@@ -226,28 +227,20 @@ export default function DeleteAccountScreen() {
                 {t('errors.networkError')}
               </Text>
             </View>
-            <Pressable
-              onPress={() => void deletionStatus.refetch()}
-              className="bg-primary rounded-button py-3.5 items-center mb-3"
-              testID="delete-account-status-retry"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.retry')}
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('common.retry')}
-              </Text>
-            </Pressable>
-            <Pressable
+            <View className="mb-3">
+              <Button
+                variant="primary"
+                label={t('common.retry')}
+                onPress={() => void deletionStatus.refetch()}
+                testID="delete-account-status-retry"
+              />
+            </View>
+            <Button
+              variant="secondary"
+              label={t('common.goBack')}
               onPress={handleClose}
-              className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-status-back"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.goBack')}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
+            />
           </View>
         ) : stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">
@@ -260,49 +253,42 @@ export default function DeleteAccountScreen() {
             <Text className="text-body-sm text-text-tertiary mb-6">
               {t('account.scheduledAccountActive')}
             </Text>
-            <Pressable
-              onPress={() => void onCancelDeletion()}
-              disabled={isLoading}
-              className="bg-primary rounded-button py-3.5 items-center mb-3"
-              testID="delete-account-keep"
-              accessibilityRole="button"
-              accessibilityLabel={t('account.keepAccountLabel')}
-            >
-              {cancelDeletion.isPending ? (
-                <ActivityIndicator
-                  color={colors.textInverse}
-                  accessibilityLabel={t('common.loading')}
-                />
-              ) : (
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('account.keepAccount')}
-                </Text>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                // UX-DE-H2: surface signOut failure
-                void signOutWithCleanup({
-                  clerkSignOut: signOut,
-                  queryClient,
-                  profileIds: profiles.map((p) => p.id),
-                  clerkUserId: userId ?? undefined,
-                }).catch(() => {
-                  platformAlert(
-                    t('account.signOutFailedTitle'),
-                    t('account.signOutFailedMessage'),
-                  );
-                })
-              }
-              className="bg-surface rounded-button py-3.5 items-center mb-3"
-              testID="delete-account-sign-out"
-              accessibilityRole="button"
-              accessibilityLabel={t('account.signOutNowLabel')}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('account.signOutNow')}
-              </Text>
-            </Pressable>
+            <View className="mb-3">
+              <Button
+                variant="primary"
+                label={t('account.keepAccount')}
+                onPress={() => void onCancelDeletion()}
+                disabled={isLoading}
+                loading={cancelDeletion.isPending}
+                testID="delete-account-keep"
+              />
+            </View>
+            <View className="mb-3">
+              <Button
+                variant="secondary"
+                label={t('account.signOutNow')}
+                onPress={() =>
+                  // UX-DE-H2: surface signOut failure
+                  void signOutWithCleanup({
+                    clerkSignOut: signOut,
+                    queryClient,
+                    profileIds: profiles.map((p) => p.id),
+                    clerkUserId: userId ?? undefined,
+                  }).catch(() => {
+                    platformAlert(
+                      t('account.signOutFailedTitle'),
+                      t('account.signOutFailedMessage'),
+                    );
+                  })
+                }
+                testID="delete-account-sign-out"
+              />
+            </View>
+            {/* Not converted to shared Button: accessibilityLabel
+                ("Close without cancelling") intentionally diverges from the
+                visible "Close" label — Button has no accessibilityLabel
+                override, so converting would regress the more specific SR
+                announcement. */}
             <Pressable
               onPress={handleClose}
               className="bg-surface rounded-button py-3.5 items-center"
@@ -373,6 +359,13 @@ export default function DeleteAccountScreen() {
               editable={!deleteAccount.isPending}
             />
 
+            {/* Not converted to shared Button: WI-1081 (route inline buttons
+                through shared Button) — Button only supports
+                primary/secondary/tertiary, no destructive/danger variant.
+                Converting would strip the red destructive-action styling
+                from this account-deletion confirm; adding a danger variant
+                to the shared component (used 19+ places) is a design-system
+                decision outside this WI's scope. */}
             <Pressable
               onPress={() => void onConfirmDelete()}
               disabled={!canConfirm}
@@ -397,18 +390,13 @@ export default function DeleteAccountScreen() {
               )}
             </Pressable>
 
-            <Pressable
+            <Button
+              variant="secondary"
+              label={t('common.goBack')}
               onPress={onBackToWarning}
               disabled={deleteAccount.isPending}
-              className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-back-to-warning"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.goBack')}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
+            />
           </View>
         ) : (
           <>
@@ -425,6 +413,8 @@ export default function DeleteAccountScreen() {
               {t('account.warningBody2')}
             </Text>
 
+            {/* Not converted to shared Button: no danger variant — see the
+                identical note on delete-account-confirm-final above. */}
             <Pressable
               onPress={onBeginConfirm}
               disabled={isLoading}
@@ -438,17 +428,12 @@ export default function DeleteAccountScreen() {
               </Text>
             </Pressable>
 
-            <Pressable
+            <Button
+              variant="secondary"
+              label={t('common.cancel')}
               onPress={handleClose}
-              className="bg-surface rounded-button py-3.5 items-center"
               testID="delete-account-cancel"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.cancel')}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.cancel')}
-              </Text>
-            </Pressable>
+            />
           </>
         )}
       </ScrollView>
