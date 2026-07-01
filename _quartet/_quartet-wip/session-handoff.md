@@ -148,7 +148,8 @@ Commits on `main` (own-work, pushed): `4497eaa`, `58b9a81` (+ earlier `c7d2e8d`)
 reviewer; I rule, hold merge gates, route the Clacks). Operator directive: **act autonomously; surface only
 `needs-operator`.** Shepherds/reviewer are separate operator-launched sessions — never spawn them as subagents.
 
-**Lanes + channels — 🔴 monitors DIE on compaction (job-scoped, F17); RE-ARM all three on resume:**
+**Lanes + channels — monitors generally SURVIVE compaction (same session); on resume RECONCILE, don't blind-re-arm.
+Current watcher task-ids: WS-18 `bpt11eqgp`, WS-22 `bb2x25w27`, WS-28 `bgrf1yg1t`:**
 - **WS-18 identity-cutover** `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8` — channel `_wip/identity-cutover/_state/`.
   Shepherd live. **I hold the merge gate** (no shepherd self-merge on this lane).
 - **WS-22 bug-lane** `3858bce9-1f7c-8083-905b-d94bca4a4325` — channel `_wip/bug-lane/_state/`. **DRAINED →
@@ -187,8 +188,10 @@ never stash untracked `_state/`. Operator offered a WI (would go to Cosmo improv
 findings-file commits while lanes are live to avoid re-churn.
 
 **RESUME CHECKLIST (do first):**
-1. **Re-arm the 3 outbox watchers** (WS-18/22/28 channel paths above) — `tail -n0 -F <outbox>`, persistent;
-   reconcile per `_quartet/clacks/monitor-hygiene.md` (task-ids don't survive — F17).
+1. **Reconcile the 3 outbox watchers — do NOT blind-re-arm.** They generally survive compaction; check each is
+   still alive (`/tasks` / TaskList) — current ids WS-18 `bpt11eqgp`, WS-22 `bb2x25w27`, WS-28 `bgrf1yg1t`; re-arm
+   **only the dead ones** (`tail -n0 -F <outbox>`, persistent; channel paths above). F17's "replace all" applies to
+   a genuine new session/job, NOT compaction. Hygiene: `_quartet/clacks/monitor-hygiene.md`.
 2. **WS-18:** check WI-868 Pass A CI status → run the merge gate (own-eyes: strict-green required checks +
    read the automated-review verdict body, not just the check colour) if green; merge = mine, no self-merge.
 3. Read each lane's `outbox.jsonl` tail for anything emitted during compaction; Cosmo-verify (channels may be stale).
