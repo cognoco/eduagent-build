@@ -301,7 +301,7 @@ jest.mock('../helpers', () => {
   };
 });
 
-import { getStepDatabase, setIdentityV2Enabled } from '../helpers';
+import { getStepDatabase } from '../helpers';
 import { weeklyProgressPushGenerate } from './weekly-progress-push';
 import { monthlyReportGenerate } from './monthly-report-cron';
 
@@ -389,9 +389,6 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockInngestTransport.clear();
   resetDbState();
-  // [WI-867] Reset the v2 flag binding to default; v2-consent tests opt in
-  // explicitly so the legacy-consent tests aren't affected by leak.
-  setIdentityV2Enabled(undefined);
   mockGetStepResendApiKey.mockReturnValue('test-resend-key');
 
   // Default snapshot responses for weekly tests
@@ -628,9 +625,6 @@ describe('Email digest channel — weekly', () => {
         state: seedState,
         personId: CHILD_ID_RESTRICTED,
       });
-      // [WI-867] Activate the v2 consent gate (boundary-left flag-branch in
-      // weekly-digest.ts) so isGdprProcessingAllowedV2 reads the seeded chain.
-      setIdentityV2Enabled('true');
 
       const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
         status: string;
@@ -656,8 +650,6 @@ describe('Email digest channel — weekly', () => {
     seedConsentState(db as unknown as Record<string, unknown>, {
       state: ['WITHDRAWN', 'WITHDRAWN'],
     });
-    // [WI-867] Activate the v2 consent gate (boundary-left flag-branch).
-    setIdentityV2Enabled('true');
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
       status: string;
@@ -684,14 +676,11 @@ describe('Email digest channel — weekly', () => {
     db.query.profiles.findFirst = jest
       .fn()
       .mockResolvedValue({ displayName: 'Alice', accountId: 'account-001' });
-    // WI-867: source reads isGdprProcessingAllowedV2 (v2, IDENTITY_V2_ENABLED=true).
     // Call order: prepare(A=CONSENTED), prepare(B=WITHDRAWN),
     //             send-push(A=CONSENTED), send-email(A=CONSENTED).
     seedConsentState(db as unknown as Record<string, unknown>, {
       state: ['CONSENTED', 'WITHDRAWN', 'CONSENTED', 'CONSENTED'],
     });
-    // [WI-867] Activate the v2 consent gate (boundary-left flag-branch).
-    setIdentityV2Enabled('true');
 
     const result = (await executeWeeklyGenerate(PARENT_ID, db)) as {
       status: string;

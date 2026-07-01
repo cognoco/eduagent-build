@@ -15,8 +15,8 @@
 // removal needs the edge cleanup to keep the family-seat semantics; it uses the
 // same revoked-at convention CUT-B2 establishes for reads.
 //
-// Flag-gated: dispatched by routes/billing.ts under IDENTITY_V2_ENABLED. Legacy
-// family.ts stays byte-identical.
+// Dispatched by routes/billing.ts. [WI-868] The identity-v2 flag is gone;
+// legacy family.ts still runs in parallel — convergence tracked in WI-1239.
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull, or, sql } from 'drizzle-orm';

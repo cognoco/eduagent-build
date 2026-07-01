@@ -29,8 +29,9 @@
 // targets LEGACY `subscriptions(id)`, so flag-on pre-repoint CI needs an
 // id-aligned legacy parent row. Remove that bridge with the convergence drop.
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
-// subscription-core.ts stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy
+// subscription-core.ts both run unconditionally in parallel (convergence
+// tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull, lte, ne, or, sql } from 'drizzle-orm';
@@ -459,7 +460,7 @@ export async function linkStripeCustomerV2(
  * [BUG-827] v2 twin of getOrCreateStripeCustomer. Same TOCTOU fix (row lock +
  * re-check + idempotency-keyed create), against the organization-keyed
  * `subscription` table. See the legacy doc comment in subscription-core.ts for
- * the full rationale. Reachable only under IDENTITY_V2_ENABLED.
+ * the full rationale.
  */
 export async function getOrCreateStripeCustomerV2(
   db: Database,

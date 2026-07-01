@@ -1,15 +1,11 @@
 // ---------------------------------------------------------------------------
 // CUT-B3 (WI-693) — webhook handler dispatchers (the seam)
 //
-// The two payment-webhook routes call these selectors once per request with the
-// env binding. Under IDENTITY_V2_ENABLED='true' they return the v2 handler
-// bundle (reads/writes the new `subscription` store); otherwise they return the
-// legacy bundle byte-identically. This is the single place the flag is read for
-// the webhook surface — the route bodies and the handler bodies never branch.
-//
-// `isIdentityV2Enabled` is the typed-config equality check (config.ts): only the
-// literal string 'true' selects v2; '`false`' and undefined stay legacy. The
-// flag-off break test (config.identity-v2.test.ts) pins that semantics.
+// [WI-868] The two payment-webhook routes call these selectors once per
+// request; they always return the v2 handler bundle (reads/writes the
+// `subscription` store). This is the single place the handler bundle is
+// selected for the webhook surface — the route bodies and the handler
+// bodies never branch.
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
@@ -88,9 +84,7 @@ const V2_STRIPE_HANDLERS: StripeWebhookHandlers = {
   handlePaymentSucceeded: handlePaymentSucceededV2,
 };
 
-export function getStripeWebhookHandlers(env: {
-  IDENTITY_V2_ENABLED?: string;
-}): StripeWebhookHandlers {
+export function getStripeWebhookHandlers(): StripeWebhookHandlers {
   return V2_STRIPE_HANDLERS;
 }
 
@@ -169,8 +163,6 @@ const V2_REVENUECAT_HANDLERS: RevenuecatWebhookHandlers = {
   handleUncancellation: handleUncancellationV2,
 };
 
-export function getRevenuecatWebhookHandlers(env: {
-  IDENTITY_V2_ENABLED?: string;
-}): RevenuecatWebhookHandlers {
+export function getRevenuecatWebhookHandlers(): RevenuecatWebhookHandlers {
   return V2_REVENUECAT_HANDLERS;
 }

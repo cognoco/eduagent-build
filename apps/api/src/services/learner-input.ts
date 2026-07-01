@@ -188,7 +188,6 @@ export async function parseLearnerInput(
   profileId: string,
   text: string,
   source: MemorySource,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ParseLearnerInputResult> {
   try {
     const analysis = await parseLearnerInputToAnalysis(text, source);
@@ -199,7 +198,6 @@ export async function parseLearnerInput(
       null,
       source,
       undefined,
-      opts,
     );
     return {
       success: true,

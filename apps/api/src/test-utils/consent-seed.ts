@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // Consent v2 test seed (WI-867).
 //
-// After the IDENTITY_V2_ENABLED collapse, GDPR-consent gating runs
+// [WI-868] The identity-v2 flag is gone; GDPR-consent gating runs
 // unconditionally through the v2 chain:
 //   resolveOrgIdForPerson → db.query.membership.findFirst
 //   resolveConsentStatus  → db.query.consentGrant.findFirst

@@ -161,7 +161,6 @@ export async function updateInterestsContext(
   profileId: string,
   accountId: string,
   interests: InterestEntry[],
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
   // Guard: verify the profile belongs to the calling account — mirrors the
   // accountId check in updateConversationLanguage / updatePronouns. The

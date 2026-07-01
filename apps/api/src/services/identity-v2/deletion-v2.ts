@@ -55,7 +55,8 @@
 // organization (it outlives both), so writing it before the drop is safe.
 //
 // person.id = profiles.id, organization.id = accounts.id (deterministic reseed).
-// FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
+// [WI-868] The identity-v2 flag is gone; these functions are called
+// unconditionally now.
 // ---------------------------------------------------------------------------
 
 import {

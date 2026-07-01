@@ -17,9 +17,8 @@
 // before exposing the legacy typed shape so DB/fixture drift fails closed at the
 // billing boundary.
 //
-// This is a flag-gated v2 module: it is reachable only when
-// IDENTITY_V2_ENABLED='true', which no deployed environment sets until the
-// WI-586 convergence flip. Legacy `types.ts` stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy `types.ts`
+// both run unconditionally in parallel (convergence tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { subscription } from '@eduagent/database';

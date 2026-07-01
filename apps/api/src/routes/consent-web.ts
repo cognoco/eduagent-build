@@ -44,7 +44,6 @@ type ConsentWebEnv = {
   Bindings: {
     DATABASE_URL: string;
     CONSENT_POLICY_VERSION: string;
-    IDENTITY_V2_ENABLED?: string;
     // [P0 email-consent-withdrawal] HMAC secret for the stateless withdrawal
     // token; the API origin the absolute withdrawal link points back at; and
     // the Resend bindings for the post-approval confirmation email. All

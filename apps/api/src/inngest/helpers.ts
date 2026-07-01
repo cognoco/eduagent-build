@@ -57,9 +57,6 @@ export interface EnvBindings {
   memoryFactsDedupThreshold?: string;
   maxDedupLlmCallsPerSession?: string;
   memoryFactsDedupRolloutPct?: string;
-  // [CUT-B1] Identity cutover flag, threaded to the B1 Inngest functions so
-  // their person-scope reads dispatch the same way the request path does.
-  identityV2Enabled?: string;
 }
 
 const envBindings = new AsyncLocalStorage<EnvBindings>();
@@ -119,30 +116,6 @@ function warnMissingBinding(bindingKey: keyof EnvBindings): void {
  */
 export function setDatabaseUrl(url: string): void {
   mergeEnvBindings({ databaseUrl: url });
-}
-
-/**
- * [CUT-B1] Whether the identity cutover is active for the current Inngest
- * invocation. Reads the per-invocation `identityV2Enabled` binding (set by the
- * env-binding middleware), falling back to `process.env` for Node test
- * environments. Strict `=== 'true'` equality — same default-closed semantics as
- * `isIdentityV2Enabled` in config.ts (the string 'false' must never select v2).
- */
-export function isIdentityV2EnabledInStep(): boolean {
-  const bound = getEnvBinding('identityV2Enabled');
-  if (bound === undefined) {
-    warnMissingBinding('identityV2Enabled');
-  }
-  const value = bound ?? process.env['IDENTITY_V2_ENABLED'];
-  return value === 'true';
-}
-
-/**
- * Injects the identity cutover flag into the current async context.
- * Test helper — production injection goes through the Inngest middleware.
- */
-export function setIdentityV2Enabled(value: string | undefined): void {
-  mergeEnvBindings({ identityV2Enabled: value });
 }
 
 /** Clear the injected URL in the current async context — for test cleanup only. */

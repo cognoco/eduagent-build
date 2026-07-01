@@ -214,7 +214,6 @@ type SessionRouteEnv = {
     JUDGE_FRAMEWORK_ENABLED?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
     MEMORY_FACTS_RELEVANCE_RETRIEVAL?: string;
-    IDENTITY_V2_ENABLED?: string;
     IDEMPOTENCY_KV?: KVNamespace;
     ENVIRONMENT?: string;
   };

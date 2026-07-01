@@ -46,9 +46,6 @@ export const stripeWebhookRoute = new Hono<{
     STRIPE_SECRET_KEY?: string;
     SUBSCRIPTION_KV?: KVNamespace;
     ENVIRONMENT?: string;
-    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
-    // subscription-store handlers. 'false'/unset in every deployed env.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     db: Database;
@@ -136,8 +133,8 @@ export const stripeWebhookRoute = new Hono<{
   const db = c.get('db');
   const kv = c.env.SUBSCRIPTION_KV;
   const eventTimestamp = new Date(event.created * 1000).toISOString();
-  // [CUT-B3 / WI-693] Resolve the handler bundle once (legacy vs v2) — the seam.
-  const handlers = getStripeWebhookHandlers(c.env);
+  // [CUT-B3 / WI-693] Resolve the handler bundle once — the seam.
+  const handlers = getStripeWebhookHandlers();
 
   // [BUG-113] Stale events (>48h old) are acknowledged (200) and dropped, NOT
   // rejected with 4xx. A 4xx response causes Stripe to RETRY the webhook for

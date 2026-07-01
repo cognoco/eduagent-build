@@ -749,7 +749,6 @@ describe('validateProductionBindings', () => {
     LLM_ROUTING_V2_ENABLED: 'false',
     MODE_NAV_V2_ENABLED: 'false',
     MANAGED_TIER_ACTIVE: 'false',
-    IDENTITY_V2_ENABLED: 'false',
     MAINTENANCE_READONLY: 'false',
     MAINTENANCE_BLOCK_INNGEST: 'false',
   };

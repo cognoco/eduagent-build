@@ -44,7 +44,6 @@ type SubjectRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

@@ -40,11 +40,9 @@ import {
   getStepResendApiKey,
   getStepRetentionPurgeEnabled,
   getStepSupportEmail,
-  isIdentityV2EnabledInStep,
   resetDatabaseUrl,
   runWithStepDatabaseScope,
   setDatabaseUrl,
-  setIdentityV2Enabled,
 } from './helpers';
 
 describe('Inngest helpers', () => {
@@ -279,66 +277,12 @@ describe('Inngest helpers', () => {
       );
     });
 
-    it('isIdentityV2EnabledInStep: captureException called when binding absent', () => {
-      isIdentityV2EnabledInStep();
-      expect(mockCaptureException).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('identityV2Enabled'),
-        }),
-        expect.objectContaining({
-          extra: expect.objectContaining({ bindingKey: 'identityV2Enabled' }),
-        }),
-      );
-    });
-
     it('guards do NOT fire when NODE_ENV=test (normal unit test env)', () => {
       // Restore to test mode to verify the guard is skipped
       process.env['NODE_ENV'] = 'test';
       getStepAppUrl();
       getStepSupportEmail();
       expect(mockCaptureException).not.toHaveBeenCalled();
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // [WI-906] ALS binding reset regression test.
-  //
-  // Verifies that setIdentityV2Enabled(undefined) clears the AsyncLocalStorage
-  // binding so isIdentityV2EnabledInStep() returns false (the flag-off default).
-  //
-  // Without a reset call in afterEach, a prior test that sets 'true' would leak
-  // into subsequent test files when Jest reuses workers (--runInBand or low
-  // --maxWorkers). This test makes that class of leak detectable: if any prior
-  // test leaked a 'true' binding, the reset-then-read will still read 'true'.
-  //
-  // Red-green: remove the setIdentityV2Enabled(undefined) call and run with a
-  // preceding test that sets 'true' — this test will fail.
-  // ---------------------------------------------------------------------------
-  describe('[WI-906] setIdentityV2Enabled(undefined) resets the ALS binding', () => {
-    afterEach(() => {
-      setIdentityV2Enabled(undefined);
-    });
-
-    it('returns false after setIdentityV2Enabled(undefined) even if previously set to true', () => {
-      // Ensure the process.env fallback cannot interfere.
-      const savedEnv = process.env['IDENTITY_V2_ENABLED'];
-      delete process.env['IDENTITY_V2_ENABLED'];
-
-      try {
-        // Simulate the state a prior test would have left behind.
-        setIdentityV2Enabled('true');
-        expect(isIdentityV2EnabledInStep()).toBe(true); // confirm the leak scenario
-
-        // The reset — this is what every suite's afterEach must do.
-        setIdentityV2Enabled(undefined);
-
-        // Now the ALS binding is absent and process.env has no fallback → false.
-        expect(isIdentityV2EnabledInStep()).toBe(false);
-      } finally {
-        if (savedEnv !== undefined) {
-          process.env['IDENTITY_V2_ENABLED'] = savedEnv;
-        }
-      }
     });
   });
 });

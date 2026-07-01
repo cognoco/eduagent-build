@@ -947,11 +947,9 @@ describe('[WI-803] listUnreadNudges v2 dispatch', () => {
     ).toHaveBeenCalled();
   });
 
-  it('[WI-803][BREAK] flag-on: returns empty when no guardians exist (post-M-DROP safe)', async () => {
+  it('[WI-803][BREAK] returns empty when no guardians exist (post-M-DROP safe)', async () => {
     const db = makeV2Db([], []);
-    const result = await listUnreadNudges(db, TO_PROFILE_ID, {
-      identityV2Enabled: true,
-    });
+    const result = await listUnreadNudges(db, TO_PROFILE_ID);
     expect(result).toEqual([]);
     // real getGuardianPersonIds drove guardianship.findMany
     expect(
@@ -961,12 +959,10 @@ describe('[WI-803] listUnreadNudges v2 dispatch', () => {
     expect(db.select as jest.Mock).not.toHaveBeenCalled();
   });
 
-  it('[WI-803][BREAK] flag-on: returns nudges via guardianship path when guardians exist', async () => {
+  it('[WI-803][BREAK] returns nudges via guardianship path when guardians exist', async () => {
     const nudgeRow = makeInsertedRow({ id: 'nudge-v2-aaa' });
     const db = makeV2Db([nudgeRow], [{ guardianPersonId: FROM_PROFILE_ID }]);
-    const result = await listUnreadNudges(db, TO_PROFILE_ID, {
-      identityV2Enabled: true,
-    });
+    const result = await listUnreadNudges(db, TO_PROFILE_ID);
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe('nudge-v2-aaa');
     expect(
@@ -976,14 +972,12 @@ describe('[WI-803] listUnreadNudges v2 dispatch', () => {
     expect(db.select as jest.Mock).toHaveBeenCalledTimes(1);
   });
 
-  it('[WI-803] flag-on: does not call familyLinks (post-M-DROP safe)', async () => {
+  it('[WI-803] does not call familyLinks (post-M-DROP safe)', async () => {
     const db = makeV2Db([], [{ guardianPersonId: FROM_PROFILE_ID }]);
     // The v2 select chain has a SINGLE innerJoin (profiles). The legacy path
     // chains innerJoin twice (profiles + familyLinks); on this stub that second
     // innerJoin is undefined and would throw — so resolving proves the v2 shape.
-    await expect(
-      listUnreadNudges(db, TO_PROFILE_ID, { identityV2Enabled: true }),
-    ).resolves.not.toThrow();
+    await expect(listUnreadNudges(db, TO_PROFILE_ID)).resolves.not.toThrow();
     expect((db.query as { familyLinks?: unknown }).familyLinks).toBeUndefined();
   });
 });

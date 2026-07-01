@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
 // CUT-B3 (WI-693) — billing-v2 barrel
 //
-// Public surface of the flag-gated v2 billing layer. Reachable only when
-// IDENTITY_V2_ENABLED='true' (no deployed environment until the WI-586 flip).
-// The webhook routes and the metering middleware select between these v2
-// symbols and the legacy ones via the dispatchers in ./dispatch.
+// Public surface of the v2 billing layer. [WI-868] The identity-v2 flag is
+// gone; the webhook routes dispatch to these v2 symbols unconditionally
+// (./dispatch), while the metering middleware and several other callers still
+// run these alongside the legacy symbols in parallel (convergence tracked in
+// WI-1239).
 // ---------------------------------------------------------------------------
 
 export { mapSubscriptionV2Row } from './types-v2';
@@ -33,8 +34,8 @@ export {
 } from './revenuecat-v2';
 
 // [WI-1057] v2 twin of the RevenueCat SUBSCRIBER_ALIAS merge — reconciles the
-// surviving identity onto the `subscription` table. Selected by the
-// billing-alias-merge worker under IDENTITY_V2_ENABLED (quota-reset split).
+// surviving identity onto the `subscription` table. Called unconditionally by
+// the billing-alias-merge worker.
 export { mergeAliasedSubscriptionV2 } from './alias-merge-v2';
 
 export { getEffectiveAccessForSubscriptionV2 } from './access-v2';

@@ -7,8 +7,8 @@
 // (subscription.id = subscriptions.id by the reseed). The effective-tier policy
 // (`resolveEffectiveAccessTier`) is store-agnostic and shared verbatim.
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy access.ts
-// stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy access.ts both
+// run unconditionally in parallel (convergence tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { type Database } from '@eduagent/database';

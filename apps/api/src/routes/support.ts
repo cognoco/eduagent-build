@@ -46,9 +46,6 @@ const SPILLOVER_WINDOW_HOURS = 1;
 const SPILLOVER_RETRY_AFTER_SECONDS = SPILLOVER_WINDOW_HOURS * 60 * 60;
 
 type SupportRouteEnv = {
-  Bindings: {
-    IDENTITY_V2_ENABLED?: string;
-  };
   Variables: {
     user: AuthUser;
     db: Database;

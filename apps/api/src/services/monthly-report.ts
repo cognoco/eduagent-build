@@ -360,9 +360,8 @@ export async function listMonthlyReportsForParentChild(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportSummary[]> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const rows = await db.query.monthlyReports.findMany({
     where: and(
       eq(monthlyReports.profileId, parentProfileId),
@@ -406,9 +405,8 @@ export async function getMonthlyReportForParentChild(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportRecord | null> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const row = await db.query.monthlyReports.findFirst({
     where: and(
       eq(monthlyReports.id, reportId),
@@ -425,9 +423,8 @@ export async function markMonthlyReportViewed(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
   await db
     .update(monthlyReports)
     .set({ viewedAt: new Date() })

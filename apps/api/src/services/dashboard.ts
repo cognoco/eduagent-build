@@ -299,7 +299,6 @@ function redactDashboardChild(child: DashboardChild): DashboardChild {
 async function getLatestConsentStatus(
   db: Database,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ConsentStatus | null> {
   // [WI-586] v2 path: resolve GDPR consent from the canonical consent graph
   // (consent_grant via the child's org).
@@ -310,9 +309,8 @@ async function getLatestConsentStatus(
 export async function assertChildDashboardDataVisible(
   db: Database,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
-  const status = await getLatestConsentStatus(db, childProfileId, opts);
+  const status = await getLatestConsentStatus(db, childProfileId);
   if (!isChildLearningDataVisible(status)) {
     throw new ForbiddenError(
       'Child learning data is hidden until consent is active.',
@@ -732,7 +730,6 @@ function parseSnapshotMetrics(input: unknown): ProgressMetrics {
 export async function getChildrenForParent(
   db: Database,
   parentProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<DashboardChild[]> {
   // 1. Query familyLinks (legacy) or guardianship (v2) for this parent's children
   let childProfileIds: string[];
@@ -1082,12 +1079,11 @@ export async function getChildDetail(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<DashboardChild | null> {
   // [EP15-I5] Throws ForbiddenError (→ 403) on access denial instead of
   // returning null. A null return here now means "parent has access but
   // the child was not present in the dashboard list" — a genuine not-found.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts); // 1 query
+  await assertParentAccess(db, parentProfileId, childProfileId); // 1 query
 
   // Step 1: Get the child's profile — 1 query
   // [WI-586] v2 path: read from person table; resolve consent via v2 resolver.
@@ -1294,11 +1290,10 @@ export async function getChildSubjectTopics(
   parentProfileId: string,
   childProfileId: string,
   subjectId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<TopicProgress[]> {
   // [EP15-I5] See assertParentAccess comment — ForbiddenError → 403.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
 
   // Verify the subject belongs to the child before querying curriculum (IDOR guard).
   const childSubject = await db.query.subjects.findFirst({
@@ -1386,12 +1381,11 @@ export async function getChildSessions(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildSession[]> {
   // [EP15-I5] ForbiddenError → 403. Empty array now means "parent has
   // access and the child has no sessions", not "access denied".
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   // [WI-586] v2 path: the active-(non-archived)-profile check reads person
   // (profiles dropped); flag-off reads legacy profiles.
   const activeProfile = await db.query.person.findFirst({
@@ -1409,10 +1403,9 @@ export async function getChildSessionDetail(
   parentProfileId: string,
   childProfileId: string,
   sessionId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildSession | null> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
 
   const session = await db.query.learningSessions.findFirst({
     where: and(
@@ -1519,12 +1512,11 @@ export async function getChildInventory(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<KnowledgeInventory> {
   // [EP15-I5] Return type tightened from `| null`. Access denial now
   // throws (→ 403); the only remaining path is a valid inventory.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return buildKnowledgeInventory(db, childProfileId);
 }
 
@@ -1537,11 +1529,10 @@ export async function getChildProgressHistory(
     to?: string;
     granularity?: 'daily' | 'weekly';
   },
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ProgressHistory> {
   // [EP15-I5] Return type tightened — access denial throws, not returns null.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return buildProgressHistory(db, childProfileId, input);
 }
 
@@ -1549,18 +1540,12 @@ export async function getChildReports(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportSummary[]> {
   // [EP15-I5] Access denial throws (→ 403). Empty array now means "no
   // reports yet for this child" — semantically distinct from forbidden.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
-  return listMonthlyReportsForParentChild(
-    db,
-    parentProfileId,
-    childProfileId,
-    opts,
-  );
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
+  return listMonthlyReportsForParentChild(db, parentProfileId, childProfileId);
 }
 
 export async function getChildReportDetail(
@@ -1568,17 +1553,15 @@ export async function getChildReportDetail(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<MonthlyReportRecord | null> {
   // [EP15-I5] null now only means "access granted but report not found".
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
   return getMonthlyReportForParentChild(
     db,
     parentProfileId,
     childProfileId,
     reportId,
-    opts,
   );
 }
 
@@ -1587,19 +1570,12 @@ export async function markChildReportViewed(
   parentProfileId: string,
   childProfileId: string,
   reportId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<void> {
   // [EP15-I5] Previously silently returned on access denial, letting an
   // unauthorized POST pretend to succeed. Now throws → 403.
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
-  await assertChildDashboardDataVisible(db, childProfileId, opts);
-  await markMonthlyReportViewed(
-    db,
-    parentProfileId,
-    childProfileId,
-    reportId,
-    opts,
-  );
+  await assertParentAccess(db, parentProfileId, childProfileId);
+  await assertChildDashboardDataVisible(db, childProfileId);
+  await markMonthlyReportViewed(db, parentProfileId, childProfileId, reportId);
 }
 
 export function buildDemoDashboard(): DemoDashboardData {

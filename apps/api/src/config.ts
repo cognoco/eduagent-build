@@ -222,19 +222,6 @@ const envSchema = z.object({
   // a separate server-enforced flag flip.
   MANAGED_TIER_ACTIVE: z.enum(['true', 'false']).default('false'),
 
-  // Identity Foundation cutover (CUT-B WP). The SINGLE flag for the whole
-  // identity surface (auth/account/person/consent-read/billing) — never
-  // per-domain flags (partial activation = split-brain, banned). Default-OFF:
-  // while 'false', every identity seam dispatches to the legacy `accounts` /
-  // `profiles` / `consent_states` store and no v2 module performs a DB call.
-  // The flip to 'true' happens once, in the WI-586 convergence runbook, AFTER
-  // freeze + final reseed + verify + FK re-point. No deployed environment
-  // carries 'true' until then; only tests set it true in-process. The
-  // flag-off break test (config.identity-v2.test.ts) pins the typed-config
-  // `=== 'true'` semantics so the JS truthiness of the string 'false' can
-  // never select v2.
-  IDENTITY_V2_ENABLED: z.enum(['true', 'false']).default('false'),
-
   // Convergence maintenance gates (WI-586 runbook §4 step 1). Two-stage:
   //   - MAINTENANCE_READONLY: stage 1. The maintenance gate (mounted at the
   //     top of index.ts, before auth/account resolution) 503s every request
@@ -382,25 +369,6 @@ export function isReviewContinuityOpenerEnabled(
  * a missing binding never accidentally turns the judge on.
  */
 export function isJudgeFrameworkEnabled(value: string | undefined): boolean {
-  return value === 'true';
-}
-
-/**
- * Identity Foundation cutover gate (CUT-B WP / WI-691). Read at each identity
- * domain seam (account resolve, profile scope, the onboarding bootstrap, the
- * person-scope twins, the B1 Inngest functions) to pick the v2 (`person` /
- * `login` / `organization` / `consent_grant`) implementation over the legacy
- * (`accounts` / `profiles` / `consent_states`) one.
- *
- * Default-closed by typed-config equality, NOT JS truthiness: the env value is
- * the literal string `'true'` or `'false'` (or undefined when the binding is
- * absent). A bare `if (config.IDENTITY_V2_ENABLED)` would treat the string
- * `'false'` as truthy and silently cut over every deployed environment — the
- * exact failure mode the flag-off break test (config.identity-v2.test.ts)
- * pins. Only `=== 'true'` selects v2; everything else (incl. `'false'` and
- * undefined) stays on legacy.
- */
-export function isIdentityV2Enabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

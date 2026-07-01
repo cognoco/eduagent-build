@@ -55,14 +55,12 @@ function makeDb(): {
 }
 
 describe('getChildTopicSnapshotForParent dispatch (WP-6 v2 seam)', () => {
-  it('flag-on reads guardianship (v2 edge guard), never familyLinks', async () => {
+  it('reads guardianship (v2 edge guard), never familyLinks', async () => {
     const { db, familyLinksFindFirst, guardianshipFindFirst } = makeDb();
 
     // No active edge → validateGuardianChargeRelationshipV2 throws before reads.
     await expect(
-      getChildTopicSnapshotForParent(db, PARENT_ID, CHILD_ID, TOPIC_ID, {
-        identityV2Enabled: true,
-      }),
+      getChildTopicSnapshotForParent(db, PARENT_ID, CHILD_ID, TOPIC_ID),
     ).rejects.toThrow();
 
     expect(guardianshipFindFirst).toHaveBeenCalledTimes(1);

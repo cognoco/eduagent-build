@@ -29,8 +29,6 @@ type NotificationsRouteEnv = {
   Bindings: {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
-    // [CUT-B3 / WI-693] Identity-foundation cutover flag.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

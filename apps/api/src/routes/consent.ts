@@ -163,7 +163,6 @@ type ConsentRouteEnv = {
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
     CONSENT_POLICY_VERSION: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

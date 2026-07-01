@@ -281,9 +281,8 @@ export async function getChildCelebrationLevel(
   db: Database,
   parentProfileId: string,
   childProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<CelebrationLevel> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const row = await db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, childProfileId),
   });
@@ -325,9 +324,8 @@ export async function upsertChildCelebrationLevel(
   parentProfileId: string,
   childProfileId: string,
   celebrationLevel: CelebrationLevel,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ celebrationLevel: CelebrationLevel }> {
-  await assertParentAccess(db, parentProfileId, childProfileId, opts);
+  await assertParentAccess(db, parentProfileId, childProfileId);
   const existing = await db.query.learningProfiles.findFirst({
     where: eq(learningProfiles.profileId, childProfileId),
   });

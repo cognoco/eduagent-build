@@ -85,8 +85,6 @@ const supplementaryInflight = new Map<
 export function getSessionStaticContextCacheKey(
   profileId: string,
   sessionId: string,
-  // [WI-867] identityV2Enabled param kept for callers; always resolves to 'idv2' (legacy path removed).
-  _identityV2Enabled = false,
 ): string {
   return `${profileId}:${sessionId}:idv2`;
 }
@@ -123,20 +121,8 @@ export async function getSessionStaticContext(
   profileId: string,
   sessionId: string,
   session: LearningSession,
-  // [WI-586] When the identity-v2 flag is on, the profile row is read from the
-  // person/membership store via the byte-identical twin; otherwise from the
-  // legacy `profiles` table. Defaults false so non-flag-threaded callers keep
-  // legacy behavior. The cache key encodes the identity mode (…:idv2 / …:legacy)
-  // so a v2-resolved row can never be served to a legacy request or vice-versa;
-  // the cold-populator (prepareExchangeContext) passes the request's flag; warm
-  // hits reuse it.
-  identityV2Enabled = false,
 ): Promise<SessionStaticContextCacheEntry> {
-  const key = getSessionStaticContextCacheKey(
-    profileId,
-    sessionId,
-    identityV2Enabled,
-  );
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const now = Date.now();
 
   pruneSessionStaticContextCache(now);
@@ -179,19 +165,13 @@ export async function getCachedHomeworkLibraryContext(
   profileId: string,
   sessionId: string,
   session: LearningSession,
-  identityV2Enabled = false,
 ): Promise<string | undefined> {
-  const key = getSessionStaticContextCacheKey(
-    profileId,
-    sessionId,
-    identityV2Enabled,
-  );
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
     db,
     profileId,
     sessionId,
     session,
-    identityV2Enabled,
   );
 
   if (entry.homeworkLibraryContextLoaded) {
@@ -215,19 +195,13 @@ export async function getCachedBookLearningHistoryContext(
   session: LearningSession,
   currentTopicId: string,
   bookId: string,
-  identityV2Enabled = false,
 ): Promise<string | undefined> {
-  const key = getSessionStaticContextCacheKey(
-    profileId,
-    sessionId,
-    identityV2Enabled,
-  );
+  const key = getSessionStaticContextCacheKey(profileId, sessionId);
   const entry = await getSessionStaticContext(
     db,
     profileId,
     sessionId,
     session,
-    identityV2Enabled,
   );
   const historyKey = `${bookId}:${currentTopicId}`;
 
@@ -332,15 +306,10 @@ export async function getOrLoadSessionSupplementary(
   subjectId: string,
   isFreeform: boolean,
   cacheEntry: SessionStaticContextCacheEntry,
-  identityV2Enabled = false,
 ): Promise<SessionSupplementaryData> {
   if (cacheEntry.supplementary) return cacheEntry.supplementary;
 
-  const cacheKey = getSessionStaticContextCacheKey(
-    profileId,
-    sessionId,
-    identityV2Enabled,
-  );
+  const cacheKey = getSessionStaticContextCacheKey(profileId, sessionId);
   const inflight = supplementaryInflight.get(cacheKey);
   if (inflight) return inflight;
 

@@ -1290,12 +1290,6 @@ export interface RefreshProgressSnapshotOptions {
    * refresh is always desired.
    */
   sessionEndedAt?: Date;
-  /**
-   * [CUT-B1 §2.5(iii)] When true, the learner-age lookup reads person.birth_date
-   * instead of profiles.birth_year. Threaded from the caller's flag (request
-   * c.env or the Inngest step flag).
-   */
-  identityV2Enabled?: boolean;
 }
 
 export async function refreshProgressSnapshot(

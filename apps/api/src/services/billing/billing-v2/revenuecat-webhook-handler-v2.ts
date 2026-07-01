@@ -16,9 +16,10 @@
 //
 // `accountId` here is the organization id (field name kept on the mapped row).
 //
-// Flag-gated: dispatched by routes/revenuecat-webhook.ts only when
-// IDENTITY_V2_ENABLED='true'. Legacy revenuecat-webhook-handler.ts stays
-// byte-identical.
+// [WI-868] Dispatched unconditionally by routes/revenuecat-webhook.ts via
+// billing-v2/dispatch.ts — the identity-v2 flag is gone and this handler is
+// the only one that runs in production. Legacy revenuecat-webhook-handler.ts
+// is retained only for routes/revenuecat-webhook.test.ts's mock seam.
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
@@ -497,9 +498,9 @@ export async function handleSubscriberAliasV2(
       // [BUG-783 / WI-1057] Pre-downgrade snapshot for the alias-merge worker.
       // The BUG-833 downgrade below force-resets the from-side to free/expired,
       // so the worker reconciles the survivor from THIS snapshot — it can no
-      // longer re-read the original tier/credits. With identity-v2 cut over
-      // (IDENTITY_V2_ENABLED='true' in stg+prd), the worker routes to
-      // mergeAliasedSubscriptionV2 against the `subscription` table. `top_up_credits`
+      // longer re-read the original tier/credits. With identity-v2 cut over,
+      // the worker routes to mergeAliasedSubscriptionV2 against the
+      // `subscription` table. `top_up_credits`
       // is a shared, non-forked satellite keyed by subscription id, so the same
       // getTopUpCreditsRemaining reader reads the v2 from-side correctly — mirror
       // the legacy handler exactly so the credit-migration half actually fires

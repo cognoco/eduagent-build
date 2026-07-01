@@ -1834,7 +1834,6 @@ export async function prepareExchangeContext(
     challengeRoundGraderEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     currentUserMessageEventId?: string;
-    identityV2Enabled?: boolean;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -1856,7 +1855,6 @@ export async function prepareExchangeContext(
     profileId,
     sessionId,
     session,
-    options?.identityV2Enabled ?? false,
   );
 
   // 2. Load all supplementary data in parallel (all independent after session load)
@@ -1897,7 +1895,6 @@ export async function prepareExchangeContext(
     session.subjectId,
     isFreeform,
     staticContext,
-    options?.identityV2Enabled ?? false,
   );
   const ownedSessionTopic = session.topicId
     ? await findOwnedCurriculumTopic(db, {
@@ -2478,17 +2475,10 @@ export async function prepareExchangeContext(
             session,
             topic.topicId,
             topic.bookId,
-            options?.identityV2Enabled ?? false,
           )
         : Promise.resolve(undefined),
       session.sessionType === 'homework'
-        ? getCachedHomeworkLibraryContext(
-            db,
-            profileId,
-            sessionId,
-            session,
-            options?.identityV2Enabled ?? false,
-          )
+        ? getCachedHomeworkLibraryContext(db, profileId, sessionId, session)
         : Promise.resolve(undefined),
     ])
   ).filter((part): part is string => Boolean(part));
@@ -3255,7 +3245,6 @@ export async function processMessage(
     // result of `isChallengeRoundGraderEnabled(value)` here.
     challengeRoundGraderEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
-    identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
 ): Promise<{
@@ -3534,7 +3523,6 @@ export async function streamMessage(
     // T8: true when CHALLENGE_ROUND_GRADER_ENABLED env binding is 'true'.
     challengeRoundGraderEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
-    identityV2Enabled?: boolean;
     judgeFrameworkEnabled?: boolean;
   },
 ): Promise<{

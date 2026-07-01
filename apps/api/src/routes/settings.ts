@@ -59,7 +59,6 @@ type SettingsRouteEnv = {
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

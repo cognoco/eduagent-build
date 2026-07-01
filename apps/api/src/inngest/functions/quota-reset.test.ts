@@ -70,10 +70,9 @@ jest.mock(
 import { quotaReset } from './quota-reset';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 // [WI-810] spy on the real billing helpers (NOT a jest.mock module mock — GC1
-// clean) to assert which quota-cycle reset the flag routes to.
+// clean) to assert the quota-cycle reset routes to the v2 helper.
 import * as billing from '../../services/billing';
 import * as billingV2 from '../../services/billing/billing-v2';
-import { setIdentityV2Enabled } from '../helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -248,37 +247,15 @@ describe('quotaReset', () => {
   });
 
   // -----------------------------------------------------------------------
-  // [WI-810] identity-v2 gating of the monthly quota-cycle reset. flag-on must
-  // route to resetExpiredQuotaCyclesV2 (joins the v2 `subscription` table); the
-  // legacy resetExpiredQuotaCycles joins the `subscriptions` table dropped at the
-  // cutover (WI-805) and would FK/500 at the #8 flag-flip. resetDailyQuotas is
+  // [WI-810] identity-v2 gating of the monthly quota-cycle reset.
+  // resetExpiredQuotaCyclesV2 joins the v2 `subscription` table; the legacy
+  // resetExpiredQuotaCycles joins the `subscriptions` table dropped at the
+  // cutover (WI-805) and would FK/500. [WI-867] collapsed the flag branch —
+  // resetExpiredQuotaCyclesV2 is now the only path. resetDailyQuotas is
   // unaffected (no subscriptions read). spyOn (not jest.mock) keeps it GC1-clean.
   // -----------------------------------------------------------------------
   describe('[WI-810] monthly quota-cycle reset identity-v2 gating', () => {
-    afterEach(() => {
-      setIdentityV2Enabled(undefined);
-    });
-
-    // [WI-867] IDENTITY_V2_ENABLED collapsed to v2-always; the legacy branch
-    // is dead. Both flag states now route to resetExpiredQuotaCyclesV2.
-    it('flag-off → resetExpiredQuotaCyclesV2 (flag collapsed, legacy branch removed)', async () => {
-      setIdentityV2Enabled('false');
-      const legacy = jest
-        .spyOn(billing, 'resetExpiredQuotaCycles')
-        .mockResolvedValue(3);
-      const v2 = jest
-        .spyOn(billingV2, 'resetExpiredQuotaCyclesV2')
-        .mockResolvedValue(99);
-
-      const { result } = await executeSteps();
-
-      expect(v2).toHaveBeenCalledTimes(1);
-      expect(legacy).not.toHaveBeenCalled();
-      expect(result.monthlyResetCount).toBe(99);
-    });
-
-    it('flag-on → resetExpiredQuotaCyclesV2 (joins the v2 subscription table, survives M-DROP)', async () => {
-      setIdentityV2Enabled('true');
+    it('routes to resetExpiredQuotaCyclesV2 (joins the v2 subscription table, survives M-DROP)', async () => {
       const legacy = jest
         .spyOn(billing, 'resetExpiredQuotaCycles')
         .mockResolvedValue(3);

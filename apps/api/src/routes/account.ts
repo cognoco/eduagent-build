@@ -35,7 +35,6 @@ type AccountRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     CLERK_SECRET_KEY?: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

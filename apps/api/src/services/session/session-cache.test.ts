@@ -159,7 +159,6 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
 
   async function makeCachedEntry(
     overrides: Partial<SessionStaticContextCacheEntry> = {},
-    identityV2Enabled = false,
   ): Promise<SessionStaticContextCacheEntry> {
     return getSessionStaticContext(
       {} as never,
@@ -169,7 +168,6 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
         subjectId: overrides.subjectId ?? 'subject-1',
         topicId: overrides.topicId ?? null,
       } as never,
-      identityV2Enabled,
     );
   }
 
@@ -346,8 +344,8 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     expect(entry.supplementary).toBeUndefined();
   });
 
-  it('[WI-911] identity-v2 supplementary loads write back to the identity-v2 cache entry', async () => {
-    const entry = await makeCachedEntry({}, true);
+  it('[WI-911] supplementary loads write back to the cache entry', async () => {
+    const entry = await makeCachedEntry({});
 
     await getOrLoadSessionSupplementary(
       {} as never,
@@ -356,39 +354,34 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       'subject-1',
       false,
       entry,
-      true,
     );
 
     expect(entry.supplementary).toEqual(expect.objectContaining({}));
   });
 
-  it('[WI-911] identity-v2 homework context touches the identity-v2 key only', async () => {
+  it('[WI-911] homework context touches the same cache key as the static context read', async () => {
     await getCachedHomeworkLibraryContext(
       {} as never,
       'profile-1',
       'session-1',
       { subjectId: 'subject-1', topicId: null } as never,
-      true,
     );
 
-    await getSessionStaticContext(
-      {} as never,
-      'profile-1',
-      'session-1',
-      { subjectId: 'subject-1', topicId: null } as never,
-      false,
-    );
+    await getSessionStaticContext({} as never, 'profile-1', 'session-1', {
+      subjectId: 'subject-1',
+      topicId: null,
+    } as never);
 
     expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
     // [WI-867] Post-collapse the legacy/idv2 key split is gone — both reads
     // share the single :idv2 key, so the static cache holds one entry.
     expect(_sessionStaticContextCacheSize()).toBe(1);
-    expect(
-      getSessionStaticContextCacheKey('profile-1', 'session-1', true),
-    ).toBe('profile-1:session-1:idv2');
+    expect(getSessionStaticContextCacheKey('profile-1', 'session-1')).toBe(
+      'profile-1:session-1:idv2',
+    );
   });
 
-  it('[WI-911] identity-v2 book context touches the identity-v2 key only', async () => {
+  it('[WI-911] book context touches the same cache key as the static context read', async () => {
     await getCachedBookLearningHistoryContext(
       {} as never,
       'profile-1',
@@ -396,16 +389,12 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
       { subjectId: 'subject-1', topicId: null } as never,
       'topic-1',
       'book-1',
-      true,
     );
 
-    await getSessionStaticContext(
-      {} as never,
-      'profile-1',
-      'session-1',
-      { subjectId: 'subject-1', topicId: null } as never,
-      false,
-    );
+    await getSessionStaticContext({} as never, 'profile-1', 'session-1', {
+      subjectId: 'subject-1',
+      topicId: null,
+    } as never);
 
     expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
     // [WI-867] Post-collapse the legacy/idv2 key split is gone — both reads
@@ -495,12 +484,12 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
 });
 
 // ---------------------------------------------------------------------------
-// [WI-586] Profile reader selection — the identity-v2 flip-critical gate.
-// getSessionStaticContext must read the cached profile row from the
-// person/membership twin (loadProfileRowByIdV2) when the identity-v2 flag is on,
-// and from the legacy `profiles` table (loadProfileRowById) when off. After
-// migration 0118 drops `profiles`, a flag-on read that still hit the legacy
-// path would 500 on the hot tutoring exchange path.
+// [WI-586] Profile reader selection. getSessionStaticContext must read the
+// cached profile row from the person/membership twin (loadProfileRowByIdV2),
+// never the legacy `profiles` table (loadProfileRowById) — [WI-867] collapsed
+// the flag branch, [WI-868] removed the flag param entirely. After migration
+// 0118 drops `profiles`, a read that still hit the legacy path would 500 on
+// the hot tutoring exchange path.
 // ---------------------------------------------------------------------------
 describe('[WI-586] getSessionStaticContext — identity-v2 profile reader selection', () => {
   const legacyRow = { id: 'p', isOwner: false, source: 'legacy' } as never;
@@ -514,44 +503,21 @@ describe('[WI-586] getSessionStaticContext — identity-v2 profile reader select
     mockLoadProfileRowByIdV2.mockResolvedValue(v2Row);
   });
 
-  function read(profileId: string, identityV2Enabled?: boolean) {
-    return getSessionStaticContext(
-      {} as never,
-      profileId,
-      'session-1',
-      { subjectId: 'subject-1', topicId: null } as never,
-      identityV2Enabled as never,
-    );
+  function read(profileId: string) {
+    return getSessionStaticContext({} as never, profileId, 'session-1', {
+      subjectId: 'subject-1',
+      topicId: null,
+    } as never);
   }
 
-  it('flag ON → reads the person/membership twin, not the legacy profiles table', async () => {
-    const entry = await read('profile-on', true);
+  it('reads the person/membership twin, never the legacy profiles table', async () => {
+    const entry = await read('profile-on');
 
     expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
     expect(mockLoadProfileRowByIdV2).toHaveBeenCalledWith(
       {} as never,
       'profile-on',
     );
-    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(v2Row);
-  });
-
-  it('always reads via the v2 twin regardless of flag arg (legacy path removed)', async () => {
-    const entry = await read('profile-off', false);
-
-    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
-    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledWith(
-      {} as never,
-      'profile-off',
-    );
-    expect(mockLoadProfileRowById).not.toHaveBeenCalled();
-    expect(entry.profile).toBe(v2Row);
-  });
-
-  it('always reads via v2 twin when flag arg is omitted', async () => {
-    const entry = await read('profile-default');
-
-    expect(mockLoadProfileRowByIdV2).toHaveBeenCalledTimes(1);
     expect(mockLoadProfileRowById).not.toHaveBeenCalled();
     expect(entry.profile).toBe(v2Row);
   });

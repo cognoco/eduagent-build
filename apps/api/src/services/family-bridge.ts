@@ -104,7 +104,6 @@ export async function getChildTopicSnapshotForParent(
   adultProfileId: string,
   childProfileId: string,
   topicId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ChildTopicSnapshot | null> {
   return getChargeSubjectsForGuardianV2(
     db,
@@ -139,7 +138,6 @@ async function findAdultSubject(
 async function getAdultConversationLanguage(
   db: Database,
   adultProfileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<string | null> {
   const row = await db.query.person.findFirst({
     where: eq(person.id, adultProfileId),
@@ -152,7 +150,6 @@ async function resolveSubject(
   db: Database,
   adultProfileId: string,
   snapshot: ChildTopicSnapshot,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ subject: typeof subjects.$inferSelect; created: boolean }> {
   const existing = await findAdultSubject(
     db,
@@ -164,7 +161,6 @@ async function resolveSubject(
       const conversationLanguage = await getAdultConversationLanguage(
         db,
         adultProfileId,
-        opts,
       );
       if (conversationLanguage) {
         await db
@@ -191,7 +187,6 @@ async function resolveSubject(
   const conversationLanguage = await getAdultConversationLanguage(
     db,
     adultProfileId,
-    opts,
   );
   if (conversationLanguage === null) throw new NotFoundError('Profile');
   const adult = { conversationLanguage };
@@ -377,18 +372,16 @@ export async function cloneTopicFromChild(
   db: Database,
   adultProfileId: string,
   input: CloneFromChildRequest,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<CloneFromChildResponse> {
   const cached = readCachedCloneResult(adultProfileId, input);
   if (cached) return cached;
 
-  await assertParentAccess(db, adultProfileId, input.childProfileId, opts);
+  await assertParentAccess(db, adultProfileId, input.childProfileId);
   const snapshot = await getChildTopicSnapshotForParent(
     db,
     adultProfileId,
     input.childProfileId,
     input.topicId,
-    opts,
   );
   if (!snapshot) throw new NotFoundError('Topic');
 
@@ -399,7 +392,6 @@ export async function cloneTopicFromChild(
       database,
       adultProfileId,
       snapshot,
-      opts,
     );
     if (resolvedSubject.created)
       createdIds.subjectId = resolvedSubject.subject.id;
