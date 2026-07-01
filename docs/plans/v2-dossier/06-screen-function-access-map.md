@@ -72,7 +72,7 @@ which wraps — jest's positional args are regexes, so the Expo Router
 `(app)`/`[param]` path segments must be escaped:
 
 ```bash
-pnpm exec jest --config apps/mobile/jest.config.cjs --no-coverage \
+pnpm exec jest --config apps/mobile/jest.config.cjs --no-coverage --forceExit \
   'apps/mobile/src/app/\(app\)/mentor\.test\.tsx' \
   'apps/mobile/src/app/\(app\)/subjects\.test\.tsx' \
   'apps/mobile/src/app/\(app\)/journal/index\.test\.tsx' \
