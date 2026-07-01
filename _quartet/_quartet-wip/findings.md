@@ -213,6 +213,16 @@ accept the companion doc holds the enumerated current-state and the DB is a writ
 (c) keep a small fetch-by-known-page-IDs index the orchestrator can `notion-fetch` row-by-row. Until
 one is chosen, "DB is master, roster is downstream mirror" is not operable for a cold boot.
 
+**Correction (operator + re-test, 2026-07-01) — F14 was overstated; downgrade from CRITICAL.** The DB
+is **not** unreadable. Per-page `notion-fetch` on an initiative returns **all properties** (verified on
+INI-6 Identity Cutover: Status, Outcome, Workstream relation, `userDefined:ID`, etc.). Only the two
+**bulk-query** tools (`query_data_sources` SQL, `query_database_view`) are plan-gated — those are
+Notion's AI-query add-on, a bulk-enumeration convenience, not the read path. The **real, much smaller**
+finding: there is no one-call "list all Mentomate initiatives filtered by Program/Status." Enumeration
+must go through `notion-search` (lossy/capped) or a maintained page-ID index; **individual reads are
+fine.** Consequence for Approach-B: **not a blocker.** The DB genuinely can be master — the companion
+doc need only hold the page-ID index (or nothing, if search suffices). No plan upgrade required.
+
 ### F15 — Live shepherd traffic contradicts the kickoff's "INI-6 has no live session" (CRITICAL — operational/collision)
 The kickoff orientation snapshot + the banked handoff state INI-6 is drivable with **no live session
 holding it**. The channels say otherwise *today*: `identity-cutover/_state/outbox.jsonl` has shepherd
