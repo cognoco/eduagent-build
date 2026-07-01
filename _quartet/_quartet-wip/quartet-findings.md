@@ -14,7 +14,7 @@ fully-hydrated world. **Fix pattern: refer to _bindings_, not _instances_** — 
 F3 (dated-filename convention), F5 (shared-tree commit + push/land scope), F7 (findings surface
 undiscoverable), F10 (no standing-lane lifecycle), F11 (monitor output-file hygiene), F17 (monitor id
 un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home for the session-start
-hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229), F32 (Clacks schema unenforced/entropies — → WI-1230). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
+hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229), F32 (Clacks schema unenforced/entropies — → WI-1230), F33 (shepherd spawn arms/signals after reconcile — → WI-1235). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
 owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
@@ -262,3 +262,15 @@ same file; and the orchestrator's own liveness pings added a hybrid. The inbox r
 the outbox's `level`/`wi` envelope — a signal the split may want **unifying**. **Fix:** shared
 append/emit helper + a validator, and rule on unify-vs-split. **Status:** escalated to **WI-1230**
 (`Design`, Quartet MVP). Provenance record only; design lives in the WI. *(2026-07-01.)*
+
+### F33 — Shepherd spawn sequence reads/reconciles before arming monitors or signalling life *(→ captured as Cosmo WI-1235)*
+`shepherd-protocol.md` §"On arrival" makes step 1 = read the tracker; monitor-arming is only in later
+sections, timed vaguely ("at activation"); and there is **no sign-of-life step at all** — the outbox's
+four triggers exclude liveness and §149's "no chatter" bar discourages it, so a healthy shepherd is
+designed never to proactively ping. **Observed live (WS-18 spawn, 07-01):** the shepherd read +
+reconciled a stale hot tracker for ~10 min before arming monitors or contacting the orchestrator — zero
+liveness the whole time (ack came only because the orchestrator pinged), inbox watcher unarmed (a ruling
+couldn't wake it), nothing structural stopping autonomous drift. **Fix:** mandate spawn order = arm
+monitors + emit sign-of-life → reconcile → dispatch (keep reconcile-before-*execute*); define a
+spawn-time `alive` event exempt from the no-chatter ban (else the rule self-contradicts). **Status:**
+escalated to **WI-1235** (`Design`, Quartet MVP). Provenance record only. *(2026-07-01.)*
