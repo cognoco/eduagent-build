@@ -129,17 +129,19 @@ export default function MoreScreen() {
         <View className="gap-2">
           <SettingsRow
             label={t('more.learningPreferences.rowLabel')}
-            onPress={() => router.push('/(app)/more/accommodation')}
+            onPress={() => router.push('/(app)/more/accommodation' as Href)}
             testID="more-row-learning-preferences"
           />
           <SettingsRow
             label={t('more.mentorMemory.sectionHeader')}
-            onPress={() => router.push('/(app)/mentor-memory?returnTo=more')}
+            onPress={() =>
+              router.push('/(app)/mentor-memory?returnTo=more' as Href)
+            }
             testID="more-row-mentor-memory"
           />
           <SettingsRow
             label={t('more.account.mentorLanguage')}
-            onPress={() => router.push('/(app)/more/account')}
+            onPress={() => router.push('/(app)/more/account' as Href)}
             testID="more-row-mentor-language"
           />
         </View>
@@ -147,12 +149,12 @@ export default function MoreScreen() {
         <View className="mt-4 gap-2">
           <SettingsRow
             label={t('more.account.profile')}
-            onPress={() => router.push('/(app)/more/account')}
+            onPress={() => router.push('/(app)/more/account' as Href)}
             testID="more-row-account"
           />
           <SettingsRow
             label={t('more.notifications.sectionHeader')}
-            onPress={() => router.push('/(app)/more/notifications')}
+            onPress={() => router.push('/(app)/more/notifications' as Href)}
             testID="more-row-notifications"
           />
         </View>
@@ -215,12 +217,12 @@ export default function MoreScreen() {
         <SectionHeader>{t('more.sections.settings')}</SectionHeader>
         <SettingsRow
           label={t('more.privacy.privacyAndData')}
-          onPress={() => router.push('/(app)/more/privacy')}
+          onPress={() => router.push('/(app)/more/privacy' as Href)}
           testID="more-row-privacy"
         />
         <SettingsRow
           label={t('more.help.helpAndFeedback')}
-          onPress={() => router.push('/(app)/more/help')}
+          onPress={() => router.push('/(app)/more/help' as Href)}
           testID="more-row-help"
         />
 
