@@ -14,7 +14,7 @@ fully-hydrated world. **Fix pattern: refer to _bindings_, not _instances_** — 
 F3 (dated-filename convention), F5 (shared-tree commit + push/land scope), F7 (findings surface
 undiscoverable), F10 (no standing-lane lifecycle), F11 (monitor output-file hygiene), F17 (monitor id
 un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home for the session-start
-hook). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
+hook), F29 (master-DB enumeration has no binding). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
 owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
@@ -217,3 +217,22 @@ drop that framing. (b) **A `Type=Bug` DoD needs a declared red-green-revert regr
 — `/cosmo:review` bounces a Bug that ships a fix without a durable guard + cited RED-pre-fix/GREEN-post-fix
 evidence, even when AC/symptoms pass (put it in the Bug-executor brief). Full runbook:
 `_wip/umbrella-program/cosmo-finalization-guide.md`. *(from tracker E8/E9)*
+
+---
+
+## From the 2026-07-01 cold re-boot (dogfood)
+
+### F29 — The kickoff mandates enumerating the master DB but supplies no enumeration binding
+Boot step 3 (launcher + kickoff §2) tells a cold orchestrator to "read the [Initiatives] DB for the
+live initiative set; do not trust a hardcoded list." Live from a genuine cold boot: `notion-fetch` on
+the DB container returns **schema + view config only, zero rows** — it cannot enumerate. Row
+enumeration needs the *bulk-query* tools (`query_data_sources` / `query_database_view`), which are
+plan-gated in this deployment (the environment fact = `repo-findings.md` **F14**). So the instruction
+is **unfollowable as written**, and the kickoff is internally contradictory: it ships a §3 hardcoded
+orientation snapshot AND says read the DB AND says distrust hardcoded lists — with no working
+enumeration path bridging them. **Machinery gap (distinct from F14's environment fact):** the reusable
+kickoff treats "enumerate the master of record" as a free capability. **Fix (same common shape):** the
+program-layer kickoff owns an **enumeration binding** — either a maintained page-ID index location it
+names, or an explicit "enumerate via `notion-search` (lossy/capped), then per-page `notion-fetch`"
+fallback with its limits stated — so "read the master" is actionable without assuming bulk-query.
+Refer to a binding, not a capability.
