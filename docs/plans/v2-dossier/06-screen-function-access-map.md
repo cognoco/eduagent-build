@@ -62,16 +62,14 @@
 
 Each row below is an existing or newly-added test proving the **V2-specific**
 trigger path for that surface (not the legacy-route default). Re-run the full
-set from `apps/mobile` — jest's positional args are regexes, so the Expo
-Router `(app)`/`[param]` path segments must be escaped (verified: 10 suites,
-96 tests):
+set from the repo root (verified: 12 suites, 121 tests):
 
 ```bash
 pnpm test:v2-parity
 ```
 
-which wraps (jest's positional args are regexes, so the Expo Router
-`(app)`/`[param]` path segments must be escaped):
+which wraps — jest's positional args are regexes, so the Expo Router
+`(app)`/`[param]` path segments must be escaped:
 
 ```bash
 pnpm exec jest --config apps/mobile/jest.config.cjs --no-coverage \
