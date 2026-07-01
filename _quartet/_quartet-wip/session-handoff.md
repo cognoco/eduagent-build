@@ -139,3 +139,60 @@ Commits on `main` (own-work, pushed): `4497eaa`, `58b9a81` (+ earlier `c7d2e8d`)
 - **Findings surfaces are the deliverable to hand the Quartet owner:** `quartet-findings.md` (machinery)
   + `repo-findings.md` (this deployment's state). The dogfood-capture pointers live in the folder README
   + the orchestrator-kickoff §6 (both now name both files).
+
+---
+
+## UPDATE 2026-07-01 (session 3) — LIVE orchestration of 3 lanes + dogfood WIs
+
+**Role now:** I am the **orchestrator driving WS-18, WS-22, WS-28** (operator spawns shepherds + the Codex
+reviewer; I rule, hold merge gates, route the Clacks). Operator directive: **act autonomously; surface only
+`needs-operator`.** Shepherds/reviewer are separate operator-launched sessions — never spawn them as subagents.
+
+**Lanes + channels — monitors generally SURVIVE compaction (same session); on resume RECONCILE, don't blind-re-arm.
+Current watcher task-ids: WS-18 `bpt11eqgp`, WS-22 `bb2x25w27`, WS-28 `bgrf1yg1t`:**
+- **WS-18 identity-cutover** `3808bce9-1f7c-81a2-9ea1-ee924aeaa0a8` — channel `_wip/identity-cutover/_state/`.
+  Shepherd live. **I hold the merge gate** (no shepherd self-merge on this lane).
+- **WS-22 bug-lane** `3858bce9-1f7c-8083-905b-d94bca4a4325` — channel `_wip/bug-lane/_state/`. **DRAINED →
+  quiescent standing lane (stays Open, NOT graduated — F10).** Shepherd has Gate-1 self-merge for focused fixes.
+- **WS-28 v2-finalization** `38f8bce9-1f7c-8185-96b2-e79cb1a458fe` (INI-33 App v2) — channel
+  `_quartet/working/lanes/v2-finalization/_state/`. Shepherd live. Charter =
+  `_quartet/working/lanes/v2-finalization/execution-tracker.md`; **substance = `docs/plans/2026-06-30-v2-publish-readiness-canonical-plan.md`** (WI-1168–1175). Reviewer already covers WS-28 via
+  `_wip/identity-cutover/_state/reviewer-loop-extra-workstreams.mjs`. **🔴 S6 hard boundary — no irreversible deletions.**
+
+**WS-18 delivered this session:** WI-905 (v2 SQL-seam integration coverage) — collapsed an over-split
+(planning-rules §2.2), dispatched a Sonnet builder, verified strict-green own-eyes, **MERGED PR #1769
+(`5257eb70add390e62a07a70dd144c70fedd96d72`) at my gate → Closed.** WI-868 — ruled re-scope to **Half-1 only**
+(delete IDENTITY_V2_ENABLED flag symbol + vestigial param-threading; verified 0 prod callers = zero-behavior
+no-op); dropped its dead-module + legacy-table-clean scope to **WI-586 (non-billing) + WI-805 (billing)**
+convergence; shepherd restated AC + renamed 868 + fixed the AC grep spec. **Builder pushing Pass A → NEXT
+ACTIONABLE: my merge gate at CI-green.** Then 869→779 (fresh-derive scope, don't pre-delete live/test-bearing
+code; **586 table-drop = the irreversible flip, operator/cutover-owner's call**).
+
+**WS-28 state:** orphan first-task items WI-1170 (merged→Reviewing) + WI-1171 (completed→Reviewing) done.
+**WI-904 (dictation 'normal' pace) PARKED in Awaiting-Info limbo** — human on-device QA unavailable; verified
+it **blocks nothing** (0 edges, reverse-scanned); PR #1749 (age-aware pause) is code-green but unmerged/unverified.
+Publish-time caveat: shipping now = dictation ships the QA-failed too-fast pace. In flight: WI-1172 (docs/test-only,
+S6-safe), WI-1174 (PR #1772, shepherd bounced on 2 valid Codex findings, builder correcting). Not started:
+WI-1173 (gated on 1172), WI-1175 (publish-review, last).
+
+**Machinery WIs captured this session (dogfood → Cosmo; findings F29–F34 in `quartet-findings.md`):**
+WI-1229 (shepherd/reviewer 1:1→1..n · Quartet MVP), WI-1230 (Clacks schema unenforced/entropies · Quartet MVP),
+WI-1235 (shepherd spawn: arm monitors + sign-of-life BEFORE reconcile · Quartet MVP), WI-1236 (orchestrator arms
+lane monitors ASAP · **Cosmo improvements / WS-23**), WI-1237 (orphaned in-flight WI adoption procedure · Quartet MVP).
+Quartet-MVP WS `38e8bce9-1f7c-816f-b5cd-c55b3c12c81d`; ZDX Work Items DS `36fd1119-9955-4684-8bfe-deb145e6a21f`.
+
+**OPEN finding — commit-reconciliation `_state` churn (NOT yet WI'd):** the commit skill's `stash+rebase` on a
+non-ff push churns working-tree-only `_state/` Clacks channels (→ monitor replay storms + a shepherd's outbox
+reverting to a stale snapshot; both seen live). Fix = reconcile via `git pull --no-rebase --no-edit` (merge),
+never stash untracked `_state/`. Operator offered a WI (would go to Cosmo improvements) — pending. Deferred
+findings-file commits while lanes are live to avoid re-churn.
+
+**RESUME CHECKLIST (do first):**
+1. **Reconcile the 3 outbox watchers — do NOT blind-re-arm.** They generally survive compaction; check each is
+   still alive (`/tasks` / TaskList) — current ids WS-18 `bpt11eqgp`, WS-22 `bb2x25w27`, WS-28 `bgrf1yg1t`; re-arm
+   **only the dead ones** (`tail -n0 -F <outbox>`, persistent; channel paths above). F17's "replace all" applies to
+   a genuine new session/job, NOT compaction. Hygiene: `_quartet/clacks/monitor-hygiene.md`.
+2. **WS-18:** check WI-868 Pass A CI status → run the merge gate (own-eyes: strict-green required checks +
+   read the automated-review verdict body, not just the check colour) if green; merge = mine, no self-merge.
+3. Read each lane's `outbox.jsonl` tail for anything emitted during compaction; Cosmo-verify (channels may be stale).
+4. Surface only `needs-operator`; drive the rest.

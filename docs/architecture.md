@@ -1310,6 +1310,7 @@ The learner-home `/now` feed shows recent notable moments (e.g. "you filed a ses
 - **Non-core writes (`safeWrite` posture).** The residual writes wrap `safeWrite` from `safe-non-core.ts` — a failed insert is captured in Sentry but never throws and never breaks the primary job. This is correct: the table is a cosmetic display aid, not authoritative, so a dropped row costs at most one lowest-priority card.
 - **Self-only visibility.** A moment is shown only to the profile it concerns (profile scope + RLS). There is no per-row visibility flag; cross-user sharing, if ever built, is a read-time relationship-derived policy (visibility-contract), never a stored column.
 - **Not a compliance substrate.** The feed is not load-bearing for GDPR-timer / deletion / retention / consent narration; those derive from their own authoritative sources.
+- **`/now` read-scope permits `person`/`supportership` reads (`WI-1123`, 2026-07-01 ruling).** The S0 plan's original "no `person`/edge reads" contract assumed identity was not yet live; identity is now live, so `now-feed.ts`'s `person`-scope and `supporter-hub` reads (`resolveNowTarget`, `collectSupporterHubCandidates`) are correct S4-scoped behavior shipped early, not a contract violation to fence. This governs what `/now` may *query*, orthogonal to the self-only visibility rule above, which governs who a stored ledger row is *shown to*.
 
 Decision rationale: `docs/adr/MMT-ADR-0022-activity-ledger-narration-substrate.md`.
 

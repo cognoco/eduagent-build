@@ -29,6 +29,13 @@ It sits above the individual S4/S5/S6 phase plans and keeps the current priority
 order explicit: finish supporter visibility, wire real shared records, preserve
 concrete progress in Subjects/Journal, then prepare S6 without executing it.
 
+That plan's **"Per-Surface Retirement Readiness (WI-1174)"** section is the S6 gate
+table: per legacy surface (More tab, Library tab, Progress tab, `ParentHomeScreen`,
+child proxy routes, session summary), it names the current owner, the replacement V2
+surface, code-verified readiness evidence, rollback posture, and the no-regression
+check protecting today's shipped flag states — and states plainly that S6 stays
+blocked until every row is live and the product ruling + human confirmation land.
+
 ## The headline surprises (found 2026-06-12)
 
 These are the things a reader of the spec alone would not know. Numbered for reference.

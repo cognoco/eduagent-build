@@ -409,6 +409,14 @@ describe('MentorScreen', () => {
     });
   });
 
+  it('V2 parity: routes the dictation light-practice affordance to the dictation screen', () => {
+    renderMentorScreen();
+
+    fireEvent.press(screen.getByTestId('light-practice-dictation'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dictation');
+  });
+
   it('advances the anchor arc and shows the mentor celebration when a card is completed', () => {
     renderMentorScreen();
 
