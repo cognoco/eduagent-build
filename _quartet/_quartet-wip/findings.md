@@ -226,6 +226,22 @@ into *durable* text. Live-session status is **channel-derived, not snapshot-deri
 **channel tail FIRST**, before any snapshot/roster read. (The boot only caught this because it tailed
 the outboxes; a snapshot-first reader would have missed it.)
 
+**Correction (operator, 2026-07-01) — the finding is sharper than first written.** There was in fact
+**no live session** on either lane; the sessions had ended. WI-867 / PR #1700 was **already merged +
+closed**, and WI-503 is a genuinely **orphaned** item awaiting a *human* confirmation with no agent
+owner. So the boot's own conclusion (inferring live shepherds + a collision risk) was **half-wrong**,
+and the real defect is worse: the Clacks **outbox is stale in BOTH directions** — it left a
+`needs-orchestrator` merge-gate showing "open" long after the WI was merged out-of-band, and gave no
+signal the writing session had died. A cold orchestrator trusting the outbox tail would chase a
+**resolved** gate (or re-attempt a done merge). monitor-hygiene already says "lifecycle is
+Cosmo-derived, not channel-derived" and "silence is unverified → direct-read Cosmo," but it does not
+warn that **a channel escalation that still reads `open` is equally unverified** — the outbox has no
+closure/ack discipline, so resolved-out-of-band escalations never retract. **Corrected fix:** before
+acting on ANY open-looking channel escalation, reconcile it against Cosmo Stage / WI state first;
+treat the outbox as an *unordered set of possibly-stale signals*, never as current open/closed truth.
+Channel **recency** does not imply a live session, and channel **content** does not imply an open
+issue.
+
 ### F16 — Protocol + planning-rules hardcode `working/program/program-roster.md`, which here resolves to a template (machinery↔state coupling)
 `orchestrator-protocol.md` "Orient on resume" step 1 AND its 🔴 mandatory re-read list AND
 `planning-rules.md` "Document map" all name `working/program/program-roster.md` as a required read.
