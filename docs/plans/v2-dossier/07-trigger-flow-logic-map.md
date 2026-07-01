@@ -174,6 +174,16 @@ flowchart TD
 | Open support sharing agreement | Link ceremony contract screen. | `/link/[contractId]` fetches `GET /visibility/links/:id/contract`, derives active side from the signed-in person, then posts accept/revoke as allowed. | Both sides review the same trust contract; accepted supportees can end sharing. | `CODE`: `app/(app)/link/[contractId].tsx`, `ContractCard.tsx`, `visibility.ts`, `supportership-revocation.ts`. |
 | Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
 
+## Failure Modes — Supporter Appeal
+
+| State | Trigger | User sees | Recovery |
+|---|---|---|---|
+| Idle | Supporter opens a shared-record card that has facts. | Appeal button (`AppealButton`, "Request attention report"). | N/A. |
+| Pending | Supporter presses the appeal button. | Loading indicator in place of the button. | Resolves automatically to the report or the error state. |
+| Report ready | `POST /visibility/reports/:personId/appeal` succeeds. | Artifact-verified attention report replaces the button. | N/A. |
+| Request failed | The appeal mutation rejects (network/API error). | `ErrorFallback` with a retry action. | Retry re-fires the same mutation. |
+| Scope switched mid-state | Supporter switches to a different supportee without the component unmounting (e.g. selecting another card while the hub stays mounted). | Appeal state resets to idle for the newly active scope; no stale report/error from the prior supportee leaks through. | `useAppealVisibility` resets its mutation state on `scope.personId` change. |
+
 ## Current Gaps To Review Before Calling V2 Complete
 
 | Gap | User-visible risk | Owner phase |

@@ -4415,7 +4415,7 @@
     },
     "appeal": {
       "label": "Poproś o raport uwagi",
-      "errorTitle": "Nie udało się zażądać raportu o skupieniu",
+      "errorTitle": "Nie udało się poprosić o raport uwagi",
       "errorMessage": "Spróbuj ponownie za chwilę."
     },
     "revocation": {

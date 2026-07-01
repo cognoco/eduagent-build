@@ -7,6 +7,7 @@ import {
 } from '@eduagent/schemas';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { useApiQuery } from '../../hooks/use-api-query';
 import { assertOk } from '../../lib/assert-ok';
@@ -39,7 +40,7 @@ export function useAppealVisibility(
 ): UseMutationResult<AppealReport, Error, void> {
   const client = useApiClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async () => {
       const res = await client.visibility.reports[':personId'].appeal.$post({
         param: { personId: scope.personId },
@@ -49,4 +50,15 @@ export function useAppealVisibility(
       return appealReportSchema.parse(await okRes.json());
     },
   });
+
+  // Reset any pending/report/error state when the caller switches person
+  // scope so a stale appeal from a prior supportee doesn't leak into the
+  // next one's view — the mutation state otherwise persists across scope
+  // changes when the consuming component stays mounted.
+  const { reset } = mutation;
+  useEffect(() => {
+    reset();
+  }, [scope.personId, reset]);
+
+  return mutation;
 }

@@ -52,6 +52,16 @@ const EMMA_SCOPE: Extract<ScopeDescriptor, { kind: 'person' }> = {
   displayName: 'Emma',
 };
 
+const NOAH_PERSON_ID = '550e8400-e29b-41d4-a716-446655440102';
+const NOAH_EDGE_ID = '550e8400-e29b-41d4-a716-446655440202';
+
+const NOAH_SCOPE: Extract<ScopeDescriptor, { kind: 'person' }> = {
+  kind: 'person',
+  personId: NOAH_PERSON_ID,
+  edgeId: NOAH_EDGE_ID,
+  displayName: 'Noah',
+};
+
 const SHARED_RECORD: SharedRecord = {
   supportershipId: EDGE_ID,
   generatedAt: '2026-06-30T12:00:00.000Z',
@@ -211,5 +221,55 @@ describe('PersonScopeJournalPlaceholder', () => {
     expect(
       fetchCallsMatching(mockFetch, `/visibility/reports/${PERSON_ID}/appeal`),
     ).toHaveLength(1);
+  });
+
+  it('resets appeal state when the person scope changes without unmounting', async () => {
+    const APPEAL_REPORT: AppealReport = {
+      supportershipId: EDGE_ID,
+      generatedAt: '2026-07-01T12:00:00.000Z',
+      report: 'Detailed attention report: Knows equivalent fractions.',
+      facts: [],
+      artifactWall: true,
+    };
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/appeal`,
+      APPEAL_REPORT,
+    );
+    mockFetch.setRoute(`/visibility/reports/${NOAH_PERSON_ID}/shared-record`, {
+      ...SHARED_RECORD,
+      supportershipId: NOAH_EDGE_ID,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: createTestProfile(),
+      profiles: [createTestProfile()],
+      queryClient,
+    });
+    const { rerender } = render(
+      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-appeal-button');
+    });
+    fireEvent.press(screen.getByTestId('visibility-appeal-button'));
+    await waitFor(() => {
+      screen.getByText(APPEAL_REPORT.report);
+    });
+
+    // Switch person scope without unmounting — the same component instance
+    // stays mounted and just receives a new `scope` prop.
+    rerender(<PersonScopeJournalPlaceholder scope={NOAH_SCOPE} />);
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-appeal-button');
+    });
+    expect(screen.queryByText(APPEAL_REPORT.report)).toBeNull();
+
+    cleanupScreen(queryClient);
   });
 });
