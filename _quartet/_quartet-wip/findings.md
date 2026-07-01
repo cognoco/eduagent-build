@@ -134,14 +134,29 @@ discover that the cutover is already planned/underway — it would re-derive it.
 state, but its *existence pointer* belongs in `_quartet/` (roster/working-program note) so the
 canonical Brain can find its own migration status.
 
-### F9 — No `_quartet/`→live-working-state pointer for un-hooked / human launch (reinforces F1)
+### F9 — [WITHDRAWN → repo-state] No `_quartet/`→live-working-state pointer for un-hooked / human launch
+**Reclassified 2026-07-01.** In a clean deployment working-state lives at `_quartet/working/` (the
+default the README already names); the "no pointer to `_wip/umbrella-program/`" gap exists *only*
+because this program's state is exiled in `_wip/` (incomplete relocation). State artifact. Its one
+machinery kernel — "the working-state *location* should be a binding the kickoff owns" — is already
+captured as F16. Original text retained below for the relocation cleanup trail.
+
 F1 covers the hooked-resume binding. Complement surfaced today: a human-oriented session pointed at
 `_quartet/` has NO breadcrumb to *where the live program actually lives* (`_wip/umbrella-program/`).
 `working/README.md` says the snapshot isn't truth and the live copy is "in its original `_wip/`
 location" — but never names the path. F1's kickoff-binding fix closes this too, but only if the
 kickoff (not just the hook) is the durable home of the binding.
 
-### F10 — Standing lane has no in-place→canonical relocation ceremony (structural)
+### F10 — [KEPT → machinery, reframed] Lifecycle model has no steady-state for a standing (non-graduating) lane
+**Reclassified 2026-07-01 — genuine machinery gap.** planning-rules describes a lane lifecycle of
+start → active → graduated/parked/killed, and §2.8's close ceremony assumes *finite* work. A **standing
+lane** (Operations / Bug Lane) never graduates, so §2.8 never fires — the standard defines no
+steady-state management for it (checkpoint cadence, relocation window, how it differs from a finite
+Initiative). The `_wip/`-vs-`working/` relocation gap is the *symptom* seen here; the *defect* is the
+missing standing-lane lifecycle, which holds in any deployment. Fix: add a standing-lane lifecycle
+(incl. an operator-gated quiescent-window relocation, since its channels/monitors are live). Original
+evidence below.
+
 Two-tier split confirmed live + load-bearing: graduated `pr-cleanup` conforms in
 `_quartet/working/lanes/`; active `identity-cutover` / `bug-lane` remain in `_wip/`. planning-rules
 §2.8 makes graduation the natural relocation moment — fine for finite lanes. But **Bug Lane is a
@@ -150,13 +165,24 @@ standard lacks a relocation ceremony for a standing lane (an operator-gated quie
 since its channels/monitors are live). Mid-flight relocation is unsafe — F5 shared-tree staging +
 today's rogue-init-commit hazard show how fragile concurrent ops on this tree are.
 
-### F11 — Abandoned monitor-output files masquerade as state (minor)
+### F11 — [KEPT → machinery, reframed] monitor-hygiene governs watcher liveness but not the stale OUTPUT files watchers leave
+**Reclassified 2026-07-01 — machinery gap (minor).** The stale file here is state, but the gap is in
+the spec: `monitor-hygiene.md` reconciles *watchers* and never addresses the derived output/cache
+files a watcher writes into `_state/` (TTL, clear-on-re-arm, or mark-as-derived). Any deployment's
+monitors leave such files; a reader can mistake them for current truth. Add an output-file discipline
+to monitor-hygiene. Original evidence below.
+
 `_wip/identity-cutover/_state/stage-watch.json` last-checked 06-21, contradicts the live WI-867 rework
 loop. monitor-hygiene reconciles *watchers* but leaves stale monitor *output files* in `_state/`; a
 reader can mistake them for current truth. Either TTL/clear them on re-arm, or mark them clearly as
 derived cache.
 
-### F12 — The cutover plan permanently bifurcates the working-state home (root of the two-tier split)
+### F12 — [WITHDRAWN → repo-state] The cutover plan permanently bifurcates the working-state home
+**Reclassified 2026-07-01.** Entirely a description of *this program's* `_wip/` cutover-plan decisions
+(Class A/B/C) and their end-state; the operator's "clean up to the standard location" request is the
+ruling on it. Program-state / operator-decision, not a Quartet-machinery defect. Retained below as
+input to the relocation cleanup.
+
 The existing cutover plan (`_wip/umbrella-program/quartet-cutover-plan.md` + `quartet-cutover-wave1.md`)
 **decided** two things that combine into a permanent split: (a) the legacy program's working state —
 roster, dashboard, channels, existing lanes — is **Class C: stays in `_wip/` indefinitely, never
@@ -173,7 +199,14 @@ The `_wip/` cutover plan is prior-thinking-to-confirm (suspect-history zone; non
 calls are reflected in `_quartet/`) — an input to the operator's call, not a constraint on it.
 Operator decision, not an orchestrator ruling.
 
-### F13 — Program-level working-state binding is physically nested inside one lane (relocation coupling)
+### F13 — [WITHDRAWN → repo-state; thin machinery residue] Program-level binding nested inside one lane
+**Reclassified 2026-07-01.** The specific misplacement (`rehydrate.sh` under `identity-cutover/_state/`)
+is a growth accident of this program = state. Thin machinery residue worth carrying: the Library/clacks
+never **defines a home for the program-level session-start (rehydration) hook** — monitor-hygiene
+mentions the hook's *content* ("reconcile, don't re-arm") but not *where it lives*. Give it a defined
+program-level slot so it can't get nested in a lane. That one line is the only machinery take-away;
+the rest is relocation cleanup. Original evidence below.
+
 The program-wide rehydration binding — `rehydrate.sh`, which on EVERY role's SessionStart globs the
 orchestrator anchor and names the roster/channel paths — lives at
 `_wip/identity-cutover/_state/quartet-hooks/rehydrate.sh`, i.e. INSIDE a single lane's `_state/`.
@@ -184,12 +217,29 @@ lane). The whole-program cutover is thus hostage to INI-6's lifecycle. Reinforce
 working-state binding has no portable home). Candidate fix: lift the hook + binding to a program-level
 home (`_quartet/working/program/` or the session-settings layer) so it isn't nested in a lane folder.
 
-**Net.** Brain is orient-sufficient; snapshot-warning + delegation mandate held cleanly. F7/F8/F9 are
-one theme — **discovery**: the Brain doesn't point a fresh session at its own live working state, its
-own migration plan, or its own findings surface. F6 escalates anchor-bloat to urgent. F10/F12/F13 are
-the relocation model: no ceremony for standing lanes, a permanent birth-date-keyed bifurcation that
-collides with the operator's clean-up-to-standard goal, and a program binding nested inside one lane
-that couples the program-level move to that lane's lifecycle.
+**Net.** Brain is orient-sufficient; snapshot-warning + delegation mandate held cleanly.
+
+**Reclassification pass (2026-07-01, system-vs-state) — F9–F13.** Of these five, **two are machinery**
+and **three are repo-state**:
+- **F10 (KEPT — machinery):** the lifecycle model has no steady-state for a *standing, non-graduating*
+  lane. Systemic.
+- **F11 (KEPT — machinery):** monitor-hygiene governs watchers but not the stale output files they
+  leave. Systemic (minor).
+- **F9 (WITHDRAWN — state):** "no pointer to `_wip/` live state" exists only because state is exiled
+  there; machinery kernel already = F16.
+- **F12 (WITHDRAWN — state):** describes this program's cutover-plan decisions; operator is ruling.
+- **F13 (WITHDRAWN — state):** a nesting accident; thin residue = "Library should define a home for
+  the session-start hook."
+
+F6–F8 (discovery: Brain doesn't point a fresh session at its live state / migration plan / findings
+surface) and the F6 anchor-bloat item were not part of this pass — they read as a mix of state
+(discovery gaps that vanish once relocation completes) and one possible machinery item (unbounded
+anchor growth: does the Library define anchor rotation?). Flag for a later F6–F8 pass if wanted.
+
+**Machinery findings still open across the whole log:** F16 (Brain hard-names a literal working-state
+path), F17 (reconcile can't keep a monitor across a job), F18 (no scoped/observer boot), F10
+(standing-lane lifecycle), F11 (monitor output-file hygiene), + the F13 residue (home for the
+session-start hook). Everything else is this program's relocation cleanup, tracked as program work.
 
 ## 2026-06-30/07-01 — Simulated fresh-orchestrator kickoff boot (machinery findings only)
 
@@ -250,5 +300,5 @@ bindings the program layer supplies). The delegation mandate, quality carve-out,
 separation all read cleanly — the Brain's *reasoning* is sound. **Process note (the meta-lesson):** the
 dogfood log had drifted into recording repo-state cleanup as "findings" (F14/F15 here; likely F9–F13
 from the prior session too — they describe the Option-C relocation mess). Machinery findings and
-program-state cleanup are different buckets; only the former belong here. A later pass should
-reclassify F9–F13 against the same test.
+program-state cleanup are different buckets; only the former belong here. F9–F13 were reclassified in
+the pass above (2026-07-01): F10/F11 kept as machinery, F9/F12/F13 withdrawn as state.
