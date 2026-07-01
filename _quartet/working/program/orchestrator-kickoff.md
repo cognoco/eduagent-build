@@ -60,9 +60,10 @@ them. Commit **own-work only** via the commit skill: explicit pathspec / `git mv
 `git add -A` (shared-tree staging hazard, finding F5).
 
 **6. Dogfooding is part of the job.** This program is the dogfood instance for the `_quartet/`
-machinery. Log machinery friction/improvement findings to **`_quartet/_quartet-wip/findings.md`** (running log,
-not a backlog). Do **not** self-capture Cosmo WIs for these — the operator converts findings to work
-items at critical mass and hands them to the ZDX/Quartet stream (INI-4/INI-5).
+machinery. Log findings to the split log (running logs, not backlogs): **reusable-machinery** friction →
+`_quartet/_quartet-wip/quartet-findings.md`; **this-deployment** state/mess → `_quartet/_quartet-wip/repo-findings.md`.
+Do **not** self-capture Cosmo WIs for these — the operator converts findings to work items at critical
+mass and hands the machinery ones to the ZDX/Quartet stream (INI-4/INI-5).
 
 **Orientation snapshot (2026-06-30 — verify against the Initiatives DB; will drift):** 15 in-scope
 initiatives + 2 new (INI-32 **Operations** = standing bug-lane / review-backlog / PR-cleanup; INI-33
@@ -85,7 +86,7 @@ SPECIAL SITUATION FOR THIS REPO — read _quartet/working/program/orchestrator-k
 - The Cosmo Initiatives DB (e8bc1bfd-215c-4cd4-a20f-a7b8be91fffe) is the MASTER for initiative core data; _wip/umbrella-program/program-roster.md is a downstream mirror that may be stale.
 - Working state is mid-relocation into _quartet/working/ (Option C, minus INI-6): some lanes already under _quartet/working/lanes/, others still under _wip/ (identity-cutover, bug-lane, umbrella-program). Your live anchor is _wip/umbrella-program/orchestrator-compaction-handoff-*.md.
 - A live session may be running concurrently on this shared checkout. Commit own-work only (never git add -A). Stay arm's-length from in-flight lanes you weren't asked to drive.
-- Log machinery friction to _quartet/_quartet-wip/findings.md; do NOT self-capture Cosmo WIs for findings (the operator hands them to the ZDX/Quartet stream).
+- Log findings to the split log — reusable-machinery friction → _quartet/_quartet-wip/quartet-findings.md, this-deployment state/mess → _quartet/_quartet-wip/repo-findings.md; do NOT self-capture Cosmo WIs for findings (the operator hands the machinery ones to the ZDX/Quartet stream).
 
 Read these, then orchestrate accordingly:
 1. _quartet/roles/orchestrator-protocol.md  — your standing role scaffold (Relentless Delegation; quality carve-out; the four roles; lane activation + graduation; progress-channel router duties; monitor hygiene; operational constraints).

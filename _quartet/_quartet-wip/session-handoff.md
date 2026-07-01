@@ -20,7 +20,7 @@ own-work committed directly per operator ruling; pushes via the commit skill, no
 2. (Earlier this session) **Initiatives DB is MASTER** for initiative core data; roster is a downstream
    mirror. **Option C** (relocate working state into `_quartet/working/`, minus INI-6) approved.
    Machinery canonical **only** in the `_quartet/` Brain/Library; `_quartet/_quartet-wip/` holds meta
-   artifacts (this file, `findings.md`, `audit.md`).
+   artifacts (this file, `quartet-findings.md`, `repo-findings.md`, `audit.md`).
 
 ## DONE THIS SESSION (all committed + pushed to main)
 - **Initiatives DB populated:** 15 outcomes; 10 Initiative→Workstream links; **INI-32 Operations**
@@ -67,7 +67,8 @@ own-work committed directly per operator ruling; pushes via the commit skill, no
 - Shared checkout: commit **own-work only** (never `git add -A`); ~50+ concurrent-session dirty files
   routinely present — leave them.
 - Full session context (orientation, inventories, the program-status synthesis) is in the conversation
-  being compacted; the durable record is the commits above + `findings.md` + this file.
+  being compacted; the durable record is the commits above + `quartet-findings.md` / `repo-findings.md`
+  + this file.
 
 ---
 
@@ -89,17 +90,20 @@ be machinery-only. Commits on `main` (own-work, pushed): `c7f8525`, `7f65a7a`, `
   read "open" because sessions ended without emitting closing `decision`s — treat any channel signal as
   possibly-stale; Cosmo-verify before acting.
 
-**Findings log is now system-vs-state disciplined.** The log (`_quartet/_quartet-wip/findings.md`) is
-for **Quartet machinery** candidates only; program-state cleanup is separate. Clean **machinery**
-finding set (the hand-off list for the ZDX/Quartet stream when converting to WIs):
+**Findings log split system-vs-state (2026-07-01).** The former merged `findings.md` is now two files:
+`_quartet/_quartet-wip/quartet-findings.md` (reusable machinery — the ZDX/Quartet hand-off surface) and
+`_quartet/_quartet-wip/repo-findings.md` (this deployment's state/mess/cleanup). Clean **machinery**
+finding set (in quartet-findings.md):
 - **F16** — reusable Brain hard-names a literal `working/program/program-roster.md` path.
 - **F17** — reconcile ritual can't "keep" a monitor across a job boundary (task-ids don't survive).
 - **F18** — no scoped/observer boot mode (Brain assumes the orchestrator owns every active lane).
 - **F10** — lifecycle model has no steady-state for a standing (non-graduating) lane.
 - **F11** — monitor-hygiene governs watchers but not the stale output files they leave.
 - **F13 residue** — Library defines no home for the program-level session-start (rehydration) hook.
+- Plus F1/F16 (literal roster path), F2/F6 (anchor read-in-full + bloat), F3 (dated filename),
+  F5 (shared-tree commit scope), F7 (findings surface undiscoverable) — see quartet-findings.md.
 - Common shape: the Brain **over-commits to deployment specifics** — fix = refer to bindings, not
-  instances. WITHDRAWN as repo-state: F9, F12, F13, F14, F15. F6–F8 not yet reclassified (optional).
+  instances. In **repo-findings.md** (state): F4, F8, F9, F12, F13, F14, F15.
 
 **OPEN — unchanged next step:** run the **Approach-B spike on INI-6 + INI-32** (now unblocked). INI-6
 page id `38e8bce9-1f7c-8149-8b14-ddae03440c84`; INI-32 Operations `38f8bce9-1f7c-8130-a26b-e9f830354fb2`.
