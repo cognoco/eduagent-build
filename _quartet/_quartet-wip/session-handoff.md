@@ -109,3 +109,33 @@ finding set (in quartet-findings.md):
 page id `38e8bce9-1f7c-8149-8b14-ddae03440c84`; INI-32 Operations `38f8bce9-1f7c-8130-a26b-e9f830354fb2`.
 The two held operator decisions (drive Identity Cutover; spin up the Operations shepherd) still stand
 behind the spike.
+
+---
+
+## UPDATE 2026-07-01 (cont.) — memory → findings migration + learning-tracker deleted
+
+Commits on `main` (own-work, pushed): `4497eaa`, `58b9a81` (+ earlier `c7d2e8d`).
+
+- **F9–F13 reclassified** system-vs-state: **F10/F11 kept as machinery**; **F9/F12/F13 withdrawn as
+  repo-state** (relocation mess). F14/F15 also withdrawn (environment / repo-state).
+- **Machinery lessons promoted from operator memory → `quartet-findings.md`:** F19 (agent isolation /
+  single-writer + cwd-pin caveat), F20 (CI-repro at failing commit), F21 (verify-at-source + shepherd
+  conformance-review + completeness-sweep), F22 (sub-agent checkpoint cadence + no-git), F23 (shepherd
+  completion gates), F24 (cutover/switch-flip owner), + an F5 push/land extension. **Category B (tagged
+  *may-not-be-Quartet*):** F25 (refine-inspects-code → ZDX DoR), F26 (PR-on-done → estate/Cosmo).
+  **From the learning-tracker:** F27 (reviewer invariants — never fork for review), F28 (ZDX/Cosmo
+  finalize lifecycle — *may-not-be-Quartet*). `quartet-findings.md` now carries **F1–F28**, machinery
+  only, dedup'd (F1≡F16, F2≡F6 merged).
+- **Deleted 13 memories + the learning-tracker** (`_wip/umbrella-program/quartet-learning-tracker.md`)
+  — all content folded into `quartet-findings.md` / `repo-findings.md`; index lines removed from
+  `MEMORY.md`.
+- **Referrer discipline (established rule):** a **forward/live dependency in a durable doc** → repoint
+  to the `Fxx` finding; a **past-tense historical mention in a log / lane-`_state` scratch / anchor /
+  audit-catalog** → leave (rewriting falsifies history + touches live-owned/immutable files). Repointed
+  6 live refs → F24/F27/F28 + `monitor-hygiene.md` (identity-foundation cutover-plan/brief, roster,
+  cosmo-finalization-guide). Remaining mentions of deleted files (pr-cleanup/bug-lane outboxes,
+  shepherd-world.md, WI-805 enumeration, orchestrator anchor, IF disposition-matrix, memory-cleanup.md,
+  quartet-cutover-plan exclusion-list, 2 `docs/_archive` audits) are **intentionally left** as history.
+- **Findings surfaces are the deliverable to hand the Quartet owner:** `quartet-findings.md` (machinery)
+  + `repo-findings.md` (this deployment's state). The dogfood-capture pointers live in the folder README
+  + the orchestrator-kickoff §6 (both now name both files).
