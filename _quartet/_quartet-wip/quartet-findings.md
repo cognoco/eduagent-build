@@ -17,7 +17,9 @@ un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home fo
 hook). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
-owner in plans).
+owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
+(PR-on-done → estate/Cosmo). **From the learning-tracker:** F27 (reviewer invariants — never fork for
+review), F28 (ZDX/Cosmo finalize lifecycle — may not be Quartet).
 
 **Validated (held under dogfood — do NOT "fix"):** Brain is orient-sufficient off `roles/` +
 `planning-rules.md` alone; four-roles / altitude invariants / 8-step lane-activation are legible as
@@ -118,8 +120,10 @@ writer agent on one worktree races** the index/edits; (c) a spawned writer fleet
 **orphaned-but-alive when its parent is killed** and keeps editing. **Fix (executor-protocol / spawn
 economics):** parallel rollout = read-only Explore mappers → a SINGLE applier, or one
 `isolation:worktree` per writer; never >1 writer per tree; after any agent kill, direct-scan for live
-descendants + recent edits before declaring quiescent. *(from memory: feedback_adversarial_fork_isolation,
-feedback_orphan_writer_fleet_survives_parent_kill)*
+descendants + recent edits before declaring quiescent. **Harness caveat:** launching a fork with
+`isolation:"worktree"` PINS the parent session cwd into `.claude/worktrees/agent-*`, after which
+Edit/Write refuse shared-checkout paths — write via Bash + absolute paths until un-pinned. *(from
+memory: feedback_adversarial_fork_isolation, feedback_orphan_writer_fleet_survives_parent_kill)*
 
 ### F20 — CI-failure repro must run at the failing commit, not the shared local tree (executor dispatch)
 On a shared checkout local `main` lags `origin/main`; CI runs at the merge commit, so reproducing or
@@ -135,8 +139,11 @@ and report, don't fabricate a no-op (executor **GATE-0**). (b) Sub-agent **appli
 citations** (cite twin test files that don't exist) and mis-classify seams; they are NOT trusted to
 self-cite/self-classify — a **shepherd conformance-review before integration** (verify each cited file
 with `git ls-files`, seed real seams) is the load-bearing net. **Fix:** bake GATE-0 into every executor
-brief and a mandatory conformance-review into the shepherd loop. *(from memory:
-feedback_verify_directive_premise_before_build, feedback_applier_fabricates_citations)*
+brief and a mandatory conformance-review into the shepherd loop. **Completeness (tracker E7):** a
+"no-gap"/fix verification must be *complete* — when the change names N variant surfaces, sweep ALL of
+them AND all sibling call sites of the guard (the "3+ sibling locations" drift class), not just the
+first paths checked. *(from memory: feedback_verify_directive_premise_before_build,
+feedback_applier_fabricates_citations; + tracker E7)*
 
 ### F22 — Sub-agent checkpoint cadence + no-git-from-subagents (dispatch rails)
 Long-running sub-agents that return findings only in chat lose the work if the thread fails. **Fix
@@ -160,3 +167,53 @@ caller. **Fix (planning-rules):** at plan ratification ask *which unit makes the
 thing, and which owns the data/state convergence at the flip?* — if none answers both, a wave is
 missing. Corollary: piecemeal merges only under the single-live-store invariant (new paths inert until
 one atomic convergence); no partial per-domain activation. *(from memory: feedback_plan_cutover_ownership)*
+
+### F25 — Refinement must inspect current code before promoting a WI to Ready *(may be ZDX DoR, not Quartet-role machinery)*
+Refining a Cosmo WI toward `Ready` must inspect the **current affected code/docs**, not just fill Cosmo
+fields against the mechanical DoR gate — a fields-only refine produced a too-shallow `Ready`/`Auto`
+classification (2026-06-21, 10 WIs). Before `--to-ready`: identify likely affected files from
+title/AC/source-links, read the current surface, base AC + Execution Path on that; if scope can't be
+bounded, leave `Refining` or classify `Assisted`. **Home caveat:** this reads as a **ZDX
+Definition-of-Ready** discipline more than a Quartet role-scaffold rule — route to the ZDX/DoR owner.
+*(from memory: feedback_cosmo_refine_requires_code_inspection — Category B)*
+
+### F26 — Open a PR when a WI's work is done, without a separate prompt *(estate/Cosmo workflow — may not be Quartet)*
+After a WI has a verified commit + branch push + `/cosmo:execute complete`, open the GitHub PR (default
+draft) before reporting done — don't wait for a separate "create PRs" prompt. **Home caveat:** this is
+an operator **workflow/handoff preference** for this estate's Cosmo→PR flow, not reusable Quartet-role
+machinery; it could inform a shepherd close-flow step but likely belongs in repo/estate conventions.
+*(from memory: feedback_cosmo_done_creates_pr — Category B)*
+
+---
+
+## Promoted from the Quartet learning-tracker (2026-07-01)
+
+Net-new findings extracted from `_wip/umbrella-program/quartet-learning-tracker.md` (the PRG-05
+productization holding-pen). Its other entries were already captured or shipped: **E3** = F20, **E6** =
+`monitor-hygiene.md`, **E5** = the orchestrator-protocol 🔴 re-read block, **E1/E4** = the
+Relentless-Delegation mandate + lane-activation ceremony already wired into the protocols. Only the
+below were not yet on this surface.
+
+### F27 — Reviewer quality invariants: never fork for review; the reviewer catches what the executor's scoped verify misses (reviewer chapter)
+Sharpens the shipped reviewer≠executor invariant with three field-proven rules. (a) **Adversarial
+review must be a fresh, no-context session — a `fork` is disallowed for review**: it inherits the
+author's conclusions and rubber-stamps them (both WI-811 review forks restated the author's status
+instead of refuting it); the reviewer sees only the artifact + attack vectors. (b) **The reviewer
+catches cross-consumer gaps executor-scoped verification misses** — WI-823: shepherd + builder + a
+fresh skeptic all concluded "no gap" scoped to the write/auth path, but the separate reviewer found a
+real gap in a *different* read-path consumer; never round an executor's confident "no-defect" up to
+done. (c) **A bounce is not automatically a real finding either** — read the reviewer's actual words
+and distinguish a code-finding from a tooling artifact (WI-825 bounced 3× on a broken test harness,
+not a defect); adjudicate findings against the WI's **AC**, and honor logged operator deferrals.
+*(from tracker E2/E7/E9)*
+
+### F28 — ZDX/Cosmo review-loop lifecycle *(system-related; may NOT be Quartet-role machinery — likely ZDX/Cosmo skill docs)*
+Two lifecycle rules from dogfooding the reviewer leg; flagged because their home is the **ZDX/Cosmo
+skill layer**, not the Quartet role-scaffold, but system-relevant per operator instruction. (a)
+**`/cosmo:execute complete` IS the finalize path** when the `completion-summary.md` is parser-conformant
+(`Title:` colon-format sections, single-line `**Caveats / Follow-ups:**`, no bare filenames/UUIDs/counts
+in prose) — the older "`complete` is unusable, use `replace_content`" is a superseded v0.1.0 workaround;
+drop that framing. (b) **A `Type=Bug` DoD needs a declared red-green-revert regression guard** up front
+— `/cosmo:review` bounces a Bug that ships a fix without a durable guard + cited RED-pre-fix/GREEN-post-fix
+evidence, even when AC/symptoms pass (put it in the Bug-executor brief). Full runbook:
+`_wip/umbrella-program/cosmo-finalization-guide.md`. *(from tracker E8/E9)*

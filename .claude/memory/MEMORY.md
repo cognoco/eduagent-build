@@ -55,7 +55,6 @@
 - [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
-- [feedback_cosmo_done_creates_pr.md](feedback_cosmo_done_creates_pr.md) — For MentoMate Cosmo WI work, create a PR every time verified work is done; do not wait for a separate PR prompt.
 - [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
@@ -114,7 +113,6 @@
 - [feedback_monitor_silence_not_health.md](feedback_monitor_silence_not_health.md) — Session/host-scoped monitors die on reboot/session-end; silence ≠ healthy. Spot-check Cosmo; re-arm after restart.
 - [feedback_subagent_stale_local_repro.md](feedback_subagent_stale_local_repro.md) — Sub-agents reproduce CI failures vs the session's LOCAL checkout (may be behind origin/main) → false causation; dispatch CI-failure repro against a fresh worktree FROM origin/main + verify HEAD==failing-commit. (WI-808 2026-06-18.)
 - [feedback_adversarial_fork_isolation.md](feedback_adversarial_fork_isolation.md) — Read-only review forks share the worktree + can edit; enforce with isolation:worktree or Explore (no-edit) type.
-- [feedback_orphan_writer_fleet_survives_parent_kill.md](feedback_orphan_writer_fleet_survives_parent_kill.md) — A sub-agent's parallel writer-fleet ORPHANS (survives parent kill) + keeps racing the tree; never >1 writer/worktree (Explore-map→single-applier); TaskStop works on local_agent not in_process_teammate; direct-scan for live children after any kill.
 - [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
