@@ -4180,12 +4180,24 @@
   "supportHub": {
     "mentor": {
       "title": "サポートハブ",
-      "subtitle": "サポートする学習者のためのコックピットです。",
+      "subtitle": "サポートしている学習者の共有された学習状況と次のステップ。",
       "empty": "学習者を追加すると、ここにサポートのニーズが表示されます。",
-      "openPerson": "{{name}}を開く",
-      "personHint": "この学習者のサポートビューを開きます。",
       "personTitle": "{{name}}",
-      "personSubtitle": "この学習者のサポートシグナルです。"
+      "personSubtitle": "この学習者のサポートシグナルです。",
+      "loadingHeadline": "共有された更新情報を確認中...",
+      "structuralOnly": "ここには共有可能な学習状況のみが表示されます。",
+      "emptyCardTitle": "共有可能な更新情報はまだありません",
+      "emptyCardMessage": "{{name}}さんが共有セッションやレポートを送信すると、ここに表示されます。",
+      "errorTitle": "共有された更新情報を読み込めませんでした",
+      "errorMessage": "時間をおいて再試行してください。",
+      "actionMentor": "メンタービュー",
+      "actionSubjects": "科目",
+      "actionJournal": "ジャーナル",
+      "factKind": {
+        "mastery": "習熟度",
+        "effort": "努力",
+        "observable_engagement": "取り組み"
+      }
     },
     "subjects": {
       "title": "科目",

@@ -4180,12 +4180,24 @@
   "supportHub": {
     "mentor": {
       "title": "Centro de apoyo",
-      "subtitle": "Un panel de control para los estudiantes que apoyas.",
+      "subtitle": "Señales compartidas y próximos pasos para los estudiantes que apoyas.",
       "empty": "Añade un estudiante para ver sus necesidades de apoyo aquí.",
-      "openPerson": "Abrir {{name}}",
-      "personHint": "Abre la vista de apoyo de este estudiante.",
       "personTitle": "{{name}}",
-      "personSubtitle": "Señales de apoyo para este estudiante."
+      "personSubtitle": "Señales de apoyo para este estudiante.",
+      "loadingHeadline": "Comprobando actualizaciones compartidas...",
+      "structuralOnly": "Aquí solo se muestran las señales de aprendizaje que se pueden compartir.",
+      "emptyCardTitle": "Aún no hay actualizaciones compartibles",
+      "emptyCardMessage": "Cuando {{name}} tenga una sesión o un informe compartido, aparecerá aquí.",
+      "errorTitle": "No se pudieron cargar las actualizaciones compartidas",
+      "errorMessage": "Vuelve a intentarlo en un momento.",
+      "actionMentor": "Vista de mentor",
+      "actionSubjects": "Asignaturas",
+      "actionJournal": "Diario",
+      "factKind": {
+        "mastery": "Dominio",
+        "effort": "Esfuerzo",
+        "observable_engagement": "Participación"
+      }
     },
     "subjects": {
       "title": "Asignaturas",

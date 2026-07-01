@@ -4180,12 +4180,24 @@
   "supportHub": {
     "mentor": {
       "title": "Support-Hub",
-      "subtitle": "Ein Cockpit für die Lernenden, die du unterstützt.",
+      "subtitle": "Geteilte Signale und nächste Schritte für die Lernenden, die du unterstützt.",
       "empty": "Füge Lernende hinzu, um hier ihren Bedarf zu sehen.",
-      "openPerson": "{{name}} öffnen",
-      "personHint": "Support-Ansicht dieses Lernenden öffnen.",
       "personTitle": "{{name}}",
-      "personSubtitle": "Support-Signale für diesen Lernenden."
+      "personSubtitle": "Support-Signale für diesen Lernenden.",
+      "loadingHeadline": "Geteilte Updates werden geprüft...",
+      "structuralOnly": "Hier werden nur teilbare Lernsignale angezeigt.",
+      "emptyCardTitle": "Noch keine teilbaren Updates",
+      "emptyCardMessage": "Wenn {{name}} eine geteilte Sitzung oder einen Bericht hat, wird er hier angezeigt.",
+      "errorTitle": "Geteilte Updates konnten nicht geladen werden",
+      "errorMessage": "Versuche es gleich noch einmal.",
+      "actionMentor": "Mentor-Ansicht",
+      "actionSubjects": "Fächer",
+      "actionJournal": "Journal",
+      "factKind": {
+        "mastery": "Beherrschung",
+        "effort": "Einsatz",
+        "observable_engagement": "Engagement"
+      }
     },
     "subjects": {
       "title": "Fächer",

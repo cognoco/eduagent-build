@@ -368,15 +368,29 @@ function LearnerMentorScreen(): React.ReactElement {
 
 export default function MentorScreen(): React.ReactElement {
   const { activeScope, availableScopes, setActiveScope } = useScopeContext();
+  const router = useRouter();
   const personScopes = availableScopes.filter(
     (scope) => scope.kind === 'person',
   );
+  const openScopedRoute = (
+    scope: (typeof personScopes)[number],
+    route: '/(app)/subjects' | '/(app)/journal',
+  ): void => {
+    setActiveScope(scope);
+    router.push(route as Href);
+  };
+  const openScopedSubjects = (scope: (typeof personScopes)[number]): void =>
+    openScopedRoute(scope, '/(app)/subjects');
+  const openScopedJournal = (scope: (typeof personScopes)[number]): void =>
+    openScopedRoute(scope, '/(app)/journal');
 
   if (activeScope.kind === 'supporter-hub') {
     return (
       <SupportHubMentorTab
         personScopes={personScopes}
         onOpenPersonScope={setActiveScope}
+        onOpenSubjects={openScopedSubjects}
+        onOpenJournal={openScopedJournal}
       />
     );
   }
@@ -386,6 +400,9 @@ export default function MentorScreen(): React.ReactElement {
       <SupportHubMentorTab
         personScopes={[activeScope]}
         activePersonScope={activeScope}
+        onOpenPersonScope={setActiveScope}
+        onOpenSubjects={openScopedSubjects}
+        onOpenJournal={openScopedJournal}
       />
     );
   }
