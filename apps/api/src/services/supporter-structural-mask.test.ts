@@ -42,6 +42,8 @@ describe('readSupporteeStructuralSubjects', () => {
   });
 
   it('returns only live structural subject/book/topic fields for an active edge', async () => {
+    const dueReviewAt = new Date('2026-06-29T12:00:00.000Z');
+    const masteredAt = new Date('2026-06-28T12:00:00.000Z');
     const db = dbWithSelectResults([
       [{ edgeId: '00000000-0000-4000-8000-000000000010' }],
       [
@@ -61,7 +63,29 @@ describe('readSupporteeStructuralSubjects', () => {
           topicSortOrder: 1,
           estimatedMinutes: 15,
           skipped: false,
+          topicNextReviewAt: dueReviewAt,
+          topicMasteredAt: null,
           artifactText: 'SECRET JOURNAL SENTENCE MUST NOT LEAK',
+        },
+        {
+          subjectId: '00000000-0000-4000-8000-000000000101',
+          subjectName: 'Physics',
+          subjectStatus: 'active',
+          bookId: '00000000-0000-4000-8000-000000000201',
+          bookTitle: 'Motion',
+          bookDescription: 'How things move',
+          bookEmoji: 'F',
+          bookSortOrder: 1,
+          topicId: '00000000-0000-4000-8000-000000000302',
+          topicTitle: 'Acceleration',
+          topicDescription: 'Changing velocity',
+          topicChapter: 'Vectors',
+          topicSortOrder: 2,
+          estimatedMinutes: 20,
+          skipped: false,
+          topicNextReviewAt: null,
+          topicMasteredAt: masteredAt,
+          artifactText: 'PRIVATE NOTE MUST NOT LEAK',
         },
       ],
     ]);
@@ -96,6 +120,21 @@ describe('readSupporteeStructuralSubjects', () => {
                   sortOrder: 1,
                   estimatedMinutes: 15,
                   skipped: false,
+                  progressState: 'review-due',
+                  nextReviewAt: '2026-06-29T12:00:00.000Z',
+                  masteredAt: null,
+                },
+                {
+                  id: '00000000-0000-4000-8000-000000000302',
+                  title: 'Acceleration',
+                  description: 'Changing velocity',
+                  chapter: 'Vectors',
+                  sortOrder: 2,
+                  estimatedMinutes: 20,
+                  skipped: false,
+                  progressState: 'mastered',
+                  nextReviewAt: null,
+                  masteredAt: '2026-06-28T12:00:00.000Z',
                 },
               ],
             },
@@ -104,5 +143,6 @@ describe('readSupporteeStructuralSubjects', () => {
       ],
     });
     expect(JSON.stringify(result)).not.toContain('SECRET JOURNAL SENTENCE');
+    expect(JSON.stringify(result)).not.toContain('PRIVATE NOTE');
   });
 });

@@ -35,6 +35,57 @@ jest.mock(
 
 const PERSON_ID = '550e8400-e29b-41d4-a716-446655440101';
 const EDGE_ID = '550e8400-e29b-41d4-a716-446655440201';
+const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440301';
+const BOOK_ID = '550e8400-e29b-41d4-a716-446655440401';
+const REVIEW_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440501';
+const MASTERED_TOPIC_ID = '550e8400-e29b-41d4-a716-446655440502';
+
+const STRUCTURAL_DATA: SupporteeStructuralSubjectsResponse = {
+  personId: PERSON_ID,
+  edgeId: EDGE_ID,
+  subjects: [
+    {
+      id: SUBJECT_ID,
+      name: 'Physics',
+      status: 'active',
+      books: [
+        {
+          id: BOOK_ID,
+          title: 'Motion',
+          description: 'How things move',
+          emoji: null,
+          sortOrder: 1,
+          topics: [
+            {
+              id: REVIEW_TOPIC_ID,
+              title: 'Velocity',
+              description: 'Speed with direction',
+              chapter: 'Vectors',
+              sortOrder: 1,
+              estimatedMinutes: 15,
+              skipped: false,
+              progressState: 'review-due',
+              nextReviewAt: '2026-06-29T12:00:00.000Z',
+              masteredAt: null,
+            },
+            {
+              id: MASTERED_TOPIC_ID,
+              title: 'Acceleration',
+              description: 'Changing velocity',
+              chapter: 'Vectors',
+              sortOrder: 2,
+              estimatedMinutes: 20,
+              skipped: false,
+              progressState: 'mastered',
+              nextReviewAt: null,
+              masteredAt: '2026-06-28T12:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 
 function wrapper(data?: SupporteeStructuralSubjectsResponse) {
   const queryClient = new QueryClient({
@@ -100,5 +151,48 @@ describe('PersonScopeStructuralSubjects', () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('opens a masked read-only Subject Hub drill-in without private artifacts or proxy actions', async () => {
+    mockFetch.setRoute(`/scopes/${PERSON_ID}/subjects`, STRUCTURAL_DATA);
+
+    render(
+      <PersonScopeStructuralSubjects
+        scope={{
+          kind: 'person',
+          personId: PERSON_ID,
+          edgeId: EDGE_ID,
+          displayName: 'Emma',
+        }}
+      />,
+      {
+        wrapper: wrapper(STRUCTURAL_DATA),
+      },
+    );
+
+    await waitFor(() => {
+      screen.getByTestId(`person-scope-subject-${SUBJECT_ID}`);
+    });
+
+    fireEvent.press(screen.getByTestId(`person-scope-subject-${SUBJECT_ID}`));
+
+    screen.getByTestId('person-scope-subject-hub');
+    screen.getByText('Physics');
+    screen.getByText('1 mastered, 0 learning, 2 topics');
+    screen.getByText('1 reviews due');
+    screen.getByText('Motion / Vectors');
+    expect(screen.getAllByText('Velocity')).toHaveLength(2);
+    screen.getByText('Acceleration');
+    screen.getByText('Mastered');
+    screen.getByText('Study actions are private to the learner in this view.');
+    screen.getByText('Subject, chapter and topic structure only.');
+    expect(screen.queryByTestId('subject-hub-next-up-action')).toBeNull();
+    expect(screen.queryByTestId('subject-hub-notes-input')).toBeNull();
+    expect(screen.queryByText('Private note')).toBeNull();
+    expect(screen.queryByText('Mentor memory')).toBeNull();
+    expect(screen.queryByText('Switching into Emma')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('person-scope-subject-hub-back'));
+    screen.getByTestId(`person-scope-subject-${SUBJECT_ID}`);
   });
 });
