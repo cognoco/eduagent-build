@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { SharedRecord } from '@eduagent/schemas';
+import type { AppealReport, SharedRecord } from '@eduagent/schemas';
 
 import { SharedRecordView } from './SharedRecordView';
 
@@ -59,5 +59,67 @@ describe('SharedRecordView', () => {
     screen.getByTestId('visibility-shared-record-error');
     fireEvent.press(screen.getByTestId('visibility-shared-record-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render the appeal affordance when onAppeal is not provided', () => {
+    render(<SharedRecordView record={RECORD} />);
+
+    expect(screen.queryByTestId('visibility-appeal-button')).toBeNull();
+  });
+
+  it('renders the appeal button and triggers onAppeal when pressed', () => {
+    const onAppeal = jest.fn();
+    render(<SharedRecordView record={RECORD} onAppeal={onAppeal} />);
+
+    const button = screen.getByTestId('visibility-appeal-button');
+    fireEvent.press(button);
+    expect(onAppeal).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a pending indicator while the appeal is in flight', () => {
+    render(
+      <SharedRecordView record={RECORD} onAppeal={jest.fn()} appealPending />,
+    );
+
+    screen.getByTestId('visibility-appeal-pending');
+    expect(screen.queryByTestId('visibility-appeal-button')).toBeNull();
+  });
+
+  it('renders the attention report once the appeal succeeds', () => {
+    const APPEAL_REPORT: AppealReport = {
+      supportershipId: RECORD.supportershipId,
+      generatedAt: '2026-07-01T12:00:00.000Z',
+      report: 'Detailed attention report: no shareable updates yet.',
+      facts: [],
+      artifactWall: true,
+    };
+
+    render(
+      <SharedRecordView
+        record={RECORD}
+        onAppeal={jest.fn()}
+        appealReport={APPEAL_REPORT}
+      />,
+    );
+
+    screen.getByTestId('visibility-appeal-report');
+    screen.getByText(APPEAL_REPORT.report);
+    expect(screen.queryByTestId('visibility-appeal-button')).toBeNull();
+  });
+
+  it('routes appeal failures through ErrorFallback with retry', () => {
+    const onRetryAppeal = jest.fn();
+    render(
+      <SharedRecordView
+        record={RECORD}
+        onAppeal={jest.fn()}
+        appealError={new Error('nope')}
+        onRetryAppeal={onRetryAppeal}
+      />,
+    );
+
+    screen.getByTestId('visibility-appeal-error');
+    fireEvent.press(screen.getByTestId('visibility-appeal-retry'));
+    expect(onRetryAppeal).toHaveBeenCalledTimes(1);
   });
 });

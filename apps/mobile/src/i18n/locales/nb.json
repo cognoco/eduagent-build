@@ -1757,9 +1757,7 @@
     "scheduledBody": "Alle dataene dine vil bli permanent fjernet den {{date}}. Du kan avbryte når som helst før det.",
     "scheduledAccountActive": "Kontoen din forblir aktiv til angrefristen utløper.",
     "keepAccount": "Jeg ombestemte meg – behold kontoen min",
-    "keepAccountLabel": "Jeg ombestemte meg – behold kontoen min",
     "signOutNow": "Logg ut nå",
-    "signOutNowLabel": "Logg ut nå",
     "signOutFailedTitle": "Utlogging mislyktes",
     "signOutFailedMessage": "Lukk og åpne appen på nytt, og logg deretter inn igjen.",
     "closeWithoutCancellingLabel": "Lukk uten å avbryte",
@@ -4250,7 +4248,9 @@
       "retry": "Prøv igjen"
     },
     "appeal": {
-      "label": "Be om oppmerksomhetsrapport"
+      "label": "Be om oppmerksomhetsrapport",
+      "errorTitle": "Kunne ikke be om oppmerksomhetsrapporten",
+      "errorMessage": "Prøv igjen om et øyeblikk."
     },
     "revocation": {
       "title": "Deling avsluttet",

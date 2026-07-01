@@ -1757,9 +1757,7 @@
     "scheduledBody": "Todos tus datos serán eliminados permanentemente el {{date}}. Puedes cancelar en cualquier momento antes de esa fecha.",
     "scheduledAccountActive": "Tu cuenta permanecerá activa hasta que finalice el período de gracia.",
     "keepAccount": "Cambié de opinión — mantener mi cuenta",
-    "keepAccountLabel": "Cambié de opinión — mantener mi cuenta",
     "signOutNow": "Cerrar sesión ahora",
-    "signOutNowLabel": "Cerrar sesión ahora",
     "signOutFailedTitle": "Falló el cierre de sesión",
     "signOutFailedMessage": "Cierra y vuelve a abrir la app, luego inicia sesión de nuevo.",
     "closeWithoutCancellingLabel": "Cerrar sin cancelar",
@@ -4250,7 +4248,9 @@
       "retry": "Reintentar"
     },
     "appeal": {
-      "label": "Solicitar informe de atención"
+      "label": "Solicitar informe de atención",
+      "errorTitle": "No se pudo solicitar el informe de atención",
+      "errorMessage": "Inténtalo de nuevo en un momento."
     },
     "revocation": {
       "title": "Se dejó de compartir",

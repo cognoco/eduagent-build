@@ -1757,9 +1757,7 @@
     "scheduledBody": "Alle deine Daten werden am {{date}} endgültig entfernt. Du kannst dies jederzeit davor abbrechen.",
     "scheduledAccountActive": "Dein Konto bleibt aktiv, bis die Frist abläuft.",
     "keepAccount": "Ich habe es mir anders überlegt – mein Konto behalten",
-    "keepAccountLabel": "Ich habe es mir anders überlegt – mein Konto behalten",
     "signOutNow": "Jetzt abmelden",
-    "signOutNowLabel": "Jetzt abmelden",
     "signOutFailedTitle": "Abmeldung fehlgeschlagen",
     "signOutFailedMessage": "Bitte schließe die App, öffne sie erneut und melde dich dann wieder an.",
     "closeWithoutCancellingLabel": "Schließen ohne Abbrechen",
@@ -4250,7 +4248,9 @@
       "retry": "Erneut versuchen"
     },
     "appeal": {
-      "label": "Aufmerksamkeitsbericht anfordern"
+      "label": "Aufmerksamkeitsbericht anfordern",
+      "errorTitle": "Aufmerksamkeitsbericht konnte nicht angefordert werden",
+      "errorMessage": "Versuche es gleich noch einmal."
     },
     "revocation": {
       "title": "Teilen beendet",

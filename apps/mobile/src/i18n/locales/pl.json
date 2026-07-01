@@ -1834,9 +1834,7 @@
     "scheduledBody": "Wszystkie Twoje dane zostaną trwale usunięte w dniu {{date}}. Możesz anulować w dowolnym momencie przed tą datą.",
     "scheduledAccountActive": "Twoje konto pozostaje aktywne do końca okresu karencji.",
     "keepAccount": "Zmieniłem(-am) zdanie — zachowaj moje konto",
-    "keepAccountLabel": "Zmieniłem(-am) zdanie — zachowaj moje konto",
     "signOutNow": "Wyloguj się teraz",
-    "signOutNowLabel": "Wyloguj się teraz",
     "signOutFailedTitle": "Wylogowanie nie powiodło się",
     "signOutFailedMessage": "Zamknij i ponownie otwórz aplikację, a następnie zaloguj się ponownie.",
     "closeWithoutCancellingLabel": "Zamknij bez anulowania",
@@ -4414,7 +4412,9 @@
       "retry": "Spróbuj ponownie"
     },
     "appeal": {
-      "label": "Poproś o raport uwagi"
+      "label": "Poproś o raport uwagi",
+      "errorTitle": "Nie udało się poprosić o raport uwagi",
+      "errorMessage": "Spróbuj ponownie za chwilę."
     },
     "revocation": {
       "title": "Koniec udostępniania",

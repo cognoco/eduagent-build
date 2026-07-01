@@ -50,6 +50,7 @@ import {
 } from '../../lib/summary-draft';
 import { getReflectionStarters } from '../../lib/reflection-starters';
 import {
+  Button,
   CheckmarkPopAnimation,
   BrandCelebration,
   ShimmerSkeleton,
@@ -517,17 +518,12 @@ export default function SessionSummaryScreen() {
         <Text className="text-body text-text-secondary text-center mb-6">
           {t('sessionSummary.expiredMessage')}
         </Text>
-        <Pressable
+        <Button
+          variant="primary"
+          label={t('common.goHome')}
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
-          className="bg-primary rounded-button py-3 px-8 items-center"
           testID="expired-session-go-home"
-          accessibilityLabel={t('common.goHome')}
-          accessibilityRole="button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            {t('common.goHome')}
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
@@ -543,17 +539,12 @@ export default function SessionSummaryScreen() {
         <Text className="text-body text-text-secondary text-center mb-6">
           {t('sessionSummary.notFoundMessage')}
         </Text>
-        <Pressable
+        <Button
+          variant="primary"
+          label={t('common.goHome')}
           onPress={() => goBackOrReplace(router, summaryHomeHref)}
-          className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
-          accessibilityLabel={t('common.goHome')}
-          accessibilityRole="button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            {t('common.goHome')}
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
@@ -612,17 +603,12 @@ export default function SessionSummaryScreen() {
         <Text className="text-body text-text-secondary text-center mb-6">
           {t('sessionSummary.couldNotLoadMessage')}
         </Text>
-        <Pressable
+        <Button
+          variant="primary"
+          label={t('common.goHome')}
           onPress={() => router.replace(summaryHomeHref as Href)}
-          className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
-          accessibilityLabel={t('common.goHome')}
-          accessibilityRole="button"
-        >
-          <Text className="text-text-inverse text-body font-semibold">
-            {t('common.goHome')}
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
@@ -1002,29 +988,26 @@ export default function SessionSummaryScreen() {
           so it never appears on the parent UI).
         */}
         {!isProxyMode && sessionId ? (
-          <Pressable
-            onPress={() => {
-              const resumeTopicId = topicId ?? fallbackSession?.topicId;
-              const resumeSubjectId = subjectId ?? fallbackSession?.subjectId;
-              router.push({
-                pathname: '/(app)/session',
-                params: {
-                  mode: 'learning',
-                  sessionId,
-                  ...(resumeSubjectId ? { subjectId: resumeSubjectId } : {}),
-                  ...(resumeTopicId ? { topicId: resumeTopicId } : {}),
-                },
-              } as Href);
-            }}
-            className="bg-primary rounded-button py-3 items-center mb-4"
-            accessibilityRole="button"
-            accessibilityLabel={t('sessionSummary.resumeSession')}
-            testID="resume-session-cta"
-          >
-            <Text className="text-text-inverse text-body font-semibold">
-              {t('sessionSummary.resumeSession')}
-            </Text>
-          </Pressable>
+          <View className="mb-4">
+            <Button
+              variant="primary"
+              label={t('sessionSummary.resumeSession')}
+              onPress={() => {
+                const resumeTopicId = topicId ?? fallbackSession?.topicId;
+                const resumeSubjectId = subjectId ?? fallbackSession?.subjectId;
+                router.push({
+                  pathname: '/(app)/session',
+                  params: {
+                    mode: 'learning',
+                    sessionId,
+                    ...(resumeSubjectId ? { subjectId: resumeSubjectId } : {}),
+                    ...(resumeTopicId ? { topicId: resumeTopicId } : {}),
+                  },
+                } as Href);
+              }}
+              testID="resume-session-cta"
+            />
+          </View>
         ) : null}
 
         {/* [BUG-889] Returning learners had no path to the actual chat history.
@@ -1052,30 +1035,28 @@ export default function SessionSummaryScreen() {
               </Text>
             </View>
           ) : (
-            <Pressable
-              onPress={() => {
-                // [M-8] session-transcript is a sibling fullScreenModal in the
-                // root stack (see _layout.tsx), not a child of session-summary.
-                // Both are presented as fullScreenModal, so Expo Router pushes
-                // transcript on top of summary — router.back() inside the
-                // transcript screen returns here correctly via goBackOrReplace.
-                // No ancestor-chain push needed; the cast to `as never` was
-                // masking a false-positive — the object already satisfies
-                // HrefObject (pathname: string, params?: UnknownInputParams).
-                router.push({
-                  pathname: '/session-transcript/[sessionId]',
-                  params: { sessionId },
-                });
-              }}
-              className="bg-surface rounded-button py-3 items-center mb-4"
-              accessibilityRole="button"
-              accessibilityLabel={t('sessionSummary.viewTranscript')}
-              testID="view-transcript-cta"
-            >
-              <Text className="text-text-primary text-body font-semibold">
-                {t('sessionSummary.viewTranscript')}
-              </Text>
-            </Pressable>
+            <View className="mb-4">
+              <Button
+                variant="secondary"
+                label={t('sessionSummary.viewTranscript')}
+                onPress={() => {
+                  // [M-8] session-transcript is a sibling fullScreenModal in
+                  // the root stack (see _layout.tsx), not a child of
+                  // session-summary. Both are presented as fullScreenModal,
+                  // so Expo Router pushes transcript on top of summary —
+                  // router.back() inside the transcript screen returns here
+                  // correctly via goBackOrReplace. No ancestor-chain push
+                  // needed; the cast to `as never` was masking a
+                  // false-positive — the object already satisfies HrefObject
+                  // (pathname: string, params?: UnknownInputParams).
+                  router.push({
+                    pathname: '/session-transcript/[sessionId]',
+                    params: { sessionId },
+                  });
+                }}
+                testID="view-transcript-cta"
+              />
+            </View>
           )
         ) : null}
 
@@ -1189,7 +1170,9 @@ export default function SessionSummaryScreen() {
               {persisted.nextTopicTitle}
             </Text>
             {effectiveSubjectId ? (
-              <Pressable
+              <Button
+                variant="primary"
+                label={t('sessionSummary.continueLearning')}
                 onPress={() =>
                   router.push({
                     pathname: '/(app)/session',
@@ -1201,15 +1184,8 @@ export default function SessionSummaryScreen() {
                     },
                   } as Href)
                 }
-                className="bg-primary rounded-button py-3 items-center"
-                accessibilityRole="button"
-                accessibilityLabel={t('sessionSummary.continueLearning')}
                 testID="session-next-topic-cta"
-              >
-                <Text className="text-text-inverse text-body font-semibold">
-                  {t('sessionSummary.continueLearning')}
-                </Text>
-              </Pressable>
+              />
             ) : null}
           </View>
         ) : null}
@@ -1357,22 +1333,19 @@ export default function SessionSummaryScreen() {
                 </Text>
               </View>
             ))}
-            <Pressable
-              className="bg-primary rounded-button py-3 items-center mt-2"
-              onPress={() => {
-                void (async () => {
-                  await maybePromptForRecall();
-                  finishSummaryNavigation();
-                })();
-              }}
-              testID="recall-bridge-done-button"
-              accessibilityLabel={t('sessionSummary.doneHeadHome')}
-              accessibilityRole="button"
-            >
-              <Text className="text-text-inverse text-body font-semibold">
-                {t('sessionSummary.doneHeadHome')}
-              </Text>
-            </Pressable>
+            <View className="mt-2">
+              <Button
+                variant="primary"
+                label={t('sessionSummary.doneHeadHome')}
+                onPress={() => {
+                  void (async () => {
+                    await maybePromptForRecall();
+                    finishSummaryNavigation();
+                  })();
+                }}
+                testID="recall-bridge-done-button"
+              />
+            </View>
           </View>
         )}
 
@@ -1501,44 +1474,28 @@ export default function SessionSummaryScreen() {
               </Text>
             )}
 
-            <Pressable
-              onPress={() => {
-                void handleSubmit();
-              }}
-              disabled={
-                summaryText.trim().length < 10 || submitSummary.isPending
-              }
-              className={`rounded-button py-3 items-center mt-3 ${
-                summaryText.trim().length >= 10 && !submitSummary.isPending
-                  ? 'bg-primary'
-                  : 'bg-surface-elevated'
-              }`}
-              testID="submit-summary-button"
-              accessibilityLabel={t('sessionSummary.submitSummary')}
-              accessibilityRole="button"
-            >
-              {submitSummary.isPending ? (
-                <ActivityIndicator
-                  color={colors.textInverse}
-                  accessibilityLabel={t('common.loading')}
-                />
-              ) : (
-                <Text
-                  className={`text-body font-semibold ${
-                    summaryText.trim().length >= 10
-                      ? 'text-text-inverse'
-                      : 'text-text-secondary'
-                  }`}
-                >
-                  {t('sessionSummary.submitSummary')}
-                </Text>
-              )}
-            </Pressable>
+            <View className="mt-3">
+              <Button
+                variant="primary"
+                label={t('sessionSummary.submitSummary')}
+                onPress={() => {
+                  void handleSubmit();
+                }}
+                disabled={summaryText.trim().length < 10}
+                loading={submitSummary.isPending}
+                testID="submit-summary-button"
+              />
+            </View>
           </View>
         )}
 
         {/* Skip / Continue — skip is only shown for the unresolved / happy path */}
         {showSubmittedView || isPersistedSkipped ? (
+          // Not converted to shared Button: this site's accessibilityLabel
+          // (a11yContinueLearning / a11yContinueToHome) intentionally
+          // diverges from its visible "Continue" label — Button has no
+          // accessibilityLabel override (it derives SR text from `label`),
+          // so converting would regress the more specific SR announcement.
           <Pressable
             onPress={() => {
               void handleContinue();

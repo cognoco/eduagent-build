@@ -1784,9 +1784,7 @@
     "scheduledBody": "Todos os seus dados serão removidos permanentemente em {{date}}. Você pode cancelar a qualquer momento antes disso.",
     "scheduledAccountActive": "Sua conta permanece ativa até o fim do período de carência.",
     "keepAccount": "Mudei de ideia — manter minha conta",
-    "keepAccountLabel": "Mudei de ideia — manter minha conta",
     "signOutNow": "Sair agora",
-    "signOutNowLabel": "Sair agora",
     "signOutFailedTitle": "Falha ao sair",
     "signOutFailedMessage": "Por favor, feche e reabra o aplicativo, depois faça login novamente.",
     "closeWithoutCancellingLabel": "Fechar sem cancelar",
@@ -4250,7 +4248,9 @@
       "retry": "Tentar novamente"
     },
     "appeal": {
-      "label": "Solicitar relatório de atenção"
+      "label": "Solicitar relatório de atenção",
+      "errorTitle": "Não foi possível solicitar o relatório de atenção",
+      "errorMessage": "Tente novamente daqui a pouco."
     },
     "revocation": {
       "title": "Acesso encerrado",

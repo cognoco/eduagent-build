@@ -1757,9 +1757,7 @@
     "scheduledBody": "すべてのデータは{{date}}に完全に削除されます。それ以前であればいつでもキャンセルできます。",
     "scheduledAccountActive": "猶予期間が終了するまで、アカウントは有効です。",
     "keepAccount": "考えが変わりました — アカウントを維持します",
-    "keepAccountLabel": "考えが変わりました — アカウントを維持します",
     "signOutNow": "今すぐサインアウト",
-    "signOutNowLabel": "今すぐサインアウト",
     "signOutFailedTitle": "サインアウトに失敗しました",
     "signOutFailedMessage": "アプリを閉じて再度開き、もう一度サインインしてください。",
     "closeWithoutCancellingLabel": "キャンセルせずに閉じる",
@@ -4250,7 +4248,9 @@
       "retry": "再試行"
     },
     "appeal": {
-      "label": "アテンションレポートをリクエスト"
+      "label": "アテンションレポートをリクエスト",
+      "errorTitle": "アテンションレポートをリクエストできませんでした",
+      "errorMessage": "時間をおいて再度お試しください。"
     },
     "revocation": {
       "title": "共有が終了しました",

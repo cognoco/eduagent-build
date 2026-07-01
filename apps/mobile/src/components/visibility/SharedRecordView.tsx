@@ -1,19 +1,30 @@
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { SharedRecord } from '@eduagent/schemas';
+import type { AppealReport, SharedRecord } from '@eduagent/schemas';
 
 import { ErrorFallback } from '../common/ErrorFallback';
+import { AppealButton } from './AppealButton';
 
 interface SharedRecordViewProps {
   record?: SharedRecord;
   error?: Error | null;
   onRetry?: () => void;
+  onAppeal?: () => void;
+  appealPending?: boolean;
+  appealReport?: AppealReport;
+  appealError?: Error | null;
+  onRetryAppeal?: () => void;
 }
 
 export function SharedRecordView({
   record,
   error,
   onRetry,
+  onAppeal,
+  appealPending,
+  appealReport,
+  appealError,
+  onRetryAppeal,
 }: SharedRecordViewProps): React.ReactElement {
   const { t } = useTranslation();
 
@@ -67,6 +78,42 @@ export function SharedRecordView({
           </View>
         ))}
       </View>
+      {record && onAppeal ? (
+        <View className="mt-4 border-t border-border pt-4">
+          {appealPending ? (
+            <ActivityIndicator
+              accessibilityLabel={t('common.loading')}
+              testID="visibility-appeal-pending"
+            />
+          ) : appealReport ? (
+            <View
+              testID="visibility-appeal-report"
+              className="rounded-card border border-border bg-background p-3"
+            >
+              <Text className="text-body-sm text-text-secondary">
+                {appealReport.report}
+              </Text>
+            </View>
+          ) : appealError ? (
+            <ErrorFallback
+              testID="visibility-appeal-error"
+              title={t('visibility.appeal.errorTitle')}
+              message={t('visibility.appeal.errorMessage')}
+              primaryAction={
+                onRetryAppeal
+                  ? {
+                      label: t('common.tryAgain'),
+                      onPress: onRetryAppeal,
+                      testID: 'visibility-appeal-retry',
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <AppealButton onPress={onAppeal} />
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
