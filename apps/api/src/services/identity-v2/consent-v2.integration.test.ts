@@ -61,6 +61,7 @@ import {
   getChildGdprConsentStatusV2,
   getChildrenGdprConsentStatusesV2,
 } from './family-v2';
+import { inngest } from '../../inngest/client';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -233,6 +234,214 @@ const COPPA = 'coppa_parental_consent';
         where: eq(guardianship.chargePersonId, childId),
       });
       expect(edge).toBeUndefined();
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1138] processConsentResponseV2(deny) — payer subscription teardown.
+    // The deny branch used to hard-delete a payer's subscription row with no
+    // audit trail and no Stripe teardown (a consent-exempt Stripe checkout can
+    // complete while consent is still pending, e.g. a teen owner-payer), so
+    // external billing kept charging after a GDPR-erasure-adjacent deletion.
+    // Covers all four AC variants: (a) live Stripe sub, (b) null Stripe sub,
+    // (c) no sub at all (ordinary managed-child deny — must stay a true
+    // no-op), (d) Stripe cancel failure (must escalate, never block the
+    // already-committed deny).
+    // -------------------------------------------------------------------------
+    describe('[WI-1138] processConsentResponseV2(deny) — payer subscription teardown', () => {
+      async function seedPendingDenyForPayer(
+        opts: { stripeSubscriptionId?: string | null } = {},
+      ): Promise<{
+        orgId: string;
+        payerId: string;
+        subId: string;
+        token: string;
+      }> {
+        const orgId = await seedOrg();
+        const payerId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Payer',
+        });
+        const [sub] = await db
+          .insert(subscription)
+          .values({
+            organizationId: orgId,
+            planTier: 'plus',
+            status: 'trial',
+            payerPersonId: payerId,
+            stripeCustomerId: `cus_${payerId}`,
+            stripeSubscriptionId:
+              opts.stripeSubscriptionId === undefined
+                ? `sub_${payerId}`
+                : opts.stripeSubscriptionId,
+          })
+          .returning();
+        await createPendingConsentRequest(db, payerId, orgId, 'GDPR');
+        await requestConsentV2(db, {
+          chargePersonId: payerId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'parent@example.com',
+          childName: 'Payer',
+          appUrl: 'https://api.test',
+        });
+        const req = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, payerId),
+        });
+        return { orgId, payerId, subId: sub!.id, token: req!.token! };
+      }
+
+      it('(a) live Stripe subscription: deletion_audit + financial_record written, sub + person gone, Stripe cancel called with the captured id', async () => {
+        const { payerId, subId, token } = await seedPendingDenyForPayer();
+        const stripeCancel = jest.fn().mockResolvedValue({});
+
+        const result = await processConsentResponseV2(
+          db,
+          token,
+          false,
+          undefined,
+          {
+            stripeClient: { subscriptions: { cancel: stripeCancel } },
+          },
+        );
+        expect(result.approved).toBe(false);
+
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, payerId),
+        });
+        expect(audit?.reason).toBe('guardian_initiated');
+        expect(audit?.deletedBy).toBeNull();
+
+        const records = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, payerId),
+        });
+        expect(records).toHaveLength(1);
+        expect(records[0]!.recordType).toBe('person_deletion_tax_retain');
+        const payload = records[0]!.payload as {
+          subscriptions: { id: string }[];
+        };
+        expect(payload.subscriptions).toHaveLength(1);
+        expect(payload.subscriptions[0]!.id).toBe(subId);
+
+        const subRow = await db.query.subscription.findFirst({
+          where: eq(subscription.id, subId),
+        });
+        expect(subRow).toBeUndefined();
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, payerId),
+        });
+        expect(personRow).toBeUndefined();
+
+        expect(stripeCancel).toHaveBeenCalledWith(`sub_${payerId}`);
+      });
+
+      it('(b) null-Stripe subscription (free/trial): deletion_audit + financial_record still written, Stripe cancel never attempted', async () => {
+        const { payerId, token } = await seedPendingDenyForPayer({
+          stripeSubscriptionId: null,
+        });
+        const stripeCancel = jest.fn().mockResolvedValue({});
+
+        await processConsentResponseV2(db, token, false, undefined, {
+          stripeClient: { subscriptions: { cancel: stripeCancel } },
+        });
+
+        const audit = await db.query.deletionAudit.findFirst({
+          where: eq(deletionAudit.personId, payerId),
+        });
+        expect(audit).toBeTruthy();
+        const records = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, payerId),
+        });
+        expect(records).toHaveLength(1);
+        expect(
+          (
+            records[0]!.payload as {
+              subscriptions: { stripeSubscriptionId: unknown }[];
+            }
+          ).subscriptions[0]!.stripeSubscriptionId,
+        ).toBeNull();
+
+        expect(stripeCancel).not.toHaveBeenCalled();
+      });
+
+      it('(c) no subscription at all (ordinary managed-child deny): zero new deletion_audit/financial_record rows — the fix does not widen scope to every deny', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        await createPendingConsentRequest(db, childId, orgId, 'GDPR');
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const req = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+
+        await processConsentResponseV2(db, req!.token!, false);
+
+        const audits = await db.query.deletionAudit.findMany({
+          where: eq(deletionAudit.personId, childId),
+        });
+        expect(audits).toHaveLength(0);
+        const records = await db.query.financialRecord.findMany({
+          where: eq(financialRecord.personId, childId),
+        });
+        expect(records).toHaveLength(0);
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+        });
+        expect(personRow).toBeUndefined();
+      });
+
+      it('(d) Stripe cancel fails: safeSend escalation fires with the failed subscription id, deny still succeeds, DB deletion stands (billing silent-recovery ban)', async () => {
+        const { payerId, token } = await seedPendingDenyForPayer();
+        const stripeCancel = jest
+          .fn()
+          .mockRejectedValue(new Error('stripe boom'));
+        // External-boundary spy on the real Inngest client (GC1-clean — no
+        // internal jest.mock of consent-v2.ts's own dependency graph).
+        const sendSpy = jest
+          .spyOn(inngest, 'send')
+          .mockResolvedValue(undefined as never);
+
+        try {
+          const result = await processConsentResponseV2(
+            db,
+            token,
+            false,
+            undefined,
+            { stripeClient: { subscriptions: { cancel: stripeCancel } } },
+          );
+          expect(result.approved).toBe(false);
+          expect(result.chargePersonId).toBe(payerId);
+
+          expect(stripeCancel).toHaveBeenCalledWith(`sub_${payerId}`);
+          expect(sendSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+              name: 'app/billing.consent_deny_stripe_cancel_failed',
+              data: expect.objectContaining({
+                chargePersonId: payerId,
+                stripeSubscriptionId: `sub_${payerId}`,
+              }),
+            }),
+          );
+
+          // The already-committed DB deletion is not rolled back by a
+          // downstream Stripe failure.
+          const personRow = await db.query.person.findFirst({
+            where: eq(person.id, payerId),
+          });
+          expect(personRow).toBeUndefined();
+          const audit = await db.query.deletionAudit.findFirst({
+            where: eq(deletionAudit.personId, payerId),
+          });
+          expect(audit).toBeTruthy();
+        } finally {
+          sendSpy.mockRestore();
+        }
+      });
     });
 
     it('withdrawal STAMPS withdrawn_at on the live grant (one in-row transition); restore APPENDS a new grant', async () => {

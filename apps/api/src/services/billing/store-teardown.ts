@@ -5,7 +5,10 @@ import { captureException } from '../sentry';
 const logger = createLogger();
 const REVENUECAT_API_BASE = 'https://api.revenuecat.com/v1';
 
-type StripeClientLike = {
+// [WI-1138] Exported so callers outside this module (e.g. the consent-deny
+// Stripe-cancel path in consent-v2.ts) can type an injected test fake without
+// duplicating the shape.
+export type StripeClientLike = {
   subscriptions: {
     cancel(subscriptionId: string): Promise<unknown>;
   };

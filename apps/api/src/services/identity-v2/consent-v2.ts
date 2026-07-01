@@ -34,6 +34,8 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
   consentGrant,
   consentRequest,
+  deletionAudit,
+  financialRecord,
   membership,
   nudges,
   person,
@@ -47,6 +49,12 @@ import {
   type EmailOptions,
 } from '../notifications/email';
 import { createLogger } from '../logger';
+import { inngest } from '../../inngest/client';
+import { safeSend } from '../safe-non-core';
+import {
+  cancelStripeSubscriptionForErasure,
+  type StripeClientLike,
+} from '../billing/store-teardown';
 import {
   type ConsentBasis,
   DEFAULT_CONSENT_PURPOSE,
@@ -447,13 +455,28 @@ export interface ProcessConsentResponseV2Result {
   guardianEmail: string | null;
 }
 
+/** The payer-subscription snapshot captured on deny, before the delete. */
+type PayerSubscriptionSnapshot = {
+  id: string;
+  planTier: string;
+  status: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+};
+
 /**
  * v2 `processConsentResponse`: looks up the request by token, validates
  * replay/expiry, then:
  *   - approve → tx: request → 'approved' + INSERT consent_grant(granted=true)
  *     + back-link consent_grant_id. (NEVER creates a guardianship edge.)
- *   - deny    → tx: request → 'denied' + delete payer subscription if this
- *     person owns one + cascade-delete the person.
+ *   - deny    → tx: request → 'denied' + [WI-1138] if this person owns a
+ *     subscription (a consent-exempt Stripe checkout can complete while
+ *     consent is still pending), snapshot + write deletion_audit/
+ *     financial_record BEFORE deleting it, so a payer-deny leaves a
+ *     forensic trail instead of a silent leak + delete payer subscription
+ *     + cascade-delete the person. Post-commit (outside the tx), cancel the
+ *     snapshotted Stripe subscription if any, escalating on failure rather
+ *     than blocking the (already-committed) deny.
  *
  * The atomic status transition's WHERE prevents the TOCTOU double-submit race.
  */
@@ -462,6 +485,7 @@ export async function processConsentResponseV2(
   token: string,
   approved: boolean,
   audit?: { policyVersion?: string; requestIp?: string; userAgent?: string },
+  billing?: { stripeSecretKey?: string; stripeClient?: StripeClientLike },
 ): Promise<ProcessConsentResponseV2Result> {
   const request = await db.query.consentRequest.findFirst({
     where: eq(consentRequest.token, token),
@@ -535,6 +559,8 @@ export async function processConsentResponseV2(
       }
     });
   } else {
+    let payerSubscriptions: PayerSubscriptionSnapshot[] = [];
+
     await db.transaction(async (tx) => {
       const [updated] = await tx
         .update(consentRequest)
@@ -563,6 +589,51 @@ export async function processConsentResponseV2(
       if (!updated) {
         throw new ConsentAlreadyProcessedError();
       }
+
+      // [WI-1138] Snapshot the payer's subscription(s) BEFORE the delete
+      // below — mirrors deletion-v2.ts's SubscriptionSnapshot. No network
+      // calls inside the tx (deletion-v2.ts:471-472 convention); the Stripe
+      // cancel runs post-commit, below.
+      payerSubscriptions = await tx.query.subscription.findMany({
+        where: eq(subscriptionTable.payerPersonId, chargePersonId),
+        columns: {
+          id: true,
+          planTier: true,
+          status: true,
+          stripeCustomerId: true,
+          stripeSubscriptionId: true,
+        },
+      });
+
+      // Only a payer-deny gets an audit trail; an ordinary managed-child
+      // deny (no subscription row) stays a true no-op — zero new writes.
+      if (payerSubscriptions.length > 0) {
+        await tx.insert(deletionAudit).values({
+          personId: chargePersonId,
+          // Anonymous token-click, no authenticated actor.
+          deletedBy: null,
+          // The consent-response token is addressed to
+          // request.guardianEmail, so this is guardian-initiated even when
+          // the denied person is also the payer.
+          reason: 'guardian_initiated',
+          retentionPeriod: null,
+        });
+        await tx.insert(financialRecord).values(
+          payerSubscriptions.map((snap) => ({
+            personId: chargePersonId,
+            organizationId: request.organizationId,
+            // §4.9 COUNSEL-OWNED — reuse the existing provisional taxonomy
+            // verbatim (deletion-v2.ts writeFinancialRecordsTx).
+            recordType: 'person_deletion_tax_retain',
+            payload: {
+              deletedAt: now.toISOString(),
+              subscriptions: [snap],
+            },
+            retentionPeriod: null,
+          })),
+        );
+      }
+
       // A consent-pending owner can already have the launch trial subscription;
       // remove only rows where THIS person is the payer before deleting them.
       // Managed children are not payers, so this is a no-op for ordinary
@@ -574,6 +645,47 @@ export async function processConsentResponseV2(
       // Deny cascade-deletes the person (FK cascades handle child data).
       await tx.delete(person).where(eq(person.id, chargePersonId));
     });
+
+    // [WI-1138] Post-commit Stripe teardown, outside the tx (no held DB
+    // locks during the network call). A cancel failure (or a missing
+    // secret) must never surface as a 500 or log via console.warn (billing
+    // silent-recovery ban, AGENTS.md) — escalate via safeSend/Inngest
+    // instead. The deny response still returns success: the DB deletion
+    // already committed and is not retryable (a second call hits
+    // ConsentAlreadyProcessedError).
+    for (const snap of payerSubscriptions) {
+      if (!snap.stripeSubscriptionId) continue;
+      const stripeSubscriptionId = snap.stripeSubscriptionId;
+      try {
+        await cancelStripeSubscriptionForErasure({
+          stripeSubscriptionId,
+          stripeSecretKey: billing?.stripeSecretKey,
+          stripeClient: billing?.stripeClient,
+        });
+      } catch (error) {
+        await safeSend(
+          () =>
+            inngest.send({
+              // orphan-allow: structured telemetry required by AGENTS.md
+              // (silent recovery in billing must emit a structured signal).
+              // Resolved in-line; dashboard-queryable failure signal, no
+              // handler — the deny already succeeded, this is a
+              // billing-ops follow-up.
+              name: 'app/billing.consent_deny_stripe_cancel_failed',
+              data: {
+                chargePersonId,
+                organizationId: request.organizationId,
+                subscriptionId: snap.id,
+                stripeSubscriptionId,
+                error: error instanceof Error ? error.message : String(error),
+                timestamp: new Date().toISOString(),
+              },
+            }),
+          'billing.consent_deny.stripe_cancel_failed',
+          { chargePersonId, organizationId: request.organizationId },
+        );
+      }
+    }
   }
 
   return {

@@ -53,6 +53,9 @@ type ConsentWebEnv = {
     API_ORIGIN?: string;
     RESEND_API_KEY?: string;
     EMAIL_FROM?: string;
+    // [WI-1138] Consent-deny Stripe teardown when the denied person is
+    // themselves the payer.
+    STRIPE_SECRET_KEY?: string;
   };
   Variables: { db: Database };
 };
@@ -517,6 +520,9 @@ export const consentWebRoutes = new Hono<ConsentWebEnv>()
         token,
         approved,
         audit,
+        {
+          stripeSecretKey: c.env.STRIPE_SECRET_KEY,
+        },
       );
 
       // [P0 email-consent-withdrawal] On approval (v2 path only), mint the
