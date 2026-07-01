@@ -329,6 +329,9 @@ function normalizeNowQuery(query: NowScope | NowQuery): NowQuery {
   return typeof query === 'string' ? { scope: query } : query;
 }
 
+// `person`/`supportership` reads here are S4-scoped and were shipped early
+// inside the S0 service; ruled correct, not a tier leak (WI-1123, 2026-07-01;
+// docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
 async function resolveNowTarget(
   db: Database,
   profileId: string,
@@ -404,6 +407,9 @@ async function collectCandidatesForRequest(
   ];
 }
 
+// `person`/`supportership` reads here are S4-scoped and were shipped early
+// inside the S0 service; ruled correct, not a tier leak (WI-1123, 2026-07-01;
+// docs/plans/v2-plan/2026-06-10-s0-backend-primitives.md).
 async function collectSupporterHubCandidates(
   db: Database,
   supporterPersonId: string,
