@@ -68,3 +68,40 @@ own-work committed directly per operator ruling; pushes via the commit skill, no
   routinely present — leave them.
 - Full session context (orientation, inventories, the program-status synthesis) is in the conversation
   being compacted; the durable record is the commits above + `findings.md` + this file.
+
+---
+
+## UPDATE 2026-07-01 — dogfood-boot session (simulated fresh-orchestrator kickoff)
+
+Ran the program kickoff launcher end-to-end as a cold orchestrator, then hardened the findings log to
+be machinery-only. Commits on `main` (own-work, pushed): `c7f8525`, `7f65a7a`, `c6f4ce0`, `7489b19`,
+`313c89b`.
+
+**Corrections to earlier-banked assumptions (IMPORTANT):**
+- **F14 "master DB unreadable" was WRONG.** The Initiatives DB reads fine **per-page** via
+  `notion-fetch` (verified INI-6 returns all props). Only the *bulk-query* MCP tools
+  (`query_data_sources`, `query_database_view`) are plan-gated — a convenience, not a wall.
+  **Approach-B is NOT blocked and needs no plan upgrade.** Enumeration is the only soft spot: use
+  `notion-search` (lossy/capped) or a small page-ID index; individual reads are fine.
+- **"No live session holds INI-6" confirmed true, but the channels were stale.** WI-867 / PR #1700 is
+  **merged + closed**; WI-503 (keyboard-avoidance bounce loop) is **orphaned — awaiting a HUMAN
+  confirmation, no agent owns it** (not agent-actionable). The identity-cutover/bug-lane outboxes still
+  read "open" because sessions ended without emitting closing `decision`s — treat any channel signal as
+  possibly-stale; Cosmo-verify before acting.
+
+**Findings log is now system-vs-state disciplined.** The log (`_quartet/_quartet-wip/findings.md`) is
+for **Quartet machinery** candidates only; program-state cleanup is separate. Clean **machinery**
+finding set (the hand-off list for the ZDX/Quartet stream when converting to WIs):
+- **F16** — reusable Brain hard-names a literal `working/program/program-roster.md` path.
+- **F17** — reconcile ritual can't "keep" a monitor across a job boundary (task-ids don't survive).
+- **F18** — no scoped/observer boot mode (Brain assumes the orchestrator owns every active lane).
+- **F10** — lifecycle model has no steady-state for a standing (non-graduating) lane.
+- **F11** — monitor-hygiene governs watchers but not the stale output files they leave.
+- **F13 residue** — Library defines no home for the program-level session-start (rehydration) hook.
+- Common shape: the Brain **over-commits to deployment specifics** — fix = refer to bindings, not
+  instances. WITHDRAWN as repo-state: F9, F12, F13, F14, F15. F6–F8 not yet reclassified (optional).
+
+**OPEN — unchanged next step:** run the **Approach-B spike on INI-6 + INI-32** (now unblocked). INI-6
+page id `38e8bce9-1f7c-8149-8b14-ddae03440c84`; INI-32 Operations `38f8bce9-1f7c-8130-a26b-e9f830354fb2`.
+The two held operator decisions (drive Identity Cutover; spin up the Operations shepherd) still stand
+behind the spike.
