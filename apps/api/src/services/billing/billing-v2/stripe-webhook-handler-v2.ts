@@ -20,9 +20,10 @@
 // (= accounts.id by the reseed); the field name stays `accountId` on the mapped
 // SubscriptionRow so the orchestration reads identically.
 //
-// Flag-gated: dispatched by routes/stripe-webhook.ts only when
-// IDENTITY_V2_ENABLED='true'. Legacy stripe-webhook-handler.ts stays
-// byte-identical.
+// [WI-868] Dispatched unconditionally by routes/stripe-webhook.ts via
+// billing-v2/dispatch.ts — the identity-v2 flag is gone and this handler is
+// the only one that runs in production. Legacy stripe-webhook-handler.ts is
+// retained only for routes/stripe-webhook.test.ts's mock seam.
 // ---------------------------------------------------------------------------
 
 import {

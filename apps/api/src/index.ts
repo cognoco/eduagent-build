@@ -183,10 +183,6 @@ type Bindings = {
   JUDGE_FRAMEWORK_ENABLED?: string;
   LLM_ROUTING_V2_ENABLED?: string;
   MODE_NAV_V2_ENABLED?: string;
-  // Identity Foundation cutover (CUT-B / WI-691). Single flag for the whole
-  // identity surface; default 'false' in every deployed env until the WI-586
-  // convergence flip. Read by the identity seam dispatchers.
-  IDENTITY_V2_ENABLED?: string;
   // Two-stage convergence freeze gate (maintenance.ts). Default 'false'.
   MAINTENANCE_READONLY?: string;
   MAINTENANCE_BLOCK_INNGEST?: string;

@@ -89,16 +89,13 @@ export const revenuecatWebhookRoute = new Hono<{
     REVENUECAT_WEBHOOK_SECRET?: string;
     SUBSCRIPTION_KV?: KVNamespace;
     ENVIRONMENT?: string;
-    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
-    // subscription-store handlers. 'false'/unset in every deployed env.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     db: Database;
   };
 }>().post('/revenuecat/webhook', async (c) => {
-  // [CUT-B3 / WI-693] Resolve the handler bundle once (legacy vs v2) — the seam.
-  const handlers = getRevenuecatWebhookHandlers(c.env);
+  // [CUT-B3 / WI-693] Resolve the handler bundle once — the seam.
+  const handlers = getRevenuecatWebhookHandlers();
   // Validate Authorization Bearer header
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {

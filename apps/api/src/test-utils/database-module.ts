@@ -12,7 +12,7 @@ type CreateDatabaseModuleMockOptions<TDb extends MockDatabaseRecord> = {
 // ---------------------------------------------------------------------------
 // v2 identity-graph seed (WI-867).
 //
-// After the IDENTITY_V2_ENABLED collapse, the account-resolve seam calls
+// [WI-868] The identity-v2 flag is gone; the account-resolve seam calls
 // `resolveIdentityV2(db, clerkUserId)` UNCONDITIONALLY. It reads exactly three
 // tables — `login` → `membership` (must be exactly one) → `organization` — and
 // returns the legacy-shaped `Account` context. Flag-off unit tests never ran

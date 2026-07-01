@@ -475,7 +475,6 @@ export async function createSubjectWithStructure(
   input: SubjectCreateInput,
   options?: {
     conversationLanguage?: ConversationLanguage;
-    identityV2Enabled?: boolean;
   },
 ): Promise<CreatedSubjectWithStructure> {
   // Server-side focus inference: if rawInput ("tea") differs from name ("Botany"),

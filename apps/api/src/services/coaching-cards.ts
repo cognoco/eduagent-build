@@ -139,7 +139,6 @@ function homeworkConnectionCopy(
 export async function precomputeCoachingCard(
   db: Database,
   profileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<CoachingCard> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MS).toISOString();
@@ -1002,7 +1001,6 @@ export interface CoachingCardResponse {
 export async function getCoachingCardForProfile(
   db: Database,
   profileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<CoachingCardResponse> {
   // Check session count for cold-start detection (real activity only)
   const countResult = await db
@@ -1028,7 +1026,7 @@ export async function getCoachingCardForProfile(
   }
 
   // Cache miss: compute fresh and write to cache
-  const card = await precomputeCoachingCard(db, profileId, opts);
+  const card = await precomputeCoachingCard(db, profileId);
   await writeCoachingCardCache(db, profileId, card);
 
   return { coldStart: false, card, fallback: null };

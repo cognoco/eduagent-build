@@ -78,7 +78,6 @@ describe('parseLearnerInput — LLM success path', () => {
       null,
       'learner',
       undefined,
-      undefined,
     );
   });
 
@@ -138,43 +137,6 @@ describe('parseLearnerInput — LLM success path', () => {
       null,
       'parent',
       undefined,
-      undefined,
-    );
-  });
-
-  it('[WI-809] threads identityV2Enabled opts through to applyAnalysis', async () => {
-    mockRouteAndCall.mockResolvedValueOnce({
-      response: JSON.stringify({
-        explanationEffectiveness: null,
-        interests: ['dinosaurs'],
-        strengths: null,
-        struggles: null,
-        resolvedTopics: null,
-        communicationNotes: null,
-        engagementLevel: null,
-        confidence: 'high',
-      }),
-    } as any);
-    mockApplyAnalysis.mockResolvedValueOnce({
-      fieldsUpdated: ['interests'],
-      notifications: [],
-    });
-
-    await parseLearnerInput(db, profileId, 'I love dinosaurs', 'learner', {
-      identityV2Enabled: true,
-    });
-
-    // Non-vacuous flag-on: the opts must reach applyAnalysis as the trailing arg
-    // (7th), so its GDPR gate routes through the v2 consent graph (consent_grant)
-    // and not the dropped consent_states. subjectId (6th) stays undefined here.
-    expect(mockApplyAnalysis).toHaveBeenCalledWith(
-      db,
-      profileId,
-      expect.objectContaining({ interests: ['dinosaurs'] }),
-      null,
-      'learner',
-      undefined,
-      { identityV2Enabled: true },
     );
   });
 });
@@ -219,7 +181,6 @@ describe('parseLearnerInput — [BUG-480] extractFirstJsonObject', () => {
       null,
       'learner',
       undefined,
-      undefined,
     );
   });
 });
@@ -256,7 +217,6 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
-      undefined,
     );
   });
 
@@ -280,7 +240,6 @@ describe('parseLearnerInput — fallback path', () => {
       expect.objectContaining({ interests: ['math puzzles'] }),
       null,
       'learner',
-      undefined,
       undefined,
     );
   });
@@ -308,7 +267,6 @@ describe('parseLearnerInput — fallback path', () => {
       null,
       'learner',
       undefined,
-      undefined,
     );
   });
 
@@ -334,7 +292,6 @@ describe('parseLearnerInput — fallback path', () => {
       }),
       null,
       'learner',
-      undefined,
       undefined,
     );
   });

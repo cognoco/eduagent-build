@@ -83,10 +83,9 @@ export async function createNudge(
     template: NudgeTemplate;
     now?: Date;
   },
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ nudge: Nudge; pushSent: boolean }> {
   const now = params.now ?? new Date();
-  await assertParentAccess(db, params.fromProfileId, params.toProfileId, opts);
+  await assertParentAccess(db, params.fromProfileId, params.toProfileId);
 
   // null means no consent_states row exists — which for the post-profile-create
   // state happens when consent isn't required for this profile's age (17+).
@@ -215,7 +214,6 @@ export async function createNudge(
 export async function listUnreadNudges(
   db: Database,
   profileId: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<Nudge[]> {
   // [WI-803/WI-586] v2 path: resolve guardian person IDs via guardianship table
   // and join person for displayName — safe post-M-DROP (no profiles/family_links join).

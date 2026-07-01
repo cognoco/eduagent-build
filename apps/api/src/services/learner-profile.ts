@@ -1316,9 +1316,6 @@ export async function applyAnalysis(
   /** [CR-119.3]: Prefer subjectId for urgency boost writes — name match
    *  is ambiguous when no (profileId, name) uniqueness constraint exists. */
   subjectId?: string | null,
-  // [WI-809] flag-on routes the GDPR gate through the v2 consent graph; legacy
-  // isGdprProcessingAllowed reads the dropped consent_states table → 500 post-drop.
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ApplyAnalysisResult> {
   if (analysis.confidence === 'low') {
     // [logging sweep] structured logger so PII fields land as JSON context

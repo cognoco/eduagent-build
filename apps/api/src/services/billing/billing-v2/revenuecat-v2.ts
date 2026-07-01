@@ -17,8 +17,8 @@
 // Billing silent-recovery ban: transition rejections escalate via
 // logger.error + captureException.
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
-// revenuecat.ts stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy revenuecat.ts
+// both run unconditionally in parallel (convergence tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { eq, and, isNull, ne, or, sql } from 'drizzle-orm';

@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // Shared continuity mock for the v2 profile-scope seam (WI-867).
 //
-// After the IDENTITY_V2_ENABLED collapse, profile-scope middleware resolves the
+// [WI-868] The identity-v2 flag is gone; profile-scope middleware resolves the
 // caller via `findOwnerPersonScope` (auto-resolve, no X-Profile-Id) and
 // `getPersonScope` (explicit X-Profile-Id) from
 // `services/identity-v2/profile-v2`. Both resolve through `db.select()` join

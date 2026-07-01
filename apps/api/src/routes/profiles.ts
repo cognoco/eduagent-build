@@ -50,8 +50,6 @@ type ProfileEnv = {
     // [WI-301] Kill switch for non-owner -> owner profile elevation.
     // Default-on; set to 'false' for emergency rollback.
     OWNER_ELEVATION_GATE_ENABLED?: string;
-    // [CUT-B1] Identity cutover flag — selects the v2 owner-bootstrap path.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

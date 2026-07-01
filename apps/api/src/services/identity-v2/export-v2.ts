@@ -22,7 +22,8 @@
 // learning-data half covers it. This module asserts its presence so a silent
 // regression of the Art-15 leg fails the test.
 //
-// FLAG-GATED: reachable only when IDENTITY_V2_ENABLED is 'true'.
+// [WI-868] The identity-v2 flag is gone; these functions are called
+// unconditionally now.
 // ---------------------------------------------------------------------------
 
 import { and, eq, inArray, isNull } from 'drizzle-orm';

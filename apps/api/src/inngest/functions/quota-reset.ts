@@ -45,11 +45,10 @@ export const quotaReset = inngest.createFunction(
             tx as unknown as Database,
             now,
           );
-          // [WI-810] flag-on routes to the v2 quota-cycle reset (joins the v2
+          // [WI-810] Routes to the v2 quota-cycle reset (joins the v2
           // `subscription` table); the legacy resetExpiredQuotaCycles joins the
           // `subscriptions` table dropped at the cutover (WI-805) and would
-          // FK/500 at the #8 atomic IDENTITY_V2_ENABLED flag-flip. flag-off is
-          // byte-identical. resetDailyQuotas (above) only touches quota_pools /
+          // FK/500. resetDailyQuotas (above) only touches quota_pools /
           // profile_quota_usage — no subscriptions read — so it needs no v2 twin.
           const monthlyCount = await resetExpiredQuotaCyclesV2(
             tx as unknown as Database,

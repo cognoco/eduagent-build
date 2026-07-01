@@ -12,8 +12,9 @@
 // lazy-provisioned marker is dispatched via safeSend (billing silent-recovery
 // ban: structured signal, never bare console.warn).
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
-// quota-provision.ts stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy
+// quota-provision.ts both run unconditionally in parallel (convergence
+// tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull } from 'drizzle-orm';

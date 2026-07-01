@@ -23,8 +23,9 @@
 // sanctioned alternative to the scoped repo for a read that joins through a
 // parent (AGENTS.md "Non-Negotiable Engineering Rules").
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. The legacy
-// verifyProfileInSubscriptionAccount stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and the legacy
+// verifyProfileInSubscriptionAccount both run unconditionally in parallel
+// (convergence tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull } from 'drizzle-orm';

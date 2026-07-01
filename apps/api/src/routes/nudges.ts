@@ -21,7 +21,7 @@ import {
 } from '../services/nudge';
 
 type NudgeRouteEnv = {
-  Bindings: { DATABASE_URL: string; IDENTITY_V2_ENABLED?: string };
+  Bindings: { DATABASE_URL: string };
   Variables: {
     user: AuthUser;
     db: Database;

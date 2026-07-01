@@ -89,10 +89,6 @@ export type MeteringEnv = {
   Bindings: {
     SUBSCRIPTION_KV?: KVNamespace;
     IDEMPOTENCY_KV?: KVNamespace;
-    // [CUT-B3 / WI-693] Identity-foundation cutover flag — selects the v2
-    // subscription store in the DB-fallback path. 'false'/unset in every
-    // deployed env until the WI-586 flip.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     db: Database;

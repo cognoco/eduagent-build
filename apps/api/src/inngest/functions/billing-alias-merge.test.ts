@@ -4,8 +4,8 @@
 // Covers the thin Inngest wrapper: the trigger registration, the schema-drift
 // guard (a malformed payload returns a structured error rather than silently
 // dropping — the billing "no silent recovery" rule), and the [WI-1057]
-// identity-v2 routing (flag-on selects the v2 merge twin; flag-off stays on the
-// legacy path). The merge SERVICE logic + the atomic/idempotent DB path are
+// identity-v2 routing (the v2 merge twin is selected; the legacy path is
+// dead — see WI-868). The merge SERVICE logic + the atomic/idempotent DB path are
 // covered for real by services/billing/alias-merge.test.ts (pure),
 // alias-merge.fake-db.test.ts (orchestration), alias-merge.integration.test.ts
 // (real Postgres, legacy table), and
@@ -37,12 +37,11 @@ jest.mock('../client', () => {
 
 import { billingAliasMerge } from './billing-alias-merge';
 // [WI-1057] spy on the REAL merge services (NOT a jest.mock module mock — GC1
-// clean) to assert which path the IDENTITY_V2 flag routes to. getStepDatabase
+// clean) to assert the v2 merge path runs and legacy never does. getStepDatabase
 // only instantiates a lazy Drizzle handle (no connection) and the spied
 // services never query it, so no @eduagent/database mock is needed.
 import * as aliasMerge from '../../services/billing/alias-merge';
 import * as billingV2 from '../../services/billing/billing-v2';
-import { setIdentityV2Enabled } from '../helpers';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 beforeEach(() => {
@@ -123,7 +122,6 @@ describe('billingAliasMerge worker — identity-v2 routing [WI-1057]', () => {
   afterEach(() => {
     legacySpy.mockRestore();
     v2Spy.mockRestore();
-    setIdentityV2Enabled(undefined);
     delete process.env['DATABASE_URL'];
   });
 

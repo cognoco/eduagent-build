@@ -84,12 +84,9 @@ const profileCreateObjectSchema = z
     location: locationSchema.optional(),
     conversationLanguage: conversationLanguageSchema.optional(),
     pronouns: pronounsSchema.nullable().optional(),
-    // WI-811: flag-on add-child discriminator. Absent = owner bootstrap/replay
-    // (the historical payload). Flag-off ignores it entirely — the legacy
-    // createProfileWithLimitCheck classifies first-vs-child by profile COUNT,
-    // so existing payloads stay byte-identical. Under IDENTITY_V2_ENABLED,
-    // kind:'child' routes the post-graph POST to createChildProfileV2 instead
-    // of the idempotent owner replay.
+    // WI-811: add-child discriminator. Absent = owner bootstrap/replay (the
+    // historical payload). kind:'child' routes the post-graph POST to
+    // createChildProfileV2 instead of the idempotent owner replay.
     kind: z.enum(['owner', 'child']).optional(),
   })
   .strict();

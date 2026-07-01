@@ -16,8 +16,8 @@
 //
 // The guard therefore takes the AUTHENTICATED caller's own person id
 // (`callerPersonId`, resolved from the login→person binding by the account
-// middleware — NEVER request-supplied, exactly like `identityV2Enabled`) and
-// authorizes the write only when the caller is:
+// middleware — NEVER request-supplied) and authorizes the write only when the
+// caller is:
 //   - SELF     — callerPersonId === targetPersonId, OR
 //   - GUARDIAN — an active guardianship edge caller→target (isGuardianOf).
 // Supporter edges are excluded by canon: §2A.4 makes the supporter edge

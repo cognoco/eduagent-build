@@ -62,9 +62,6 @@ export interface ProfileMeta {
 }
 
 export type ProfileScopeEnv = {
-  Bindings: {
-    IDENTITY_V2_ENABLED?: string;
-  };
   Variables: {
     db: Database;
     account: Account;

@@ -1330,7 +1330,6 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
       'owner-1',
       'account-123',
       'study',
-      { identityV2Enabled: true },
     );
 
     expect(result).not.toBeNull();
@@ -1356,7 +1355,6 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
       'owner-2',
       'account-123',
       'study',
-      { identityV2Enabled: true },
     );
 
     expect(result).not.toBeNull();
@@ -1381,7 +1379,6 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
       'child-1',
       'account-123',
       'study',
-      { identityV2Enabled: true },
     );
 
     expect(result).not.toBeNull();
@@ -1408,7 +1405,6 @@ describe('[WI-803] updateProfileAppContext — loadProfileFamilyMeta v2 dispatch
       'child-2',
       'account-123',
       'study',
-      { identityV2Enabled: true },
     );
 
     expect(result).not.toBeNull();

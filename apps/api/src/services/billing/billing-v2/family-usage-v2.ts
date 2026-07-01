@@ -31,9 +31,9 @@
 // reseeded family. The integration test seeds ONE real family into BOTH stores
 // and asserts the two functions return an equal breakdown.
 //
-// Flag-gated: dispatched by routes/billing.ts under IDENTITY_V2_ENABLED, the
-// same per-route `v2 ? fnV2 : fn` ternary CUT-B3 established for every other
-// billing-v2 seam. Legacy family.ts stays byte-identical when the flag is off.
+// Dispatched by routes/billing.ts when a profile-scoped breakdown is
+// requested. [WI-868] The identity-v2 flag is gone; legacy family.ts still
+// runs in parallel — convergence tracked in WI-1239.
 // ---------------------------------------------------------------------------
 
 import { and, eq, gte, isNull, sql } from 'drizzle-orm';

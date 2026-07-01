@@ -99,9 +99,6 @@ type BillingRouteEnv = {
     STRIPE_PRICE_PRO_YEARLY?: string;
     APP_URL?: string;
     SUBSCRIPTION_KV?: KVNamespace;
-    // [CUT-B3 / WI-693] Identity-foundation cutover flag. 'false'/unset in every
-    // deployed env until the WI-586 flip.
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;
@@ -597,11 +594,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         ).toISOString();
       }
     })();
-    // [WI-722] Dispatched to the v2 twin under the cutover flag — the same
-    // per-route `v2 ? fnV2 : fn` ternary CUT-B3 uses for every other billing-v2
-    // seam. The v2 twin reads guardianship via the CUT-B2 reader (not
-    // family_links) + usage_events; the legacy path stays the live one in every
-    // deployed env (flag-off) until the WI-586 flip and is byte-identical.
+    // [WI-722] Dispatched to the v2 twin when a profile-scoped breakdown is
+    // requested. The v2 twin reads guardianship via the CUT-B2 reader (not
+    // family_links) + usage_events. [WI-868] The identity-v2 flag is gone;
+    // convergence with the legacy read path is tracked in WI-1239.
     const usageBreakdown =
       activeProfileId && supportsProfileBreakdown
         ? await getUsageBreakdownForProfileV2(db, {

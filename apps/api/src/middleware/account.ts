@@ -18,8 +18,8 @@ import type { Database } from '@eduagent/database';
 const logger = createLogger();
 
 /**
- * [CUT-B1 §2.2a] The pre-graph identity context. Under IDENTITY_V2_ENABLED,
- * when no `login` row exists yet (onboarding not completed), accountMiddleware
+ * [CUT-B1 §2.2a] The pre-graph identity context. When no `login` row exists
+ * yet (onboarding not completed), accountMiddleware
  * does NOT JIT-create an account — it sets this graphless context and leaves
  * `account` unset. The bootstrap route (POST /v1/profiles) reads it to create
  * the graph. The legacy path never sets this.
@@ -32,7 +32,6 @@ export interface ClerkIdentity {
 export type AccountEnv = {
   Bindings: {
     CLERK_SECRET_KEY?: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

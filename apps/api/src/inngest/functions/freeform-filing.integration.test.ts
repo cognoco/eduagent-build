@@ -32,7 +32,6 @@ import {
 } from '@eduagent/database';
 
 import { freeformFilingRetry } from './freeform-filing';
-import { setIdentityV2Enabled } from '../helpers';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 // [WI-809] v2-only seed (no legacy accounts/profiles), so this suite can only run
@@ -78,10 +77,6 @@ const GDPR = 'gdpr_parental_consent';
 
     // org → the person.id (= profileId) anchored to it, for teardown ordering.
     const profileToPerson: Record<string, string> = {};
-
-    afterEach(() => {
-      setIdentityV2Enabled(undefined);
-    });
 
     /**
      * [WI-809] v2-only seed (no legacy accounts/profiles — they are dropped at
@@ -180,7 +175,6 @@ const GDPR = 'gdpr_parental_consent';
         grantedAt: new Date(),
         withdrawnAt: new Date(),
       });
-      setIdentityV2Enabled('true');
 
       const result = await handler({
         event: createEvent(profileId),
@@ -203,7 +197,6 @@ const GDPR = 'gdpr_parental_consent';
         granted: true,
         grantedAt: new Date(),
       });
-      setIdentityV2Enabled('true');
 
       const result = (await handler({
         event: createEvent(profileId),
@@ -217,7 +210,6 @@ const GDPR = 'gdpr_parental_consent';
     it('flag-on + no GDPR consent row → allowed (legacy "no row → allowed")', async () => {
       const { profileId } = await seedChain();
       // No consent_grant seeded; membership present so v2 resolves null → allowed.
-      setIdentityV2Enabled('true');
 
       const result = (await handler({
         event: createEvent(profileId),

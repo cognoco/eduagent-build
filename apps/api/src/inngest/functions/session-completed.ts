@@ -1781,10 +1781,9 @@ export const sessionCompleted = inngest.createFunction(
         // i18n Phase 1 — thread conversation_language to the homework
         // summary LLM so the parent-facing card matches the learner locale.
         // Also fetch subscription anchor so we can gate this LLM call on quota.
-        // [WI-784] v2 twin: under IDENTITY_V2_ENABLED read person +
-        // membership (no profiles.accountId which was dropped 2026-06-14).
-        // Legacy path (flag-off) is byte-identical.
-        const identityV2 = true; // flag always-on post-cutover
+        // [WI-784] v2 twin: reads person + membership (no profiles.accountId
+        // which was dropped 2026-06-14).
+        const identityV2 = true; // always-on post-cutover
         let homeworkOrganizationId: string | undefined;
         const [personRow] = await db
           .select({ conversationLanguage: person.conversationLanguage })
@@ -1849,8 +1848,8 @@ export const sessionCompleted = inngest.createFunction(
           throw missingProfileErr;
         }
 
-        // [WI-784] Hard-stop: under IDENTITY_V2_ENABLED, organizationId comes
-        // from membership.findFirst — if membership hasn't replicated yet, it is
+        // [WI-784] Hard-stop: organizationId comes from membership.findFirst —
+        // if membership hasn't replicated yet, it is
         // undefined here. This guard is OUTSIDE runIsolated (same as the profile
         // check above) so a missing membership throws to step.run and Inngest
         // retries, absorbing transient replication lag instead of permanently

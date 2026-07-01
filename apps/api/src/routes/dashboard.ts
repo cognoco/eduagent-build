@@ -63,7 +63,6 @@ type DashboardRouteEnv = {
     DATABASE_URL: string;
     CLERK_JWKS_URL?: string;
     MEMORY_FACTS_READ_ENABLED?: string;
-    IDENTITY_V2_ENABLED?: string;
   };
   Variables: {
     user: AuthUser;

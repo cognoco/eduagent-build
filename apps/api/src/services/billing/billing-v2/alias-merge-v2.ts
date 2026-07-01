@@ -4,11 +4,10 @@
 //
 // v2 twin of services/billing/alias-merge.ts `mergeAliasedSubscription`. The
 // legacy service reconciles the dropped `subscriptions` table; this one reads
-// and writes the v2 `subscription` table via the billing-v2 surface. The
-// billing-alias-merge worker selects between the two on IDENTITY_V2_ENABLED,
-// mirroring quota-reset's resetExpiredQuotaCycles / resetExpiredQuotaCyclesV2
-// split. Inert behind the flag until the WI-586 cutover; the legacy path stays
-// byte-identical.
+// and writes the v2 `subscription` table via the billing-v2 surface.
+// [WI-868] The identity-v2 flag is gone — the billing-alias-merge worker calls
+// this unconditionally now; the legacy service is retained for its own test
+// coverage only.
 //
 // Only the four identity-bound I/O calls are re-pointed:
 //   - surviving identity resolution: findAccountByClerkId → resolveAccountIdV2
@@ -25,8 +24,7 @@
 // idempotency claim, tier config, and Sentry escalation. Policy, atomicity, and
 // idempotency guarantees are identical to the legacy service — see its header.
 //
-// Live path: identity-v2 is cut over (IDENTITY_V2_ENABLED='true' in stg+prd),
-// so the billing-alias-merge worker routes here, and the v2 webhook handler
+// Live path: the billing-alias-merge worker routes here, and the v2 webhook handler
 // (handleSubscriberAliasV2) dispatches a real `fromSnapshot.topUpRemaining`
 // read via the shared getTopUpCreditsRemaining reader (WI-1057 closed the prior
 // `topUpRemaining: 0` floor). Both halves of the BUG-783 reconciliation — tier

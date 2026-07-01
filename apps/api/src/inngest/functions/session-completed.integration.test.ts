@@ -56,7 +56,6 @@ import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
 import { loadTopicTitle, sessionCompleted } from './session-completed';
-import { setIdentityV2Enabled } from '../helpers';
 import {
   deleteLegacyAccountsForTest,
   ensureLegacyProfileAnchorForTest,
@@ -1275,44 +1274,32 @@ describe('session-completed integration', () => {
     const step = buildStep();
     const handler = getHandler();
 
-    // [WI-1153] sendStruggleNotification selects the parent-link source by the
-    // identity-v2 flag; this test seeds the v2 `guardianship` edge (familyLinks
-    // was removed in WI-586 drop-4). The CI `main` lane runs flag-OFF, taking
-    // the legacy v1 familyLinks path which finds no parent and skips the push.
-    // Pin the flag ON for this handler run so the v2 path fires the push.
-    // Forward-correct: post-cutover the flag no-ops. finally-reset prevents the
-    // injected binding from leaking into sibling tests.
-    setIdentityV2Enabled('true');
-    let result: {
+    // [WI-1153] sendStruggleNotification selects the parent-link source via
+    // the v2 `guardianship` edge (familyLinks was removed in WI-586 drop-4);
+    // this test seeds that edge. The v2 path is unconditional post-WI-868, so
+    // no flag pin is needed here.
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as {
       status: string;
       outcomes: Array<{ step: string; status: string }>;
     };
-    try {
-      result = (await handler({
-        event: {
-          name: 'app/session.completed',
-          data: {
-            profileId,
-            sessionId,
-            subjectId,
-            topicId,
-            exchangeCount: 3,
-            summaryStatus: 'pending',
-            timestamp: now.toISOString(),
-            verificationType: null,
-            sessionType: 'learning',
-            qualityRating: 4,
-            reason: 'user_ended',
-          },
-        },
-        step,
-      })) as {
-        status: string;
-        outcomes: Array<{ step: string; status: string }>;
-      };
-    } finally {
-      setIdentityV2Enabled(undefined);
-    }
 
     // analyze-learner-profile ran (consent granted)
     const analyzeOutcome = result.outcomes.find(

@@ -25,8 +25,9 @@
 // Approval NEVER creates a guardianship edge (inv 14) — it writes a
 // consent_grant and back-links it from the request (consent_grant_id).
 //
-// FLAG-GATED: every function here is reachable only when IDENTITY_V2_ENABLED is
-// 'true'. `consent_request` has NO flag-off writer (single-live-store arg 2).
+// [WI-868] The identity-v2 flag is gone; these functions are called
+// unconditionally now. `consent_request` has no legacy writer
+// (single-live-store arg 2).
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull, sql } from 'drizzle-orm';

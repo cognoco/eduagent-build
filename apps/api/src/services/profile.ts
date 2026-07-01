@@ -111,16 +111,11 @@ function mapProfileRow(
 /**
  * Resolves family-link meta for a profile row.
  *
- * [WI-803] v2 seam: flag-on reads `guardianship` (active charges or guardians)
- * instead of `family_links`. Flag-off is byte-identical to pre-WI-803. The v2
- * path is only threaded from `updateProfileAppContext`; the other callers
- * (`findOwnerProfile`, `getProfile`, `updateProfile`) remain on the legacy path
- * until their own WP fixes them.
+ * [WI-803] Reads `guardianship` (active charges or guardians).
  */
 async function loadProfileFamilyMeta(
   db: Database,
   row: typeof profiles.$inferSelect,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<{ linkCreatedAt: Date | null; hasFamilyLinks: boolean }> {
   // [WI-803] v2 path: guardianship table — safe post-M-DROP.
   // Owner (guardian): has family links iff they hold active charge edges;
@@ -678,15 +673,13 @@ export async function updateProfile(
  * Returns null if the profile does not exist or is not owned by the account.
  * The route layer enforces whether the caller may update this profile.
  *
- * [WI-802] v2 seam: under `opts.identityV2Enabled`, the family-context guard
- * checks `guardianship` (active charges) instead of `family_links`.
+ * [WI-802] The family-context guard checks `guardianship` (active charges).
  */
 export async function updateProfileAppContext(
   db: Database,
   profileId: string,
   accountId: string,
   defaultAppContext: AppContext,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<Profile | null> {
   // [WI-586] v2 path: read/write person + membership; no profiles/family_links touch.
   // accountId maps to organizationId in v2.

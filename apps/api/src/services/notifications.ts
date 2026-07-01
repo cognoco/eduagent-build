@@ -394,15 +394,13 @@ const SUBSCRIBE_RATE_LIMIT_HOURS = 24;
  * Notifies a child's parent to subscribe. Sends push notification + email.
  * Rate limited to 1 notification per 24 hours per child profile.
  *
- * [WI-802] v2 seam: flag-on resolves the parent via `guardianship` (active
- * guardian person ids), flag-off reads legacy `family_links`.
+ * [WI-802] Resolves the parent via `guardianship` (active guardian person ids).
  */
 export async function notifyParentToSubscribe(
   db: Database,
   childProfileId: string,
   emailOptions?: EmailOptions,
   appUrl?: string,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<ParentSubscribeResult> {
   // 1. [BUG-856] Atomic rate-limit check — counts recent subscribe_request
   // notifications and reserves the rate-limit slot in a single transaction
@@ -510,16 +508,12 @@ export function formatStruggleNotificationCopy(
 
 /**
  * Send struggle push notification to the parent of a child profile.
- * Looks up parent via familyLinks (legacy) or guardianship (v2), resolves
- * child display name, sends push.
- *
- * [WI-802] v2 seam: flag-on reads `guardianship`, flag-off reads `family_links`.
+ * Looks up parent via guardianship, resolves child display name, sends push.
  */
 export async function sendStruggleNotification(
   db: Database,
   childProfileId: string,
   notification: StruggleNotification,
-  opts?: { identityV2Enabled?: boolean },
 ): Promise<NotificationResult> {
   const guardianIds = await getGuardianPersonIds(db, childProfileId);
   const parentProfileId = guardianIds[0];

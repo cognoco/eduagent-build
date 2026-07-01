@@ -193,8 +193,9 @@ export async function findTopUpByTransactionId__unscoped(
 // onto the `subscription` table keyed on `organization_id`. By the deterministic
 // reseed `organization.id = accounts.id`, so the SAME id value the request
 // context carries (account.id under flag-on = organization.id) keys both stores.
-// These helpers read the new table; the billing-v2 layer selects them behind
-// the IDENTITY_V2_ENABLED flag. Legacy helpers stay byte-identical.
+// These helpers read the new table; the billing-v2 layer calls them
+// unconditionally (WI-868 removed the flag). Legacy helpers still run in
+// parallel — convergence tracked in WI-1239.
 //
 // SECURITY: same `__unscoped` caller contract as the legacy helpers — webhook
 // handlers (authenticated by external event signature/transaction id) and

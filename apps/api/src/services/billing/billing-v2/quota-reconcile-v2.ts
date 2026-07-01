@@ -15,8 +15,9 @@
 // shared-pool branch touches no identity table and is reused verbatim from the
 // legacy module.
 //
-// Flag-gated: reachable only when IDENTITY_V2_ENABLED='true'. Legacy
-// quota-reconcile.ts stays byte-identical.
+// [WI-868] The identity-v2 flag is gone; this module and legacy
+// quota-reconcile.ts both run unconditionally in parallel (convergence
+// tracked in WI-1239).
 // ---------------------------------------------------------------------------
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
