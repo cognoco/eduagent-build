@@ -101,7 +101,12 @@ describe('RecentSessionsList', () => {
     screen.getByText('No sessions yet for Alex');
     fireEvent.press(screen.getByTestId('recent-sessions-empty-action'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/session');
+    // Ancestor-chain guardrail: home must be pushed BEFORE session so
+    // router.back() from session returns to home, not the tab's first route.
+    // Assert count as well as order so a stray extra/missing push can't slip by.
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/session');
   });
 
   it('routes parents to child curriculum from the empty state', () => {

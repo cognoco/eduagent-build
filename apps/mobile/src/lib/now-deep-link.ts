@@ -1,4 +1,4 @@
-import type { Router } from 'expo-router';
+import type { Href, Router } from 'expo-router';
 import {
   nowDeepLinkRouteSchema,
   type NowDeepLink,
@@ -86,6 +86,6 @@ export function pushNowDeepLink(
 ): void {
   for (const route of [...deepLink.chain, deepLink.route]) {
     assertSupportedRoute(route);
-    router.push(buildNowPath(route, deepLink.params, options) as never);
+    router.push(buildNowPath(route, deepLink.params, options) as Href);
   }
 }
