@@ -63,7 +63,7 @@ Out of scope:
 
 - [ ] T5 / WI-1172: Preserve concrete progress in the right places — done when topic/book/subject mastery, due-review state, and learning counts live in Subjects/Subject Hub; reports, recaps, milestones, notes, and memory live in Journal; next action lives in Mentor; and the old Progress tab has no unique publish-critical job left.
 
-- [ ] T6 / WI-1173: Verify learner V2 parity, not just existence — done when Mentor, Subjects, Journal, Subject Hub, session, homework, quiz, dictation, and practice each have one current smoke or focused test proving the V2 trigger path, not only the legacy route path.
+- [x] T6 / WI-1173: Verify learner V2 parity, not just existence — done when Mentor, Subjects, Journal, Subject Hub, session, homework, quiz, dictation, and practice each have one current smoke or focused test proving the V2 trigger path, not only the legacy route path.
 
 - [ ] T7 / WI-1174: Define per-surface retirement gates and prepare S6 — done when S6 has a checklist mapping each legacy surface to its live V2 heir: More tab -> Avatar/Admin, Library tab -> Subjects/Subject Hub, Progress tab -> Subject Hub + Journal, ParentHomeScreen -> Support hub + shared records, child proxy routes -> person scopes + masked drill-in, session summary -> in-thread V2 wrap-up; all current evidence is reflected in the S6 gates; and the plan still blocks actual deletion until explicit human confirmation.
 
