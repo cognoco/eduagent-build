@@ -19,7 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
@@ -262,7 +262,12 @@ const RUN = !!process.env.DATABASE_URL;
       await db
         .update(childCapNotifications)
         .set({ dismissedAt: new Date() })
-        .where(eq(childCapNotifications.kind, 'monthly_exceeded'));
+        .where(
+          and(
+            eq(childCapNotifications.ownerProfileId, OWNER_ID),
+            eq(childCapNotifications.kind, 'monthly_exceeded'),
+          ),
+        );
 
       const list = await listActiveChildCapNotificationsV2(db, OWNER_ID);
 
