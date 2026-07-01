@@ -297,6 +297,22 @@ describe('DictationReviewScreen', () => {
       getByTestId('review-celebration');
     });
 
+    it('does not advance or celebrate when the return key is pressed with an empty input', () => {
+      const { getByTestId, getByText, queryByTestId } = render(
+        <DictationReviewScreen />,
+      );
+      const input = getByTestId('review-correction-input');
+      // Input is left empty — no changeText call.
+      fireEvent(input, 'submitEditing');
+
+      // Still on the remediation screen, still showing the first mistake
+      // (its unique "written" text, not shared with the second mistake).
+      getByTestId('review-remediation-screen');
+      getByTestId('review-correction-input');
+      getByText('The quik browne fox.');
+      expect(queryByTestId('review-celebration')).toBeNull();
+    });
+
     it('shows celebration after all mistakes are corrected', () => {
       const { getByTestId } = render(<DictationReviewScreen />);
       // First mistake
