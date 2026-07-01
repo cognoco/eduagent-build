@@ -135,7 +135,6 @@ flowchart TD
   Private --> Sections{Segmented sections}
   Sections -- Sessions --> Recaps[Recaps/session rows]
   Sections -- Notes --> Notes[Notes + mentor bookmarks archive]
-  Sections -- Practice --> Practice[Practice history + open Practice hub]
   Sections -- Memory --> Memory[Mentor memory screen]
   Sections -- Reports --> Reports[Weekly/monthly reports]
 
@@ -145,7 +144,7 @@ flowchart TD
   PersonRecord -. missing .-> RealShared
 ```
 
-**Code anchors:** `journal/index.tsx:10-27`, `JournalTabView.tsx:44`, `:214`, `:406`, `:470`, `:593`, `:845`, `:936`, `:1072`, `SupportHubJournalTab.tsx:33-65`, `PersonScopeJournalPlaceholder.tsx:9-42`, `visibility.ts:175-188`.
+**Code anchors:** `journal/index.tsx:10-27`, `JournalTabView.tsx:24`, `:44`, `:214`, `:406`, `:470`, `:593`, `:845`, `SupportHubJournalTab.tsx:33-65`, `PersonScopeJournalPlaceholder.tsx:9-42`, `visibility.ts:175-188`.
 
 ## Trigger Matrix
 
@@ -181,4 +180,11 @@ flowchart TD
 | Person-scope Subjects masked Subject Hub drill-in now exists; keep reviewing privacy copy and masked aggregate language during publish-readiness QA. | Supporters can inspect masked structure, but QA still needs end-to-end product review before V2 publish. | S4/S5 |
 | Shared-record Journal data depends on available report/recap/milestone rows. | Supporters see honest empty state until reportable facts exist; private notes/chat text stay outside the record. | S5 |
 | Visibility ceremony depends on upstream anchors. | Link/accept/revoke/trust-contract flows now have mobile routes; remaining work is wiring S4 cold-start/Approve anchors into `/link/new` or existing contract IDs. | S4/S5 |
+| No V2-native forward trigger reaches the standalone `/(app)/practice` history hub (WI-1173 finding). | Mentor's light-practice affordance pushes directly to `/(app)/quiz` or `/(app)/dictation`; `/(app)/practice` itself is only reached as a `router.replace`/`goBackOrReplace` return destination from quiz/dictation completion, or via the legacy V0/V1 Progress tab (`LearnerScreen.tsx`). No test can honestly prove a V2 forward trigger that does not exist in code. | S4/S5 |
 | S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
+
+## V2 Publish-Readiness Smoke Set
+
+See `06-screen-function-access-map.md` → "V2 Publish-Readiness Smoke Set (WI-1173)"
+for the enumerated test citations (existing + newly-added) proving each trigger
+above, plus the re-run command.
