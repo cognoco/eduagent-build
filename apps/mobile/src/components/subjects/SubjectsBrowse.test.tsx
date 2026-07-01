@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react-native';
 
 import { SubjectsBrowse } from './SubjectsBrowse';
@@ -124,6 +125,27 @@ describe('SubjectsBrowse', () => {
     );
 
     expect(onOpenSubject).toHaveBeenCalledWith(SPANISH.subjectId);
+  });
+
+  // [WI-1172] Ownership-split gap: the positive path (chip renders when
+  // dueReviews > 0) was already covered above; this pins the negative path
+  // (subject.dueReviews > 0 ? ... : null in SubjectsBrowse.tsx) so a subject
+  // with no due reviews never shows a stale/zero reviews-due chip.
+  it('omits the reviews-due chip when a subject has no due reviews', () => {
+    render(
+      <SubjectsBrowse
+        subjects={ITEMS}
+        onOpenSubject={jest.fn()}
+        onCreateSubject={jest.fn()}
+      />,
+      { wrapper },
+    );
+
+    const algebraRow = screen.getByTestId(
+      `subjects-browse-row-${ALGEBRA.subjectId}`,
+    );
+    within(algebraRow).getByText('1 mastered · 1 learning · 5 topics');
+    expect(within(algebraRow).queryByText(/due/)).toBeNull();
   });
 
   it('filters by search and clearing search restores the full list', () => {
