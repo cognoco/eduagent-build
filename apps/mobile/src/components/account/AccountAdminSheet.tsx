@@ -75,17 +75,19 @@ export function AccountAdminSheet(): React.ReactElement {
       </SectionHeader>
       <SettingsRow
         label={t('more.learningPreferences.rowLabel')}
-        onPress={() => router.push('/(app)/more/accommodation')}
+        onPress={() => router.push('/(app)/more/accommodation' as Href)}
         testID="account-admin-learning-preferences"
       />
       <SettingsRow
         label={t('more.mentorMemory.sectionHeader')}
-        onPress={() => router.push('/(app)/mentor-memory?returnTo=account')}
+        onPress={() =>
+          router.push('/(app)/mentor-memory?returnTo=account' as Href)
+        }
         testID="account-admin-mentor-memory"
       />
       <SettingsRow
         label={t('more.account.mentorLanguage')}
-        onPress={() => router.push('/(app)/more/account')}
+        onPress={() => router.push('/(app)/more/account' as Href)}
         testID="account-admin-mentor-language"
       />
 
@@ -102,20 +104,20 @@ export function AccountAdminSheet(): React.ReactElement {
       {navigationContract.gates.showAccountSecurity ? (
         <SettingsRow
           label={t('accountAdmin.security')}
-          onPress={() => router.push('/(app)/more/account')}
+          onPress={() => router.push('/(app)/more/account' as Href)}
           testID="account-admin-security"
         />
       ) : null}
       {navigationContract.gates.showBilling ? (
         <SettingsRow
           label={t('more.account.subscription')}
-          onPress={() => router.push('/(app)/subscription')}
+          onPress={() => router.push('/(app)/subscription' as Href)}
           testID="account-admin-subscription"
         />
       ) : null}
       <SettingsRow
         label={t('more.notifications.sectionHeader')}
-        onPress={() => router.push('/(app)/more/notifications')}
+        onPress={() => router.push('/(app)/more/notifications' as Href)}
         testID="account-admin-notifications"
       />
 
@@ -138,7 +140,7 @@ export function AccountAdminSheet(): React.ReactElement {
           ) : null}
           <SettingsRow
             label={t('accountAdmin.familySettings')}
-            onPress={() => router.push('/(app)/more')}
+            onPress={() => router.push('/(app)/more' as Href)}
             testID="account-admin-family-settings"
           />
         </>
@@ -147,12 +149,12 @@ export function AccountAdminSheet(): React.ReactElement {
       <SectionHeader>{t('more.sections.settings')}</SectionHeader>
       <SettingsRow
         label={t('more.privacy.privacyAndData')}
-        onPress={() => router.push('/(app)/more/privacy')}
+        onPress={() => router.push('/(app)/more/privacy' as Href)}
         testID="account-admin-privacy"
       />
       <SettingsRow
         label={t('more.help.helpAndFeedback')}
-        onPress={() => router.push('/(app)/more/help')}
+        onPress={() => router.push('/(app)/more/help' as Href)}
         testID="account-admin-help"
       />
 

@@ -433,7 +433,7 @@ function JournalRecapsSection(): React.ReactElement {
       <RecapsEmptyState
         testID="journal-recaps-empty"
         ctaTestID="journal-recaps-empty-start-session"
-        onStart={() => router.push('/(app)/mentor')}
+        onStart={() => router.push('/(app)/mentor' as Href)}
       />
     );
   }

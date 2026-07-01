@@ -62,7 +62,7 @@ export function RecentSessionsList({
   const errorEscapeAction = isActiveProfile
     ? {
         label: t('common.goHome'),
-        onPress: () => router.push('/(app)/home'),
+        onPress: () => router.push('/(app)/home' as Href),
       }
     : {
         label: t('common.goHome'),
