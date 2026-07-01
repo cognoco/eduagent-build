@@ -191,68 +191,30 @@ the relocation model: no ceremony for standing lanes, a permanent birth-date-key
 collides with the operator's clean-up-to-standard goal, and a program binding nested inside one lane
 that couples the program-level move to that lane's lifecycle.
 
-## 2026-06-30 (cont.) — Simulated fresh-orchestrator kickoff boot (from `working/program/orchestrator-kickoff.md`)
+## 2026-06-30/07-01 — Simulated fresh-orchestrator kickoff boot (machinery findings only)
 
-Ran the program kickoff's launcher end-to-end as a cold orchestrator would, executing each prescribed
-step (read protocol + planning-rules + monitor-hygiene → read the Initiatives DB master → check live
-lane channels → reconcile monitors). Findings from the boot itself:
+Ran the program kickoff launcher end-to-end as a cold orchestrator. **Scope discipline (operator,
+2026-07-01): this log is for _Quartet machinery_ improvement candidates — not this repo's transient
+state.** Each boot observation was re-tested against "is this the *system*, or *our mess*?" Two of the
+five were environment/repo-state and are **withdrawn** (kept as stubs so the reasoning trail survives).
 
-### F14 — The master Initiatives DB is unreadable by the orchestrator's own tools (CRITICAL — Approach-B blocker)
-The kickoff makes the Cosmo Initiatives DB the **master** and tells the orchestrator to "read the DB
-for the live initiative set." It can't. Both query modes are **plan-gated** (HTTP 400 "requires a
-Business plan or higher with Notion AI"): `notion-query-data-sources` (SQL) AND
-`notion-query-database-view`. `notion-fetch` on the database, the data-source, and the view each
-return **schema only, never rows**. The sole non-gated read is `notion-search` — semantic, ranked,
-**capped (~10), un-filterable by Program/Status, and noisy** (returns cross-program hits like
-"Equities", "Nexus Control-Plane"). So a fresh orchestrator cannot enumerate "all Mentomate
-initiatives by status" from the master at all. **Impact on the banked Approach-B spike:** if the DB is
-master but the orchestrator can't read current-state from it, the "thin companion doc" is forced to
-carry the enumerated roster — collapsing B toward "the markdown is the real master," the opposite of
-the decision's intent. Resolve **before/within** the spike: (a) obtain the plan entitlement, or (b)
-accept the companion doc holds the enumerated current-state and the DB is a write-through index, or
-(c) keep a small fetch-by-known-page-IDs index the orchestrator can `notion-fetch` row-by-row. Until
-one is chosen, "DB is master, roster is downstream mirror" is not operable for a cold boot.
+### F14 — [WITHDRAWN → environment, not machinery]
+Originally "master DB unreadable." False: the DB reads fine per-page via `notion-fetch`; only Notion's
+**bulk-query add-on** is plan-gated — an **estate binding** (the Notion MCP tier), not a Quartet
+defect. The only machinery-relevant residue is the roster-vs-DB (Approach-B) **library** question —
+the Library still defines `program-roster.md` as an artifact while this program moves the master to
+Cosmo — and that is tracked as the Approach-B spike, not as a finding.
 
-**Correction (operator + re-test, 2026-07-01) — F14 was overstated; downgrade from CRITICAL.** The DB
-is **not** unreadable. Per-page `notion-fetch` on an initiative returns **all properties** (verified on
-INI-6 Identity Cutover: Status, Outcome, Workstream relation, `userDefined:ID`, etc.). Only the two
-**bulk-query** tools (`query_data_sources` SQL, `query_database_view`) are plan-gated — those are
-Notion's AI-query add-on, a bulk-enumeration convenience, not the read path. The **real, much smaller**
-finding: there is no one-call "list all Mentomate initiatives filtered by Program/Status." Enumeration
-must go through `notion-search` (lossy/capped) or a maintained page-ID index; **individual reads are
-fine.** Consequence for Approach-B: **not a blocker.** The DB genuinely can be master — the companion
-doc need only hold the page-ID index (or nothing, if search suffices). No plan upgrade required.
+### F15 — [WITHDRAWN → repo-state, not machinery]
+Originally "stale outbox / live-session collision." The machinery already prescribes the right
+behavior: lifecycle is **Cosmo-Stage-owned** (not channel-derived) and escalations close via a
+`ref`-tagged `decision` (`progress-channel-design.md` §"the closed loop"). What the boot hit — a
+`needs-orchestrator` still reading "open" after WI-867 had merged, on dead lanes — was a **session
+that ended without emitting its closing `decision`**: our mess, machinery working as designed. The
+generic rule ("Cosmo-verify before acting on any channel signal") is already in monitor-hygiene. No
+system change indicated.
 
-### F15 — Live shepherd traffic contradicts the kickoff's "INI-6 has no live session" (CRITICAL — operational/collision)
-The kickoff orientation snapshot + the banked handoff state INI-6 is drivable with **no live session
-holding it**. The channels say otherwise *today*: `identity-cutover/_state/outbox.jsonl` has shepherd
-writes through 13:21Z with an **open `needs-orchestrator` merge-gate** (WI-867 PR #1700 CI-green +
-claude-review APPROVED 0/0/0 — "yours to merge"); `bug-lane/_state/outbox.jsonl` shows **WI-503
-bounced a 4th time at 14:06Z** (open `decision`; escalation bug-lane-128/129 unanswered). A cold
-orchestrator booting on "drivable, no live session" would collide with a live shepherd and/or
-wrongly self-authorize the merge. **Root cause:** the kickoff bakes a *volatile* live-session claim
-into *durable* text. Live-session status is **channel-derived, not snapshot-derived** — the
-"don't trust the hardcoded snapshot" warning must extend to it, and the orient order must put the
-**channel tail FIRST**, before any snapshot/roster read. (The boot only caught this because it tailed
-the outboxes; a snapshot-first reader would have missed it.)
-
-**Correction (operator, 2026-07-01) — the finding is sharper than first written.** There was in fact
-**no live session** on either lane; the sessions had ended. WI-867 / PR #1700 was **already merged +
-closed**, and WI-503 is a genuinely **orphaned** item awaiting a *human* confirmation with no agent
-owner. So the boot's own conclusion (inferring live shepherds + a collision risk) was **half-wrong**,
-and the real defect is worse: the Clacks **outbox is stale in BOTH directions** — it left a
-`needs-orchestrator` merge-gate showing "open" long after the WI was merged out-of-band, and gave no
-signal the writing session had died. A cold orchestrator trusting the outbox tail would chase a
-**resolved** gate (or re-attempt a done merge). monitor-hygiene already says "lifecycle is
-Cosmo-derived, not channel-derived" and "silence is unverified → direct-read Cosmo," but it does not
-warn that **a channel escalation that still reads `open` is equally unverified** — the outbox has no
-closure/ack discipline, so resolved-out-of-band escalations never retract. **Corrected fix:** before
-acting on ANY open-looking channel escalation, reconcile it against Cosmo Stage / WI state first;
-treat the outbox as an *unordered set of possibly-stale signals*, never as current open/closed truth.
-Channel **recency** does not imply a live session, and channel **content** does not imply an open
-issue.
-
-### F16 — Protocol + planning-rules hardcode `working/program/program-roster.md`, which here resolves to a template (machinery↔state coupling)
+### F16 — Reusable Brain hard-names a literal working-state path (machinery↔state coupling)
 `orchestrator-protocol.md` "Orient on resume" step 1 AND its 🔴 mandatory re-read list AND
 `planning-rules.md` "Document map" all name `working/program/program-roster.md` as a required read.
 In this deployment the live roster is `_wip/umbrella-program/program-roster.md` (a *deprecated*
@@ -262,16 +224,14 @@ redirects, but the program-agnostic Brain still encodes a program-specific path 
 Sharpens F1/F9. Fix: the protocol/planning-rules should refer to "the roster (location is a
 working-state binding — see the program kickoff)", not a literal path.
 
-### F17 — Monitor manifest/dashboard live in `_wip/` while monitor-hygiene points at `working/program/`; manifest task-ids are un-keepable across jobs
-(a) **Location split:** monitor-hygiene mandates `working/program/monitor-manifest.json`; the live
-manifest is `_wip/umbrella-program/monitor-manifest.json`, and `working/program/` has only
-`monitor-manifest.template.json`. The kickoff §4 lists the anchor + roster locations but **omits the
-manifest location**, so a cold orchestrator running the mandatory reconcile ritual can't find its own
-manifest from the kickoff. (b) **Un-keepable task-ids:** monitors are job-scoped (manifest notes "job
-cd122717"); a fresh orchestrator in a new job sees none of them in `/tasks`, so the reconcile ritual's
-"keep — refresh task-id" branch is **unreachable across a job boundary** — it always resolves to
-"replace all," and the recorded task-ids carry no cross-session value. monitor-hygiene should say so
-(reconcile after a job change = re-arm all; the manifest's value is the *intent rows*, not the ids).
+### F17 — Reconcile ritual can't "keep" a monitor across a job boundary (machinery)
+monitor-hygiene's reconcile ritual has a **"keep — refresh its task-id"** branch, but Monitor watches
+are **job-scoped**: a fresh orchestrator in a new job sees none of the prior job's monitors in
+`/tasks`, so reconcile after any job change **always** resolves to "replace all," and the manifest's
+stored `task-id`s carry no cross-session value. The manifest's durable worth is its **intent rows**,
+not the ids. monitor-hygiene should say this explicitly and stop implying task-ids survive a
+compaction/resume that crosses a job. System-level (independent of where the manifest file lives —
+that split is a repo-state artifact of the incomplete relocation, not a machinery finding).
 
 ### F18 — No "observer boot" mode: the reconcile ritual re-arms watchers on lanes the kickoff says to stay arm's-length from
 monitor-hygiene + the protocol require, at session-start, a central Cosmo-Stage backstop **plus**
@@ -282,11 +242,13 @@ lanes outside the remit. The Brain assumes the booting orchestrator **owns every
 is no scoped/observer boot. Minor but real: the protocol should let the orient scope be a named lane
 subset, with monitors armed only for owned lanes.
 
-**Net (boot).** The launcher's *reading* steps are the weak link, not its *reasoning* steps. Two are
-CRITICAL: the master DB the kickoff designates is unreadable on this plan (F14 — blocks Approach-B as
-written), and a volatile "no live session" claim baked into durable kickoff text is already false and
-collision-prone (F15 — fix by making channel-tail the first orient action). F16/F17 are the same
-machinery↔state coupling F1 flagged, now confirmed at three more concrete paths (roster, manifest,
-dashboard). F18 exposes a missing scoped-boot mode. The delegation mandate / quality carve-out /
-four-roles separation all read cleanly — the Brain's *process* is sound; its *path + freshness
-bindings* are what a cold boot trips on.
+**Net (machinery).** Three keepers, one shape: the reusable Brain **over-commits to this-deployment
+specifics** — it hard-names a literal roster path (F16), assumes monitor task-ids survive a job (F17),
+and assumes the booting orchestrator owns *every* active lane (F18). Fix pattern = make the Brain refer
+to **bindings, not instances** (roster location, monitor identity, lane scope are all deployment/run
+bindings the program layer supplies). The delegation mandate, quality carve-out, and four-role
+separation all read cleanly — the Brain's *reasoning* is sound. **Process note (the meta-lesson):** the
+dogfood log had drifted into recording repo-state cleanup as "findings" (F14/F15 here; likely F9–F13
+from the prior session too — they describe the Option-C relocation mess). Machinery findings and
+program-state cleanup are different buckets; only the former belong here. A later pass should
+reclassify F9–F13 against the same test.
