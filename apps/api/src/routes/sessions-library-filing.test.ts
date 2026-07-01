@@ -339,14 +339,37 @@ import { Hono } from 'hono';
 import { sessionRoutes } from './sessions';
 
 describe('[F-126 / WI-575] library-filing central authority check (server-derived, no header)', () => {
-  // Records any property access on the stub db — the guard must reject BEFORE
-  // the handler touches the DB (mirrors the proxy-guard.test.ts pattern).
+  // Records any property access OR call on the stub db — the guard must
+  // reject BEFORE the handler touches the DB. A recording proxy (not a
+  // dumb stub) is required because real handlers chain through the db
+  // (e.g. db.query.sessions.findFirst(...)); every get/apply trap fires
+  // dbCalled() so the chain can't silently bypass the assertion below.
+  // `then`/`catch`/`finally` are left undefined so `await`ing a proxy
+  // result doesn't mistake it for a real thenable.
   const dbCalled = jest.fn();
+
+  function makeDbSpy(): unknown {
+    const target = () => undefined;
+    const handler: ProxyHandler<typeof target> = {
+      get(_t, prop) {
+        if (prop === 'then' || prop === 'catch' || prop === 'finally') {
+          return undefined;
+        }
+        dbCalled();
+        return new Proxy(target, handler);
+      },
+      apply() {
+        dbCalled();
+        return new Proxy(target, handler);
+      },
+    };
+    return new Proxy(target, handler);
+  }
 
   function makeProxyAppNoHeader() {
     const proxyApp = new Hono();
     proxyApp.use('*', async (c, next) => {
-      c.set('db' as never, new Proxy({}, { get: () => dbCalled }));
+      c.set('db' as never, makeDbSpy());
       c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
       c.set('user' as never, { id: 'test-user' });
       // isOwner=false is set server-side by profileScopeMiddleware when the

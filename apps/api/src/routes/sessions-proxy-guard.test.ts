@@ -381,6 +381,7 @@ describe('[WI-171 / DS-082] sessions proxy-mode guard', () => {
       body: JSON.stringify({ message: 'hello' }),
     });
     expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('PROXY_MODE');
   });
 
   it('POST /sessions/:sessionId/close returns 403 in proxy mode', async () => {
@@ -390,6 +391,7 @@ describe('[WI-171 / DS-082] sessions proxy-mode guard', () => {
       body: JSON.stringify({ summaryStatus: 'skipped' }),
     });
     expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe('PROXY_MODE');
   });
 });
 
