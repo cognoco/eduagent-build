@@ -14,7 +14,7 @@ fully-hydrated world. **Fix pattern: refer to _bindings_, not _instances_** — 
 F3 (dated-filename convention), F5 (shared-tree commit + push/land scope), F7 (findings surface
 undiscoverable), F10 (no standing-lane lifecycle), F11 (monitor output-file hygiene), F17 (monitor id
 un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home for the session-start
-hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
+hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229), F32 (Clacks schema unenforced/entropies — → WI-1230). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
 owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
@@ -251,3 +251,14 @@ shepherd's scope via a **Clacks directive**; the operator manually adds workstre
 1..n span; kickoffs accept a workstream set; runtime add/drop mechanism; de-dupe + monitor-isolation
 over N workstreams; preserve reviewer≠executor). Left here as the provenance record; the design lives in
 the WI. *(2026-07-01 cold boot.)*
+
+### F32 — The Clacks channel schema is documented but unenforced → entropies *(→ captured as Cosmo WI-1230)*
+The canonical schema IS in `library/clacks-channel.md` (outbox `{id,ts,lane,wi,level,ref,msg}`, inbox
+`{id,ts,from,type,ref,msg}`), but it is **prose-only, hand-authored per line, and unenforced**, so it
+drifts. 07-01 sweep of 7 live lanes: **outboxes uniformly canonical**; **inboxes drift** (5/7 canonical;
+flow-remediation uses outbox-style + drops `msg`; new-llm-integration uses outbox-style); **intra-file
+drift** — identity-cutover's inbox starts `from`/`type` then later lines switch to `wi`/`level` in the
+same file; and the orchestrator's own liveness pings added a hybrid. The inbox repeatedly gravitates to
+the outbox's `level`/`wi` envelope — a signal the split may want **unifying**. **Fix:** shared
+append/emit helper + a validator, and rule on unify-vs-split. **Status:** escalated to **WI-1230**
+(`Design`, Quartet MVP). Provenance record only; design lives in the WI. *(2026-07-01.)*
