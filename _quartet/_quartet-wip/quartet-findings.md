@@ -14,7 +14,7 @@ fully-hydrated world. **Fix pattern: refer to _bindings_, not _instances_** — 
 F3 (dated-filename convention), F5 (shared-tree commit + push/land scope), F7 (findings surface
 undiscoverable), F10 (no standing-lane lifecycle), F11 (monitor output-file hygiene), F17 (monitor id
 un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home for the session-start
-hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229), F32 (Clacks schema unenforced/entropies — → WI-1230), F33 (shepherd spawn arms/signals after reconcile — → WI-1235). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
+hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229), F32 (Clacks schema unenforced/entropies — → WI-1230), F33 (shepherd spawn arms/signals after reconcile — → WI-1235), F34 (orchestrator arms lane monitors too late on boot — → WI-1236). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
 owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
@@ -274,3 +274,14 @@ couldn't wake it), nothing structural stopping autonomous drift. **Fix:** mandat
 monitors + emit sign-of-life → reconcile → dispatch (keep reconcile-before-*execute*); define a
 spawn-time `alive` event exempt from the no-chatter ban (else the rule self-contradicts). **Status:**
 escalated to **WI-1235** (`Design`, Quartet MVP). Provenance record only. *(2026-07-01.)*
+
+### F34 — Orchestrator arms its lane monitors too late on boot (the orchestrator-side twin of F33) *(→ captured as Cosmo WI-1236)*
+Symmetric to F33 from the orchestrator's side: on boot/resume the orchestrator arms its outbox watchers only
+*after* shepherds are already spawned and working (observed live 07-01 — I armed the WS-18/WS-22 watchers
+after the operator had spawned all three sessions, and the WS-18 shepherd had already restructured WI-905 +
+claimed children in the unobserved window). `orchestrator-protocol.md` step 7 arms the outbox watcher "when
+the shepherd launches," with no ordering guarantee that observability precedes shepherd work. **Fix:** the
+orchestrator bootup arms the lane outbox + Cosmo-Stage monitors ASAP, with the invariant *no lane runs a live
+shepherd without the orchestrator's outbox watcher armed for it*. **Status:** escalated to **WI-1236**
+(`Enhancement`, **Cosmo improvements / WS-23** — not Quartet MVP). Together F33/WI-1235 (shepherd side) +
+F34/WI-1236 (orchestrator side) close the observability gap from both ends. *(2026-07-01, operator-requested.)*
