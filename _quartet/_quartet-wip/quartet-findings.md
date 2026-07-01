@@ -14,7 +14,7 @@ fully-hydrated world. **Fix pattern: refer to _bindings_, not _instances_** — 
 F3 (dated-filename convention), F5 (shared-tree commit + push/land scope), F7 (findings surface
 undiscoverable), F10 (no standing-lane lifecycle), F11 (monitor output-file hygiene), F17 (monitor id
 un-keepable across jobs), F18 (no scoped/observer boot), F13-residue (no home for the session-start
-hook), F29 (master-DB enumeration has no binding). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
+hook), F29 (master-DB enumeration has no binding), F30/F31 (shepherd/reviewer doc'd 1:1 vs 1..n — → WI-1229). **Promoted from memory (2026-07-01):** F19 (agent isolation / single-writer on a shared tree),
 F20 (CI-repro at the failing commit), F21 (verify-at-source + shepherd conformance-review), F22
 (sub-agent checkpoint cadence + no-git), F23 (shepherd completion gates), F24 (cutover/switch-flip
 owner in plans). **Category B (may not be Quartet):** F25 (refine-inspects-code → ZDX DoR), F26
@@ -236,3 +236,18 @@ program-layer kickoff owns an **enumeration binding** — either a maintained pa
 names, or an explicit "enumerate via `notion-search` (lossy/capped), then per-page `notion-fetch`"
 fallback with its limits stated — so "read the master" is actionable without assuming bulk-query.
 Refer to a binding, not a capability.
+
+### F30 / F31 — Shepherd & reviewer are documented 1:1 with a workstream; real practice is 1..n *(→ captured as Cosmo WI-1229)*
+The by-the-book lane-setup test surfaced a doc self-contradiction. **F30 (shepherd):** `orchestrator-protocol.md`
+equates a shepherd with "one lane (**one Cosmo workstream**) … One per active lane", and
+`shepherd-kickoff-template.md` bakes in a single `«WORKSTREAM»`+id placeholder + a single-workstream
+monitor — yet `planning-rules.md` §1.1 says "0..n per Initiative — never assume 1:1" and real practice
+is **one shepherd per LANE = 1..n related workstreams** (operator: routinely two related workstreams).
+**F31 (reviewer):** `reviewer-protocol.md` + template are hard-scoped "**one workstream ONLY**", but a
+reviewer routinely covers a **mutable set** of workstreams, expanded at runtime. **How scope actually
+grows (operator, 07-01):** organically, not at spawn — the orchestrator adds a workstream to a
+shepherd's scope via a **Clacks directive**; the operator manually adds workstreams to the reviewer.
+**Status:** escalated to **WI-1229** (`Design`, Quartet MVP workstream) — needs proper design (lane =
+1..n span; kickoffs accept a workstream set; runtime add/drop mechanism; de-dupe + monitor-isolation
+over N workstreams; preserve reviewer≠executor). Left here as the provenance record; the design lives in
+the WI. *(2026-07-01 cold boot.)*
