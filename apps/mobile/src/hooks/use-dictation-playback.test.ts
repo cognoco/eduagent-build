@@ -1233,6 +1233,31 @@ describe('useDictationPlayback', () => {
     );
   });
 
+  it('[WI-904] speaks each word at natural rate, not the old slurred 0.5–0.6', async () => {
+    const { result } = renderHook(() =>
+      useDictationPlayback({
+        sentences: LONG_SENTENCES,
+        pace: 'normal',
+        punctuationReadAloud: false,
+        language: 'en',
+        chunkSize: 3,
+      }),
+    );
+
+    await startPlayback(result);
+    act(() => {
+      jest.advanceTimersByTime(4000); // past countdown
+    });
+
+    // The word is spoken at natural articulation speed — the "drunk/slurred"
+    // stretch came from a sub-1.0 rate; writing time comes from the pauses, not
+    // from drawing the voice out.
+    expect(mockSpeak).toHaveBeenCalledWith(
+      'The little rabbit',
+      expect.objectContaining({ rate: 1.0 }),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // [WI-904] The writing pause after a chunk is modelled on the handwriting
   // cost of the just-spoken text (per-word length × age), surfaced by

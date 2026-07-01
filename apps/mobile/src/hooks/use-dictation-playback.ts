@@ -51,24 +51,28 @@ export interface PlaybackControls {
 
 type VoiceAvailabilityResult = boolean | Promise<boolean>;
 
-// [WI-904] Writing-pause model. Learners reported the gaps between chunks were
-// too short even at the default pace. The articulation `rate` is left unchanged
-// (words are NOT drawn out, only the silence between them grows); the gap is now
-// modelled on how long the just-spoken text takes to write by hand rather than a
-// flat per-word constant. Each word costs `baseWordMs` (a floor, so even a
-// one-letter word gets a beat) plus `perCharMs` per letter — so "I"/"am" cost
-// little while "extraordinary" costs a lot. The chunk gap is the sum of its
-// words' costs; the sentence gap is `sentencePause`. Both are then scaled by an
-// age multiplier (see AGE_PAUSE_MULTIPLIER). These constants are tuned by feel
-// on-device — nudge `baseWordMs`/`perCharMs`/`sentencePause` to make the whole
-// pace slower or faster without touching the model.
+// [WI-904] Two independent levers — keep them separate:
+//   1. `rate` — how fast each WORD is spoken. The old 0.5–0.6 stretched every
+//      word and sounded slurred / "drunk". Words must sound NATURAL, so `rate`
+//      sits at ~1.0 (expo-speech's normal speed); the writing time does NOT come
+//      from slowing the voice down.
+//   2. The writing PAUSE — the silence AFTER a chunk/sentence, where the learner
+//      writes. This is modelled on how long the just-spoken text takes to write
+//      by hand: each word costs `baseWordMs` (a floor, so even a one-letter word
+//      gets a beat) plus `perCharMs` per letter — "I"/"am" cost little,
+//      "extraordinary" costs a lot. The chunk gap is the sum of its words' costs;
+//      the sentence gap is `sentencePause`. Both are scaled by an age multiplier
+//      (see AGE_PAUSE_MULTIPLIER).
+// Tune the *voice* with `rate`; tune the *writing time* with
+// `baseWordMs`/`perCharMs`/`sentencePause`. slow/normal/fast now differ mainly in
+// writing time, with only a gentle articulation difference.
 const PACE_CONFIG: Record<
   DictationPace,
   { rate: number; baseWordMs: number; perCharMs: number; sentencePause: number }
 > = {
-  slow: { rate: 0.5, baseWordMs: 1900, perCharMs: 580, sentencePause: 5500 },
-  normal: { rate: 0.6, baseWordMs: 1200, perCharMs: 360, sentencePause: 4000 },
-  fast: { rate: 0.75, baseWordMs: 720, perCharMs: 220, sentencePause: 3000 },
+  slow: { rate: 0.9, baseWordMs: 1900, perCharMs: 580, sentencePause: 5500 },
+  normal: { rate: 1.0, baseWordMs: 1200, perCharMs: 360, sentencePause: 4000 },
+  fast: { rate: 1.0, baseWordMs: 720, perCharMs: 220, sentencePause: 3000 },
 };
 
 // [WI-904] Younger learners write more slowly, so they need a longer writing
