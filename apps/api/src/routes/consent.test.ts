@@ -2,6 +2,12 @@
 // Mock dependencies used by consent service and routes
 // ---------------------------------------------------------------------------
 
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_PROFILE_ID_3,
+} from '@eduagent/test-utils';
+
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
@@ -146,7 +152,7 @@ jest.mock('../services/consent', () => {
     requestConsent: jest.fn().mockResolvedValue({
       consentState: {
         id: 'consent-1',
-        profileId: '00000000-0000-4000-8000-000000000001',
+        profileId: TEST_PROFILE_ID,
         consentType: 'GDPR',
         status: 'PARENTAL_CONSENT_REQUESTED',
         parentEmail: 'parent@example.com',
@@ -160,7 +166,7 @@ jest.mock('../services/consent', () => {
     resendConsent: jest.fn().mockResolvedValue({
       consentState: {
         id: 'consent-1',
-        profileId: '00000000-0000-4000-8000-000000000001',
+        profileId: TEST_PROFILE_ID,
         consentType: 'GDPR',
         status: 'PARENTAL_CONSENT_REQUESTED',
         parentEmail: 'parent@example.com',
@@ -184,7 +190,7 @@ jest.mock('../services/consent', () => {
       ),
     revokeConsent: jest.fn().mockResolvedValue({
       id: 'consent-1',
-      profileId: '00000000-0000-4000-8000-000000000001',
+      profileId: TEST_PROFILE_ID,
       consentType: 'GDPR',
       status: 'WITHDRAWN',
       parentEmail: 'parent@example.com',
@@ -193,7 +199,7 @@ jest.mock('../services/consent', () => {
     }),
     restoreConsent: jest.fn().mockResolvedValue({
       id: 'consent-1',
-      profileId: '00000000-0000-4000-8000-000000000001',
+      profileId: TEST_PROFILE_ID,
       consentType: 'GDPR',
       status: 'CONSENTED',
       parentEmail: 'parent@example.com',
@@ -311,11 +317,6 @@ jest.mock(
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { ERROR_CODES } from '@eduagent/schemas';
-import {
-  TEST_PROFILE_ID,
-  TEST_PROFILE_ID_2,
-  TEST_PROFILE_ID_3,
-} from '@eduagent/test-utils';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -405,7 +406,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
@@ -435,7 +436,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
@@ -447,7 +448,7 @@ describe('consent routes', () => {
       expect(mockInngest.send).toHaveBeenCalledWith({
         name: 'app/consent.requested',
         data: expect.objectContaining({
-          profileId: '00000000-0000-4000-8000-000000000001',
+          profileId: TEST_PROFILE_ID,
           consentType: 'GDPR',
           requestedAt: expect.any(String),
         }),
@@ -461,7 +462,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'COPPA',
           }),
@@ -492,7 +493,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
@@ -518,7 +519,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
@@ -544,7 +545,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'INVALID',
           }),
@@ -562,7 +563,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'not-an-email',
             consentType: 'GDPR',
           }),
@@ -598,7 +599,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'parent@example.com',
             consentType: 'GDPR',
           }),
@@ -623,7 +624,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             parentEmail: 'rotated@example.com',
             consentType: 'GDPR',
           }),
@@ -652,7 +653,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -672,9 +673,7 @@ describe('consent routes', () => {
       >;
       // v2 uses chargePersonId (not childProfileId) and never carries parentEmail.
       expect(passedOptions).not.toHaveProperty('parentEmail');
-      expect(passedOptions.chargePersonId).toBe(
-        '00000000-0000-4000-8000-000000000001',
-      );
+      expect(passedOptions.chargePersonId).toBe(TEST_PROFILE_ID);
     });
 
     it('[WI-261 break] returns 400 when a parentEmail is included (strict schema)', async () => {
@@ -684,7 +683,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
             parentEmail: 'j***@gmail.com',
           }),
@@ -707,7 +706,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -718,7 +717,7 @@ describe('consent routes', () => {
       expect(mockInngest.send).toHaveBeenCalledWith({
         name: 'app/consent.requested',
         data: expect.objectContaining({
-          profileId: '00000000-0000-4000-8000-000000000001',
+          profileId: TEST_PROFILE_ID,
           consentType: 'GDPR',
           requestedAt: expect.any(String),
         }),
@@ -740,7 +739,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -767,7 +766,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -793,7 +792,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: SELF_SERVICE_HEADERS,
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -810,7 +809,7 @@ describe('consent routes', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            childProfileId: '00000000-0000-4000-8000-000000000001',
+            childProfileId: TEST_PROFILE_ID,
             consentType: 'GDPR',
           }),
         },
@@ -1193,7 +1192,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
         method: 'POST',
         headers: SELF_SERVICE_HEADERS,
         body: JSON.stringify({
-          childProfileId: '00000000-0000-4000-8000-000000000001',
+          childProfileId: TEST_PROFILE_ID,
           parentEmail: 'parent@example.com',
           consentType: 'GDPR',
         }),
@@ -1226,7 +1225,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     mockInngest.send.mockRejectedValueOnce(new Error('Inngest unreachable'));
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1264,7 +1263,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     });
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1277,7 +1276,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
       expect.objectContaining({
         name: 'app/consent.revoked',
         data: expect.objectContaining({
-          childProfileId: '00000000-0000-4000-8000-000000000001',
+          childProfileId: TEST_PROFILE_ID,
           parentProfileId: 'test-profile-id',
           revokedAt: '2026-01-15T10:00:00.000Z',
         }),
@@ -1447,7 +1446,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     );
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/status',
+      `/v1/consent/${TEST_PROFILE_ID}/status`,
       {
         method: 'GET',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1474,7 +1473,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     );
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1497,7 +1496,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     );
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1524,7 +1523,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     );
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/restore',
+      `/v1/consent/${TEST_PROFILE_ID}/restore`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1548,7 +1547,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     );
 
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
@@ -1601,7 +1600,7 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
 
   it('[BREAK] GET /v1/consent/:id/status returns 403 for non-owner profile', async () => {
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/status',
+      `/v1/consent/${TEST_PROFILE_ID}/status`,
       {
         method: 'GET',
         headers: {
@@ -1630,7 +1629,7 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
 
   it('[BREAK] PUT /v1/consent/:id/revoke returns 403 for non-owner profile', async () => {
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/revoke',
+      `/v1/consent/${TEST_PROFILE_ID}/revoke`,
       {
         method: 'PUT',
         headers: {
@@ -1653,7 +1652,7 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
 
   it('[BREAK] PUT /v1/consent/:id/restore returns 403 for non-owner profile', async () => {
     const res = await app.request(
-      '/v1/consent/00000000-0000-4000-8000-000000000001/restore',
+      `/v1/consent/${TEST_PROFILE_ID}/restore`,
       {
         method: 'PUT',
         headers: {
@@ -1694,7 +1693,7 @@ describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent consent r
 
 describe('[BUG-791] non-owner sibling cannot request/resend consent for another profile', () => {
   const SIBLING_PROFILE_ID = TEST_PROFILE_ID_2;
-  const TARGET_CHILD_ID = '00000000-0000-4000-8000-000000000001';
+  const TARGET_CHILD_ID = TEST_PROFILE_ID;
 
   beforeEach(() => {
     const profileMock = jest.requireMock('../services/profile') as {

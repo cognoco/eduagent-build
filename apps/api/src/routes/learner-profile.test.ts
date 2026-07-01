@@ -14,6 +14,13 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_PROFILE_ID_3,
+  TEST_PROFILE_ID_4,
+  TEST_PROFILE_ID_5,
+} from '@eduagent/test-utils';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -41,8 +48,8 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 // (SEEDABLE). Proxy exposes it on the mock DB so IDOR tests can control the edge.
 const mockFindGuardianship = jest.fn().mockResolvedValue({
   id: 'guardianship-1',
-  guardianPersonId: '00000000-0000-4000-8000-000000000001',
-  chargePersonId: '00000000-0000-4000-8000-000000000002',
+  guardianPersonId: TEST_PROFILE_ID,
+  chargePersonId: TEST_PROFILE_ID_2,
   revokedAt: null,
 });
 const guardianshipQuery = {
@@ -126,7 +133,7 @@ jest.mock(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      personId: '00000000-0000-4000-8000-000000000001',
+      personId: TEST_PROFILE_ID,
       organizationId: 'test-account-id',
       isOwner: true,
       roles: ['admin'],
@@ -216,13 +223,6 @@ import { learnerProfileRoutes } from './learner-profile';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
 import { ERROR_CODES } from '@eduagent/schemas';
-import {
-  TEST_PROFILE_ID,
-  TEST_PROFILE_ID_2,
-  TEST_PROFILE_ID_3,
-  TEST_PROFILE_ID_4,
-  TEST_PROFILE_ID_5,
-} from '@eduagent/test-utils';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
