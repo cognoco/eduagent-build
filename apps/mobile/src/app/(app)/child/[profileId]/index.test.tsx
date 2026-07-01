@@ -97,15 +97,45 @@ jest.mock(
   '../../../../components/common' /* gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM */,
   () => ({
     // Mirrors TimeoutLoader's steady loading state: a progressbar View carrying
-    // the forwarded testID. The retry/back actions only surface after the
-    // timeout in the real component, so the pre-timeout shim omits them.
-    TimeoutLoader: ({ testID }: { testID?: string }) => {
-      const { View } = require('react-native');
+    // the forwarded testID, plus the primary/secondary action Pressables so
+    // callers can assert the retry/back wiring without simulating the real
+    // component's timeout (that timing is covered by TimeoutLoader.test.tsx).
+    TimeoutLoader: ({
+      testID,
+      primaryAction,
+      secondaryAction,
+    }: {
+      testID?: string;
+      primaryAction?: { label: string; onPress: () => void; testID?: string };
+      secondaryAction?: {
+        label: string;
+        onPress: () => void;
+        testID?: string;
+      };
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
       return (
         <View
           testID={testID ?? 'timeout-loader'}
           accessibilityRole="progressbar"
-        />
+        >
+          {primaryAction ? (
+            <Pressable
+              testID={primaryAction.testID ?? 'timeout-loader-primary'}
+              onPress={primaryAction.onPress}
+            >
+              <Text>{primaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+          {secondaryAction ? (
+            <Pressable
+              testID={secondaryAction.testID ?? 'timeout-loader-secondary'}
+              onPress={secondaryAction.onPress}
+            >
+              <Text>{secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       );
     },
     ErrorFallback: ({
@@ -536,6 +566,15 @@ describe('ChildDetailScreen — profile overview', () => {
     result.getByTestId('child-profile-loading');
     expect(result.queryByTestId('child-detail-scroll')).toBeNull();
     expect(result.queryByText('common.loading')).toBeNull();
+
+    // [WI-1021] loading gate exposes retry + back affordances (UX Resilience
+    // Rules) instead of a bare spinner.
+    result.getByTestId('child-profile-loading-retry');
+    fireEvent.press(result.getByTestId('child-profile-loading-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/home',
+    );
 
     cleanup();
   });
