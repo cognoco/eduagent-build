@@ -54,14 +54,19 @@ join_unique_classes() {
   local seen=$'\n'
   local class
   local out=()
-  for class in "${CLASSES[@]}"; do
-    case "$seen" in
-      *$'\n'"$class"$'\n'*) continue ;;
-    esac
-    seen="${seen}${class}"$'\n'
-    out+=("$class")
-  done
-  echo "${out[*]}"
+  # bash 3.2 (macOS default) throws "unbound variable" under set -u when
+  # expanding "${ARR[@]}" on an empty array — guard with the count check,
+  # which bash 3.2 handles fine even when empty.
+  if [[ ${#CLASSES[@]} -gt 0 ]]; then
+    for class in "${CLASSES[@]}"; do
+      case "$seen" in
+        *$'\n'"$class"$'\n'*) continue ;;
+      esac
+      seen="${seen}${class}"$'\n'
+      out+=("$class")
+    done
+  fi
+  echo "${out[*]:-}"
 }
 
 hit() {
@@ -512,14 +517,18 @@ run_one() {
   fi
 }
 
-for entry in "${FAST_CMDS[@]}"; do
-  run_one "${entry%%|*}" "${entry#*|}"
-done
-
-if [[ "$SPEED_FILTER" == "all" ]]; then
-  for entry in "${SLOW_CMDS[@]}"; do
+if [[ ${#FAST_CMDS[@]} -gt 0 ]]; then
+  for entry in "${FAST_CMDS[@]}"; do
     run_one "${entry%%|*}" "${entry#*|}"
   done
+fi
+
+if [[ "$SPEED_FILTER" == "all" ]]; then
+  if [[ ${#SLOW_CMDS[@]} -gt 0 ]]; then
+    for entry in "${SLOW_CMDS[@]}"; do
+      run_one "${entry%%|*}" "${entry#*|}"
+    done
+  fi
 else
   SKIPPED=${#SLOW_CMDS[@]}
   if [[ $SKIPPED -gt 0 ]]; then
