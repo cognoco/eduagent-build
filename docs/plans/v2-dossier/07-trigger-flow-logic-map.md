@@ -168,9 +168,20 @@ flowchart TD
 | Subject Hub Next-up pressed | Resume, review, or topic. | `nextUp.kind` controls route. | One next action per subject. | `CODE`: `subject-hub/[subjectId]/index.tsx:162-178`, `use-subject-hub.ts:228-276`. |
 | Person scope Subjects opened | Structural masked subject list; tapping a subject opens a masked read-only Subject Hub backed by the same structural response. | Fetch `GET /scopes/:personId/subjects`, then local subject selection adapts the masked data into `SubjectHub` with `canStudy=false`. | Supporter sees only shareable structure plus safe due-review/mastery signals. | `CODE`: `PersonScopeStructuralSubjects.tsx`, `scopes.ts:25-35`, `supporter-structural-mask.ts`. |
 | Supporter Journal opened | API-backed shared-record projections. | Mobile fetches `GET /visibility/reports/:personId/shared-record`; API projects weekly report, recap-presence, and milestone facts through `projectSharedRecord`. | Visibility contract record with reportable facts only. | `CODE`: `SupportHubJournalTab.tsx`, `PersonScopeJournalPlaceholder.tsx`, `use-shared-record.ts`, `visibility.ts`, `shared-record-read-model.ts`. |
+| Supporter requests attention report | Appeal affordance below the curated shared-record card. | `AppealButton` posts `POST /visibility/reports/:personId/appeal`; endpoint requires the caller to be the supporter of an accepted contract, so this is supporter-facing, not a supportee dispute mechanism. | Lets a supporter escalate past the curated summary to an artifact-verified report when it seems surprising or incomplete. | `CODE`: `SharedRecordView.tsx`, `AppealButton.tsx`, `use-shared-record.ts` (`useAppealVisibility`), `visibility.ts`, `supporter-report.ts`. |
 | Start support sharing request | Link ceremony create screen. | `/link/new` receives `supporteePersonId` + relation, then posts `POST /visibility/links`. | A supporter can create the pending visibility contract before either side accepts. | `CODE`: `app/(app)/link/new.tsx`, `visibility.ts`, `linking-ceremony.ts`. |
 | Open support sharing agreement | Link ceremony contract screen. | `/link/[contractId]` fetches `GET /visibility/links/:id/contract`, derives active side from the signed-in person, then posts accept/revoke as allowed. | Both sides review the same trust contract; accepted supportees can end sharing. | `CODE`: `app/(app)/link/[contractId].tsx`, `ContractCard.tsx`, `visibility.ts`, `supportership-revocation.ts`. |
 | Avatar tapped | Account admin sheet. | `AccountAvatar` pushes `/account`. | More/account admin re-homed out of bottom tabs. | `CODE`: `AccountAvatar.tsx:22-37`, `account/index.tsx:10-32`, `AccountAdminSheet.tsx:23-174`. |
+
+## Failure Modes — Supporter Appeal
+
+| State | Trigger | User sees | Recovery |
+|---|---|---|---|
+| Idle | Supporter opens a shared-record card that has facts. | Appeal button (`AppealButton`, "Request attention report"). | N/A. |
+| Pending | Supporter presses the appeal button. | Loading indicator in place of the button. | Resolves automatically to the report or the error state. |
+| Report ready | `POST /visibility/reports/:personId/appeal` succeeds. | Artifact-verified attention report replaces the button. | N/A. |
+| Request failed | The appeal mutation rejects (network/API error). | `ErrorFallback` with a retry action. | Retry re-fires the same mutation. |
+| Scope switched mid-state | Supporter switches to a different supportee without the component unmounting (e.g. selecting another card while the hub stays mounted). | Appeal state resets to idle for the newly active scope; no stale report/error from the prior supportee leaks through. | `useAppealVisibility` resets its mutation state on `scope.personId` change. |
 
 ## Current Gaps To Review Before Calling V2 Complete
 

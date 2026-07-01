@@ -4028,7 +4028,9 @@
       "retry": "Try again"
     },
     "appeal": {
-      "label": "Request attention report"
+      "label": "Request attention report",
+      "errorTitle": "Couldn't request the attention report",
+      "errorMessage": "Try again in a moment."
     },
     "revocation": {
       "title": "Sharing ended",

@@ -4248,7 +4248,9 @@
       "retry": "Tentar novamente"
     },
     "appeal": {
-      "label": "Solicitar relatório de atenção"
+      "label": "Solicitar relatório de atenção",
+      "errorTitle": "Não foi possível solicitar o relatório de atenção",
+      "errorMessage": "Tente novamente daqui a pouco."
     },
     "revocation": {
       "title": "Acesso encerrado",

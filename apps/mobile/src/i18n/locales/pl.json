@@ -4412,7 +4412,9 @@
       "retry": "Spróbuj ponownie"
     },
     "appeal": {
-      "label": "Poproś o raport uwagi"
+      "label": "Poproś o raport uwagi",
+      "errorTitle": "Nie udało się poprosić o raport uwagi",
+      "errorMessage": "Spróbuj ponownie za chwilę."
     },
     "revocation": {
       "title": "Koniec udostępniania",

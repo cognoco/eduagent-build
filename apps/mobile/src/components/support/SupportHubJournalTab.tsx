@@ -5,7 +5,7 @@ import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
 import { DeskLampAnimation } from '../common/DeskLampAnimation';
 import { MagicPenAnimation } from '../common/MagicPenAnimation';
 import { SharedRecordView } from '../visibility';
-import { useSharedRecord } from './use-shared-record';
+import { useAppealVisibility, useSharedRecord } from './use-shared-record';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
@@ -63,6 +63,7 @@ function SupportHubJournalPersonCard({
 }): React.ReactElement {
   const { t } = useTranslation();
   const query = useSharedRecord(scope);
+  const appeal = useAppealVisibility(scope);
 
   return (
     <View
@@ -88,6 +89,11 @@ function SupportHubJournalPersonCard({
             record={query.data}
             error={null}
             onRetry={() => void query.refetch()}
+            onAppeal={() => appeal.mutate()}
+            appealPending={appeal.isPending}
+            appealReport={appeal.data}
+            appealError={appeal.error}
+            onRetryAppeal={() => appeal.mutate()}
           />
         ) : (
           <SupportHubJournalEmptyState scope={scope} />

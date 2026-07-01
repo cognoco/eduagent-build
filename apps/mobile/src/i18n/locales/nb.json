@@ -4248,7 +4248,9 @@
       "retry": "Prøv igjen"
     },
     "appeal": {
-      "label": "Be om oppmerksomhetsrapport"
+      "label": "Be om oppmerksomhetsrapport",
+      "errorTitle": "Kunne ikke be om oppmerksomhetsrapporten",
+      "errorMessage": "Prøv igjen om et øyeblikk."
     },
     "revocation": {
       "title": "Deling avsluttet",
