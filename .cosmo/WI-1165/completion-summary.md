@@ -1,0 +1,7 @@
+**What was done:** Completed the onFailure `getStepDatabase` scope sweep the reviewer found incomplete on the original WI-1165 merge — the two sibling Inngest functions that wrote to the step DB in `onFailure` without the scope wrapper.
+
+**What changed:** `apps/api/src/inngest/functions/subject-retry-curriculum.ts` and `subject-prewarm-curriculum.ts` — their `onFailure` DB access (getStepDatabase / markBookFailed / captureException) is now wrapped in `runWithStepDatabaseScope` + `closeStepDatabases` (try/finally), matching the canonical fixed sites. Regression guard tests added to both test files. Landed via fix-forward PR #1666 (squash 6a0fd396d0b06b46eda91fd1086a80be9434f52d). The safe-non-core empty-catch guard was already on main from the original WI-1165 squash; not re-applied.
+
+**Verification:** Full sweep of all 7 `onFailure` files confirmed only these two needed fixing (4 others have no DB access in onFailure; 2 were already fixed by the original squash). PR #1666: all 9 required checks SUCCESS, claude-review VERDICT APPROVED (0 must-fix / 0 should-fix / 0 consider), mergeStateStatus CLEAN. Pre-push: 1150 API tests pass (41 suites), typecheck clean.
+
+**Caveats / Follow-ups:** One `gc1-allow: Inngest step DB boundary` on a helpers mock in the prewarm test (the step DB boundary is genuinely unavailable in a unit test); accepted by the GC1 CI check and the APPROVED review. None outstanding.

@@ -154,3 +154,13 @@ builder.md + the exact finding above + builder.md GATE-0 premise-verify). I SHUT
 (b-1071/1087/1165/1166/902/1059) prematurely — dispatch fresh ones. Shepherd merges + re-completes (new Fixed-In).
 Gate-1 lesson reinforced: closure verifies against origin/main, so a green-PR-at-merge can still bounce if the
 post-merge `main` run is red or a completeness sweep finds siblings. Outbox through pr-cleanup-6.
+
+## ✅ LANE EXECUTION COMPLETE (2026-06-30 ~08:28)
+All 12 in-scope WS-27 WIs landed. **CLOSED (11):** 1151, 1119, 1097, 1071, 1075, 902, 1087, 1059, 560, 1165, 1166. **REVIEWING (1, awaiting reviewer close):** WI-1132 (#1669 squash aa94a68a). Plus 2 no-WI incidental hotfixes merged: #1654 (no-db @inngest-admin annotation, 411803de) + #1664 (docs_only gate on @inngest-admin step, 5dad2616 — killed the spurious `pnpm: command not found` class).
+
+**Bounce taxonomy (this round):**
+- **Zero-code closure-verification artifacts (re-completed, no new PR):** WI-1071 (ambient main-red false-negative), WI-1075 (annotation already on main via #1654), WI-902 (validation-DB unmigrated — applied 0126 forward), WI-560 (drift verdict now explicit via WI-1148 evaluateGates: "Baseline check passed, 5.0pp"; exit-1 was orthogonal scenario-quality).
+- **Real fix-forward code rework (new PR → merge → re-complete):** WI-1087 (#1663 tutor sweep), WI-1165 (#1666 onFailure scope siblings), WI-1166 (#1665 reclaim null-guard), WI-1059 (#1667 parseJson boundary).
+- **BOTH:** WI-1132 — zero-code-completed in error; reviewer correctly re-bounced on an unresolved a11y finding (identical accessibilityLabel/row) in already-merged source + a red Fixed-In rollup; fixed forward (#1669: subject-specific interpolated label + 7-locale key + baseline regen + regression test).
+
+**Process catches:** (1) per-ID Cosmo monitor (bzcbvwm1s) caught WI-1059's premature builder-run `/cosmo:execute complete` (wrong/old Fixed-In) → corrected in place. (2) WS-27 relation monitor proved unreliable (stale WI-1075=Reviewing) — per-ID authoritative. **Lesson → memory:** `feedback_shepherd_zerocode_completion_gates`. Remaining: reviewer closes WI-1132 → lane graduates.

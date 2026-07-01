@@ -4,9 +4,9 @@
   "monitors": [
     {
       "target": "_wip/bug-lane/_state/inbox.jsonl",
-      "purpose": "catch orchestrator rulings/relays",
-      "command": "tail -n 0 -F _wip/bug-lane/_state/inbox.jsonl",
-      "task-id": "b6ka5dno6"
+      "purpose": "catch orchestrator rulings/relays (rewrite-safe line-count poller; replaced the tail -F watcher b6ka5dno6 which replayed full history on a file rewrite, 2026-06-30)",
+      "command": "line-count poller seeded at EOF, emits only new lines, resets baseline on truncation/rewrite",
+      "task-id": "baks23el7"
     },
     {
       "target": "Cosmo Stage/State — Bug Lane WS 3858bce9-1f7c-8083-905b-d94bca4a4325",
