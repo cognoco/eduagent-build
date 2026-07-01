@@ -103,6 +103,8 @@ describe('RecentSessionsList', () => {
 
     // Ancestor-chain guardrail: home must be pushed BEFORE session so
     // router.back() from session returns to home, not the tab's first route.
+    // Assert count as well as order so a stray extra/missing push can't slip by.
+    expect(mockPush).toHaveBeenCalledTimes(2);
     expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/home');
     expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/session');
   });
