@@ -4250,7 +4250,9 @@
       "retry": "Erneut versuchen"
     },
     "appeal": {
-      "label": "Aufmerksamkeitsbericht anfordern"
+      "label": "Aufmerksamkeitsbericht anfordern",
+      "errorTitle": "Aufmerksamkeitsbericht konnte nicht angefordert werden",
+      "errorMessage": "Versuche es gleich noch einmal."
     },
     "revocation": {
       "title": "Teilen beendet",

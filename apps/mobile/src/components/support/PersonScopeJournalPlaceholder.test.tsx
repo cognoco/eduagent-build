@@ -1,6 +1,15 @@
-import { render, screen, waitFor } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import type { ScopeDescriptor, SharedRecord } from '@eduagent/schemas';
+import type {
+  AppealReport,
+  ScopeDescriptor,
+  SharedRecord,
+} from '@eduagent/schemas';
 
 import {
   cleanupScreen,
@@ -170,5 +179,37 @@ describe('PersonScopeJournalPlaceholder', () => {
       'Private chats, notes, and mentor memory are not shown here.',
     );
     expect(screen.queryByText('No shared record yet')).toBeNull();
+  });
+
+  it('requests the attention report when the appeal affordance is pressed', async () => {
+    const APPEAL_REPORT: AppealReport = {
+      supportershipId: EDGE_ID,
+      generatedAt: '2026-07-01T12:00:00.000Z',
+      report: 'Detailed attention report: Knows equivalent fractions.',
+      facts: [],
+      artifactWall: true,
+    };
+    mockFetch.setRoute(
+      `/visibility/reports/${PERSON_ID}/appeal`,
+      APPEAL_REPORT,
+    );
+
+    queryClient = renderWithProfile(
+      <PersonScopeJournalPlaceholder scope={EMMA_SCOPE} />,
+    );
+
+    await waitFor(() => {
+      screen.getByTestId('visibility-appeal-button');
+    });
+
+    fireEvent.press(screen.getByTestId('visibility-appeal-button'));
+
+    await waitFor(() => {
+      screen.getByText(APPEAL_REPORT.report);
+    });
+
+    expect(
+      fetchCallsMatching(mockFetch, `/visibility/reports/${PERSON_ID}/appeal`),
+    ).toHaveLength(1);
   });
 });

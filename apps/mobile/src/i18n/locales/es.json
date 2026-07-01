@@ -4250,7 +4250,9 @@
       "retry": "Reintentar"
     },
     "appeal": {
-      "label": "Solicitar informe de atención"
+      "label": "Solicitar informe de atención",
+      "errorTitle": "No se pudo solicitar el informe de atención",
+      "errorMessage": "Inténtalo de nuevo en un momento."
     },
     "revocation": {
       "title": "Se dejó de compartir",
