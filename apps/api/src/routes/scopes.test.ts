@@ -6,6 +6,7 @@ import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 import { scopesRoutes } from './scopes';
 import { resolveScopesForPerson } from '../services/scope-resolution';
 import { readSupporteeStructuralSubjects } from '../services/supporter-structural-mask';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 jest.mock(
   '../services/scope-resolution' /* gc1-allow: route unit test - service has direct unit coverage */,
@@ -17,7 +18,7 @@ jest.mock(
   () => ({ readSupporteeStructuralSubjects: jest.fn() }),
 );
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 const EDGE_ID = '00000000-0000-4000-8000-000000000201';
 

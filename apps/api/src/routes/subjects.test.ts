@@ -88,14 +88,15 @@ import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { subjectRoutes } from './subjects';
 import { ERROR_CODES, SubjectNotFoundError } from '@eduagent/schemas';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Test constants
 // ---------------------------------------------------------------------------
 
-const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
-const OTHER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000099';
+const OTHER_PROFILE_ID = TEST_PROFILE_ID_2;
 
 // ---------------------------------------------------------------------------
 // App factory — bypasses auth, injects profile context
@@ -695,7 +696,7 @@ describe('[WI-177 / DS-088] subjects proxy-mode guard', () => {
     const proxyApp = new Hono();
     proxyApp.use('*', async (c, next) => {
       c.set('db' as never, {});
-      c.set('profileId' as never, 'a0000000-0000-4000-a000-000000000001');
+      c.set('profileId' as never, PROFILE_ID);
       c.set('user' as never, { id: 'test-user' });
       c.set('profileMeta' as never, { isOwner: false, resolvedVia: 'auto' });
       await next();

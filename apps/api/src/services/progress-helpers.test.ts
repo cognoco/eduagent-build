@@ -20,8 +20,9 @@ import {
   computeWeeklyDeltas,
   getActiveSubjectsByRecency,
 } from './progress-helpers';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
-const CHILD_PROFILE_ID = '01933b3c-0000-7000-8000-000000000042';
+const CHILD_PROFILE_ID = TEST_PROFILE_ID;
 
 // ---------------------------------------------------------------------------
 // Shared mock helpers

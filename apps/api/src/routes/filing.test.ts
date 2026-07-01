@@ -20,6 +20,8 @@ import {
   TEST_BOOK_ID,
   TEST_SHELF_ID,
   TEST_TOPIC_ID,
+  TEST_SESSION_ID,
+  TEST_SESSION_ID_2,
 } from '@eduagent/test-utils';
 
 import {
@@ -398,7 +400,7 @@ describe('filing routes', () => {
     // [CR-2026-05-19-H34] schema now requires UUID and handler verifies
     // ownership + retry-count cap. Tests below build a valid session shape
     // and drive the mocked getSession / db.update chain accordingly.
-    const SESSION_ID = '00000000-0000-4000-8000-000000000abc';
+    const SESSION_ID = TEST_SESSION_ID;
 
     const makeSession = (
       overrides: Partial<{
@@ -1011,7 +1013,7 @@ describe('[WI-153 / DS-064] filing proxy-mode guard', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('POST /filing/request-retry returns 403 when caller is in proxy mode', async () => {
-    const SESSION_ID = '550e8400-e29b-41d4-a716-446655440111';
+    const SESSION_ID = TEST_SESSION_ID_2;
     const res = await makeProxyApp().request('/filing/request-retry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

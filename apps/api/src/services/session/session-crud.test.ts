@@ -38,8 +38,13 @@ import type {
   LearningSession,
   BookTopicGenerationResult,
 } from '@eduagent/schemas';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_SESSION_ID,
+} from '@eduagent/test-utils';
 
-const PROFILE_ID = '00000000-0000-7000-8000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = '00000000-0000-7000-8000-000000000002';
 const FALLBACK_TOPIC_ID = '00000000-0000-7000-8000-000000000003';
 const MATCHED_TOPIC_ID = '00000000-0000-7000-8000-000000000004';
@@ -1839,8 +1844,8 @@ describe('[WI-958] closeStaleSessions — bounded cursor pagination', () => {
 // the predicate's cap follows it — a restored `lt(..., 3)` then binds 3 (not the
 // sentinel) and the test fails, which is the genuine red-green guard.
 describe('[WI-730] claimSessionForFilingRetry — cap is derived from FILING_CONFIG.maxRetries', () => {
-  const PROFILE_ID = '00000000-0000-7000-8001-000000000001';
-  const SESSION_ID = '00000000-0000-7000-8001-000000000002';
+  const PROFILE_ID = TEST_PROFILE_ID_2;
+  const SESSION_ID = TEST_SESSION_ID;
 
   // Walk any nested plain-object / array structure and collect all numeric
   // values. Drizzle SQL expression objects are plain objects whose leaves

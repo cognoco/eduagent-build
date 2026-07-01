@@ -3,6 +3,7 @@ import type { Database } from '@eduagent/database';
 
 import { nowRoutes } from './now';
 import { buildNowFeed, buildNowOverflow } from '../services/now-feed';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 jest.mock(
   '../services/now-feed' /* gc1-allow: route unit test - service has direct unit coverage */,
@@ -12,7 +13,7 @@ jest.mock(
   }),
 );
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const CHILD_ID = '00000000-0000-4000-8000-000000000101';
 
 function makeApp() {

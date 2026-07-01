@@ -50,9 +50,10 @@ import {
   recordChildCapNotificationForAccountV2,
 } from '../services/billing/billing-v2';
 import { notificationsRoutes } from './notifications';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
-const OWNER_PROFILE_ID = 'a0000000-0000-4000-8000-000000000010';
-const CHILD_PROFILE_ID = 'a0000000-0000-4000-8000-000000000020';
+const OWNER_PROFILE_ID = TEST_PROFILE_ID;
+const CHILD_PROFILE_ID = TEST_PROFILE_ID_2;
 const ACCOUNT_ID = 'c0000000-0000-4000-8000-000000000001';
 const NOTIFICATION_ID = 'b0000000-0000-4000-8000-000000000001';
 

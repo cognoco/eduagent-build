@@ -6,6 +6,7 @@ import {
   EmbeddingDimensionMismatchError,
 } from './embeddings';
 import type { Database } from '@eduagent/database';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 function mockDatabaseModuleFactory() {
   const { createDatabaseModuleMock } =
@@ -257,8 +258,8 @@ function createMockDb(
   } as unknown as Database;
 }
 
-const SESSION_ID = '00000000-0000-7000-8000-000000000001';
-const PROFILE_ID = '00000000-0000-7000-8000-000000000002';
+const SESSION_ID = TEST_SESSION_ID;
+const PROFILE_ID = TEST_PROFILE_ID;
 
 describe('extractSessionContent', () => {
   it('concatenates user_message and ai_response content', async () => {

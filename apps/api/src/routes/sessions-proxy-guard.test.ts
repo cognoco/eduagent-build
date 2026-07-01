@@ -350,6 +350,7 @@ jest.mock('../inngest/client', () => {
 
 import { Hono } from 'hono';
 import { sessionRoutes } from './sessions';
+import { TEST_SESSION_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // [WI-171 / DS-082] Proxy-mode write guard — stream + close
@@ -369,7 +370,7 @@ describe('[WI-171 / DS-082] sessions proxy-mode guard', () => {
     return proxyApp;
   }
 
-  const SESSION_ID = '550e8400-e29b-41d4-a716-446655440111';
+  const SESSION_ID = TEST_SESSION_ID;
 
   beforeEach(() => jest.clearAllMocks());
 

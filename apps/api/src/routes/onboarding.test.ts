@@ -17,6 +17,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Database mock — family link query must be controllable per test
@@ -32,7 +33,7 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 // override it. Tests that exercise the forbidden path override per-call.
 const mockFindFamilyLink = jest.fn().mockResolvedValue({
   parentProfileId: 'test-profile-id',
-  childProfileId: 'a0000000-0000-4000-a000-000000000099',
+  childProfileId: TEST_PROFILE_ID,
 });
 const mockFindConsentState = jest.fn().mockResolvedValue(undefined);
 
@@ -190,7 +191,7 @@ const TEST_ENV = {
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 // CHILD_PROFILE_ID must be a valid UUID; the profileId param is used as a
 // family-link lookup key and may be validated by Drizzle ORM helpers.
-const CHILD_PROFILE_ID = 'a0000000-0000-4000-a000-000000000099';
+const CHILD_PROFILE_ID = TEST_PROFILE_ID;
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -2,14 +2,15 @@ import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import { noteRoutes } from './notes';
 import type { AppVariables } from '../types/hono';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
-const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000020';
 const NOTE_ID = 'a0000000-0000-4000-a000-000000000030';
 const NOTE_ID_2 = 'a0000000-0000-4000-a000-000000000031';
 const BOOK_ID = 'a0000000-0000-4000-a000-000000000040';
-const SESSION_ID = 'a0000000-0000-4000-a000-000000000050';
+const SESSION_ID = TEST_SESSION_ID;
 
 type FakeDb = Database & {
   selectRows: unknown[][];

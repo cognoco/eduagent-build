@@ -8,6 +8,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -105,20 +106,20 @@ jest.mock('../services/account', () => {
 // — after the Issue 901 fix, an auto-synthesized owner is rejected by the owner
 // gates (a non-owner can omit X-Profile-Id; auto-resolution must not confer
 // owner privileges).
-const OWNER_PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
+const OWNER_PROFILE_ID = TEST_PROFILE_ID;
 
 // [CR-2026-05-19-H1] Mock findOwnerProfile (auto-resolve path) and getProfile
 // (explicit-header path) so owner-gated routes resolve an owner profile.
-// NOTE: the OWNER_PROFILE_ID literal is duplicated inside this factory because
-// jest hoists jest.mock() above the const declaration above; referencing the
-// const here would throw "Cannot access before initialization". The two must
-// stay in sync — enforced implicitly: the success-path tests fail
-// (getProfile/findOwnerProfile returns null → 403) if the literals diverge.
+// NOTE: this factory re-derives ownerProfileId from the imported TEST_PROFILE_ID
+// (not the local OWNER_PROFILE_ID const above) because jest hoists jest.mock()
+// above local const declarations — referencing OWNER_PROFILE_ID here would
+// throw "Cannot access before initialization". Imported bindings don't have
+// that problem, so both stay in sync via the shared @eduagent/test-utils fixture.
 jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
-  const ownerProfileId = 'a0000000-0000-4000-a000-000000000001';
+  const ownerProfileId = TEST_PROFILE_ID;
   const ownerProfile = {
     id: ownerProfileId,
     accountId: 'test-account-id',
@@ -228,7 +229,7 @@ jest.mock(
 // [WI-867] Module-level refs so post-collapse v2-default scenario tests (non-owner,
 // account-disappears) can override per-test.
 const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
-  profileId: 'a0000000-0000-4000-a000-000000000001',
+  profileId: TEST_PROFILE_ID,
   meta: {
     birthYear: 1990,
     location: null,
@@ -243,12 +244,9 @@ const mockFindOwnerPersonScope = jest.fn().mockResolvedValue({
 const mockGetPersonScope = jest
   .fn()
   .mockImplementation((_db, profileId, organizationId) => {
-    if (
-      profileId === 'a0000000-0000-4000-a000-000000000001' &&
-      organizationId === 'test-account-id'
-    ) {
+    if (profileId === TEST_PROFILE_ID && organizationId === 'test-account-id') {
       return Promise.resolve({
-        profileId: 'a0000000-0000-4000-a000-000000000001',
+        profileId: TEST_PROFILE_ID,
         meta: {
           birthYear: 1990,
           location: null,
@@ -273,7 +271,7 @@ jest.mock(
 // call this in every beforeEach that clears, so the post-collapse v2-default
 // profile-scope resolution keeps resolving the owner.
 const OWNER_SCOPE = {
-  profileId: 'a0000000-0000-4000-a000-000000000001',
+  profileId: TEST_PROFILE_ID,
   meta: {
     birthYear: 1990,
     location: null,
@@ -286,8 +284,7 @@ const OWNER_SCOPE = {
 const restoreProfileScopeMocks = () => {
   mockFindOwnerPersonScope.mockResolvedValue(OWNER_SCOPE);
   mockGetPersonScope.mockImplementation((_db, profileId, organizationId) =>
-    profileId === 'a0000000-0000-4000-a000-000000000001' &&
-    organizationId === 'test-account-id'
+    profileId === TEST_PROFILE_ID && organizationId === 'test-account-id'
       ? Promise.resolve(OWNER_SCOPE)
       : Promise.resolve(null),
   );
@@ -937,7 +934,7 @@ describe('account routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[CR-2026-05-19-H1] non-owner profile is rejected from owner-gated account routes', () => {
-    const NON_OWNER_PROFILE_ID = 'b0000000-0000-4000-b000-000000000001';
+    const NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_2;
 
     beforeEach(() => {
       mockUpdateAccountEmailFromClerk.mockClear();

@@ -183,10 +183,11 @@ import { app } from '../index';
 import { settingsRoutes } from './settings';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';
 import { ForbiddenError } from '@eduagent/schemas';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 const AUTH_HEADERS = makeAuthHeaders();
 const PROFILE_HEADERS = { ...AUTH_HEADERS, 'X-Profile-Id': 'profile-1' };
-const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440111';
+const CHILD_PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
