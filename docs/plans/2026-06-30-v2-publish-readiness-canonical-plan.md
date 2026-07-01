@@ -61,7 +61,7 @@ Out of scope:
 
 - [ ] T4 / WI-1171: Build visibility ceremony screens — done when link, accept, revoke, trust-contract, kid-initiated unlink, and appeal affordance flows exist on mobile, are wired to the visibility API, and have tests for the non-reportable class and artifact-wall boundaries.
 
-- [ ] T5 / WI-1172: Preserve concrete progress in the right places — done when topic/book/subject mastery, due-review state, and learning counts live in Subjects/Subject Hub; reports, recaps, milestones, notes, and memory live in Journal; next action lives in Mentor; and the old Progress tab has no unique publish-critical job left.
+- [x] T5 / WI-1172: Preserve concrete progress in the right places — done when topic/book/subject mastery, due-review state, and learning counts live in Subjects/Subject Hub; reports, recaps, milestones, notes, and memory live in Journal; next action lives in Mentor; and the old Progress tab has no unique publish-critical job left. Ownership split documented in `docs/plans/v2-dossier/06-screen-function-access-map.md` → "Concrete Progress Ownership Split (WI-1172)"; residual legacy-Progress-only signals (vocabulary browser, milestone history, live global glance) tracked there for WI-1174, not silently dropped.
 
 - [x] T6 / WI-1173: Verify learner V2 parity, not just existence — done when Mentor, Subjects, Journal, Subject Hub, session, homework, quiz, dictation, and practice each have one current smoke or focused test proving the V2 trigger path, not only the legacy route path.
 

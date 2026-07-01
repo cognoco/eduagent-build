@@ -1,6 +1,6 @@
 # V2 Trigger Flow Logic Map
 
-**Last verified:** 2026-06-30  
+**Last verified:** 2026-07-01  
 **Purpose:** Review why users move between V2 surfaces. This complements `06-screen-function-access-map.md` by mapping triggers, decision points, and access boundaries.
 
 ## Source Legend
@@ -182,6 +182,7 @@ flowchart TD
 | Visibility ceremony depends on upstream anchors. | Link/accept/revoke/trust-contract flows now have mobile routes; remaining work is wiring S4 cold-start/Approve anchors into `/link/new` or existing contract IDs. | S4/S5 |
 | No V2-native forward trigger reaches the standalone `/(app)/practice` history hub (WI-1173 finding). | Mentor's light-practice affordance pushes directly to `/(app)/quiz` or `/(app)/dictation`; `/(app)/practice` itself is only reached as a `router.replace`/`goBackOrReplace` return destination from quiz/dictation completion, or via the legacy V0/V1 Progress tab (`LearnerScreen.tsx`). No test can honestly prove a V2 forward trigger that does not exist in code. | S4/S5 |
 | S6 deletion is deferred and irreversible. | Old shells/screens must remain until product explicitly retires V0/V1 and replacement parity is verified. | S6 |
+| Legacy-Progress-only concrete signals (CEFR vocabulary browser, full milestone history list, live global engagement glance — streak/sessions/minutes/recall-queue) have no V2-native home; see `06-screen-function-access-map.md` → "Concrete Progress Ownership Split (WI-1172)". | Learner loses these views only if/when Progress is retired before a V2 home exists. | S6, consumed by WI-1174's retirement-gate audit |
 
 ## V2 Publish-Readiness Smoke Set
 

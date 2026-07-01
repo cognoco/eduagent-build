@@ -1,6 +1,6 @@
 # V2 Screen Function And Access Map
 
-**Last verified:** 2026-06-30  
+**Last verified:** 2026-07-01  
 **Purpose:** Review which V2 screen owns which job, when it appears, why it exists, who can access it, and whether the claim is backed by code or by the V2 plan.
 
 ## Source Legend
@@ -118,3 +118,28 @@ pushes directly to `/(app)/quiz` or `/(app)/dictation`, never to
 shared quiz/dictation completion landing cited above); there is simply no V2
 "browse practice" entry point yet. See `07-trigger-flow-logic-map.md` →
 "Current Gaps To Review" for the tracked finding.
+
+## Concrete Progress Ownership Split (WI-1172)
+
+**Purpose:** T5's done-condition is "the old Progress tab has no unique publish-critical
+job left." This table maps every concrete-progress signal the legacy
+`apps/mobile/src/app/(app)/progress/**` tree carries to its V2 owner (Progress Placement
+Rule, above), with evidence, and separately records what is genuinely NOT re-homed yet so
+it isn't silently dropped ahead of an S6 decision.
+
+| Signal | V2 owner | Status | Evidence |
+|---|---|---|---|
+| Topic/book/subject mastery + due-review counts | Subjects tab, Subject Hub | `CODE` | `buildSubjectsIndex()` computes `mastered/learning/total/dueReviews` per subject: `apps/mobile/src/hooks/use-subjects-index.ts:34`, asserted with concrete values in `use-subjects-index.test.tsx:72`. `SubjectHubProgressSummary.tsx:10` renders the same triad plus `reviewsDue`/`weeklyMasteredDelta`, asserted in `SubjectHubProgressSummary.test.tsx:19-39`. |
+| Reports (weekly/monthly) | Journal, Reports section | `CODE` | `JournalTabView.tsx:44` Reports section; `JournalTabView.test.tsx:154` ("auto-surfaces the latest report inline in the Reports section"). |
+| Recaps (session summaries) | Journal, Sessions section | `CODE` | `JournalTabView.test.tsx:287` ("routes self recap rows to the learner session-summary route"). |
+| Milestone moments (as they occur) | Journal, moments strip | `CODE` | `JournalTabView.tsx:87-102` renders `milestone_reached` ledger moments; `JournalTabView.test.tsx:128` asserts `'3 learning sessions completed'` renders. |
+| Next action / what to do now | Mentor | `CODE` | Continue-card / cold-start / anchor-arc flows: `mentor.tsx:85-181`; asserted in `mentor.test.tsx:239,299,364`. |
+| Subjects-tab row rendering of mastery + due-review (`SubjectsBrowse.tsx:289-307`) | Subjects tab | `CODE`, test added | The positive path (mastered/learning/total text + reviews-due chip when `dueReviews > 0`) was already asserted (`SubjectsBrowse.test.tsx:119-120`). The negative path — the chip must NOT render when `dueReviews === 0` — had no assertion; added in this WI (`SubjectsBrowse.test.tsx` → "omits the reviews-due chip when a subject has no due reviews"). |
+| CEFR vocabulary browser (`progress/vocabulary.tsx`, `/vocabulary/[subjectId]`) | *(not re-homed)* | `OPEN` | Per-subject CEFR vocabulary breakdown for language-pedagogy subjects has no V2 entry point in Subjects/Subject Hub — confirmed by grep for `vocabular`/`cefr` across those trees; the only hits are Mentor's unrelated `'vocabulary'` light-practice route key (`mentor.tsx:357`, `LightPracticeAffordance.tsx`), not a CEFR count/breakdown display. Legacy route stays live (not being deleted by this WI). Does not appear in WI-1175's publish-critical prompt list, so it doesn't block T5. Tracked for the WI-1174 retirement-gate audit. |
+| Full milestone history (server-paged, all-time list) | *(not re-homed)* | `OPEN` | `progress/milestones.tsx` (`useProgressMilestones(50)`) is a durable, browsable milestone history; Journal's moments strip only surfaces milestones as they cross the `/now` ledger feed, not the full history. Same disposition as vocabulary above — legacy route stays live; tracked for WI-1174. |
+| Live global engagement glance (current streak, total sessions/minutes, recall-queue due/strong/fading) | *(not re-homed as a live chip)* | `OPEN`, partially covered | `ProgressStatsChips.tsx` renders these as a live glance; confirmed absent from Mentor/Subjects/Subject Hub/Journal by grep (`streak`, `retentionCards`, `totalActiveMinutes`/`totalWallClockMinutes`/`totalSessions` — no hits in those trees, aside from `OnTrackBadge`'s unrelated `reviewsDue` prop). The underlying values are already captured per-week inside report snapshots owned by Journal (`packages/schemas/src/snapshots.ts:30-48`: `totalSessions`, `totalActiveMinutes`, `currentStreak`, `retentionCardsDue/Strong/Fading`), so the concrete *value* is not lost — only the always-current single-glance chip has no V2 home. Note: streak/leaderboard-style framing is a deliberate Mentor exclusion, not an oversight — `OnTrackBadge.test.tsx:14` and `LightPracticeAffordance.test.tsx:22` assert streak/leaderboard/rank language is absent from Mentor; any future V2 home for this signal should not reintroduce that framing there. Tracked for WI-1174. |
+| Guardian nudge action (`childSummaryQuery.nudgeRecommended`) | Support hub (WI-1170 scope) | `OPEN`, different WI | Not a progress-ownership gap — it's a supporter attention/cockpit affordance, tracked under the support-hub job-to-be-done work, not this WI. |
+
+**Scope note:** per the shepherd's GATE-0 ruling, this WI documents and adds targeted
+checks for what's already owned; it does not build new UI for the `OPEN` residual rows.
+Those rows are the input WI-1174 needs for its per-surface retirement-gate map.
