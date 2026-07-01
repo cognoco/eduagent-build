@@ -7,11 +7,11 @@
 
 ## Shepherding & Cosmo Workflow
 
-- **Quartet mechanics extracted (2026-06-20)** → `_wip/umbrella-program/quartet-learning-tracker.md` (PRG-05 productization input; 5 drained memories deleted, residual-bearing ones retained below).
+- **Quartet mechanics** → folded into `_quartet/_quartet-wip/quartet-findings.md` (2026-07-01); the learning-tracker and all residual source memories deleted.
 
 - **Cosmo WI finalization drained (2026-06-20)** → `_wip/umbrella-program/cosmo-finalization-guide.md` (3 memories merged: shepherd-finalization + execute-complete-finalize + reviewer-reads-objective). Covers: `complete` vs `replace_content`, parser-clean completion-summary, `Fixed In`, re-finalize after a bounce, closure-verification reads OBJECTIVE/NAME, append-parse deadlock → operator force-close.
 - [project_cosmo_wi_project_relation_misfiling.md](project_cosmo_wi_project_relation_misfiling.md) — Cosmo WIs about eduagent captured from a Nexus-context session inherit the Nexus Project + fail the execute repo guard; fix the Project relation to MentoMate, never run from the wrong repo.
-- [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons moved to quartet-learning-tracker §E9): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
+- [project_prg14_agent_instructions_lane.md](project_prg14_agent_instructions_lane.md) — Repo CI/merge gotchas (ex-PRG-14 lane; shepherd lessons folded into `_quartet/_quartet-wip/quartet-findings.md` F27/F28): docs-PR `paths-ignore` blocks the required `main` check; merge-on-UNSTABLE ok for advisory-red; `session/index.test.tsx` ambient flake.
 
 ## Identity Foundation (re-platform)
 
@@ -55,13 +55,11 @@
 - [feedback_verify_code_not_memory_or_docs.md](feedback_verify_code_not_memory_or_docs.md) — ANY code-related question: verify against current source (grep/read, cite file:line) BEFORE answering; never answer from memory or plan/spec docs alone.
 - Commit early + push after every commit. Never batch large changes.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
-- [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_code_review_should_fix.md](feedback_code_review_should_fix.md) — Valid code-review should-fixes get fixed now; never ask whether to fix, only rule on validity. "Ping on findings" = surface, not ask-permission.
 - [feedback_no_ota_unless_asked.md](feedback_no_ota_unless_asked.md) — NEVER run eas update (OTA) unless user asks.
-- [feedback_use_sonnet_agents.md](feedback_use_sonnet_agents.md) — Use Sonnet for subagents where possible; reserve Opus for deep reasoning.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
 
 ## Android SDK & Build
@@ -110,22 +108,14 @@
 
 ## Development Process & Feedback
 
-- [feedback_monitor_silence_not_health.md](feedback_monitor_silence_not_health.md) — Session/host-scoped monitors die on reboot/session-end; silence ≠ healthy. Spot-check Cosmo; re-arm after restart.
-- [feedback_subagent_stale_local_repro.md](feedback_subagent_stale_local_repro.md) — Sub-agents reproduce CI failures vs the session's LOCAL checkout (may be behind origin/main) → false causation; dispatch CI-failure repro against a fresh worktree FROM origin/main + verify HEAD==failing-commit. (WI-808 2026-06-18.)
-- [feedback_adversarial_fork_isolation.md](feedback_adversarial_fork_isolation.md) — Read-only review forks share the worktree + can edit; enforce with isolation:worktree or Explore (no-edit) type.
-- [feedback_plan_cutover_ownership.md](feedback_plan_cutover_ownership.md) — Replace/rewrite plans need an owner for the cutover wave (switch-flip check); single-live-store invariant for piecemeal merges. From the WI-586 scope finding.
 
 - [project_agent_doc_and_memory_architecture_revisit.md](project_agent_doc_and_memory_architecture_revisit.md) — Open: AGENTS.md/CLAUDE.md content profile + cross-agent memory architecture. Memories currently Claude-only; Cortex (Nexus repo) is prior art for shared memory.
 - [feedback_audit_check_deleted_concepts.md](feedback_audit_check_deleted_concepts.md) — Before governance posture on rule violations, check if the concept was deleted by an epic. Literal grep misses aliases.
-- [feedback_verify_directive_premise_before_build.md](feedback_verify_directive_premise_before_build.md) — A directed "fix this live prod error" can rest on a grep of the legacy helper that missed the CALLER-level flag branch; verify caller reachability by primary source before building, and don't fabricate a no-op if the fix already exists. (WI-779 ic-180/181 2026-06-18.)
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_e2e_cascade_root_cause.md](feedback_e2e_cascade_root_cause.md) — 20+ same-day Notion bugs with "Cascading X" in Found In = ONE infra bug. Fix upstream, don't close N individually.
 - [feedback_prepush_bail_masks_failures.md](feedback_prepush_bail_masks_failures.md) — Pre-push `--bail` + a leading flake masks real fails; verify affected set WITHOUT --bail before any SKIP_PRE_PUSH. tsc/integration miss stale mock `toHaveBeenCalledWith` arg-count.
 - [feedback_forward_ratchets_not_in_prepush.md](feedback_forward_ratchets_not_in_prepush.md) — Forward-only git-diff ratchets (GC1 jest.mock, i18n-jsx, no-clinical-copy, decision-adr) aren't run by local pre-push/jest; run `check-change-class.sh --run` (or the ratchet) before claiming CI-clean. 3rd occurrence (809/586/811).
 - [feedback_batch_merge_verify_main_green.md](feedback_batch_merge_verify_main_green.md) — After a batch merge under strict=false, check main's own CI before moving on; independently-green PRs can combine to a red main (guard + new guarded file). (WS-27, 2026-06-29.)
-- [feedback_commit_skill_bare_push_worktree.md](feedback_commit_skill_bare_push_worktree.md) — Forked /commit bare `git push` in a worktree tracking origin/new-llm FF'd the shared branch directly, bypassing the PR/review gate. Rule: explicit refspec `HEAD:<wi-branch>`, never bare, in worktrees tracking a shared integration branch. ACTION: harden commit/worktree-setup skills.
-- [feedback_applier_fabricates_citations.md](feedback_applier_fabricates_citations.md) — Appliers fabricate gc1-allow twin citations + convenience-mock seedable seams; mandatory shepherd conformance-review (git-ls-files twin verify + seed-real db.query) before cherry-pick — appliers not trusted to self-cite/self-classify. (WI-867 2/2 appliers, 2026-06-21.)
-- [feedback_shepherd_zerocode_completion_gates.md](feedback_shepherd_zerocode_completion_gates.md) — Shepherd zero-code re-completion of a bounced WI must also verify NO unresolved review finding in landed source + GREEN Fixed-In rollup, not just "content on main"; builders must not self-run /cosmo:execute complete (per-ID monitor Executing→Reviewing alarm catches it). (WS-27 PR-cleanup, 2026-06-30.)
 - [feedback_fk_violation_not_rls_and_masked_step_bisect.md](feedback_fk_violation_not_rls_and_masked_step_bisect.md) — Integration FK-violation = parent GENUINELY ABSENT (FK bypasses RLS absent FORCE RLS), never role-leak; a masked/skipped CI step invalidates run-history bisect → git-blame the failing artifact instead; "passes local, red CI" on ephemeral DB = missing-seed signature. (WI-1145 P0, 2026-06-29.)
 
 ## User Profile

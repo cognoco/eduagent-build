@@ -861,7 +861,7 @@ PRG-12 · PRG-14-light · PRG-10 out-of-radius subset  ──▶  parallel-safe 
   adversarial review; seed: `wi586-scope-report.md`, the executor report
   landed durably by the IF shepherd). WI-586 PAUSED; shepherd holding;
   ratification + Cosmo re-slice happen at program level when the plan doc
-  lands. Lesson memorialized: `feedback_plan_cutover_ownership.md`
+  lands. Lesson memorialized: `_quartet/_quartet-wip/quartet-findings.md` F24
   (switch-flip check at every plan ratification).
 - **2026-06-11 (late night) — G4 FIRED: the IF rewrite proper is BUILT.**
   `WI-578` (pii-step-state) Closed → W3 6/6 → **every wave W0–W4 fully

@@ -55,7 +55,7 @@ flip → drop → grep-clean).
    WP description — useful for the drop scope's own wording, nothing more.
 4. `_wip/identity-foundation/execution-tracker.md` — read-only context (shepherd-owned;
    **never edit it**).
-5. `.claude/memory/feedback_plan_cutover_ownership.md` — the lesson that produced this
+5. `_quartet/_quartet-wip/quartet-findings.md` F24 (cutover/switch-flip owner) — the lesson that produced this
    brief. Your plan must pass its switch-flip check explicitly: name the unit that makes
    the system USE the new model, and the unit that owns data/state convergence at the
    flip.

@@ -148,7 +148,7 @@
 - `_wip/identity-foundation/wi586-scope-report.md` @ `763c5b7c7` — the executor's plan-phase report (the inventory seed)
 - `_wip/identity-foundation/cutover-plan-delta-newllm.md` @ `ff67821e5` — the O2 ruling deltas (v1.6 inputs)
 - `_wip/identity-foundation/execution-tracker.md` (read-only) — W0–W4 + WI-585 closed; WI-586 PAUSED
-- `.claude/memory/feedback_plan_cutover_ownership.md` — the switch-flip check this plan must pass
+- `_quartet/_quartet-wip/quartet-findings.md` F24 (cutover/switch-flip owner) — the switch-flip check this plan must pass
 - `docs/adr/MMT-ADR-0000` §II.1 — the significance gate
 - Repo ground truth: `packages/database/src/schema/{profiles,billing,identity}.ts`,
   `apps/api/drizzle/0108/0109`, `packages/database/scripts/verify-identity-reseed.mjs`,
@@ -211,7 +211,7 @@ S-sized "remove legacy readers". The operator ruled a SPLIT (2026-06-11):
 No material divergence. The executor's per-table figures are adopted as authoritative;
 Appendix B carries the per-file inventory.
 
-### 0.3 The switch-flip check (explicit, per `feedback_plan_cutover_ownership.md`)
+### 0.3 The switch-flip check (explicit, per `_quartet/_quartet-wip/quartet-findings.md` F24)
 
 - **Which unit makes the system USE the new model?** The **flip step of the WI-586
   convergence runbook** (§4 step 7): one config flag (`IDENTITY_V2_ENABLED`, §2.1)

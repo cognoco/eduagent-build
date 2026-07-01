@@ -2,7 +2,7 @@
 
 > **Purpose.** Consolidated ZDX/Cosmo **autonomous-review finalization** knowledge, drained from three
 > `.claude/memory/` files on **2026-06-20** into one place. This is the **reviewer leg of the Quartet**
-> (cross-ref `quartet-learning-tracker.md` §E8): ZDX-lifecycle knowledge used by *any* agent, not
+> (cross-ref `_quartet/_quartet-wip/quartet-findings.md` F28): ZDX-lifecycle knowledge used by *any* agent, not
 > Quartet-only. Productization should fold this into the **cosmo / zdx skill docs**, not a `_quartet/`
 > protocol file.
 >
@@ -159,7 +159,7 @@ be cited IN the WI.
 The autonomous reviewer **bounces within ~1 min of finalize**. Verify the WI's Stage via a **DIRECT page
 read** shortly after finalize — the WS-18 DB-query monitor **lags** the authoritative page state and
 **replays stale transitions**; do not trust it as the bounce trigger. (This is the Cosmo-side instance of
-the differ-baseline monitor blind spot — see `quartet-learning-tracker.md` §E6.)
+the differ-baseline monitor blind spot — see `_quartet/clacks/monitor-hygiene.md`.)
 
 Pre-poll self-check: `bun <cosmo>/skills/review/review.ts --check WI-NN` → `mechanicalOk:true` BEFORE the
 reviewer next polls. (Reviewing items are reviewed; Executing ones are skipped — so edit the body while
