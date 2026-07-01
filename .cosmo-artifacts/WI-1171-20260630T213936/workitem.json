@@ -1,0 +1,17 @@
+{
+  "pageId": "38f8bce9-1f7c-817e-ac9b-e214728a691e",
+  "id": "WI-1171",
+  "name": "Build V2 visibility ceremony and trust affordances",
+  "description": "Implement the missing link/accept/revoke and trust affordances that explain what a supporter can see, why they can see it, and what changed.",
+  "acceptanceCriteria": "Supporter/learner visibility flows include link, accept, revoke, and review states where applicable. Copy explains what is shared and what remains private without proxy semantics. Appeal or trust affordance exists for disputed or surprising visibility. Trigger-flow dossier is updated and targeted tests/verification cover the ceremony routes.",
+  "riskImpact": "P1 trust risk: without the ceremony, supporter visibility can feel like unexplained surveillance rather than consented sharing.",
+  "type": "Feature",
+  "altitude": "Item",
+  "priority": "P1",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

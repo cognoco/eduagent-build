@@ -43,6 +43,8 @@ jest.mock(
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
 let mockSearchParams: () => { subjectId?: string | string[] } = () => ({
   subjectId: SUBJECT_ID,
 });
@@ -50,8 +52,8 @@ let mockSearchParams: () => { subjectId?: string | string[] } = () => ({
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams(),
   useRouter: () => ({
-    back: jest.fn(),
-    canGoBack: () => false,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
     push: mockPush,
     replace: mockReplace,
   }),
@@ -314,6 +316,199 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
     fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
   });
+
+  it('replaces to the Subjects tab instead of raw back when V2 native history is misleading', async () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    mockCanGoBack.mockReturnValue(true);
+    try {
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('subject-hub-pick-book-back');
+      });
+
+      fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
+
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
+  });
+});
+
+describe('SubjectHubRoute — V2 empty-state back contract', () => {
+  let originalV2: boolean;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = () => ({ subjectId: SUBJECT_ID });
+    originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+  });
+
+  afterEach(() => {
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      originalV2;
+    jest.useRealTimers();
+  });
+
+  it.each([
+    {
+      label: 'query error state',
+      testID: 'subject-hub-back',
+      arrange: () => {
+        seedRoutes();
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, () =>
+          Promise.resolve(
+            new Response(JSON.stringify({ message: 'Failed' }), {
+              status: 500,
+            }),
+          ),
+        );
+      },
+    },
+    {
+      label: 'loading timeout state',
+      testID: 'subject-hub-back',
+      arrange: () => {
+        jest.useFakeTimers();
+        seedRoutes();
+        const neverSettlingBooks = new Promise<Response>(() => undefined);
+        mockFetch.setRoute(
+          `/subjects/${SUBJECT_ID}/books`,
+          () => neverSettlingBooks,
+        );
+      },
+      afterRender: async () => {
+        await act(async () => {
+          jest.advanceTimersByTime(15_000);
+        });
+        await Promise.resolve();
+      },
+    },
+    {
+      label: 'pick-book empty state',
+      testID: 'subject-hub-pick-book-back',
+      arrange: () => {
+        seedRoutes();
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, { books: [] });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      },
+    },
+    {
+      label: 'preparing empty state',
+      testID: 'subject-hub-preparing-back',
+      arrange: () => {
+        seedRoutes();
+        mockFetch.setRoute('/subjects', {
+          subjects: [
+            {
+              id: SUBJECT_ID,
+              profileId: '990e8400-e29b-41d4-a716-446655440004',
+              name: 'Spanish',
+              status: 'active',
+              curriculumStatus: 'preparing',
+              pedagogyMode: 'socratic',
+              createdAt: '2026-06-01T00:00:00.000Z',
+              updatedAt: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+        });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books`, {
+          books: [
+            {
+              id: BOOK_ID,
+              subjectId: SUBJECT_ID,
+              title: 'Spanish 1',
+              description: null,
+              emoji: null,
+              sortOrder: 1,
+              topicsGenerated: false,
+              status: 'NOT_STARTED',
+              topicCount: 0,
+              completedTopicCount: 0,
+              masteredTopicCount: 0,
+              createdAt: '2026-06-01T00:00:00.000Z',
+              updatedAt: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+        });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      },
+    },
+    {
+      label: 'stuck empty state',
+      testID: 'subject-hub-stuck-back',
+      arrange: () => {
+        seedRoutes();
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/books/${BOOK_ID}`, {
+          book: {
+            id: BOOK_ID,
+            subjectId: SUBJECT_ID,
+            title: 'Spanish 1',
+            description: null,
+            emoji: null,
+            sortOrder: 1,
+            topicsGenerated: true,
+            createdAt: '2026-06-01T00:00:00.000Z',
+            updatedAt: '2026-06-01T00:00:00.000Z',
+          },
+          topics: [
+            {
+              id: TOPIC_ID,
+              title: 'Greetings',
+              description: 'Say hello.',
+              sortOrder: 1,
+              relevance: 'core',
+              estimatedMinutes: 20,
+              bookId: BOOK_ID,
+              chapter: 'Basics',
+              skipped: true,
+            },
+          ],
+          connections: [],
+          status: 'IN_PROGRESS',
+          completedTopicIds: [],
+        });
+        mockFetch.setRoute(`/subjects/${SUBJECT_ID}/retention`, {
+          topics: [],
+          reviewDueCount: 0,
+        });
+        mockFetch.setRoute('/progress/resume-target', { target: null });
+      },
+    },
+  ])(
+    '$label routes Back to Subjects without trusting native history',
+    async ({ afterRender, arrange, testID }) => {
+      arrange();
+      mockCanGoBack.mockReturnValue(true);
+
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+      await afterRender?.();
+
+      await waitFor(() => {
+        screen.getByTestId(testID);
+      });
+
+      fireEvent.press(screen.getByTestId(testID));
+
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    },
+  );
 });
 
 describe('SubjectHubRoute — preparing curriculum', () => {

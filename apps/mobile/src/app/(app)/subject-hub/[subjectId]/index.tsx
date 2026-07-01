@@ -20,10 +20,7 @@ import { useRetryCurriculum } from '../../../../hooks/use-books';
 import { useSubjects, useUpdateSubject } from '../../../../hooks/use-subjects';
 import { useCreateNote } from '../../../../hooks/use-notes';
 import { useNavigationContract } from '../../../../hooks/use-navigation-contract';
-import {
-  goBackOrReplace,
-  pushLearningResumeTarget,
-} from '../../../../lib/navigation';
+import { pushLearningResumeTarget } from '../../../../lib/navigation';
 import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { formatApiError } from '../../../../lib/format-api-error';
@@ -118,7 +115,11 @@ export default function SubjectHubRoute(): React.ReactElement {
     const fallback = (
       FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
     ) as Href;
-    goBackOrReplace(router, fallback);
+    // Subject-hub entries are cross-stack pushes from tab surfaces. On native,
+    // canGoBack() can still be true for a one-deep synthesized stack, and
+    // router.back() then falls through to the Tabs first route (Home). This
+    // exit is intentionally contextual, so replace to the owning tab directly.
+    router.replace(fallback);
   }, [router]);
 
   const goPickBook = useCallback(() => {

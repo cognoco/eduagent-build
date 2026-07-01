@@ -6,6 +6,7 @@ import {
   cleanupScreen,
 } from '../../../../test-utils/screen-render';
 import PickBookScreen from './[subjectId]';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting.
@@ -428,6 +429,152 @@ describe('PickBookScreen', () => {
     });
   });
 
+  describe('V2 Subjects back contract', () => {
+    let originalV2: boolean;
+
+    beforeEach(() => {
+      originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+    });
+
+    afterEach(() => {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    });
+
+    it.each([
+      {
+        label: 'normal picker back',
+        testID: 'pick-book-back',
+      },
+      {
+        label: 'loading-state back',
+        testID: 'pick-book-loading-back',
+        arrange: () => {
+          const pendingForever = new Promise<Response>(() => undefined);
+          mockFetch.setRoute('/book-suggestions', () => pendingForever);
+        },
+      },
+      {
+        label: 'full-screen error back',
+        testID: 'pick-book-back-button',
+        arrange: () => {
+          mockFetch.setRoute('/book-suggestions', () =>
+            Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  code: 'PROXY_MODE',
+                  message: 'Switch back to your profile first.',
+                }),
+                { status: 403 },
+              ),
+            ),
+          );
+        },
+      },
+    ])(
+      '$label stays inside the subject hub instead of old Library',
+      async ({ arrange, testID }) => {
+        arrange?.();
+
+        const { result } = renderPickBook();
+
+        await waitFor(() => {
+          result.getByTestId(testID);
+        });
+        fireEvent.press(result.getByTestId(testID));
+
+        expect(mockBack).not.toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId: 'sub-1' },
+        });
+      },
+    );
+
+    it.each([
+      {
+        label: 'suggestion filing failure alert',
+        trigger: async (
+          result: ReturnType<typeof renderPickBook>['result'],
+        ) => {
+          mockFetch.setRoute('/filing', () =>
+            Promise.resolve(
+              new Response(JSON.stringify({ message: 'Network error' }), {
+                status: 500,
+              }),
+            ),
+          );
+          await waitFor(() => {
+            result.getByText('Europe');
+          });
+          fireEvent.press(result.getByText('Europe'));
+        },
+      },
+      {
+        label: 'custom filing failure alert',
+        trigger: async (
+          result: ReturnType<typeof renderPickBook>['result'],
+        ) => {
+          mockFetch.setRoute('/filing', () =>
+            Promise.resolve(
+              new Response(JSON.stringify({ message: 'Network error' }), {
+                status: 500,
+              }),
+            ),
+          );
+          await waitFor(() => {
+            result.getByText('Something else...');
+          });
+          fireEvent.press(result.getByText('Something else...'));
+          fireEvent.changeText(
+            result.getByTestId('pick-book-custom-input'),
+            'My custom book',
+          );
+          fireEvent.press(result.getByTestId('pick-book-custom-submit'));
+        },
+      },
+    ])(
+      '$label Go Back action stays inside the subject hub',
+      async ({ trigger }) => {
+        const alertSpy = jest.spyOn(Alert, 'alert');
+        const { result } = renderPickBook();
+
+        try {
+          await trigger(result);
+          await waitFor(() => {
+            expect(alertSpy).toHaveBeenCalledWith(
+              expect.any(String),
+              expect.any(String),
+              expect.any(Array),
+              undefined,
+            );
+          });
+
+          const actions = alertSpy.mock.calls[0]?.[2] as
+            | Array<{ text?: string; onPress?: () => void }>
+            | undefined;
+          const goBackAction = actions?.find((action) =>
+            /back/i.test(action.text ?? ''),
+          );
+          expect(goBackAction?.onPress).toEqual(expect.any(Function));
+
+          mockReplace.mockClear();
+          goBackAction?.onPress?.();
+
+          expect(mockBack).not.toHaveBeenCalled();
+          expect(mockReplace).toHaveBeenCalledWith({
+            pathname: '/(app)/subject-hub/[subjectId]',
+            params: { subjectId: 'sub-1' },
+          });
+        } finally {
+          alertSpy.mockRestore();
+        }
+      },
+    );
+  });
+
   // [BUG-808] When the URL subjectId is malformed or stale (i.e. subjects
   // does not contain a row with that id), the screen must NOT crash.
   describe('— stale subjectId regression', () => {
@@ -729,6 +876,26 @@ describe('PickBookScreen', () => {
       fireEvent.press(result.getByTestId('pick-book-missing-param-back'));
 
       expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    });
+
+    it('missing-param back button replaces to Subjects in V2', () => {
+      const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        true;
+      mockSearchParams = {};
+
+      try {
+        const { result } = renderPickBook();
+
+        fireEvent.press(result.getByTestId('pick-book-missing-param-back'));
+
+        expect(mockBack).not.toHaveBeenCalled();
+        expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+      } finally {
+        (
+          FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }
+        ).MODE_NAV_V2_ENABLED = originalV2;
+      }
     });
   });
 

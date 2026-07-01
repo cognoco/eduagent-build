@@ -1,0 +1,17 @@
+{
+  "pageId": "38f8bce9-1f7c-8172-80ac-fdaea89a3893",
+  "id": "WI-1207",
+  "name": "Restore Practice access on Journal landing",
+  "description": "Journal landing currently omits Practice after WI-1122 removed JournalPracticeSection as out-of-scope, but current product expectation is that Practice is reachable from this screen.",
+  "acceptanceCriteria": "Root cause: PR #1694 / commit 5213982a8 removed JournalPracticeSection and the practice entry from JOURNAL_SECTIONS while resolving WI-1122 as out-of-scope, after PR #1542 / commit 268347274 had added the five-button Journal with Practice. Behavioral variants: single visible variant confirmed so far — the Journal landing section selector should expose Practice alongside Notes, Sessions, Memory, and Reports for the learner Journal surface. Done when: (1) Journal landing exposes a Practice section/tab/button in the expected order/layout; (2) selecting Practice routes to or renders the intended Practice experience without breaking Notes, Sessions, Memory, or Reports; (3) a regression test in JournalTabView coverage fails when Practice is missing and passes when it is present; (4) i18n/source-baseline keys are restored or updated as needed with no orphan-key drift.",
+  "riskImpact": "",
+  "type": "Bug",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}
