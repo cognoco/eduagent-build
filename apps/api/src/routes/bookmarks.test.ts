@@ -131,6 +131,7 @@ jest.mock('../inngest/client', () => {
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { TEST_SESSION_ID } from '@eduagent/test-utils';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -142,7 +143,7 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const BOOKMARK_ID = '550e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '550e8400-e29b-41d4-a716-446655440001';
-const SESSION_ID = '550e8400-e29b-41d4-a716-446655440002';
+const SESSION_ID = TEST_SESSION_ID;
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440003';
 const TOPIC_ID = '550e8400-e29b-41d4-a716-446655440004';
 

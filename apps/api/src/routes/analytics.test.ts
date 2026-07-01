@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 
 import { analyticsRoutes } from './analytics';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
 type AnalyticsTestEnv = {
   Bindings: {
@@ -11,8 +12,8 @@ type AnalyticsTestEnv = {
   };
 };
 
-const PROFILE_ID = '018f1f2a-7c8d-7000-8000-000000000123';
-const OTHER_PROFILE_ID = '018f1f2a-7c8d-7000-8000-000000000456';
+const PROFILE_ID = TEST_PROFILE_ID;
+const OTHER_PROFILE_ID = TEST_PROFILE_ID_2;
 const ANALYTICS_HASH_KEY = 'server-test-analytics-key-32-bytes-min';
 
 function createTestApp(options?: {
@@ -49,7 +50,7 @@ describe('POST /analytics/hash-profile-id', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
-      hash: 'v3_6f93fa6d5e1f98ae1c7e472c6722f972',
+      hash: 'v3_c8a239bb0b639b0ce39a977b8ce714bd',
     });
   });
 

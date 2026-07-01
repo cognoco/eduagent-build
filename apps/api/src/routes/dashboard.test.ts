@@ -7,6 +7,11 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import {
+  TEST_PROFILE_ID,
+  TEST_SESSION_ID,
+  TEST_PROFILE_ID_2,
+} from '@eduagent/test-utils';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 import { personScope } from '../test-utils/identity-v2-scope-mock';
@@ -14,7 +19,7 @@ import { personScope } from '../test-utils/identity-v2-scope-mock';
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 const mockFindFamilyLink = jest.fn().mockResolvedValue({
   parentProfileId: 'test-profile-id',
-  childProfileId: '770e8400-e29b-41d4-a716-446655440000',
+  childProfileId: TEST_PROFILE_ID,
 });
 const familyLinksQuery = {
   findFirst: (...args: unknown[]) => mockFindFamilyLink(...args),
@@ -181,7 +186,7 @@ const TEST_ENV = {
 
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
-const PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
+const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('dashboard routes', () => {
@@ -812,7 +817,7 @@ describe('dashboard routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[BUG-830] Dashboard 404s use the typed apiError envelope', () => {
-    const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
+    const SESSION_ID = TEST_SESSION_ID;
     const REPORT_ID = '880e8400-e29b-41d4-a716-446655440000';
 
     it('[BREAK] GET /dashboard/children/:id/sessions/:sessionId — 404 has { code: NOT_FOUND, message }', async () => {
@@ -887,7 +892,7 @@ describe('dashboard routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent dashboard routes', () => {
-    const NON_OWNER_PROFILE_ID = 'c0000000-0000-4000-c000-000000000001';
+    const NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_2;
     const NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': NON_OWNER_PROFILE_ID,
     });

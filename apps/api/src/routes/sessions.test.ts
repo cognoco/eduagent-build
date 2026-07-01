@@ -14,6 +14,7 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 // [BUG-666] capture mock used by the SSE-onComplete-failure break test
 const mockCaptureException = jest.fn();
@@ -319,7 +320,7 @@ jest.mock(
 );
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
-const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
+const SESSION_ID = TEST_SESSION_ID;
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
 const mockSessionCrudGetSession = jest.fn();
@@ -1426,7 +1427,7 @@ describe('session routes', () => {
 
   describe('POST /v1/sessions/:sessionId/close', () => {
     let sendSpy: jest.SpyInstance;
-    const AUTO_FILE_PROFILE_ID = '880e8400-e29b-41d4-a716-446655440000';
+    const AUTO_FILE_PROFILE_ID = TEST_PROFILE_ID;
     const AUTO_FILE_AUTH_HEADERS = {
       ...AUTH_HEADERS,
       'X-Profile-Id': AUTO_FILE_PROFILE_ID,
@@ -3264,7 +3265,7 @@ describe('session routes', () => {
 
   describe('POST /v1/sessions/:sessionId/retry-filing', () => {
     // filingRetryEventSchema requires a proper UUID profileId — use one here.
-    const RETRY_PROFILE_ID = '880e8400-e29b-41d4-a716-446655440000';
+    const RETRY_PROFILE_ID = TEST_PROFILE_ID;
     const RETRY_AUTH_HEADERS = {
       ...AUTH_HEADERS,
       'X-Profile-Id': RETRY_PROFILE_ID,

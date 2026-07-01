@@ -29,6 +29,7 @@ import {
   addParkingLotItem,
 } from '../services/parking-lot-data';
 import { getSession } from '../services/session';
+import { TEST_SESSION_ID } from '@eduagent/test-utils';
 
 const mockGetParkingLotItems = getParkingLotItems as jest.MockedFunction<
   typeof getParkingLotItems
@@ -42,7 +43,6 @@ const mockAddParkingLotItem = addParkingLotItem as jest.MockedFunction<
 >;
 const mockGetSession = getSession as jest.MockedFunction<typeof getSession>;
 
-const TEST_SESSION_ID = 'a0000000-0000-4000-a000-000000000101';
 const TEST_TOPIC_ID = 'a0000000-0000-4000-a000-000000000301';
 const TEST_SUBJECT_ID = 'a0000000-0000-4000-a000-000000000201';
 const TEST_ITEM_ID = 'a0000000-0000-4000-a000-000000000501';

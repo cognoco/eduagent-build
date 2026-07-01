@@ -93,6 +93,7 @@ jest.mock('../services/library-search', () => {
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { TEST_SESSION_ID } from '@eduagent/test-utils';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -109,7 +110,7 @@ const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const BOOK_ID = 'a0000000-0000-4000-a000-000000000020';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000030';
 const NOTE_ID = 'a0000000-0000-4000-a000-000000000040';
-const SESSION_ID = 'a0000000-0000-4000-a000-000000000050';
+const SESSION_ID = TEST_SESSION_ID;
 
 const MOCK_RESULT = {
   subjects: [{ id: SUBJECT_ID, name: 'Mathematics' }],

@@ -142,16 +142,17 @@ import { insertSessionXpEntry } from '../services/xp';
 import { refundQuotaOrEscalate } from '../services/billing';
 import { assessmentRoutes } from './assessments';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Test constants
 // ---------------------------------------------------------------------------
 
-const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
+const PROFILE_ID = TEST_PROFILE_ID;
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000020';
 const ASSESSMENT_ID = 'a0000000-0000-4000-a000-000000000030';
-const SESSION_ID = 'a0000000-0000-4000-a000-000000000040';
+const SESSION_ID = TEST_SESSION_ID;
 
 // ---------------------------------------------------------------------------
 // App factory — bypasses auth, injects profile context

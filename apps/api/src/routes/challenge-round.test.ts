@@ -14,6 +14,7 @@ import {
   abortChallengeRound,
   declineChallengeRound,
 } from '../services/challenge-round/route-actions';
+import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
 
 jest.mock(
   '../services/challenge-round/route-actions' /* gc1-allow: route unit test - route delegates to service; service has direct unit coverage */,
@@ -24,8 +25,8 @@ jest.mock(
   }),
 );
 
-const PROFILE_ID = '00000000-0000-4000-8000-000000000001';
-const SESSION_ID = '00000000-0000-4000-8000-000000000101';
+const PROFILE_ID = TEST_PROFILE_ID;
+const SESSION_ID = TEST_SESSION_ID;
 const TOPIC_ID = '00000000-0000-4000-8000-000000000201';
 
 const offeredState = {

@@ -273,6 +273,7 @@ import { app } from '../index';
 import { curriculumRoutes } from './curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, TopicNotSkippedError } from '../errors';
+import { TEST_PROFILE_ID } from '@eduagent/test-utils';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -282,7 +283,7 @@ const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const TOPIC_ID = '550e8400-e29b-41d4-a716-446655440001';
-const CHILD_PROFILE_ID = '550e8400-e29b-41d4-a716-446655440002';
+const CHILD_PROFILE_ID = TEST_PROFILE_ID;
 const REQUEST_ID = '550e8400-e29b-41d4-a716-446655440003';
 
 // getCurriculum returns a Curriculum object (not an array of topics)

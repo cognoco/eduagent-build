@@ -14,6 +14,13 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import {
+  TEST_PROFILE_ID,
+  TEST_PROFILE_ID_2,
+  TEST_PROFILE_ID_3,
+  TEST_PROFILE_ID_4,
+  TEST_PROFILE_ID_5,
+} from '@eduagent/test-utils';
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -41,8 +48,8 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 // (SEEDABLE). Proxy exposes it on the mock DB so IDOR tests can control the edge.
 const mockFindGuardianship = jest.fn().mockResolvedValue({
   id: 'guardianship-1',
-  guardianPersonId: '770e8400-e29b-41d4-a716-446655440000',
-  chargePersonId: '770e8400-e29b-41d4-a716-446655440001',
+  guardianPersonId: TEST_PROFILE_ID,
+  chargePersonId: TEST_PROFILE_ID_2,
   revokedAt: null,
 });
 const guardianshipQuery = {
@@ -126,7 +133,7 @@ jest.mock(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      personId: '770e8400-e29b-41d4-a716-446655440000',
+      personId: TEST_PROFILE_ID,
       organizationId: 'test-account-id',
       isOwner: true,
       roles: ['admin'],
@@ -224,8 +231,8 @@ const TEST_ENV = {
 // [WI-867] Retained: verifies callerPersonId is always threaded (v2 always active).
 const V2_TEST_ENV = { ...TEST_ENV, IDENTITY_V2_ENABLED: 'true' };
 
-const PARENT_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440000';
-const OWN_CHILD_PROFILE_ID = '770e8400-e29b-41d4-a716-446655440001';
+const PARENT_PROFILE_ID = TEST_PROFILE_ID;
+const OWN_CHILD_PROFILE_ID = TEST_PROFILE_ID_2;
 const OTHER_FAMILY_CHILD_ID = '770e8400-e29b-41d4-a716-446655440099';
 
 const PARENT_HEADERS = makeAuthHeaders({ 'X-Profile-Id': PARENT_PROFILE_ID });
@@ -625,7 +632,7 @@ describe('learner-profile routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[CR-2026-05-21-010] minor non-owner profile is blocked from self consent/collection mutations', () => {
-    const MINOR_NON_OWNER_PROFILE_ID = 'e0000000-0000-4000-e000-000000000001';
+    const MINOR_NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_3;
     const MINOR_NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': MINOR_NON_OWNER_PROFILE_ID,
     });
@@ -744,7 +751,7 @@ describe('learner-profile routes', () => {
   });
 
   describe('[CR-2026-05-21-010] adult non-owner profile (18+) is allowed to manage own consent', () => {
-    const ADULT_NON_OWNER_PROFILE_ID = 'f0000000-0000-4000-f000-000000000001';
+    const ADULT_NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_4;
     const ADULT_NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': ADULT_NON_OWNER_PROFILE_ID,
     });
@@ -825,7 +832,7 @@ describe('learner-profile routes', () => {
   // -------------------------------------------------------------------------
 
   describe('[CR-2026-05-21-010] minor non-owner profile is blocked from self consent/collection mutations', () => {
-    const MINOR_NON_OWNER_PROFILE_ID = 'e0000000-0000-4000-e000-000000000001';
+    const MINOR_NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_3;
     const MINOR_NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': MINOR_NON_OWNER_PROFILE_ID,
     });
@@ -954,7 +961,7 @@ describe('learner-profile routes', () => {
   });
 
   describe('[CR-2026-05-21-010] adult non-owner profile (18+) is allowed to manage own consent', () => {
-    const ADULT_NON_OWNER_PROFILE_ID = 'f0000000-0000-4000-f000-000000000001';
+    const ADULT_NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_4;
     const ADULT_NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': ADULT_NON_OWNER_PROFILE_ID,
     });
@@ -1020,7 +1027,7 @@ describe('learner-profile routes', () => {
   });
 
   describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent child routes', () => {
-    const NON_OWNER_PROFILE_ID = 'd0000000-0000-4000-d000-000000000001';
+    const NON_OWNER_PROFILE_ID = TEST_PROFILE_ID_5;
     const NON_OWNER_HEADERS = makeAuthHeaders({
       'X-Profile-Id': NON_OWNER_PROFILE_ID,
     });

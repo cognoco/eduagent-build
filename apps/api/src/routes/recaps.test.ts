@@ -37,13 +37,14 @@ import {
   listRecapsForProfile,
 } from '../services/recaps';
 import { recapsRoutes } from './recaps';
+import { TEST_PROFILE_ID, TEST_PROFILE_ID_2 } from '@eduagent/test-utils';
 
 // ---------------------------------------------------------------------------
 // Canonical IDs for test data
 // ---------------------------------------------------------------------------
 
-const PROFILE_ID = 'a0000000-0000-4000-8000-000000000010';
-const CHILD_PROFILE_ID = 'a0000000-0000-4000-8000-000000000020';
+const PROFILE_ID = TEST_PROFILE_ID;
+const CHILD_PROFILE_ID = TEST_PROFILE_ID_2;
 const RECAP_ID = 'b0000000-0000-4000-8000-000000000001';
 
 // ---------------------------------------------------------------------------
