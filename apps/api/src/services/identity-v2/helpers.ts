@@ -22,7 +22,8 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
-import { computeAgeBracket, type AgeBracket } from '@eduagent/schemas';
+import { computeAgeBracketFromDate, type AgeBracket } from '@eduagent/schemas';
+import { birthYearFromDate, birthMonthDayFromDate } from './profile-v2';
 
 /**
  * (ii) The owner person id for an organization — membership with the 'admin'
@@ -54,18 +55,29 @@ export async function findOwnerPersonId(
  * `profiles.birth_year` / `profiles.conversation_language` reads that feed
  * system-prompt age bracketing and tutor-prose language. Returns null when the
  * person row is absent.
+ * [WI-367] Also returns birthMonth/birthDay (additive) for safety-adjacent
+ * callers (e.g. BUG-734 session-insights ageBracket) that need
+ * computeAgeBracketFromDate instead of year-only computeAgeBracket.
  */
 export async function getPersonLlmContext(
   db: Database,
   profileId: string,
-): Promise<{ birthYear: number; conversationLanguage: string } | null> {
+): Promise<{
+  birthYear: number;
+  birthMonth: number | null;
+  birthDay: number | null;
+  conversationLanguage: string;
+} | null> {
   const row = await db.query.person.findFirst({
     where: eq(person.id, profileId),
     columns: { birthDate: true, conversationLanguage: true },
   });
   if (!row) return null;
+  const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
   return {
-    birthYear: Number(row.birthDate.slice(0, 4)),
+    birthYear: birthYearFromDate(row.birthDate),
+    birthMonth,
+    birthDay,
     conversationLanguage: row.conversationLanguage,
   };
 }
@@ -105,13 +117,25 @@ export async function getPersonAge(
  * replacement (reads person.birth_date instead of profiles.birth_year). Mirrors
  * the legacy default exactly: returns 'adult' (the conservative minor-safe
  * default) when the person / birthYear is absent.
+ * [WI-367] Uses the exact birth date (computeAgeBracketFromDate) — this
+ * bracket feeds the LLM safety preamble, so a year-only overestimate could
+ * apply an adult-tier preamble to a still-minor learner.
  */
 export async function getPersonAgeBracket(
   db: Database,
   profileId: string,
 ): Promise<AgeBracket> {
-  const birthYear = await getPersonBirthYear(db, profileId);
-  return birthYear ? computeAgeBracket(birthYear) : 'adult';
+  const row = await db.query.person.findFirst({
+    where: eq(person.id, profileId),
+    columns: { birthDate: true },
+  });
+  if (!row) return 'adult';
+  const { birthMonth, birthDay } = birthMonthDayFromDate(row.birthDate);
+  return computeAgeBracketFromDate(
+    birthYearFromDate(row.birthDate),
+    birthMonth ?? undefined,
+    birthDay ?? undefined,
+  );
 }
 
 /**

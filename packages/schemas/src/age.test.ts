@@ -1,5 +1,6 @@
 import {
   computeAgeBracket,
+  computeAgeBracketFromDate,
   isAdultOwner,
   isUnambiguouslyAdult,
   type AgeBracket,
@@ -50,6 +51,36 @@ describe('computeAgeBracket', () => {
   it('boundary: age 18 = adult, age 17 = adolescent', () => {
     expect(computeAgeBracket(2026 - 18, 2026)).toBe('adult');
     expect(computeAgeBracket(2026 - 17, 2026)).toBe('adolescent');
+  });
+});
+
+describe('computeAgeBracketFromDate (WI-367 — exact-date gating/safety bracket)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('subtracts a year before the birthday has occurred this year (17, not 18)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-01T12:00:00Z'));
+    // Birthday June 15 — not yet reached on March 1, so still 17 (adolescent).
+    expect(computeAgeBracketFromDate(2008, 6, 15)).toBe('adolescent');
+  });
+
+  it('does not subtract once the birthday has passed this year (18, adult)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-01T12:00:00Z'));
+    expect(computeAgeBracketFromDate(2008, 6, 15)).toBe('adult');
+  });
+
+  it('falls back to the year-only approximation when month/day are absent', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-01T12:00:00Z'));
+    expect(computeAgeBracketFromDate(2008)).toBe('adult'); // 2026 - 2008, no adjustment
+  });
+
+  it('uses the identical banding thresholds as computeAgeBracket (single source of truth)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-29T12:00:00Z'));
+    expect(computeAgeBracketFromDate(2026 - 13, 1, 1)).toBe('adolescent');
+    expect(computeAgeBracketFromDate(2026 - 12, 1, 1)).toBe('child');
+    expect(computeAgeBracketFromDate(2026 - 18, 1, 1)).toBe('adult');
+    expect(computeAgeBracketFromDate(2026 - 17, 1, 1)).toBe('adolescent');
   });
 });
 

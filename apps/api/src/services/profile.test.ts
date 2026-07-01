@@ -716,6 +716,30 @@ describe('updateProfileAppContext', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
+  // [WI-367 / SECURITY] Exact-date family-mode gate. Year-only math
+  // (currentYear - birthYear) overestimates age by up to 11 months: an owner
+  // born Dec 31 of (currentYear - 18) reads as 18 (adult) by year-only math
+  // but is still 17 for all of the current year except a Dec-31 run. Red-
+  // green-revert: swap computeAgeBracketFromDate back to
+  // computeAgeBracket(birthYear) in profile.ts and this stops throwing (a
+  // 17-year-old owner switches into family mode).
+  it('[WI-367][SECURITY] rejects family context for an owner whose exact age is still 17 (year-only reads 18)', async () => {
+    const currentYear = new Date().getUTCFullYear();
+    const personRow = makePersonRow({
+      id: 'owner-1',
+      birthDate: `${currentYear - 18}-12-31`,
+      isOwner: true,
+    });
+    const db = makeV2DbLocal(personRow, true, {
+      chargeRows: [{ chargePersonId: 'child-1' }],
+    });
+
+    await expect(
+      updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
   it('returns null when the profile does not exist', async () => {
     // person.findFirst returns undefined → short-circuit null return
     const db = {
