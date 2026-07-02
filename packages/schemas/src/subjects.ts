@@ -14,11 +14,14 @@ export type SubjectStatus = z.infer<typeof subjectStatusSchema>;
 
 // Coarse subject-level rollup derived over the per-book generation state.
 // 'failed' is surfaced when a subject has NO studyable content (no ready book,
-// no suggestion) AND at least one book has terminally failed (curriculum_books.
-// failed_at set) — so the hub can route straight to the actionable 'stuck' UI
-// instead of leaving the learner on a comforting-but-false "preparing" screen
-// until a client-side timer gives up. Consent-blocked is intentionally NOT
-// 'failed' (owned by the consent gate; a retry cannot fix it).
+// no suggestion, no book still generating) AND at least one book has
+// terminally failed (curriculum_books.failed_at set) — so the hub can route
+// straight to the actionable 'stuck' UI instead of leaving the learner on a
+// comforting-but-false "preparing" screen until a client-side timer gives up.
+// Consent-blocked is intentionally NOT 'failed' (owned by the consent gate; a
+// retry cannot fix it). [WI-1210] A book still generating (topics_generated =
+// false, not failed) outranks a leftover/unpicked suggestion so an
+// actively-generating subject reads as 'preparing', not 'ready'.
 export const subjectCurriculumStatusSchema = z.enum([
   'ready',
   'preparing',

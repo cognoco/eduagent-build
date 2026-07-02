@@ -3,7 +3,16 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  notInArray,
+  sql,
+} from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -155,39 +164,58 @@ async function getSubjectCurriculumStatuses(
 ): Promise<Map<string, SubjectCurriculumStatus>> {
   if (subjectIds.length === 0) return new Map();
 
-  const [readyBooks, suggestions, failedBooks] = await Promise.all([
-    db.query.curriculumBooks.findMany({
-      where: and(
-        inArray(curriculumBooks.subjectId, subjectIds),
-        eq(curriculumBooks.topicsGenerated, true),
-      ),
-      columns: { subjectId: true },
-    }),
-    db.query.bookSuggestions.findMany({
-      where: inArray(bookSuggestions.subjectId, subjectIds),
-      columns: { subjectId: true },
-    }),
-    // Books whose topic generation reached a terminal failure (failed_at set).
-    // This is the single authoritative failure signal; a subject is only
-    // surfaced as 'failed' when it has NO ready content (see precedence below)
-    // — a single failed sibling next to a ready book must not hide studyable
-    // content. Consent-blocked is deliberately NOT counted as failure here
-    // (it is owned by the consent gate; a retry cannot fix it).
-    db.query.curriculumBooks.findMany({
-      where: and(
-        inArray(curriculumBooks.subjectId, subjectIds),
-        isNotNull(curriculumBooks.failedAt),
-      ),
-      columns: { subjectId: true },
-    }),
-  ]);
+  const [readyBooks, suggestions, failedBooks, inFlightBooks] =
+    await Promise.all([
+      db.query.curriculumBooks.findMany({
+        where: and(
+          inArray(curriculumBooks.subjectId, subjectIds),
+          eq(curriculumBooks.topicsGenerated, true),
+        ),
+        columns: { subjectId: true },
+      }),
+      db.query.bookSuggestions.findMany({
+        where: inArray(bookSuggestions.subjectId, subjectIds),
+        columns: { subjectId: true },
+      }),
+      // Books whose topic generation reached a terminal failure (failed_at set).
+      // This is the single authoritative failure signal; a subject is only
+      // surfaced as 'failed' when it has NO ready content (see precedence below)
+      // — a single failed sibling next to a ready book must not hide studyable
+      // content. Consent-blocked is deliberately NOT counted as failure here
+      // (it is owned by the consent gate; a retry cannot fix it).
+      db.query.curriculumBooks.findMany({
+        where: and(
+          inArray(curriculumBooks.subjectId, subjectIds),
+          isNotNull(curriculumBooks.failedAt),
+        ),
+        columns: { subjectId: true },
+      }),
+      // [WI-1210] Books that exist but haven't finished generating and haven't
+      // failed either — i.e. actively in flight. Picking a suggestion only
+      // stamps bookSuggestions.picked_at; the row is never deleted, so a
+      // subject whose picked book is still generating can still have a
+      // leftover (or sibling) bookSuggestions row. An in-flight book must
+      // outrank that leftover suggestion when deriving 'ready' vs 'preparing'
+      // — otherwise the subject reads as "pick a book" / ready while the
+      // generation it's actually waiting on is invisible.
+      db.query.curriculumBooks.findMany({
+        where: and(
+          inArray(curriculumBooks.subjectId, subjectIds),
+          eq(curriculumBooks.topicsGenerated, false),
+          isNull(curriculumBooks.failedAt),
+        ),
+        columns: { subjectId: true },
+      }),
+    ]);
 
   const readySubjectIds = new Set<string>();
   for (const book of readyBooks) {
     readySubjectIds.add(book.subjectId);
   }
+
+  const suggestionSubjectIds = new Set<string>();
   for (const suggestion of suggestions) {
-    readySubjectIds.add(suggestion.subjectId);
+    suggestionSubjectIds.add(suggestion.subjectId);
   }
 
   const failedSubjectIds = new Set<string>();
@@ -195,22 +223,54 @@ async function getSubjectCurriculumStatuses(
     failedSubjectIds.add(book.subjectId);
   }
 
-  // Precedence: ready beats failed beats preparing.
-  //  - 'ready'     — has studyable content / a next action (generated book or
-  //                  suggestion), even if a sibling book failed.
-  //  - 'failed'    — no ready content, but at least one book with failed_at set
-  //                  (terminal generation failure). Consent-blocked is NOT
-  //                  counted here (owned by the consent gate).
-  //  - 'preparing' — neither (generation still in flight, derived not persisted).
+  const inFlightSubjectIds = new Set<string>();
+  for (const book of inFlightBooks) {
+    inFlightSubjectIds.add(book.subjectId);
+  }
+
+  // Precedence: generated-ready beats in-flight beats suggestion-ready beats
+  // failed beats preparing.
+  //  - 'ready' (generated)   — has a book whose topics actually finished
+  //                            generating (topics_generated = true) — real
+  //                            studyable content, even if a sibling book
+  //                            failed or is still generating.
+  //  - 'preparing' (in-flight) — no generated content yet, but a book row
+  //                            exists that hasn't finished generating and
+  //                            hasn't failed. Outranks a leftover suggestion
+  //                            (WI-1210) so an actively-generating subject
+  //                            never reads as ready/pick-book. A
+  //                            consent-blocked book has this same row shape
+  //                            (topics_generated=false, failed_at=null) and so
+  //                            also derives 'preparing' — which is the schema's
+  //                            documented intent (schema/subjects.ts: "the book
+  //                            stays derived-'preparing' until consent is
+  //                            granted... or the consent domain surfaces its
+  //                            own blocked state"). Distinguishing consent-block
+  //                            from active generation is owned by the consent
+  //                            domain, not this rollup.
+  //  - 'ready' (suggestion)  — no generated content, nothing in flight, but
+  //                            the learner has an unpicked suggestion list to
+  //                            choose from — a real next action, even if a
+  //                            sibling book already failed.
+  //  - 'failed'              — no ready content, nothing in flight, no
+  //                            suggestion to pick, but at least one book with
+  //                            failed_at set (terminal generation failure).
+  //                            Consent-blocked is NOT counted here (owned by
+  //                            the consent gate).
+  //  - 'preparing' (default) — none of the above (nothing dispatched yet).
   return new Map(
-    subjectIds.map((subjectId) => [
-      subjectId,
-      readySubjectIds.has(subjectId)
+    subjectIds.map((subjectId) => {
+      const status: SubjectCurriculumStatus = readySubjectIds.has(subjectId)
         ? 'ready'
-        : failedSubjectIds.has(subjectId)
-          ? 'failed'
-          : 'preparing',
-    ]),
+        : inFlightSubjectIds.has(subjectId)
+          ? 'preparing'
+          : suggestionSubjectIds.has(subjectId)
+            ? 'ready'
+            : failedSubjectIds.has(subjectId)
+              ? 'failed'
+              : 'preparing';
+      return [subjectId, status];
+    }),
   );
 }
 
