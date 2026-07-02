@@ -734,6 +734,20 @@
       "stopAudioLabel": "Stopp teksten",
       "dismissLabel": "Lukk lesekortet"
     },
+    "speakingPractice": {
+      "title": "Si det tilbake",
+      "subtitle": "Gjenta setningen",
+      "playAudioLabel": "Spill av målsetningen",
+      "stopAudioLabel": "Stopp lyd",
+      "startRecordingLabel": "Start taleforsøk",
+      "stopRecordingLabel": "Stopp taleforsøk",
+      "listening": "Lytter...",
+      "transcriptLabel": "Du sa",
+      "matched": "Treff",
+      "retryWithMissingWords": "Prøv igjen: {{words}}",
+      "retry": "Prøv igjen",
+      "retryLabel": "Prøv taleforsøket igjen"
+    },
     "chatShell": {
       "defaultSubtitle": "Jeg er her for å hjelpe",
       "defaultPlaceholder": "Skriv en melding ...",

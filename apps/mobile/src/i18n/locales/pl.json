@@ -767,6 +767,20 @@
       "stopAudioLabel": "Zatrzymaj tekst",
       "dismissLabel": "Zamknij kartę czytania"
     },
+    "speakingPractice": {
+      "title": "Powtórz na głos",
+      "subtitle": "Powtórz zdanie",
+      "playAudioLabel": "Odtwórz zdanie docelowe",
+      "stopAudioLabel": "Zatrzymaj audio",
+      "startRecordingLabel": "Zacznij próbę mówienia",
+      "stopRecordingLabel": "Zatrzymaj próbę mówienia",
+      "listening": "Słucham...",
+      "transcriptLabel": "Powiedziałeś",
+      "matched": "Pasuje",
+      "retryWithMissingWords": "Spróbuj ponownie: {{words}}",
+      "retry": "Ponów",
+      "retryLabel": "Ponów próbę mówienia"
+    },
     "chatShell": {
       "defaultSubtitle": "Jestem tu, by pomóc",
       "defaultPlaceholder": "Wpisz wiadomość...",

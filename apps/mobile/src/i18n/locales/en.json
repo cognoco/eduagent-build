@@ -761,6 +761,20 @@
       "stopAudioLabel": "Stop the passage",
       "dismissLabel": "Dismiss reading card"
     },
+    "speakingPractice": {
+      "title": "Say it back",
+      "subtitle": "Repeat the line",
+      "playAudioLabel": "Play target sentence",
+      "stopAudioLabel": "Stop target audio",
+      "startRecordingLabel": "Start speaking attempt",
+      "stopRecordingLabel": "Stop speaking attempt",
+      "listening": "Listening...",
+      "transcriptLabel": "You said",
+      "matched": "Matched",
+      "retryWithMissingWords": "Try again: {{words}}",
+      "retry": "Retry",
+      "retryLabel": "Retry speaking attempt"
+    },
     "chatShell": {
       "defaultSubtitle": "I'm here to help",
       "defaultPlaceholder": "Type a message...",
