@@ -55,6 +55,28 @@ describe('MentorInputBar', () => {
     expect(onTranscript).not.toHaveBeenCalled();
   });
 
+  it('keeps the ask field tall enough for its wrapped placeholder', () => {
+    const { getByTestId } = render(
+      <MentorInputBar
+        onSubmitText={jest.fn()}
+        onOpenCamera={jest.fn()}
+        onOpenHomework={jest.fn()}
+        onTranscript={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('mentor-bar-input').props).toEqual(
+      expect.objectContaining({
+        multiline: true,
+        numberOfLines: 2,
+        textAlignVertical: 'top',
+      }),
+    );
+    expect(getByTestId('mentor-bar-input').props.className).toContain(
+      'min-h-16',
+    );
+  });
+
   it('keeps deterministic submit and non-LLM affordances live when unavailable', () => {
     const onSubmitText = jest.fn();
     const onOpenCamera = jest.fn();

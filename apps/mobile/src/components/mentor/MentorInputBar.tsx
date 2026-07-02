@@ -57,7 +57,11 @@ export function MentorInputBar({
           onChangeText={setValue}
           onSubmitEditing={submit}
           placeholder={t('mentorHome.bar.placeholder')}
-          className="min-h-11 flex-1 rounded-xl border border-border px-3 text-text-primary"
+          multiline
+          numberOfLines={2}
+          textAlignVertical="top"
+          blurOnSubmit
+          className="min-h-16 flex-1 rounded-xl border border-border px-3 py-2 text-text-primary"
           returnKeyType="send"
         />
         <Pressable
