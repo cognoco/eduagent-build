@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, AppState, type AppStateStatus } from 'react-native';
+import { Alert, AppState, StyleSheet, type AppStateStatus } from 'react-native';
 import {
   render,
   fireEvent,
@@ -263,6 +263,9 @@ function createWrapper() {
 
 // Import mocks after jest.mock
 const { useCameraPermissions } = require('expo-camera');
+const { useSafeAreaInsets } = require('react-native-safe-area-context') as {
+  useSafeAreaInsets: jest.Mock;
+};
 const {
   launchImageLibraryAsync: mockLaunchImageLibraryAsync,
   getMediaLibraryPermissionsAsync: mockGetMediaLibraryPermissionsAsync,
@@ -1888,6 +1891,150 @@ describe('CameraScreen', () => {
       // Picker stays actionable: create + manual entry are always present.
       getByTestId('camera-create-subject');
       getByTestId('camera-subject-input');
+    });
+  });
+
+  // [WI-1204] Result-phase bottom actions (Retake / Let's go / Continue) must
+  // sit above the device's safe-area bottom inset (system nav bar). Root
+  // cause: the result ScrollView applied `insets.bottom` to its outer `style`
+  // (which only shrinks the outer frame, not the scrollable content) while
+  // `contentContainerStyle` — the prop that actually reserves trailing scroll
+  // space — carried only a fixed `24`, so on Android nav-bar devices the last
+  // row could render under system nav. Fix: move the inset onto
+  // `contentContainerStyle` (matching the established idiom used across
+  // ~15 other screens, e.g. `progress/index.tsx`, `topic/[topicId].tsx`).
+  // These assertions are RED against the pre-fix fixed-24 padding for any
+  // non-zero inset, and GREEN once contentContainerStyle.paddingBottom tracks
+  // insets.bottom.
+  describe('[WI-1204] result-phase bottom actions respect safe-area inset', () => {
+    function withOcrDone(text: string): void {
+      (useHomeworkOcr as jest.Mock).mockReturnValue({
+        text,
+        status: 'done',
+        error: null,
+        errorCode: undefined,
+        source: null,
+        failCount: 0,
+        process: mockProcess,
+        retry: mockRetry,
+        cancel: mockCancel,
+      });
+    }
+
+    function expectResultScrollReservesInset(
+      getByTestId: (testId: string) => { props: Record<string, unknown> },
+      expectedBottomInset: number,
+    ): void {
+      const scroll = getByTestId('result-scroll');
+      expect(
+        StyleSheet.flatten(scroll.props.contentContainerStyle as object),
+      ).toEqual(
+        expect.objectContaining({
+          paddingBottom: expectedBottomInset + 24,
+        }),
+      );
+    }
+
+    it('variant 1 — subject-known action row reserves the safe-area inset', async () => {
+      // Default useLocalSearchParams already supplies subjectId/subjectName
+      // (needsSubjectPick = false) — the "subject already known" branch.
+      withOcrDone('Solve for x: 2x + 5 = 13');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('confirm-button');
+      });
+      expectResultScrollReservesInset(getByTestId, 34);
+    });
+
+    it('variant 2 — auto-detected subject action row reserves the safe-area inset', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      mockClassifyResult = {
+        needsConfirmation: false,
+        candidates: [
+          {
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            confidence: 0.95,
+          },
+        ],
+      };
+      withOcrDone('Solve 2x + 5 = 17');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('auto-detected-subject');
+        getByTestId('confirm-button');
+      });
+      expectResultScrollReservesInset(getByTestId, 34);
+    });
+
+    it('variant 3 — manual/ambiguous subject-picker bottom controls reserve the safe-area inset', async () => {
+      (useLocalSearchParams as jest.Mock).mockReturnValue({});
+      mockClassifyResult = {
+        needsConfirmation: true,
+        candidates: [
+          {
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            confidence: 0.55,
+          },
+          { subjectId: 'sub-789', subjectName: 'Physics', confidence: 0.5 },
+        ],
+      };
+      withOcrDone('A ball rolls down a frictionless ramp');
+
+      const { getByTestId } = render(<CameraScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => {
+        getByTestId('subject-picker');
+        getByTestId('camera-continue-button');
+      });
+      expectResultScrollReservesInset(getByTestId, 34);
+    });
+
+    describe('variant 4 — small-viewport / larger bottom inset', () => {
+      afterEach(() => {
+        // Restore the module-level default so this override never leaks into
+        // other tests (jest.clearAllMocks() in the outer beforeEach clears
+        // call history but not a persisted mockReturnValue).
+        useSafeAreaInsets.mockReturnValue({
+          top: 44,
+          bottom: 34,
+          left: 0,
+          right: 0,
+        });
+      });
+
+      it('a taller 3-button nav-bar inset on a small-height device is honored dynamically, not hardcoded', async () => {
+        // Set for every render (not mockReturnValueOnce) — the screen calls
+        // useSafeAreaInsets() on every re-render, and later renders (after
+        // async OCR/classify effects settle) must still see the taller inset.
+        useSafeAreaInsets.mockReturnValue({
+          top: 20,
+          bottom: 48,
+          left: 0,
+          right: 0,
+        });
+        withOcrDone('Solve for x: 2x + 5 = 13');
+
+        const { getByTestId } = render(<CameraScreen />, {
+          wrapper: createWrapper(),
+        });
+
+        await waitFor(() => {
+          getByTestId('confirm-button');
+        });
+        expectResultScrollReservesInset(getByTestId, 48);
+      });
     });
   });
 
