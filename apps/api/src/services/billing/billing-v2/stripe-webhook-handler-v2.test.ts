@@ -42,7 +42,8 @@ jest.mock(
 );
 
 jest.mock(
-  '../../sentry' /* gc1-allow: external boundary (Sentry SDK wrapper) */,
+  // gc1-allow: external boundary (Sentry SDK wrapper)
+  '../../sentry',
   () => ({
     captureException: jest.fn(),
   }),
@@ -69,14 +70,16 @@ jest.mock(
 );
 
 jest.mock(
-  '../top-up' /* gc1-allow: emits a metric only on tier-reattribution, which is short-circuited (previousTier undefined) in every test in this file */,
+  // gc1-allow: emits a metric only on tier-reattribution, which is short-circuited (previousTier undefined) in every test in this file
+  '../top-up',
   () => ({
     emitTopUpCreditsReattributedMetric: jest.fn().mockResolvedValue(undefined),
   }),
 );
 
 jest.mock(
-  '../../../inngest/client' /* gc1-allow: external boundary — the Inngest framework client; only relative because the module lives in this repo's own src tree, not a true internal seam under test */,
+  // gc1-allow: external boundary — the Inngest framework client; only relative because the module lives in this repo's own src tree, not a true internal seam under test
+  '../../../inngest/client',
   () => ({
     inngest: { send: jest.fn().mockResolvedValue(undefined) },
   }),

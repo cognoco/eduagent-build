@@ -19,7 +19,8 @@
 const mockGetRevenuecatWebhookHandlers = jest.fn();
 
 jest.mock(
-  '../services/billing/billing-v2/dispatch' /* gc1-allow: intentional full replacement, not a passthrough gap — the whole point of this mock is to isolate route-level dispatch behavior (which handler gets called for which event type) from v2 handler business logic, which is covered separately in revenuecat-webhook-handler-v2.test.ts */,
+  // gc1-allow: intentional full replacement, not a passthrough gap — the whole point of this mock is to isolate route-level dispatch behavior (which handler gets called for which event type) from v2 handler business logic, which is covered separately in revenuecat-webhook-handler-v2.test.ts
+  '../services/billing/billing-v2/dispatch',
   () => ({
     getRevenuecatWebhookHandlers: (...args: unknown[]) =>
       mockGetRevenuecatWebhookHandlers(...args),

@@ -17,7 +17,8 @@
 // ---------------------------------------------------------------------------
 
 jest.mock(
-  './subscription-core-v2' /* gc1-allow: DB-backed service — requires live Postgres; boundary under test is the non-throwing catch/capture contract, not the billing service itself */,
+  // gc1-allow: DB-backed service — requires live Postgres; boundary under test is the non-throwing catch/capture contract, not the billing service itself
+  './subscription-core-v2',
   () => ({
     getSubscriptionByAccountIdV2: jest.fn(),
     getQuotaPoolV2: jest.fn(),
@@ -25,21 +26,24 @@ jest.mock(
 );
 
 jest.mock(
-  './access-v2' /* gc1-allow: DB-backed service — requires live Postgres; boundary under test is the non-throwing catch/capture contract, not the billing service itself */,
+  // gc1-allow: DB-backed service — requires live Postgres; boundary under test is the non-throwing catch/capture contract, not the billing service itself
+  './access-v2',
   () => ({
     getEffectiveAccessForSubscriptionV2: jest.fn(),
   }),
 );
 
 jest.mock(
-  '../../kv' /* gc1-allow: external boundary — Cloudflare Workers KV, unavailable in the jest context */,
+  // gc1-allow: external boundary — Cloudflare Workers KV, unavailable in the jest context
+  '../../kv',
   () => ({
     writeSubscriptionStatus: jest.fn(),
   }),
 );
 
 jest.mock(
-  '../../sentry' /* gc1-allow: external boundary (Sentry SDK wrapper) */,
+  // gc1-allow: external boundary (Sentry SDK wrapper)
+  '../../sentry',
   () => ({
     captureException: jest.fn(),
     captureMessage: jest.fn(),
