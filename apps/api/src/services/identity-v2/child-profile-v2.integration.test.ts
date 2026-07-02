@@ -330,25 +330,47 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
   // cannot add a child. Red-green-revert: swap calculateAgeFromParts back to
   // calculateAge(owner.birthYear) in child-profile-v2.ts and this stops
   // throwing (a 17-year-old owner adds a child).
+  //
+  // Pinned system time so this is deterministic year-round (not just every
+  // day but Dec 31, when a real Dec-31 test run would otherwise see the
+  // birthday as "already passed"). Fakes ONLY Date/performance.now — never
+  // setTimeout/setInterval, which the Neon HTTP driver relies on internally;
+  // a full jest.useFakeTimers() hangs it (see vocabulary.integration.test.ts).
   itGraph(
     '[SECURITY] throws ADULT_OWNER_REQUIRED for an owner whose exact age is still 17 (year-only reads 18)',
     async () => {
-      const currentYear = new Date().getUTCFullYear();
-      const { organizationId } = await seedOwnerGraph({
-        birthYear: currentYear - 18,
-        birthMonth: 12,
-        birthDay: 31,
+      jest.useFakeTimers({
+        doNotFake: [
+          'setTimeout',
+          'clearTimeout',
+          'setInterval',
+          'clearInterval',
+          'setImmediate',
+          'clearImmediate',
+          'nextTick',
+          'queueMicrotask',
+        ],
       });
-      // Child birthYear passes the child's OWN >=13 minimum-age floor
-      // (currentYear - 13) so a masked bug can't hide behind a
-      // ProfileValidationError from the unrelated child-age check — this
-      // isolates the adult-owner gate as the only possible rejection reason.
-      await expect(
-        addChild(organizationId, {
-          displayName: 'Kid',
-          birthYear: currentYear - 13,
-        }),
-      ).rejects.toBeInstanceOf(ForbiddenError);
+      jest.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+      try {
+        const { organizationId } = await seedOwnerGraph({
+          birthYear: 2008,
+          birthMonth: 12,
+          birthDay: 31,
+        });
+        // Child birthYear passes the child's OWN >=13 minimum-age floor so a
+        // masked bug can't hide behind a ProfileValidationError from the
+        // unrelated child-age check — this isolates the adult-owner gate as
+        // the only possible rejection reason.
+        await expect(
+          addChild(organizationId, {
+            displayName: 'Kid',
+            birthYear: 2013,
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenError);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 

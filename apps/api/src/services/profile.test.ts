@@ -723,21 +723,27 @@ describe('updateProfileAppContext', () => {
   // green-revert: swap computeAgeBracketFromDate back to
   // computeAgeBracket(birthYear) in profile.ts and this stops throwing (a
   // 17-year-old owner switches into family mode).
+  // Pinned system time (mid-year, away from the Dec-31 boundary) so this
+  // test is deterministic year-round — not just on every day but Dec 31.
   it('[WI-367][SECURITY] rejects family context for an owner whose exact age is still 17 (year-only reads 18)', async () => {
-    const currentYear = new Date().getUTCFullYear();
-    const personRow = makePersonRow({
-      id: 'owner-1',
-      birthDate: `${currentYear - 18}-12-31`,
-      isOwner: true,
-    });
-    const db = makeV2DbLocal(personRow, true, {
-      chargeRows: [{ chargePersonId: 'child-1' }],
-    });
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    try {
+      const personRow = makePersonRow({
+        id: 'owner-1',
+        birthDate: '2008-12-31',
+        isOwner: true,
+      });
+      const db = makeV2DbLocal(personRow, true, {
+        chargeRows: [{ chargePersonId: 'child-1' }],
+      });
 
-    await expect(
-      updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-    expect(db.update).not.toHaveBeenCalled();
+      await expect(
+        updateProfileAppContext(db, 'owner-1', 'account-123', 'family'),
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(db.update).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('returns null when the profile does not exist', async () => {
