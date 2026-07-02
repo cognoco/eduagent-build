@@ -1,0 +1,19 @@
+{
+  "role": "shepherd",
+  "lane": "safety-eval",
+  "monitors": [
+    {
+      "target": "_quartet/working/lanes/safety-eval/_state/inbox.jsonl",
+      "purpose": "catch orchestrator rulings/answers/directives (wake-on-write)",
+      "command": "Monitor: tail -n +1 -f <repo>/_quartet/working/lanes/safety-eval/_state/inbox.jsonl (persistent:true)",
+      "task-id": "b7rbc9qg9"
+    },
+    {
+      "target": "Cosmo Stage — WS-31 Safety & Eval (3918bce9-1f7c-810d-a939-dce083b0473b)",
+      "purpose": "catch review verdicts (Reviewing→Closed / Reviewing→Executing rework) for WI-1154/1155/781",
+      "command": "Monitor: bash <scratchpad>/ws31-stage-watch.sh — 90s poll of data source 36fd1119-9955-4684-8bfe-deb145e6a21f filtered by Workstream relation, emits Stage diffs (persistent:true)",
+      "task-id": "b2ywohp7e"
+    }
+  ],
+  "updated": "2026-07-02"
+}

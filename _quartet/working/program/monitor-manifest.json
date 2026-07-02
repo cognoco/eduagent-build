@@ -1,0 +1,39 @@
+{
+  "_comment": "ORION orchestrator monitor manifest. Durable record of the watcher set this instance EXPECTS running; reconcile against the live /tasks list at session-start / post-compact / post-resume (clacks/monitor-hygiene.md). Machine-local; not committed. Re-arm & refresh task-id on reconcile — never blind-re-arm.",
+  "role": "orchestrator",
+  "instance": "ORION",
+  "monitors": [
+    {
+      "target": "WS-33 Mobile UX & Navigation — Cosmo Stage/State (page id 3918bce9-1f7c-81ae-97c1-d15ad8951beb)",
+      "purpose": "Central lifecycle backstop for PRG-33: catch review verdicts (Closed vs rework→Executing), human-holds (State→Blocked/Awaiting Info), graduation signal. Independent of the Clacks channel.",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 3918bce9-1f7c-81ae-97c1-d15ad8951beb 120  (persistent)",
+      "task-id": "bwpfyfk0b"
+    },
+    {
+      "target": "mobile-ux-nav lane outbox.jsonl (_quartet/working/lanes/mobile-ux-nav/_state/outbox.jsonl)",
+      "purpose": "Catch shepherd → orchestrator Clacks traffic (needs-operator / needs-orchestrator / blocked / decision). Armed pre-launch so the first shepherd event isn't missed.",
+      "command": "tail -n0 -f _quartet/working/lanes/mobile-ux-nav/_state/outbox.jsonl  (persistent)",
+      "task-id": "bj85k2iux"
+    },
+    {
+      "target": "WS-31 Safety & Eval — Cosmo Stage/State (page id 3918bce9-1f7c-810d-a939-dce083b0473b)",
+      "purpose": "Lifecycle backstop for PRG-31: catch review verdicts, holds, graduation. P1 safety leak WI-1154 is the priority item.",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 3918bce9-1f7c-810d-a939-dce083b0473b 120  (persistent)",
+      "task-id": "bnutpcm1x"
+    },
+    {
+      "target": "safety-eval lane outbox.jsonl (_quartet/working/lanes/safety-eval/_state/outbox.jsonl)",
+      "purpose": "Catch WS-31 shepherd → orchestrator Clacks traffic. Armed pre-launch.",
+      "command": "tail -n0 -f _quartet/working/lanes/safety-eval/_state/outbox.jsonl  (persistent)",
+      "task-id": "bj10kh3t0"
+    }
+  ],
+  "_parked": [
+    {
+      "target": "WS-34 Platform Hardening (page id 3918bce9-1f7c-8142-9b75-dfcafbc94d65)",
+      "purpose": "PARKED — no watchers armed while parked. Arm a Cosmo-Stage + outbox pair here on activation.",
+      "command": "(deferred until WS-34 released)",
+      "task-id": null
+    }
+  ]
+}

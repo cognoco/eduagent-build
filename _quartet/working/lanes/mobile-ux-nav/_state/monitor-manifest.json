@@ -1,0 +1,22 @@
+{
+  "lane": "mobile-ux-nav",
+  "role": "shepherd",
+  "updated": "2026-07-02",
+  "phase": "prime-and-hold",
+  "monitors": [
+    {
+      "target": "_quartet/working/lanes/mobile-ux-nav/_state/inbox.jsonl",
+      "purpose": "catch operator release directive / rulings while holding (primary path during hold)",
+      "command": "tail -n0 -F _quartet/working/lanes/mobile-ux-nav/_state/inbox.jsonl",
+      "persistent": true,
+      "task-id": "b3n3onft1"
+    },
+    {
+      "target": "Cosmo Stage — WS-33 'Mobile UX & Navigation' work items",
+      "purpose": "catch reviewer verdicts (Reviewing->Closed done / Reviewing->Executing rework) + any Stage/State transition",
+      "command": "bash _quartet/clacks/orch-stage-monitor.sh 3918bce9-1f7c-81ae-97c1-d15ad8951beb 180",
+      "persistent": true,
+      "task-id": "bvjzn5ovy"
+    }
+  ]
+}

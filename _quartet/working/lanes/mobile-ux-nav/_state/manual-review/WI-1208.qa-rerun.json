@@ -1,0 +1,97 @@
+{
+  "mode": "verify",
+  "wi_id": "WI-1208",
+  "page_id": "38f8bce9-1f7c-8174-ac1d-f713ba9ac429",
+  "stage": "Reviewing",
+  "repo": ".",
+  "disposition": "discrepancies-found",
+  "verdicts": [
+    {
+      "claim": {
+        "kind": "commit",
+        "ref": "75ace696094e019dbdceb11a12f61122bf667fe8",
+        "text": "Fixed In cites commit 75ace696094e019dbdceb11a12f61122bf667fe8",
+        "source": "fixed_in"
+      },
+      "status": "verified",
+      "evidence": "commit 75ace696094e019dbdceb11a12f61122bf667fe8 exists in ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/pick-book/[subjectId].tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/pick-book/[subjectId].tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "subject-hub/[subjectId]/index.tsx",
+        "text": "summary cites `subject-hub/[subjectId]/index.tsx`",
+        "source": "summary"
+      },
+      "status": "failed",
+      "evidence": "`subject-hub/[subjectId]/index.tsx` does NOT exist under ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "shelf/[subjectId]/index.tsx",
+        "text": "summary cites `shelf/[subjectId]/index.tsx`",
+        "source": "summary"
+      },
+      "status": "failed",
+      "evidence": "`shelf/[subjectId]/index.tsx` does NOT exist under ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "create-subject.tsx",
+        "text": "summary cites `create-subject.tsx`",
+        "source": "summary"
+      },
+      "status": "failed",
+      "evidence": "`create-subject.tsx` does NOT exist under ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Verify-first AC (shepherd-ruled, WS-33): FIRST action in execution is a live nav-walkthrough verify (Browse-books -> Back) under BOTH MODE_NAV_V2 on AND off. handleBack in apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:123-133 already replaces to /(app)/shelf/[subjectId] on the normal flow (subjectId present), so the likely disposition is ALREADY-FIXED (predates this WI by commit 75ace69609, 2026-04-13). If the symptom does NOT reproduce: close the WI as already-fixed citing commit 75ace69609, AND add a regression test that locks the in-shell Back target so it cannot silently regress. If the symptom DOES reproduce: root-cause the actual repro path (it is not the handleBack fallback as currently written -- that only fires when subjectId is falsy, an edge case already guarded separately at lines 307-329) and fix + cover with a regression test. Root cause is provisional (candidate found, predates WI) until the live verify runs; the verify-first step is the DoR-satisfying framing for this Assisted item. Regression guard (red-green-revert): apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:417-429 asserts Back from pick-book (subjectId present) replaces to /(app)/shelf/[subjectId], not /(app)/library — RED if handleBack falls back to library, GREEN with the in-shell target; guard pre-exists (landed with the fix in commit 75ace69609) and is verified passing.",
+        "text": "Verify-first AC (shepherd-ruled, WS-33): FIRST action in execution is a live nav-walkthrough verify (Browse-books -> Back) under BOTH MODE_NAV_V2 on AND off. handleBack in apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:123-133 already replaces to /(app)/shelf/[subjectId] on the normal flow (subjectId present), so the likely disposition is ALREADY-FIXED (predates this WI by commit 75ace69609, 2026-04-13). If the symptom does NOT reproduce: close the WI as already-fixed citing commit 75ace69609, AND add a regression test that locks the in-shell Back target so it cannot silently regress. If the symptom DOES reproduce: root-cause the actual repro path (it is not the handleBack fallback as currently written -- that only fires when subjectId is falsy, an edge case already guarded separately at lines 307-329) and fix + cover with a regression test. Root cause is provisional (candidate found, predates WI) until the live verify runs; the verify-first step is the DoR-satisfying framing for this Assisted item. Regression guard (red-green-revert): apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx:417-429 asserts Back from pick-book (subjectId present) replaces to /(app)/shelf/[subjectId], not /(app)/library — RED if handleBack falls back to library, GREEN with the in-shell target; guard pre-exists (landed with the fix in commit 75ace69609) and is verified passing.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    }
+  ],
+  "counts": {
+    "verified": 4,
+    "failed": 3,
+    "cannot_verify": 0,
+    "needs_judgment": 1
+  },
+  "comment_id": null
+}

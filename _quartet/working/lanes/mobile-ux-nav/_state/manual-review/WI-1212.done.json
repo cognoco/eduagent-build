@@ -1,0 +1,74 @@
+{
+  "wi_id": "WI-1212",
+  "page_id": "38f8bce9-1f7c-810a-a326-db85254bc588",
+  "altitude": "Item",
+  "type": "Enhancement",
+  "stage_before": "Reviewing",
+  "stage_after": "Closed",
+  "disposition": "done",
+  "dod": {
+    "mechanical": [],
+    "manual": [
+      {
+        "rule_id": "dod.1.ac_met",
+        "check": "Every Acceptance Criterion is verified, with evidence cited in the completion summary (not just 'done')."
+      },
+      {
+        "rule_id": "dod.2.local_validation",
+        "check": "Local validation passes — lint, type-check, tests (project's standard set)."
+      },
+      {
+        "rule_id": "dod.3.ci_green",
+        "check": "Landing checks pass for the path used — PR path: all required CI checks green on the merged commit; direct-commit path (no-CI repo / meta-tooling): the project's local validation set is green, output cited (the other path is N/A by construction)."
+      },
+      {
+        "rule_id": "dod.4.pr_merged",
+        "check": "The change has LANDED on the base branch (not 'looks done') — PR path: PR merged; direct-commit path: committed to the base branch AND deployment confirmed (e.g. synced / symlinked)."
+      },
+      {
+        "rule_id": "dod.closure_verification",
+        "check": "The original symptom is gone, verified via the source artifact (re-test / re-run scanner) — not merely 'PR merged'."
+      },
+      {
+        "rule_id": "dod.cross_cutting_sweep",
+        "check": "If the fix has 3+ sibling occurrences: all swept + forward guard installed, OR a deferred sweep is documented (tracked WI, owner, target, remaining sites)."
+      },
+      {
+        "rule_id": "dod.feature.docs_user_check",
+        "check": "User-facing docs touched (if behavior changed) AND AC verified by a user-shaped check, not only unit tests."
+      }
+    ],
+    "mechanicalOk": true
+  },
+  "recommended": "needs-confirmation",
+  "applied": true,
+  "comment_id": "3918bce9-1f7c-8113-80cb-001d99bb7974",
+  "ci_gate": {
+    "outcome": "pass",
+    "kind": "commit-url",
+    "verdict": {
+      "ok": true,
+      "blocking": [],
+      "tolerated": [],
+      "failOpenWarning": "CI gate FAILED OPEN: required checks unreadable — could not resolve the default branch for cognoco/eduagent-build via gh; close allowed under advisory-safe policy."
+    },
+    "reason": "CI gate FAILED OPEN: required checks unreadable — could not resolve the default branch for cognoco/eduagent-build via gh; close allowed under advisory-safe policy."
+  },
+  "envelope": {
+    "schema": "quartet.review_result.v1",
+    "wi": "WI-1212",
+    "workstream": "Mobile UX & Navigation",
+    "reviewerRuntime": "codex-manual",
+    "disposition": "approve",
+    "evidence": [],
+    "commandsRun": [],
+    "cosmoMutations": [
+      "Stage: Reviewing -> Closed",
+      "Comment posted (3918bce9-1f7c-8113-80cb-001d99bb7974)"
+    ],
+    "overridesApplied": [],
+    "findings": [],
+    "followUps": [],
+    "timestamp": "2026-07-02T18:42:17.872Z"
+  }
+}
