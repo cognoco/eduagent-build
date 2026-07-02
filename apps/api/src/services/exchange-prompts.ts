@@ -1177,6 +1177,7 @@ export function buildSystemPrompt(
   // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
   // learning-path-clarity-pass spec.
   if (
+    !isLanguageMode &&
     !isReviewMode &&
     !isRecitation &&
     context.verificationType === 'evaluate'
@@ -1210,6 +1211,7 @@ export function buildSystemPrompt(
   // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
   // learning-path-clarity-pass spec.
   if (
+    !isLanguageMode &&
     !isReviewMode &&
     !isRecitation &&
     context.verificationType === 'teach_back'

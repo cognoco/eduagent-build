@@ -145,4 +145,53 @@ describe('buildFourStrandsPrompt', () => {
 
     expect(joined).toContain('fluency');
   });
+
+  it('includes the server-generated graded input artifact when present', () => {
+    const result = buildFourStrandsPrompt(
+      makeContext({
+        languageCode: 'es',
+        languageSessionState: {
+          activeStrand: 'meaning_input',
+          sessionStrandCounts: {
+            meaning_input: 0,
+            meaning_output: 0,
+            language_focus: 0,
+            fluency: 0,
+          },
+          nextActivity: {
+            strand: 'meaning_input',
+            activityType: 'graded_input',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            gradedInput: {
+              type: 'graded_input',
+              modality: 'reading',
+              cefrLevel: 'A1',
+              knownWordRatioTarget: 0.96,
+              knownWordEstimate: 0.67,
+              targetWords: ['agua'],
+              text: 'hola gracias agua',
+              comprehensionQuestions: [
+                {
+                  id: 'gist-1',
+                  prompt: 'What is the main thing happening in this passage?',
+                  answerHint: 'hola gracias agua',
+                },
+              ],
+              audioEnabled: false,
+            },
+          },
+        },
+      }),
+    );
+    const joined = result.join('\n');
+
+    expect(joined).toContain('Graded input artifact:');
+    expect(joined).toContain('Passage: hola gracias agua');
+    expect(joined).toContain('Known-word estimate: 67%');
+    expect(joined).toContain(
+      'Comprehension question: What is the main thing happening in this passage?',
+    );
+  });
 });
