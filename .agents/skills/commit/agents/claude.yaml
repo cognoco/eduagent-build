@@ -1,8 +1,22 @@
-# Claude Code harness frontmatter, injected into .claude/skills/commit/SKILL.md
-# by scripts/sync-skills.mjs (WI-454). The runtime-neutral body lives in
-# ../SKILL.md; these keys make the commit skill run as a forked sub-agent with
-# only the git tools it needs. Codex reads ./openai.yaml instead.
-context: fork
-agent: general-purpose
-model: sonnet
-allowed-tools: Bash, Read, Grep
+# Claude Code harness frontmatter adapter for the commit skill, consumed by
+# scripts/sync-skills.mjs (WI-454) and merged into .claude/skills/commit/SKILL.md.
+#
+# WI-1246: this adapter intentionally injects NO keys. The commit skill runs
+# INLINE in the caller's context — it must NOT be a forked sub-agent.
+#
+# Why the fork was removed: a forked general-purpose sub-agent is spawned with
+# its cwd at the PRIMARY working directory (the shared main checkout), and the
+# invoking worktree's path is never threaded into the fork. So when /commit was
+# invoked from inside a worktree, its git ops resolved against shared main and
+# could commit/push straight to origin/main, bypassing PR gates. Running inline
+# keeps the commit in the context of the agent that knows its own worktree, so
+# the skill body's `git -C <path>` discipline is actionable. The .husky
+# main-guards (scripts/husky-main-*-guard.sh) are the mechanism-independent
+# backstop regardless.
+#
+# Do NOT re-add `context: fork` (or `agent`/`model`/`allowed-tools`) here without
+# revisiting WI-1246 — that reintroduces the shared-main landing hazard.
+#
+# sync-skills merges an empty adapter as base-only frontmatter (the master's
+# name + description), which is exactly what an inline skill needs. Codex reads
+# ./openai.yaml instead.

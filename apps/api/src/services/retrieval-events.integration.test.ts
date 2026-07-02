@@ -15,6 +15,7 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  person,
   profiles,
   retrievalEvents,
   subjects,
@@ -66,6 +67,17 @@ async function seedProfileWithTopic(
     })
     .returning({ id: profiles.id });
 
+  // [ic-362] retrievalEvents.profileId FKs to person, not profiles (see
+  // packages/database/src/schema/retrieval-events.ts) — the app writes
+  // person ids into this column. Seed a person row sharing the profile's id,
+  // mirroring the identity-v2 bridge in child-profile-v2.ts.
+  await database.insert(person).values({
+    id: profile!.id,
+    displayName: `${CLERK_PREFIX}-${label}`,
+    birthDate: '2010-01-01',
+    residenceJurisdiction: 'EU',
+  });
+
   const [subject] = await database
     .insert(subjects)
     .values({
@@ -109,6 +121,11 @@ async function cleanupByPrefix(database: Database): Promise<void> {
   await database
     .delete(accounts)
     .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  // person isn't reachable via the accounts cascade (it's a separate v2
+  // identity row sharing the profile's id) — clean it up explicitly.
+  await database
+    .delete(person)
+    .where(like(person.displayName, `${CLERK_PREFIX}%`));
 }
 
 let db: Database;

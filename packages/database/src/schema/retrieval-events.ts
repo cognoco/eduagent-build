@@ -8,7 +8,7 @@ import {
   pgEnum,
   index,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
 import { learningSessions } from './sessions';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -53,9 +53,13 @@ export const retrievalEvents = pgTable(
     id: uuid('id')
       .primaryKey()
       .$defaultFn(() => generateUUIDv7()),
+    // [ic-362] References `person` (v2 identity table), not the legacy
+    // `profiles` table — see apps/api/drizzle/0124_striped_thing.sql for the
+    // repoint history. The app writes this from `input.profileId`, which in
+    // the v2-only app is the person id.
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),

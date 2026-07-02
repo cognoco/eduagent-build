@@ -7606,15 +7606,6 @@
         }
       },
       "foreignKeys": {
-        "retrieval_events_profile_id_profiles_id_fk": {
-          "name": "retrieval_events_profile_id_profiles_id_fk",
-          "tableFrom": "retrieval_events",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "retrieval_events_subject_id_subjects_id_fk": {
           "name": "retrieval_events_subject_id_subjects_id_fk",
           "tableFrom": "retrieval_events",
@@ -7640,6 +7631,15 @@
           "columnsFrom": ["session_id"],
           "columnsTo": ["id"],
           "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "retrieval_events_profile_id_person_id_fk": {
+          "name": "retrieval_events_profile_id_person_id_fk",
+          "tableFrom": "retrieval_events",
+          "tableTo": "person",
+          "columnsFrom": ["profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

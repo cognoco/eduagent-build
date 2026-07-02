@@ -163,6 +163,9 @@ type ConsentRouteEnv = {
     EMAIL_FROM?: string;
     API_ORIGIN?: string;
     CONSENT_POLICY_VERSION: string;
+    // [WI-1138] Consent-deny Stripe teardown when the denied person is
+    // themselves the payer.
+    STRIPE_SECRET_KEY?: string;
   };
   Variables: {
     user: AuthUser;
@@ -418,7 +421,9 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
             undefined,
           userAgent: c.req.header('user-agent') ?? undefined,
         };
-        await processConsentResponseV2(db, input.token, input.approved, audit);
+        await processConsentResponseV2(db, input.token, input.approved, audit, {
+          stripeSecretKey: c.env.STRIPE_SECRET_KEY,
+        });
         return c.json(
           consentRespondResultSchema.parse({
             message: input.approved ? 'Consent granted' : 'Consent denied',

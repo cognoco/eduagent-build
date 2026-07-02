@@ -50,6 +50,10 @@ describe('MentorCelebration', () => {
     const spy = jest
       .spyOn(reanimated, 'useReducedMotion')
       .mockReturnValue(true);
+    // Spy (not mock) on useSharedValue so it still delegates to the real
+    // mock implementation — this lets us see what initial value the
+    // component requested (scale/opacity rest state) without changing it.
+    const sharedValueSpy = jest.spyOn(reanimated, 'useSharedValue');
     try {
       const onMarkSeen = jest.fn();
       const { getByTestId, getByText } = render(
@@ -64,8 +68,16 @@ describe('MentorCelebration', () => {
       expect(getByTestId('mentor-celebration')).toBeTruthy();
       expect(getByText('You chose the next step.')).toBeTruthy();
       expect(onMarkSeen).toHaveBeenCalledWith('event-2');
+
+      // Reduced motion: scale and opacity are initialised straight to their
+      // rest values (1) instead of the burst's start values (0.8 / 0), and
+      // the exit transition is skipped entirely.
+      const initialSharedValues = sharedValueSpy.mock.calls.map(([v]) => v);
+      expect(initialSharedValues).toEqual([1, 1]);
+      expect(getByTestId('mentor-celebration').props.exiting).toBeUndefined();
     } finally {
       spy.mockRestore();
+      sharedValueSpy.mockRestore();
     }
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -183,6 +183,36 @@ describe('ChildCurriculumScreen', () => {
 
     screen.getByTestId('child-curriculum-loading');
     expect(screen.queryByTestId('child-curriculum-screen')).toBeNull();
+  });
+
+  it('[WI-1021] surfaces retry and back on the loading gate once the timeout elapses', () => {
+    jest.useFakeTimers();
+    const refetch = jest.fn();
+    mockUseChildDetail.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch,
+    });
+    mockUseDashboard.mockReturnValue({ data: { children: [] } });
+
+    render(<ChildCurriculumScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    fireEvent.press(screen.getByTestId('child-curriculum-loading-retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByTestId('child-curriculum-loading-back'));
+    const { goBackOrReplace } = require('../../../../lib/navigation');
+    expect(goBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ replace: mockReplace }),
+      '/(app)/child/child-001',
+    );
+
+    jest.useRealTimers();
   });
 
   it('[PARENT-17] shows an error state with a retry that re-fetches when detail fails and dashboard has no fallback', () => {

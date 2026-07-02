@@ -1,11 +1,5 @@
 import { memo, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -22,6 +16,7 @@ import {
 } from '../../../../lib/navigation';
 import { firstParam } from '../../../../lib/route-params';
 import { useThemeColors } from '../../../../lib/theme';
+import { TimeoutLoader } from '../../../../components/common';
 
 type DashboardSubject = DashboardChild['subjects'][number];
 
@@ -69,7 +64,7 @@ const SubjectRow = memo(function SubjectRow({
         ) : null}
         <Text className="mt-2 text-caption font-semibold text-primary">
           {t(
-            `parentView.retention.${subject.retentionStatus}.label` as TranslateKey
+            `parentView.retention.${subject.retentionStatus}.label` as TranslateKey,
           )}
         </Text>
       </View>
@@ -221,13 +216,21 @@ export default function ChildCurriculumScreen(): React.ReactElement {
 
   if (childQuery.isLoading && !child) {
     return (
-      <View
-        className="flex-1 items-center justify-center bg-background px-6"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      <TimeoutLoader
+        isLoading
+        loadingLabel={t('common.loading')}
+        primaryAction={{
+          label: t('common.tryAgain'),
+          onPress: () => void childQuery.refetch(),
+          testID: 'child-curriculum-loading-retry',
+        }}
+        secondaryAction={{
+          label: t('common.goBack'),
+          onPress: () => goBackOrReplace(router, backHref),
+          testID: 'child-curriculum-loading-back',
+        }}
         testID="child-curriculum-loading"
-      >
-        <ActivityIndicator accessibilityLabel={t('common.loading')} />
-      </View>
+      />
     );
   }
 

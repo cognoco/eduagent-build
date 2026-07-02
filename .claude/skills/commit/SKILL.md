@@ -2,10 +2,6 @@
 name: commit
 description: Use when committing or pushing in the EduAgent repo (commit, save
   changes, commit staged/specific files, commit and push, push).
-context: fork
-agent: general-purpose
-model: sonnet
-allowed-tools: Bash, Read, Grep
 ---
 
 # Commit (EduAgent overlay)
@@ -15,6 +11,17 @@ allowed-tools: Bash, Read, Grep
 > conventions on top. If `/zdx-core:commit` is not available, stop and report
 > that the global `zdx-core` plugin must be installed — do not hand-roll a
 > commit.
+
+> **Runs INLINE — resolve your worktree explicitly (WI-1246).** This skill is
+> deliberately NOT a forked sub-agent (see `agents/claude.yaml`). A fork's cwd
+> resolves to the shared main checkout, not the worktree you are working in, so
+> a forked commit could land on `origin/main`. Running inline keeps the commit
+> in the context of the agent that knows its own worktree — but an agent's cwd
+> can still reset between shell calls, so **never rely on ambient cwd**: resolve
+> the working tree once (`ROOT=$(git rev-parse --show-toplevel)`) and pass it to
+> every git call as `git -C "$ROOT" …`, or `cd "$ROOT" && git …` within a single
+> shell invocation. The `.husky` main-guards backstop a miss, but they refuse
+> the commit rather than redirect it — get the path right.
 
 ## What the CORE owns (follow `/zdx-core:commit` exactly)
 

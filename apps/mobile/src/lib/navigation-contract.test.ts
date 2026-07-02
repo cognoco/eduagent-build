@@ -915,12 +915,37 @@ describe('resolveNavigationContract snapshot surface', () => {
       }),
     };
 
+    // Exhaustiveness guard: the snapshot assertions below hand-pick a
+    // subset of NavigationContract fields (chrome, diagnostic, gates,
+    // home, queryScope, routeSurface, shape, tabs). Assert the actual
+    // resolved contract's own key set for every context so a field
+    // added to or removed from NavigationContract can't silently slip
+    // past this test without the picked-field assertions noticing.
+    const navigationContractKeys: Array<keyof NavigationContract> = [
+      'canEnter',
+      'chrome',
+      'diagnostic',
+      'effectiveAppContext',
+      'gates',
+      'home',
+      'isFamilyCapable',
+      'isParentProxy',
+      'isSurfaced',
+      'queryScope',
+      'shape',
+      'visibleTabs',
+    ];
+
     // Explicit structural assertions (replaces toMatchSnapshot).
     // Expected values recovered from the committed snapshot at:
     //   apps/mobile/src/lib/__snapshots__/navigation-contract.test.ts.snap
     const resolved = Object.fromEntries(
       Object.entries(contexts).map(([name, context]) => {
         const contract = resolveNavigationContract(context);
+
+        expect(Object.keys(contract).sort()).toEqual(
+          [...navigationContractKeys].sort(),
+        );
 
         return [
           name,
