@@ -164,6 +164,56 @@ describe('buildLanguageActivityTelemetry', () => {
 
     expect(telemetry.gradedInput).toBeUndefined();
   });
+
+  it('attaches structured meaning-output metadata to output turns', () => {
+    const telemetry = buildLanguageActivityTelemetry({
+      strand: 'meaning_output',
+      inputMode: 'voice',
+      targetWords: ['cafe', 'sugar'],
+      targetGrammar: ['I would like + noun'],
+    });
+
+    expect(telemetry).toMatchObject({
+      strand: 'meaning_output',
+      activityType: 'free_response',
+      modality: 'voice',
+      targetWords: ['cafe', 'sugar'],
+      targetGrammar: ['I would like + noun'],
+      meaningOutput: {
+        type: 'meaning_output',
+        taskType: 'role_play',
+        communicativeGoal: expect.stringContaining('conversation'),
+        prompt: expect.stringContaining('cafe'),
+        responseMode: 'dialogue_turn',
+        targetWords: ['cafe', 'sugar'],
+        targetGrammar: ['I would like + noun'],
+        retryExpectation: 'retry_after_feedback',
+        correctionExpectation: 'meaning_first_then_form',
+      },
+    });
+    expect(telemetry.gradedInput).toBeUndefined();
+  });
+
+  it.each([
+    [0, 'role_play', 'dialogue_turn'],
+    [1, 'personal_answer', 'short_answer'],
+    [2, 'retell', 'short_retell'],
+    [3, 'describe', 'short_description'],
+    [4, 'ask_question', 'question'],
+  ] as const)(
+    'selects meaning-output task %s as %s',
+    (meaningOutputTurnIndex, taskType, responseMode) => {
+      const telemetry = buildLanguageActivityTelemetry({
+        strand: 'meaning_output',
+        meaningOutputTurnIndex,
+      });
+
+      expect(telemetry.meaningOutput).toMatchObject({
+        taskType,
+        responseMode,
+      });
+    },
+  );
 });
 
 describe('evaluatePendingGradedInputAnswer', () => {
@@ -245,6 +295,58 @@ describe('buildLanguageSessionState', () => {
     });
     expect(state.nextActivity.gradedInput?.text).toContain('hola');
     expect(state.nextActivity.gradedInput?.text).toContain('agua');
+  });
+
+  it('threads meaning-output context through the strand-selected next activity without graded input', () => {
+    const state = buildLanguageSessionState({
+      exchangeCount: 1,
+      events: [
+        {
+          eventType: 'ai_response',
+          metadata: {
+            languageLearning: {
+              strand: 'meaning_input',
+              activityType: 'graded_input',
+              modality: 'text',
+              targetWords: ['agua'],
+              targetGrammar: [],
+              gradedInput: {
+                type: 'graded_input',
+                modality: 'reading',
+                cefrLevel: 'A1',
+                knownWordRatioTarget: 0.96,
+                knownWordEstimate: 0.67,
+                targetWords: ['agua'],
+                text: 'Ana quiere agua.',
+                comprehensionQuestions: [
+                  {
+                    id: 'gist-1',
+                    prompt: 'What does Ana want?',
+                    answerHint: 'Ana wants water',
+                  },
+                ],
+                audioEnabled: false,
+              },
+            },
+          },
+        },
+      ],
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['hola', 'gracias'],
+      targetWords: ['agua'],
+      targetGrammar: ['querer + noun'],
+    });
+
+    expect(state.activeStrand).toBe('meaning_output');
+    expect(state.nextActivity.gradedInput).toBeUndefined();
+    expect(state.nextActivity.meaningOutput).toMatchObject({
+      taskType: 'role_play',
+      responseMode: 'dialogue_turn',
+      targetWords: ['agua'],
+      targetGrammar: ['querer + noun'],
+    });
   });
 
   it('routes a missed graded-input answer into language-focused repair', () => {
