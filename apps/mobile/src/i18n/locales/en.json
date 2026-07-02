@@ -3178,7 +3178,9 @@
       "memory": "Memory",
       "memorySubtitle": "See and manage what your mentor remembers.",
       "reports": "Reports",
-      "reportsSubtitle": "Open weekly and monthly progress reports."
+      "reportsSubtitle": "Open weekly and monthly progress reports.",
+      "practice": "Practice",
+      "practiceSubtitle": "Open the practice hub or review your past activity."
     },
     "moments": {
       "title": "Recent moments",
@@ -3214,6 +3216,21 @@
       "title": "Mentor memory controls",
       "body": "Review, edit, hide, export, or clear what your mentor remembers from the full memory screen.",
       "open": "Open memory controls"
+    },
+    "practice": {
+      "openHub": "Open practice hub",
+      "pastActivityTitle": "My past activity",
+      "empty": "Your quizzes, reviews, assessments, and drills will appear here.",
+      "error": "We couldn't load your past activity.",
+      "type": {
+        "all": "All",
+        "quiz": "Quiz",
+        "review": "Review",
+        "assessment": "Assessment",
+        "dictation": "Dictation",
+        "recitation": "Recitation",
+        "fluency_drill": "Fluency drill"
+      }
     }
   },
   "recaps": {
