@@ -758,6 +758,15 @@
       "a11yScore": "Ćwiczenie ukończone: {{correct}} z {{total}} poprawnych odpowiedzi, {{pct}} procent",
       "a11yTimer": "Ćwiczenie płynności: pozostało {{time}}"
     },
+    "gradedInput": {
+      "title": "Przeczytaj i odpowiedz",
+      "subtitle": "Poziom {{level}}",
+      "targetWords": "Zwróć uwagę na: {{words}}",
+      "questionLabel": "Pytanie",
+      "playAudioLabel": "Odtwórz tekst",
+      "stopAudioLabel": "Zatrzymaj tekst",
+      "dismissLabel": "Zamknij kartę czytania"
+    },
     "chatShell": {
       "defaultSubtitle": "Jestem tu, by pomóc",
       "defaultPlaceholder": "Wpisz wiadomość...",

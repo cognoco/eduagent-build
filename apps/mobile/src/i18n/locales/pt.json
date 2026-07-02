@@ -752,6 +752,15 @@
       "a11yScore": "Exercício concluído: {{correct}} de {{total}} corretas, {{pct}} por cento",
       "a11yTimer": "Exercício de fluência: {{time}} restantes"
     },
+    "gradedInput": {
+      "title": "Leia e responda",
+      "subtitle": "Nível {{level}}",
+      "targetWords": "Observe: {{words}}",
+      "questionLabel": "Pergunta",
+      "playAudioLabel": "Reproduzir o texto",
+      "stopAudioLabel": "Parar o texto",
+      "dismissLabel": "Dispensar cartão de leitura"
+    },
     "chatShell": {
       "defaultSubtitle": "Estou aqui para ajudar",
       "defaultPlaceholder": "Digite uma mensagem...",

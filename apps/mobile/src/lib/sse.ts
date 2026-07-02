@@ -63,6 +63,37 @@ export interface FluencyDrillEvent {
   score?: { correct: number; total: number };
 }
 
+export interface LanguageComprehensionQuestionEvent {
+  id: string;
+  prompt: string;
+  answerHint: string;
+}
+
+export interface LanguageGradedInputEvent {
+  type: 'graded_input';
+  modality: 'reading' | 'listening';
+  cefrLevel: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  knownWordRatioTarget: number;
+  knownWordEstimate: number;
+  targetWords: string[];
+  text: string;
+  comprehensionQuestions: LanguageComprehensionQuestionEvent[];
+  audioEnabled: boolean;
+}
+
+export interface LanguageLearningActivityEvent {
+  strand: 'meaning_input' | 'meaning_output' | 'language_focus' | 'fluency';
+  activityType:
+    | 'graded_input'
+    | 'free_response'
+    | 'correction_retry'
+    | 'timed_drill';
+  modality: 'text' | 'voice' | 'listening';
+  targetWords: string[];
+  targetGrammar: string[];
+  gradedInput?: LanguageGradedInputEvent;
+}
+
 export interface ChallengeRoundOfferEvent {
   pitch: string;
 }
@@ -89,6 +120,8 @@ export interface StreamDoneEvent {
   notePromptPostSession?: boolean;
   /** Fluency drill start/end annotation for language sessions. */
   fluencyDrill?: FluencyDrillEvent;
+  /** Server-selected four-strands language activity for the completed turn. */
+  languageLearning?: LanguageLearningActivityEvent;
   /** Challenge Round state snapshot after the server has parsed and gated the exchange. */
   challengeRound?: ChallengeRoundSessionState;
   /** Server-gated Challenge Round offer. Mobile never parses raw envelope JSON. */

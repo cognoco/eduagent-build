@@ -153,6 +153,7 @@ interface DoneFrameSource {
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
   fluencyDrill?: unknown;
+  languageLearning?: unknown;
   confidence?: 'low' | 'medium' | 'high';
   readyToFinish?: boolean;
   challengeRound?: unknown;
@@ -181,6 +182,7 @@ function buildDoneFramePayload(source: DoneFrameSource) {
     notePrompt: source.notePrompt || undefined,
     notePromptPostSession: source.notePromptPostSession || undefined,
     fluencyDrill: source.fluencyDrill || undefined,
+    languageLearning: source.languageLearning || undefined,
     confidence: source.confidence || undefined,
     // [#419] Propagate the server-side readyToFinish flag so the streaming /
     // fallback paths reach parity with processMessage (non-streaming).

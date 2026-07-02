@@ -10,6 +10,7 @@ import type {
   ChallengeRoundOfferEvent,
   DraftedChallengeNoteEvent,
   FluencyDrillEvent,
+  LanguageLearningActivityEvent,
 } from '../../lib/sse';
 import type { ChatMessage } from './ChatShell';
 import type {
@@ -139,6 +140,9 @@ export interface UseSessionStreamingOptions {
   setFluencyDrill: React.Dispatch<
     React.SetStateAction<FluencyDrillEvent | null>
   >;
+  setLanguageLearning: React.Dispatch<
+    React.SetStateAction<LanguageLearningActivityEvent | null>
+  >;
   setChallengeRound: React.Dispatch<
     React.SetStateAction<ChallengeRoundSessionState | null>
   >;
@@ -240,6 +244,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setLanguageLearning,
     setChallengeRound,
     setChallengeOffer,
     setDraftedNote,
@@ -255,7 +260,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     quotaError,
     draftText,
     notePromptOffered,
-    animationCleanupRef,
     silenceTimerRef,
     lastAiAtRef,
     lastExpectedMinutesRef,
@@ -896,6 +900,11 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             if (result.fluencyDrill) {
               setFluencyDrill(result.fluencyDrill);
             }
+            setLanguageLearning(
+              result.languageLearning?.gradedInput
+                ? result.languageLearning
+                : null,
+            );
 
             if (result.challengeRound) {
               setChallengeRound(result.challengeRound);
@@ -1100,7 +1109,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       activeHomeworkProblem,
       activeSessionId,
       activeProfileId,
-      animationCleanupRef,
       classifiedSubject,
       createLocalMessageId,
       currentProblemIndex,
@@ -1125,6 +1133,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       setChallengeRound,
       setDraftedNote,
       setFluencyDrill,
+      setLanguageLearning,
       setHomeworkProblemsState,
       setIsStreaming,
       setLowConfidenceMessageId,
