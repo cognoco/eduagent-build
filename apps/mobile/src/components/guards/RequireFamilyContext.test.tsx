@@ -638,76 +638,85 @@ describe('RequireFamilyContext [WI-1142] switch-to-family CTA — query-cache-ba
     (globalThis as unknown as { fetch: typeof fetch }).fetch =
       routedFetch as unknown as typeof fetch;
 
-    const Wrapper = makeQueryCacheBackedWrapper(queryClient, cacheGuardian.id);
+    // try/finally so a mid-test assertion throw never leaks the overridden
+    // global fetch into subsequent tests in this file (cascading pollution).
+    try {
+      const Wrapper = makeQueryCacheBackedWrapper(
+        queryClient,
+        cacheGuardian.id,
+      );
 
-    render(
-      <Wrapper>
-        <RequireFamilyContext
-          route="child/[profileId]"
-          params={{ profileId: CHILD_ID }}
-        >
-          <Text testID="child-sentinel">child-content</Text>
-        </RequireFamilyContext>
-      </Wrapper>,
-    );
+      render(
+        <Wrapper>
+          <RequireFamilyContext
+            route="child/[profileId]"
+            params={{ profileId: CHILD_ID }}
+          >
+            <Text testID="child-sentinel">child-content</Text>
+          </RequireFamilyContext>
+        </Wrapper>,
+      );
 
-    await waitFor(() => screen.getByTestId('family-route-switch-cta'));
-    expect(screen.queryByTestId('child-sentinel')).toBeNull();
+      await waitFor(() => screen.getByTestId('family-route-switch-cta'));
+      expect(screen.queryByTestId('child-sentinel')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('family-route-switch-cta'));
+      fireEvent.press(screen.getByTestId('family-route-switch-cta'));
 
-    // `AppContextProvider.setMode` sets `modeOverride('family')`
-    // SYNCHRONOUSLY on press, before the server confirms -- canRender is
-    // already true here. Only the switchingToFamily guard-hold keeps the
-    // child surface blocked while the write is still in flight. This is the
-    // regression lock: if the guard is reverted (`if (canRender)` instead of
-    // `if (canRender && !switchingToFamily)`), child-sentinel renders here,
-    // one write early.
-    await waitFor(() => {
+      // `AppContextProvider.setMode` sets `modeOverride('family')`
+      // SYNCHRONOUSLY on press, before the server confirms -- canRender is
+      // already true here. Only the switchingToFamily guard-hold keeps the
+      // child surface blocked while the write is still in flight. This is the
+      // regression lock: if the guard is reverted (`if (canRender)` instead of
+      // `if (canRender && !switchingToFamily)`), child-sentinel renders here,
+      // one write early.
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/app-context').length,
+        ).toBeGreaterThanOrEqual(1);
+      });
+      expect(screen.queryByTestId('child-sentinel')).toBeNull();
       expect(
-        fetchCallsMatching(routedFetch, '/app-context').length,
-      ).toBeGreaterThanOrEqual(1);
-    });
-    expect(screen.queryByTestId('child-sentinel')).toBeNull();
-    expect(
-      screen.getByTestId('family-route-switch-cta').props.accessibilityState
-        ?.disabled,
-    ).toBe(true);
-    // Confirm the block above is genuinely driven by switchingToFamily, not
-    // a cache that happens to still say 'study' for an unrelated reason.
-    expect(
-      queryClient
-        .getQueryData<Profile[]>(['profiles'])
-        ?.find((profile) => profile.id === cacheGuardian.id)?.defaultAppContext,
-    ).toBe('study');
+        screen.getByTestId('family-route-switch-cta').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+      // Confirm the block above is genuinely driven by switchingToFamily, not
+      // a cache that happens to still say 'study' for an unrelated reason.
+      expect(
+        queryClient
+          .getQueryData<Profile[]>(['profiles'])
+          ?.find((profile) => profile.id === cacheGuardian.id)
+          ?.defaultAppContext,
+      ).toBe('study');
 
-    // Server confirms. The guard's onSuccess (in app-context.tsx) writes the
-    // confirmed profile into the SAME `['profiles']` query cache the real
-    // switch-CTA flow uses; this harness's ProfileContext is genuinely
-    // subscribed to that cache, unlike the static-literal harnesses above.
-    resolvePatch?.({
-      profile: { ...cacheGuardian, defaultAppContext: 'family' },
-    });
+      // Server confirms. The guard's onSuccess (in app-context.tsx) writes the
+      // confirmed profile into the SAME `['profiles']` query cache the real
+      // switch-CTA flow uses; this harness's ProfileContext is genuinely
+      // subscribed to that cache, unlike the static-literal harnesses above.
+      resolvePatch?.({
+        profile: { ...cacheGuardian, defaultAppContext: 'family' },
+      });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('child-sentinel')).toBeTruthy();
-    });
-    expect(screen.queryByTestId('family-route-blocked')).toBeNull();
+      await waitFor(() => {
+        expect(screen.getByTestId('child-sentinel')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('family-route-blocked')).toBeNull();
 
-    // The transient modeOverride clears right after the cache write;
-    // confirm the child surface does not regress back to blocked once
-    // derivedMode re-derives from the now-updated (cache-confirmed)
-    // defaultAppContext.
-    await waitFor(() => {
-      expect(screen.getByTestId('child-sentinel')).toBeTruthy();
-    });
-    expect(
-      queryClient
-        .getQueryData<Profile[]>(['profiles'])
-        ?.find((profile) => profile.id === cacheGuardian.id)?.defaultAppContext,
-    ).toBe('family');
-
-    (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
-    queryClient.clear();
+      // The transient modeOverride clears right after the cache write;
+      // confirm the child surface does not regress back to blocked once
+      // derivedMode re-derives from the now-updated (cache-confirmed)
+      // defaultAppContext.
+      await waitFor(() => {
+        expect(screen.getByTestId('child-sentinel')).toBeTruthy();
+      });
+      expect(
+        queryClient
+          .getQueryData<Profile[]>(['profiles'])
+          ?.find((profile) => profile.id === cacheGuardian.id)
+          ?.defaultAppContext,
+      ).toBe('family');
+    } finally {
+      (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+      queryClient.clear();
+    }
   });
 });
