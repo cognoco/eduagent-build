@@ -18,6 +18,17 @@
 // Red-green-revert pattern applied for both gaps (recorded in the PR):
 //   Gap 3: remove the guardianship/supportership teardown block (Step 2a) → THROWS (RED).
 //   Gap 1: remove the subscription delete block (Step G1) → THROWS (RED). Restore → GREEN.
+//
+// [WI-1255] A durably-pinned event.data.identityVersion: 'v1' (from an event
+// dispatched before the legacy tables were dropped) must NOT route
+// scheduledDeletion to the legacy accounts/profiles path on resume — per Gap
+// 2 above, those tables don't exist on this DB target either, so the legacy
+// path throws. The [WI-1255] test below runs the real scheduledDeletion
+// handler with identityVersion: 'v1' against this real DB and asserts the
+// v2 organization/person rows are ACTUALLY deleted — not merely "no error
+// thrown" — the GDPR-completion proof. Red-green-revert: reverting
+// account-deletion.ts's v2 collapse makes this test throw (legacy path hits
+// the dropped accounts table); restoring it deletes the real rows.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
@@ -380,6 +391,42 @@ const RUN = !!process.env.DATABASE_URL;
         columns: { id: true },
       });
       expect(outsiderRow).toBeDefined();
+    });
+
+    // -----------------------------------------------------------------------
+    // [WI-1255] A pinned identityVersion: 'v1' must erase the real v2 org,
+    // not route to the (dropped, per Gap 2 above) legacy accounts/profiles
+    // path. See comment block above for the red-green-revert story.
+    // -----------------------------------------------------------------------
+
+    it('[BREAK WI-1255] pinned v1 erases the real v2 organization + owner, not merely "no error"', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+
+      const { step } = createInngestStepRunner();
+      const handler = (scheduledDeletion as any).fn;
+      const result = await handler({
+        event: {
+          data: {
+            accountId: orgId,
+            identityVersion: 'v1',
+          },
+        },
+        step,
+      });
+
+      expect(result).toEqual({ status: 'deleted', accountId: orgId });
+
+      // GDPR-completion proof: the real rows are gone, not just "no error".
+      const orgRow = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { id: true },
+      });
+      expect(orgRow).toBeUndefined();
+      const ownerRow = await db.query.person.findFirst({
+        where: eq(person.id, ownerId),
+        columns: { id: true },
+      });
+      expect(ownerRow).toBeUndefined();
     });
   },
 );

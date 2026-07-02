@@ -2,12 +2,6 @@
 import { inngest } from '../client';
 import { getStepDatabase, getStepClerkSecretKey } from '../helpers';
 import {
-  accountExists,
-  isDeletionCancelled,
-  executeDeletion,
-  getAccountClerkUserId,
-} from '../../services/deletion';
-import {
   organizationExistsV2,
   isDeletionCancelledV2,
   executeDeletionV2,
@@ -87,66 +81,51 @@ export const scheduledDeletion = inngest.createFunction(
   async ({ event, step }) => {
     const { accountId } = event.data;
 
-    // [CUT-B2] Identity mode is PINNED at schedule time, not re-read here. The
-    // schedule handler (POST /account/delete) wrote the deletion stamp into the
-    // v1 (accounts) or v2 (organization) store and stamped the matching
-    // `identityVersion` onto this event. Reading the live flag at execution
-    // time would let a mid-grace-period flip (cutover or rollback) route every
-    // step below at the WRONG store: the resume would miss the active-deletion
-    // stamp and return cancelled/already_deleted WITHOUT erasing — a silently
-    // skipped GDPR/COPPA deletion. We therefore branch on the pinned version
-    // for EVERY step. Fallback to the live flag only when the field is absent
-    // (an in-flight event dispatched before this field existed).
-    const identityVersion = (event.data as { identityVersion?: 'v1' | 'v2' })
-      .identityVersion;
-    const useV2 =
-      identityVersion === 'v2' ? true : identityVersion === 'v1' ? false : true; // flag always-on post-cutover; absent-field events drain as v2
+    // [WI-1255] Prod is v2-only — the T1 identity migration
+    // (0106_identity_t1_org_membership.sql) reused account.id AS
+    // organization.id, and the legacy tables (accounts/profiles/
+    // family_links/consent_states) have since been dropped outright. A
+    // durably-pinned event.data.identityVersion: 'v1', left over from before
+    // the drop, can therefore no longer be honored — that store doesn't
+    // exist, and routing to it 500s. Every run erases via v2, using the same
+    // accountId as the organizationId (no identifier translation needed).
+    // This retires the earlier [CUT-B2] schedule-time pinning that branched
+    // per-step on identityVersion.
 
     // Wait 7-day grace period
     await step.sleep('grace-period', '7d');
 
     // [BUG-844] After a 7-day sleep the account may have been removed by an
-    // admin or background GC. isDeletionCancelled and executeDeletion below
-    // are both safe in that case (the former returns false, the latter is
-    // idempotent), but blindly running them would either re-issue a no-op
+    // admin or background GC. isDeletionCancelledV2 and executeDeletionV2
+    // below are both safe in that case (the former returns false, the latter
+    // is idempotent), but blindly running them would either re-issue a no-op
     // DELETE or report a misleading 'deleted' status. Surface the
     // already-deleted case as its own terminal status so on-call has clear
     // telemetry for grace-period overruns vs. happy-path completions.
     const exists = await step.run('check-account-exists', async () => {
       const db = getStepDatabase();
-      if (useV2) {
-        return organizationExistsV2(db, accountId);
-      }
-      return accountExists(db, accountId);
+      return organizationExistsV2(db, accountId);
     });
 
     if (!exists) {
       return { status: 'already_deleted', accountId };
     }
 
-    // [R1] Capture the Clerk login id BEFORE executeDeletion removes the row,
-    // so we can erase the external identity afterwards (GDPR Art 17). Held in
-    // its own memoized step so a retry of the Clerk-erasure step below re-uses
-    // the captured value rather than reading a now-deleted row.
+    // [R1] Capture the Clerk login id BEFORE executeDeletionV2 removes the
+    // row, so we can erase the external identity afterwards (GDPR Art 17).
+    // Held in its own memoized step so a retry of the Clerk-erasure step
+    // below re-uses the captured value rather than reading a now-deleted row.
     const clerkUserId = await step.run('capture-clerk-user-id', async () => {
       const db = getStepDatabase();
-      if (useV2) {
-        return getOrganizationOwnerClerkUserIdV2(db, accountId);
-      }
-      return getAccountClerkUserId(db, accountId);
+      return getOrganizationOwnerClerkUserIdV2(db, accountId);
     });
 
-    // [CUT-B2] v2 also pre-reads the owner email for the byok_waitlist erase
-    // (D2 GDPR Art-17 leg in executeDeletionV2). Captured separately so the
+    // [CUT-B2] Pre-reads the owner email for the byok_waitlist erase (D2
+    // GDPR Art-17 leg in executeDeletionV2). Captured separately so the
     // value survives the person cascade and a retry of delete-account-data
     // re-uses the memoized value. Null when no login exists (pre-graph edge
     // case) — executeDeletionV2 handles null ownerEmail as a no-op on that leg.
     const ownerEmail = await step.run('capture-owner-email', async () => {
-      // v1 has no owner-email pre-read leg — short-circuit before acquiring a
-      // DB connection so a legacy deletion does not open one needlessly.
-      if (!useV2) {
-        return null;
-      }
       const db = getStepDatabase();
       return getOrganizationOwnerEmailV2(db, accountId);
     });
@@ -154,10 +133,7 @@ export const scheduledDeletion = inngest.createFunction(
     // Check if deletion was cancelled
     const cancelled = await step.run('check-cancellation', async () => {
       const db = getStepDatabase();
-      if (useV2) {
-        return isDeletionCancelledV2(db, accountId);
-      }
-      return isDeletionCancelled(db, accountId);
+      return isDeletionCancelledV2(db, accountId);
     });
 
     if (cancelled) {
@@ -172,31 +148,25 @@ export const scheduledDeletion = inngest.createFunction(
     const subscriptionStoreTeardownTargets = await step.run(
       'capture-subscription-store-teardown-targets',
       async () => {
-        if (!useV2) {
-          return [];
-        }
         const db = getStepDatabase();
         return getSubscriptionStoreTeardownTargetsV2(db, accountId);
       },
     );
 
     // Permanently delete all data.
-    // [Fix Bug #494] executeDeletion now includes an atomic TOCTOU guard:
-    // the DELETE carries the same cancellation predicate as isDeletionCancelled(),
+    // [Fix Bug #494] executeDeletionV2 includes an atomic TOCTOU guard: the
+    // DELETE carries the same cancellation predicate as isDeletionCancelledV2(),
     // so a cancel that races with this step cannot delete an account that was
     // just cancelled. The result distinguishes 'deleted', 'cancelled', and
     // 'already_deleted' so telemetry is accurate.
     const deletionResult = await step.run('delete-account-data', async () => {
       const db = getStepDatabase();
-      if (useV2) {
-        return executeDeletionV2(db, {
-          organizationId: accountId,
-          ownerEmail,
-          reason: 'user_initiated',
-          deletedBy: null,
-        });
-      }
-      return executeDeletion(db, accountId);
+      return executeDeletionV2(db, {
+        organizationId: accountId,
+        ownerEmail,
+        reason: 'user_initiated',
+        deletedBy: null,
+      });
     });
 
     if (deletionResult === 'cancelled') {
@@ -207,7 +177,6 @@ export const scheduledDeletion = inngest.createFunction(
 
     if (
       deletionResult === 'deleted' &&
-      useV2 &&
       subscriptionStoreTeardownTargets.length > 0
     ) {
       await step.sendEvent('request-subscription-store-teardown', {

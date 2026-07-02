@@ -590,6 +590,15 @@ describe('[INNGEST-DELETION-ONFAILURE] terminal-failure escalation', () => {
 //     active-deletion stamp and silently skip a GDPR/COPPA erasure. The
 //     pinning tests flip the live flag to the OPPOSITE of the pinned version
 //     and assert the run still erases against the originally-scheduled store.
+//  3. [WI-1255] The legacy (v1) store no longer exists in prod — the T1
+//     identity migration (0106_identity_t1_org_membership.sql) reused
+//     account.id AS organization.id, and the follow-up M-DROP migration
+//     dropped accounts/profiles/family_links/consent_states outright. An
+//     event carrying a stale identityVersion: 'v1' pin (dispatched before the
+//     legacy tables were dropped) can no longer honor that pin — the CODEX-P1
+//     "pinned v1 survives via legacy executeDeletion" behavior is retired.
+//     Every run now erases via v2, using the same accountId as the
+//     organizationId (no identifier translation needed).
 // ---------------------------------------------------------------------------
 describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
   const mockDb = { query: {} };
@@ -738,11 +747,16 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     expect(mockAccountExists).not.toHaveBeenCalled();
   });
 
-  it('[BREAK CODEX-P1] pinned v1 survives a mid-grace-period flip to v2 — erases via executeDeletion', async () => {
-    // Scheduled in legacy (identityVersion: 'v1'), then the flag flipped ON
-    // (cutover) before resume — live flag now returns true.
-    mockIsIdentityV2EnabledInStep.mockReturnValue(true);
-
+  // [BREAK WI-1255] Prod dropped the legacy tables (accounts/profiles/
+  // family_links/consent_states — see comment block above). A durably
+  // pinned identityVersion: 'v1', left over from an event dispatched before
+  // the drop, must no longer route to executeDeletion/accountExists — that
+  // store is gone and the resume would 500. Retired the CODEX-P1
+  // "pinned v1 survives via legacy" behavior in favor of always erasing via
+  // v2. Red→green: before the fix, useV2 was false for identityVersion:
+  // 'v1' and this asserted mockExecuteDeletionV2 was never called; the fix
+  // makes it always be called.
+  it('[BREAK WI-1255] pinned v1 with legacy tables dropped erases via v2, not legacy', async () => {
     const { step } = createInngestStepRunner();
     const handler = (scheduledDeletion as any).fn;
     const result = await handler({
@@ -751,10 +765,39 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     });
 
     expect(result).toEqual({ status: 'deleted', accountId: 'acc-1' });
-    // The erasure ran against the originally-scheduled legacy store, NOT the
-    // now-active v2 store.
-    expect(mockExecuteDeletion).toHaveBeenCalledWith(mockDb, 'acc-1');
+    // organization.id was REUSED from account.id at the T1 migration, so the
+    // same accountId already resolves the v2 entity — no translation step.
+    expect(mockExecuteDeletionV2).toHaveBeenCalledWith(mockDb, {
+      organizationId: 'acc-1',
+      ownerEmail: 'owner@example.com',
+      reason: 'user_initiated',
+      deletedBy: null,
+    });
+    // The dropped-table legacy store must never be queried.
+    expect(mockAccountExists).not.toHaveBeenCalled();
+    expect(mockExecuteDeletion).not.toHaveBeenCalled();
+    expect(mockGetAccountClerkUserId).not.toHaveBeenCalled();
+    expect(mockIsDeletionCancelled).not.toHaveBeenCalled();
+  });
+
+  it('[BREAK WI-1255] pinned v1 whose v2 org is already gone completes as already_deleted, no error', async () => {
+    // Genuine can't-resolve case: the v2 entity truly no longer exists (e.g.
+    // already erased by an earlier run). Must be a clean no-op, never a 500.
+    mockOrganizationExistsV2.mockResolvedValue(false);
+
+    const { step } = createInngestStepRunner();
+    const handler = (scheduledDeletion as any).fn;
+    const result = await handler({
+      event: { data: { accountId: 'acc-gone', identityVersion: 'v1' } },
+      step,
+    });
+
+    expect(result).toEqual({
+      status: 'already_deleted',
+      accountId: 'acc-gone',
+    });
+    expect(mockAccountExists).not.toHaveBeenCalled();
+    expect(mockExecuteDeletion).not.toHaveBeenCalled();
     expect(mockExecuteDeletionV2).not.toHaveBeenCalled();
-    expect(mockOrganizationExistsV2).not.toHaveBeenCalled();
   });
 });
