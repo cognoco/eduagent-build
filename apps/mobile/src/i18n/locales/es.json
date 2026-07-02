@@ -4079,7 +4079,9 @@
       "memory": "Memoria",
       "memorySubtitle": "Ve y gestiona lo que tu mentor recuerda.",
       "sessions": "Sesiones",
-      "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes."
+      "sessionsSubtitle": "Revisa los resúmenes de sesiones recientes.",
+      "practice": "Práctica",
+      "practiceSubtitle": "Abre el centro de práctica o revisa tu actividad pasada."
     },
     "moments": {
       "title": "Momentos recientes",
@@ -4115,6 +4117,21 @@
       "filterAll": "Todo",
       "filterMine": "Mis notas",
       "filterMentor": "Marcadores"
+    },
+    "practice": {
+      "openHub": "Abrir centro de práctica",
+      "pastActivityTitle": "Mi actividad pasada",
+      "empty": "Tus quizzes, repasos, evaluaciones y ejercicios aparecerán aquí.",
+      "error": "No pudimos cargar tu actividad anterior.",
+      "type": {
+        "all": "Todos",
+        "quiz": "Quiz",
+        "review": "Repaso",
+        "assessment": "Evaluación",
+        "dictation": "Dictado",
+        "recitation": "Recitación",
+        "fluency_drill": "Ejercicio de fluidez"
+      }
     }
   },
   "accountAdmin": {
