@@ -1,8 +1,11 @@
 # 10 — Spine ↔ Cosmo Reconciliation Map (Phase B)
 
-**Status:** DRAFT — read-only classification. **No Cosmo mutations** occur from this document.
-It is the proposed re-baseline; the operator approves the map, and only then does any
-Stage/close/capture/re-point write happen. Authority: `08-convergence-spine.md` (RATIFIED).
+**Status:** **APPROVED** by operator 2026-07-02. Captures executed (C1–C8 → WI-1301…1308); WI-1250 re-filed.
+Remaining writes (WS re-files, compliance dedup, WI-1249, pause-lift) held for a triage pass — see end.
+Authority: `08-convergence-spine.md` (RATIFIED). Original classification below is unchanged (the map of record).
+
+**Operator rulings on this map (2026-07-02):** map **approved**; supporter S0–S5 **in the V2 MVP**
+(spine §6.5); C1 captured as a **new WI**, WI-787 stays separate (spine §6.7).
 
 **Pulled 2026-07-02** from Cosmo "Work Items" (`f170be9e…`), Stage ≠ Closed → **269 open estate-wide**.
 The spine governs **MentoMate app convergence only**, so scope narrows to **77 items**: 75 with
@@ -63,20 +66,21 @@ manifesting for real**; `WI-1176` — supporter self-unlink 500s. Both independe
 | **Retire V0 + flags-off shell** | **M5** | — | — | **CAPTURE** |
 | Ship V2 | M6 | — | S0–S5 build cluster (1121/1127/1134/1135/1136/1137) + V2 nav (1208/1209/1210/1283) | ✓ (feature-build; MVP-scope fork below) |
 
-**CAPTURE list (8) — the actionable output.** Nobody owns these; they are the spine made real:
+**CAPTURE list (8) — the actionable output. CREATED 2026-07-02.** Nobody owned these; they are the spine made real:
 
-| # | Capture | M | Notes |
-|---|---|---|---|
-| C1 | Route-gate caller-bound authority (R1 IDOR) | M1 | scope-expand `WI-787` or new WI; **top risk**; the M1-immediate dispatch |
-| C2 | `/profiles/switch` elevation-bypass close (R2) | M1 | pairs with C1 |
-| C3 | One-membership-per-person DB constraint (R8) | M1 | before any invite/claim/multi-credential flow |
-| C4 | Flag-combo ratchet — 3 sanctioned rows (R9) | M1 | CI test; encodes V2⇒V1 dependency |
-| C5 | Cross-boundary `profile-v2` seam test (R6) | M1 | real adapter, PR-gated |
-| C6 | CI-schema-fidelity: build prod schema / journal-promote freeze-only (R3) | M2a | closes the phantom-schema class biting `WI-1167` |
-| C7 | Build + E2E-prove the `V2=off/V1=on` fallback channel | M4 | **gates M5 + M6** — no rollback exists today |
-| C8 | Retire V0 + flags-off shell | M5 | irreversible; gated on C7 |
+| # | WI | Capture | M | Stage | Notes |
+|---|---|---|---|---|---|
+| C1 | **WI-1301** | Route-gate caller-bound authority (R1 IDOR) | M1 | Ready | new WI (§6.7); **top risk**; `WI-787` stays separate |
+| C2 | **WI-1302** | `/profiles/switch` elevation-bypass close (R2) | M1 | Ready | pairs with C1 |
+| C3 | **WI-1303** | One-membership-per-person DB constraint (R8) | M1 | Ready | before any invite/claim/multi-credential flow |
+| C4 | **WI-1304** | Flag-combo ratchet — 3 sanctioned rows (R9) | M1 | Ready | CI test; encodes V2⇒V1 dependency |
+| C5 | **WI-1305** | Cross-boundary `profile-v2` seam test (R6) | M1 | Ready | real adapter, PR-gated |
+| C6 | **WI-1306** | CI-schema-fidelity: build prod schema / journal-promote freeze-only (R3) | M2a | Captured | closes the phantom-schema class biting `WI-1167` |
+| C7 | **WI-1307** | Build + E2E-prove the `V2=off/V1=on` fallback channel | M4 | Captured | **gates M5 + M6** — no rollback exists today |
+| C8 | **WI-1308** | Retire V0 + flags-off shell | M5 | Captured | irreversible; gated on C7; carries the tag+register preservation AC (§6.6) |
 
-C1–C5 are the **M1 bundle** → the "M1 immediate" dispatch. C7/C8 are the rollback spine that must exist before ship.
+C1–C5 (WI-1301…1305, Ready) are the **M1 bundle** — owner J+Z per spine. C6–C8 (Captured) are later-milestone work.
+C7/C8 are the rollback spine that must exist before ship.
 
 ---
 
@@ -189,11 +193,18 @@ WI-1190 · WI-482 — **O**. None spine-governed; all proceed independently.
 
 ---
 
-## What happens on approval (the only writes)
-- Create 8 CAPTURE WIs (C1–C8), C1–C5 tagged M1.
-- Re-file 5 misfiled items (Project / WS-ID).
-- Dedup-triage the compliance overlap; triage/delete WI-1249.
-- Annotate on-spine items with their milestone + gate.
-- Lift the WS-18/WS-28 pause under the re-sequenced order.
+## Writes — done vs. held
 
-**Until then: read-only. No mutations.**
+**DONE (2026-07-02, post-approval):**
+- ✅ Created 8 CAPTURE WIs → **WI-1301…1308** (C1–C5 Ready/M1, C6–C8 Captured).
+- ✅ Re-filed **WI-1250** Project Nexus → MentoMate (clear-cut misfile).
+
+**HELD for a deliberate triage pass (judgment-heavy / destructive — not auto-fired):**
+- Workstream re-files: WI-904 (WS-28→UX), WI-1288/781 (WS-31→WS-18), WI-770 (→Nexus/WS-23). Relation
+  changes needing target resolution; low-urgency.
+- Compliance **dedup**: reconcile the Ready `11xx` vs Captured `119x` duplicate generation — needs a human
+  call on which to keep/merge; not an agent auto-close.
+- **WI-1249** (null Stage + empty Name): flagged for the operator to delete/repair — left untouched (won't
+  guess at an empty item).
+- On-spine milestone annotations on existing items + the WS-18/WS-28 **pause-lift** (shepherd resume signal —
+  operator/Zuzka-coordinated).

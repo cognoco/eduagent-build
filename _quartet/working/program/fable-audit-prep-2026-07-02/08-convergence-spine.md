@@ -121,7 +121,8 @@ legacy row is time-boxed to pre-M5). Encodes the hard **V2⇒V1 dependency** (V2
 
 **Standing guardrails:** the irreversible gate (M2b + M5 + any V0/V1-reachable destructive delete stay on
 explicit human confirm); no new config (no third shell arm, no new identity flag, no "preserve live" without
-a named retirement date).
+a named retirement date); **preservation gate (§6.6)** — every strip delete (M3, M5) requires a pushed
+annotated tag + a `docs/archive/retired-code.md` entry before the delete lands (never a backup branch).
 
 ---
 
@@ -141,6 +142,17 @@ retaining refinement wherever an item survives, writing off only map-obsoleted w
 2. **F=V1 retention → through launch + stability window** (eventual V1-only is post-launch, out of scope).
 3. **dev target → converge to v2-only** (M2b applies to dev).
 4. **M1 timing → immediate** — starts now, independent of the pause and the cutover.
+5. **Supporter S0–S5 surfaces → IN the V2 MVP** (operator, 2026-07-02). WI-1121/1127/1134/1135/1136/1137
+   stay in M6 scope; not deferred to post-launch.
+6. **V0/legacy preservation → annotated pushed git TAG, not a branch** (operator, 2026-07-02). A backup
+   *branch* is banned — it reads as "maintained" and reintroduces the parallel-version drift the spine
+   exists to kill. Each strip point gets an annotated, pushed tag (`retired/<subsystem>-<date>`) whose
+   message carries what/why/how-to-restore. Discoverability is a one-page **in-repo retired-code register**
+   (`docs/archive/retired-code.md`): subsystem → tag → commit → PR → retrieval command → rebuild caveat.
+   The register is introduced at the **M3** legacy strip (WI-779/1139) and appended at **M5** (C8).
+   **Hard gate:** no strip delete lands without its pushed tag + register entry (an AC on every strip WI).
+7. **C1 capture mechanism → new WI** (operator, 2026-07-02). The route-gate authority IDOR (R1) is a
+   fresh WI; `WI-787` stays its narrower self (guardian-write suppression inside the same guard). Both M1.
 
 ---
 
