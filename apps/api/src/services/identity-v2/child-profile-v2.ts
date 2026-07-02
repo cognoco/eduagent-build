@@ -51,7 +51,7 @@ import {
 } from './identity-graph';
 import { getOwnerProfileV2, jurisdictionToLocation } from './profile-v2';
 import { createDirectConsentGrant } from './consent-v2';
-import { calculateAge } from '../age-utils';
+import { calculateAgeFromParts } from '../age-utils';
 
 async function legacyProfilesTableExists(db: Database): Promise<boolean> {
   const raw = (await db.execute(
@@ -113,15 +113,23 @@ export async function createChildProfileV2(
         'Cannot add a child to an organization without an owner.',
       );
     }
-    // Adult-owner gate: the existing owner must be >=18 to add a child.
-    // Year-only math via calculateAge() (UTC-safe currentYear - birthYear),
-    // behavior-identical to the legacy createProfileWithLimitCheck gate and
-    // consistent with birthYearSchema.
+    // [WI-367] Adult-owner gate: the existing owner must be >=18 to add a
+    // child. Uses the owner's exact birth date (calculateAgeFromParts) when
+    // present, year-only fallback otherwise — year-only math alone
+    // overestimates by up to 11 months, letting an owner born late in the
+    // year (still 17) read as 18 and add a child. Aligns with the legacy
+    // twin (services/profile.ts createProfileWithLimitCheck), which already
+    // uses the exact-date check.
     // NOT computeAgeBracket() — AGENTS.md §Profile Shapes bans it for feature
     // gating (theming/copy only); this is a feature gate. Fail-closed on null.
     if (
       adultOwnerGateEnabled &&
-      (owner.birthYear == null || calculateAge(owner.birthYear) < 18)
+      (owner.birthYear == null ||
+        calculateAgeFromParts(
+          owner.birthYear,
+          owner.birthMonth ?? undefined,
+          owner.birthDay ?? undefined,
+        ) < 18)
     ) {
       throw new ForbiddenError(
         'Account holder must be 18 or older to add a child profile.',

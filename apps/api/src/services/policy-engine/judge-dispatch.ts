@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  computeAgeBracket,
+  computeAgeBracketFromDate,
   type AgeBracket,
   type ConversationLanguage,
   type SuitabilityJudgeRequestedEvent,
@@ -36,6 +36,13 @@ export interface SuitabilityJudgeDispatchInput {
   precedingLearnerMessageEventId: string | undefined;
   /** Learner birth year; `null`/`undefined` (age not loaded) → conservative minor. */
   birthYear: number | null | undefined;
+  /**
+   * [WI-367] Exact birth-date parts, when known — used with birthYear for
+   * exact-date age-bracket computation (computeAgeBracketFromDate) so
+   * coverage sampling is safety-adjacent, not tone/theming.
+   */
+  birthMonth?: number | null;
+  birthDay?: number | null;
   tutorVendor: string | undefined;
   tutorModel: string | undefined;
   flow: string;
@@ -63,8 +70,17 @@ export function resolveSuitabilityJudgeDispatch(
 
   // Unknown age → conservative minor default ('child' → full coverage), never
   // under-covered. Matches resolveSuitabilityProfile's null handling.
+  // [WI-367] Exact-date bracket (not computeAgeBracket): coverage sampling is
+  // safety-adjacent, so a year-only overestimate must not under-sample a
+  // still-minor learner into the adult 10% sampling rate.
   const ageBracket: AgeBracket =
-    input.birthYear != null ? computeAgeBracket(input.birthYear) : 'child';
+    input.birthYear != null
+      ? computeAgeBracketFromDate(
+          input.birthYear,
+          input.birthMonth ?? undefined,
+          input.birthDay ?? undefined,
+        )
+      : 'child';
 
   if (!shouldJudge(ageBracket, input.rng)) return null;
 

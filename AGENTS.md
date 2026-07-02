@@ -238,6 +238,7 @@ Key rules:
 - Use `resolveTabShape()` for tab visibility. Use `isOwner` / `role` for content gating inside screens.
 - `isGuardianProfile()` requires `isOwner` AND at least one non-owner in profiles[].
 - `computeAgeBracket()` (from `@eduagent/schemas`) is the canonical age-bracket function — use it for theming and age-appropriate copy, never for feature gating. The removed `personaFromBirthYear()` (and related fossils `isLearner`, local `Persona` type) must not be re-introduced — enforced by `persona-fossil-guard.test.ts`.
+- `computeAgeBracketFromDate()` (from `@eduagent/schemas`) is the canonical function for feature-gating and safety-adjacent age decisions (family-mode gate, adult-owner gate, LLM safety preamble, suitability-judge sampling). It falls back to year-only when month/day are absent. Use it — not `computeAgeBracket()` — for any gate that turns on the learner's age.
 - A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
 ## Languages

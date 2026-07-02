@@ -22,7 +22,11 @@ import {
   resolveLatestConsentStatusAnyBasis,
   DEFAULT_CONSENT_PURPOSE,
 } from './identity-v2/consent-status-v2';
-import { jurisdictionToLocation } from './identity-v2/profile-v2';
+import {
+  jurisdictionToLocation,
+  birthYearFromDate,
+  birthMonthDayFromDate,
+} from './identity-v2/profile-v2';
 
 const logger = createLogger();
 import type {
@@ -33,7 +37,7 @@ import type {
   Profile,
 } from '@eduagent/schemas';
 import {
-  computeAgeBracket,
+  computeAgeBracketFromDate,
   PARENT_ACCOUNT_MINIMUM_AGE,
   ForbiddenError,
 } from '@eduagent/schemas';
@@ -700,13 +704,25 @@ export async function updateProfileAppContext(
   if (!existingPerson || !existingMembership) return null;
 
   const isOwner = existingMembership.roles.includes('admin');
-  const birthYear = Number(existingPerson.birthDate.slice(0, 4));
+  // [WI-367] Exact-date family-mode gate. Year-only math (currentYear -
+  // birthYear) overestimates age by up to 11 months, which could let a
+  // 17-year-old owner (birthday not yet passed) switch into family mode.
+  // NOT computeAgeBracket() — AGENTS.md §Profile Shapes bans year-only math
+  // for feature gating (theming/copy only); this is a feature gate.
+  const birthYear = birthYearFromDate(existingPerson.birthDate);
+  const { birthMonth, birthDay } = birthMonthDayFromDate(
+    existingPerson.birthDate,
+  );
 
   if (defaultAppContext === 'family') {
     const charges = await getChargePersonIds(db, profileId);
     if (
       !isOwner ||
-      computeAgeBracket(birthYear) !== 'adult' ||
+      computeAgeBracketFromDate(
+        birthYear,
+        birthMonth ?? undefined,
+        birthDay ?? undefined,
+      ) !== 'adult' ||
       charges.length === 0
     ) {
       throw new ForbiddenError(
@@ -849,6 +865,9 @@ export async function getProfileDisplayName(
  * Resolves a profile's AgeBracket for passing to LLM safety-preamble calls.
  * Returns 'adult' (the conservative minor-safe default) if birthYear is unset.
  * BUG-352: isNull(profiles.archivedAt) prevents reads of GDPR-pending archived profiles.
+ * [WI-367] Uses the exact birth date (computeAgeBracketFromDate) when
+ * birthMonth/birthDay are present, year-only fallback otherwise — the
+ * safety-preamble selection is safety-adjacent, not tone/theming.
  */
 export async function getProfileAgeBracket(
   db: Database,
@@ -856,9 +875,15 @@ export async function getProfileAgeBracket(
 ): Promise<AgeBracket> {
   const profile = await db.query.profiles.findFirst({
     where: and(eq(profiles.id, profileId), isNull(profiles.archivedAt)),
-    columns: { birthYear: true },
+    columns: { birthYear: true, birthMonth: true, birthDay: true },
   });
-  return profile?.birthYear ? computeAgeBracket(profile.birthYear) : 'adult';
+  return profile?.birthYear
+    ? computeAgeBracketFromDate(
+        profile.birthYear,
+        profile.birthMonth ?? undefined,
+        profile.birthDay ?? undefined,
+      )
+    : 'adult';
 }
 
 // ---------------------------------------------------------------------------

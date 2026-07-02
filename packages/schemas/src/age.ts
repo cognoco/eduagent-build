@@ -61,6 +61,39 @@ export function computeAgeBracket(
   return 'adult';
 }
 
+/**
+ * WI-367: exact-date age bracket for GATING and SAFETY-adjacent decisions —
+ * feature-access gates (adult-owner, family-mode), LLM safety-preamble
+ * selection, suitability-judge sampling coverage. Never use this for
+ * tone/voice/theming, which stays on the year-only `computeAgeBracket()`
+ * (AGENTS.md § Profile Shapes bans year-only math for feature gating, but the
+ * calendar-year semantics are the intended trade-off for tone/theming).
+ *
+ * Same UTC-safe day math as `calculateAgeFromParts`
+ * (apps/api/src/services/age-utils.ts) and the identical banding thresholds
+ * as `computeAgeBracket` — this is the single banding source of truth for
+ * both. Falls back to the year-only approximation when month/day are absent.
+ */
+export function computeAgeBracketFromDate(
+  birthYear: number,
+  birthMonth?: number,
+  birthDay?: number,
+): AgeBracket {
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
+  let age = currentYear - birthYear;
+  if (birthMonth != null && birthDay != null) {
+    const birthdayThisYear = new Date(
+      Date.UTC(currentYear, birthMonth - 1, birthDay),
+    );
+    if (now < birthdayThisYear) age -= 1;
+  }
+
+  if (age < PROFILE_MINIMUM_AGE) return 'child';
+  if (age < PARENT_ACCOUNT_MINIMUM_AGE) return 'adolescent';
+  return 'adult';
+}
+
 export function isAdultOwner(
   profile: AgeGateProfile | null | undefined,
   currentYear?: number,
