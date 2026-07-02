@@ -41,7 +41,7 @@ import {
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
 import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
-import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
+import type { RevenueCatEvent } from '../revenuecat-shared';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;

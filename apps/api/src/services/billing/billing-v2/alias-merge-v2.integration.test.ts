@@ -39,7 +39,7 @@ import { resolve } from 'path';
 
 import { ALIAS_MERGE_IDEMPOTENCY_SOURCE } from '../alias-merge';
 import { getTopUpCreditsRemaining } from '../top-up';
-import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
+import type { RevenueCatEvent } from '../revenuecat-shared';
 import { getTierConfig } from '../../subscription';
 import { inngest } from '../../../inngest/client';
 import {

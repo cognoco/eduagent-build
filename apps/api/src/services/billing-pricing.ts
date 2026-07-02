@@ -10,6 +10,8 @@
 // of [WI-85 / WI-175] (entitlements granted from unverified metadata).
 
 import type { PaidTier, BillingInterval } from '@eduagent/schemas';
+import type Stripe from 'stripe';
+import type { AppliedSubscriptionRow } from './billing/types';
 
 const PAID_TIERS: readonly PaidTier[] = ['plus', 'family', 'pro'];
 const INTERVALS: readonly BillingInterval[] = ['monthly', 'yearly'];
@@ -119,4 +121,86 @@ export function verifySubscriptionTier(
   }
 
   return { effectiveTier, status, priceTier, metadataTier, priceId };
+}
+
+// ---------------------------------------------------------------------------
+// [WI-1239 / 779-strip] Stripe webhook-payload extraction helpers
+// ---------------------------------------------------------------------------
+// Relocated from the legacy stripe-webhook-handler.ts (deleted) — these are
+// pure, store-agnostic and shared by the v2 handler
+// (billing-v2/stripe-webhook-handler-v2.ts). Kept alongside verifySubscriptionTier
+// since both are pure Stripe-payload interpretation used by the same callers.
+
+// In Stripe SDK v20, `current_period_start` and `current_period_end` moved
+// from `Subscription` to `SubscriptionItem`. Webhook payloads still include
+// them at the subscription level, but the TypeScript types don't expose them.
+// These helpers safely extract period timestamps from subscription items.
+
+export function extractPeriodStart(
+  sub: Stripe.Subscription,
+): number | undefined {
+  const ts = sub.items?.data?.[0]?.current_period_start;
+  return typeof ts === 'number' ? ts : undefined;
+}
+
+export function extractPeriodEnd(sub: Stripe.Subscription): number | undefined {
+  const ts = sub.items?.data?.[0]?.current_period_end;
+  return typeof ts === 'number' ? ts : undefined;
+}
+
+/**
+ * Extracts the subscription ID from an Invoice.
+ * In Stripe SDK v20, `subscription` moved to `parent.subscription_details`.
+ */
+export function extractSubscriptionIdFromInvoice(
+  invoice: Stripe.Invoice,
+): string | undefined {
+  const parentSub = invoice.parent?.subscription_details?.subscription;
+  if (typeof parentSub === 'string') return parentSub;
+  if (parentSub && typeof parentSub === 'object' && 'id' in parentSub) {
+    return parentSub.id;
+  }
+  return undefined;
+}
+
+const PAID_TIERS_SET = new Set<string>(['plus', 'family', 'pro']);
+
+export function shouldRefreshStripeKv(
+  updated: AppliedSubscriptionRow | null,
+  stripeEventId: string,
+): updated is AppliedSubscriptionRow {
+  return (
+    updated !== null &&
+    (updated.webhookApplied !== false ||
+      updated.lastStripeEventId === stripeEventId)
+  );
+}
+
+/** Validates and extracts a paid tier from metadata. */
+export function extractPaidTier(
+  metadata: Record<string, string> | undefined | null,
+): ('plus' | 'family' | 'pro') | null {
+  const tier = metadata?.tier;
+  if (!tier || !PAID_TIERS_SET.has(tier)) return null;
+  return tier as 'plus' | 'family' | 'pro';
+}
+
+/** Maps a Stripe subscription status to our internal status. */
+export function mapStripeStatus(
+  stripeStatus: string,
+): 'active' | 'past_due' | 'cancelled' | 'expired' | null {
+  switch (stripeStatus) {
+    case 'active':
+    case 'trialing':
+      return 'active';
+    case 'past_due':
+      return 'past_due';
+    case 'canceled':
+      return 'cancelled';
+    case 'unpaid':
+    case 'incomplete_expired':
+      return 'expired';
+    default:
+      return null;
+  }
 }

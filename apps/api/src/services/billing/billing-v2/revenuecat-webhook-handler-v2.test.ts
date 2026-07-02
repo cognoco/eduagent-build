@@ -98,7 +98,7 @@ import {
   handleNonRenewingPurchaseV2,
   handleBillingIssueV2,
 } from './revenuecat-webhook-handler-v2';
-import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
+import type { RevenueCatEvent } from '../revenuecat-shared';
 
 // A db that throws on ANY property access — any attempt to reach the DB or grant
 // path after the guard would fail loudly.
