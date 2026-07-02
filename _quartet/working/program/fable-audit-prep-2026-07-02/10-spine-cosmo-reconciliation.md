@@ -197,14 +197,15 @@ WI-1190 · WI-482 — **O**. None spine-governed; all proceed independently.
 
 **DONE (2026-07-02, post-approval):**
 - ✅ Created 8 CAPTURE WIs → **WI-1301…1308** (C1–C5 Ready/M1, C6–C8 Captured).
-- ✅ Re-filed **WI-1250** Project Nexus → MentoMate (clear-cut misfile).
+- ✅ Re-filed **WI-1250** Project Nexus → MentoMate.
+- ✅ Workstream re-files (held batch): **WI-904** WS-28→WS-33, **WI-1288** WS-31→WS-18, **WI-781** WS-31→WS-18.
+- ✅ Capture workstream assignments: **WI-1306** → WS-18 (M2a); **WI-1307/1308** → WS-28 (M4/M5).
+  **M1 bundle (WI-1301…1305) held** for a **new "Seam Hardening" workstream** (operator's call — see §Decisions).
+- ✅ Resume note for the WS-18/WS-28 orchestrator drafted → `11-ws18-28-resume-note.md`.
 
-**HELD for a deliberate triage pass (judgment-heavy / destructive — not auto-fired):**
-- Workstream re-files: WI-904 (WS-28→UX), WI-1288/781 (WS-31→WS-18), WI-770 (→Nexus/WS-23). Relation
-  changes needing target resolution; low-urgency.
+**STILL HELD (judgment-heavy / operator-owned — not auto-fired):**
 - Compliance **dedup**: reconcile the Ready `11xx` vs Captured `119x` duplicate generation — needs a human
   call on which to keep/merge; not an agent auto-close.
-- **WI-1249** (null Stage + empty Name): flagged for the operator to delete/repair — left untouched (won't
-  guess at an empty item).
-- On-spine milestone annotations on existing items + the WS-18/WS-28 **pause-lift** (shepherd resume signal —
-  operator/Zuzka-coordinated).
+- **WI-1249** (null Stage + empty Name): left untouched — operator to delete/repair.
+- **WI-770** (Cosmo-tooling): likely re-homes to Nexus, not a within-MentoMate WS move — left for operator.
+- The **pause-lift** itself (shepherd/orchestrator resume signal) — the resume note is drafted; operator/Zuzka deliver.
