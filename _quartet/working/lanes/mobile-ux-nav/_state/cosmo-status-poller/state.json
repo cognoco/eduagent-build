@@ -1,0 +1,282 @@
+[
+  {
+    "key": "Mobile UX & Navigation::WI-1142",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1142",
+    "name": "Add Study->Family switch-CTA regression coverage for child entry surfaces (BRIDGE-04 path)",
+    "stage": "Reviewing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T19:10:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1184",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1184",
+    "name": "Verify/fix child subject route wedging Chrome walkthrough (needs staging repro)",
+    "stage": "Refining",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:00:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1204",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1204",
+    "name": "Keep homework capture bottom actions above system navigation",
+    "stage": "Closed",
+    "state": null,
+    "resolution": "Done",
+    "modified": "2026-07-02T18:49:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1208",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1208",
+    "name": "Keep pick-book Back inside the Subjects shell",
+    "stage": "Reviewing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T18:59:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1209",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1209",
+    "name": "Return subject-hub empty-state Back to Subjects, not Home",
+    "stage": "Executing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T19:05:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1210",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1210",
+    "name": "Align empty subject states with visible curriculum state",
+    "stage": "Reviewing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T19:05:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1212",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1212",
+    "name": "Use book-flip animation for subject curriculum preparation",
+    "stage": "Closed",
+    "state": null,
+    "resolution": "Done",
+    "modified": "2026-07-02T18:42:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1248",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1248",
+    "name": "Route remaining inline CTA buttons through shared Button (WI-1081 tail)",
+    "stage": "Executing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T19:11:00Z"
+  },
+  {
+    "key": "Mobile UX & Navigation::WI-1283",
+    "workstream": "Mobile UX & Navigation",
+    "wi": "WI-1283",
+    "name": "shelf/[subjectId] Back hardcodes Library, ignores MODE_NAV_V2 (sibling of WI-1209/1208)",
+    "stage": "Captured",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:13:00Z"
+  },
+  {
+    "key": "Safety & Eval::WI-781",
+    "workstream": "Safety & Eval",
+    "wi": "WI-781",
+    "name": "Decide CONCEPT_CAPTURE_ENABLED: flip on (tables landed via 0113) or confirm deferral pending cutover profiles→person FK repoint",
+    "stage": "Reviewing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T18:33:00Z"
+  },
+  {
+    "key": "Safety & Eval::WI-1154",
+    "workstream": "Safety & Eval",
+    "wi": "WI-1154",
+    "name": "Safety: minor-routed model leaks step-by-step opium→heroin extraction despite no-how-to rule (eval SL-DU02)",
+    "stage": "Executing",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:28:00Z"
+  },
+  {
+    "key": "Safety & Eval::WI-1155",
+    "workstream": "Safety & Eval",
+    "wi": "WI-1155",
+    "name": "Envelope signal discipline: private_sources.insufficient not set on partial/unsupported-source scenarios + teach_back rubric missing (eval HW02/HW04/SGA04/P17)",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:34:00Z"
+  },
+  {
+    "key": "Safety & Eval::WI-1285",
+    "workstream": "Safety & Eval",
+    "wi": "WI-1285",
+    "name": "Audit: safety rules enforced only in prompt text (no server-side gate, no deterministic break test) - sweep & harden",
+    "stage": "Captured",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:20:00Z"
+  },
+  {
+    "key": "Safety & Eval::WI-1288",
+    "workstream": "Safety & Eval",
+    "wi": "WI-1288",
+    "name": "Repoint concepts/concept_mastery schema-code FK profiles.id -> person.id + idempotent migration 0129 (split from WI-781)",
+    "stage": "Captured",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T17:58:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-482",
+    "workstream": "Platform Hardening",
+    "wi": "WI-482",
+    "name": "Split monolithic session/curriculum service modules",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1041",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1041",
+    "name": "Root dependency hygiene: tailwindcss placement + wrangler dedup + query-core override scoping",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1069",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1069",
+    "name": "Centralize mobile data-hook conventions and split oversized hooks",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1088",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1088",
+    "name": "Consolidate owner/role naming and name magic values",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1096",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1096",
+    "name": "WP: API query-performance pass (FCR L7 — N+1 / serial awaits / unbounded fetches)",
+    "stage": "Ready",
+    "state": null,
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1098",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1098",
+    "name": "Validate API responses at the mobile trust boundary — remaining hooks (parseJson sweep)",
+    "stage": "Refining",
+    "state": "Blocked",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1177",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1177",
+    "name": "Extract assessment-answer and stream-failure business logic out of route handlers",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1178",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1178",
+    "name": "Capture remaining silent-recovery observability gaps (sse-utf8 + analytics)",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1179",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1179",
+    "name": "Migrate mobile auth from deprecated @clerk/clerk-expo to @clerk/expo (Core 3)",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1180",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1180",
+    "name": "Upgrade @sentry/react-native off pinned 8.1.0 and reconcile with @sentry/cloudflare",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1181",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1181",
+    "name": "Dev-dependency lockfile hygiene: drop transitive node-fetch@2 / lodash / moment + build-tool deprecations",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1183",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1183",
+    "name": "Add i18n value-equality guard and re-translate echoed-English strings per locale",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1188",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1188",
+    "name": "Adopt QueryStateView/TimeoutLoader/ErrorFallback — Batch 2-4 (11 remaining gap sites)",
+    "stage": "Captured",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  },
+  {
+    "key": "Platform Hardening::WI-1190",
+    "workstream": "Platform Hardening",
+    "wi": "WI-1190",
+    "name": "Burn down remaining gc1-allow internal-mock backlog (mobile + api routes + genuine conversions)",
+    "stage": "Ready",
+    "state": "Active",
+    "resolution": null,
+    "modified": "2026-07-02T10:45:00Z"
+  }
+]

@@ -1,0 +1,87 @@
+{
+  "mode": "verify",
+  "wi_id": "WI-1204",
+  "page_id": "38f8bce9-1f7c-817a-a71e-f7d029912c4c",
+  "stage": "Reviewing",
+  "repo": ".",
+  "disposition": "verified",
+  "verdicts": [
+    {
+      "claim": {
+        "kind": "commit",
+        "ref": "267b743f6b616801155af254a0aacfa992781f11",
+        "text": "Fixed In cites commit 267b743f6b616801155af254a0aacfa992781f11",
+        "source": "fixed_in"
+      },
+      "status": "verified",
+      "evidence": "commit 267b743f6b616801155af254a0aacfa992781f11 exists in ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/homework/camera.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/homework/camera.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/homework/camera.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/progress/index.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/progress/index.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/progress/index.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/topic/[topicId].tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/topic/[topicId].tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/topic/[topicId].tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/homework/camera.test.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/homework/camera.test.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/homework/camera.test.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "tests",
+        "ref": "",
+        "source": "summary",
+        "text": "summary claims tests green (no count)"
+      },
+      "status": "verified",
+      "evidence": "tests re-run green now: `pnpm run test` exit 0 — > @eduagent/source@0.0.0 test C:\\Dev\\Projects\\Products\\Apps\\eduagent-build > node scripts/doppler-run.mjs run -- nx run-many -t test"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Root cause: the homework result screen renders final controls inside a ScrollView with fixed 24px content padding while safe-area padding is on the ScrollView style; on Android navigation-bar devices the last row can sit under system nav. Variants: subject-known action row, auto-detected subject action row, manual/ambiguous subject picker bottom controls, small-height viewport with bottom inset. Acceptance: reserve safe-area-aware scroll content/footer space, keep Retake/Let us go/Continue fully visible and tappable, preserve disabled/enabled readability, add regression coverage for bottom-inset navigation-bar viewport. Regression guard (red-green-revert): apps/mobile/src/app/(app)/homework/camera.test.tsx asserts the result-phase action-row bottom padding is derived from the safe-area inset — RED when padding equals the fixed 24px buffer, GREEN when inset-derived (variant 4 uses a taller inset to prove it) — across all four viewport variants.",
+        "text": "Root cause: the homework result screen renders final controls inside a ScrollView with fixed 24px content padding while safe-area padding is on the ScrollView style; on Android navigation-bar devices the last row can sit under system nav. Variants: subject-known action row, auto-detected subject action row, manual/ambiguous subject picker bottom controls, small-height viewport with bottom inset. Acceptance: reserve safe-area-aware scroll content/footer space, keep Retake/Let us go/Continue fully visible and tappable, preserve disabled/enabled readability, add regression coverage for bottom-inset navigation-bar viewport. Regression guard (red-green-revert): apps/mobile/src/app/(app)/homework/camera.test.tsx asserts the result-phase action-row bottom padding is derived from the safe-area inset — RED when padding equals the fixed 24px buffer, GREEN when inset-derived (variant 4 uses a taller inset to prove it) — across all four viewport variants.",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    }
+  ],
+  "counts": {
+    "verified": 6,
+    "failed": 0,
+    "cannot_verify": 0,
+    "needs_judgment": 1
+  },
+  "comment_id": null
+}
