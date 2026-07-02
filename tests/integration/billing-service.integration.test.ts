@@ -5,27 +5,40 @@
  * This suite targets the mock-heavy quota, top-up, and RevenueCat paths.
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
+  membership,
+  organization,
+  person,
   profileQuotaUsage,
   profiles,
   quotaPools,
+  subscription as subscriptionV2Table,
   subscriptions,
   topUpCredits,
 } from '@eduagent/database';
 
 import {
-  activateSubscriptionFromRevenuecat,
   createSubscription,
   decrementQuota,
   ensureFreeSubscription,
   getTopUpCreditsRemaining,
-  handleTierChange,
-  isRevenuecatEventProcessed,
-  purchaseTopUpCredits,
-  updateSubscriptionFromRevenuecatWebhook,
 } from '../../apps/api/src/services/billing';
+// [WI-1239 / 779-strip] purchaseTopUpCredits, activateSubscriptionFromRevenuecat,
+// isRevenuecatEventProcessed, updateSubscriptionFromRevenuecatWebhook, and
+// handleTierChange were removed from the legacy barrel — decrementQuota and the
+// RevenueCat/top-up write paths now resolve ownership/tier exclusively via the
+// v2 (organization/person/membership/subscription) store. Pull the v2 twins
+// directly from billing-v2 for the cases that still need real DB coverage; see
+// the per-test-case comments below for why each case converts, deletes, or is
+// left untouched.
+import {
+  activateSubscriptionFromRevenuecatV2,
+  isRevenuecatEventProcessedV2,
+  purchaseTopUpCreditsV2,
+  updateSubscriptionFromRevenuecatWebhookV2,
+} from '../../apps/api/src/services/billing/billing-v2';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 
@@ -62,6 +75,74 @@ const TEST_ACCOUNTS = [
 
 const ALL_EMAILS = TEST_ACCOUNTS.map((account) => account.email);
 const ALL_CLERK_USER_IDS = TEST_ACCOUNTS.map((account) => account.clerkUserId);
+
+// [WI-1239 / 779-strip] v2 dual-store seeding. decrementQuota /
+// purchaseTopUpCreditsV2 / activateSubscriptionFromRevenuecatV2 resolve tier
+// and ownership via the v2 (organization/person/membership/subscription)
+// store unconditionally, but quota_pools/profile_quota_usage/top_up_credits
+// still FK to the legacy subscriptions/profiles tables (pre-M-REPOINT). Seed
+// BOTH stores with the SAME id for the shared subscription/profile rows (the
+// "reseed identity contract" used throughout billing-v2/*.integration.test.ts)
+// so the legacy-table FKs are satisfiable and the v2 ownership/tier reads
+// actually resolve.
+const V2_ORG_NAMES = [
+  'integration-billing-service-v2-daily-exceeded',
+  'integration-billing-service-v2-topup',
+  'integration-billing-service-v2-revenuecat',
+];
+
+async function seedV2Counterpart(input: {
+  organizationName: string;
+  ownerProfileId: string;
+  legacySubscriptionId: string;
+  tier: 'free' | 'plus' | 'family' | 'pro';
+}) {
+  const db = createIntegrationDb();
+  const [org] = await db
+    .insert(organization)
+    .values({ name: input.organizationName })
+    .returning();
+  await db.insert(person).values({
+    id: input.ownerProfileId,
+    displayName: 'V2 Owner',
+    birthDate: '1990-01-01',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: input.ownerProfileId,
+    organizationId: org!.id,
+    roles: ['admin'],
+  });
+  await db.insert(subscriptionV2Table).values({
+    id: input.legacySubscriptionId,
+    organizationId: org!.id,
+    planTier: input.tier,
+    status: 'active',
+    payerPersonId: input.ownerProfileId,
+  });
+  return org!;
+}
+
+async function cleanupV2() {
+  const db = createIntegrationDb();
+  const orgs = await db.query.organization.findMany({
+    where: inArray(organization.name, V2_ORG_NAMES),
+  });
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) return;
+  const subs = await db.query.subscription.findMany({
+    where: inArray(subscriptionV2Table.organizationId, orgIds),
+    columns: { payerPersonId: true },
+  });
+  const personIds = [...new Set(subs.map((s) => s.payerPersonId))];
+  await db
+    .delete(subscriptionV2Table)
+    .where(inArray(subscriptionV2Table.organizationId, orgIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+}
 
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
@@ -216,6 +297,13 @@ async function loadSubscriptionByAccountId(accountId: string) {
   });
 }
 
+async function loadV2SubscriptionById(subscriptionId: string) {
+  const db = createIntegrationDb();
+  return db.query.subscription.findFirst({
+    where: eq(subscriptionV2Table.id, subscriptionId),
+  });
+}
+
 async function loadQuotaPool(subscriptionId: string) {
   const db = createIntegrationDb();
   return db.query.quotaPools.findFirst({
@@ -236,6 +324,7 @@ beforeEach(async () => {
     emails: ALL_EMAILS,
     clerkUserIds: ALL_CLERK_USER_IDS,
   });
+  await cleanupV2();
 });
 
 afterAll(async () => {
@@ -243,6 +332,7 @@ afterAll(async () => {
     emails: ALL_EMAILS,
     clerkUserIds: ALL_CLERK_USER_IDS,
   });
+  await cleanupV2();
 });
 
 describe('Integration: billing service', () => {
@@ -393,6 +483,19 @@ describe('Integration: billing service', () => {
       dailyLimit: freeTier.dailyLimit,
       usedToday: freeTier.dailyLimit!,
     });
+    // [WI-1239 / 779-strip] decrementQuota's ownership guard
+    // (verifyProfileOwnsSubscription) resolves exclusively via the v2 store
+    // now — a profile that exists only in the legacy `profiles` table reads as
+    // a stale/unowned profileId and short-circuits to `profile_mismatch`
+    // before the free-tier daily-limit guard below is ever reached. Seed the
+    // v2 counterpart so the ownership check passes and the guard path this
+    // test targets is the one actually exercised.
+    await seedV2Counterpart({
+      organizationName: 'integration-billing-service-v2-daily-exceeded',
+      ownerProfileId: profile.id,
+      legacySubscriptionId: seeded.subscription.id,
+      tier: 'free',
+    });
     await seedProfileQuotaUsage({
       subscriptionId: seeded.subscription.id,
       profileId: profile.id,
@@ -417,6 +520,7 @@ describe('Integration: billing service', () => {
       expect.objectContaining({
         success: false,
         source: 'daily_exceeded',
+        quotaModel: 'per-profile',
         remainingMonthly: 0,
         remainingTopUp: 0,
         remainingDaily: 0,
@@ -436,9 +540,21 @@ describe('Integration: billing service', () => {
       tier: 'plus',
     });
     const ownerProfile = await seedOwnerProfile(account.id, 'Top Up Owner');
+    // [WI-1239 / 779-strip] purchaseTopUpCredits was removed — the RevenueCat
+    // webhook handler dispatches exclusively to purchaseTopUpCreditsV2, which
+    // resolves the tier (free-tier rejection) and the per-profile buyer
+    // (findOwnerPersonId) via the v2 store. No integration test exercises its
+    // real DB behavior directly (revenuecat-webhook-handler-v2.test.ts mocks
+    // it out), so convert rather than drop this coverage.
+    await seedV2Counterpart({
+      organizationName: 'integration-billing-service-v2-topup',
+      ownerProfileId: ownerProfile.id,
+      legacySubscriptionId: seeded.subscription.id,
+      tier: 'plus',
+    });
     const now = new Date('2026-04-12T12:00:00.000Z');
 
-    const first = await purchaseTopUpCredits(
+    const first = await purchaseTopUpCreditsV2(
       createIntegrationDb(),
       seeded.subscription.id,
       500,
@@ -446,7 +562,7 @@ describe('Integration: billing service', () => {
       'rc_txn_real_001',
       ownerProfile.id,
     );
-    const duplicate = await purchaseTopUpCredits(
+    const duplicate = await purchaseTopUpCreditsV2(
       createIntegrationDb(),
       seeded.subscription.id,
       500,
@@ -474,10 +590,33 @@ describe('Integration: billing service', () => {
 
   it('persists RevenueCat activation, webhook ordering, and partial updates against real rows', async () => {
     const account = await seedAccount(6);
+    const ownerProfile = await seedOwnerProfile(account.id, 'RC Owner');
+    // [WI-1239 / 779-strip] activateSubscriptionFromRevenuecat,
+    // isRevenuecatEventProcessed, and updateSubscriptionFromRevenuecatWebhook
+    // were removed — the RevenueCat webhook route dispatches exclusively to
+    // the v2 twins now. Pre-seed a subscription in BOTH stores (id-aligned) so
+    // activateSubscriptionFromRevenuecatV2 takes its UPDATE branch rather than
+    // its fresh-INSERT branch: the insert branch writes a brand-new v2
+    // subscription id into quota_pools, whose FK still points at the legacy
+    // `subscriptions` table (pre-M-REPOINT) — a fresh v2 id has no matching
+    // legacy row and the insert would violate that FK. This also matches how
+    // production actually calls it ("the org's subscription is created at
+    // onboarding" — see activateSubscriptionFromRevenuecatV2's own comment),
+    // so the UPDATE branch is the realistic path to test anyway.
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'free',
+    });
+    const org = await seedV2Counterpart({
+      organizationName: 'integration-billing-service-v2-revenuecat',
+      ownerProfileId: ownerProfile.id,
+      legacySubscriptionId: seeded.subscription.id,
+      tier: 'free',
+    });
 
-    const activated = await activateSubscriptionFromRevenuecat(
+    const activated = await activateSubscriptionFromRevenuecatV2(
       createIntegrationDb(),
-      account.id,
+      org.id,
       'family',
       'evt_1000',
       {
@@ -489,7 +628,7 @@ describe('Integration: billing service', () => {
       },
     );
 
-    const activatedSubscription = await loadSubscriptionByAccountId(account.id);
+    const activatedSubscription = await loadV2SubscriptionById(activated.id);
     const activatedQuotaPool = await loadQuotaPool(activated.id);
 
     expect(activated.status).toBe('trial');
@@ -501,33 +640,33 @@ describe('Integration: billing service', () => {
     );
 
     expect(
-      await isRevenuecatEventProcessed(
+      await isRevenuecatEventProcessedV2(
         createIntegrationDb(),
-        account.id,
+        org.id,
         'evt_1000',
         1000,
       ),
     ).toBe(true);
     expect(
-      await isRevenuecatEventProcessed(
+      await isRevenuecatEventProcessedV2(
         createIntegrationDb(),
-        account.id,
+        org.id,
         'evt_0999',
         999,
       ),
     ).toBe(true);
     expect(
-      await isRevenuecatEventProcessed(
+      await isRevenuecatEventProcessedV2(
         createIntegrationDb(),
-        account.id,
+        org.id,
         'evt_1001',
         1001,
       ),
     ).toBe(false);
 
-    const updated = await updateSubscriptionFromRevenuecatWebhook(
+    const updated = await updateSubscriptionFromRevenuecatWebhookV2(
       createIntegrationDb(),
-      account.id,
+      org.id,
       {
         status: 'active',
         currentPeriodEnd: '2026-06-01T00:00:00.000Z',
@@ -537,7 +676,7 @@ describe('Integration: billing service', () => {
       },
     );
 
-    const updatedSubscription = await loadSubscriptionByAccountId(account.id);
+    const updatedSubscription = await loadV2SubscriptionById(activated.id);
 
     expect(updated).not.toBeNull();
     expect(updated!.status).toBe('active');
@@ -546,46 +685,25 @@ describe('Integration: billing service', () => {
     expect(updatedSubscription!.lastRevenuecatEventTimestampMs).toBe('2000');
     expect(updatedSubscription!.cancelledAt).toBeNull();
     expect(
-      await isRevenuecatEventProcessed(
+      await isRevenuecatEventProcessedV2(
         createIntegrationDb(),
-        account.id,
+        org.id,
         'evt_1500',
         1500,
       ),
     ).toBe(true);
   });
 
-  it('recomputes quota pool limits for a mid-cycle tier change without resetting usage', async () => {
-    const account = await seedAccount(0);
-    const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
-      tier: 'plus',
-      monthlyLimit: getTierConfig('plus').monthlyQuota,
-      usedThisMonth: 123,
-      dailyLimit: null,
-      usedToday: 7,
-    });
-
-    const result = await handleTierChange(
-      createIntegrationDb(),
-      seeded.subscription.id,
-      'family',
-    );
-
-    const updatedQuotaPool = await loadQuotaPool(seeded.subscription.id);
-
-    expect(result).toEqual({
-      previousTier: 'plus',
-      newTier: 'family',
-      usedThisCycle: 123,
-      newMonthlyLimit: getTierConfig('family').monthlyQuota,
-      remainingQuestions: getTierConfig('family').monthlyQuota - 123,
-    });
-    expect(updatedQuotaPool!.monthlyLimit).toBe(
-      getTierConfig('family').monthlyQuota,
-    );
-    expect(updatedQuotaPool!.usedThisMonth).toBe(123);
-    expect(updatedQuotaPool!.usedToday).toBe(7);
-    expect(updatedQuotaPool!.dailyLimit).toBeNull();
-  });
+  // [WI-1239 / 779-strip] handleTierChange was removed — the billing.test.ts
+  // removal comment confirms it "had zero production callers even before this
+  // WI" (routes/billing.ts, stripe-webhook.ts, revenuecat-webhook.ts already
+  // dispatched exclusively to the -V2 twins). The mid-cycle recompute behavior
+  // this test targeted (tier changes update quota-pool limits while preserving
+  // in-cycle usage) is the shared-pool branch of reconcileQuotaStateForEffectiveTier
+  // — the actual mechanism webhooks use on a tier change (both legacy and
+  // reconcileQuotaStateForEffectiveTierV2 delegate to it verbatim for
+  // shared-pool tiers) — and is covered by
+  // apps/api/src/services/billing/quota-reconcile.integration.test.ts →
+  // "preserves mid-cycle usage when the cycle is still active". No replacement
+  // test added here; the case is dropped, not converted.
 });
