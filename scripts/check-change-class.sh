@@ -398,7 +398,7 @@ if hit '(^tests/e2e/|^apps/mobile/e2e/|playwright\.config|\.e2e\.)'; then
   CLASSES+=("e2e")
   add_cmd slow  "doppler run -c stg -- pnpm test:e2e:web:smoke" "Playwright E2E smoke"
   note "e2e: Full web suite: doppler run -c stg -- pnpm test:e2e:web"
-  note "e2e: Windows dev machines without doppler on PATH: C:/Tools/doppler/doppler.exe"
+  note "e2e: Windows dev machines without doppler on PATH: node scripts/doppler-run.mjs run -c stg -- pnpm test:e2e:web:smoke"
 fi
 
 # ── Lint / Tooling Config ────────────────────────────────────────────────
