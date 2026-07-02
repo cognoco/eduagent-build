@@ -338,6 +338,36 @@ describe('SubjectHubRoute — no books (pick-book)', () => {
         originalV2;
     }
   });
+
+  // [WI-1209] Legacy counterpart to the V2 test above. goBack is a single
+  // un-branched function shared by all empty-state surfaces (WI-1209 AC:
+  // "single behavioral variant") and no longer reads canGoBack() at all, so
+  // the misleading-native-history regression applies identically regardless
+  // of MODE_NAV_V2_ENABLED. Without this test, a future regression that
+  // reintroduces a canGoBack()-preferring branch only under the V2-off path
+  // would go undetected — the V2-on describe block below never exercises
+  // this flag state.
+  it('replaces to the legacy Library tab instead of raw back when native history is misleading (MODE_NAV_V2_ENABLED off)', async () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    mockCanGoBack.mockReturnValue(true);
+    try {
+      render(<SubjectHubRoute />, { wrapper: wrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('subject-hub-pick-book-back');
+      });
+
+      fireEvent.press(screen.getByTestId('subject-hub-pick-book-back'));
+
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
+  });
 });
 
 describe('SubjectHubRoute — V2 empty-state back contract', () => {
