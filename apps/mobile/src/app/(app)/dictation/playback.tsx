@@ -40,7 +40,7 @@ export default function PlaybackScreen(): React.ReactElement {
     punctuationReadAloud: prefs.punctuationReadAloud,
     language: data?.language ?? 'en',
     chunkSize,
-    // [WI-904] Scales the writing-pause budget by age (younger → longer).
+    // Younger learners keep smaller chunks and get longer sentence windows.
     ageBracket,
   });
 

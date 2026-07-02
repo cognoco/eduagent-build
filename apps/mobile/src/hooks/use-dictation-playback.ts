@@ -28,10 +28,7 @@ export interface PlaybackConfig {
   language: string;
   /** Words per spoken chunk. Young children get 2-3, older learners 4-5. Defaults to 3. */
   chunkSize?: number;
-  /**
-   * [WI-904] Learner age bracket — scales the writing-pause budget (younger →
-   * longer). Defaults to `adult` (the neutral 1.0 multiplier) when omitted.
-   */
+  /** Learner age bracket. Defaults to `adult` when omitted. */
   ageBracket?: AgeBracket;
 }
 
@@ -51,74 +48,38 @@ export interface PlaybackControls {
 
 type VoiceAvailabilityResult = boolean | Promise<boolean>;
 
-// [WI-904] Two independent levers — keep them separate:
-//   1. `rate` — how fast each WORD is spoken. The old 0.5–0.6 stretched every
-//      word and sounded slurred / "drunk". Words must sound NATURAL, so `rate`
-//      sits at ~1.0 (expo-speech's normal speed); the writing time does NOT come
-//      from slowing the voice down.
-//   2. The writing PAUSE — the silence AFTER a chunk/sentence, where the learner
-//      writes. This is modelled on how long the just-spoken text takes to write
-//      by hand: each word costs `baseWordMs` (a floor, so even a one-letter word
-//      gets a beat) plus `perCharMs` per letter — "I"/"am" cost little,
-//      "extraordinary" costs a lot. The chunk gap is the sum of its words' costs;
-//      the sentence gap is `sentencePause`. Both are scaled by an age multiplier
-//      (see AGE_PAUSE_MULTIPLIER).
-// Tune the *voice* with `rate`; tune the *writing time* with
-// `baseWordMs`/`perCharMs`/`sentencePause`. slow/normal/fast now differ mainly in
-// writing time, with only a gentle articulation difference.
+// Natural clear-speech pacing:
+// - `rate` controls articulation. Keep it near normal so words do not sound
+//   stretched or robotic.
+// - `phrasePause` is the short audible boundary between chunks.
+// - `sentencePause` is the larger response window after a complete sentence.
 const PACE_CONFIG: Record<
   DictationPace,
-  { rate: number; baseWordMs: number; perCharMs: number; sentencePause: number }
+  { rate: number; phrasePause: number; sentencePause: number }
 > = {
-  slow: { rate: 0.9, baseWordMs: 1900, perCharMs: 580, sentencePause: 5500 },
-  normal: { rate: 1.0, baseWordMs: 1200, perCharMs: 360, sentencePause: 4000 },
-  fast: { rate: 1.0, baseWordMs: 720, perCharMs: 220, sentencePause: 3000 },
+  slow: { rate: 0.9, phrasePause: 700, sentencePause: 1400 },
+  normal: { rate: 1.0, phrasePause: 600, sentencePause: 1200 },
+  fast: { rate: 1.0, phrasePause: 400, sentencePause: 800 },
 };
 
-// [WI-904] Younger learners write more slowly, so they need a longer writing
-// budget for the same text. The multiplier widens both the chunk gap and the
-// sentence gap. `adult` is the baseline; `adolescent` (the 13–17 launch cohort)
-// and `child` (the deferred sub-13 ungating cohort) get progressively more time.
-// Note: chunk *grouping* (how often we pause) is still LLM-driven for 12+; the
-// finer "two-word breath group" re-chunking the 10–12 cohort wants is a tracked
-// follow-up gated on that ungating — see the WI-904 completion summary.
+// Younger learners get more response time after complete sentence boundaries.
+// Phrase pauses stay short; age/profile support primarily comes from chunking
+// and sentence/item windows, not long silence after every spoken phrase.
 const AGE_PAUSE_MULTIPLIER: Record<AgeBracket, number> = {
   child: 1.45,
-  adolescent: 1.2,
+  adolescent: 1.15,
   adult: 1.0,
 };
 
-// Letters/numbers only — punctuation is not written stroke-for-stroke at the
-// pace of a letter, so it does not count toward the handwriting budget.
-function wordWritingCostMs(
-  word: string,
-  baseWordMs: number,
-  perCharMs: number,
-): number {
-  const letters = word.replace(/[^\p{L}\p{N}]/gu, '').length;
-  return baseWordMs + perCharMs * letters;
-}
-
-/**
- * The writing pause (ms) after speaking `chunkText`: the sum of each word's
- * estimated handwriting cost, scaled by the learner's age multiplier.
- * Pure and deterministic — the surface the on-device pace is tuned against.
- */
 export function computeChunkPauseMs(
   chunkText: string,
   pace: DictationPace,
-  ageBracket: AgeBracket,
+  _ageBracket: AgeBracket,
 ): number {
-  const { baseWordMs, perCharMs } = PACE_CONFIG[pace];
   const words = chunkText.split(/\s+/).filter(Boolean);
-  const raw = words.reduce(
-    (sum, word) => sum + wordWritingCostMs(word, baseWordMs, perCharMs),
-    0,
-  );
-  return Math.round(raw * AGE_PAUSE_MULTIPLIER[ageBracket]);
+  return words.length === 0 ? 0 : PACE_CONFIG[pace].phrasePause;
 }
 
-/** The pause (ms) at a sentence boundary, age-scaled like the chunk pause. */
 export function computeSentencePauseMs(
   pace: DictationPace,
   ageBracket: AgeBracket,
@@ -402,8 +363,7 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
               computeSentencePauseMs(pace, ageBracket),
             );
           } else {
-            // Chunk boundary — writing pause modelled on the handwriting cost of
-            // the just-spoken chunk (word length × age), not a flat per-word constant.
+            // Chunk boundary: short phrase pause, not writing-time silence.
             const chunkPause = computeChunkPauseMs(
               chunks[chunkIndex] ?? '',
               pace,
