@@ -1,0 +1,5 @@
+§12 contamination scan — 2026-07-02
+Command: rg -n 'strip-proposal|strip proposal|proposal critique|conditional-ship|2026-07-01-identity-cutover-779-strip-proposal' <prep-dir>
+Result: 8 matches, ALL exclusion-acknowledgements (files named as NOT-read / "did not open").
+Per handover §12, hits that are only the exclusion acknowledgement are allowed.
+VERDICT: PASS — no §1-excluded analysis substance present in the bundle.

@@ -1,0 +1,17 @@
+         tbl         | rls_enabled | rls_forced | n_policies 
+---------------------+-------------+------------+------------
+ consent_grant       | f           | f          |          0
+ consent_receipt     | f           | f          |          0
+ deletion_audit      | f           | f          |          0
+ financial_record    | f           | f          |          0
+ guardianship        | f           | f          |          0
+ login               | f           | f          |          0
+ membership          | f           | f          |          0
+ organization        | f           | f          |          0
+ person              | f           | f          |          0
+ subscription        | f           | f          |          0
+ subscription_payers | f           | f          |          0
+ supportership       | f           | f          |          0
+ consent_request     | t           | f          |          1
+(13 rows)
+

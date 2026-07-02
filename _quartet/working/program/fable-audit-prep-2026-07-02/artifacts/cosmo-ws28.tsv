@@ -1,0 +1,17 @@
+WI-1207	Executing	Active	-	Restore Practice access on Journal landing
+WI-1175	Executing	Active	-	Run V2 publish-readiness task review
+WI-1174	Closed	-	Done	Define S6 per-surface retirement gates
+WI-1173	Closed	-	Done	Add V2 trigger-path parity smoke coverage
+WI-1172	Closed	-	Done	Preserve concrete progress across V2 Subjects and Journal
+WI-1171	Closed	-	Done	Build V2 visibility ceremony and trust affordances
+WI-1170	Closed	-	Done	Replace placeholder Support hub with actionable supporter cockpit
+WI-1169	Closed	-	Done	Build masked person-scope Subject Hub drill-in
+WI-1168	Closed	-	Done	Wire real shared-record data into V2 supporter Journal
+WI-1133	Closed	-	Done	S2: re-add cross-entity search (notes + sessions)
+WI-1131	Closed	-	Done	S1: differentiate retention.review vs challenge.start deep links
+WI-1130	Closed	-	Done	S1: improve bar-intent-match fidelity beyond literal IDs
+WI-1124	Executing	Active	-	S0-R: add T10 cross-writer lifecycle integration test + GC6 mock cleanup
+WI-1122	Closed	-	Done	S3: add use-my-reports hook + remove out-of-scope JournalPracticeSection
+WI-1120	Executing	Active	-	S1: add card + celebration animation (NowCard / NowCardStack / MentorCelebration)
+WI-1118	Closed	-	Done	S2: wire writable Subject Hub notes (onAddNote)
+WI-904	Refining	Active	-	Dictation playback: rework pacing around clear speech and phrase/sentence pauses

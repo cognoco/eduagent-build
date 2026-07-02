@@ -1,0 +1,8 @@
+          t          | c 
+---------------------+---
+ organization        | 0
+ person              | 0
+ subscription        | 0
+ subscription_payers | 0
+(4 rows)
+

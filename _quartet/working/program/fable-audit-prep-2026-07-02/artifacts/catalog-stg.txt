@@ -1,0 +1,12 @@
+         name          |   regclass    
+-----------------------+---------------
+ public.accounts       | 
+ public.consent_states | 
+ public.family_links   | 
+ public.organization   | organization
+ public.person         | person
+ public.profiles       | 
+ public.subscription   | subscription
+ public.subscriptions  | subscriptions
+(8 rows)
+

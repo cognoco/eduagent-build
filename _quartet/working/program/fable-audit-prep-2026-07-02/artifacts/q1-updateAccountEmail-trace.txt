@@ -1,0 +1,24 @@
+# updateAccountEmailFromClerk — caller trace on origin/main (a4798547e), 2026-07-02
+# Command: git grep -n updateAccountEmailFromClerk origin/main -- apps/ packages/
+origin/main:apps/api/src/routes/account.test.ts:97:    updateAccountEmailFromClerk: (...args: unknown[]) =>
+origin/main:apps/api/src/routes/account.ts:83:  // from updateAccountEmailFromClerk so it cannot be spoofed by a client.
+origin/main:apps/api/src/services/account.test.ts:10:  updateAccountEmailFromClerk,
+origin/main:apps/api/src/services/account.test.ts:788:describe('updateAccountEmailFromClerk', () => {
+origin/main:apps/api/src/services/account.test.ts:804:    const result = await updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.test.ts:838:    await updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.test.ts:867:    await updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.test.ts:888:      updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.test.ts:904:      updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.test.ts:921:      updateAccountEmailFromClerk(db, {
+origin/main:apps/api/src/services/account.ts:38:   * (`updateAccountEmailFromClerk` runs without a profile context).
+origin/main:apps/api/src/services/account.ts:341:export async function updateAccountEmailFromClerk(
+origin/main:apps/api/src/services/identity-v2/account-v2.test.ts:5:// Mirrors the legacy `updateAccountEmailFromClerk` unit tests
+origin/main:apps/api/src/services/identity-v2/account-v2.ts:2:// [WI-586 C4] Account email update — v2 twin of `updateAccountEmailFromClerk`.
+origin/main:apps/api/src/services/identity-v2/account-v2.ts:36: * v2 twin of `updateAccountEmailFromClerk` — updates `login.email` for the
+origin/main:apps/mobile/src/components/change-email.tsx:114:  // (see updateAccountEmailFromClerk).
+origin/main:apps/mobile/src/hooks/use-email-reconciliation.ts:21: * verified Clerk primary. The server (`updateAccountEmailFromClerk`) re-checks
+origin/main:packages/schemas/src/account.ts:602: * it is dispatched server-side from `updateAccountEmailFromClerk`, never from a
+origin/main:packages/schemas/src/account.ts:614: * which is dispatched only from the server (`updateAccountEmailFromClerk`) and
+
+# VERDICT: only test files, comments/docstrings, and the v2 twin (account-v2.ts) reference it.
+# The definition (services/account.ts:341) has ZERO live route/inngest callers -> dead legacy, consistent with the orphaned subtree.

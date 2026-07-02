@@ -1,0 +1,9 @@
+      tbl       | rls | pol 
+----------------+-----+-----
+ accounts       | f   |   0
+ consent_states | f   |   0
+ family_links   | f   |   0
+ profiles       | f   |   0
+ subscriptions  | f   |   0
+(5 rows)
+

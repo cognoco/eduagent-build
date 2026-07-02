@@ -1,0 +1,75 @@
+WI-1255	Closed	-	Done	P1: v1-pinned scheduledDeletion resumes into dropped legacy tables — LIVE prod 500 + GDPR-deletion may silently not complete
+WI-1254	Ready	Active	-	779 §7.3: exhaustive legacy-reader sweep + remediation
+WI-1250	Captured	-	-	Drop orphaned legacy subscriptions table on staging (staging slice of WI-779 strip step 4)
+WI-1249	-	-	-	
+WI-1239	Executing	Active	-	WI-779-E: Converge legacy-identity-table READERS (account/consent/billing non-v2) to v2-only — unblocks WI-1139
+WI-1234	Closed	-	Cancelled	WI-905c: integration test — recordChildCapNotificationV2 / listActiveChildCapNotificationsV2 SQL
+WI-1233	Closed	-	Cancelled	WI-905b: integration test — consent-v2 write paths (grantConsent/withdrawConsent)
+WI-1232	Closed	-	Cancelled	WI-905a: integration test — listEligibleSelfReportPersonIdsV2 eligibility SQL
+WI-1162	Captured	Active	-	Decide whether v2 payerPersonId/storeProductId/storePlatform belong in the GDPR account export
+WI-1161	Closed	-	Done	GET /v1/account/export 500s under identity-v2: export-v2 parses raw v2 subscription row against legacy-named schema
+WI-1145	Closed	-	Done	Integration seed harness does not populate identity-v2 tables → flag-on integration suites systemically red
+WI-1141	Backlog	Active	-	Dev environment: flip IDENTITY_V2_ENABLED=true for dev<->prod parity
+WI-1140	Closed	Active	Duplicate	WI-779-D: Remove legacy identity table definitions from the schema package (converges dev DB)
+WI-1139	Ready	Active	-	WI-779-D: Remove legacy identity table definitions from the schema package (converges dev DB)
+WI-1138	Closed	-	Done	Consent-deny deletes payer subscription row without store teardown (GDPR provider leak)
+WI-1128	Ready	Blocked	-	Mechanical FK-repoint (profiles.id->person.id + subscriptions.id->subscription) — part of the WI-779 residual [was: S4 schema-code<->DB drift sync]
+WI-1123	Closed	-	Done	S0↔S4: re-classify or fence person/supporter reads in /now (tier-leak; identity now live)
+WI-1103	Closed	Active	Cancelled	V2 guardian/supporter accounts cannot reach own dictation/practice (me scope) — scope-resolution.ts default + SupportHubMentorTab me-affordance
+WI-1102	Closed	-	Done	Collapse IDENTITY_V2_ENABLED in billing-alias-merge-v2 + migrate billing-v2 suites
+WI-1101	Closed	-	Done	Fix v2 test-seed divergence failing session-completed + weekly-progress-push integration tests on the Flag-ON lane
+WI-1099	Closed	-	Done	session-exchange-router applies gemini_only to under-18 family-plan learners (no age gate) — MMT-ADR-0016 leak
+WI-1076	Closed	-	Done	Collapse identity-v2 dual-path threading
+WI-1072	Closed	-	Done	Dedupe billing v1/v2 helpers and reset-time math
+WI-905	Closed	-	Done	Integration twins for WI-867 gc1-allow'd unseedable seams (umbrella): v2 self-report eligibility SQL + consent-v2 writes + billing-v2 cap-notification + further wave gaps — stg-DB+Neon tests of the real SQL
+WI-885	Closed	-	Done	Subscription teardown on whole-org GDPR erasure (Stripe-API cancellation) — carved from WI-849 Gap 1
+WI-869	Closed	-	Done	WI-779-C: Verify flag-on integration lane green v2-only (no rename, no branch-protection change)
+WI-868	Closed	-	Done	WI-779-B: Delete IDENTITY_V2_ENABLED flag symbol + vestigial param-threading (v2-only, zero behavior change)
+WI-867	Closed	-	Done	WI-779-A: Collapse IDENTITY_V2_ENABLED branches to v2-only (no deletions)
+WI-849	Closed	-	Done	Fix v2 account-deletion GDPR gaps (executeDeletionV2)
+WI-828	Closed	-	Done	P5 — #11 drop: drop legacy identity tables (0118, operator-executed)
+WI-827	Closed	Active	Duplicate	Fix stale IDENTITY_V2_ENABLED comment in config.ts (post-flip)
+WI-826	Closed	-	Done	[ACCOUNT-41] Show withdrawal countdown banner after consent withdrawal
+WI-824	Closed	-	Done	[ACCOUNT-05/ACCOUNT-35] Replace generic profile-limit error with upgrade path
+WI-823	Closed	-	Done	[PARENT-04/PARENT-05] Restore parent bridge child topic/session/recap route entry surfaces
+WI-821	Closed	-	Done	[PARENT-11] Load seeded parent recaps instead of recaps error state
+WI-817	Closed	-	Done	Post-cutover: drive flag-on integration lane green + make-required
+WI-814	Closed	-	Done	Staging rehearsal data: decide reseed (discard vs preserve) + execute if reseeding
+WI-811	Closed	-	Done	Build v2 child-profile create + parent-created-child consent grant (CUT-B2)
+WI-810	Closed	-	Done	Flip-critical quota-reset cron v2 gating — resetExpiredQuotaCyclesV2 (pre-#8, carved from WI-805 billing)
+WI-809	Closed	-	Done	Flip-critical consent / dropped-table reader gating sweep — consent_states + family_links + export (carved from WI-586, B3 split)
+WI-808	Closed	-	Done	Flag-on COLON-suite test-fixture residual (cleanupAccounts + learning_profiles + family-bridge dual-writes)
+WI-805	Closed	-	Done	CUT-B billing fast-follow: drop legacy subscriptions + sweep ~18 billing/quota readers to v2 subscription + rewire quota-reset cron (carved from WI-586)
+WI-803	Closed	-	Duplicate	nudge.ts + profile.ts unbranched family_links readers (post-M-DROP 500 flip-blockers) - v2 twins + a real drop-safety net
+WI-802	Closed	-	Done	Dashboard getChildrenForParent (+ any flag-on-reachable family_links data readers) need v2 guardianship twins - unbranched legacy reader 500s parent dashboard post-M-DROP
+WI-801	Closed	-	Done	E2E smoke: auth.setup readiness assertion not persona-aware (waits learner-screen on guardian parent-home-screen) -> parent-multi-child setup fails
+WI-800	Closed	-	Done	Test-infra: assess seedTrialExpiredChild + seedConsentPending sub-13 birthYear (else /v1/profiles 500 if signed in as parent)
+WI-799	Closed	-	Done	E2E parent-multi-child seed creates sub-13 children -> GET /v1/profiles 500 (v1 13+ response-floor) -> run-smoke auth.setup timeout
+WI-798	Closed	-	Done	Sweep 14+ service-layer assertParentAccess sites to flag-aware v2 guardianship (family_links inner-guard drift)
+WI-797	Closed	-	Done	Investigate + resolve parent-multi-child profile-load timeout blocking staging run-smoke (possible v2-identity regression)
+WI-796	Closed	-	Done	Provision DOPPLER_TOKEN_STG in CI for staging Playwright run-smoke (cutover prerequisite)
+WI-795	Closed	-	Done	Investigate the prohibited db:push against staging + add a db:push stg/prod guard
+WI-794	Closed	-	Done	Post-WI-586-rebuild staging RLS verification (40/40) + family_preferences GUC fix
+WI-793	Closed	-	Done	WP-8 Inngest flag-ON seeder coverage: review-due-scan + weekly-progress-push
+WI-792	Closed	-	Done	Billing trial-expiry v2 seeder/flag-ON: findExpiredTrialsV2 reads empty v2 subscription
+WI-791	Closed	-	Done	database-rls-coverage =ANY($1) query bug (PG17 array-cast rejection)
+WI-790	Closed	-	Done	Consent restoreConsent v2 twin (consent-restore-archive flag-ON false-green)
+WI-789	Closed	-	Done	Flag-ON committed-migration integration coverage (buildIntegrationEnv) — enabler + WI-586/WP-FLAG close-gate mechanism
+WI-788	Closed	-	Done	Main-RED fix A: v2 test-seed must write legacy FK parents on committed-migration DBs (self-inerting post-DROP)
+WI-786	Closed	-	Done	Family-access parent-on-behalf — build v2 twin (unbranched-legacy family_links reader)
+WI-785	Closed	-	Done	Test-infra: de-flake identity-reseed integration suite (serialize under maxWorkers)
+WI-784	Closed	-	Done	Homework-summary Inngest job — build v2 billing twin
+WI-780	Closed	-	Done	consent_request missing service-role RLS exceptions (public token lookup + reminder sweep) claimed by MMT-ADR-0020 but not built
+WI-779	Ready	Active	-	WP-FLAG — Remove IDENTITY_V2_ENABLED + legacy schema/twins
+WI-778	Closed	-	Done	WP-9 — Test-seed: wire /__test/* to test-seed-v2 (unblocks cutover re-run, clears run-smoke)
+WI-777	Closed	-	Done	WP-8 — Inngest scans: wire monthly-report-cron + daily-reminder-scan + review-due-scan to v2
+WI-776	Closed	-	Done	WP-7 — Billing: wire remaining billing services + build isPersonUnderSubscriptionV2
+WI-775	Closed	-	Done	WP-6 — Family: build family-domain v2 twins + guardianship authorization guards
+WI-774	Closed	-	Done	WP-5 — Settings + LearnerProfile: build verifyPersonOwnershipV2 + wire settings/learner-profile to v2
+WI-773	Closed	-	Done	WP-4 — Deletion + Export: wire deletion.ts + export.ts to v2
+WI-772	Closed	-	Done	WP-3 — Consent: wire consent.ts (30+ sites) + consent inngest to consent-v2
+WI-771	Closed	-	Done	WP-2 — Core identity: build listProfilesV2 + wire GET /v1/profiles to v2
+WI-765	Closed	-	Done	Enumerate the full legacy reader/writer breaking set (+ fold in pre-graph 401 fix)
+WI-752	Executing	Active	-	ADR governance correction & re-vetting
+WI-586	Closed	-	Done	WP-TAIL-drop-legacy: drop legacy identity tables and readers (clean-cut close)
+WI-367	Executing	Active	-	Persist full birth date to enable exact age across all age logic

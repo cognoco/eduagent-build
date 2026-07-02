@@ -1,0 +1,8 @@
+          t          |  c   
+---------------------+------
+ organization        | 1361
+ person              | 1353
+ subscription        |    6
+ subscription_payers |    6
+(4 rows)
+

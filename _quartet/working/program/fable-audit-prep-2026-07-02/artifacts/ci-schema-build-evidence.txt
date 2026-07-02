@@ -1,0 +1,11 @@
+# CI schema build — drizzle-kit migrate evidence, .github/workflows/ci.yml, 2026-07-02
+126:      # CFG-12: replaced db:push with db:migrate so that broken migration SQL is caught in CI,
+131:        run: pnpm exec drizzle-kit migrate
+276:      # `drizzle-kit migrate` and drifts the schema (the 2026-05 staging ledger
+419:  # FRESH committed-migration DB (drizzle-kit migrate, NOT push). This gives
+492:      # drizzle-kit migrate (NOT push) is deliberate: push diffs schema and can
+494:      - name: Apply database migrations (drizzle-kit migrate)
+496:        run: pnpm exec drizzle-kit migrate
+
+# VERDICT: CI main lane (ci.yml:131) and flag-on integration lane (ci.yml:496) both apply drizzle-kit migrate on a FRESH committed-migration DB.
+# The freeze-only 0117/0118/0119 are OUT OF JOURNAL -> not applied in CI -> CI DB has legacy subscriptions + legacy FKs -> matches NO deployed env.

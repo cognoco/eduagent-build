@@ -1,0 +1,13 @@
+    source_table     |                        conname                         | target_table 
+---------------------+--------------------------------------------------------+--------------
+ profile_quota_usage | profile_quota_usage_profile_id_person_id_fk            | person
+ profile_quota_usage | profile_quota_usage_subscription_id_subscription_id_fk | subscription
+ quota_pools         | quota_pools_subscription_id_subscription_id_fk         | subscription
+ subscription_payers | subscription_payers_person_id_person_id_fk             | person
+ subscription_payers | subscription_payers_subscription_id_subscription_id_fk | subscription
+ top_up_credits      | top_up_credits_profile_id_person_id_fk                 | person
+ top_up_credits      | top_up_credits_subscription_id_subscription_id_fk      | subscription
+ usage_events        | usage_events_profile_id_person_id_fk                   | person
+ usage_events        | usage_events_subscription_id_subscription_id_fk        | subscription
+(9 rows)
+

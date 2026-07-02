@@ -1,0 +1,12 @@
+         tbl         | rls | pol 
+---------------------+-----+-----
+ concept_mastery     | t   |   0
+ concepts            | t   |   0
+ learning_sessions   | t   |   1
+ profile_quota_usage | t   |   1
+ quota_pools         | t   |   0
+ subjects            | t   |   1
+ usage_events        | t   |   0
+ curriculum_topics   | f   |   0
+(8 rows)
+

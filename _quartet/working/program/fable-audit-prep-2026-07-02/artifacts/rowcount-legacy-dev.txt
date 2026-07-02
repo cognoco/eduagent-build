@@ -1,0 +1,9 @@
+       t        |  c   
+----------------+------
+ accounts       | 1429
+ consent_states |  155
+ family_links   |   21
+ profiles       | 1416
+ subscriptions  |    8
+(5 rows)
+
