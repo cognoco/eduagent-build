@@ -22,11 +22,22 @@ jest.mock(
   },
 );
 
-const mockFindFirst = jest.fn();
+// [WI-1254] findAccountByClerkId now reads the v2 identity graph
+// (login→membership→organization via resolveIdentityV2) rather than the
+// legacy `accounts` table.
+const mockLoginFindFirst = jest.fn();
+const mockMembershipFindMany = jest.fn();
+const mockOrganizationFindFirst = jest.fn();
 const mockDb = {
   query: {
-    accounts: {
-      findFirst: mockFindFirst,
+    login: {
+      findFirst: mockLoginFindFirst,
+    },
+    membership: {
+      findMany: mockMembershipFindMany,
+    },
+    organization: {
+      findFirst: mockOrganizationFindFirst,
     },
   },
 };
@@ -116,10 +127,20 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
       .mockResolvedValue(
         new Response(JSON.stringify({ id: 'resend-msg-1' }), { status: 200 }),
       );
-    mockFindFirst.mockResolvedValue({
-      id: 'acc-existing',
+    mockLoginFindFirst.mockResolvedValue({
       clerkUserId: 'clerk-existing',
+      personId: 'person-existing',
       email: 'owner@example.com',
+    });
+    mockMembershipFindMany.mockResolvedValue([
+      {
+        personId: 'person-existing',
+        organizationId: 'acc-existing',
+        roles: ['admin'],
+      },
+    ]);
+    mockOrganizationFindFirst.mockResolvedValue({
+      id: 'acc-existing',
       timezone: null,
       createdAt: new Date('2026-06-01T00:00:00.000Z'),
       updatedAt: new Date('2026-06-01T00:00:00.000Z'),
@@ -162,7 +183,7 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
       status: 'sent',
       accountId: 'acc-existing',
     });
-    expect(mockFindFirst).toHaveBeenCalledWith(
+    expect(mockLoginFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.anything(),
       }),
@@ -183,7 +204,7 @@ describe('accountReclaimAttempt Inngest function [BUG-784]', () => {
   });
 
   it('returns skipped and sends no email when the existing account is gone', async () => {
-    mockFindFirst.mockResolvedValueOnce(undefined);
+    mockLoginFindFirst.mockResolvedValueOnce(undefined);
 
     const result = await executeHandler(reclaimEvent());
 

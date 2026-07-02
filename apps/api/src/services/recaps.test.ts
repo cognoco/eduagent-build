@@ -346,7 +346,7 @@ describe('listRecapsForProfile — self-scope session mapping', () => {
 
     const profileDb = {
       query: {
-        profiles: {
+        person: {
           findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
         },
       },
@@ -381,7 +381,7 @@ describe('listRecapsForProfile — self-scope session mapping', () => {
 
     const profileDb = {
       query: {
-        profiles: {
+        person: {
           findFirst: jest.fn(async () => null),
         },
       },
@@ -410,7 +410,7 @@ describe('listRecapsForProfile — self-scope session mapping', () => {
 
     const profileDb = {
       query: {
-        profiles: {
+        person: {
           findFirst: jest.fn(async () => ({ displayName: 'Self Learner' })),
         },
       },
