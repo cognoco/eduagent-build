@@ -1194,6 +1194,136 @@ describe('CameraScreen', () => {
     );
   });
 
+  // [WI-1203] The confirm-gate `canStartSession` check must also block the
+  // subject-pick path — picking an existing subject before confirming the
+  // OCR-derived task must not navigate to a session. The direct
+  // confirm-button path is covered above ('requires confirming the
+  // extracted task before starting the session'); this proves the same
+  // guard on handlePickSubject.
+  it('[WI-1203] blocks subject-pick navigation until the OCR task is confirmed', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    // Classify returns needsConfirmation with no candidates → picker opens
+    // showing the enrolled subjects (sub-123 Mathematics) as pick options.
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Solve for x: 2x + 5 = 13',
+      status: 'done',
+      error: null,
+      errorCode: undefined,
+      source: 'local',
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      getByTestId('subject-picker');
+      getByTestId('subject-pick-sub-123');
+    });
+
+    // Do NOT press confirm-task-button — the OCR task is still unconfirmed.
+    fireEvent.press(getByTestId('subject-pick-sub-123'));
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+
+    // Confirming now lets the same pick proceed, proving the picker itself
+    // still works once canStartSession flips true.
+    fireEvent.press(getByTestId('confirm-task-button'));
+    fireEvent.press(getByTestId('subject-pick-sub-123'));
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: 'sub-123',
+          subjectName: 'Mathematics',
+        }),
+      }),
+    );
+  });
+
+  // [WI-1203] Same confirm-gate, manual-subject-continue path — typing a new
+  // subject name and continuing before confirming the OCR-derived task must
+  // neither navigate nor create the subject.
+  it('[WI-1203] blocks manual-subject-continue navigation and subject creation until the OCR task is confirmed', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({});
+    mockClassifyResult = { needsConfirmation: true, candidates: [] };
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'Solve for x: 2x + 5 = 13',
+      status: 'done',
+      error: null,
+      errorCode: undefined,
+      source: 'local',
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const { getByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      getByTestId('subject-picker');
+    });
+
+    fireEvent.changeText(getByTestId('camera-subject-input'), 'Biology');
+    // Do NOT press confirm-task-button — the OCR task is still unconfirmed.
+    fireEvent.press(getByTestId('camera-continue-button'));
+
+    // handleManualSubjectContinue is async (createSubject.mutateAsync goes
+    // through the fetch-boundary mock) — flush pending microtasks so a
+    // missing guard would have had time to fire the create+navigate chain
+    // before we assert it didn't.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    const blockedCreateCalls = fetchCallsMatching(mockFetch, 'subjects').filter(
+      (c: { url: string; init?: { method?: string } }) =>
+        c.init?.method === 'POST' && !c.url.includes('classify'),
+    );
+    expect(blockedCreateCalls).toHaveLength(0);
+
+    // Confirming now lets the same continue proceed, proving the manual
+    // path itself still works once canStartSession flips true.
+    fireEvent.press(getByTestId('confirm-task-button'));
+    fireEvent.press(getByTestId('camera-continue-button'));
+
+    await waitFor(() => {
+      const allCalls = fetchCallsMatching(mockFetch, 'subjects');
+      const createCall = allCalls.find(
+        (c: { url: string; init?: { method?: string } }) =>
+          c.init?.method === 'POST' && !c.url.includes('classify'),
+      );
+      const body = extractJsonBody<{ name: string; rawInput: string }>(
+        createCall?.init,
+      );
+      expect(body).toEqual(
+        expect.objectContaining({
+          name: 'Biology',
+          rawInput: 'Biology',
+        }),
+      );
+    });
+
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/session',
+        params: expect.objectContaining({
+          subjectId: 'sub-created',
+          subjectName: 'Biology',
+        }),
+      }),
+    );
+  });
+
   // [BUG-690] When classification fails AND useSubjects() is still loading,
   // the picker would have rendered no choice rows at all — only "Create New"
   // and the manual-name input. Show a loading row so the user knows their
