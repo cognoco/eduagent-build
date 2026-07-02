@@ -290,7 +290,7 @@ const COPPA = 'coppa_parental_consent';
         return { orgId, payerId, subId: sub!.id, token: req!.token! };
       }
 
-      it('(a) live Stripe subscription: deletion_audit + financial_record written, sub + person gone, Stripe cancel called with the captured id', async () => {
+      it('(a) live Stripe subscription: deletion_audit + the canonical tax+chargeback financial_record pair written, sub + person gone, Stripe cancel called with the captured id', async () => {
         const { payerId, subId, token } = await seedPendingDenyForPayer();
         const stripeCancel = jest.fn().mockResolvedValue({});
 
@@ -311,16 +311,21 @@ const COPPA = 'coppa_parental_consent';
         expect(audit?.reason).toBe('guardian_initiated');
         expect(audit?.deletedBy).toBeNull();
 
+        // [WI-1138 review] Reuses writeFinancialRecordsTx (deletion-v2.ts) —
+        // the canonical §4.9 COUNSEL-OWNED pair, not a narrower tax-only row.
         const records = await db.query.financialRecord.findMany({
           where: eq(financialRecord.personId, payerId),
         });
-        expect(records).toHaveLength(1);
-        expect(records[0]!.recordType).toBe('person_deletion_tax_retain');
-        const payload = records[0]!.payload as {
-          subscriptions: { id: string }[];
-        };
-        expect(payload.subscriptions).toHaveLength(1);
-        expect(payload.subscriptions[0]!.id).toBe(subId);
+        expect(records).toHaveLength(2);
+        expect(records.map((r) => r.recordType).sort()).toEqual([
+          'person_deletion_chargeback_retain',
+          'person_deletion_tax_retain',
+        ]);
+        for (const r of records) {
+          const payload = r.payload as { subscriptions: { id: string }[] };
+          expect(payload.subscriptions).toHaveLength(1);
+          expect(payload.subscriptions[0]!.id).toBe(subId);
+        }
 
         const subRow = await db.query.subscription.findFirst({
           where: eq(subscription.id, subId),
@@ -351,14 +356,16 @@ const COPPA = 'coppa_parental_consent';
         const records = await db.query.financialRecord.findMany({
           where: eq(financialRecord.personId, payerId),
         });
-        expect(records).toHaveLength(1);
-        expect(
-          (
-            records[0]!.payload as {
-              subscriptions: { stripeSubscriptionId: unknown }[];
-            }
-          ).subscriptions[0]!.stripeSubscriptionId,
-        ).toBeNull();
+        expect(records).toHaveLength(2);
+        for (const r of records) {
+          expect(
+            (
+              r.payload as {
+                subscriptions: { stripeSubscriptionId: unknown }[];
+              }
+            ).subscriptions[0]!.stripeSubscriptionId,
+          ).toBeNull();
+        }
 
         expect(stripeCancel).not.toHaveBeenCalled();
       });

@@ -903,8 +903,11 @@ async function personExistsTx(
  * The subscription snapshot captured into the financial_record payload — the
  * billing-correlation fields a tax/chargeback record would need to reconcile
  * against the payment store after the person is gone.
+ *
+ * [WI-1138] Exported so the consent-deny payer-subscription path
+ * (consent-v2.ts) can share this shape rather than redeclaring it.
  */
-type SubscriptionSnapshot = {
+export type SubscriptionSnapshot = {
   id: string;
   planTier: string;
   status: string;
@@ -987,8 +990,13 @@ export async function getSubscriptionStoreTeardownTargetsV2(
  * person cardinality, the payload shape, and retention_period (NULL) are all
  * provisional pending counsel — mirroring consent_receipt.retention_period. We
  * do NOT invent a legal retention duration. See data-model.md §4.9.
+ *
+ * [WI-1138] Exported so the consent-deny payer-subscription path
+ * (consent-v2.ts) reuses this ONE canonical financial-record write instead
+ * of a second, narrower (tax-only) insert — the tax/chargeback pairing is
+ * §4.9 COUNSEL-OWNED and not a per-caller decision.
  */
-async function writeFinancialRecordsTx(
+export async function writeFinancialRecordsTx(
   tx: DeletionTx,
   personId: string,
   organizationId: string,

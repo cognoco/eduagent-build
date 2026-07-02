@@ -35,7 +35,6 @@ import {
   consentGrant,
   consentRequest,
   deletionAudit,
-  financialRecord,
   membership,
   nudges,
   person,
@@ -60,7 +59,11 @@ import {
   DEFAULT_CONSENT_PURPOSE,
   resolveLatestConsentStatusAnyBasis,
 } from './consent-status-v2';
-import { consentPersonLockKey } from './deletion-v2';
+import {
+  consentPersonLockKey,
+  writeFinancialRecordsTx,
+  type SubscriptionSnapshot,
+} from './deletion-v2';
 import { isGuardianOf } from './guardianship';
 
 const logger = createLogger();
@@ -455,15 +458,6 @@ export interface ProcessConsentResponseV2Result {
   guardianEmail: string | null;
 }
 
-/** The payer-subscription snapshot captured on deny, before the delete. */
-type PayerSubscriptionSnapshot = {
-  id: string;
-  planTier: string;
-  status: string;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-};
-
 /**
  * v2 `processConsentResponse`: looks up the request by token, validates
  * replay/expiry, then:
@@ -559,7 +553,7 @@ export async function processConsentResponseV2(
       }
     });
   } else {
-    let payerSubscriptions: PayerSubscriptionSnapshot[] = [];
+    let payerSubscriptions: SubscriptionSnapshot[] = [];
 
     await db.transaction(async (tx) => {
       const [updated] = await tx
@@ -618,19 +612,16 @@ export async function processConsentResponseV2(
           reason: 'guardian_initiated',
           retentionPeriod: null,
         });
-        await tx.insert(financialRecord).values(
-          payerSubscriptions.map((snap) => ({
-            personId: chargePersonId,
-            organizationId: request.organizationId,
-            // §4.9 COUNSEL-OWNED — reuse the existing provisional taxonomy
-            // verbatim (deletion-v2.ts writeFinancialRecordsTx).
-            recordType: 'person_deletion_tax_retain',
-            payload: {
-              deletedAt: now.toISOString(),
-              subscriptions: [snap],
-            },
-            retentionPeriod: null,
-          })),
+        // [WI-1138 review] Reuse the ONE canonical financial-record write
+        // (tax + chargeback retain-tier pair, §4.9 COUNSEL-OWNED) instead of
+        // a narrower tax-only insert — the pairing is not a per-caller
+        // decision. Full snapshot array, matching deletion-v2.ts's own
+        // single-subscription-org call sites.
+        await writeFinancialRecordsTx(
+          tx,
+          chargePersonId,
+          request.organizationId,
+          payerSubscriptions,
         );
       }
 
