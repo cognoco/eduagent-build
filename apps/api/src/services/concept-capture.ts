@@ -4,19 +4,24 @@ import { conceptMastery, concepts, type Database } from '@eduagent/database';
 import type { ChallengeRoundEvaluationItem } from '@eduagent/schemas';
 
 /**
- * Concept-capture (the Challenge-Round "mastery star" feature) is PARKED in code
- * until the identity baseline reset (MMT-ADR-0012) applies the `concepts` /
- * `concept_mastery` tables. Migration 0107, which creates them, is REFERENCE-ONLY
- * and applied in no deployed environment, so every live call throws
- * `relation "concepts" does not exist` — swallowed by safeWrite() into recurring
- * Sentry noise that can mask real failures (db-migration.md Critical #2).
+ * Concept-capture (the Challenge-Round "mastery star" feature) is now ACTIVE.
+ * It was PARKED in code (kill-switch off) until the MMT-ADR-0012 baseline-reset
+ * tables landed and the identity-cutover `profiles`→`person` FK repoint applied
+ * to `concepts` / `concept_mastery`. Both conditions are now satisfied on
+ * staging and production (live-verified: no `profiles` table exists in either
+ * environment; both tables' `profile_id` FKs reference `person(id)`; RLS
+ * profile-isolation policies from migration 0125 / WI-1104 are enabled).
+ * `concepts` / `concept_mastery` row counts were 0/0 at flip time.
  *
  * Gate is applied at the single live call site (session-exchange.ts) rather than
  * inside captureConceptMastery, so the function and its integration tests still
- * exercise the real write path against a DB that has the tables. Flip to `true`
- * (and remove this note) once the tables exist post-reset to re-home the feature.
+ * exercise the real write path against a DB that has the tables. Note: actual
+ * traffic through this path still requires `CHALLENGE_ROUND_RUNTIME_ENABLED`,
+ * which is a separate flag and is `false` on staging/prod as of this flip — so
+ * the flip is presently inert in those environments until Challenge Round
+ * runtime is separately enabled.
  */
-export const CONCEPT_CAPTURE_ENABLED = false;
+export const CONCEPT_CAPTURE_ENABLED = true;
 
 export interface ConceptCaptureSession {
   id: string;
