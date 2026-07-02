@@ -1,0 +1,13 @@
+#!/bin/sh
+# Fake doppler binary for scripts/doppler-run.test.ts (WI-1247). Placed first
+# on PATH so doppler-run.mjs's PATH lookup resolves to this fixture instead of
+# a real doppler install, with no secrets or network access required.
+if [ "$1" = "--version" ]; then
+  echo "fake-doppler 0.0.0"
+  exit 0
+fi
+echo "ARGS:$*"
+if [ "$1" = "--exit-check" ]; then
+  exit 7
+fi
+exit 0
