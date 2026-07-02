@@ -10,10 +10,13 @@
 
 import { and, eq, inArray } from 'drizzle-orm';
 import {
+  accounts,
   organization,
   person,
   membership,
   subscription as subscriptionV2Table,
+  subscriptions,
+  profiles,
   profileQuotaUsage,
   quotaPools,
   topUpCredits,
@@ -74,6 +77,17 @@ async function seedOrganization(index: number) {
     .insert(organization)
     .values({ name: ORG_NAMES[index]! })
     .returning();
+  // [WI-1239 / 779-strip] quota_pools/profile_quota_usage/top_up_credits/
+  // usage_events still FK to the legacy `subscriptions` table
+  // (pre-M-REPOINT), and `subscriptions.accountId` is itself a NOT NULL FK to
+  // `accounts` — seed a matching legacy account (same id as the org, the
+  // "reseed identity contract") so seedSubscriptionWithQuota's legacy
+  // subscription row below has somewhere to point.
+  await db.insert(accounts).values({
+    id: row!.id,
+    clerkUserId: `${ORG_NAMES[index]}-clerk`,
+    email: `${ORG_NAMES[index]}@integration.test`,
+  });
   return row!;
 }
 
@@ -124,6 +138,17 @@ async function seedSubscriptionWithQuota(input: {
           : input.currentPeriodEnd,
     })
     .returning();
+
+  // [WI-1239 / 779-strip] Mirror the v2 subscription into the legacy
+  // `subscriptions` table under the SAME id — quota_pools' FK still points at
+  // the legacy table (pre-M-REPOINT), so a v2-only subscription row leaves
+  // nothing for the insert below to reference.
+  await db.insert(subscriptions).values({
+    id: subscription!.id,
+    accountId: input.organizationId,
+    tier,
+    status: input.status ?? 'active',
+  });
 
   const [quotaPool] = await db
     .insert(quotaPools)
@@ -183,6 +208,16 @@ async function seedPerson(input: {
     personId: row!.id,
     organizationId: input.organizationId,
     roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
+  });
+  // [WI-1239 / 779-strip] profile_quota_usage.profileId still FKs to the
+  // legacy `profiles` table (pre-M-REPOINT) — mirror the person under the
+  // SAME id, same as the account/subscription dual-write above.
+  await db.insert(profiles).values({
+    id: row!.id,
+    accountId: input.organizationId,
+    displayName: input.displayName,
+    birthYear: input.isOwner ? 1990 : 2016,
+    isOwner: input.isOwner,
   });
   return row!;
 }
@@ -267,6 +302,10 @@ async function cleanupTestAccounts() {
     await db.delete(person).where(inArray(person.id, personIds));
   }
   await db.delete(organization).where(inArray(organization.id, orgIds));
+  // Legacy account (same id as the org — see seedOrganization) cascades to
+  // its subscriptions row, which cascades to quota_pools/profile_quota_usage/
+  // top_up_credits/usage_events.
+  await db.delete(accounts).where(inArray(accounts.id, orgIds));
 }
 
 // ---------------------------------------------------------------------------

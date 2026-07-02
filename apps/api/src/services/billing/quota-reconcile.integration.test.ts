@@ -14,9 +14,13 @@
 import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
+  membership,
+  organization,
+  person,
   profileQuotaUsage,
   profiles,
   quotaPools,
+  subscription as subscriptionV2Table,
   subscriptions,
   createDatabase,
 } from '@eduagent/database';
@@ -27,6 +31,17 @@ import {
   reconcileQuotaStateForEffectiveTier,
   reconcileQuotaStateForSubscription,
 } from './quota-reconcile';
+// [WI-1239 / 779-strip] the per-profile branch of reconcileQuotaStateForEffectiveTier
+// (legacy profiles×subscriptions join) was removed — see quota-reconcile.ts's
+// header comment. reconcileQuotaStateForEffectiveTierV2 is the surviving
+// per-profile implementation (person×membership×subscription); the
+// per-profile describe block below and the effective-tier-resolution test
+// convert to it. The shared-pool describe block is untouched — that branch is
+// reused verbatim by v2 and stays on the legacy (still-exported) function.
+import {
+  reconcileQuotaStateForEffectiveTierV2,
+  reconcileQuotaStateForSubscriptionV2,
+} from './billing-v2';
 import { getTierConfig } from '../subscription';
 
 // ---------------------------------------------------------------------------
@@ -156,12 +171,87 @@ async function cleanupTestAccounts() {
   }
 }
 
+// [WI-1239 / 779-strip] v2 dual-store seeding for the per-profile describe
+// block below. reconcileQuotaStateForEffectiveTierV2 reads owner/child
+// enumeration via person×membership×subscription (v2), but profile_quota_usage
+// still FKs to the legacy profiles/subscriptions tables (pre-M-REPOINT) — seed
+// BOTH stores with the SAME ids for the shared subscription/profile rows, the
+// "reseed identity contract" used throughout billing-v2/*.integration.test.ts.
+const V2_ORG_NAMES = [
+  'integration-quota-reconcile-v2-provisions',
+  'integration-quota-reconcile-v2-archived',
+  'integration-quota-reconcile-v2-resolve',
+];
+
+async function seedV2Counterpart(input: {
+  organizationName: string;
+  legacySubscriptionId: string;
+  tier: 'free' | 'plus' | 'family' | 'pro';
+  persons: Array<{
+    legacyProfileId: string;
+    isOwner: boolean;
+    archivedAt?: Date | null;
+  }>;
+}) {
+  const db = createIntegrationDb();
+  const [org] = await db
+    .insert(organization)
+    .values({ name: input.organizationName })
+    .returning();
+  const owner = input.persons.find((p) => p.isOwner)!;
+  for (const p of input.persons) {
+    await db.insert(person).values({
+      id: p.legacyProfileId,
+      displayName: p.isOwner ? 'Owner' : 'Child',
+      birthDate: p.isOwner ? '1985-01-01' : '2015-01-01',
+      residenceJurisdiction: 'EU',
+      archivedAt: p.archivedAt ?? null,
+    });
+    await db.insert(membership).values({
+      personId: p.legacyProfileId,
+      organizationId: org!.id,
+      roles: p.isOwner ? ['admin'] : ['learner'],
+    });
+  }
+  await db.insert(subscriptionV2Table).values({
+    id: input.legacySubscriptionId,
+    organizationId: org!.id,
+    planTier: input.tier,
+    status: 'active',
+    payerPersonId: owner.legacyProfileId,
+  });
+  return org!;
+}
+
+async function cleanupV2() {
+  const db = createIntegrationDb();
+  const orgs = await db.query.organization.findMany({
+    where: inArray(organization.name, V2_ORG_NAMES),
+  });
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) return;
+  const members = await db.query.membership.findMany({
+    where: inArray(membership.organizationId, orgIds),
+    columns: { personId: true },
+  });
+  const personIds = [...new Set(members.map((m) => m.personId))];
+  await db
+    .delete(subscriptionV2Table)
+    .where(inArray(subscriptionV2Table.organizationId, orgIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+}
+
 beforeEach(async () => {
   await cleanupTestAccounts();
+  await cleanupV2();
 });
 
 afterAll(async () => {
   await cleanupTestAccounts();
+  await cleanupV2();
 });
 
 // ---------------------------------------------------------------------------
@@ -395,8 +485,19 @@ describe('reconcileQuotaStateForEffectiveTier — per-profile', () => {
       birthYear: 2015,
       isOwner: false,
     });
+    await seedV2Counterpart({
+      organizationName: 'integration-quota-reconcile-v2-provisions',
+      legacySubscriptionId: sub.id,
+      tier: 'plus',
+      persons: [
+        { legacyProfileId: owner.id, isOwner: true },
+        { legacyProfileId: child.id, isOwner: false },
+      ],
+    });
 
-    await reconcileQuotaStateForEffectiveTier(
+    // [WI-1239 / 779-strip] reconcileQuotaStateForEffectiveTierV2 is the
+    // surviving per-profile implementation — see the import comment above.
+    await reconcileQuotaStateForEffectiveTierV2(
       createIntegrationDb(),
       sub.id,
       'plus',
@@ -423,15 +524,25 @@ describe('reconcileQuotaStateForEffectiveTier — per-profile', () => {
       birthYear: 1980,
       isOwner: true,
     });
+    const archivedAt = new Date('2026-04-01T00:00:00.000Z');
     const archivedChild = await seedProfile({
       accountId: account.id,
       displayName: 'Archived Child',
       birthYear: 2012,
       isOwner: false,
-      archivedAt: new Date('2026-04-01T00:00:00.000Z'),
+      archivedAt,
+    });
+    await seedV2Counterpart({
+      organizationName: 'integration-quota-reconcile-v2-archived',
+      legacySubscriptionId: sub.id,
+      tier: 'plus',
+      persons: [
+        { legacyProfileId: owner.id, isOwner: true },
+        { legacyProfileId: archivedChild.id, isOwner: false, archivedAt },
+      ],
     });
 
-    await reconcileQuotaStateForEffectiveTier(
+    await reconcileQuotaStateForEffectiveTierV2(
       createIntegrationDb(),
       sub.id,
       'plus',
@@ -464,8 +575,17 @@ describe('reconcileQuotaStateForSubscription', () => {
       birthYear: 1988,
       isOwner: true,
     });
+    await seedV2Counterpart({
+      organizationName: 'integration-quota-reconcile-v2-resolve',
+      legacySubscriptionId: sub.id,
+      tier: 'plus',
+      persons: [{ legacyProfileId: owner.id, isOwner: true }],
+    });
 
-    const resolved = await reconcileQuotaStateForSubscription(
+    // [WI-1239 / 779-strip] reconcileQuotaStateForSubscriptionV2 is the
+    // surviving per-profile-capable resolver (reads the v2 `subscription`
+    // table) — see the import comment above.
+    const resolved = await reconcileQuotaStateForSubscriptionV2(
       createIntegrationDb(),
       sub.id,
       new Date('2026-05-15T12:00:00.000Z'),
