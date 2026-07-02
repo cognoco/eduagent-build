@@ -725,6 +725,15 @@
       "a11yScore": "Øvelse fullført: {{correct}} av {{total}} riktige, {{pct}} prosent",
       "a11yTimer": "Ferdighetsøvelse: {{time}} gjenstår"
     },
+    "gradedInput": {
+      "title": "Les og svar",
+      "subtitle": "Nivå {{level}}",
+      "targetWords": "Se etter: {{words}}",
+      "questionLabel": "Spørsmål",
+      "playAudioLabel": "Spill av teksten",
+      "stopAudioLabel": "Stopp teksten",
+      "dismissLabel": "Lukk lesekortet"
+    },
     "chatShell": {
       "defaultSubtitle": "Jeg er her for å hjelpe",
       "defaultPlaceholder": "Skriv en melding ...",

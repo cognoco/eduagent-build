@@ -752,6 +752,15 @@
       "a11yScore": "Drill complete: {{correct}} out of {{total}} correct, {{pct}} percent",
       "a11yTimer": "Fluency drill: {{time}} remaining"
     },
+    "gradedInput": {
+      "title": "Read and answer",
+      "subtitle": "Level {{level}}",
+      "targetWords": "Watch for: {{words}}",
+      "questionLabel": "Question",
+      "playAudioLabel": "Play the passage",
+      "stopAudioLabel": "Stop the passage",
+      "dismissLabel": "Dismiss reading card"
+    },
     "chatShell": {
       "defaultSubtitle": "I'm here to help",
       "defaultPlaceholder": "Type a message...",

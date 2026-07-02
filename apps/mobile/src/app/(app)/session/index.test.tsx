@@ -533,6 +533,17 @@ jest.mock(
     QuestionCounter: () => null,
     LibraryPrompt: () => null,
     SessionInputModeToggle: () => null,
+    GradedInputCard: ({ activity }: { activity: any }) => {
+      const { View, Text } = require('react-native');
+      return (
+        <View testID="graded-input-card">
+          <Text>{activity.gradedInput?.text}</Text>
+          <Text>
+            {activity.gradedInput?.comprehensionQuestions?.[0]?.prompt}
+          </Text>
+        </View>
+      );
+    },
     QuotaExceededCard: ({
       details,
       isOwner,
@@ -1282,6 +1293,65 @@ describe('SessionScreen homework flow', () => {
         fetchCallsMatching(mockFetch, '/challenge-round/accept').length,
       ).toBe(1);
       expect(testScreen.queryByTestId('challenge-offer-card')).toBeNull();
+    });
+  });
+
+  it('renders graded input from the typed language-learning done payload', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Spanish',
+      topicId: '11111111-1111-4111-8111-111111111111',
+      topicName: 'Ordering drinks',
+    });
+    mockStream.mockImplementationOnce(
+      async (
+        _message: string,
+        onChunk: (value: string) => void,
+        onDone: (result: Record<string, unknown>) => void | Promise<void>,
+      ) => {
+        onChunk('Read this, then answer in the chat.');
+        await onDone({
+          exchangeCount: 1,
+          escalationRung: 1,
+          aiEventId: 'event-graded-input',
+          languageLearning: {
+            strand: 'meaning_input',
+            activityType: 'graded_input',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            gradedInput: {
+              type: 'graded_input',
+              modality: 'reading',
+              cefrLevel: 'A1',
+              knownWordRatioTarget: 0.85,
+              knownWordEstimate: 0.82,
+              targetWords: ['agua'],
+              text: 'Tengo agua en la mesa.',
+              comprehensionQuestions: [
+                {
+                  id: 'q1',
+                  prompt: 'What is on the table?',
+                  answerHint: 'agua',
+                },
+              ],
+              audioEnabled: true,
+            },
+          },
+        });
+      },
+    );
+
+    const testScreen = renderSessionScreen();
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      testScreen.getByTestId('graded-input-card');
+      testScreen.getByText('Tengo agua en la mesa.');
+      testScreen.getByText('What is on the table?');
     });
   });
 
