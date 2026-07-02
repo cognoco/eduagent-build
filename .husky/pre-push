@@ -3,4 +3,14 @@
 # checks on the push delta. Catches cross-file breakage that per-commit
 # hooks miss. Skip with: git push --no-verify
 
-bash scripts/pre-push-tests.sh
+# WI-1246 — main push guard. git feeds the refspec lines on stdin, which the
+# validation script below also consumes, so capture stdin ONCE and re-feed it
+# to both. Refuse any push targeting refs/heads/main (belt to the pre-commit
+# guard's suspenders). SKIP_PRE_PUSH=1 / --no-verify bypass it for deliberate
+# human main work, same as the validation gate.
+REFSPEC_STDIN=$(cat)
+if [ "${SKIP_PRE_PUSH:-}" != "1" ]; then
+  printf '%s\n' "$REFSPEC_STDIN" | sh scripts/husky-main-push-guard.sh || exit 1
+fi
+
+printf '%s\n' "$REFSPEC_STDIN" | bash scripts/pre-push-tests.sh

@@ -1,6 +1,13 @@
 #!/usr/bin/env sh
 set -e
 
+# WI-1246 — shared-main commit guard. Runs FIRST (fail fast): refuse a commit on
+# `main` in the shared checkout (the landing site for the /commit fork-cwd
+# hazard). Invoked as a subprocess, never sourced, so the guard's own `exit 0`
+# cannot abort this hook under `set -e` and skip lint-staged/tsc. Escape for
+# deliberate human main work: git commit --no-verify.
+sh scripts/husky-main-commit-guard.sh || exit 1
+
 # Secret / large-file guard (WI-450 / gate-spec D3). Relocated out of the commit
 # skill into the hook so it runs for EVERY committer (human, agent, /commit, raw
 # git), not just when a skill chooses to scan. .gitignore is the primary control;
