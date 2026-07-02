@@ -1783,7 +1783,6 @@ export const sessionCompleted = inngest.createFunction(
         // Also fetch subscription anchor so we can gate this LLM call on quota.
         // [WI-784] v2 twin: reads person + membership (no profiles.accountId
         // which was dropped 2026-06-14).
-        const identityV2 = true; // always-on post-cutover
         let homeworkOrganizationId: string | undefined;
         const [personRow] = await db
           .select({ conversationLanguage: person.conversationLanguage })
@@ -1864,7 +1863,6 @@ export const sessionCompleted = inngest.createFunction(
             {
               event: 'metering.homework_summary.org_missing',
               profileId,
-              identityV2,
             },
           );
           sentry.captureException(missingOrgErr, { profileId });
@@ -1872,9 +1870,8 @@ export const sessionCompleted = inngest.createFunction(
         }
 
         // [WI-784] v2 twin: ensureFreeSubscriptionV2 reads the v2
-        // `subscription` table keyed by organizationId; legacy path reads
-        // `subscriptions` via accountId. decrementQuota / safeRefundQuota
-        // already accept identityV2 to select the v2 ownership cross-check.
+        // `subscription` table keyed by organizationId.
+        // [WI-1239 / 779-strip] decrementQuota / safeRefundQuota are v2-only.
         const subscription = await ensureFreeSubscriptionV2(
           db,
           homeworkOrganizationId,
@@ -1883,7 +1880,6 @@ export const sessionCompleted = inngest.createFunction(
           db,
           subscription.id,
           profileId,
-          identityV2,
         );
         if (!decrementResult.success) {
           // [C7] profile_mismatch is a data-integrity anomaly (the profileId
@@ -1989,7 +1985,6 @@ export const sessionCompleted = inngest.createFunction(
                   : undefined,
               quotaModel: decrementResult.quotaModel,
               topUpCreditId: decrementResult.topUpCreditId,
-              identityV2,
             });
             throw err;
           }

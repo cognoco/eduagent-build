@@ -166,6 +166,37 @@ function mockTopUpRow(
   };
 }
 
+// [WI-1239 / 779-strip] decrementQuota/incrementQuota now resolve effective
+// access via the v2 `subscription` table (organization-keyed), not the legacy
+// `subscriptions` table. Derive the v2-shaped row from the same
+// mockSubscriptionRow() fixture so existing test call sites (which only build
+// legacy rows) keep working unchanged — see types-v2.ts mapSubscriptionV2Row
+// for the field-name mapping this mirrors.
+function toV2SubscriptionRow(
+  row: ReturnType<typeof mockSubscriptionRow> | undefined,
+) {
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    organizationId: row.accountId,
+    stripeCustomerId: row.stripeCustomerId,
+    stripeSubscriptionId: row.stripeSubscriptionId,
+    planTier: row.tier,
+    status: row.status,
+    trialEndsAt: row.trialEndsAt,
+    periodStartAt: row.currentPeriodStart,
+    periodEndAt: row.currentPeriodEnd,
+    cancelledAt: row.cancelledAt,
+    lastStripeEventTimestamp: row.lastStripeEventTimestamp,
+    lastStripeEventId: row.lastStripeEventId,
+    revenuecatOriginalAppUserId: null,
+    lastRevenuecatEventId: row.lastRevenuecatEventId,
+    lastRevenuecatEventTimestampMs: row.lastRevenuecatEventTimestampMs,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 function mockProfileRow(
   overrides?: Partial<{
     id: string;
@@ -250,6 +281,14 @@ function createMockDb({
     query: {
       subscriptions: {
         findFirst: jest.fn().mockResolvedValue(subscriptionFindFirst),
+      },
+      // [WI-1239 / 779-strip] v2-only: decrementQuota/incrementQuota resolve
+      // effective access via getEffectiveAccessForSubscriptionV2, which reads
+      // this table. Derived from the same fixture — see toV2SubscriptionRow.
+      subscription: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue(toV2SubscriptionRow(subscriptionFindFirst)),
       },
       quotaPools: {
         findFirst: jest.fn().mockResolvedValue(quotaPoolFindFirst),
@@ -830,14 +869,16 @@ describe('safeRefundQuota [BUG-661]', () => {
       where: jest.fn().mockReturnValue({ limit: selectLimit }),
     };
     selectChain.innerJoin.mockReturnValue(selectChain);
+    const subRow = mockSubscriptionRow({ tier: 'family', status: 'active' });
     const db = {
       query: {
         subscriptions: {
-          findFirst: jest
-            .fn()
-            .mockResolvedValue(
-              mockSubscriptionRow({ tier: 'family', status: 'active' }),
-            ),
+          findFirst: jest.fn().mockResolvedValue(subRow),
+        },
+        // [WI-1239 / 779-strip] v2-only: incrementQuota resolves effective
+        // access via getEffectiveAccessForSubscriptionV2.
+        subscription: {
+          findFirst: jest.fn().mockResolvedValue(toV2SubscriptionRow(subRow)),
         },
       },
       select: jest.fn().mockReturnValue({

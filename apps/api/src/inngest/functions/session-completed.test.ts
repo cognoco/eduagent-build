@@ -1897,7 +1897,6 @@ describe('sessionCompleted', () => {
         expect.anything(),
         'sub-test-id',
         PROFILE_ID,
-        true,
       );
       expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();
       // No refund — LLM succeeded.
@@ -2090,7 +2089,7 @@ describe('sessionCompleted', () => {
     //   - read from `person` (not `profiles`) for conversationLanguage
     //   - resolve organizationId via `membership` (not profiles.accountId)
     //   - call ensureFreeSubscriptionV2 (not ensureFreeSubscription)
-    //   - call decrementQuota with identityV2=true
+    //   - call decrementQuota (v2-only since WI-1239)
     //   - NOT read the dropped `profiles` table
     //
     // The DB mock supplies a person row + membership.findFirst resolver.
@@ -2143,12 +2142,11 @@ describe('sessionCompleted', () => {
         );
         // Legacy subscription call must NOT fire under flag-on
         expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
-        // decrementQuota called with identityV2=true (4th arg)
+        // [WI-1239] decrementQuota is v2-only — no identityV2 arg to assert.
         expect(mockDecrementQuota).toHaveBeenCalledWith(
           expect.anything(),
           'sub-test-id',
           PROFILE_ID,
-          true,
         );
         // LLM still fires (quota not exhausted in this test)
         expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalled();

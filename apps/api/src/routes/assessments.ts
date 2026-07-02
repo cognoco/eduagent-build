@@ -54,9 +54,6 @@ type AssessmentRouteEnv = RouteEnv & {
     quotaDecrementTopUpCreditId: string | undefined;
     quotaDecrementQuotaModel: QuotaModel | undefined;
     quotaRefunded: boolean | undefined;
-    // [WI-776 / WP-7] Cutover flag the decrement ran under; threaded into
-    // safeRefundQuota so the refund's ownership check uses the same store.
-    quotaIdentityV2: boolean | undefined;
   };
 };
 
@@ -154,8 +151,6 @@ export const assessmentRoutes = new Hono<AssessmentRouteEnv>()
             source: c.get('quotaDecrementSource'),
             quotaModel: c.get('quotaDecrementQuotaModel'),
             topUpCreditId: c.get('quotaDecrementTopUpCreditId'),
-            // [WI-776 / WP-7] Use the store the decrement ran under.
-            identityV2: c.get('quotaIdentityV2'),
           });
           // [WI-776 / WP-7] Only claim the refund happened when it actually did.
           // Marking quotaRefunded=true on a failed refund would charge the user
