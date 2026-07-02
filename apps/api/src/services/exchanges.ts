@@ -40,6 +40,8 @@ import {
   IMAGE_UNSCREENED_MODEL,
   type CatastrophicCategory,
 } from './safety-tripwire';
+import { applyDangerousProcedureGate } from './dangerous-procedure-gate';
+import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { getOcrProvider } from './ocr';
 import {
   GENERAL_KNOWLEDGE_SOURCE_ID,
@@ -108,6 +110,53 @@ export async function emitCrisisRedirectEvent(context: {
         },
       }),
     'safety.crisis_redirect_fired',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1154] Structured safety event when the server-side dangerous-procedure
+ * reply gate fires (a minor-routed model leaked actionable produce / extract /
+ * synthesise / refine / acquire / dose how-to for a controlled or dangerous
+ * item, and the server replaced it with a safe harm-education refusal).
+ *
+ * Silent recovery is banned on safety paths — this is the required escalation
+ * signal (logger.warn + a queryable Inngest event), NOT a bare console.warn.
+ * Deliberately METADATA ONLY — never the learner message or the leaked reply.
+ */
+export async function emitDangerousProcedureBlockedEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+}): Promise<void> {
+  logger.warn('safety.dangerous_procedure_blocked', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety marker (WI-1154). The
+        // learner-facing response (safe harm-education refusal) already
+        // replaced the leaked reply server-side; this event exists so ops can
+        // query "dangerous-procedure blocks per week" and monitor the gate's
+        // fire rate. No downstream handler is required or intended.
+        name: 'app/safety.dangerous_procedure_blocked',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: context.model,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.dangerous_procedure_blocked',
     { sessionId: context.sessionId, profileId: context.profileId },
   );
 }
@@ -1587,12 +1636,35 @@ export async function processExchange(
     sourceAudit,
   );
 
+  // [WI-1154] Server-side dangerous-procedure reply gate (fail-closed). Runs
+  // AFTER the source-audit fallback so it is the final word on the tutor reply.
+  // Scoped to minors via the exact-date age bracket (safety-adjacent decision).
+  const isMinorLearner =
+    computeAgeBracketFromDate(
+      context.birthYear,
+      context.birthMonth,
+      context.birthDay,
+    ) !== 'adult';
+  const procedureGate = applyDangerousProcedureGate(sourceSafe.response, {
+    isMinor: isMinorLearner,
+  });
+  if (procedureGate.blocked) {
+    await emitDangerousProcedureBlockedEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+    });
+  }
+  const gatedResponse = procedureGate.response;
+
   return {
-    response: sourceSafe.response,
+    response: gatedResponse,
     newEscalationRung: context.escalationRung,
     isUnderstandingCheck: finalParsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
-      sourceSafe.response,
+      gatedResponse,
       context,
     ),
     needsDeepening: finalParsed.needsDeepening,

@@ -34,7 +34,10 @@ import type {
   TopicProbeRequestedEvent,
   ReviewCalibrationRequestedEvent,
 } from '@eduagent/schemas';
-import { computeAgeBracket } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  computeAgeBracketFromDate,
+} from '@eduagent/schemas';
 import {
   ConflictError,
   NotFoundError,
@@ -52,12 +55,14 @@ import {
   classifyExchangeOutcome,
   auditExchangeSources,
   applySourceAuditSafetyFallback,
+  emitDangerousProcedureBlockedEvent,
   inferObviousReliableSourceForAudit,
   type ExchangeFallback,
   type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
+import { applyDangerousProcedureGate } from '../dangerous-procedure-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
 import {
@@ -3730,12 +3735,34 @@ export async function streamMessage(
         parsed.cleanResponse,
         sourceAudit,
       );
+      // [WI-1154] Server-side dangerous-procedure reply gate (fail-closed).
+      // Runs AFTER the source-audit fallback so it is the final word on the
+      // reply. Scoped to minors via the exact-date age bracket. When it fires,
+      // the safe refusal rides the existing `sourceReplacement` rail so the
+      // client replaces the tokens it already streamed.
+      const isMinorLearner =
+        computeAgeBracketFromDate(
+          context.birthYear,
+          context.birthMonth,
+          context.birthDay,
+        ) !== 'adult';
+      const procedureGate = applyDangerousProcedureGate(sourceSafe.response, {
+        isMinor: isMinorLearner,
+      });
+      if (procedureGate.blocked) {
+        await emitDangerousProcedureBlockedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          model: result.model,
+        });
+      }
+      const gatedResponse = procedureGate.response;
       const sourceReplacement =
-        sourceSafe.response !== parsed.cleanResponse
-          ? sourceSafe.response
-          : undefined;
+        gatedResponse !== parsed.cleanResponse ? gatedResponse : undefined;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
-        sourceSafe.response,
+        gatedResponse,
         context,
       );
       // T6: source the asked-question from the last assistant turn in history.
@@ -3757,7 +3784,7 @@ export async function streamMessage(
         session,
         context,
         {
-          response: sourceSafe.response,
+          response: gatedResponse,
           challengeRoundOffer: parsed.challengeRoundOffer,
           challengeRoundEvaluation: parsed.challengeRoundEvaluation,
           noteDraft: parsed.noteDraft,
@@ -3775,7 +3802,7 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        sourceSafe.response,
+        gatedResponse,
         effectiveRung,
         {
           isUnderstandingCheck: parsed.understandingCheck,
@@ -3867,7 +3894,7 @@ export async function streamMessage(
       });
 
       return {
-        response: sourceSafe.response,
+        response: gatedResponse,
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,
