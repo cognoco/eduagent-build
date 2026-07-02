@@ -79,6 +79,26 @@ function formatLanguageSessionState(context: ExchangeContext): string {
         '- Use this exact passage as the input seed. You may lightly smooth grammar, but do not add unrelated vocabulary.',
       ]
     : [];
+  const previousComprehension = state.previousComprehension;
+  const previousComprehensionLines = previousComprehension
+    ? [
+        'Previous graded-input answer:',
+        `- Question: ${sanitizeXmlValue(previousComprehension.prompt, 240)}`,
+        `- Learner answer: ${sanitizeXmlValue(
+          previousComprehension.learnerAnswer,
+          240,
+        )}`,
+        `- Verdict: ${previousComprehension.verdict}`,
+        `- Expected terms still missing: ${
+          previousComprehension.missingTerms.length > 0
+            ? previousComprehension.missingTerms
+                .map((term) => sanitizeXmlValue(term, 80))
+                .join(', ')
+            : 'none'
+        }`,
+        '- If the verdict is partial or missed, briefly repair the meaning before continuing.',
+      ]
+    : [];
 
   return [
     'Server-selected language activity:',
@@ -90,6 +110,7 @@ function formatLanguageSessionState(context: ExchangeContext): string {
     `- Session strand counts: meaning_input=${counts.meaning_input}, meaning_output=${counts.meaning_output}, language_focus=${counts.language_focus}, fluency=${counts.fluency}.`,
     '- Follow this activity brief for the current turn. Do not switch strands unless the learner asks for something urgent or safety-related.',
     ...gradedInputLines,
+    ...previousComprehensionLines,
   ].join('\n');
 }
 

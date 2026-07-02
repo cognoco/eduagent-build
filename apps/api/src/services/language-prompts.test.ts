@@ -194,4 +194,44 @@ describe('buildFourStrandsPrompt', () => {
       'Comprehension question: What is the main thing happening in this passage?',
     );
   });
+
+  it('includes the server-graded comprehension result when present', () => {
+    const result = buildFourStrandsPrompt(
+      makeContext({
+        languageCode: 'es',
+        languageSessionState: {
+          activeStrand: 'language_focus',
+          sessionStrandCounts: {
+            meaning_input: 1,
+            meaning_output: 0,
+            language_focus: 0,
+            fluency: 0,
+          },
+          previousComprehension: {
+            questionId: 'gist-1',
+            prompt: 'What does Ana want?',
+            answerHint: 'Ana wants water',
+            learnerAnswer: 'She is going home.',
+            verdict: 'missed',
+            matchedTerms: [],
+            missingTerms: ['wants', 'water'],
+          },
+          nextActivity: {
+            strand: 'language_focus',
+            activityType: 'correction_retry',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: [],
+          },
+        },
+      }),
+    );
+    const joined = result.join('\n');
+
+    expect(joined).toContain('Previous graded-input answer:');
+    expect(joined).toContain('Verdict: missed');
+    expect(joined).toContain('What does Ana want?');
+    expect(joined).toContain('She is going home.');
+    expect(joined).toContain('wants, water');
+  });
 });
