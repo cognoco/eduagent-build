@@ -16,7 +16,11 @@ import {
 } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import type { ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from '@tanstack/react-query';
 
 import { AppContextProvider } from '../../lib/app-context';
 import {
@@ -29,7 +33,10 @@ import {
   createTestProfile,
   renderScreen,
 } from '../../test-utils/screen-render';
-import { fetchCallsMatching } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+} from '../../test-utils/mock-api-routes';
 import { RequireFamilyContext } from './RequireFamilyContext';
 
 // expo-router: external navigation boundary
@@ -483,5 +490,233 @@ describe('RequireFamilyContext [PARENT-22] switch-to-family CTA', () => {
     expect(mockReplace).not.toHaveBeenCalled();
 
     cleanup();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1142] Regression floor for the Study->Family switch-CTA transition on
+// child entry surfaces (BRIDGE-04 path).
+//
+// The describes above use either a hand-built static ProfileContext literal
+// (top of file) or `renderScreen`'s static literal (PARENT-22) -- neither is
+// backed by the React Query `['profiles']` cache, so neither can observe the
+// real optimistic write the switch-CTA performs: `AppContextProvider.setMode`
+// (apps/mobile/src/lib/app-context.tsx) sets `modeOverride('family')`
+// SYNCHRONOUSLY on button press (before the server confirms), then on a
+// successful PATCH its `onSuccess` calls
+// `queryClient.setQueriesData({ queryKey: ['profiles'] }, updater)` to commit
+// the server-confirmed profile BEFORE clearing the transient `modeOverride`.
+// With a static-literal ProfileContext, that cache write is a no-op as far as
+// `activeProfile` is concerned, so no existing test can tell "the guard held
+// correctly and the cache write landed" apart from "the literal never
+// changed so canRender never really flips" -- both render the same DOM.
+//
+// This wrapper backs ProfileContext with a real `useQuery(['profiles'])`
+// subscription against the SAME QueryClient the guard's mutation writes to,
+// so `activeProfile.defaultAppContext` genuinely reflects the write.
+// ---------------------------------------------------------------------------
+
+function makeQueryCacheBackedWrapper(
+  queryClient: QueryClient,
+  activeProfileId: string,
+): React.ComponentType<{ children: ReactNode }> {
+  function ProfileFromQueryCache({ children }: { children: ReactNode }) {
+    const { data: profiles = [] } = useQuery<Profile[]>({
+      queryKey: ['profiles'],
+      queryFn: () => queryClient.getQueryData<Profile[]>(['profiles']) ?? [],
+      staleTime: Infinity,
+    });
+    const activeProfile =
+      profiles.find((profile) => profile.id === activeProfileId) ?? null;
+    const profileContextValue: ProfileContextValue = {
+      profiles,
+      activeProfile,
+      isExplicitProxyMode: false,
+      switchProfile: jest.fn().mockResolvedValue({ success: true }),
+      isLoading: false,
+      profileLoadError: null,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+    };
+    return (
+      <ProfileContext.Provider value={profileContextValue}>
+        {children}
+      </ProfileContext.Provider>
+    );
+  }
+
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ProfileFromQueryCache>
+          <AppContextProvider>{children}</AppContextProvider>
+        </ProfileFromQueryCache>
+      </QueryClientProvider>
+    );
+  };
+}
+
+describe('RequireFamilyContext [WI-1142] switch-to-family CTA — query-cache-backed regression floor', () => {
+  const originalV0 = FEATURE_FLAGS.MODE_NAV_V0_ENABLED;
+  const originalV1 = FEATURE_FLAGS.MODE_NAV_V1_ENABLED;
+
+  const CHILD_ID = 'child-1142';
+
+  const cacheGuardian: Profile = createTestProfile({
+    id: 'guardian-1142',
+    accountId: 'account-1142',
+    displayName: 'Guardian',
+    isOwner: true,
+    birthYear: 1985,
+    hasFamilyLinks: true,
+    // Persisted context is study; V1 derives study mode from this until the
+    // switch-CTA write lands.
+    defaultAppContext: 'study',
+  });
+
+  const cacheLinkedChild: Profile = createTestProfile({
+    id: CHILD_ID,
+    accountId: 'account-1142',
+    displayName: 'Kid',
+    isOwner: false,
+    birthYear: 2014,
+    linkCreatedAt: '2026-01-02T00:00:00.000Z',
+  });
+
+  const CACHE_READY_SUBSCRIPTION = {
+    subscription: {
+      tier: 'family',
+      effectiveAccessTier: 'family',
+      billingAccess: 'current',
+      status: 'active',
+      trialEndsAt: null,
+      currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+      cancelAtPeriodEnd: false,
+      monthlyLimit: 700,
+      usedThisMonth: 0,
+      remainingQuestions: 700,
+      dailyLimit: null,
+      usedToday: 0,
+      dailyRemainingQuestions: null,
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      false;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      true;
+  });
+
+  afterEach(() => {
+    (FEATURE_FLAGS as { MODE_NAV_V0_ENABLED: boolean }).MODE_NAV_V0_ENABLED =
+      originalV0;
+    (FEATURE_FLAGS as { MODE_NAV_V1_ENABLED: boolean }).MODE_NAV_V1_ENABLED =
+      originalV1;
+  });
+
+  it('[WI-1142] holds the child entry surface blocked through the optimistic mode flip, then renders and keeps rendering it once the profiles-cache write lands', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, gcTime: 0 },
+        mutations: { retry: false, gcTime: 0 },
+      },
+    });
+    queryClient.setQueryData(['profiles'], [cacheGuardian, cacheLinkedChild]);
+
+    let resolvePatch: ((value: { profile: Profile }) => void) | undefined;
+    const pendingPatch = new Promise<{ profile: Profile }>((resolve) => {
+      resolvePatch = resolve;
+    });
+
+    const routedFetch = createRoutedMockFetch({
+      '/app-context': () => pendingPatch,
+      '/subscription': CACHE_READY_SUBSCRIPTION,
+    });
+    const prevFetch = globalThis.fetch;
+    (globalThis as unknown as { fetch: typeof fetch }).fetch =
+      routedFetch as unknown as typeof fetch;
+
+    // try/finally so a mid-test assertion throw never leaks the overridden
+    // global fetch into subsequent tests in this file (cascading pollution).
+    try {
+      const Wrapper = makeQueryCacheBackedWrapper(
+        queryClient,
+        cacheGuardian.id,
+      );
+
+      render(
+        <Wrapper>
+          <RequireFamilyContext
+            route="child/[profileId]"
+            params={{ profileId: CHILD_ID }}
+          >
+            <Text testID="child-sentinel">child-content</Text>
+          </RequireFamilyContext>
+        </Wrapper>,
+      );
+
+      await waitFor(() => screen.getByTestId('family-route-switch-cta'));
+      expect(screen.queryByTestId('child-sentinel')).toBeNull();
+
+      fireEvent.press(screen.getByTestId('family-route-switch-cta'));
+
+      // `AppContextProvider.setMode` sets `modeOverride('family')`
+      // SYNCHRONOUSLY on press, before the server confirms -- canRender is
+      // already true here. Only the switchingToFamily guard-hold keeps the
+      // child surface blocked while the write is still in flight. This is the
+      // regression lock: if the guard is reverted (`if (canRender)` instead of
+      // `if (canRender && !switchingToFamily)`), child-sentinel renders here,
+      // one write early.
+      await waitFor(() => {
+        expect(
+          fetchCallsMatching(routedFetch, '/app-context').length,
+        ).toBeGreaterThanOrEqual(1);
+      });
+      expect(screen.queryByTestId('child-sentinel')).toBeNull();
+      expect(
+        screen.getByTestId('family-route-switch-cta').props.accessibilityState
+          ?.disabled,
+      ).toBe(true);
+      // Confirm the block above is genuinely driven by switchingToFamily, not
+      // a cache that happens to still say 'study' for an unrelated reason.
+      expect(
+        queryClient
+          .getQueryData<Profile[]>(['profiles'])
+          ?.find((profile) => profile.id === cacheGuardian.id)
+          ?.defaultAppContext,
+      ).toBe('study');
+
+      // Server confirms. The guard's onSuccess (in app-context.tsx) writes the
+      // confirmed profile into the SAME `['profiles']` query cache the real
+      // switch-CTA flow uses; this harness's ProfileContext is genuinely
+      // subscribed to that cache, unlike the static-literal harnesses above.
+      resolvePatch?.({
+        profile: { ...cacheGuardian, defaultAppContext: 'family' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('child-sentinel')).toBeTruthy();
+      });
+      expect(screen.queryByTestId('family-route-blocked')).toBeNull();
+
+      // The transient modeOverride clears right after the cache write;
+      // confirm the child surface does not regress back to blocked once
+      // derivedMode re-derives from the now-updated (cache-confirmed)
+      // defaultAppContext.
+      await waitFor(() => {
+        expect(screen.getByTestId('child-sentinel')).toBeTruthy();
+      });
+      expect(
+        queryClient
+          .getQueryData<Profile[]>(['profiles'])
+          ?.find((profile) => profile.id === cacheGuardian.id)
+          ?.defaultAppContext,
+      ).toBe('family');
+    } finally {
+      (globalThis as unknown as { fetch: typeof fetch }).fetch = prevFetch;
+      queryClient.clear();
+    }
   });
 });
