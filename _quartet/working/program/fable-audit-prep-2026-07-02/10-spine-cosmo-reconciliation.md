@@ -200,12 +200,14 @@ WI-1190 · WI-482 — **O**. None spine-governed; all proceed independently.
 - ✅ Re-filed **WI-1250** Project Nexus → MentoMate.
 - ✅ Workstream re-files (held batch): **WI-904** WS-28→WS-33, **WI-1288** WS-31→WS-18, **WI-781** WS-31→WS-18.
 - ✅ Capture workstream assignments: **WI-1306** → WS-18 (M2a); **WI-1307/1308** → WS-28 (M4/M5).
-  **M1 bundle (WI-1301…1305) held** for a **new "Seam Hardening" workstream** (operator's call — see §Decisions).
+- ✅ Created **WS-37 "Seam Hardening"** (Project=MentoMate); assigned the **M1 bundle WI-1301…1305** to it
+  (operator-approved). Owner unset — ready for orchestrator handoff.
+- ✅ Re-homed **WI-770** ("enhance /cosmo:review") → Project=Nexus, Workstream=WS-23 (Cosmo improvements) —
+  estate tooling, off the MentoMate board.
 - ✅ Resume note for the WS-18/WS-28 orchestrator drafted → `11-ws18-28-resume-note.md`.
 
 **STILL HELD (judgment-heavy / operator-owned — not auto-fired):**
 - Compliance **dedup**: reconcile the Ready `11xx` vs Captured `119x` duplicate generation — needs a human
   call on which to keep/merge; not an agent auto-close.
 - **WI-1249** (null Stage + empty Name): left untouched — operator to delete/repair.
-- **WI-770** (Cosmo-tooling): likely re-homes to Nexus, not a within-MentoMate WS move — left for operator.
 - The **pause-lift** itself (shepherd/orchestrator resume signal) — the resume note is drafted; operator/Zuzka deliver.
