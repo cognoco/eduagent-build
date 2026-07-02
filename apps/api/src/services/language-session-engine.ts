@@ -1,4 +1,8 @@
-import type { CefrLevel, InputMode } from '@eduagent/schemas';
+import {
+  streamLanguageLearningActivitySchema,
+  type CefrLevel,
+  type InputMode,
+} from '@eduagent/schemas';
 
 import { SUPPORTED_LANGUAGES } from '../data/languages';
 
@@ -55,9 +59,22 @@ export interface LanguageActivityTelemetry {
   gradedInput?: LanguageGradedInputArtifact;
 }
 
+export type LanguageComprehensionVerdict = 'understood' | 'partial' | 'missed';
+
+export interface LanguageComprehensionEvaluation {
+  questionId: string;
+  prompt: string;
+  answerHint: string;
+  learnerAnswer: string;
+  verdict: LanguageComprehensionVerdict;
+  matchedTerms: string[];
+  missingTerms: string[];
+}
+
 export interface LanguageSessionState {
   activeStrand: LanguageStrand;
   sessionStrandCounts: LanguageStrandCounts;
+  previousComprehension?: LanguageComprehensionEvaluation;
   nextActivity: LanguageActivityTelemetry;
 }
 
@@ -170,6 +187,80 @@ function cleanTerms(terms: string[] | undefined, limit: number): string[] {
     }
   }
   return cleaned;
+}
+
+const ANSWER_STOPWORDS = new Set([
+  'about',
+  'after',
+  'also',
+  'and',
+  'are',
+  'because',
+  'does',
+  'for',
+  'from',
+  'has',
+  'have',
+  'her',
+  'him',
+  'his',
+  'into',
+  'its',
+  'she',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'they',
+  'this',
+  'was',
+  'what',
+  'when',
+  'where',
+  'who',
+  'with',
+]);
+
+function tokenizeAnswerTerms(value: string): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const match of value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .matchAll(/[a-z0-9]+/g)) {
+    const term = match[0];
+    if (term.length < 4 || ANSWER_STOPWORDS.has(term) || seen.has(term)) {
+      continue;
+    }
+    seen.add(term);
+    terms.push(term);
+  }
+  return terms;
+}
+
+function findLatestGradedInputEvent(
+  events: Array<{ eventType: string; metadata: unknown }>,
+): LanguageActivityTelemetry | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if (event?.eventType !== 'ai_response') {
+      continue;
+    }
+    const metadata = event.metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      continue;
+    }
+    const parsed = streamLanguageLearningActivitySchema.safeParse(
+      (metadata as { languageLearning?: unknown }).languageLearning,
+    );
+    if (!parsed.success || !parsed.data.gradedInput) {
+      continue;
+    }
+    return parsed.data as LanguageActivityTelemetry;
+  }
+  return null;
 }
 
 function starterWordsForLanguage(languageCode?: string): string[] {
@@ -294,6 +385,44 @@ export function getLanguageStrandCounts(
   return counts;
 }
 
+export function evaluatePendingGradedInputAnswer(input: {
+  events: Array<{ eventType: string; metadata: unknown }>;
+  learnerMessage: string;
+}): LanguageComprehensionEvaluation | undefined {
+  const activity = findLatestGradedInputEvent(input.events);
+  const gradedInput = activity?.gradedInput;
+  const question = gradedInput?.comprehensionQuestions[0];
+  if (!gradedInput || !question) {
+    return undefined;
+  }
+
+  const expectedTerms = tokenizeAnswerTerms(question.answerHint);
+  if (expectedTerms.length === 0) {
+    return undefined;
+  }
+
+  const answerTerms = new Set(tokenizeAnswerTerms(input.learnerMessage));
+  const matchedTerms = expectedTerms.filter((term) => answerTerms.has(term));
+  const missingTerms = expectedTerms.filter((term) => !answerTerms.has(term));
+  const matchRatio = matchedTerms.length / expectedTerms.length;
+  const verdict: LanguageComprehensionVerdict =
+    matchedTerms.length === 0
+      ? 'missed'
+      : matchRatio >= 0.67
+        ? 'understood'
+        : 'partial';
+
+  return {
+    questionId: question.id,
+    prompt: question.prompt,
+    answerHint: question.answerHint,
+    learnerAnswer: input.learnerMessage,
+    verdict,
+    matchedTerms,
+    missingTerms,
+  };
+}
+
 export function chooseNextLanguageStrand(input: {
   exchangeCount: number;
   priorCounts: Partial<LanguageStrandCounts>;
@@ -356,6 +485,7 @@ export function buildLanguageActivityTelemetry(input: {
 export function buildLanguageSessionState(input: {
   exchangeCount: number;
   events: Array<{ eventType: string; metadata: unknown }>;
+  learnerMessage?: string;
   inputMode?: InputMode;
   languageCode?: string;
   cefrLevel?: CefrLevel | null;
@@ -364,14 +494,24 @@ export function buildLanguageSessionState(input: {
   targetGrammar?: string[];
 }): LanguageSessionState {
   const sessionStrandCounts = getLanguageStrandCounts(input.events);
-  const activeStrand = chooseNextLanguageStrand({
-    exchangeCount: input.exchangeCount,
-    priorCounts: sessionStrandCounts,
-  });
+  const previousComprehension = input.learnerMessage
+    ? evaluatePendingGradedInputAnswer({
+        events: input.events,
+        learnerMessage: input.learnerMessage,
+      })
+    : undefined;
+  const activeStrand =
+    previousComprehension && previousComprehension.verdict !== 'understood'
+      ? 'language_focus'
+      : chooseNextLanguageStrand({
+          exchangeCount: input.exchangeCount,
+          priorCounts: sessionStrandCounts,
+        });
 
   return {
     activeStrand,
     sessionStrandCounts,
+    previousComprehension,
     nextActivity: buildLanguageActivityTelemetry({
       strand: activeStrand,
       inputMode: input.inputMode,

@@ -2,6 +2,7 @@ import {
   buildLanguageActivityTelemetry,
   buildLanguageSessionState,
   chooseNextLanguageStrand,
+  evaluatePendingGradedInputAnswer,
   getLanguageStrandCounts,
   isLikelyLanguageLearningIntent,
 } from './language-session-engine';
@@ -165,6 +166,64 @@ describe('buildLanguageActivityTelemetry', () => {
   });
 });
 
+describe('evaluatePendingGradedInputAnswer', () => {
+  const priorInputEvent = {
+    eventType: 'ai_response',
+    metadata: {
+      languageLearning: {
+        strand: 'meaning_input',
+        activityType: 'graded_input',
+        modality: 'text',
+        targetWords: ['agua'],
+        targetGrammar: [],
+        gradedInput: {
+          type: 'graded_input',
+          modality: 'reading',
+          cefrLevel: 'A1',
+          knownWordRatioTarget: 0.96,
+          knownWordEstimate: 0.67,
+          targetWords: ['agua'],
+          text: 'Ana quiere agua.',
+          comprehensionQuestions: [
+            {
+              id: 'gist-1',
+              prompt: 'What does Ana want?',
+              answerHint: 'Ana wants water',
+            },
+          ],
+          audioEnabled: false,
+        },
+      },
+    },
+  };
+
+  it('marks an answer understood when it overlaps the previous graded-input hint', () => {
+    expect(
+      evaluatePendingGradedInputAnswer({
+        events: [priorInputEvent],
+        learnerMessage: 'She wants water.',
+      }),
+    ).toMatchObject({
+      questionId: 'gist-1',
+      verdict: 'understood',
+      matchedTerms: expect.arrayContaining(['wants', 'water']),
+    });
+  });
+
+  it('marks an answer missed when it does not overlap the previous graded-input hint', () => {
+    expect(
+      evaluatePendingGradedInputAnswer({
+        events: [priorInputEvent],
+        learnerMessage: 'She is going home.',
+      }),
+    ).toMatchObject({
+      questionId: 'gist-1',
+      verdict: 'missed',
+      matchedTerms: [],
+    });
+  });
+});
+
 describe('buildLanguageSessionState', () => {
   it('threads graded input context through the server-selected next activity', () => {
     const state = buildLanguageSessionState({
@@ -186,5 +245,59 @@ describe('buildLanguageSessionState', () => {
     });
     expect(state.nextActivity.gradedInput?.text).toContain('hola');
     expect(state.nextActivity.gradedInput?.text).toContain('agua');
+  });
+
+  it('routes a missed graded-input answer into language-focused repair', () => {
+    const state = buildLanguageSessionState({
+      exchangeCount: 1,
+      events: [
+        {
+          eventType: 'ai_response',
+          metadata: {
+            languageLearning: {
+              strand: 'meaning_input',
+              activityType: 'graded_input',
+              modality: 'text',
+              targetWords: ['agua'],
+              targetGrammar: [],
+              gradedInput: {
+                type: 'graded_input',
+                modality: 'reading',
+                cefrLevel: 'A1',
+                knownWordRatioTarget: 0.96,
+                knownWordEstimate: 0.67,
+                targetWords: ['agua'],
+                text: 'Ana quiere agua.',
+                comprehensionQuestions: [
+                  {
+                    id: 'gist-1',
+                    prompt: 'What does Ana want?',
+                    answerHint: 'Ana wants water',
+                  },
+                ],
+                audioEnabled: false,
+              },
+            },
+          },
+        },
+      ],
+      learnerMessage: 'She is going home.',
+      inputMode: 'text',
+      languageCode: 'es',
+      cefrLevel: 'A1',
+      knownWords: ['Ana'],
+      targetWords: ['agua'],
+    });
+
+    expect(state.previousComprehension).toMatchObject({
+      verdict: 'missed',
+      questionId: 'gist-1',
+    });
+    expect(state.activeStrand).toBe('language_focus');
+    expect(state.nextActivity).toMatchObject({
+      strand: 'language_focus',
+      activityType: 'correction_retry',
+      targetWords: ['agua'],
+    });
   });
 });
