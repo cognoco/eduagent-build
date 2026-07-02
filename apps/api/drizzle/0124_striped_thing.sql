@@ -1,3 +1,10 @@
+-- [ic-362] Edited post-commit, operator-authorized (deploy-unblock, WI-1128
+-- slice): the legacy `profiles` table was dropped out-of-band on staging/prod
+-- (v2-only; `person` is now the identity table) before this migration was
+-- ever applied there. The original FK below referenced `profiles`, which no
+-- longer exists, so `drizzle-kit migrate` aborted here for ~13h. Repointed to
+-- `person.id` (see scripts/migration-immutability-allowlist.json). This
+-- migration was never applied to staging/prod, so editing it is runtime-safe.
 CREATE TYPE "public"."retrieval_grader" AS ENUM('llm', 'fallback_heuristic');--> statement-breakpoint
 CREATE TYPE "public"."retrieval_next_action" AS ENUM('advance', 'reschedule_soon', 'relearn', 'redirect_to_library');--> statement-breakpoint
 CREATE TYPE "public"."retrieval_verdict" AS ENUM('solid', 'partial', 'missing', 'misconception');--> statement-breakpoint
@@ -21,7 +28,7 @@ CREATE TABLE "retrieval_events" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_profile_id_profiles_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_profile_id_person_id_fk" FOREIGN KEY ("profile_id") REFERENCES "public"."person"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_subject_id_subjects_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subjects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_topic_id_curriculum_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."curriculum_topics"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "retrieval_events" ADD CONSTRAINT "retrieval_events_session_id_learning_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."learning_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
