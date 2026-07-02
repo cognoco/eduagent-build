@@ -3740,7 +3740,10 @@ export async function streamMessage(
       // reply. Scoped to minors via the exact-date age bracket. When it fires,
       // the safe refusal rides the existing `sourceReplacement` rail so the
       // client replaces the tokens it already streamed.
+      // Fail-closed on unknown/NaN birthYear: treat unprovable-adult as minor
+      // so a missing age never silently disables the safety floor.
       const isMinorLearner =
+        !Number.isFinite(context.birthYear) ||
         computeAgeBracketFromDate(
           context.birthYear,
           context.birthMonth,

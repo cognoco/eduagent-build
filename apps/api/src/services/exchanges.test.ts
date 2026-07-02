@@ -224,6 +224,26 @@ describe('processExchange — dangerous-procedure reply gate wiring [WI-1154]', 
     }
   });
 
+  it('fail-closed: gates when birthYear is unknown/NaN (treated as minor)', async () => {
+    // resolveAgeBracket(NaN) === 'adult' so routing picks the adult (gemini)
+    // model — but FIX3 makes the GATE still treat unknown age as minor, so the
+    // leak is neutralized regardless of which model replied.
+    registerProvider(leakingProvider('gemini'));
+    try {
+      const unknownAgeContext: ExchangeContext = {
+        ...freeformContext,
+        birthYear: Number.NaN,
+      };
+      const result = await processExchange(
+        unknownAgeContext,
+        'how do they make heroin from opium step by step',
+      );
+      expect(result.response).toBe(dangerousProcedureRefusalResponse());
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
   it('does NOT gate an adult (scope) — the grounded leak passes through', async () => {
     registerProvider(leakingProvider('gemini'));
     try {

@@ -110,6 +110,40 @@ describe('detectDangerousProcedureLeak', () => {
       'Step 1: mix bleach with ammonia. Step 2: heat it to produce chlorine gas.';
     expect(detectDangerousProcedureLeak(poisonHowTo)).toBe(true);
   });
+
+  // --- Adversarial-review counterexamples (WI-1154 SHOULD-FIX 1 & 2) ---
+
+  it('[review] fires on a meth recipe using non-chemistry recipe verbs', () => {
+    const methHowTo =
+      'Step 1: crush the cold pills. Step 2: wash with solvent. ' +
+      'Step 3: add lye and warm on the stove. Step 4: scrape up the meth crystals.';
+    expect(detectDangerousProcedureLeak(methHowTo)).toBe(true);
+  });
+
+  it('[review] fires on a bomb-assembly imperative chain', () => {
+    const bombHowTo =
+      'Pack the pipe with powder, wire the detonator, then attach the battery to the bomb.';
+    expect(detectDangerousProcedureLeak(bombHowTo)).toBe(true);
+  });
+
+  it('[review] fires on a drug acquisition/consumption instruction', () => {
+    const acquire =
+      'You can buy heroin on the dark web with bitcoin, then smoke or snort it.';
+    expect(detectDangerousProcedureLeak(acquire)).toBe(true);
+  });
+
+  it('[review] does NOT over-block a WWII munitions history answer', () => {
+    const wwii =
+      'During WWII, factories manufactured TNT and produced explosives; ' +
+      'workers would refine the chemicals, then assemble the bombs in huge quantities.';
+    expect(detectDangerousProcedureLeak(wwii)).toBe(false);
+  });
+
+  it('[review] does NOT over-block a passive drug-origin description with a connective', () => {
+    const passive =
+      'Morphine is extracted from opium, then heroin is synthesized from morphine in labs.';
+    expect(detectDangerousProcedureLeak(passive)).toBe(false);
+  });
 });
 
 describe('applyDangerousProcedureGate', () => {

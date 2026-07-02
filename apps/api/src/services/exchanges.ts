@@ -1639,7 +1639,10 @@ export async function processExchange(
   // [WI-1154] Server-side dangerous-procedure reply gate (fail-closed). Runs
   // AFTER the source-audit fallback so it is the final word on the tutor reply.
   // Scoped to minors via the exact-date age bracket (safety-adjacent decision).
+  // Fail-closed on unknown/NaN birthYear: treat unprovable-adult as minor so a
+  // missing age never silently disables the safety floor.
   const isMinorLearner =
+    !Number.isFinite(context.birthYear) ||
     computeAgeBracketFromDate(
       context.birthYear,
       context.birthMonth,
