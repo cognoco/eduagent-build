@@ -11,20 +11,16 @@ export type {
   WebhookSubscriptionUpdate,
 } from './types';
 
-// Subscription CRUD, Stripe linking, free provisioning, quota pool read/write
+// Quota pool read/write (subscriptionId-keyed, store-agnostic) + the
+// legacy-reachable subscription CRUD subset kept for out-of-scope callers
+// (services/account.ts, services/profile.ts — see subscription-core.ts header)
 export {
   getSubscriptionByAccountId,
   createSubscription,
-  updateSubscriptionFromWebhook,
-  linkStripeCustomer,
-  getOrCreateStripeCustomer,
-  getSubscriptionByStripeCustomerId,
+  ensureFreeSubscription,
   getQuotaPool,
   resetMonthlyQuota,
-  ensureFreeSubscription,
-  markSubscriptionCancelled,
   updateQuotaPoolLimit,
-  activateSubscriptionFromCheckout,
 } from './subscription-core';
 
 // Trial expiry, quota cron helpers
@@ -52,46 +48,25 @@ export {
   refundQuotaOrEscalate,
 } from './metering';
 
-export { getEffectiveAccessForSubscription } from './access';
 export type {
   ProfileQuotaUsageSnapshot,
   ProfileQuotaRole,
 } from './quota-provision';
-export {
-  getOrProvisionProfileQuotaUsage,
-  provisionProfileQuotaUsage,
-  resolveProfileQuotaRole,
-} from './quota-provision';
-export {
-  reconcileQuotaStateForEffectiveTier,
-  reconcileQuotaStateForSubscription,
-} from './quota-reconcile';
+export { provisionProfileQuotaUsage } from './quota-provision';
+export { reconcileQuotaStateForEffectiveTier } from './quota-reconcile';
 
-// Top-up credit management
-export type { TopUpCreditRow } from './top-up';
+// Top-up credit management + mid-cycle tier-change pricing/metric
+export type {
+  TopUpCreditRow,
+  TopUpCreditsReattributedEventData,
+} from './top-up';
 export {
   getTopUpCreditsRemaining,
-  isTopUpAlreadyGranted,
-  purchaseTopUpCredits,
   findExpiringTopUpCredits,
-  countTopUpPurchasesSinceCycleStart,
-} from './top-up';
-
-// Mid-cycle tier change + upgrade prompts
-export type {
-  TierChangeResult,
-  UpgradePromptReason,
-  UpgradePrompt,
-  TopUpCreditsReattributedEventData,
-} from './tier';
-export {
-  handleTierChange,
-  getUpgradePrompt,
   getTopUpPriceCents,
-  reattributeTopUpCreditsOnModelChange,
   buildTopUpCreditsReattributedEventData,
   emitTopUpCreditsReattributedMetric,
-} from './tier';
+} from './top-up';
 
 // Time-zone helpers (per-account day-window resolution)
 export { getTimeZoneOffsetMs, getStartOfTodayInTimeZone } from './timezone';
@@ -99,23 +74,8 @@ export { getTimeZoneOffsetMs, getStartOfTodayInTimeZone } from './timezone';
 // Family billing (Story 5.5)
 export type { FamilyMember } from './family';
 export {
-  getSubscriptionForProfile,
   getProfileCountForSubscription,
   canAddProfile,
   addToByokWaitlist,
-  listFamilyMembers,
-  addProfileToSubscription,
-  removeProfileFromSubscription,
   ProfileRemovalNotImplementedError,
-  downgradeAllFamilyProfiles,
-  getFamilyPoolStatus,
 } from './family';
-
-// RevenueCat webhook helpers (Epic 9)
-export type { RevenuecatWebhookUpdate } from './revenuecat';
-export {
-  isRevenuecatEventProcessed,
-  updateSubscriptionFromRevenuecatWebhook,
-  updateSubscriptionAndQuotaFromRevenuecatWebhook,
-  activateSubscriptionFromRevenuecat,
-} from './revenuecat';

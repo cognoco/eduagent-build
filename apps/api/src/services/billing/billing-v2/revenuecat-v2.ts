@@ -38,8 +38,8 @@ import { type AppliedSubscriptionRow, type SubscriptionRow } from '../types';
 import type {
   RevenuecatWebhookUpdate,
   RevenuecatQuotaUpdate,
-} from '../revenuecat';
-import { emitTopUpCreditsReattributedMetric } from '../tier';
+} from '../revenuecat-shared';
+import { emitTopUpCreditsReattributedMetric } from '../top-up';
 import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 import {
   mapSubscriptionV2Row,

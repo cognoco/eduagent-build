@@ -18,23 +18,17 @@ export type {
 } from './billing/types';
 
 // ---------------------------------------------------------------------------
-// Subscription CRUD, Stripe linking, free provisioning, quota pool read/write
+// Quota pool read/write (subscriptionId-keyed, store-agnostic)
 // ---------------------------------------------------------------------------
 
-export type { StripeCustomerCreator } from './billing/subscription-core';
+export type { StripeCustomerCreator } from './billing/types';
 export {
   getSubscriptionByAccountId,
   createSubscription,
-  updateSubscriptionFromWebhook,
-  linkStripeCustomer,
-  getOrCreateStripeCustomer,
-  getSubscriptionByStripeCustomerId,
+  ensureFreeSubscription,
   getQuotaPool,
   resetMonthlyQuota,
-  ensureFreeSubscription,
-  markSubscriptionCancelled,
   updateQuotaPoolLimit,
-  activateSubscriptionFromCheckout,
 } from './billing/subscription-core';
 
 // [WI-784] Identity-v2 twin re-exported here so callers import the v2
@@ -82,48 +76,28 @@ export {
   refundQuotaOrEscalate,
 } from './billing/metering';
 
-export { getEffectiveAccessForSubscription } from './billing/access';
 export type {
   ProfileQuotaUsageSnapshot,
   ProfileQuotaRole,
 } from './billing/quota-provision';
-export {
-  getOrProvisionProfileQuotaUsage,
-  provisionProfileQuotaUsage,
-  resolveProfileQuotaRole,
-} from './billing/quota-provision';
-export {
-  reconcileQuotaStateForEffectiveTier,
-  reconcileQuotaStateForSubscription,
-} from './billing/quota-reconcile';
+export { provisionProfileQuotaUsage } from './billing/quota-provision';
+export { reconcileQuotaStateForEffectiveTier } from './billing/quota-reconcile';
 
 // ---------------------------------------------------------------------------
-// Top-up credit management
-// ---------------------------------------------------------------------------
-
-export type { TopUpCreditRow } from './billing/top-up';
-export {
-  getTopUpCreditsRemaining,
-  isTopUpAlreadyGranted,
-  purchaseTopUpCredits,
-  findExpiringTopUpCredits,
-  countTopUpPurchasesSinceCycleStart,
-} from './billing/top-up';
-
-// ---------------------------------------------------------------------------
-// Mid-cycle tier change + upgrade prompts
+// Top-up credit management + mid-cycle tier-change pricing/metric
 // ---------------------------------------------------------------------------
 
 export type {
-  TierChangeResult,
-  UpgradePromptReason,
-  UpgradePrompt,
-} from './billing/tier';
+  TopUpCreditRow,
+  TopUpCreditsReattributedEventData,
+} from './billing/top-up';
 export {
-  handleTierChange,
-  getUpgradePrompt,
+  getTopUpCreditsRemaining,
+  findExpiringTopUpCredits,
   getTopUpPriceCents,
-} from './billing/tier';
+  buildTopUpCreditsReattributedEventData,
+  emitTopUpCreditsReattributedMetric,
+} from './billing/top-up';
 
 // ---------------------------------------------------------------------------
 // Time-zone helpers (per-account day-window resolution)
@@ -140,29 +114,10 @@ export {
 
 export type { FamilyMember } from './billing/family';
 export {
-  getSubscriptionForProfile,
   getProfileCountForSubscription,
   canAddProfile,
   addToByokWaitlist,
-  listFamilyMembers,
-  getUsageBreakdownForProfile,
   getUsageEventsAvailableSince,
   buildUsageDateLabels,
-  addProfileToSubscription,
-  removeProfileFromSubscription,
   ProfileRemovalNotImplementedError,
-  downgradeAllFamilyProfiles,
-  getFamilyPoolStatus,
 } from './billing/family';
-
-// ---------------------------------------------------------------------------
-// RevenueCat webhook helpers (Epic 9)
-// ---------------------------------------------------------------------------
-
-export type { RevenuecatWebhookUpdate } from './billing/revenuecat';
-export {
-  isRevenuecatEventProcessed,
-  updateSubscriptionFromRevenuecatWebhook,
-  updateSubscriptionAndQuotaFromRevenuecatWebhook,
-  activateSubscriptionFromRevenuecat,
-} from './billing/revenuecat';

@@ -58,7 +58,7 @@ import {
   getSubscriptionByStripeCustomerIdV2,
 } from './subscription-core-v2';
 import { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
-import { emitTopUpCreditsReattributedMetric } from '../tier';
+import { emitTopUpCreditsReattributedMetric } from '../top-up';
 import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 
 const logger = createLogger();

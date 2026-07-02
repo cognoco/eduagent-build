@@ -57,6 +57,26 @@ export interface WebhookSubscriptionUpdate {
   stripeEventId?: string;
 }
 
+/**
+ * Minimal structural slice of the Stripe SDK needed to create a customer
+ * (with an idempotency-key option). Declared locally so callers do not put
+ * the full `Stripe` SDK type in their public signature, and so route
+ * callers can pass the real `stripe.customers.create` directly (its type is
+ * assignable to this).
+ *
+ * [WI-1239 / 779-strip] Relocated from the legacy subscription-core.ts
+ * (whose getOrCreateStripeCustomer was removed — dead) — this type is still
+ * used by getOrCreateStripeCustomerV2 (billing-v2/subscription-core-v2.ts).
+ */
+export interface StripeCustomerCreator {
+  customers: {
+    create: (
+      params: { email?: string; metadata?: Record<string, string> },
+      options?: { idempotencyKey?: string },
+    ) => Promise<{ id: string }>;
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared mappers — Drizzle Date -> API ISO string
 // ---------------------------------------------------------------------------

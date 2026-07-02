@@ -69,6 +69,15 @@ const mockUpdateSubscriptionFromRevenuecatWebhookV2 = jest
     webhookApplied: true,
     lastRevenuecatEventId: 'evt_billing_issue_1',
   });
+const mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2 = jest
+  .fn()
+  .mockResolvedValue({
+    id: 'sub-v2-test',
+    accountId: 'account-v2-test',
+    webhookApplied: true,
+    lastRevenuecatEventId: 'evt_billing_issue_1',
+  });
+const mockActivateSubscriptionFromRevenuecatV2 = jest.fn();
 jest.mock('./revenuecat-v2', () => {
   const actual = jest.requireActual(
     './revenuecat-v2',
@@ -77,6 +86,64 @@ jest.mock('./revenuecat-v2', () => {
     ...actual,
     updateSubscriptionFromRevenuecatWebhookV2: (...args: unknown[]) =>
       mockUpdateSubscriptionFromRevenuecatWebhookV2(...args),
+    updateSubscriptionAndQuotaFromRevenuecatWebhookV2: (...args: unknown[]) =>
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2(...args),
+    activateSubscriptionFromRevenuecatV2: (...args: unknown[]) =>
+      mockActivateSubscriptionFromRevenuecatV2(...args),
+  };
+});
+
+// [WI-1239 / 779-strip] getSubscriptionByAccountIdV2 — read used to detect
+// tier changes (RENEWAL, EXPIRATION trial branch) and quota-role decisions.
+const mockGetSubscriptionByAccountIdV2 = jest.fn();
+jest.mock(
+  './subscription-core-v2' /* gc1-allow: DB-backed service — requires live Postgres */,
+  () => {
+    const actual = jest.requireActual(
+      './subscription-core-v2',
+    ) as typeof import('./subscription-core-v2');
+    return {
+      ...actual,
+      getSubscriptionByAccountIdV2: (...args: unknown[]) =>
+        mockGetSubscriptionByAccountIdV2(...args),
+    };
+  },
+);
+
+// [WI-1239 / 779-strip] trial-v2 — EXPIRATION's trial branch.
+const mockTransitionToExtendedTrialFromRevenuecatEventV2 = jest.fn();
+jest.mock('./trial-v2', () => {
+  const actual = jest.requireActual(
+    './trial-v2',
+  ) as typeof import('./trial-v2');
+  return {
+    ...actual,
+    transitionToExtendedTrialFromRevenuecatEventV2: (...args: unknown[]) =>
+      mockTransitionToExtendedTrialFromRevenuecatEventV2(...args),
+  };
+});
+
+// [WI-1239 / 779-strip] top-up-v2 — NON_RENEWING_PURCHASE credit grant.
+const mockPurchaseTopUpCreditsV2 = jest.fn();
+jest.mock('./top-up-v2', () => {
+  const actual = jest.requireActual(
+    './top-up-v2',
+  ) as typeof import('./top-up-v2');
+  return {
+    ...actual,
+    purchaseTopUpCreditsV2: (...args: unknown[]) =>
+      mockPurchaseTopUpCreditsV2(...args),
+  };
+});
+
+// [WI-1239 / 779-strip] top-up — SUBSCRIBER_ALIAS from-side credit snapshot.
+const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
+jest.mock('../top-up', () => {
+  const actual = jest.requireActual('../top-up') as typeof import('../top-up');
+  return {
+    ...actual,
+    getTopUpCreditsRemaining: (...args: unknown[]) =>
+      mockGetTopUpCreditsRemaining(...args),
   };
 });
 
@@ -94,10 +161,15 @@ jest.mock('./safe-refresh-kv-cache-v2', () => {
 import {
   handleInitialPurchaseV2,
   handleRenewalV2,
+  handleCancellationV2,
+  handleExpirationV2,
   handleProductChangeV2,
   handleNonRenewingPurchaseV2,
   handleBillingIssueV2,
+  handleSubscriberAliasV2,
+  handleUncancellationV2,
 } from './revenuecat-webhook-handler-v2';
+import { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
 import type { RevenueCatEvent } from '../revenuecat-shared';
 
 // A db that throws on ANY property access — any attempt to reach the DB or grant
@@ -224,17 +296,29 @@ describe('[Issue 836] v2 family-share entitlement block', () => {
   });
 
   it('handleInitialPurchaseV2 does NOT escalate when is_family_share is false (control)', async () => {
-    // false → guard returns false → handler proceeds → throwingDb makes the
-    // grant path throw. We assert it threw (proving the guard did NOT block) and
-    // that the family-share escalation was NOT emitted.
-    await expect(
-      handleInitialPurchaseV2(
-        throwingDb,
-        mockKv,
-        baseEvent({ is_family_share: false }),
-      ),
-    ).rejects.toThrow('DB accessed');
+    // false → guard returns false → handler proceeds to the grant path.
+    // [WI-1239 / 779-strip] activateSubscriptionFromRevenuecatV2 is now
+    // mocked (see the business-logic describe blocks below) rather than
+    // real, so the guard-bypass proof asserts the grant path was REACHED
+    // (mock called with throwingDb) instead of relying on a real-DB throw.
+    mockActivateSubscriptionFromRevenuecatV2.mockResolvedValue({
+      id: 'sub-v2-control',
+      accountId: 'account-v2-test',
+    });
 
+    await handleInitialPurchaseV2(
+      throwingDb,
+      mockKv,
+      baseEvent({ is_family_share: false }),
+    );
+
+    // Referential (not structural) checks — throwingDb's Proxy throws on any
+    // property access, including what Jest's deep-equal matchers would do.
+    expect(mockActivateSubscriptionFromRevenuecatV2).toHaveBeenCalledTimes(1);
+    const call = mockActivateSubscriptionFromRevenuecatV2.mock.calls[0];
+    expect(call[0]).toBe(throwingDb);
+    expect(call[1]).toBe('account-v2-test');
+    expect(call[2]).toBe('plus');
     expect(mockCaptureMessage).not.toHaveBeenCalled();
   });
 });
@@ -329,5 +413,565 @@ describe('[WI-1010] handleBillingIssueV2 inngest.send failure escalation', () =>
 
     expect(mockInngestSend).toHaveBeenCalledTimes(1);
     expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1239 / 779-strip] Converted from routes/revenuecat-webhook.test.ts's
+// legacy-handler-backed per-event-type business-logic blocks (INITIAL_
+// PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, BILLING_ISSUE grace period,
+// SUBSCRIBER_ALIAS, PRODUCT_CHANGE, UNCANCELLATION, NON_RENEWING_PURCHASE).
+// The route no longer forces dispatch to a legacy handler — these
+// assertions target the v2 handler functions directly, mocking the
+// DB-backed subscription-core-v2/revenuecat-v2/trial-v2/top-up-v2 functions
+// each handler calls (same pattern as the family-share tests above).
+// ---------------------------------------------------------------------------
+
+const mockDb = {} as any;
+
+function mockSub(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'sub-v2-1',
+    accountId: 'account-v2-test',
+    tier: 'plus',
+    status: 'active',
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  mockGetSubscriptionByAccountIdV2.mockResolvedValue(mockSub());
+});
+
+describe('handleInitialPurchaseV2', () => {
+  it('activates the subscription with the tier mapped from product_id', async () => {
+    mockActivateSubscriptionFromRevenuecatV2.mockResolvedValue(mockSub());
+
+    await handleInitialPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({ product_id: 'com.eduagent.family.monthly' }),
+    );
+
+    expect(mockActivateSubscriptionFromRevenuecatV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      'family',
+      'evt_rc_v2_1',
+      expect.objectContaining({ isTrial: false }),
+    );
+    expect(safeRefreshKvCacheV2).toHaveBeenCalled();
+  });
+
+  it('escalates an unmapped product_id to Sentry without activating', async () => {
+    await handleInitialPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({ product_id: 'com.eduagent.unknown.monthly' }),
+    );
+
+    expect(mockActivateSubscriptionFromRevenuecatV2).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          productId: 'com.eduagent.unknown.monthly',
+        }),
+      }),
+    );
+  });
+
+  it('marks isTrial true when period_type is TRIAL', async () => {
+    mockActivateSubscriptionFromRevenuecatV2.mockResolvedValue(mockSub());
+
+    await handleInitialPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({ period_type: 'TRIAL' }),
+    );
+
+    expect(mockActivateSubscriptionFromRevenuecatV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      'plus',
+      'evt_rc_v2_1',
+      expect.objectContaining({ isTrial: true }),
+    );
+  });
+});
+
+describe('handleRenewalV2', () => {
+  it('renews without a tier change via updateSubscriptionFromRevenuecatWebhookV2', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'plus' }),
+    );
+
+    await handleRenewalV2(
+      mockDb,
+      mockKv,
+      baseEvent({ product_id: 'com.eduagent.plus.monthly' }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'active', cancelledAt: null }),
+    );
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('renews WITH a tier change via updateSubscriptionAndQuotaFromRevenuecatWebhookV2 and the new tier quota', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'plus' }),
+    );
+    mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ tier: 'family' }),
+    );
+
+    await handleRenewalV2(
+      mockDb,
+      mockKv,
+      baseEvent({ product_id: 'com.eduagent.family.monthly' }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ tier: 'family' }),
+      expect.objectContaining({ monthlyQuota: 1500, dailyLimit: null }),
+    );
+  });
+});
+
+describe('handleCancellationV2', () => {
+  // [BUG-445] A CANCELLATION event must NOT flip an already-past_due
+  // subscription back to active — cancellation only sets cancelledAt.
+  it('[BUG-445] does not flip past_due back to active on cancellation', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ status: 'past_due' }),
+    );
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue(mockSub());
+
+    await handleCancellationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'CANCELLATION' }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'past_due' }),
+    );
+  });
+
+  it('sets status to active and stamps cancelledAt for a normal cancellation', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ status: 'active' }),
+    );
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue(mockSub());
+
+    await handleCancellationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'CANCELLATION' }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({
+        status: 'active',
+        cancelledAt: expect.any(String),
+      }),
+    );
+  });
+
+  // A refund/chargeback cancel_reason revokes entitlement immediately —
+  // free/expired, not the normal cancellation flow.
+  it('revokes entitlement immediately to free/expired for a refund-class cancel_reason', async () => {
+    mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ tier: 'free', status: 'expired' }),
+    );
+
+    await handleCancellationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'CANCELLATION', cancel_reason: 'CUSTOMER_SUPPORT' }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
+      expect.objectContaining({ monthlyQuota: 100, dailyLimit: 10 }),
+    );
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('entitlement revoked due to refund/chargeback'),
+      expect.objectContaining({
+        extra: expect.objectContaining({ cancelReason: 'CUSTOMER_SUPPORT' }),
+      }),
+    );
+  });
+});
+
+describe('handleExpirationV2', () => {
+  it('extends the trial when the expiring subscription is on trial', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ status: 'trial' }),
+    );
+    mockTransitionToExtendedTrialFromRevenuecatEventV2.mockResolvedValue(
+      mockSub({ status: 'trial' }),
+    );
+
+    await handleExpirationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'EXPIRATION', period_type: 'TRIAL' }),
+    );
+
+    expect(
+      mockTransitionToExtendedTrialFromRevenuecatEventV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'sub-v2-1',
+      expect.any(Number),
+      'evt_rc_v2_1',
+      expect.anything(),
+    );
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('resets to expired/free with free-tier quota for a non-trial expiration', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ status: 'active' }),
+    );
+    mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ status: 'expired', tier: 'free' }),
+    );
+
+    await handleExpirationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'EXPIRATION', period_type: 'NORMAL' }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
+      expect.objectContaining({ monthlyQuota: 100, dailyLimit: 10 }),
+    );
+  });
+});
+
+describe('handleBillingIssueV2 — grace period [BUG-792]', () => {
+  it('[BUG-792] preserves a future grace-period currentPeriodEnd instead of nulling it', async () => {
+    const graceExpiryMs = Date.now() + 3 * 24 * 60 * 60 * 1000; // 3 days out
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ status: 'past_due', webhookApplied: true }),
+    );
+
+    await handleBillingIssueV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'BILLING_ISSUE',
+        grace_period_expiration_at_ms: graceExpiryMs,
+      }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({
+        status: 'past_due',
+        currentPeriodEnd: new Date(graceExpiryMs).toISOString(),
+      }),
+    );
+  });
+
+  it('nulls currentPeriodEnd when there is no future grace period', async () => {
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ status: 'past_due', webhookApplied: true }),
+    );
+
+    await handleBillingIssueV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'BILLING_ISSUE',
+        grace_period_expiration_at_ms: undefined,
+      }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'past_due', currentPeriodEnd: null }),
+    );
+  });
+});
+
+describe('handleSubscriberAliasV2', () => {
+  // [BUG-783 / WI-1057] The from-side identity's active subscription must be
+  // downgraded to free/expired AND an alias-merge event dispatched carrying
+  // a pre-downgrade snapshot (including its top-up balance) so the merge
+  // worker can reconcile the survivor.
+  it('[BUG-783 / WI-1057] downgrades the from-side subscription and dispatches app/billing.alias_received with a snapshot', async () => {
+    mockResolveIdentityV2.mockImplementation(
+      async (_db: unknown, appUserId: string) =>
+        appUserId === 'clerk_user_from'
+          ? { organizationId: 'account-from' }
+          : { organizationId: 'account-v2-test' },
+    );
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ id: 'sub-from-1', accountId: 'account-from', tier: 'plus' }),
+    );
+    mockGetTopUpCreditsRemaining.mockResolvedValue(250);
+    mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({
+        id: 'sub-from-1',
+        accountId: 'account-from',
+        tier: 'free',
+        status: 'expired',
+      }),
+    );
+
+    await handleSubscriberAliasV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'SUBSCRIBER_ALIAS',
+        transferred_from: ['clerk_user_from'],
+      }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'account-from',
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
+      expect.objectContaining({ monthlyQuota: 100, dailyLimit: 10 }),
+    );
+    expect(mockInngestSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/billing.alias_received',
+        data: expect.objectContaining({
+          fromAppUserId: 'clerk_user_from',
+          fromAccountId: 'account-from',
+          fromSubscriptionId: 'sub-from-1',
+          fromSnapshot: expect.objectContaining({
+            tier: 'plus',
+            topUpRemaining: 250,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('no-ops when transferred_from is empty', async () => {
+    await handleSubscriberAliasV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'SUBSCRIBER_ALIAS', transferred_from: [] }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).not.toHaveBeenCalled();
+    expect(mockInngestSend).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/billing.alias_received' }),
+    );
+  });
+});
+
+describe('handleProductChangeV2', () => {
+  it('applies the new tier and its quota limits', async () => {
+    mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2.mockResolvedValue(
+      mockSub({ tier: 'pro' }),
+    );
+
+    await handleProductChangeV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'PRODUCT_CHANGE',
+        new_product_id: 'com.eduagent.pro.monthly',
+      }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ tier: 'pro', status: 'active' }),
+      expect.objectContaining({ monthlyQuota: 3000, dailyLimit: null }),
+    );
+  });
+
+  it('escalates an unmapped new_product_id to Sentry without updating', async () => {
+    await handleProductChangeV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'PRODUCT_CHANGE',
+        new_product_id: 'com.eduagent.unknown.monthly',
+      }),
+    );
+
+    expect(
+      mockUpdateSubscriptionAndQuotaFromRevenuecatWebhookV2,
+    ).not.toHaveBeenCalled();
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          newProductId: 'com.eduagent.unknown.monthly',
+        }),
+      }),
+    );
+  });
+});
+
+describe('handleNonRenewingPurchaseV2 [BS-02]', () => {
+  it('grants top-up credits for a paid-tier account', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'plus' }),
+    );
+    mockPurchaseTopUpCreditsV2.mockResolvedValue({ id: 'topup-1' });
+
+    const result = await handleNonRenewingPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'NON_RENEWING_PURCHASE',
+        product_id: 'com.eduagent.topup.500',
+        store_transaction_id: 'txn_apple_123',
+      }),
+    );
+
+    expect(mockPurchaseTopUpCreditsV2).toHaveBeenCalledWith(
+      mockDb,
+      'sub-v2-1',
+      500,
+      expect.any(Date),
+      'txn_apple_123',
+    );
+    expect(result).toBeNull();
+  });
+
+  // [BUG-793] A top-up for an account with no paid local subscription is a
+  // permanent rejection, acked with 200 (not retried), credits never granted.
+  it('[BUG-793] rejects and skips a top-up on a free-tier account', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'free' }),
+    );
+
+    const result = await handleNonRenewingPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'NON_RENEWING_PURCHASE',
+        product_id: 'com.eduagent.topup.500',
+        store_transaction_id: 'txn_apple_456',
+      }),
+    );
+
+    expect(mockPurchaseTopUpCreditsV2).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true, skipped: 'topup_requires_paid_subscription' },
+    });
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('NON_RENEWING_PURCHASE rejected'),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          category: 'revenuecat.topup_rejected_free_tier',
+        }),
+      }),
+    );
+  });
+
+  it('escalates and skips when the transaction id is missing', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'plus' }),
+    );
+
+    const result = await handleNonRenewingPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'NON_RENEWING_PURCHASE',
+        product_id: 'com.eduagent.topup.500',
+        store_transaction_id: undefined,
+        transaction_id: undefined,
+      }),
+    );
+
+    expect(mockPurchaseTopUpCreditsV2).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      status: 200,
+      body: { received: true, skipped: 'missing_transaction_id' },
+    });
+  });
+
+  // [BS-02] ON CONFLICT DO NOTHING returns null on a duplicate transaction —
+  // the handler must not double-grant or throw.
+  it('[BS-02] is idempotent — a duplicate transaction id does not double-grant', async () => {
+    mockGetSubscriptionByAccountIdV2.mockResolvedValue(
+      mockSub({ tier: 'plus' }),
+    );
+    mockPurchaseTopUpCreditsV2.mockResolvedValue(null);
+
+    const result = await handleNonRenewingPurchaseV2(
+      mockDb,
+      mockKv,
+      baseEvent({
+        type: 'NON_RENEWING_PURCHASE',
+        product_id: 'com.eduagent.topup.500',
+        store_transaction_id: 'txn_duplicate_123',
+      }),
+    );
+
+    expect(mockPurchaseTopUpCreditsV2).toHaveBeenCalledWith(
+      mockDb,
+      'sub-v2-1',
+      500,
+      expect.any(Date),
+      'txn_duplicate_123',
+    );
+    expect(result).toBeNull();
+    expect(safeRefreshKvCacheV2).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleUncancellationV2', () => {
+  it('sets status to active and clears cancelledAt', async () => {
+    mockUpdateSubscriptionFromRevenuecatWebhookV2.mockResolvedValue(mockSub());
+
+    await handleUncancellationV2(
+      mockDb,
+      mockKv,
+      baseEvent({ type: 'UNCANCELLATION' }),
+    );
+
+    expect(mockUpdateSubscriptionFromRevenuecatWebhookV2).toHaveBeenCalledWith(
+      mockDb,
+      'account-v2-test',
+      expect.objectContaining({ status: 'active', cancelledAt: null }),
+    );
   });
 });

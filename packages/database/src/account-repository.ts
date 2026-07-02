@@ -1,13 +1,21 @@
 // ---------------------------------------------------------------------------
 // BD-10: Account-scoped repository for billing tables.
 //
-// Parallels `createScopedRepository` (profile-scoped) for account-level
-// tables: subscriptions, quota_pools, top_up_credits.
+// [WI-1239 / 779-strip] Most legacy `subscriptions`-table helpers
+// (lockSubscriptionById__unscoped, lockSubscriptionByAccountId__unscoped,
+// findSubscriptionByStripeId__unscoped, findSubscriptionByStripeCustomerId__unscoped)
+// were removed — every caller was dead or routed through the v2 dispatch
+// (billing-v2/dispatch.ts), which always selects the V2 handler bundle. Use
+// the `V2` twins below (findSubscriptionByOrganizationId__unscoped etc.).
 //
-// Use `createAccountRepository(db, accountId)` when accountId is available.
-// Use standalone helpers (findSubscriptionById__unscoped, findQuotaPool__unscoped,
-// etc.) when only a subscriptionId or other key is available — callers MUST
-// verify ownership before returning data to a client.
+// createAccountRepository / findSubscriptionById__unscoped are KEPT — they
+// are still transitively reachable from services/account.ts's
+// findOrCreateAccount and services/profile.ts's createProfileWithLimitCheck
+// (both out of WI-1239's scope; tracked as follow-up hygiene / WI-1254).
+//
+// Remaining standalone helpers are used when only a subscriptionId or other
+// key is available — callers MUST verify ownership before returning data to
+// a client.
 //
 // EXCEPTIONS — the following bypass this repository intentionally:
 //   - Cron/system functions (resetDailyQuotas, resetExpiredQuotaCycles,
@@ -22,10 +30,10 @@
 import { eq, and, type SQL } from 'drizzle-orm';
 import type { Database } from './client';
 import {
-  subscriptions,
   quotaPools,
   topUpCredits,
   subscription,
+  subscriptions,
 } from './schema/index';
 
 /**
@@ -61,8 +69,7 @@ export type AccountRepository = ReturnType<typeof createAccountRepository>;
 //   - Internal cron/system functions that iterate across accounts
 //
 // The `__unscoped` suffix is a deliberate signal to reviewers. If you find
-// yourself calling these from a user-facing route, stop — use
-// `createAccountRepository(db, accountId)` instead.
+// yourself calling these from a user-facing route, stop.
 // ---------------------------------------------------------------------------
 
 /**
@@ -77,80 +84,6 @@ export async function findSubscriptionById__unscoped(
 ) {
   return db.query.subscriptions.findFirst({
     where: eq(subscriptions.id, subscriptionId),
-  });
-}
-
-/**
- * Lock-and-read a subscription row by primary key (SELECT … FOR UPDATE).
- *
- * MUST be called inside a `db.transaction()` callback — the row lock is held
- * until the transaction commits, serializing concurrent tier-change
- * transactions on the same subscription. A plain in-transaction read under
- * READ COMMITTED does NOT serialize: two transactions can both read the same
- * pre-change tier before either commits.
- *
- * SECURITY: same caller contract as findSubscriptionById__unscoped.
- */
-export async function lockSubscriptionById__unscoped(
-  db: Database,
-  subscriptionId: string,
-) {
-  const [row] = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.id, subscriptionId))
-    .for('update');
-  return row;
-}
-
-/**
- * Lock-and-read a subscription row by account ID (SELECT … FOR UPDATE).
- * Same contract and rationale as lockSubscriptionById__unscoped.
- */
-export async function lockSubscriptionByAccountId__unscoped(
-  db: Database,
-  accountId: string,
-) {
-  const [row] = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.accountId, accountId))
-    .limit(1)
-    .for('update');
-  return row;
-}
-
-/**
- * Find a subscription by its Stripe subscription ID.
- *
- * SECURITY: caller MUST verify ownership before returning data to a client;
- * intended for Stripe webhook handlers that authenticate via event signature.
- */
-export async function findSubscriptionByStripeId__unscoped(
-  db: Database,
-  stripeSubscriptionId: string,
-) {
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId),
-  });
-}
-
-/**
- * Find a subscription by its Stripe customer ID.
- *
- * SECURITY: caller MUST verify ownership before returning data to a client;
- * intended for Stripe webhook handlers that authenticate via event signature.
- * Used by the checkout-completed handler to assert the (mutable) metadata
- * accountId matches the account already bound to this Stripe customer before
- * granting an entitlement. `stripe_customer_id` is UNIQUE, so this returns at
- * most one row.
- */
-export async function findSubscriptionByStripeCustomerId__unscoped(
-  db: Database,
-  stripeCustomerId: string,
-) {
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.stripeCustomerId, stripeCustomerId),
   });
 }
 
@@ -188,18 +121,16 @@ export async function findTopUpByTransactionId__unscoped(
 // ---------------------------------------------------------------------------
 // CUT-B3 (WI-693) — v2 subscription helpers (organization-keyed)
 //
-// The legacy helpers above read the `subscriptions` table keyed on
-// `account_id`. The identity-foundation cutover re-homes the billing subsystem
-// onto the `subscription` table keyed on `organization_id`. By the deterministic
-// reseed `organization.id = accounts.id`, so the SAME id value the request
-// context carries (account.id under flag-on = organization.id) keys both stores.
-// These helpers read the new table; the billing-v2 layer calls them
-// unconditionally (WI-868 removed the flag). Legacy helpers still run in
-// parallel — convergence tracked in WI-1239.
+// The identity-foundation cutover re-homes the billing subsystem onto the
+// `subscription` table keyed on `organization_id` (was `subscriptions` keyed
+// on `account_id` — that table and its helpers were removed [WI-1239]). By
+// the deterministic reseed `organization.id = accounts.id`, so the SAME id
+// value the request context carries keys this store. The billing-v2 layer
+// calls these helpers unconditionally (WI-868 removed the flag).
 //
-// SECURITY: same `__unscoped` caller contract as the legacy helpers — webhook
-// handlers (authenticated by external event signature/transaction id) and
-// internal cron only. Verify ownership before returning to a client.
+// SECURITY: same `__unscoped` caller contract as above — webhook handlers
+// (authenticated by external event signature/transaction id) and internal
+// cron only. Verify ownership before returning to a client.
 // ---------------------------------------------------------------------------
 
 /**

@@ -44,7 +44,7 @@ import {
   decideAliasMerge,
   ALIAS_MERGE_IDEMPOTENCY_SOURCE,
   type AliasMergeResult,
-} from '../alias-merge';
+} from '../alias-merge-shared';
 import { extractTierQuota } from '../billing-shared';
 import { resolveAccountIdV2 } from './revenuecat-webhook-handler-v2';
 import { getSubscriptionByAccountIdV2 } from './subscription-core-v2';

@@ -49,7 +49,7 @@ import {
   lockSubscriptionByOrganizationId__unscoped,
 } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
-import type { StripeCustomerCreator } from '../subscription-core';
+import type { StripeCustomerCreator } from '../types';
 import { getTierConfig, isValidTransition } from '../../subscription';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';

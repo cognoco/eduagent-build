@@ -2,10 +2,25 @@
 // RevenueCat webhook — shared, store-agnostic types and helpers
 // ---------------------------------------------------------------------------
 // [WI-1239 / 779-strip] Relocated from the legacy revenuecat-webhook-handler.ts
-// (store-coupled, superseded by billing-v2/revenuecat-webhook-handler-v2.ts).
-// This module holds only the inbound-payload type and pure product-id mapping
-// — no DB access — so both the legacy handler (retained for its test seam)
-// and the v2 handler share exactly one copy.
+// and revenuecat.ts (both deleted — dead, superseded by their `-v2` twins).
+// This module holds only pure, store-agnostic types and mapping — no DB
+// access — reused by billing-v2/revenuecat-v2.ts.
+
+import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+
+export interface RevenuecatWebhookUpdate {
+  tier?: SubscriptionTier;
+  status?: SubscriptionStatus;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string | null;
+  cancelledAt?: string | null;
+  trialEndsAt?: string | null;
+}
+
+export interface RevenuecatQuotaUpdate {
+  monthlyQuota: number;
+  dailyLimit: number | null;
+}
 
 // ---------------------------------------------------------------------------
 // Inbound event shape (kept in sync with revenuecatWebhookSchema in the route)

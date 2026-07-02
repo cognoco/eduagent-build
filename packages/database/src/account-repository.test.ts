@@ -6,28 +6,17 @@
  * named exports. This fails if a future rename accidentally drops the suffix
  * (restoring the invisible-risk pattern) or if new helpers are added without
  * the suffix.
+ *
+ * [WI-1239 / 779-strip] Most legacy `subscriptions`-table helpers
+ * (findSubscriptionByStripeId__unscoped, findSubscriptionByStripeCustomerId__unscoped,
+ * lockSubscriptionById__unscoped, lockSubscriptionByAccountId__unscoped) were
+ * removed — dead, superseded by the v2 twins (findSubscriptionByOrganizationId__unscoped
+ * etc.). findSubscriptionById__unscoped is KEPT — still transitively reachable
+ * from out-of-scope legacy code (services/account.ts, services/profile.ts).
  */
 import * as accountRepository from './account-repository.js';
 
 describe('[BUG-565] account-repository — __unscoped naming contract', () => {
-  it('exports findSubscriptionById__unscoped', () => {
-    expect(typeof accountRepository.findSubscriptionById__unscoped).toBe(
-      'function',
-    );
-  });
-
-  it('exports findSubscriptionByStripeId__unscoped', () => {
-    expect(typeof accountRepository.findSubscriptionByStripeId__unscoped).toBe(
-      'function',
-    );
-  });
-
-  it('exports findSubscriptionByStripeCustomerId__unscoped', () => {
-    expect(
-      typeof accountRepository.findSubscriptionByStripeCustomerId__unscoped,
-    ).toBe('function');
-  });
-
   it('exports findQuotaPool__unscoped', () => {
     expect(typeof accountRepository.findQuotaPool__unscoped).toBe('function');
   });
