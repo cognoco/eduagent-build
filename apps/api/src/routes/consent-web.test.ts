@@ -99,6 +99,13 @@ function makeDb(opts: {
     insert: jest.fn().mockReturnValue(insertChain),
     update: jest.fn().mockReturnValue(updateChain),
     delete: jest.fn().mockReturnValue(deleteChain),
+    // [WI-1138] processConsentResponseV2's deny branch snapshots the
+    // payer's subscription(s) via tx.query.subscription.findMany before
+    // deleting. None of these fixtures seed a subscription (ordinary
+    // managed-child deny), so this stays empty — matching the no-op path.
+    query: {
+      subscription: { findMany: jest.fn().mockResolvedValue([]) },
+    },
   };
   return {
     query: {
