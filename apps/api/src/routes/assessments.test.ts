@@ -220,7 +220,6 @@ function makeMeteredApp(opts?: {
   subscriptionId?: string | undefined;
   omitSubscriptionId?: boolean;
   isOwner?: boolean;
-  identityV2?: boolean;
 }) {
   const app = new Hono<
     TestEnv & {
@@ -230,7 +229,6 @@ function makeMeteredApp(opts?: {
         quotaDecrementTopUpCreditId: string | undefined;
         quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
         quotaRefunded: boolean | undefined;
-        quotaIdentityV2: boolean | undefined;
       };
     }
   >();
@@ -258,8 +256,6 @@ function makeMeteredApp(opts?: {
     c.set('quotaDecrementTopUpCreditId', undefined);
     c.set('quotaDecrementQuotaModel', 'shared-pool');
     c.set('quotaRefunded', undefined);
-    // [WI-776 / WP-7] The cutover flag the metering decrement ran under.
-    c.set('quotaIdentityV2', opts?.identityV2 ?? false);
     await next();
   });
   app.onError((err, c) => {
@@ -730,35 +726,6 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
       );
     });
 
-    // [WI-776 / WP-7] P1 fix — flag-on positive coverage. Under
-    // IDENTITY_V2_ENABLED the metering middleware decremented against the v2
-    // store; the handler self-refund MUST thread identityV2:true so the
-    // refund's ownership cross-check uses the SAME (v2) store. Without the
-    // threading (revert: drop `identityV2: c.get('quotaIdentityV2')` from the
-    // handler) this assertion goes red — the refund would default to the legacy
-    // join and, post-DROP, return false → the learner is charged for a no-LLM
-    // app-help turn.
-    it('[WI-776] threads identityV2=true into the refund under flag-on', async () => {
-      getAssessmentMock.mockResolvedValue(makeAssessmentRecord());
-      refundQuotaOrEscalateMock.mockResolvedValueOnce({ refunded: true });
-
-      const res = await makeMeteredApp({ identityV2: true }).request(
-        path,
-        validAnswerBody(APP_HELP_ANSWER),
-      );
-
-      expect(res.status).toBe(200);
-      expect(evaluateAssessmentAnswerMock).not.toHaveBeenCalled();
-      expect(refundQuotaOrEscalateMock).toHaveBeenCalledWith(
-        expect.anything(),
-        SUBSCRIPTION_ID,
-        expect.objectContaining({
-          route: 'assessments.answer.app_help',
-          identityV2: true,
-        }),
-      );
-    });
-
     // [WI-776 / WP-7] Silent-recovery ban — when the refund does NOT complete
     // (e.g. the v2 ownership join finds no row, or any non-success), the handler
     // must NOT claim it refunded. Marking quotaRefunded=true on a failed refund
@@ -777,7 +744,6 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
             quotaDecrementTopUpCreditId: string | undefined;
             quotaDecrementQuotaModel: 'per-profile' | 'shared-pool' | undefined;
             quotaRefunded: boolean | undefined;
-            quotaIdentityV2: boolean | undefined;
           };
         }
       >();
@@ -798,7 +764,6 @@ describe('POST /v1/assessments/:assessmentId/answer', () => {
         c.set('quotaDecrementTopUpCreditId', undefined);
         c.set('quotaDecrementQuotaModel', 'shared-pool');
         c.set('quotaRefunded', undefined);
-        c.set('quotaIdentityV2', true);
         await next();
         capturedQuotaRefunded = c.get('quotaRefunded');
       });

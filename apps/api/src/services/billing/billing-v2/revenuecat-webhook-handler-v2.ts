@@ -10,16 +10,16 @@
 // discipline (Sentry, structured signals, ack-200 on unresolvable) is preserved.
 //
 // The pure helpers (extractTierFromProductId, getTopUpCreditsForProduct,
-// PRODUCT_TIER_MAP, RevenueCatEvent type) are imported from the legacy module —
-// one copy. `shouldRefreshRevenuecatKv` is module-private in the legacy file and
+// PRODUCT_TIER_MAP, RevenueCatEvent type) live in revenuecat-shared.ts — one
+// copy, relocated there from the legacy handler [WI-1239 / 779-strip].
+// `shouldRefreshRevenuecatKv` is module-private in the legacy file and
 // re-implemented locally.
 //
 // `accountId` here is the organization id (field name kept on the mapped row).
 //
 // [WI-868] Dispatched unconditionally by routes/revenuecat-webhook.ts via
 // billing-v2/dispatch.ts — the identity-v2 flag is gone and this handler is
-// the only one that runs in production. Legacy revenuecat-webhook-handler.ts
-// is retained only for routes/revenuecat-webhook.test.ts's mock seam.
+// the only one that runs in production.
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
@@ -28,7 +28,7 @@ import {
   getTopUpCreditsForProduct,
   extractTierFromProductId,
   type RevenueCatEvent,
-} from '../revenuecat-webhook-handler';
+} from '../revenuecat-shared';
 import { purchaseTopUpCreditsV2 } from './top-up-v2';
 import { getTopUpCreditsRemaining } from '../top-up';
 import { getTierConfig } from '../../subscription';

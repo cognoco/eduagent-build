@@ -11,7 +11,7 @@
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
 import type { StripePriceEnv } from '../../billing-pricing';
-import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
+import type { RevenueCatEvent } from '../revenuecat-shared';
 
 // v2 handlers
 import {

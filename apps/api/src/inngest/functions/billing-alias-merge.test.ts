@@ -36,11 +36,14 @@ jest.mock('../client', () => {
 });
 
 import { billingAliasMerge } from './billing-alias-merge';
-// [WI-1057] spy on the REAL merge services (NOT a jest.mock module mock — GC1
-// clean) to assert the v2 merge path runs and legacy never does. getStepDatabase
-// only instantiates a lazy Drizzle handle (no connection) and the spied
-// services never query it, so no @eduagent/database mock is needed.
-import * as aliasMerge from '../../services/billing/alias-merge';
+// [WI-1057] spy on the REAL merge service (NOT a jest.mock module mock — GC1
+// clean) to assert the v2 merge path runs. getStepDatabase only instantiates
+// a lazy Drizzle handle (no connection) and the spied service never queries
+// it, so no @eduagent/database mock is needed.
+// [WI-1239 / 779-strip] The legacy services/billing/alias-merge.ts module
+// (mergeAliasedSubscription) was deleted — its only caller was this worker,
+// which already routes to mergeAliasedSubscriptionV2 unconditionally
+// (WI-867). There is no legacy call site left to assert against.
 import * as billingV2 from '../../services/billing/billing-v2';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
@@ -106,21 +109,16 @@ function validEventData() {
 }
 
 describe('billingAliasMerge worker — identity-v2 routing [WI-1057]', () => {
-  let legacySpy: jest.SpyInstance;
   let v2Spy: jest.SpyInstance;
 
   beforeEach(() => {
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
-    legacySpy = jest
-      .spyOn(aliasMerge, 'mergeAliasedSubscription')
-      .mockResolvedValue({ status: 'no_change' });
     v2Spy = jest
       .spyOn(billingV2, 'mergeAliasedSubscriptionV2')
       .mockResolvedValue({ status: 'no_change' });
   });
 
   afterEach(() => {
-    legacySpy.mockRestore();
     v2Spy.mockRestore();
     delete process.env['DATABASE_URL'];
   });
@@ -135,10 +133,11 @@ describe('billingAliasMerge worker — identity-v2 routing [WI-1057]', () => {
   }
 
   // [WI-867] flag-off test deleted — v2 is always active.
+  // [WI-1239 / 779-strip] "never calls legacy" assertion deleted alongside
+  // it — the legacy mergeAliasedSubscription module no longer exists.
 
   it('[WI-867] always calls mergeAliasedSubscriptionV2 (v2 collapsed)', async () => {
     await run();
     expect(v2Spy).toHaveBeenCalledTimes(1);
-    expect(legacySpy).not.toHaveBeenCalled();
   });
 });

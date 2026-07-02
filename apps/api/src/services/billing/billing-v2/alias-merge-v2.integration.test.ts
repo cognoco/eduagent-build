@@ -37,9 +37,11 @@ import type { BillingAliasReceivedEvent } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
-import { ALIAS_MERGE_IDEMPOTENCY_SOURCE } from '../alias-merge';
+// [WI-1239 / 779-strip] alias-merge.ts (legacy) was deleted; the shared
+// constant now lives in alias-merge-shared.ts (re-exported by alias-merge-v2.ts).
+import { ALIAS_MERGE_IDEMPOTENCY_SOURCE } from '../alias-merge-shared';
 import { getTopUpCreditsRemaining } from '../top-up';
-import type { RevenueCatEvent } from '../revenuecat-webhook-handler';
+import type { RevenueCatEvent } from '../revenuecat-shared';
 import { getTierConfig } from '../../subscription';
 import { inngest } from '../../../inngest/client';
 import {

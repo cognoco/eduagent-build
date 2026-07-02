@@ -1,22 +1,31 @@
 // ---------------------------------------------------------------------------
-// WI-722 — semantic-equivalence proof for the getUsageBreakdownForProfile v2
-// twin, against a REAL family seeded into BOTH stores.
+// WI-722 — coverage for the getUsageBreakdownForProfile v2 twin, against a
+// REAL family seeded into BOTH stores.
 //
-// THE CRUX (shepherd adjustment #3). "Behavior-preserving" is a trap when the
-// new schema models the relationship differently. The legacy function reads
-// `family_links` (parent_profile_id × child_profile_id) to decide hasChildLink
-// / isChild; the v2 twin reads the ratified `guardianship` edge
-// (guardian_person_id × charge_person_id, revoked_at IS NULL) via the CUT-B2
-// reader. The correctness risk is whether the twin aggregates usage over the
-// SAME set of profileIds as the legacy family_links query.
+// [WI-1239 / 779-strip] Originally a semantic-equivalence proof against the
+// legacy getUsageBreakdownForProfile (family.ts) — that function was deleted
+// (routes/billing.ts already dispatched exclusively to -V2), so the
+// call-both-and-diff pattern no longer has a legacy side to compare against.
+// Converted to direct assertions against getUsageBreakdownForProfileV2 alone,
+// using the same concrete expected values the legacy comparison used to
+// anchor (family aggregate totals, self-scoped usage counts, visibility
+// flags). The dual-store seed (legacy accounts/profiles/family_links/
+// family_preferences AND v2 organization/person/membership/subscription/
+// guardianship, id-aligned) is UNCHANGED — usage_events and family_preferences
+// still FK to / are keyed on the legacy ids (pre-M-REPOINT), and
+// family_links stays seeded because other legacy-path tests in this package
+// still exercise it.
 //
-// This test seeds ONE family into both stores under the reseed identity
-// contract (person.id = profiles.id, organization.id = accounts.id,
-// subscription.id = subscriptions.id) plus a shared `usage_events` table, then
-// asserts getUsageBreakdownForProfileV2(...) deep-equals the legacy
-// getUsageBreakdownForProfile(...) for every viewer perspective: the
-// owner-guardian, a non-owner co-parent (with and without owner sharing), and
-// the child. Equal output ⇒ the profile-set equivalence holds.
+// THE CRUX this suite still guards (shepherd adjustment #3, WI-722 original
+// design): "behavior-preserving" is a trap when the new schema models the
+// relationship differently. The legacy function read `family_links`
+// (parent_profile_id × child_profile_id) to decide hasChildLink / isChild;
+// the v2 twin reads the ratified `guardianship` edge (guardian_person_id ×
+// charge_person_id, revoked_at IS NULL) via the CUT-B2 reader. The correctness
+// risk is whether the twin aggregates usage over the SAME set of profileIds
+// the legacy family_links query would have — the adversarial out-of-org-edge
+// test below (case 5) is what actually proves that, independent of any
+// legacy comparison.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
@@ -37,14 +46,13 @@ import {
   guardianship,
   type Database,
 } from '@eduagent/database';
-import { getUsageBreakdownForProfile } from '../family';
 import { getUsageBreakdownForProfileV2 } from './family-usage-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
 
 (RUN ? describe : describe.skip)(
-  'getUsageBreakdownForProfile v2 ≡ legacy (integration)',
+  'getUsageBreakdownForProfileV2 (integration)',
   () => {
     let db: Database;
 
@@ -239,59 +247,63 @@ const RUN = !!process.env.DATABASE_URL;
 
     afterEach(cleanup);
 
-    function callBoth(activeProfileId: string) {
-      const input = {
+    function callV2(activeProfileId: string) {
+      return getUsageBreakdownForProfileV2(db, {
         subscriptionId: SUB_ID,
         activeProfileId,
         monthlyLimit: MONTHLY_LIMIT,
         cycleStartAt: CYCLE_START,
         dayStartAt: DAY_START,
-      };
-      return Promise.all([
-        getUsageBreakdownForProfile(db, input),
-        getUsageBreakdownForProfileV2(db, input),
-      ]);
+      });
     }
 
-    it('owner-guardian: v2 breakdown equals legacy (full family aggregate)', async () => {
+    // Usage seeded by seedFamily(): owner 10/1, coparent 5/2, child 7/3
+    // (used/usedToday) — see its doc comment.
+
+    it('owner-guardian: full family aggregate visible to the admin viewer', async () => {
       await seedFamily({ ownerSharing: false });
-      const [legacy, v2] = await callBoth(OWNER_ID);
+      const v2 = await callV2(OWNER_ID);
 
-      // Equivalence is the assertion; sanity-anchor a couple of fields so a
-      // mutually-broken pair can't pass by both returning empty.
-      expect(legacy.isOwnerBreakdownViewer).toBe(true);
-      expect(legacy.familyAggregate).toEqual({
-        used: 22,
-        limit: MONTHLY_LIMIT,
-      });
-      expect(normalize(v2)).toEqual(normalize(legacy));
+      expect(v2.isOwnerBreakdownViewer).toBe(true);
+      expect(v2.familyAggregate).toEqual({ used: 22, limit: MONTHLY_LIMIT });
+      const profileIds = v2.byProfile.map((r) => r.profile_id);
+      expect(profileIds).toHaveLength(3);
+      expect(profileIds).toContain(OWNER_ID);
+      expect(profileIds).toContain(COPARENT_ID);
+      expect(profileIds).toContain(CHILD_ID);
+      expect(v2.selfUsedToday).toBeNull();
+      expect(v2.selfUsedThisMonth).toBeNull();
     });
 
-    it('co-parent with owner sharing ON: v2 equals legacy (sees full breakdown)', async () => {
+    it('co-parent with owner sharing ON: sees full breakdown', async () => {
       await seedFamily({ ownerSharing: true });
-      const [legacy, v2] = await callBoth(COPARENT_ID);
+      const v2 = await callV2(COPARENT_ID);
 
-      expect(legacy.isOwnerBreakdownViewer).toBe(true);
-      expect(normalize(v2)).toEqual(normalize(legacy));
+      expect(v2.isOwnerBreakdownViewer).toBe(true);
+      expect(v2.familyAggregate).toEqual({ used: 22, limit: MONTHLY_LIMIT });
+      expect(v2.byProfile.map((r) => r.profile_id)).toHaveLength(3);
     });
 
-    it('co-parent with owner sharing OFF: v2 equals legacy (self-scoped only)', async () => {
+    it('co-parent with owner sharing OFF: self-scoped only', async () => {
       await seedFamily({ ownerSharing: false });
-      const [legacy, v2] = await callBoth(COPARENT_ID);
+      const v2 = await callV2(COPARENT_ID);
 
-      expect(legacy.isOwnerBreakdownViewer).toBe(false);
-      expect(legacy.byProfile.map((r) => r.profile_id)).toEqual([COPARENT_ID]);
-      expect(normalize(v2)).toEqual(normalize(legacy));
+      expect(v2.isOwnerBreakdownViewer).toBe(false);
+      expect(v2.byProfile.map((r) => r.profile_id)).toEqual([COPARENT_ID]);
+      expect(v2.familyAggregate).toBeNull();
+      expect(v2.selfUsedToday).toBe(2);
+      expect(v2.selfUsedThisMonth).toBe(5);
     });
 
-    it('child: v2 equals legacy (no breakdown, self-scoped usage)', async () => {
+    it('child: no breakdown, self-scoped usage', async () => {
       await seedFamily({ ownerSharing: true });
-      const [legacy, v2] = await callBoth(CHILD_ID);
+      const v2 = await callV2(CHILD_ID);
 
-      expect(legacy.isOwnerBreakdownViewer).toBe(false);
-      expect(legacy.byProfile).toHaveLength(0);
-      expect(legacy.selfUsedThisMonth).toBe(7);
-      expect(normalize(v2)).toEqual(normalize(legacy));
+      expect(v2.isOwnerBreakdownViewer).toBe(false);
+      expect(v2.byProfile).toHaveLength(0);
+      expect(v2.familyAggregate).toBeNull();
+      expect(v2.selfUsedToday).toBe(3);
+      expect(v2.selfUsedThisMonth).toBe(7);
     });
 
     // -----------------------------------------------------------------------
@@ -452,37 +464,19 @@ const RUN = !!process.env.DATABASE_URL;
       await db.insert(usageEvents).values(events);
     }
 
-    it('out-of-org guardianship edge does NOT flip hasChildLink: v2 stays self-scoped, equals legacy', async () => {
+    it('out-of-org guardianship edge does NOT flip hasChildLink: v2 stays self-scoped', async () => {
       await seedAdversarial();
-      const [legacy, v2] = await callBoth(COPARENT_ID);
+      const v2 = await callV2(COPARENT_ID);
 
-      // Legacy: the co-parent has no in-org family link → self-scoped, NOT an
-      // owner-breakdown viewer, even with sharing ON. The v2 twin must match —
-      // the out-of-org edge must not grant the full-family breakdown.
-      expect(legacy.isOwnerBreakdownViewer).toBe(false);
-      expect(legacy.byProfile.map((r) => r.profile_id)).toEqual([COPARENT_ID]);
-      expect(legacy.familyAggregate).toBeNull();
-      expect(normalize(v2)).toEqual(normalize(legacy));
-      // Pin the privacy invariant directly: no sibling rows leaked to v2.
+      // The co-parent has no in-org guardianship edge over the child — the
+      // out-of-org edge (co-parent → outsider, a different org) must NOT
+      // grant the full-family breakdown even with sharing ON. Pins the
+      // privacy invariant the CUT-B2 in-org intersection exists to enforce.
       expect(v2.isOwnerBreakdownViewer).toBe(false);
       expect(v2.byProfile.map((r) => r.profile_id)).toEqual([COPARENT_ID]);
+      expect(v2.familyAggregate).toBeNull();
+      expect(v2.selfUsedToday).toBe(2);
+      expect(v2.selfUsedThisMonth).toBe(5);
     });
   },
 );
-
-/**
- * The two functions enumerate members in store-natural order (legacy: profiles
- * scan; v2: person × membership scan), which Postgres does not guarantee to
- * match. Profile-set equivalence — not row order — is what semantic-preservation
- * requires, so sort byProfile by profile_id before comparing.
- */
-function normalize<T extends { byProfile: Array<{ profile_id: string }> }>(
-  result: T,
-): T {
-  return {
-    ...result,
-    byProfile: [...result.byProfile].sort((a, b) =>
-      a.profile_id.localeCompare(b.profile_id),
-    ),
-  };
-}

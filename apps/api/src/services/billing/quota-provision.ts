@@ -1,16 +1,10 @@
-import { and, eq, isNull } from 'drizzle-orm';
-import {
-  profileQuotaUsage,
-  profiles,
-  subscriptions,
-  type Database,
-} from '@eduagent/database';
+import { and, eq } from 'drizzle-orm';
+import { profileQuotaUsage, type Database } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 
-import { getTierConfig } from '../subscription';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
-import { getEffectiveAccessForSubscription } from './access';
+import { getEffectiveAccessForSubscriptionV2 } from './billing-v2/access-v2';
 import {
   getProfileQuotaLimits,
   mapProfileQuotaUsageRow,
@@ -25,27 +19,15 @@ export type {
   ProfileQuotaUsageSnapshot,
 } from './billing-shared';
 
-export async function resolveProfileQuotaRole(
-  db: Database,
-  subscriptionId: string,
-  profileId: string,
-): Promise<ProfileQuotaRole | null> {
-  const [row] = await db
-    .select({ isOwner: profiles.isOwner })
-    .from(profiles)
-    .innerJoin(subscriptions, eq(subscriptions.accountId, profiles.accountId))
-    .where(
-      and(
-        eq(subscriptions.id, subscriptionId),
-        eq(profiles.id, profileId),
-        isNull(profiles.archivedAt),
-      ),
-    )
-    .limit(1);
-
-  if (!row) return null;
-  return row.isOwner ? 'owner' : 'child';
-}
+// [WI-1239 / 779-strip] resolveProfileQuotaRole (legacy profiles×subscriptions
+// join) and getOrProvisionProfileQuotaUsage were removed — dead, superseded by
+// resolveProfileQuotaRoleV2 / getOrProvisionProfileQuotaUsageV2
+// (billing-v2/quota-provision-v2.ts). provisionProfileQuotaUsage below is kept:
+// its only remaining caller is services/profile.ts's createProfileWithLimitCheck,
+// itself dead (routes use createChildProfileV2) but out of this WI's named
+// scope — see the 779-strip handoff's deferred-hygiene note. Its internal
+// effective-access resolution now uses the v2 store (access.ts, the legacy
+// `subscriptions`-table twin, is deleted — this was its last caller).
 
 export async function provisionProfileQuotaUsage(
   db: Database,
@@ -62,7 +44,7 @@ export async function provisionProfileQuotaUsage(
   const now = options.now ?? new Date();
   const tier =
     options.tier ??
-    (await getEffectiveAccessForSubscription(db, subscriptionId, now))
+    (await getEffectiveAccessForSubscriptionV2(db, subscriptionId, now))
       ?.effectiveAccessTier;
   if (!tier) return null;
 
@@ -114,58 +96,4 @@ export async function provisionProfileQuotaUsage(
     ),
   });
   return existing ? mapProfileQuotaUsageRow(existing) : null;
-}
-
-export async function getOrProvisionProfileQuotaUsage(
-  db: Database,
-  subscriptionId: string,
-  profileId: string,
-  options: { now?: Date; tier?: SubscriptionTier } = {},
-): Promise<ProfileQuotaUsageSnapshot | null> {
-  const now = options.now ?? new Date();
-  const tier =
-    options.tier ??
-    (await getEffectiveAccessForSubscription(db, subscriptionId, now))
-      ?.effectiveAccessTier;
-  if (!tier) return null;
-
-  const config = getTierConfig(tier);
-  if (config.quotaModel !== 'per-profile') return null;
-
-  const existing = await db.query.profileQuotaUsage.findFirst({
-    where: and(
-      eq(profileQuotaUsage.subscriptionId, subscriptionId),
-      eq(profileQuotaUsage.profileId, profileId),
-    ),
-  });
-
-  if (existing) {
-    const limits = getProfileQuotaLimits(tier, existing.role);
-    if (
-      limits &&
-      (existing.monthlyLimit !== limits.monthlyLimit ||
-        existing.dailyLimit !== limits.dailyLimit)
-    ) {
-      const [updated] = await db
-        .update(profileQuotaUsage)
-        .set({
-          monthlyLimit: limits.monthlyLimit,
-          dailyLimit: limits.dailyLimit,
-          updatedAt: now,
-        })
-        .where(eq(profileQuotaUsage.id, existing.id))
-        .returning();
-      return updated ? mapProfileQuotaUsageRow(updated) : null;
-    }
-    return mapProfileQuotaUsageRow(existing);
-  }
-
-  const role = await resolveProfileQuotaRole(db, subscriptionId, profileId);
-  if (!role) return null;
-
-  return provisionProfileQuotaUsage(db, subscriptionId, profileId, role, {
-    tier,
-    now,
-    emitLazyProvisioned: true,
-  });
 }

@@ -1,0 +1,17 @@
+{
+  "pageId": "3908bce9-1f7c-81e5-ae24-c844dd3b2d23",
+  "id": "WI-1239",
+  "name": "WI-779-E: Converge legacy-identity-table READERS (account/consent/billing non-v2) to v2-only — unblocks WI-1139",
+  "description": "Scope: identity-cutover-779-strip proposal (_wip/identity-cutover/2026-07-01-identity-cutover-779-strip-proposal.md) §5 steps 1-2, operator-ratified R3 plan (ic-orch-352). Un-parked: the imagined operator-gated terminal cutover this WI was waiting on does not exist (§4/§6) — there is only a mechanical cleanup. Unblocks WI-1128 (FK repoint) and, transitively, WI-1139 (schema-def deletion) and WI-779's closure.",
+  "acceptanceCriteria": "Scope: proposal §5 steps 1-2 only.\n\nStep 1 — collapse the metering.ts identityV2 ternary to v2-only. apps/api/src/services/billing/metering.ts: decrementQuota (~:259), safeRefundQuota, getEffectiveAccessForSubscription — remove the legacy branch AND the identityV2 param. This is the single load-bearing behavioural change in the whole 779-strip lane (§7.1): verify the v2 branch is a complete replacement (quota decrement, refund, effective-access) and that collapsing the param does not silently change any caller's behaviour.\n\nStep 2 — remove legacy readers + relocate shared symbols. Compiler-driven, NOT blind file deletion — a legacy module can be DB-reader-dead yet still export error classes / route-facing types / parse helpers that v2 code or tests import (e.g. apps/api/src/routes/consent.ts:20,39 imports legacy consent error classes while calling the v2 consent service).\n  2a. Delete/rewrite the code paths that read/write legacy tables (profiles/accounts/subscriptions/family_links/consent_states). Targets: packages/database/src/account-repository.ts; legacy services/billing/* superseded by services/billing-v2/*; legacy stripe-webhook-handler.ts / revenuecat.ts superseded by their -v2 twins.\n  2b. Before deleting each legacy impl file, move any still-used shared errors/types/parse-helpers it exports into neutral (non-legacy) modules.\n  Guard every file deletion: rg -n \"<symbol|basename>\" apps packages tests → pnpm typecheck → targeted tests.\n\nAcceptance (done at outcome level, per §6 correction — not blind deletion):\n- No production code reads or writes a legacy table (profiles/accounts/subscriptions/family_links/consent_states) via Drizzle.\n- Every remaining import from a legacy module is either removed or relocated to a neutral module — no orphaned imports, pnpm typecheck clean.\n- A fresh independent sweep confirms no reader was missed: real Drizzle-table references, not word-grep (the \\b(profiles|...) pattern false-matches English prose) — explicitly covering inngest jobs and any raw-SQL FROM subscriptions / FROM profiles sites (§7.3).\n\nOut of scope (other WIs in the lane): FK repoint + migrations + seed conversion (WI-1128); schema-def deletion (WI-1139); dev reseed + final verify (WI-779 parent).\n\n§0 framing applies: zero production users, non-prod data disposable — no mode-pin/drain/soak/runbook ceremony; reversible via git.",
+  "riskImpact": "",
+  "type": "Task",
+  "altitude": "Item",
+  "priority": "P2",
+  "stage": "Ready",
+  "state": "Active",
+  "executionPath": "Assisted",
+  "claimedBy": "",
+  "projectPageId": "3658bce9-1f7c-8128-9f9b-fa7fcf75a13b",
+  "bodyText": ""
+}

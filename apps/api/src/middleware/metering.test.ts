@@ -842,7 +842,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 is now hardcoded true post-flag-collapse
       );
       expect(mockSafeRefundQuota).toHaveBeenCalledWith(
         expect.anything(),
@@ -1005,7 +1004,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -1039,7 +1037,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -1131,7 +1128,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
       expect(res.status).toBe(200);
     });
@@ -1191,7 +1187,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -1407,7 +1402,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -1695,7 +1689,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-free',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
   });
@@ -1906,7 +1899,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 
@@ -2513,7 +2505,6 @@ describe('metering middleware', () => {
           expect.anything(),
           'sub-1',
           'test-profile-id',
-          true, // WI-867: identityV2 hardcoded true post-flag-collapse
         );
       },
     );
@@ -2591,7 +2582,6 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         'test-profile-id',
-        true, // WI-867: identityV2 hardcoded true post-flag-collapse
       );
     });
 

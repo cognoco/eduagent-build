@@ -11,10 +11,14 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
-  profileQuotaUsage,
-  profiles,
-  quotaPools,
+  organization,
+  person,
+  membership,
+  subscription as subscriptionV2Table,
   subscriptions,
+  profiles,
+  profileQuotaUsage,
+  quotaPools,
   topUpCredits,
   createDatabase,
 } from '@eduagent/database';
@@ -51,40 +55,44 @@ function createIntegrationDb() {
 }
 
 // ---------------------------------------------------------------------------
-// Unique e-mail / clerkUserId prefixes so parallel test runs don't collide
+// [WI-1239 / 779-strip] v2-only: seeds organization/person/membership/
+// subscription (v2, organization-keyed) instead of the legacy accounts/
+// profiles/subscriptions tables, since decrementQuota/incrementQuota now
+// resolve effective access + ownership via the v2 store unconditionally.
+// Deterministic name prefixes (rather than a legacy accounts.email/
+// clerkUserId match) so parallel test runs don't collide and cleanup can
+// find every row this suite created.
 // ---------------------------------------------------------------------------
 
 const PREFIX = 'integration-metering';
-const TEST_ACCOUNTS = [
-  { clerkUserId: `${PREFIX}-01`, email: `${PREFIX}-01@integration.test` },
-  { clerkUserId: `${PREFIX}-02`, email: `${PREFIX}-02@integration.test` },
-  { clerkUserId: `${PREFIX}-03`, email: `${PREFIX}-03@integration.test` },
-  { clerkUserId: `${PREFIX}-04`, email: `${PREFIX}-04@integration.test` },
-  { clerkUserId: `${PREFIX}-05`, email: `${PREFIX}-05@integration.test` },
-  { clerkUserId: `${PREFIX}-06`, email: `${PREFIX}-06@integration.test` },
-  { clerkUserId: `${PREFIX}-07`, email: `${PREFIX}-07@integration.test` },
-  { clerkUserId: `${PREFIX}-08`, email: `${PREFIX}-08@integration.test` },
-];
-
-const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
+const ORG_NAMES = Array.from({ length: 8 }, (_, i) => `${PREFIX}-${i}`);
 
 // ---------------------------------------------------------------------------
 // Seed helpers
 // ---------------------------------------------------------------------------
 
-async function seedAccount(index: number) {
+async function seedOrganization(index: number) {
   const db = createIntegrationDb();
-  const account = TEST_ACCOUNTS[index]!;
   const [row] = await db
-    .insert(accounts)
-    .values({ clerkUserId: account.clerkUserId, email: account.email })
+    .insert(organization)
+    .values({ name: ORG_NAMES[index]! })
     .returning();
+  // [WI-1239 / 779-strip] quota_pools/profile_quota_usage/top_up_credits/
+  // usage_events still FK to the legacy `subscriptions` table
+  // (pre-M-REPOINT), and `subscriptions.accountId` is itself a NOT NULL FK to
+  // `accounts` — seed a matching legacy account (same id as the org, the
+  // "reseed identity contract") so seedSubscriptionWithQuota's legacy
+  // subscription row below has somewhere to point.
+  await db.insert(accounts).values({
+    id: row!.id,
+    clerkUserId: `${ORG_NAMES[index]}-clerk`,
+    email: `${ORG_NAMES[index]}@integration.test`,
+  });
   return row!;
 }
 
 async function seedSubscriptionWithQuota(input: {
-  accountId: string;
+  organizationId: string;
   tier?: 'free' | 'plus' | 'family' | 'pro';
   status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
   currentPeriodEnd?: Date | null;
@@ -97,19 +105,50 @@ async function seedSubscriptionWithQuota(input: {
   const tier = input.tier ?? 'plus';
   const tierConfig = getTierConfig(tier);
 
-  const [subscription] = await db
-    .insert(subscriptions)
+  // subscription.payerPersonId is NOT NULL (data-model.md §2A.4). Most tests
+  // in this file don't care about the payer's identity (only the per-profile
+  // describe block seeds an explicit owner/child), so auto-provision a throw-
+  // away payer person + membership here rather than threading one through
+  // every call site.
+  const [payer] = await db
+    .insert(person)
     .values({
-      accountId: input.accountId,
-      tier,
+      displayName: 'Auto Payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  await db.insert(membership).values({
+    personId: payer!.id,
+    organizationId: input.organizationId,
+    roles: ['admin'],
+  });
+
+  const [subscription] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: input.organizationId,
+      planTier: tier,
       status: input.status ?? 'active',
-      currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
-      currentPeriodEnd:
+      payerPersonId: payer!.id,
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt:
         input.currentPeriodEnd === undefined
           ? new Date('2026-05-01T00:00:00.000Z')
           : input.currentPeriodEnd,
     })
     .returning();
+
+  // [WI-1239 / 779-strip] Mirror the v2 subscription into the legacy
+  // `subscriptions` table under the SAME id — quota_pools' FK still points at
+  // the legacy table (pre-M-REPOINT), so a v2-only subscription row leaves
+  // nothing for the insert below to reference.
+  await db.insert(subscriptions).values({
+    id: subscription!.id,
+    accountId: input.organizationId,
+    tier,
+    status: input.status ?? 'active',
+  });
 
   const [quotaPool] = await db
     .insert(quotaPools)
@@ -151,21 +190,35 @@ async function seedTopUpCredit(input: {
   return row!;
 }
 
-async function seedProfile(input: {
-  accountId: string;
+async function seedPerson(input: {
+  organizationId: string;
   displayName: string;
   isOwner: boolean;
 }) {
   const db = createIntegrationDb();
   const [row] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: input.accountId,
       displayName: input.displayName,
-      birthYear: input.isOwner ? 1990 : 2016,
-      isOwner: input.isOwner,
+      birthDate: input.isOwner ? '1990-01-01' : '2016-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
+  await db.insert(membership).values({
+    personId: row!.id,
+    organizationId: input.organizationId,
+    roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
+  });
+  // [WI-1239 / 779-strip] profile_quota_usage.profileId still FKs to the
+  // legacy `profiles` table (pre-M-REPOINT) — mirror the person under the
+  // SAME id, same as the account/subscription dual-write above.
+  await db.insert(profiles).values({
+    id: row!.id,
+    accountId: input.organizationId,
+    displayName: input.displayName,
+    birthYear: input.isOwner ? 1990 : 2016,
+    isOwner: input.isOwner,
+  });
   return row!;
 }
 
@@ -222,17 +275,37 @@ async function loadTopUps(subscriptionId: string) {
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
+  const orgs = await db.query.organization.findMany({
+    where: inArray(organization.name, ORG_NAMES),
   });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) return;
 
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+  // Capture member person ids BEFORE deleting membership (the join that
+  // finds them disappears once membership rows are gone).
+  const memberships = await db
+    .select({ personId: membership.personId })
+    .from(membership)
+    .where(inArray(membership.organizationId, orgIds));
+  const personIds = [...new Set(memberships.map((m) => m.personId))];
+
+  // Ordering respects the FK constraints: subscription.organizationId is
+  // RESTRICT (not cascade) on organization, and subscription.payerPersonId
+  // is RESTRICT on person — subscription must go first. membership cascades
+  // on both organization and person deletes, but deleting it explicitly here
+  // keeps the ordering self-contained rather than relying on cascade timing.
+  await db
+    .delete(subscriptionV2Table)
+    .where(inArray(subscriptionV2Table.organizationId, orgIds));
+  await db.delete(membership).where(inArray(membership.organizationId, orgIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
   }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+  // Legacy account (same id as the org — see seedOrganization) cascades to
+  // its subscriptions row, which cascades to quota_pools/profile_quota_usage/
+  // top_up_credits/usage_events.
+  await db.delete(accounts).where(inArray(accounts.id, orgIds));
 }
 
 // ---------------------------------------------------------------------------
@@ -258,9 +331,9 @@ afterEach(() => {
 
 describe('Quota metering (integration)', () => {
   it('decrements monthly quota atomically', async () => {
-    const account = await seedAccount(0);
+    const org = await seedOrganization(0);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 5,
@@ -281,9 +354,9 @@ describe('Quota metering (integration)', () => {
   });
 
   it('enforces daily cap', async () => {
-    const account = await seedAccount(1);
+    const org = await seedOrganization(1);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 100,
       usedThisMonth: 0,
@@ -305,9 +378,9 @@ describe('Quota metering (integration)', () => {
   });
 
   it('falls back to top-up credits when monthly quota exhausted', async () => {
-    const account = await seedAccount(2);
+    const org = await seedOrganization(2);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10,
@@ -335,9 +408,9 @@ describe('Quota metering (integration)', () => {
   });
 
   it('increments quota back on LLM failure (no underflow)', async () => {
-    const account = await seedAccount(3);
+    const org = await seedOrganization(3);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 0,
@@ -359,9 +432,9 @@ describe('Quota metering (integration)', () => {
   // Post-fix: only one succeeds; the others get daily_exceeded and their
   // top-up decrements are rolled back.
   it('[BREAK] concurrent top-up consumers do not bypass daily cap', async () => {
-    const account = await seedAccount(5);
+    const org = await seedOrganization(5);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10, // monthly exhausted — forces top-up path
@@ -404,9 +477,9 @@ describe('Quota metering (integration)', () => {
   // incrementQuota unconditionally ran `usedThisMonth = GREATEST(usedThisMonth - 1, 0)`
   // — so every LLM failure on a top-up consumption inflated the monthly pool by 1.
   it('[BREAK CR-2026-05-19-C6] LLM-failure refund after top-up consumption credits top-up, not monthly', async () => {
-    const account = await seedAccount(6);
+    const org = await seedOrganization(6);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10, // monthly exhausted — forces top-up path
@@ -454,9 +527,9 @@ describe('Quota metering (integration)', () => {
   });
 
   it('[BREAK] refund uses the quota model from the original decrement', async () => {
-    const account = await seedAccount(6);
+    const org = await seedOrganization(6);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 10,
@@ -481,9 +554,9 @@ describe('Quota metering (integration)', () => {
     });
 
     await createIntegrationDb()
-      .update(subscriptions)
-      .set({ tier: 'plus', updatedAt: new Date() })
-      .where(eq(subscriptions.id, seeded.subscription.id));
+      .update(subscriptionV2Table)
+      .set({ planTier: 'plus', updatedAt: new Date() })
+      .where(eq(subscriptionV2Table.id, seeded.subscription.id));
 
     await incrementQuota(
       createIntegrationDb(),
@@ -507,9 +580,9 @@ describe('Quota metering (integration)', () => {
   // refund the monthly pool (back-compat) — they were the only refund path
   // before the fix and shouldn't break.
   it('[CR-2026-05-19-C6] legacy refund without source falls back to monthly pool', async () => {
-    const account = await seedAccount(7);
+    const org = await seedOrganization(7);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 10,
       usedThisMonth: 5,
@@ -539,9 +612,9 @@ describe('Quota metering (integration)', () => {
     const dailyLimit = 2;
     const monthlyLimit = 10;
 
-    const account = await seedAccount(0); // reuse slot 0 — cleaned in beforeEach
+    const org = await seedOrganization(0); // reuse slot 0 — cleaned in beforeEach
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit,
       usedThisMonth: monthlyLimit, // monthly exhausted
@@ -573,9 +646,9 @@ describe('Quota metering (integration)', () => {
   it('concurrent decrements do not over-consume', async () => {
     // Set remaining=1 → fire 5 concurrent decrementQuota calls
     // Exactly 1 should succeed, 4 should get quota_exceeded
-    const account = await seedAccount(4);
+    const org = await seedOrganization(4);
     const seeded = await seedSubscriptionWithQuota({
-      accountId: account.id,
+      organizationId: org.id,
       tier: 'family',
       monthlyLimit: 1,
       usedThisMonth: 0,
@@ -605,9 +678,9 @@ describe('Quota metering (integration)', () => {
     it.each(['free', 'plus'] as const)(
       'requires a profileId for %s metering',
       async (tier) => {
-        const account = await seedAccount(0);
+        const org = await seedOrganization(0);
         const seeded = await seedSubscriptionWithQuota({
-          accountId: account.id,
+          organizationId: org.id,
           tier,
         });
 
@@ -618,9 +691,9 @@ describe('Quota metering (integration)', () => {
     );
 
     it('resets stale shared-pool usage when a subscription re-enters that model', async () => {
-      const account = await seedAccount(0);
+      const org = await seedOrganization(0);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'family',
         monthlyLimit: 1,
         usedThisMonth: 1,
@@ -648,18 +721,18 @@ describe('Quota metering (integration)', () => {
 
     it('decrements owner and child rows independently', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(1);
+      const org = await seedOrganization(1);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const owner = await seedProfile({
-        accountId: account.id,
+      const owner = await seedPerson({
+        organizationId: org.id,
         displayName: 'Owner',
         isOwner: true,
       });
-      const child = await seedProfile({
-        accountId: account.id,
+      const child = await seedPerson({
+        organizationId: org.id,
         displayName: 'Child',
         isOwner: false,
       });
@@ -722,18 +795,18 @@ describe('Quota metering (integration)', () => {
 
     it('spends Plus top-ups only for the owner profile', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(2);
+      const org = await seedOrganization(2);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const owner = await seedProfile({
-        accountId: account.id,
+      const owner = await seedPerson({
+        organizationId: org.id,
         displayName: 'Owner',
         isOwner: true,
       });
-      const child = await seedProfile({
-        accountId: account.id,
+      const child = await seedPerson({
+        organizationId: org.id,
         displayName: 'Child',
         isOwner: false,
       });
@@ -795,13 +868,13 @@ describe('Quota metering (integration)', () => {
 
     it('lazily provisions a missing child row and retries the decrement', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(3);
+      const org = await seedOrganization(3);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const child = await seedProfile({
-        accountId: account.id,
+      const child = await seedPerson({
+        organizationId: org.id,
         displayName: 'Child',
         isOwner: false,
       });
@@ -836,14 +909,14 @@ describe('Quota metering (integration)', () => {
       const plusTier = getTierConfig('plus');
       const freeTier = getTierConfig('free');
       const staleUsedThisMonth = freeTier.ownerMonthlyQuota! - 1;
-      const account = await seedAccount(4);
+      const org = await seedOrganization(4);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
         status: 'past_due',
       });
-      const owner = await seedProfile({
-        accountId: account.id,
+      const owner = await seedPerson({
+        organizationId: org.id,
         displayName: 'Owner',
         isOwner: true,
       });
@@ -885,13 +958,13 @@ describe('Quota metering (integration)', () => {
 
     it('[PR3] emits a quota-specific parent notification event when a child exhausts the daily cap', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(5);
+      const org = await seedOrganization(5);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const child = await seedProfile({
-        accountId: account.id,
+      const child = await seedPerson({
+        organizationId: org.id,
         displayName: 'Child',
         isOwner: false,
       });
@@ -930,18 +1003,18 @@ describe('Quota metering (integration)', () => {
 
     it('[PR3] emits monthly_exceeded when a child exhausts the monthly cap without using owner top-ups', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(5);
+      const org = await seedOrganization(5);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const owner = await seedProfile({
-        accountId: account.id,
+      const owner = await seedPerson({
+        organizationId: org.id,
         displayName: 'Owner',
         isOwner: true,
       });
-      const child = await seedProfile({
-        accountId: account.id,
+      const child = await seedPerson({
+        organizationId: org.id,
         displayName: 'Child',
         isOwner: false,
       });
@@ -988,13 +1061,13 @@ describe('Quota metering (integration)', () => {
 
     it('[PR3] does not notify a parent when the owner exhausts Plus quota', async () => {
       const plusTier = getTierConfig('plus');
-      const account = await seedAccount(5);
+      const org = await seedOrganization(5);
       const seeded = await seedSubscriptionWithQuota({
-        accountId: account.id,
+        organizationId: org.id,
         tier: 'plus',
       });
-      const owner = await seedProfile({
-        accountId: account.id,
+      const owner = await seedPerson({
+        organizationId: org.id,
         displayName: 'Owner',
         isOwner: true,
       });

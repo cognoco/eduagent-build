@@ -12,9 +12,10 @@
 //
 // The pure, store-agnostic helpers (mapStripeStatus, extractPaidTier,
 // extractPeriodStart/End, extractSubscriptionIdFromInvoice, shouldRefreshStripeKv,
-// verifySubscriptionTier) are imported from the legacy module / billing-pricing
-// so there is exactly one copy of that logic. `escalateSubscriptionNotFound` is
-// re-implemented locally (module-private in the legacy file).
+// verifySubscriptionTier) live in billing-pricing.ts so there is exactly one
+// copy of that logic — relocated there from the legacy handler [WI-1239 /
+// 779-strip]. `escalateSubscriptionNotFound` is re-implemented locally
+// (module-private in the legacy file).
 //
 // `accountId` everywhere here is the organization id under the flag
 // (= accounts.id by the reseed); the field name stays `accountId` on the mapped
@@ -22,8 +23,7 @@
 //
 // [WI-868] Dispatched unconditionally by routes/stripe-webhook.ts via
 // billing-v2/dispatch.ts — the identity-v2 flag is gone and this handler is
-// the only one that runs in production. Legacy stripe-webhook-handler.ts is
-// retained only for routes/stripe-webhook.test.ts's mock seam.
+// the only one that runs in production.
 // ---------------------------------------------------------------------------
 
 import {
@@ -41,15 +41,13 @@ import { getTierConfig } from '../../subscription';
 import {
   verifySubscriptionTier,
   type StripePriceEnv,
-} from '../../billing-pricing';
-import {
   extractPeriodStart,
   extractPeriodEnd,
   extractSubscriptionIdFromInvoice,
   shouldRefreshStripeKv,
   extractPaidTier,
   mapStripeStatus,
-} from '../stripe-webhook-handler';
+} from '../../billing-pricing';
 import { inngest } from '../../../inngest/client';
 import { captureException } from '../../sentry';
 import { createLogger } from '../../logger';
@@ -60,7 +58,7 @@ import {
   getSubscriptionByStripeCustomerIdV2,
 } from './subscription-core-v2';
 import { safeRefreshKvCacheV2 } from './safe-refresh-kv-cache-v2';
-import { emitTopUpCreditsReattributedMetric } from '../tier';
+import { emitTopUpCreditsReattributedMetric } from '../top-up';
 import { reattributeTopUpCreditsOnModelChangeV2 } from './tier-v2';
 
 const logger = createLogger();

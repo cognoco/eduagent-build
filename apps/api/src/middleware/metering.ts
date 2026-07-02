@@ -108,16 +108,6 @@ export type MeteringEnv = {
     quotaDecrementTopUpCreditId?: string;
     /** Quota model that funded the decrement; refund paths must not re-resolve it. */
     quotaDecrementQuotaModel?: 'per-profile' | 'shared-pool';
-    /**
-     * [WI-776 / WP-7] Identity-cutover flag that the decrement ran under.
-     * Handler-owned self-refund paths (routes/sessions.ts, routes/assessments.ts)
-     * MUST thread this into safeRefundQuota so the refund's ownership cross-check
-     * uses the SAME store (v2 vs legacy) the decrement used. Without it the
-     * refund defaults to the legacy profiles/subscriptions join, which under
-     * flag-on/post-DROP fails — and the handler would mark quotaRefunded=true on
-     * a refund that never happened, charging the user for a no-LLM branch.
-     */
-    quotaIdentityV2?: boolean;
     /** Remaining billable turns after the current decrement. */
     quotaRemainingTurns?: number;
     /** Remaining-turn ratio against the user's currently enforced cap. */
@@ -554,8 +544,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const profileMeta = c.get('profileMeta');
     const profileId = c.get('profileId');
     const proxyModeHeader = c.req.header('X-Proxy-Mode') === 'true';
-    // [WI-776 / WP-7] Single read of the cutover flag for the whole metering
-    const identityV2 = true;
 
     if (
       (!profileId || !profileMeta) &&
@@ -773,12 +761,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
     let decrement: Awaited<ReturnType<typeof decrementQuota>>;
     try {
-      decrement = await decrementQuota(
-        db,
-        subscriptionId,
-        profileId,
-        identityV2,
-      );
+      decrement = await decrementQuota(db, subscriptionId, profileId);
     } catch (err) {
       if (err instanceof MeteringError) {
         // [WI-1008] Silent recovery in billing code is banned (AGENTS.md).
@@ -846,9 +829,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       decrement.source === 'top_up' ? 'top_up' : 'monthly',
     );
     c.set('quotaDecrementQuotaModel', decrement.quotaModel ?? quotaModel);
-    // [WI-776 / WP-7] Expose the cutover flag the decrement ran under so
-    // handler-owned self-refund paths use the same store's ownership check.
-    c.set('quotaIdentityV2', identityV2);
     if (decrement.topUpCreditId) {
       c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
     }
@@ -924,7 +904,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
           source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
           quotaModel: decrement.quotaModel ?? quotaModel,
           topUpCreditId: decrement.topUpCreditId,
-          identityV2,
         });
         c.set('quotaRefunded', true);
       }
@@ -967,7 +946,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
         quotaModel: decrement.quotaModel ?? quotaModel,
         topUpCreditId: decrement.topUpCreditId,
-        identityV2,
       });
       c.set('quotaRefunded', true);
       return;

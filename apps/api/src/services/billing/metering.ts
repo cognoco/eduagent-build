@@ -7,8 +7,6 @@ import { and, eq, notInArray, sql, type SQL } from 'drizzle-orm';
 import {
   profileQuotaUsage,
   quotaPools,
-  profiles,
-  subscriptions,
   topUpCredits,
   usageEvents,
   type Database,
@@ -19,12 +17,7 @@ import { captureException } from '../sentry';
 import { createLogger } from '../logger';
 import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
-import { getEffectiveAccessForSubscription } from './access';
-import {
-  provisionProfileQuotaUsage,
-  resolveProfileQuotaRole,
-  type ProfileQuotaRole,
-} from './quota-provision';
+import type { ProfileQuotaRole } from './quota-provision';
 import { isPersonUnderSubscriptionV2 } from './billing-v2/metering-v2';
 import {
   resolveProfileQuotaRoleV2,
@@ -143,40 +136,20 @@ export class MeteringError extends Error {
   }
 }
 
-async function verifyProfileInSubscriptionAccount(
-  db: Database,
-  subscriptionId: string,
-  profileId: string,
-): Promise<boolean> {
-  const row = await db
-    .select({ profileId: profiles.id })
-    .from(profiles)
-    .innerJoin(subscriptions, eq(subscriptions.accountId, profiles.accountId))
-    .where(
-      and(eq(subscriptions.id, subscriptionId), eq(profiles.id, profileId)),
-    )
-    .limit(1);
-
-  return row.length > 0;
-}
-
 /**
  * [WI-776 / WP-7] Quota-enforcement ownership cross-check (enumeration §4.6,
- * HIGH). Selects the v2 twin (person × membership × subscription via
- * organization_id) when `identityV2` is true, else the legacy join
- * (profiles × subscriptions via account_id). The legacy path is byte-identical;
- * the flag defaults to false so every existing caller stays on legacy until its
- * own cutover. Threaded from the metering middleware, which owns the request env.
+ * HIGH). v2-only: person × membership × subscription via organization_id.
+ * [WI-1239 / 779-strip] The legacy join (profiles × subscriptions via
+ * account_id) and the identityV2 branch were collapsed — v2 is the only
+ * reachable path (WI-867/WI-868 already hardcoded the flag on at every
+ * caller).
  */
 async function verifyProfileOwnsSubscription(
   db: Database,
   subscriptionId: string,
   profileId: string,
-  identityV2: boolean,
 ): Promise<boolean> {
-  return identityV2
-    ? isPersonUnderSubscriptionV2(db, subscriptionId, profileId)
-    : verifyProfileInSubscriptionAccount(db, subscriptionId, profileId);
+  return isPersonUnderSubscriptionV2(db, subscriptionId, profileId);
 }
 
 /**
@@ -260,22 +233,13 @@ export async function decrementQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string,
-  identityV2 = false,
 ): Promise<DecrementResult> {
-  // [WI-776 / WP-7] Effective-tier resolution reads the subscription row;
-  // select the v2 store (organization-keyed `subscription`) under the flag so
-  // this read does not hit the dropped legacy `subscriptions` table post-DROP.
-  // Legacy path (flag-off) is byte-identical.
-  const access = identityV2
-    ? await getEffectiveAccessForSubscriptionV2(db, subscriptionId)
-    : await getEffectiveAccessForSubscription(db, subscriptionId);
+  // [WI-776 / WP-7] Effective-tier resolution reads the subscription row from
+  // the v2 store (organization-keyed `subscription`).
+  // [WI-1239 / 779-strip] identityV2 branch collapsed — v2 is the only path.
+  const access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
   if (!access) {
-    const result = await decrementPoolQuota(
-      db,
-      subscriptionId,
-      profileId,
-      identityV2,
-    );
+    const result = await decrementPoolQuota(db, subscriptionId, profileId);
     return { ...result, quotaModel: 'shared-pool' };
   }
 
@@ -292,17 +256,11 @@ export async function decrementQuota(
       subscriptionId,
       profileId,
       tier,
-      identityV2,
     );
     return { ...result, quotaModel: 'per-profile' };
   }
 
-  const result = await decrementPoolQuota(
-    db,
-    subscriptionId,
-    profileId,
-    identityV2,
-  );
+  const result = await decrementPoolQuota(db, subscriptionId, profileId);
   return { ...result, quotaModel: 'shared-pool' };
 }
 
@@ -310,14 +268,12 @@ async function decrementPoolQuota(
   db: Database,
   subscriptionId: string,
   profileId?: string,
-  identityV2 = false,
 ): Promise<DecrementResult> {
   if (profileId) {
     const ownsProfile = await verifyProfileOwnsSubscription(
       db,
       subscriptionId,
       profileId,
-      identityV2,
     );
     if (!ownsProfile) {
       logger.warn('[metering] decrementQuota ownership mismatch', {
@@ -557,13 +513,11 @@ async function decrementProfileQuota(
   subscriptionId: string,
   profileId: string,
   tier: SubscriptionTier,
-  identityV2 = false,
 ): Promise<DecrementResult> {
   const ownsProfile = await verifyProfileOwnsSubscription(
     db,
     subscriptionId,
     profileId,
-    identityV2,
   );
   if (!ownsProfile) {
     logger.warn('[metering] decrementQuota ownership mismatch', {
@@ -594,7 +548,6 @@ async function decrementProfileQuota(
       profileId,
       tier,
       true,
-      identityV2,
     ),
   );
 
@@ -749,7 +702,6 @@ async function attemptProfileDecrementInTx(
   profileId: string,
   tier: SubscriptionTier,
   allowLazyProvision: boolean,
-  identityV2 = false,
 ): Promise<DecrementResult> {
   const now = new Date();
   await clampProfileQuotaLimits(db, subscriptionId, profileId, tier);
@@ -800,15 +752,12 @@ async function attemptProfileDecrementInTx(
         profileId,
       });
     }
-    // [WI-776 / WP-7] Lazy-provision role-resolve + provision select the v2
-    // twins under the flag (person × membership × subscription on
-    // organization_id) so this fallback does not read/write the legacy
-    // identity tables post-DROP. The metering middleware pre-provisions the
-    // quota row before decrement, so this branch is a rare race fallback; under
-    // v2 it must still avoid the dropped tables. Legacy path byte-identical.
-    const role = identityV2
-      ? await resolveProfileQuotaRoleV2(db, subscriptionId, profileId)
-      : await resolveProfileQuotaRole(db, subscriptionId, profileId);
+    // [WI-776 / WP-7] Lazy-provision role-resolve + provision read/write the
+    // v2 twins (person × membership × subscription on organization_id). The
+    // metering middleware pre-provisions the quota row before decrement, so
+    // this branch is a rare race fallback.
+    // [WI-1239 / 779-strip] identityV2 branch collapsed — v2 is the only path.
+    const role = await resolveProfileQuotaRoleV2(db, subscriptionId, profileId);
     if (!role) {
       return {
         success: false,
@@ -819,26 +768,17 @@ async function attemptProfileDecrementInTx(
         profileRole: null,
       };
     }
-    if (identityV2) {
-      await provisionProfileQuotaUsageV2(db, subscriptionId, profileId, role, {
-        tier,
-        now,
-        emitLazyProvisioned: true,
-      });
-    } else {
-      await provisionProfileQuotaUsage(db, subscriptionId, profileId, role, {
-        tier,
-        now,
-        emitLazyProvisioned: true,
-      });
-    }
+    await provisionProfileQuotaUsageV2(db, subscriptionId, profileId, role, {
+      tier,
+      now,
+      emitLazyProvisioned: true,
+    });
     return attemptProfileDecrementInTx(
       db,
       subscriptionId,
       profileId,
       tier,
       false,
-      identityV2,
     );
   }
 
@@ -919,13 +859,6 @@ export interface IncrementQuotaOptions {
   source?: 'monthly' | 'top_up';
   topUpCreditId?: string;
   quotaModel?: QuotaModel;
-  /**
-   * [WI-776 / WP-7] When true, the ownership cross-check uses the v2 twin
-   * (person × membership × subscription via organization_id) instead of the
-   * legacy profiles × subscriptions join. Defaults to false (legacy). Threaded
-   * from the metering middleware, which owns the request env.
-   */
-  identityV2?: boolean;
 }
 
 export async function incrementQuota(
@@ -948,13 +881,10 @@ export async function incrementQuota(
     return incrementPoolQuota(db, subscriptionId, profileId, options);
   }
 
-  // [WI-776 / WP-7] Effective-tier resolution reads the subscription row;
-  // select the v2 store under the flag so this read does not hit the dropped
-  // legacy `subscriptions` table post-DROP. Legacy path is byte-identical.
-  const access =
-    (options?.identityV2 ?? false)
-      ? await getEffectiveAccessForSubscriptionV2(db, subscriptionId)
-      : await getEffectiveAccessForSubscription(db, subscriptionId);
+  // [WI-776 / WP-7] Effective-tier resolution reads the subscription row from
+  // the v2 store.
+  // [WI-1239 / 779-strip] identityV2 branch collapsed — v2 is the only path.
+  const access = await getEffectiveAccessForSubscriptionV2(db, subscriptionId);
   if (
     access &&
     getTierConfig(access.effectiveAccessTier).quotaModel === 'per-profile'
@@ -982,7 +912,6 @@ async function incrementPoolQuota(
       db,
       subscriptionId,
       profileId,
-      options?.identityV2 ?? false,
     );
     if (!ownsProfile) {
       logger.warn('[metering] incrementQuota ownership mismatch', {
@@ -1064,7 +993,6 @@ async function incrementProfileQuota(
     db,
     subscriptionId,
     profileId,
-    options?.identityV2 ?? false,
   );
   if (!ownsProfile) {
     logger.warn('[metering] incrementQuota ownership mismatch', {
@@ -1203,12 +1131,6 @@ export async function safeRefundQuota(
     quotaModel?: QuotaModel;
     /** Required when source === 'top_up'. From `DecrementResult.topUpCreditId`. */
     topUpCreditId?: string;
-    /**
-     * [WI-776 / WP-7] When true, the ownership cross-check uses the v2 twin
-     * instead of the legacy join. Defaults to false (legacy). Threaded from the
-     * metering middleware so the refund path matches the decrement path's store.
-     */
-    identityV2?: boolean;
   },
 ): Promise<{ refunded: boolean }> {
   try {
@@ -1216,7 +1138,6 @@ export async function safeRefundQuota(
       source: context.source,
       quotaModel: context.quotaModel,
       topUpCreditId: context.topUpCreditId,
-      identityV2: context.identityV2,
     });
     if (!result.success) {
       // Structured non-error path: a profile/subscription mismatch is a caller
@@ -1295,7 +1216,6 @@ export async function refundQuotaOrEscalate(
     source?: 'monthly' | 'top_up';
     quotaModel?: QuotaModel;
     topUpCreditId?: string;
-    identityV2?: boolean;
   },
 ): Promise<{ refunded: boolean }> {
   if (subscriptionId) {
@@ -1306,7 +1226,6 @@ export async function refundQuotaOrEscalate(
       source: context.source,
       quotaModel: context.quotaModel,
       topUpCreditId: context.topUpCreditId,
-      identityV2: context.identityV2,
     });
   }
 

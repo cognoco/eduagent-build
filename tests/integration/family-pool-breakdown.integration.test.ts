@@ -1,7 +1,7 @@
 /**
  * Integration: Family pool breakdown visibility (BUG-898 break test, C6)
  *
- * Verifies that getUsageBreakdownForProfile enforces the correct visibility
+ * Verifies that getUsageBreakdownForProfileV2 enforces the correct visibility
  * rules against a real database. The C2 fix specifically prevents child
  * profiles from receiving full breakdown access when owner sharing is enabled.
  *
@@ -11,22 +11,39 @@
  * 3. non-owner adult + sharing ON → full breakdown
  * 4. owner + child link          → full breakdown regardless of sharing flag
  *
+ * [WI-1239 / 779-strip] Converted from getUsageBreakdownForProfile (legacy) to
+ * its v2 twin — the legacy function was deleted (routes/billing.ts already
+ * dispatched exclusively to -V2). getUsageBreakdownForProfileV2 resolves the
+ * viewer/family-owner/family-edge state via the v2
+ * (organization/person/membership/guardianship) store, but usage_events and
+ * family_preferences (the sharing flag) still FK to / are keyed on the legacy
+ * profiles/subscriptions ids (pre-M-REPOINT), so this seeds BOTH stores with
+ * the SAME ids for the shared subscription/profile rows — the "reseed
+ * identity contract" used throughout billing-v2/*.integration.test.ts (see
+ * family-usage-v2.integration.test.ts for the canonical example). Guardianship
+ * edges (guardian_person_id x charge_person_id) are the v2 image of the
+ * legacy family_links rows this file used to seed.
+ *
  * Mocked boundaries: none — all DB access is real.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
-  familyLinks,
   familyPreferences,
+  guardianship,
+  membership,
+  organization,
+  person,
   profiles,
   quotaPools,
+  subscription as subscriptionV2Table,
   subscriptions,
   usageEvents,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
-import { getUsageBreakdownForProfile } from '../../apps/api/src/services/billing/family';
+import { getUsageBreakdownForProfileV2 } from '../../apps/api/src/services/billing/billing-v2/family-usage-v2';
 
 // ---------------------------------------------------------------------------
 // Test identity constants
@@ -38,6 +55,7 @@ const CHILD_CLERK_ID = 'integration-fpool-child';
 const CHILD_EMAIL = 'integration-fpool-child@integration.test';
 const COPARENT_CLERK_ID = 'integration-fpool-coparent';
 const COPARENT_EMAIL = 'integration-fpool-coparent@integration.test';
+const V2_ORG_NAME = 'integration-fpool-v2-org';
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -45,6 +63,7 @@ const COPARENT_EMAIL = 'integration-fpool-coparent@integration.test';
 
 interface SeedResult {
   subscriptionId: string;
+  organizationId: string;
   ownerProfileId: string;
   childProfileId: string;
   coParentProfileId: string;
@@ -53,22 +72,23 @@ interface SeedResult {
 }
 
 /**
- * Seeds a single account with three profiles (owner, child, co-parent),
- * one shared subscription, and per-profile usage events.
+ * Seeds a single account with three profiles (owner, child, co-parent), one
+ * shared subscription, and per-profile usage events — in BOTH the legacy
+ * store (accounts/profiles/subscriptions, still FK-referenced by
+ * usage_events/quota_pools/family_preferences) and the v2 store
+ * (organization/person/membership/subscription/guardianship, which
+ * getUsageBreakdownForProfileV2 actually reads). Every shared row uses the
+ * SAME id in both stores.
  *
  * Account layout:
- * - ownerProfile (isOwner=true, has familyLink to childProfile)
- * - childProfile (isOwner=false, linked as child via familyLinks)
- * - coParentProfile (isOwner=false, has familyLink TO childProfile → hasChildLink=true, isChild=false)
- *
- * The test account uses one Clerk user (owner) because the billing DB model
- * is account-scoped. Co-parent and child are additional profiles on the same
- * account, which is the real multi-profile family model.
+ * - ownerProfile (admin membership, guardian of childProfile)
+ * - childProfile (learner membership, charge of ownerProfile + coParentProfile)
+ * - coParentProfile (learner membership, guardian of childProfile)
  */
 async function seedFamilyWithUsage(): Promise<SeedResult> {
   const db = createIntegrationDb();
 
-  // Single account for all profiles (family account model)
+  // ---- legacy store (usage_events/quota_pools/family_preferences FKs) ----
   const [account] = await db
     .insert(accounts)
     .values({ clerkUserId: OWNER_CLERK_ID, email: OWNER_EMAIL })
@@ -104,18 +124,6 @@ async function seedFamilyWithUsage(): Promise<SeedResult> {
     })
     .returning();
 
-  // Owner and co-parent both have a child link (hasChildLink=true)
-  await db.insert(familyLinks).values({
-    parentProfileId: ownerProfile!.id,
-    childProfileId: childProfile!.id,
-  });
-
-  await db.insert(familyLinks).values({
-    parentProfileId: coParentProfile!.id,
-    childProfileId: childProfile!.id,
-  });
-
-  // Subscription
   const [sub] = await db
     .insert(subscriptions)
     .values({
@@ -125,7 +133,8 @@ async function seedFamilyWithUsage(): Promise<SeedResult> {
     })
     .returning();
 
-  // Quota pool (required for the subscription to be queryable)
+  // Quota pool (required for usage_events/subscriptions FKs, not read by
+  // getUsageBreakdownForProfileV2 directly).
   const cycleStart = new Date('2026-05-01T00:00:00.000Z');
   await db.insert(quotaPools).values({
     subscriptionId: sub!.id,
@@ -134,6 +143,61 @@ async function seedFamilyWithUsage(): Promise<SeedResult> {
     usedToday: 0,
     cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
   });
+
+  // ---- v2 store (id-aligned with the legacy rows above) ----
+  const [org] = await db
+    .insert(organization)
+    .values({ id: account!.id, name: V2_ORG_NAME })
+    .returning();
+  await db.insert(person).values([
+    {
+      id: ownerProfile!.id,
+      displayName: 'Owner',
+      birthDate: '1980-01-01',
+      residenceJurisdiction: 'EU',
+    },
+    {
+      id: childProfile!.id,
+      displayName: 'Child',
+      birthDate: '2013-01-01',
+      residenceJurisdiction: 'EU',
+    },
+    {
+      id: coParentProfile!.id,
+      displayName: 'Co-parent',
+      birthDate: '1982-01-01',
+      residenceJurisdiction: 'EU',
+    },
+  ]);
+  await db.insert(membership).values([
+    { personId: ownerProfile!.id, organizationId: org!.id, roles: ['admin'] },
+    {
+      personId: childProfile!.id,
+      organizationId: org!.id,
+      roles: ['learner'],
+    },
+    {
+      personId: coParentProfile!.id,
+      organizationId: org!.id,
+      roles: ['learner'],
+    },
+  ]);
+  await db.insert(subscriptionV2Table).values({
+    id: sub!.id,
+    organizationId: org!.id,
+    planTier: 'family',
+    status: 'active',
+    payerPersonId: ownerProfile!.id,
+  });
+  // Guardianship edges — the v2 image of the legacy family_links rows this
+  // file used to seed: owner and co-parent are both guardians of the child.
+  await db.insert(guardianship).values([
+    { guardianPersonId: ownerProfile!.id, chargePersonId: childProfile!.id },
+    {
+      guardianPersonId: coParentProfile!.id,
+      chargePersonId: childProfile!.id,
+    },
+  ]);
 
   const now = new Date('2026-05-06T12:00:00.000Z');
 
@@ -197,6 +261,7 @@ async function seedFamilyWithUsage(): Promise<SeedResult> {
 
   return {
     subscriptionId: sub!.id,
+    organizationId: org!.id,
     ownerProfileId: ownerProfile!.id,
     childProfileId: childProfile!.id,
     coParentProfileId: coParentProfile!.id,
@@ -216,6 +281,34 @@ async function setSharingEnabled(ownerProfileId: string, enabled: boolean) {
     });
 }
 
+async function cleanupV2() {
+  const db = createIntegrationDb();
+  const org = await db.query.organization.findFirst({
+    where: eq(organization.name, V2_ORG_NAME),
+  });
+  if (!org) return;
+  await db
+    .delete(subscriptionV2Table)
+    .where(eq(subscriptionV2Table.organizationId, org.id));
+  const members = await db.query.membership.findMany({
+    where: eq(membership.organizationId, org.id),
+    columns: { personId: true },
+  });
+  const personIds = members.map((m) => m.personId);
+  if (personIds.length > 0) {
+    // guardianship RESTRICTs on person for both endpoints — clear edges on
+    // either side before deleting the persons.
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, personIds));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, personIds));
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(eq(organization.id, org.id));
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
@@ -225,6 +318,7 @@ beforeEach(async () => {
     emails: [OWNER_EMAIL, CHILD_EMAIL, COPARENT_EMAIL],
     clerkUserIds: [OWNER_CLERK_ID, CHILD_CLERK_ID, COPARENT_CLERK_ID],
   });
+  await cleanupV2();
 });
 
 afterAll(async () => {
@@ -232,6 +326,7 @@ afterAll(async () => {
     emails: [OWNER_EMAIL, CHILD_EMAIL, COPARENT_EMAIL],
     clerkUserIds: [OWNER_CLERK_ID, CHILD_CLERK_ID, COPARENT_CLERK_ID],
   });
+  await cleanupV2();
 });
 
 // ---------------------------------------------------------------------------
@@ -244,7 +339,7 @@ describe('Integration: family pool breakdown visibility (BUG-898)', () => {
     const seed = await seedFamilyWithUsage();
     await setSharingEnabled(seed.ownerProfileId, false);
 
-    const result = await getUsageBreakdownForProfile(db, {
+    const result = await getUsageBreakdownForProfileV2(db, {
       subscriptionId: seed.subscriptionId,
       activeProfileId: seed.childProfileId,
       monthlyLimit: 700,
@@ -267,7 +362,7 @@ describe('Integration: family pool breakdown visibility (BUG-898)', () => {
     const seed = await seedFamilyWithUsage();
     await setSharingEnabled(seed.ownerProfileId, true);
 
-    const result = await getUsageBreakdownForProfile(db, {
+    const result = await getUsageBreakdownForProfileV2(db, {
       subscriptionId: seed.subscriptionId,
       activeProfileId: seed.childProfileId,
       monthlyLimit: 700,
@@ -290,7 +385,7 @@ describe('Integration: family pool breakdown visibility (BUG-898)', () => {
     const seed = await seedFamilyWithUsage();
     await setSharingEnabled(seed.ownerProfileId, true);
 
-    const result = await getUsageBreakdownForProfile(db, {
+    const result = await getUsageBreakdownForProfileV2(db, {
       subscriptionId: seed.subscriptionId,
       activeProfileId: seed.coParentProfileId,
       monthlyLimit: 700,
@@ -318,7 +413,7 @@ describe('Integration: family pool breakdown visibility (BUG-898)', () => {
     // Sharing is OFF — owner should still see full breakdown
     await setSharingEnabled(seed.ownerProfileId, false);
 
-    const result = await getUsageBreakdownForProfile(db, {
+    const result = await getUsageBreakdownForProfileV2(db, {
       subscriptionId: seed.subscriptionId,
       activeProfileId: seed.ownerProfileId,
       monthlyLimit: 700,

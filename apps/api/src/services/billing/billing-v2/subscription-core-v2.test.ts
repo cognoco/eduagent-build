@@ -1,12 +1,18 @@
 // ---------------------------------------------------------------------------
-// subscription-core.ts — getOrCreateStripeCustomer concurrency regression
+// subscription-core-v2.ts — getOrCreateStripeCustomerV2 concurrency regression
 //
 // [BUG-827] TOCTOU race: the old route logic did read-subscription → if no
 // stripeCustomerId, stripe.customers.create → linkStripeCustomer. Two concurrent
-// billing requests for the same account both saw "no customer" and both created
-// one → one orphaned, unlinked Stripe customer. getOrCreateStripeCustomer closes
-// the race with a SELECT … FOR UPDATE row lock + re-check inside a txn (plus an
-// idempotency-keyed create as a cross-process backstop).
+// billing requests for the same organization both saw "no customer" and both
+// created one → one orphaned, unlinked Stripe customer.
+// getOrCreateStripeCustomerV2 closes the race with a SELECT … FOR UPDATE row
+// lock + re-check inside a txn (plus an idempotency-keyed create as a
+// cross-process backstop).
+//
+// [WI-1239 / 779-strip] Converted from the legacy subscription-core.test.ts
+// (getOrCreateStripeCustomer, deleted — dead, no reachable caller) to target
+// this v2 twin directly. Same fake-DB/fake-Stripe harness; only the imported
+// function and the id vocabulary (organizationId vs accountId) changed.
 //
 // No internal mocks. The Database is a hand-built in-memory fake at the boundary
 // that models the FOR UPDATE lock as a serializing mutex AND shares mutable row
@@ -16,17 +22,15 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
-import {
-  getOrCreateStripeCustomer,
-  type StripeCustomerCreator,
-} from './subscription-core';
+import type { StripeCustomerCreator } from '../types';
+import { getOrCreateStripeCustomerV2 } from './subscription-core-v2';
 
-const accountId = 'acc-550e8400-e29b-41d4-a716-446655440000';
+const organizationId = 'org-550e8400-e29b-41d4-a716-446655440000';
 const subscriptionId = 'sub-660e8400-e29b-41d4-a716-446655440000';
 
 type SubRow = {
   id: string;
-  accountId: string;
+  organizationId: string;
   stripeCustomerId: string | null;
   updatedAt: Date;
 };
@@ -83,7 +87,7 @@ function createFakeDb(initial: SubRow) {
   let mutex: Promise<void> = Promise.resolve();
 
   const makeTxApi = () => ({
-    // .select().from(subscriptions).where(...).limit(1).for('update')
+    // .select().from(subscription).where(...).limit(1).for('update')
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
         where: jest.fn().mockReturnValue({
@@ -93,7 +97,7 @@ function createFakeDb(initial: SubRow) {
         }),
       }),
     }),
-    // .update(subscriptions).set({...}).where(...).returning()
+    // .update(subscription).set({...}).where(...).returning()
     update: jest.fn().mockReturnValue({
       set: jest.fn((values: Partial<SubRow>) => ({
         where: jest.fn().mockReturnValue({
@@ -133,19 +137,23 @@ function createFakeDb(initial: SubRow) {
   };
 }
 
-describe('getOrCreateStripeCustomer — TOCTOU race [BUG-827]', () => {
+describe('getOrCreateStripeCustomerV2 — TOCTOU race [BUG-827]', () => {
   it('two concurrent calls create EXACTLY ONE Stripe customer (no orphan)', async () => {
     const { db, getRow } = createFakeDb({
       id: subscriptionId,
-      accountId,
+      organizationId,
       stripeCustomerId: null,
       updatedAt: new Date(0),
     });
     const { stripe, createCalls } = createFakeStripe();
 
     const [a, b] = await Promise.all([
-      getOrCreateStripeCustomer(db, accountId, stripe, { email: 'p@x.io' }),
-      getOrCreateStripeCustomer(db, accountId, stripe, { email: 'p@x.io' }),
+      getOrCreateStripeCustomerV2(db, organizationId, stripe, {
+        email: 'p@x.io',
+      }),
+      getOrCreateStripeCustomerV2(db, organizationId, stripe, {
+        email: 'p@x.io',
+      }),
     ]);
 
     // Exactly one Stripe customer was created — the second caller saw the
@@ -160,36 +168,45 @@ describe('getOrCreateStripeCustomer — TOCTOU race [BUG-827]', () => {
   it('returns the existing customer without calling Stripe when already linked', async () => {
     const { db } = createFakeDb({
       id: subscriptionId,
-      accountId,
+      organizationId,
       stripeCustomerId: 'cus_existing',
       updatedAt: new Date(0),
     });
     const { stripe, createCalls } = createFakeStripe();
 
-    const result = await getOrCreateStripeCustomer(db, accountId, stripe, {
-      email: 'p@x.io',
-    });
+    const result = await getOrCreateStripeCustomerV2(
+      db,
+      organizationId,
+      stripe,
+      {
+        email: 'p@x.io',
+      },
+    );
 
     expect(result).toBe('cus_existing');
     expect(createCalls).toHaveLength(0);
   });
 
-  it('passes a stable per-account idempotency key to customers.create', async () => {
+  it('passes a stable per-organization idempotency key to customers.create', async () => {
     const { db } = createFakeDb({
       id: subscriptionId,
-      accountId,
+      organizationId,
       stripeCustomerId: null,
       updatedAt: new Date(0),
     });
     const { stripe, createCalls } = createFakeStripe();
 
-    await getOrCreateStripeCustomer(db, accountId, stripe, { email: 'p@x.io' });
+    await getOrCreateStripeCustomerV2(db, organizationId, stripe, {
+      email: 'p@x.io',
+    });
 
     expect(createCalls).toHaveLength(1);
-    expect(createCalls[0]?.idempotencyKey).toBe(`customer-create-${accountId}`);
+    expect(createCalls[0]?.idempotencyKey).toBe(
+      `customer-create-${organizationId}`,
+    );
   });
 
-  it('throws when the account has no subscription row', async () => {
+  it('throws when the organization has no subscription row', async () => {
     // transaction runs the callback but the locked read returns no row.
     const db = {
       transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -209,7 +226,9 @@ describe('getOrCreateStripeCustomer — TOCTOU race [BUG-827]', () => {
     const { stripe } = createFakeStripe();
 
     await expect(
-      getOrCreateStripeCustomer(db, accountId, stripe, { email: 'p@x.io' }),
+      getOrCreateStripeCustomerV2(db, organizationId, stripe, {
+        email: 'p@x.io',
+      }),
     ).rejects.toThrow('no subscription row');
   });
 });
