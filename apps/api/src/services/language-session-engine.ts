@@ -25,6 +25,20 @@ export type LanguageActivityModality = 'text' | 'voice' | 'listening';
 
 export type LanguageGradedInputModality = 'reading' | 'listening';
 
+export type LanguageMeaningOutputTaskType =
+  | 'role_play'
+  | 'personal_answer'
+  | 'retell'
+  | 'describe'
+  | 'ask_question';
+
+export type LanguageMeaningOutputResponseMode =
+  | 'dialogue_turn'
+  | 'short_answer'
+  | 'short_retell'
+  | 'short_description'
+  | 'question';
+
 export interface LanguageComprehensionQuestion {
   id: string;
   prompt: string;
@@ -43,6 +57,18 @@ export interface LanguageGradedInputArtifact {
   audioEnabled: boolean;
 }
 
+export interface LanguageMeaningOutputArtifact {
+  type: 'meaning_output';
+  taskType: LanguageMeaningOutputTaskType;
+  communicativeGoal: string;
+  prompt: string;
+  responseMode: LanguageMeaningOutputResponseMode;
+  targetWords: string[];
+  targetGrammar: string[];
+  retryExpectation: 'retry_after_feedback';
+  correctionExpectation: 'meaning_first_then_form';
+}
+
 export interface LanguageStrandCounts {
   meaning_input: number;
   meaning_output: number;
@@ -57,6 +83,7 @@ export interface LanguageActivityTelemetry {
   targetWords: string[];
   targetGrammar: string[];
   gradedInput?: LanguageGradedInputArtifact;
+  meaningOutput?: LanguageMeaningOutputArtifact;
 }
 
 export type LanguageComprehensionVerdict = 'understood' | 'partial' | 'missed';
@@ -356,6 +383,107 @@ function buildGradedInputArtifact(input: {
   };
 }
 
+type MeaningOutputTaskDefinition = {
+  taskType: LanguageMeaningOutputTaskType;
+  responseMode: LanguageMeaningOutputResponseMode;
+  communicativeGoal: string;
+  buildPrompt: (targetWords: string[], targetGrammar: string[]) => string;
+};
+
+const MEANING_OUTPUT_TASKS = [
+  {
+    taskType: 'role_play',
+    responseMode: 'dialogue_turn',
+    communicativeGoal: 'Use the language to keep a simple conversation moving.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Role-play a real conversation. Reply with one short line using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'personal_answer',
+    responseMode: 'short_answer',
+    communicativeGoal:
+      'Share a true or imagined personal answer someone could respond to.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Answer personally in one or two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'retell',
+    responseMode: 'short_retell',
+    communicativeGoal: 'Retell familiar meaning in your own words.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Retell the idea in two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'describe',
+    responseMode: 'short_description',
+    communicativeGoal:
+      'Describe a concrete scene so another person understands it.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Describe a simple scene in two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'ask_question',
+    responseMode: 'question',
+    communicativeGoal: 'Ask a useful question in a real conversation.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Ask one natural question using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+] satisfies readonly [
+  MeaningOutputTaskDefinition,
+  ...MeaningOutputTaskDefinition[],
+];
+
+function formatOutputTargets(
+  targetWords: string[],
+  targetGrammar: string[],
+): string {
+  const parts: string[] = [];
+  if (targetWords.length > 0) {
+    parts.push(`word(s): ${targetWords.join(', ')}`);
+  }
+  if (targetGrammar.length > 0) {
+    parts.push(`grammar: ${targetGrammar.join(', ')}`);
+  }
+  return parts.length > 0 ? parts.join('; ') : 'language you already know';
+}
+
+function buildMeaningOutputArtifact(input: {
+  meaningOutputTurnIndex?: number;
+  targetWords: string[];
+  targetGrammar: string[];
+}): LanguageMeaningOutputArtifact {
+  const taskIndex =
+    Math.abs(input.meaningOutputTurnIndex ?? 0) % MEANING_OUTPUT_TASKS.length;
+  const task = MEANING_OUTPUT_TASKS[taskIndex] ?? MEANING_OUTPUT_TASKS[0];
+
+  return {
+    type: 'meaning_output',
+    taskType: task.taskType,
+    communicativeGoal: task.communicativeGoal,
+    prompt: task.buildPrompt(input.targetWords, input.targetGrammar),
+    responseMode: task.responseMode,
+    targetWords: input.targetWords,
+    targetGrammar: input.targetGrammar,
+    retryExpectation: 'retry_after_feedback',
+    correctionExpectation: 'meaning_first_then_form',
+  };
+}
+
 export function getLanguageStrandCounts(
   events: Array<{ eventType: string; metadata: unknown }>,
 ): LanguageStrandCounts {
@@ -445,6 +573,7 @@ export function buildLanguageActivityTelemetry(input: {
   knownWords?: string[];
   targetWords?: string[];
   targetGrammar?: string[];
+  meaningOutputTurnIndex?: number;
 }): LanguageActivityTelemetry {
   const activityTypeByStrand: Record<LanguageStrand, LanguageActivityType> = {
     meaning_input: 'graded_input',
@@ -461,12 +590,14 @@ export function buildLanguageActivityTelemetry(input: {
         ? 'voice'
         : 'text';
 
+  const targetWords = input.targetWords?.slice(0, 8) ?? [];
+  const targetGrammar = input.targetGrammar?.slice(0, 8) ?? [];
   const activity: LanguageActivityTelemetry = {
     strand: input.strand,
     activityType: activityTypeByStrand[input.strand],
     modality,
-    targetWords: input.targetWords?.slice(0, 8) ?? [],
-    targetGrammar: input.targetGrammar?.slice(0, 8) ?? [],
+    targetWords,
+    targetGrammar,
   };
 
   if (input.strand === 'meaning_input') {
@@ -476,6 +607,14 @@ export function buildLanguageActivityTelemetry(input: {
       cefrLevel: input.cefrLevel,
       knownWords: input.knownWords,
       targetWords: input.targetWords,
+    });
+  }
+
+  if (input.strand === 'meaning_output') {
+    activity.meaningOutput = buildMeaningOutputArtifact({
+      meaningOutputTurnIndex: input.meaningOutputTurnIndex,
+      targetWords,
+      targetGrammar,
     });
   }
 
@@ -520,6 +659,7 @@ export function buildLanguageSessionState(input: {
       knownWords: input.knownWords,
       targetWords: input.targetWords,
       targetGrammar: input.targetGrammar,
+      meaningOutputTurnIndex: sessionStrandCounts.meaning_output,
     }),
   };
 }
