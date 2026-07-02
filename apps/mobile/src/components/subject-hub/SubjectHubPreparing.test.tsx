@@ -21,6 +21,7 @@ describe('SubjectHubPreparing', () => {
     render(<SubjectHubPreparing onRetry={jest.fn()} onBack={jest.fn()} />);
 
     screen.getByText('subjectHub.preparing.title');
+    screen.getByTestId('subject-hub-preparing-book-animation');
     screen.getByTestId('subject-hub-preparing-back');
     // Pre-timeout: the building state must not offer retry — the hub poll is
     // still expected to resolve it on its own.

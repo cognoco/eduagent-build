@@ -63,11 +63,13 @@ export function SubjectHubPreparing({
 
   return (
     <View className="flex-1 items-center justify-center px-5" testID={testID}>
-      <BookPageFlipAnimation
-        size={motion.size}
-        color={themeColors.accent}
-        testID="subject-hub-preparing-animation"
-      />
+      <View testID="subject-hub-preparing-book-animation">
+        <BookPageFlipAnimation
+          size={motion.size}
+          color={themeColors.accent}
+          testID="subject-hub-preparing-animation"
+        />
+      </View>
       <Text className="mt-4 text-h2 font-bold text-text-primary text-center">
         {subjectName
           ? t('subjectHub.preparing.titleNamed', { subject: subjectName })
