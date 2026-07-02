@@ -115,6 +115,15 @@ export interface ExchangeContext {
     orphan_reason?: string;
   }>;
   birthYear: number;
+  /**
+   * [WI-367] Exact birth-date parts, when known. Additive-only — existing
+   * tone/theming callers (e.g. the Challenge Round grader) keep reading
+   * birthYear alone via year-only computeAgeBracket(); safety-adjacent
+   * callers (the suitability-judge dispatch) use these with
+   * computeAgeBracketFromDate().
+   */
+  birthMonth?: number;
+  birthDay?: number;
   priorLearningContext?: string;
   /** Cross-subject learning highlights — recent topics from other subjects (Story 16.0) */
   crossSubjectContext?: string;

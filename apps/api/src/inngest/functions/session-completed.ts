@@ -63,7 +63,7 @@ import { parseConversationLanguage } from '../../services/llm';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   cefrLevelSchema,
-  computeAgeBracket,
+  computeAgeBracketFromDate,
   sessionCompletedEventSchema,
   verificationTypeSchema,
 } from '@eduagent/schemas';
@@ -1028,20 +1028,34 @@ export const sessionCompleted = inngest.createFunction(
             // insights render in the learner's selected language.
             // [CUT-B1 §2.5(iii)] v2 seam: birthYear + conversation_language from person.
             let profileForBracket:
-              | { birthYear: number; conversationLanguage: string | null }
+              | {
+                  birthYear: number;
+                  birthMonth: number | null;
+                  birthDay: number | null;
+                  conversationLanguage: string | null;
+                }
               | undefined;
             {
               const ctx = await getPersonLlmContext(db, profileId);
               profileForBracket = ctx
                 ? {
                     birthYear: ctx.birthYear,
+                    birthMonth: ctx.birthMonth,
+                    birthDay: ctx.birthDay,
                     conversationLanguage: ctx.conversationLanguage,
                   }
                 : undefined;
             }
+            // [WI-367] Exact-date bracket (not computeAgeBracket): this feeds
+            // the LLM safety preamble, so a year-only overestimate could
+            // apply an adult-tier preamble to a still-minor learner.
             const ageBracket =
               profileForBracket?.birthYear != null
-                ? computeAgeBracket(profileForBracket.birthYear)
+                ? computeAgeBracketFromDate(
+                    profileForBracket.birthYear,
+                    profileForBracket.birthMonth ?? undefined,
+                    profileForBracket.birthDay ?? undefined,
+                  )
                 : undefined;
 
             const result = await generateSessionInsights(transcriptText, {

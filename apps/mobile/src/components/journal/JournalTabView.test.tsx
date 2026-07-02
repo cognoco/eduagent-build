@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import type { NowResponse } from '@eduagent/schemas';
 
 import { JournalTabView } from './JournalTabView';
@@ -16,6 +21,8 @@ let mockMonthlyReports: ReturnType<typeof query>;
 let mockWeeklyReports: ReturnType<typeof query>;
 let mockNotes: ReturnType<typeof infiniteQuery>;
 let mockBookmarks: ReturnType<typeof infiniteQuery>;
+let mockPracticeHistory!: ReturnType<typeof infiniteQuery>;
+let lastPracticeOpts: { limit?: number; type?: string } | undefined;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -54,6 +61,17 @@ jest.mock(
   '../../hooks/use-bookmarks' /* gc1-allow: Journal only reads count previews from the archive hook */,
   () => ({
     useBookmarks: () => mockBookmarks,
+  }),
+);
+
+jest.mock(
+  // gc1-allow: Journal composes the practice-history hook; endpoint and hook have dedicated coverage
+  '../../hooks/use-practice-activity-history',
+  () => ({
+    usePracticeActivityHistory: (opts?: { limit?: number; type?: string }) => {
+      lastPracticeOpts = opts;
+      return mockPracticeHistory;
+    },
   }),
 );
 
@@ -222,6 +240,25 @@ describe('JournalTabView', () => {
         },
       ],
     });
+    lastPracticeOpts = undefined;
+    mockPracticeHistory = infiniteQuery({
+      items: [
+        {
+          id: 'activity-1',
+          activityType: 'assessment',
+          topicTitle: 'Photosynthesis',
+          subjectName: 'Biology',
+          occurredAt: '2026-06-20T10:00:00.000Z',
+        },
+        {
+          id: 'activity-2',
+          activityType: 'dictation',
+          topicTitle: null,
+          subjectName: 'Spanish',
+          occurredAt: '2026-06-19T10:00:00.000Z',
+        },
+      ],
+    });
   });
 
   it('renders ledger moments and defaults to the sessions section', () => {
@@ -238,16 +275,56 @@ describe('JournalTabView', () => {
     screen.getByTestId(`journal-recap-row-${recap.recapId}`);
   });
 
-  it('renders all four section buttons in the segmented control', () => {
+  it('renders all five section buttons in the two-row control', () => {
     render(<JournalTabView />);
 
     screen.getByTestId('journal-tab-notes');
     screen.getByTestId('journal-tab-sessions');
+    screen.getByTestId('journal-tab-practice');
     screen.getByTestId('journal-tab-memory');
     screen.getByTestId('journal-tab-reports');
     // Full labels render (no truncation/font-shrink) — the original bug.
     screen.getByText('Sessions');
-    expect(screen.queryByTestId('journal-tab-practice')).toBeNull();
+    screen.getByText('Practice');
+  });
+
+  it('opens the practice hub from the Practice section', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    screen.getByTestId('journal-practice-section');
+    screen.getByTestId('journal-practice-past-activity');
+
+    fireEvent.press(screen.getByTestId('journal-practice-open-hub'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('lists past practice activity of every type with topic as the headline', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+
+    expect(screen.getByTestId('journal-activity-activity-1')).toBeTruthy();
+    expect(screen.getByTestId('journal-activity-activity-2')).toBeTruthy();
+    within(screen.getByTestId('journal-activity-activity-1')).getByText(
+      'Photosynthesis',
+    );
+    within(screen.getByTestId('journal-activity-activity-2')).getByText(
+      'Dictation',
+    );
+  });
+
+  it('filters past activity by type chips, driving the server query', () => {
+    render(<JournalTabView />);
+
+    fireEvent.press(screen.getByTestId('journal-tab-practice'));
+    screen.getByTestId('journal-practice-filter');
+
+    fireEvent.press(screen.getByTestId('journal-practice-filter-dictation'));
+    expect(lastPracticeOpts?.type).toBe('dictation');
+
+    fireEvent.press(screen.getByTestId('journal-practice-filter-all'));
+    expect(lastPracticeOpts?.type).toBeUndefined();
   });
 
   it('auto-surfaces the latest report inline in the Reports section', () => {

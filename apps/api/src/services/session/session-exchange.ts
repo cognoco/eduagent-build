@@ -1473,6 +1473,9 @@ export async function maybeDispatchSuitabilityJudge(input: {
   replyEventId: string | undefined;
   precedingLearnerMessageEventId: string | undefined;
   birthYear: number | null | undefined;
+  /** [WI-367] Exact birth-date parts, when known — see SuitabilityJudgeDispatchInput. */
+  birthMonth?: number | null;
+  birthDay?: number | null;
   tutorVendor: string | undefined;
   tutorModel: string | undefined;
   flow: string;
@@ -2766,6 +2769,10 @@ export async function prepareExchangeContext(
     escalationRung: effectiveRung,
     exchangeHistory,
     birthYear: profile.birthYear,
+    // [WI-367] Exact birth-date parts, when known (used only by the
+    // safety-adjacent suitability-judge dispatch — see maybeDispatchSuitabilityJudge).
+    birthMonth: profile.birthMonth ?? undefined,
+    birthDay: profile.birthDay ?? undefined,
     // BKT-C.1 — source the profile-level tutor language + pronouns here so
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
@@ -3463,6 +3470,8 @@ export async function processMessage(
       replyEventId: persisted.aiEventId,
       precedingLearnerMessageEventId: persisted.userMessageEventId,
       birthYear: context.birthYear,
+      birthMonth: context.birthMonth,
+      birthDay: context.birthDay,
       tutorVendor: result.provider,
       tutorModel: result.model,
       flow: context.effectiveMode ?? 'exchange',
@@ -3839,6 +3848,8 @@ export async function streamMessage(
           replyEventId: persisted.aiEventId,
           precedingLearnerMessageEventId: persisted.userMessageEventId,
           birthYear: context.birthYear,
+          birthMonth: context.birthMonth,
+          birthDay: context.birthDay,
           tutorVendor: result.provider,
           tutorModel: result.model,
           flow: context.effectiveMode ?? 'exchange',

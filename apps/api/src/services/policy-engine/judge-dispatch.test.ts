@@ -120,6 +120,25 @@ describe('resolveSuitabilityJudgeDispatch', () => {
     expect(event).toMatchObject({ ageBracket: 'child' });
   });
 
+  it('[WI-367] uses the exact birth date to catch a still-17 draw that year-only would read as adult (full coverage, not sampled)', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-03-01T12:00:00Z'));
+    try {
+      // Year-only (2026 - 2008 = 18) would read 'adult' → 10% sampling, and
+      // this high draw would be dropped. Exact date (birthday June 15 not
+      // yet reached on March 1) is still 17 → 'adolescent' → full coverage.
+      const event = resolveSuitabilityJudgeDispatch({
+        ...baseInput(),
+        birthYear: 2008,
+        birthMonth: 6,
+        birthDay: 15,
+        rng: 0.99,
+      });
+      expect(event).toMatchObject({ ageBracket: 'adolescent' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('carries a null preceding-message id when none was persisted', () => {
     const event = resolveSuitabilityJudgeDispatch({
       ...baseInput(),

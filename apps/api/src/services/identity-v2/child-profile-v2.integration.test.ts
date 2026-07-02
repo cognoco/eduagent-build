@@ -107,6 +107,8 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
   // bootstrap, then return the ids the child orchestrator needs.
   async function seedOwnerGraph(args: {
     birthYear: number;
+    birthMonth?: number;
+    birthDay?: number;
   }): Promise<{ organizationId: string; ownerPersonId: string }> {
     const clerkUserId = `wi811-${crypto.randomUUID()}`;
     const graph = await createIdentityGraph(db, {
@@ -114,6 +116,8 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
       verifiedEmail: `${clerkUserId}@test.local`,
       displayName: 'Owner',
       birthYear: args.birthYear,
+      birthMonth: args.birthMonth,
+      birthDay: args.birthDay,
       location: 'EU',
       conversationLanguage: 'en',
       pronouns: null,
@@ -315,6 +319,58 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
       await expect(
         addChild(organizationId, { displayName: 'Kid', birthYear: 2018 }),
       ).rejects.toBeInstanceOf(ForbiddenError);
+    },
+  );
+
+  // [WI-367 / SECURITY] Exact-date adult-owner gate. Year-only math
+  // (currentYear - birthYear) overestimates age by up to 11 months: an owner
+  // born Dec 31 of (currentYear - 18) reads as 18 by year-only math but is
+  // still 17 for all of the current year except a Dec-31 run. The gate must
+  // use the owner's exact birth date (when present) so a not-yet-18 owner
+  // cannot add a child. Red-green-revert: swap calculateAgeFromParts back to
+  // calculateAge(owner.birthYear) in child-profile-v2.ts and this stops
+  // throwing (a 17-year-old owner adds a child).
+  //
+  // Pinned system time so this is deterministic year-round (not just every
+  // day but Dec 31, when a real Dec-31 test run would otherwise see the
+  // birthday as "already passed"). Fakes ONLY Date/performance.now — never
+  // setTimeout/setInterval, which the Neon HTTP driver relies on internally;
+  // a full jest.useFakeTimers() hangs it (see vocabulary.integration.test.ts).
+  itGraph(
+    '[SECURITY] throws ADULT_OWNER_REQUIRED for an owner whose exact age is still 17 (year-only reads 18)',
+    async () => {
+      jest.useFakeTimers({
+        doNotFake: [
+          'setTimeout',
+          'clearTimeout',
+          'setInterval',
+          'clearInterval',
+          'setImmediate',
+          'clearImmediate',
+          'nextTick',
+          'queueMicrotask',
+        ],
+      });
+      jest.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+      try {
+        const { organizationId } = await seedOwnerGraph({
+          birthYear: 2008,
+          birthMonth: 12,
+          birthDay: 31,
+        });
+        // Child birthYear passes the child's OWN >=13 minimum-age floor so a
+        // masked bug can't hide behind a ProfileValidationError from the
+        // unrelated child-age check — this isolates the adult-owner gate as
+        // the only possible rejection reason.
+        await expect(
+          addChild(organizationId, {
+            displayName: 'Kid',
+            birthYear: 2013,
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenError);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 

@@ -68,12 +68,12 @@ export function jurisdictionToLocation(
 }
 
 /** Year-from-DATE: person.birth_date is a 'YYYY-MM-DD' string (Drizzle `date`). */
-function birthYearFromDate(birthDate: string): number {
+export function birthYearFromDate(birthDate: string): number {
   return Number(birthDate.slice(0, 4));
 }
 
 /** Month/day-from-DATE, with YYYY-01-01 preserving the year-only sentinel. */
-function birthMonthDayFromDate(birthDate: string): {
+export function birthMonthDayFromDate(birthDate: string): {
   birthMonth: number | null;
   birthDay: number | null;
 } {
@@ -194,7 +194,19 @@ export async function findOwnerPersonScope(
 export async function getOwnerProfileV2(
   db: Database,
   organizationId: string,
-): Promise<Profile | null> {
+): Promise<
+  | (Profile & {
+      // [WI-367] Additive-only: exact birth-date parts for gating callers
+      // (e.g. child-profile-v2.ts's adult-owner gate) that need
+      // calculateAgeFromParts instead of year-only math. Not part of the
+      // Profile response schema — any route that serializes this through
+      // profileResponseSchema.parse() has these fields stripped (the schema
+      // is not .strict(), so z.object() drops unknown keys by default).
+      birthMonth?: number | null;
+      birthDay?: number | null;
+    })
+  | null
+> {
   const ownerRow = await db
     .select({
       personId: person.id,
@@ -229,13 +241,16 @@ export async function getOwnerProfileV2(
     organizationId,
     DEFAULT_CONSENT_PURPOSE,
   );
+  const { birthMonth, birthDay } = birthMonthDayFromDate(owner.birthDate);
 
   return {
     id: owner.personId,
     accountId: organizationId, // account.id = organization.id
     displayName: owner.displayName,
     avatarUrl: owner.avatarUrl ?? null,
-    birthYear: Number(owner.birthDate.slice(0, 4)),
+    birthYear: birthYearFromDate(owner.birthDate),
+    birthMonth,
+    birthDay,
     location: jurisdictionToLocation(owner.residenceJurisdiction),
     isOwner: owner.roles.includes('admin'),
     hasPremiumLlm: false, // derived (§1.3)
