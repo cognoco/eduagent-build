@@ -133,10 +133,10 @@ Before any V2 publish-readiness claim:
 
 **Reviewed:** 2026-07-02. **Recommendation: CONDITIONAL-SHIP.** The seven publish-critical
 task prompts in T8's done-condition all pass on current `origin/main` code, but this WI's
-own Acceptance Criteria are not fully met today — see the conditions below. This section is
-additive: it does not retroactively flip the T3/T4 checkboxes above or the dossier's
-`PARTIAL`/`OPEN` labels, because two of those are accurate, not stale (see WS-28 Full
-Roster).
+own Acceptance Criteria are not fully met today — see the conditions below. This section
+does not retroactively edit the T3/T4 checkboxes above or the dossier's `PARTIAL`/`OPEN`
+labels in place; it records the reconciliation and recommends who should update what (see
+"Recommended follow-up actions").
 
 ### Publish-critical task prompts (T8 done-condition)
 
@@ -194,63 +194,69 @@ is an existing-feature UX-quality issue, not a missing V2 surface.
 
 ### Dossier/plan/Cosmo reconciliation (AC clause 2: "Dossier maps, canonical plan, and route/flow inventory agree on what ships")
 
-They do not fully agree today. Two distinct patterns, kept separate because they cut
-opposite ways:
+They do not fully agree today. All of the following are currency gaps (docs lag landed
+code) — benign, needs a follow-up doc pass, not a product concern:
 
-1. **Currency gaps (docs lag landed code) — benign, needs a follow-up doc pass, not a
-   product concern:**
-   - T4/WI-1171's checkbox above is still unticked even though WI-1171 is Closed and its
-     appeal-affordance follow-on (`AppealButton.tsx`, `apps/mobile/src/components/visibility/AppealButton.tsx`)
-     is merged and documented in `07-trigger-flow-logic-map.md`'s "Failure Modes — Supporter
-     Appeal" table.
-   - `06-screen-function-access-map.md` § "Plan-Backed Or Partial Screens Still Needed" →
-     "Visibility ceremony screens" row still reads "appeal affordance is in-flight rework
-     (WI-1171)" — stale; it has landed.
-   - `07-trigger-flow-logic-map.md` § "Current Gaps To Review" still lists "Support hub is
-     still mostly list/placeholder UI" as a gap — stale relative to WI-1170's cockpit-card
-     landing (see next point for why the row isn't simply wrong).
+- T4/WI-1171's checkbox above is still unticked even though WI-1171 is Closed and its
+  appeal-affordance follow-on (`AppealButton.tsx`, `apps/mobile/src/components/visibility/AppealButton.tsx`)
+  is merged and documented in `07-trigger-flow-logic-map.md`'s "Failure Modes — Supporter
+  Appeal" table.
+- `06-screen-function-access-map.md` § "Plan-Backed Or Partial Screens Still Needed" →
+  "Visibility ceremony screens" row still reads "appeal affordance is in-flight rework
+  (WI-1171)" — stale; it has landed.
+- `07-trigger-flow-logic-map.md` § "Current Gaps To Review" still lists "Support hub is
+  still mostly list/placeholder UI" as a gap, and T3/WI-1170's checkbox above is still
+  unticked, even though WI-1170 is Closed and delivered real, verified functionality
+  (`SupportHubMentorTab.tsx` now renders visibility-backed shared-record cards with next
+  actions into Mentor/Subjects/Journal — confirmed merged via PR #1751,
+  `bad3821df19a6c443197e55fdc7fe8bf5b9b0f59`, an ancestor of `origin/main`).
 
-2. **A real, accurate discrepancy — not a doc-sync issue:** T3/WI-1170's checkbox is
-   unticked and `06`'s "Mentor tab, supporter hub scope" / "Support hub cold-start" /
-   "Supporter co-learning/nudge actions" rows are correctly labelled `PARTIAL`/`PLAN`. WI-1170
-   was closed 2026-07-01 delivering real, verified functionality (`SupportHubMentorTab.tsx`
-   now renders visibility-backed shared-record cards with next actions into Mentor/Subjects/
-   Journal — confirmed merged via PR #1751, `bad3821df19a6c443197e55fdc7fe8bf5b9b0f59`, an
-   ancestor of `origin/main`). But T3's own Acceptance Criteria explicitly required
-   "co-learning/start-together actions, and quiet nudge affordances" in addition to the
-   attention-item cards. A repo-wide grep (`co-?learn|nudge|start.together`) over
-   `apps/mobile/src/components/support/` and `mentor.tsx` on `origin/main` returns **zero
-   hits** — that scope was not built. WI-1170's own completion summary does not mention this
-   gap; it reads as fully done. This is a **silent scope-narrowing on close**, not a
-   documentation-currency lag: the docs (T3 checkbox, dossier `PARTIAL` label) are the
-   accurate record here, and Cosmo's `Closed/Done` status is the outlier.
-   `06`'s companion table (§ "Concrete Progress Ownership Split (WI-1172)") independently
-   confirms this: it lists "Guardian nudge action (`childSummaryQuery.nudgeRecommended`)" as
-   `OPEN`, explicitly attributed to "the support-hub job-to-be-done work" (i.e. T3/WI-1170
-   scope), not yet delivered.
+  **Correction (2026-07-02):** an earlier draft of this review flagged WI-1170's missing
+  "co-learning/start-together actions, and quiet nudge affordances" as a silent
+  scope-narrowing on close. That was a citation error, not a real finding — that language
+  is from *this plan's own T3 checklist prose* (line above), not WI-1170's actual Cosmo
+  Acceptance Criteria, which reads: "Support hub cards are driven by real visibility-backed
+  facts, not static placeholders. Each card has a clear next action that routes to Mentor,
+  Journal, Subjects, or visibility settings as appropriate. The hub does not duplicate
+  Progress browsing or expose learner-private details. Dossier maps and targeted mobile
+  verification cover primary supporter entry routes." — no co-learning/nudge language at
+  all. WI-1170 fully met its own AC. Separately, co-learning/nudge affordances are **not**
+  absent from the app: `NudgeBanner` renders at `apps/mobile/src/components/home/LearnerScreen.tsx:568`;
+  `NudgeActionSheet` at `apps/mobile/src/components/home/ParentHomeScreen.tsx:1053`,
+  `apps/mobile/src/app/(app)/progress/index.tsx:773`, and
+  `apps/mobile/src/app/(app)/child/[profileId]/weekly-report/[weeklyReportId].tsx:353`;
+  `LearnTogetherSheet` at `ParentHomeScreen.tsx:1061` — all on legacy V0/V1 surfaces, not the
+  V2 support-hub tree (`apps/mobile/src/components/support/`), which is why a grep scoped to
+  that tree alone returns zero hits. This is a **plan-prose-vs-WI-AC scope gap** (this plan's
+  T3 line describes a broader job than WI-1170's AC ever promised the V2 surface would
+  deliver), not a defect in WI-1170's closure. `06`'s "Mentor tab, supporter hub scope" row
+  correctly stays `PARTIAL` for this reason — the V2-surface job is broader than what
+  WI-1170 shipped — but that is accurate scoping, not a violated contract.
 
-3. **Route/flow inventory:** the plan's own text (top of this document) names
-   `06-screen-function-access-map.md` + `07-trigger-flow-logic-map.md` as "the source maps
-   for this plan," and `07` is the trigger/flow map, so this review treats `06`+`07` as the
-   operative "route/flow inventory" for V2. Separately: `docs/flows/mobile-app-flow-inventory.md`
-   (the repo's general flow inventory, cited by `AGENTS.md`'s navigation-shell-matrix note)
-   has **zero** mentions of V2, the Mentor/Subjects/Journal shell, scope chip, or support hub
-   as of its last rebuild (2026-06-25) — it was not extended to cover V2 and none of the
-   WS-28 closures touched it. It cannot be said to "agree" with the V2 canonical plan because
-   it is silent on V2 entirely. Recommend a follow-up item to either extend it to cover the
-   V2 shell or explicitly scope-note it as V0/V1-only.
+- **Route/flow inventory:** the plan's own text (top of this document) names
+  `06-screen-function-access-map.md` + `07-trigger-flow-logic-map.md` as "the source maps
+  for this plan," and `07` is the trigger/flow map, so this review treats `06`+`07` as the
+  operative "route/flow inventory" for V2. Separately: `docs/flows/mobile-app-flow-inventory.md`
+  (the repo's general flow inventory, cited by `AGENTS.md`'s navigation-shell-matrix note)
+  has **zero** mentions of V2, the Mentor/Subjects/Journal shell, scope chip, or support hub
+  as of its last rebuild (2026-06-25) — it was not extended to cover V2 and none of the
+  WS-28 closures touched it. It cannot be said to "agree" with the V2 canonical plan because
+  it is silent on V2 entirely. Recommend a follow-up item to either extend it to cover the
+  V2 shell or explicitly scope-note it as V0/V1-only.
 
 ### Recommended follow-up actions (not this WI's job to execute)
 
-1. Tick T4/WI-1171's checkbox and refresh the two stale `06`/`07` rows named above (currency
-   gaps only — do not touch T3 or its dossier `PARTIAL` labels).
-2. Get a product ruling on WI-1170's missing co-learning/nudge scope: accept as a fast-follow
-   (open a new WI) or reopen T3.
-3. Land or formally re-scope/defer WI-1207 (Practice-access regression) so WS-28's roster is
+1. Tick T3/WI-1170's and T4/WI-1171's checkboxes (both WIs are Closed and fully met their
+   own AC) and refresh the two stale rows named above — the "Visibility ceremony screens"
+   row in `06` and the "Support hub is still mostly list/placeholder UI" gap row in `07`.
+   Leave `06`'s "Mentor tab, supporter hub scope" `PARTIAL` label as-is — it correctly
+   describes a broader V2-surface job than WI-1170's AC promised, per the reconciliation
+   above.
+2. Land or formally re-scope/defer WI-1207 (Practice-access regression) so WS-28's roster is
    accurate; not a publish blocker on its own.
-4. Rule on WI-1118's topicless-vs-topic-scoped notes AC supersession.
-5. Decide WI-1120's disposition (fix the reduced-motion AC mismatch, or re-rule the AC) —
+3. Rule on WI-1118's topicless-vs-topic-scoped notes AC supersession.
+4. Decide WI-1120's disposition (fix the reduced-motion AC mismatch, or re-rule the AC) —
    cosmetic, non-blocking.
-6. Assign an `Owner` to WI-904 per its documented rework direction; not a publish blocker.
-7. Either extend `docs/flows/mobile-app-flow-inventory.md` to cover the V2 shell or add an
+5. Assign an `Owner` to WI-904 per its documented rework direction; not a publish blocker.
+6. Either extend `docs/flows/mobile-app-flow-inventory.md` to cover the V2 shell or add an
    explicit scope note that it is V0/V1-only.
