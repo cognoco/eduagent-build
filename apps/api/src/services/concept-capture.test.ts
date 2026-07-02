@@ -3,13 +3,17 @@ import {
   captureConceptMastery,
 } from './concept-capture';
 
-// Parked guard: CONCEPT_CAPTURE_ENABLED must stay false until MMT-ADR-0012 baseline-reset tables land; a silent flip throws `relation "concepts" does not exist` on staging/prod.
-describe('concept-capture parked-state guard', () => {
-  it('keeps CONCEPT_CAPTURE_ENABLED disabled until the baseline reset', () => {
-    expect(CONCEPT_CAPTURE_ENABLED).toBe(false);
+// WI-781: concept-capture is now ACTIVE. The MMT-ADR-0012 baseline-reset tables
+// landed and the identity-cutover `profiles`→`person` FK repoint applied to
+// `concepts` / `concept_mastery` on staging and production, so the parked
+// kill-switch is flipped on. (Live traffic through the gated call site still
+// additionally requires CHALLENGE_ROUND_RUNTIME_ENABLED, a separate flag.)
+describe('concept-capture enabled-state guard', () => {
+  it('keeps CONCEPT_CAPTURE_ENABLED enabled now the person-FK repoint has landed', () => {
+    expect(CONCEPT_CAPTURE_ENABLED).toBe(true);
   });
 
-  it('keeps the gated write path exported so the kill-switch still guards something live', () => {
+  it('keeps the gated write path exported so the kill-switch still guards a live path', () => {
     expect(typeof captureConceptMastery).toBe('function');
   });
 });
