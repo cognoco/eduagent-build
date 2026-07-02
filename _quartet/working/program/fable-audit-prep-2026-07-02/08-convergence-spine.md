@@ -1,10 +1,12 @@
-# 08 — The Convergence Spine (DRAFT for operator sign-off)
+# 08 — The Convergence Spine
 
-**Status:** DRAFT — Phase A output. Not yet authoritative. On sign-off, this becomes the single
-architecture both the identity and front-end halves obey, and Phase B re-baselines Cosmo against it.
-**Owner:** Jörn (aligns with Zuzka). **Anchor:** `origin/main` 145e74d5e-era; findings from `06-fable-audit.md`.
-**Promotion path on sign-off:** this is ADR-class (contested, hard-to-reverse, cross-cutting) → promote to an
-`MMT-ADR` + update `docs/architecture.md`, per the repo's decisions-layer gate. Until then it lives here.
+**Status:** **RATIFIED** by operator (Jörn), 2026-07-02 — the four §6 forks are ruled and the six
+independent-review fixes are folded in. This is now the single architecture both the identity and
+front-end halves obey. **Formal-canon caveat:** authority is operator-ratified now; it becomes *documented
+canon* on promotion to an `MMT-ADR` + a `docs/architecture.md` line (the durability step below). Execution
+proceeds per the milestone gates in §4 — no step runs ahead of its gate.
+**Owner:** Jörn (sole authority; aligns with Zuzka). **Anchor:** `origin/main` 145e74d5e-era; findings from `06-fable-audit.md`.
+**Review history:** independent agent review of the draft (2026-07-02) found 6 issues; all 6 applied here (§4/§1/§7 + truth-table).
 
 ---
 
@@ -14,169 +16,141 @@ Two initiatives — Identity Foundation/Cutover (backend) and the V0/V1/V2 front
 parallel with **no shared architecture**. The front-end rebased on identity changes as they landed; nobody
 owned the cross-product. The result is a matrix (shell-generation × identity-generation × DB-generation)
 where **no environment runs a verified target triple**, plus a large dead legacy subtree and a seam that was
-never designed. There is no shortage of plans (dossiers, phase plans, a canonical plan, ADRs); there is a
-shortage of **one** plan both halves obey. This is that plan.
-
-Its job is as much **social as technical**: a single owned contract that stops the *next* parallel
-divergence. Where any other plan conflicts with this, **this wins**, and the conflict is a bug in the other
-plan to be fixed, not a fork to be tolerated.
+never designed. There is no shortage of plans; there is a shortage of **one** plan both halves obey. This is
+that plan. Its job is as much **social as technical**: a single owned contract that stops the *next* parallel
+divergence. Where any other plan conflicts with this ratified spine, **this wins**, and the conflict is a bug
+in the other plan to fix.
 
 ---
 
 ## 1. Target end-state — two supported configs, nothing else
 
-The collapse target is exactly **two** owned, tested configurations, both on the **v2-identity backend**:
+Exactly **two** owned configurations, both on the **v2-identity backend**:
 
+| | **Config T (target / MVP)** | **Config F (fallback)** |
+|---|---|---|
+| Shell | V2 — "mentor-is-the-app" (Mentor/Subjects/Journal) | V1 — the `resolveNavigationContract` engine |
+| Backend | v2-identity | **same** v2-identity backend |
+| Selection (build-time) | `V0=off, V1=on, V2=on` | `V0=off, V1=on, V2=off` |
+| Rollback role | what ships to users | the rollback target if V2 must be pulled |
+| Status today | live on preview/staging; supporter half **shipped** (WI-1170/1171 closed to AC) | **UNPROVEN — must be verified.** No current env runs `V2=off/V1=on`; preview/dev set both V1 and V2 on, and V2 wins the tab shape (`use-navigation-contract.ts:185`). Config F is a capability to **build + prove** (M4), not one we have. |
 
-|              | **Config T (target / MVP)**                                                            | **Config F (fallback)**                                 |
-| ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Shell        | V2 — "mentor-is-the-app" (Mentor / Subjects / Journal)                                | V1 — the`resolveNavigationContract` engine             |
-| Backend      | v2-identity (person/organization/membership/subscription/…)                           | **same** v2-identity backend                            |
-| Selection    | `MODE_NAV_V2_ENABLED` on (default)                                                     | flag-reachable (V2 off, V1 on)                          |
-| Purpose      | what ships to users                                                                    | instant rollback without a redeploy                     |
-| Status today | live on preview/staging; supporter half**already shipped** (WI-1170/1171 closed to AC) | **already works** — preview/staging run V1-on-v2 today |
+**Rollback is OTA/channel promotion, not a runtime flag flip.** The `MODE_NAV_*` flags are **build-time**
+`EXPO_PUBLIC_*`, read at module load (`feature-flags.ts:30`) — not a server-side runtime toggle. Pulling V2
+back to V1 means promoting a **prebuilt, tested V2=off/V1=on JS bundle** via OTA/channel (fast — ~5 min for
+JS-only — but not instant, not runtime; a binary if any native surface differs). So Config F must exist as a
+**built, E2E-verified artifact/channel** before it can be relied on (M4).
 
-**Not in the target — retired as releases, not preserved as live code:**
+**Not in the target — retired as tagged releases, not preserved as live code:** the V0 shell + flags-off
+legacy shell; the dead legacy-identity subtree; the legacy identity DB tables (dev's full legacy schema,
+stg's orphan `subscriptions`). Git is the version-preservation system — nothing stays alive "to be safe."
 
-- **V0 shell** + the flags-off legacy shell.
-- The **dead legacy-identity subtree** (`services/profile.ts` dead exports, `billing/family|tier|quota-*| revenuecat|subscription-core`, `consent.ts` DB fns, `solo-progress-reports.ts`, `deletion.ts`, legacy
-  webhook handlers) and the legacy schema defs.
-- The legacy identity **DB tables** everywhere they still exist (dev's full legacy schema; stg's orphan
-  `subscriptions`).
+> **Not splitting into two apps.** Shells share 86% of screens (83/97) + the entire non-UI stack; V2-specific
+> code is ~5 files. A split duplicates/re-packages the wrong 86% and worsens rollback. One app, two flag arms.
 
-**Operating principle (ratified with operator):** *preserve old versions as tagged git releases, not as
-live code.* Git is the version-preservation system; you never lose the ability to resurrect a retired shell,
-so nothing needs to stay alive "to be safe." **Two flag arms only** (V2 default, V1 fallback); **no
-unsanctioned flag combos** (see §4 guardrail).
-
-> **Not splitting into two apps.** Measured: the shells share 86% of screens (83/97 route files) + the entire
-> non-UI stack; V2-specific code is ~5 files. A split duplicates or re-packages the wrong 86%, doubles every
-> pipeline, and makes rollback *worse* (binary-swap vs flag-flip). One app, two flag arms, is the target.
-
-**F's lifespan is a deliberate keep, not a permanent commitment.** V1 stays flag-reachable through launch +
-a stability window (your "perfect world: V1 still works against the v2 backend"). Whether V1 is *eventually*
-also retired to leave V2-only is a **post-launch decision**, explicitly out of scope for this collapse.
+**F retention (RULED):** V1 stays flag-reachable through launch + a stability window. Eventual V1 retirement
+to leave V2-only is a **post-launch decision**, out of scope here.
 
 ---
 
 ## 2. The seam contract — promote the accident to a design
 
-The shell never consumed identity-v2 directly. It consumes a **legacy-shaped profile DTO synthesized from
-identity-v2** (`listProfilesV2` / `getPersonScope` / `getProfileV2` / `loadProfileRowByIdV2` in
-`services/identity-v2/profile-v2.ts`). This synthesis layer is the **only** place the two systems touch, and
-every materialized incident (WI-1255 deletion-500, WI-1161 export-500, WI-1138 consent leak) happened there.
-The spine makes it a **named, owned, tested contract** with four clauses:
+The shell consumes a **legacy-shaped profile DTO synthesized from identity-v2** (`listProfilesV2` /
+`getPersonScope` / `getProfileV2` / `loadProfileRowByIdV2`, `profile-v2.ts`) — the only place the two systems
+touch, and where every incident (WI-1255/1161/1138) happened. Make it a **named, owned, tested contract**:
 
-1. **Shape.** identity-v2 provides the shell a stable `Profile` DTO: `{ id, isOwner, role, displayName, birthYear, conversationLanguage, consentStatus, linkedChildIds, … }`. This shape is the contract; changes
-   to it are contract changes (versioned, both-halves-reviewed), not silent adapter edits.
-2. **Authority is caller-bound, never shape-bound (fixes R1 — the top risk).** Owner/write authority on
-   every `/account/*` and `/billing/*` endpoint MUST derive from the **server-resolved `callerPersonId`**
-   (via `verifyPersonOwnershipV2`), **not** from the client-supplied `X-Profile-Id` shape's `isOwner`. The
-   codebase's own canon (`ownership-v2.ts`) already says the membership-derived check is "the IDOR this guard
-   exists to deny"; today only settings + learner-profile self-writes obey it. The contract makes
-   caller-bound authority mandatory across the owner-gated surface. Also close R2 (the `/profiles/switch`
-   owner-elevation reverification must not be bypassable by a direct `X-Profile-Id` to owner endpoints).
-3. **Invariant: one org = one household, enforced by constraint (fixes R8).** Holds today by construction
-   (single membership per person, server-derived org) but only by convention + a login-resolve guard — **not**
-   by the DB. Add a DB-level one-membership-per-person constraint before any invite / claim / multi-credential
-   flow ships, so a future path cannot arm the `!isOwner`-filter cross-family leak.
-4. **Tested at the boundary (fixes R6).** A cross-boundary seam test (the real `profile-v2` adapter, not
-   mobile fixtures) is **PR-gated in CI** — today the only real coverage is opt-in staging-Playwright, so an
-   adapter drift is caught by neither system's unit suite.
+1. **Shape.** A stable `Profile` DTO (`{ id, isOwner, role, displayName, birthYear, conversationLanguage,
+   consentStatus, linkedChildIds, … }`). Changes are contract changes (versioned, both-halves-reviewed).
+2. **Authority is caller-bound, never shape-bound (R1 — top risk).** Owner/write authority on every
+   `/account/*` and `/billing/*` endpoint MUST derive from the **server-resolved `callerPersonId`**
+   (`verifyPersonOwnershipV2`), not the client `X-Profile-Id` shape's `isOwner`. Also close R2 (the
+   `/profiles/switch` elevation reverification must not be bypassable by a direct `X-Profile-Id`).
+3. **Invariant: one org = one household, enforced by constraint (R8).** Holds today by convention + a
+   login-resolve guard, not the DB. Add a DB-level one-membership-per-person constraint before any
+   invite/claim/multi-credential flow ships.
+4. **Tested at the boundary (R6).** A cross-boundary seam test (real `profile-v2` adapter, not mobile
+   fixtures) is PR-gated in CI.
 
-**No `IDENTITY_V2_ENABLED` flag returns.** The cutover is a hardcoded source-level commit; the contract is
-enforced by tests + the constraint, not a runtime toggle.
+No `IDENTITY_V2_ENABLED` flag returns; the contract is enforced by tests + the constraint.
 
 ---
 
 ## 3. Target environment triple
 
+| | dev | staging | prod | CI |
+|---|---|---|---|---|
+| Today | full legacy schema + data | orphan `subscriptions` (42 rows), else v2 | v2-only (empty) | journal-built → matches no env |
+| Target | **v2-only (RULED: converge)** | v2-only | v2-only (unchanged) | builds the real (prod) schema |
 
-|            | dev                                    | staging                                  | prod                      | CI                                 |
-| ---------- | -------------------------------------- | ---------------------------------------- | ------------------------- | ---------------------------------- |
-| **Today**  | full legacy schema + data + legacy FKs | orphan`subscriptions` (42 rows), else v2 | v2-only (cleanest, empty) | journal-built →**matches no env** |
-| **Target** | v2-only                                | v2-only                                  | v2-only (unchanged)       | **builds the real (prod) schema**  |
-
-Target: the freeze-only terminal migrations (`_freeze-only/0117/0118/0119`) are **promoted into the journal**
-as catalog-gated forward migrations applied to **every** env, so `drizzle-kit migrate` reproduces prod from
-the journal and CI stops testing a schema nothing runs (fixes R3). prod's pre-drop Neon PITR marker is
-confirmed intact (`pre-subscriptions-drop-20260618`, `ready`), so the drop path is recoverable.
+Freeze-only terminal migrations (`_freeze-only/0117/0118/0119`) promoted into the journal as catalog-gated
+forward migrations applied to every env, so `drizzle-kit migrate` reproduces prod and CI stops testing a
+phantom schema (R3). prod pre-drop PITR marker confirmed intact (`pre-subscriptions-drop-20260618`, `ready`).
 
 ---
 
 ## 4. The ordered collapse — milestones, gates, owners, reversibility
 
-Legend: **Rev** = reversible (flag flip / git revert / re-add) · **IRREV** = irreversible (needs explicit
-human confirmation). Owners: **J** = Jörn (identity/backend/DB/cutover) · **Z** = Zuzka (shell/mobile/product)
-· **fleet** = mechanical agent execution under gates.
+Legend: **Rev** = reversible (git revert / OTA re-promote) · **IRREV** = irreversible (needs explicit human
+confirmation + recorded rationale). Owners: **J** = Jörn (identity/backend/DB) · **Z** = Zuzka (shell/mobile/
+product) · **fleet** = mechanical agent execution under gates.
 
+| M | Milestone | Entry gate | Exit gate | Owner | Rev |
+|---|---|---|---|---|---|
+| **M1** | **Harden the seam** — caller-bound authority (R1), close switch-bypass (R2), one-membership DB constraint (R8), flag-combo ratchet (R9) | **IMMEDIATE (RULED)** — not gated on pause or cutover | red-green break test for the B-1 exploit passes; ratchet green | J + Z | Rev |
+| **M2a** | **Cutover: journal-prep** — author the catalog-gated forward migrations (repoint + drops) after the current journal tail | M1 not required | migrations authored, typecheck green, immutability guard satisfied | J | **Rev** |
+| **M2b** | **Cutover: env-apply** — apply the chain to dev/stg/CI (prod already applied), converge all to v2-only | M2a done | **per-env: fresh PITR marker + live-catalog spot-check + human-confirm** before each destructive apply | J | **IRREV** (catalog drops / journal promotion) |
+| **M3** | **Strip legacy** — tag current tree, delete dead legacy subtree + legacy schema defs (779 direction) | M2b green + tag pushed | typecheck + integration green on stripped tree; resurrection-500 surface gone | J + fleet | Rev (tag/revert) |
+| **M4** | **Prove the V1 fallback** — build a `V2=off/V1=on` channel/artifact; a **real V2-off/V1-on E2E pass** | M1 done | E2E green on the fallback artifact; artifact/channel is release-ready | Z + J | Rev |
+| **M5** | **Retire V0 — BEFORE SHIP (RULED)** — remove flags-off + V0 behind a tag; V1 (M4) is now the sole net | **M4 proven** (a rollback must exist first) + explicit human irreversibility confirm | V2 default + V1 fallback are the only reachable configs; no V0 path | Z + J | **IRREV** |
+| **M6** | **Ship V2** | M1 + M4 + M5 done; 3 open WS-28 items closed/deferred with owners; seam smoke PR-gated | 7 publish-critical prompts green (already are) + fallback proven (M4) | Z (scope) + J | Rev (unship = OTA) |
 
-| M      | Milestone                                        | Work                                                                                                                                                                 | Entry gate                                                                                | Exit gate                                                                      | Owner                             | Rev                       |
-| ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------- | ------------------------- |
-| **M1** | **Harden the seam** (do first — blocks nothing) | Route owner-gates through`callerPersonId` (R1); close switch-bypass (R2); add one-membership DB constraint (R8); add flag-combo ratchet test (R9)                    | none — start now                                                                         | red-green break test for the B-1 exploit passes; ratchet green                 | J (auth/constraint) + Z (ratchet) | Rev                       |
-| **M2** | **cutover-go — finish the cutover**             | Land reader-convergence (WI-1239); confirm WI-1254 sweep has a completion gate; promote freeze migrations to one journaled catalog-gated chain across dev/stg/prd/CI | M1 not required                                                                           | CI DB == prod;`drizzle-kit migrate` reproduces prod; dev+stg converged v2-only | J                                 | Rev (per-env, pre-launch) |
-| **M3** | **Strip legacy (release-not-code)**              | Tag current tree; delete dead legacy subtree + legacy schema defs (WI-1139 / the 779 direction)                                                                      | M2 green + tag pushed                                                                     | typecheck + integration green on stripped tree; resurrection-500 surface gone  | J + fleet                         | Rev via tag/revert        |
-| **M4** | **Collapse the shell ladder**                    | Retire flags-off + V0 behind a tag; leave V1 as the single flag fallback (Config F)                                                                                  | **§13.1 V0-retirement ruling (Z/product)** + explicit human irreversibility confirmation | V2 default + V1 fallback are the only reachable configs; no V0 path            | Z + J                             | **IRREV** (S6)            |
-| **M5** | **V2-ship**                                      | Close/defer the 3 open WS-28 items with owners; reconcile the canonical plan doc; seam smoke PR-gated                                                                | M1 done (seam hardened)                                                                   | 7 publish-critical prompts green (already are) + a real V2-flag E2E pass       | Z (scope) + J (M1)                | Rev (unship = flag)       |
+**Chain:** M1 (now, parallel) · M2a→M2b→M3 (DB/code collapse) · M4→M5→M6 (prove-fallback → retire-V0 →
+ship). M4 gates both M5 and M6 — you never remove V0 or ship V2 without a proven rollback.
 
-**Milestone independence worth noting:** M1 (seam hardening) and M5 (ship-readiness) do **not** depend on the
-cutover being finished. R1 especially should not wait — it converts to a live IDOR the instant a second
-credential enters any org. M2→M3→M4 is the DB/code/shell collapse chain.
+### Flag truth-table (the R9 ratchet — the only sanctioned build states)
 
-**Guardrails (standing, not milestones):**
+| Profile | `MODE_NAV_V0` | `MODE_NAV_V1` | `MODE_NAV_V2` | Renders | Status |
+|---|---|---|---|---|---|
+| **Config T** | off | on | on | V2 shell (V2 wins; V1 contract underneath) | sanctioned target |
+| **Config F** | off | on | off | V1 shell | sanctioned fallback — **must be built + E2E-proven (M4)** |
+| Legacy (prod today) | on | off | off | V0 shell | **retirement target** — sanctioned only until M5, then banned |
+| any other combo | — | — | — | — | **BANNED** (esp. `V2=on/V1=off` → V2 tabs over legacy contract; and any `V0=on` with V1/V2 on) |
 
-- **Irreversible gate** — S6 deletions, the terminal drop promotion, and any V0/V1-reachable destructive
-  delete stay blocked on explicit human confirmation. M4 is the only IRREV milestone; everything else is a
-  flag flip or git revert.
-- **Flag-combo ratchet (R9)** — a test that fails on any unsanctioned nav flag state (e.g. the current
-  dead-zone: `MODE_NAV_V2_ENABLED` doesn't feed `resolveNavigationContract`, and V2's subscription fetch is
-  gated on `V1_ENABLED`, so V2-on/V1-off renders V2 tabs over legacy contract). Only {V2-on/V1-on,
-  V2-off/V1-on, legacy-off} are sanctioned.
-- **No new config** — no third shell arm, no new identity flag, no "preserve this version live" without a
-  named retirement date.
+The ratchet test fails CI on any build/env whose flag triple is not one of the three sanctioned rows (and the
+legacy row is time-boxed to pre-M5). Encodes the hard **V2⇒V1 dependency** (V2 on requires V1 on).
+
+**Standing guardrails:** the irreversible gate (M2b + M5 + any V0/V1-reachable destructive delete stay on
+explicit human confirm); no new config (no third shell arm, no new identity flag, no "preserve live" without
+a named retirement date).
 
 ---
 
 ## 5. Relationship to existing plans (what Phase B reconciles)
 
-The spine sits **above** the canonical plan (`2026-06-30-v2-publish-readiness-canonical-plan.md`), the phase
-plans (`docs/plans/v2-plan/`), the dossiers (`docs/plans/v2-dossier/`), and the identity runway docs. Where
-they conflict, the spine wins. Two specific corrections the spine bakes in (the canonical plan is stale on
-both):
-
-- The plan calls the **supporter gap** the "critical publish blocker." It is **closed** (WI-1170/1171 shipped
-  to their ACs). The blocker language is retired.
-- The plan treats the **cutover** as the terminal gate. It is **done at the live-code level**; what remains is
-  env/CI convergence + deletion (M2/M3), which is cleanup, not construction.
-
-**Phase B** classifies every open Cosmo item against this spine into: on-spine-keep / on-spine-resequence /
-off-spine-close / spine-missing-capture / triage — producing the re-baselined pipeline. Refinement is
-retained wherever an item survives; only map-obsoleted work (supporter-gap-build, V0-preservation) is written
-off, deliberately.
+The spine sits **above** the canonical plan, phase plans, dossiers, and identity runway docs; conflicts are
+bugs in those. Two baked-in corrections (the canonical plan is stale on both): the **supporter gap is closed**
+(not the blocker); the **cutover is done at the live-code level** (remaining work is convergence + deletion).
+**Phase B** classifies every open Cosmo item against this spine — keep / re-sequence / close / capture —
+retaining refinement wherever an item survives, writing off only map-obsoleted work.
 
 ---
 
-## 6. Open decisions the spine forces (for Jörn)
+## 6. Ruled decisions (operator, 2026-07-02)
 
-These are genuine forks the spine cannot resolve for you; they change M4/M5 and the Phase B classification:
-
-1. **V0 retirement timing (§13.1 ruling).** M4 is IRREV and gated on your ruling + Zuzka's product sign-off.
-   When does V0 retire — before ship (cleaner target, but a hard commit) or after a V2 stability window on
-   real users? This gates M4 and buckets every V0-touching Cosmo item.
-2. **F=V1 retention horizon.** Confirm V1 is kept flag-reachable through launch + stability window (my
-   assumption), vs a shorter/longer horizon. Affects whether V1-specific maintenance items are on-spine.
-3. **dev target.** Converge dev to v2-only (parity, M2) vs leave dev on legacy for some workflow reason.
-   The spine assumes converge; confirm.
-4. **M1 timing.** I recommend M1 (esp. R1 authority-key) starts immediately, independent of the pause and the
-   cutover. Confirm it's not gated behind Phase B.
+1. **V0 retirement timing → RETIRE BEFORE SHIP.** M5 precedes M6, gated on M4 (a proven fallback).
+2. **F=V1 retention → through launch + stability window** (eventual V1-only is post-launch, out of scope).
+3. **dev target → converge to v2-only** (M2b applies to dev).
+4. **M1 timing → immediate** — starts now, independent of the pause and the cutover.
 
 ---
 
 ## 7. One-paragraph summary
 
 Collapse the matrix to **two configs on the v2 backend** — V2 (target) and V1 (fallback) — by **subtraction**:
-harden the seam into a named caller-bound contract (M1), finish the cutover's env/CI convergence (M2), strip
-the dead legacy behind a tag (M3), retire V0 on your ruling (M4, the only irreversible step), and ship V2 with
-the supporter gap already closed (M5). Preserve retired versions as git tags, not live code; enforce two flag
-arms and no unsanctioned combos; and do it now, aggressively, because pre-launch with zero users is the
-cheapest this cleanup will ever be.
+harden the seam into a caller-bound contract (M1, now), finish the cutover's journal-prep then gated env-apply
+(M2a/M2b), strip dead legacy behind a tag (M3), **build and prove the V1 rollback artifact (M4)**, retire V0
+before ship (M5, gated on a proven rollback), and ship V2 with the supporter gap already closed (M6). Preserve
+retired versions as git tags; enforce the three-row flag truth-table; and move fast on the *reversible* work
+— but note that **zero production users lowers customer-risk, not release/infra rollback risk**: CI schema
+fidelity, migration-history immutability, the PITR window, and the fallback artifact are not free, and their
+gates (M2b, M4) hold regardless of the empty user table.
