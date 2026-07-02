@@ -4,7 +4,7 @@ import type { ZodError } from 'zod';
 import {
   curriculumBooks,
   curriculumTopics,
-  profiles,
+  person,
   sessionSummaries,
   subjects,
   type Database,
@@ -307,8 +307,8 @@ export async function listRecapsForProfile(
 ): Promise<RecapListItem[]> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
   const [profile, page] = await Promise.all([
-    db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
+    db.query.person.findFirst({
+      where: eq(person.id, profileId),
       columns: { displayName: true },
     }),
     listProfileSessions(db, profileId, { limit }),

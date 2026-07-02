@@ -4,6 +4,7 @@
 
 import type { Database } from '@eduagent/database';
 import { BadRequestError, ConflictError, NotFoundError } from '../errors';
+import { createDatabaseModuleMock } from '../test-utils/database-module';
 import {
   findAccountByClerkId,
   findOrCreateAccount,
@@ -202,33 +203,65 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+// [WI-1254] findAccountByClerkId now reads the v2 identity graph
+// (login→membership→organization via resolveIdentityV2) rather than the
+// legacy `accounts` table. Seed the canonical graph via
+// createDatabaseModuleMock (the established pattern for exercising
+// resolveIdentityV2 for real — see test-utils/database-module.ts) instead of
+// convenience-mocking `db.query.accounts.findFirst`.
 describe('findAccountByClerkId', () => {
-  it('returns null when account not found', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    const result = await findAccountByClerkId(db, 'clerk_user_123');
+  it('returns null when the login row is not found', async () => {
+    const { db } = createDatabaseModuleMock({
+      db: {
+        query: {
+          login: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        },
+      },
+    });
+    const result = await findAccountByClerkId(
+      db as unknown as Database,
+      'no_such_clerk_user',
+    );
 
     expect(result).toBeNull();
   });
 
-  it('returns mapped account when found', async () => {
-    const row = mockAccountRow();
-    const db = createMockDb({ findFirstResult: row });
-    const result = await findAccountByClerkId(db, 'clerk_user_123');
+  it('returns the resolved account when the identity graph resolves', async () => {
+    const { db } = createDatabaseModuleMock();
+    const result = await findAccountByClerkId(
+      db as unknown as Database,
+      'user_test',
+    );
 
     expect(result).toEqual({
-      id: 'acc-1',
-      clerkUserId: 'clerk_user_123',
-      email: 'user@example.com',
-      timezone: null,
-      createdAt: '2025-01-15T10:00:00.000Z',
-      updatedAt: '2025-01-15T10:00:00.000Z',
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      timezone: 'UTC',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
     });
   });
 
-  it('maps timezone when present', async () => {
-    const row = mockAccountRow({ timezone: 'Europe/Prague' });
-    const db = createMockDb({ findFirstResult: row });
-    const result = await findAccountByClerkId(db, 'clerk_user_123');
+  it('maps the organization timezone when present', async () => {
+    const { db } = createDatabaseModuleMock({
+      db: {
+        query: {
+          organization: {
+            findFirst: jest.fn().mockResolvedValue({
+              id: 'test-account-id',
+              timezone: 'Europe/Prague',
+              createdAt: NOW,
+              updatedAt: NOW,
+            }),
+          },
+        },
+      },
+    });
+    const result = await findAccountByClerkId(
+      db as unknown as Database,
+      'user_test',
+    );
 
     expect(result!.timezone).toBe('Europe/Prague');
   });

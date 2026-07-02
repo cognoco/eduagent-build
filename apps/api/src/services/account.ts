@@ -20,6 +20,7 @@ import { safeSend } from './safe-non-core';
 import type { SecurityNotificationType } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { BadRequestError, ConflictError, NotFoundError } from '../errors';
+import { resolveIdentityV2 } from './identity-v2/identity-resolve';
 
 const logger = createLogger();
 
@@ -90,8 +91,33 @@ function mapAccountRow(row: typeof accounts.$inferSelect): Account {
 
 /**
  * Finds an existing account by its Clerk user ID.
+ *
+ * [WI-1254] v2 read: resolves via the login→membership→organization identity
+ * graph (`resolveIdentityV2`, the same resolver `accountMiddleware` runs on
+ * every authenticated request) rather than the legacy `accounts` table, which
+ * is being dropped (WI-1128). Its one live caller is the
+ * account-reclaim-attempt Inngest handler, which looks up the already-verified
+ * existing owner by clerkUserId to send them a security notification.
  */
 export async function findAccountByClerkId(
+  db: Database,
+  clerkUserId: string,
+): Promise<Account | null> {
+  const resolved = await resolveIdentityV2(db, clerkUserId);
+  return resolved?.account ?? null;
+}
+
+/**
+ * [WI-1254 dead-sweep] delete with findOrCreateAccount (WI-1139 dead-sweep
+ * DELETE-LIST, alongside the legacy `accounts` table def). Legacy-only lookup
+ * by clerkUserId, reading the `accounts` table directly. Used exclusively by
+ * findOrCreateAccount (below), which has zero live callers — accountMiddleware
+ * resolves via resolveIdentityV2, not findOrCreateAccount — and still does its
+ * own separate legacy accounts reads/writes out of scope for this WI. Kept
+ * separate from findAccountByClerkId (now v2) so this dead-but-tested legacy
+ * flow's behavior and tests are unchanged.
+ */
+async function findLegacyAccountByClerkId(
   db: Database,
   clerkUserId: string,
 ): Promise<Account | null> {
@@ -132,7 +158,7 @@ export async function findOrCreateAccount(
   email: string | undefined,
   timezone?: string | null,
 ): Promise<Account> {
-  const existing = await findAccountByClerkId(db, clerkUserId);
+  const existing = await findLegacyAccountByClerkId(db, clerkUserId);
   if (existing) {
     // [BUG-417] Idempotent trial repair: if this account exists but was created
     // by a request that failed mid-flight after inserting the account row but
@@ -282,7 +308,7 @@ export async function findOrCreateAccount(
 
   // If conflict occurred (row is undefined), the other request won — re-query.
   if (!row) {
-    const found = await findAccountByClerkId(db, clerkUserId);
+    const found = await findLegacyAccountByClerkId(db, clerkUserId);
     if (!found) throw new Error('Account creation failed after conflict');
     return found;
   }
