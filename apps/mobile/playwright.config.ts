@@ -246,5 +246,24 @@ export default defineConfig({
       testMatch: /flows[\\/]mentor-audit[\\/].+\.spec\.ts/,
       fullyParallel: false,
     },
+    {
+      // [WI-1307 / M4-C7] Config F (V1-on/V2-off) nav-shell smoke.
+      // docs/specs/2026-06-09-mentor-is-the-app-shell-redesign.md — proves the
+      // `fallback` EAS Update channel's flag posture (apps/mobile/eas.json
+      // build.fallback) renders the V1 shell (recaps tab) with no V2 tabs.
+      //
+      // **Opt-in.** Not in the default smoke run, and requires the web export
+      // itself to be built with the Config F flags (this project does not
+      // override them — `serve-exported-web.mjs` reads process.env at export
+      // time). Invoke with:
+      //   EXPO_PUBLIC_ENABLE_MODE_NAV=true \
+      //   EXPO_PUBLIC_ENABLE_MODE_NAV_V1=true \
+      //   EXPO_PUBLIC_ENABLE_MODE_NAV_V2=false \
+      //   pnpm exec playwright test -c apps/mobile/playwright.config.ts --project=config-f-smoke
+      name: 'config-f-smoke',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]config-f[\\/].+\.spec\.ts/,
+      fullyParallel: false,
+    },
   ],
 });
