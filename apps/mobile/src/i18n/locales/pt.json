@@ -761,6 +761,20 @@
       "stopAudioLabel": "Parar o texto",
       "dismissLabel": "Dispensar cartão de leitura"
     },
+    "speakingPractice": {
+      "title": "Repita em voz alta",
+      "subtitle": "Repita a frase",
+      "playAudioLabel": "Reproduzir frase alvo",
+      "stopAudioLabel": "Parar áudio",
+      "startRecordingLabel": "Iniciar tentativa falada",
+      "stopRecordingLabel": "Parar tentativa falada",
+      "listening": "Ouvindo...",
+      "transcriptLabel": "Você disse",
+      "matched": "Corresponde",
+      "retryWithMissingWords": "Tente novamente: {{words}}",
+      "retry": "Tentar novamente",
+      "retryLabel": "Tentar a fala novamente"
+    },
     "chatShell": {
       "defaultSubtitle": "Estou aqui para ajudar",
       "defaultPlaceholder": "Digite uma mensagem...",

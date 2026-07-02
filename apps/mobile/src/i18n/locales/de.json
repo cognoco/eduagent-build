@@ -734,6 +734,20 @@
       "stopAudioLabel": "Text stoppen",
       "dismissLabel": "Lesekarte schließen"
     },
+    "speakingPractice": {
+      "title": "Sprich es nach",
+      "subtitle": "Wiederhole den Satz",
+      "playAudioLabel": "Zielsatz abspielen",
+      "stopAudioLabel": "Audio stoppen",
+      "startRecordingLabel": "Sprechversuch starten",
+      "stopRecordingLabel": "Sprechversuch stoppen",
+      "listening": "Höre zu...",
+      "transcriptLabel": "Du hast gesagt",
+      "matched": "Passt",
+      "retryWithMissingWords": "Versuch es nochmal: {{words}}",
+      "retry": "Nochmal",
+      "retryLabel": "Sprechversuch wiederholen"
+    },
     "chatShell": {
       "defaultSubtitle": "Ich bin hier, um zu helfen",
       "defaultPlaceholder": "Nachricht eingeben...",
