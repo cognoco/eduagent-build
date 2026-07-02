@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "tag": "0124_striped_thing",
+    "reason": "779-strip pulled-forward slice: repoint retrieval_events.profile_id FK from dropped legacy `profiles` to `person`, so the committed chain replays on the hand-dropped staging/prod DBs. Never applied to staging/prod prior to this edit. Operator-authorized ic-362 (deploy-unblock)."
+  },
+  {
+    "tag": "0128_lively_kylun",
+    "reason": "779-strip pulled-forward slice: catalog-gate the ALTER TABLE profiles statements (WI-367 birth-date columns) so they no-op when `profiles` is absent, instead of aborting `drizzle-kit migrate`. person.birth_date already covers v2; no v2-side addition needed. Never applied to staging/prod prior to this edit. Operator-authorized ic-362 (deploy-unblock)."
+  }
+]
