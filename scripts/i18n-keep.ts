@@ -342,6 +342,12 @@ const raw: readonly KeepPattern[] = [
       'apps/mobile/src/components/session/MessageBubble.tsx:274',
   },
   {
+    pattern: 'journal.practice.type.*',
+    reason:
+      'selected via practiceTypeLabel(type, t) → t(`journal.practice.type.${type}`) at ' +
+      'apps/mobile/src/components/journal/JournalTabView.tsx:883',
+  },
+  {
     pattern: 'more.accommodation.sectionHeader',
     reason:
       'consumed cross-package by the API app-help map (the help prompt + its ' +
