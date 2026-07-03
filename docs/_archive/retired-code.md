@@ -56,15 +56,18 @@ removed by a dead-code-sweep WI, with reachability evidence:
 ## WI-1128 — subscription-core.integration.test.ts, follow-up (2026-07-03)
 
 The `isIdentityV2Enabled()`-gated quarantine on 4 dead-fn test blocks in this file
-(added by the WI-1128 entry above) did NOT make them drop-safe: CI's
-`drizzle-kit migrate` applies 0129/0130 unconditionally in every lane (flag-ON and
-flag-OFF alike — schema state isn't flag-gated), so the flag-OFF lane still ran these
-blocks un-skipped against the post-repoint schema and FK-violated on
+(added by the WI-1128 entry above) did NOT make them drop-safe. This branch's
+migration chain currently tops out at `0129_m_repoint` — the FK re-point;
+`0130` (the physical legacy-table drop) was reverted out of this branch by commit
+`fb7a49f6a` and does not exist here — and CI's `drizzle-kit migrate` applies that
+chain unconditionally in every lane (flag-ON and flag-OFF alike — schema state
+isn't flag-gated). So the flag-OFF lane still ran these blocks un-skipped against
+the post-0129-repoint schema and FK-violated on
 `quota_pools_subscription_id_subscription_id_fk`. Retired outright rather than
 re-guarded — the guard mechanism was categorically wrong for a schema-level break,
-not a runtime-behavior difference. Verified via local Postgres with the full
-migration chain applied (matching CI's `drizzle-kit migrate`): full-file suite is
-20/20 passing in both `IDENTITY_V2_ENABLED=true` and `=false`.
+not a runtime-behavior difference. Verified via local Postgres with this branch's
+full migration chain applied (matching CI's `drizzle-kit migrate`): full-file
+suite is 20/20 passing in both `IDENTITY_V2_ENABLED=true` and `=false`.
 
 | Removed | Reachability evidence |
 |---|---|
@@ -75,8 +78,8 @@ migration chain applied (matching CI's `drizzle-kit migrate`): full-file suite i
 
 `getSubscriptionByAccountId`, `getQuotaPool`, `updateSubscriptionFromWebhookV2`,
 `activateSubscriptionFromCheckoutV2` coverage is KEPT — all pass both flag-ON and
-flag-OFF against the post-0130 schema. The `isIdentityV2Enabled()` guard and its
-import are removed from the file entirely — no guarded blocks remain in it.
+flag-OFF against the post-0129-repoint schema. The `isIdentityV2Enabled()` guard
+and its import are removed from the file entirely — no guarded blocks remain in it.
 
 `getSubscriptionByAccountId`'s own prod-fn deadness (flagged in the "Follow-up
 dead-sweep" list above) is explicitly **not** addressed here — its test coverage

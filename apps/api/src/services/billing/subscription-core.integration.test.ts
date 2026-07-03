@@ -370,10 +370,13 @@ describe('getSubscriptionByAccountId', () => {
 // revenuecat-webhook.ts:323's `handlers.ensureFreeSubscription` resolves to
 // `ensureFreeSubscriptionV2` via dispatch.ts's always-v2 seam, not this fn).
 // The prior `isIdentityV2Enabled()`-gated quarantine did not make these
-// drop-safe: CI's `drizzle-kit migrate` applies the 0129/0130 legacy-table
-// repoint unconditionally in every lane (flag-ON and flag-OFF alike — schema
-// state isn't flag-gated), so the flag-OFF CI lane still ran these blocks
-// un-skipped against the post-repoint schema and FK-violated on
+// drop-safe: CI's `drizzle-kit migrate` applies this branch's migration
+// chain — currently topping out at `0129_m_repoint` (the FK-repoint;
+// `0130`, the physical legacy-table drop, was reverted out of this branch
+// per commit fb7a49f6a and does not exist here) — unconditionally in every
+// lane (flag-ON and flag-OFF alike — schema state isn't flag-gated), so the
+// flag-OFF CI lane still ran these blocks un-skipped against the
+// post-0129-repoint schema and FK-violated on
 // `quota_pools_subscription_id_subscription_id_fk`. Retired outright rather
 // than re-guarded. See docs/_archive/retired-code.md ("Trimmed —
 // subscription-core.integration.test.ts, follow-up") for the full register
