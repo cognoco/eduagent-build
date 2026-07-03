@@ -205,9 +205,12 @@ WI-1190 · WI-482 — **O**. None spine-governed; all proceed independently.
 - ✅ Re-homed **WI-770** ("enhance /cosmo:review") → Project=Nexus, Workstream=WS-23 (Cosmo improvements) —
   estate tooling, off the MentoMate board.
 - ✅ Resume note for the WS-18/WS-28 orchestrator drafted → `11-ws18-28-resume-note.md`.
+- ✅ **Compliance dedup resolved** (operator-ruled 2026-07-03). Only two real overlaps existed (not a whole
+  parallel generation): closed **WI-1191** as Duplicate → canonicals WI-1105/1109/1110; closed **WI-1112 +
+  WI-1113** as Duplicate → broader canonical WI-1192 (all-processor DPAs). 1193/1194/1195/1196 kept (net-new
+  eng conditions); all `11xx`-only items kept. Rationale recorded on each closed item's Notes.
+- ✅ **WI-1249** deleted (archived) — empty/junk item.
 
-**STILL HELD (judgment-heavy / operator-owned — not auto-fired):**
-- Compliance **dedup**: reconcile the Ready `11xx` vs Captured `119x` duplicate generation — needs a human
-  call on which to keep/merge; not an agent auto-close.
-- **WI-1249** (null Stage + empty Name): left untouched — operator to delete/repair.
-- The **pause-lift** itself (shepherd/orchestrator resume signal) — the resume note is drafted; operator/Zuzka deliver.
+**Fully executed.** The only remaining step is the **pause-lift** (operator/Zuzka deliver the resume note to
+the WS-18/WS-28 orchestrator) + the **orchestrator handoff for WS-37 Seam Hardening** — both operator-owned,
+not Cosmo writes.
