@@ -52,7 +52,7 @@ jobs:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -76,7 +76,7 @@ jobs:
 
       # Detect which areas of the codebase changed (used to skip integration tests
       # when only mobile/non-API files changed)
-      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4
         if: steps.scope.outputs.docs_only != 'true'
         id: changes
         with:
@@ -89,17 +89,18 @@ jobs:
               - 'pnpm-lock.yaml'
 
       # Setup pnpm (version read from packageManager field in package.json)
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.scope.outputs.docs_only != 'true'
         with:
           standalone: true
 
       # Cache node_modules
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         if: steps.scope.outputs.docs_only != 'true'
         with:
           node-version: 22
           cache: 'pnpm'
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
         if: steps.scope.outputs.docs_only != 'true'
@@ -110,7 +111,7 @@ jobs:
       # work without the cloud — only the shared cache needed replacing.
       - name: Cache Nx local cache
         if: steps.scope.outputs.docs_only != 'true'
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ github.sha }}
@@ -479,19 +480,20 @@ jobs:
       NX_DAEMON: false
       NX_ISOLATE_PLUGINS: false
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: 'pnpm'
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
 
@@ -536,7 +538,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 2
           persist-credentials: false
@@ -577,23 +579,24 @@ jobs:
 
           echo "native_changed=$native_changed" >> "$GITHUB_OUTPUT"
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         if: steps.mobile-check.outputs.mobile_changed == 'true'
         with:
           standalone: true
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         if: steps.mobile-check.outputs.mobile_changed == 'true'
         with:
           node-version: 22
           cache: 'pnpm'
+          package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
         if: steps.mobile-check.outputs.mobile_changed == 'true'
 
       - name: Setup Expo
         if: steps.mobile-check.outputs.mobile_changed == 'true'
-        uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8
+        uses: expo/expo-github-action@eab7a230208c952974db8c3245cfd78402c7b385 # 9.0.0
         with:
           eas-version: 18.x
           packager: pnpm
