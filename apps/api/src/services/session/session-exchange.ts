@@ -59,6 +59,7 @@ import {
   auditExchangeSources,
   applySourceAuditSafetyFallback,
   emitDangerousProcedureBlockedEvent,
+  emitMinorPiiEchoRedactedEvent,
   inferObviousReliableSourceForAudit,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -3859,6 +3860,16 @@ export async function streamMessage(
         learnerVolunteeredText,
         { isMinor: isMinorLearner },
       );
+      if (piiEchoGate.redacted) {
+        await emitMinorPiiEchoRedactedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          redactedKinds: piiEchoGate.echoedKinds,
+          redactedCount: piiEchoGate.echoedTerms.length,
+        });
+      }
       const gatedResponse = piiEchoGate.response;
       const sourceReplacement =
         gatedResponse !== parsed.cleanResponse ? gatedResponse : undefined;

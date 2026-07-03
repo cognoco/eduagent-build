@@ -11,6 +11,7 @@ import {
   sessionPurgeDelayedEventSchema,
   summaryReconciliationRequeuedEventSchema,
   topicProbeRequestedEventSchema,
+  minorPiiEchoRedactedEventSchema,
 } from './inngest-events.js';
 
 const validUuid = '00000000-0000-4000-8000-000000000001';
@@ -441,5 +442,69 @@ describe('BUG-581 — UUID enforcement on retention SLO schemas', () => {
       timestamp: ts,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1348] Minor-PII echo-back gate observability event
+// ---------------------------------------------------------------------------
+
+describe('[WI-1348] minorPiiEchoRedactedEventSchema', () => {
+  const validUuid = '00000000-0000-4000-8000-000000000001';
+  const ts = '2026-07-03T10:00:00.000Z';
+
+  it('accepts a valid kinds+count payload', () => {
+    const result = minorPiiEchoRedactedEventSchema.safeParse({
+      profileId: validUuid,
+      sessionId: validUuid,
+      flow: 'exchange.process',
+      provider: 'openai',
+      model: 'deterministic:minor_pii_echo',
+      redactedKinds: ['name', 'school'],
+      redactedCount: 2,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('PII-egress guard: strips any raw redacted VALUES from the payload', () => {
+    // A caller that mistakenly tried to ship the raw values must not leak them:
+    // the schema has no field for them, so parse drops the extra key entirely.
+    const parsed = minorPiiEchoRedactedEventSchema.parse({
+      profileId: validUuid,
+      flow: 'session-exchange.stream',
+      model: 'deterministic:minor_pii_echo',
+      redactedKinds: ['name', 'school'],
+      redactedCount: 2,
+      timestamp: ts,
+      // Attempted PII egress — the minor's actual name + school:
+      echoedTerms: ['Ada', 'Oakwood School'],
+      redactedValues: ['Ada', 'Oakwood School'],
+    });
+    expect(parsed).not.toHaveProperty('echoedTerms');
+    expect(parsed).not.toHaveProperty('redactedValues');
+    expect(JSON.stringify(parsed)).not.toContain('Ada');
+    expect(JSON.stringify(parsed)).not.toContain('Oakwood');
+  });
+
+  it('rejects an unknown PII kind', () => {
+    const result = minorPiiEchoRedactedEventSchema.safeParse({
+      profileId: validUuid,
+      flow: 'exchange.process',
+      model: 'deterministic:minor_pii_echo',
+      redactedKinds: ['ssn'],
+      redactedCount: 1,
+      timestamp: ts,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('requires profileId, model, and timestamp', () => {
+    const result = minorPiiEchoRedactedEventSchema.safeParse({
+      flow: 'exchange.process',
+      redactedKinds: [],
+      redactedCount: 0,
+    });
+    expect(result.success).toBe(false);
   });
 });

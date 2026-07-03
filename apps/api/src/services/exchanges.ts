@@ -40,7 +40,11 @@ import {
   type CatastrophicCategory,
 } from './safety-tripwire';
 import { applyDangerousProcedureGate } from './dangerous-procedure-gate';
-import { applyMinorPiiEchoGate } from './minor-pii-echo-gate';
+import {
+  applyMinorPiiEchoGate,
+  MINOR_PII_ECHO_GATE_MODEL,
+  type PiiKind,
+} from './minor-pii-echo-gate';
 import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { getOcrProvider } from './ocr';
 import {
@@ -157,6 +161,54 @@ export async function emitDangerousProcedureBlockedEvent(context: {
         },
       }),
     'safety.dangerous_procedure_blocked',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1348] Observability escalation for the minor-PII echo-back gate. Silent
+ * recovery is banned on safety paths — this is the required escalation signal
+ * (logger.warn + a queryable Inngest event), NOT a bare console.warn. The
+ * learner-facing + persisted reply is already redacted server-side; this event
+ * lets ops query the gate's fire rate, monitor recall, and hold an audit trail.
+ * METADATA ONLY: carries the coarse PII KINDS + a count, NEVER the raw redacted
+ * values — shipping a minor's actual name / school / email into Inngest's
+ * third-party event store would re-leak the very PII this gate strips.
+ */
+export async function emitMinorPiiEchoRedactedEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  redactedKinds: PiiKind[];
+  redactedCount: number;
+}): Promise<void> {
+  logger.warn('safety.minor_pii_echo_redacted', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    redacted_kinds: context.redactedKinds,
+    redacted_count: context.redactedCount,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety marker (WI-1348). No
+        // downstream handler is required or intended.
+        name: 'app/safety.minor_pii_echo_redacted',
+        data: {
+          profileId: context.profileId,
+          sessionId: context.sessionId,
+          flow: context.flow,
+          provider: context.provider,
+          model: MINOR_PII_ECHO_GATE_MODEL,
+          redactedKinds: context.redactedKinds,
+          redactedCount: context.redactedCount,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.minor_pii_echo_redacted',
     { sessionId: context.sessionId, profileId: context.profileId },
   );
 }
@@ -1692,6 +1744,16 @@ export async function processExchange(
     learnerVolunteeredText,
     { isMinor: isMinorLearner },
   );
+  if (piiEchoGate.redacted) {
+    await emitMinorPiiEchoRedactedEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      redactedKinds: piiEchoGate.echoedKinds,
+      redactedCount: piiEchoGate.echoedTerms.length,
+    });
+  }
   const gatedResponse = piiEchoGate.response;
 
   return {

@@ -40,6 +40,27 @@ export const MINOR_PII_ECHO_GATE_MODEL = 'deterministic:minor_pii_echo';
 /** Neutral placeholder that replaces an echoed PII token in the reply. */
 const REDACTION_PLACEHOLDER = '[removed]';
 
+/**
+ * Coarse CATEGORY of a volunteered PII token. The observability event carries
+ * these kinds (plus a count), never the raw values — the raw name / school /
+ * email must not egress into Inngest's third-party event store (same PII-egress
+ * rule the event schemas in @eduagent/schemas enforce). An incident
+ * investigator rehydrates the raw values first-party from `session_events`,
+ * scoped by profileId.
+ */
+export type PiiKind =
+  | 'email'
+  | 'handle'
+  | 'phone'
+  | 'name'
+  | 'school'
+  | 'address';
+
+export interface PiiMatch {
+  value: string;
+  kind: PiiKind;
+}
+
 // --- Self-identifying PII patterns (extractable from raw text by shape) ------
 
 // Email addresses. Conservative local/domain classes; requires a dotted TLD.
@@ -130,26 +151,28 @@ function collectMatches(text: string, re: RegExp, group = 0): string[] {
 }
 
 /**
- * Extract the concrete PII VALUES the learner volunteered in their own text.
- * Returns a de-duplicated list of literal token strings (a name, a school, an
- * email, …) to look for in the tutor reply. NOT a general PII scan of arbitrary
- * text — the caller must pass the LEARNER's input, never the model's.
+ * Extract the concrete PII the learner volunteered in their own text, each
+ * tagged with its coarse category (kind). De-duplicated case-insensitively,
+ * first-seen literal form kept. NOT a general PII scan of arbitrary text — the
+ * caller must pass the LEARNER's input, never the model's.
  */
-export function extractVolunteeredPii(learnerText: string): string[] {
+export function extractVolunteeredPiiMatches(learnerText: string): PiiMatch[] {
   if (!learnerText) return [];
-  const values: string[] = [];
+  const matches: PiiMatch[] = [];
 
-  for (const email of collectMatches(learnerText, EMAIL_RE)) values.push(email);
+  for (const email of collectMatches(learnerText, EMAIL_RE))
+    matches.push({ value: email, kind: 'email' });
   for (const handle of collectMatches(learnerText, HANDLE_RE))
-    values.push(handle);
+    matches.push({ value: handle, kind: 'handle' });
   for (const phone of collectMatches(learnerText, PHONE_RE)) {
     // Require >= 7 actual digits so "1 2 3" style math prose does not match.
-    if ((phone.match(/\d/g) ?? []).length >= 7) values.push(phone.trim());
+    if ((phone.match(/\d/g) ?? []).length >= 7)
+      matches.push({ value: phone.trim(), kind: 'phone' });
   }
   for (const school of collectMatches(learnerText, SCHOOL_RE, 1))
-    values.push(school);
+    matches.push({ value: school, kind: 'school' });
   for (const address of collectMatches(learnerText, ADDRESS_RE, 1))
-    values.push(address);
+    matches.push({ value: address, kind: 'address' });
   for (const rawName of collectMatches(learnerText, NAME_CUE_RE, 1)) {
     // Split the (up to two) captured tokens. The cue is matched
     // case-insensitively, so the OPTIONAL second token must be validated in
@@ -164,7 +187,7 @@ export function extractVolunteeredPii(learnerText: string): string[] {
       first.length >= 2 &&
       !NAME_STOPWORDS.has(first.toLowerCase())
     ) {
-      values.push(first);
+      matches.push({ value: first, kind: 'name' });
     }
     if (
       second &&
@@ -172,51 +195,71 @@ export function extractVolunteeredPii(learnerText: string): string[] {
       second.length >= 2 &&
       !NAME_STOPWORDS.has(second.toLowerCase())
     ) {
-      values.push(second);
+      matches.push({ value: second, kind: 'name' });
     }
   }
 
-  // De-duplicate case-insensitively, keep the first-seen literal form.
+  // De-duplicate case-insensitively on value, keep the first-seen match.
   const seen = new Set<string>();
-  const unique: string[] = [];
-  for (const value of values) {
-    const key = value.toLowerCase();
+  const unique: PiiMatch[] = [];
+  for (const match of matches) {
+    const key = match.value.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    unique.push(value);
+    unique.push(match);
   }
   return unique;
 }
 
 /**
- * Deterministic: does the tutor reply echo back any PII the learner
- * volunteered? Returns the list of volunteered PII values the reply repeats
- * (empty when none). Whole-token, case-insensitive matching so "Ada" matches
- * "ada" but not "Adalene".
+ * Convenience: the de-duplicated literal PII VALUES the learner volunteered.
+ * Kept for callers/tests that only need the values.
  */
-export function detectVolunteeredPiiEcho(
+export function extractVolunteeredPii(learnerText: string): string[] {
+  return extractVolunteeredPiiMatches(learnerText).map((m) => m.value);
+}
+
+/**
+ * Deterministic: which volunteered PII matches does the tutor reply echo back?
+ * Whole-token, case-insensitive matching so "Ada" matches "ada" but not
+ * "Adalene". Returns the matched {value, kind} entries (empty when none).
+ */
+export function detectVolunteeredPiiEchoMatches(
   reply: string,
   learnerText: string,
-): string[] {
+): PiiMatch[] {
   if (!reply) return [];
-  const volunteered = extractVolunteeredPii(learnerText);
+  const volunteered = extractVolunteeredPiiMatches(learnerText);
   if (volunteered.length === 0) return [];
-  const echoed: string[] = [];
-  for (const value of volunteered) {
+  const echoed: PiiMatch[] = [];
+  for (const match of volunteered) {
     const re = new RegExp(
-      `(?<![A-Za-z0-9])${escapeRegExp(value)}(?![A-Za-z0-9])`,
+      `(?<![A-Za-z0-9])${escapeRegExp(match.value)}(?![A-Za-z0-9])`,
       'i',
     );
-    if (re.test(reply)) echoed.push(value);
+    if (re.test(reply)) echoed.push(match);
   }
   return echoed;
 }
 
 /**
+ * Convenience: the echoed PII VALUES only (see detectVolunteeredPiiEchoMatches).
+ */
+export function detectVolunteeredPiiEcho(
+  reply: string,
+  learnerText: string,
+): string[] {
+  return detectVolunteeredPiiEchoMatches(reply, learnerText).map(
+    (m) => m.value,
+  );
+}
+
+/**
  * Strip every echoed PII token from the reply, replacing each with a neutral
- * placeholder, then tidy the residual whitespace / dangling punctuation the
- * removal leaves behind. Surgical by design: only the echoed PII values change;
- * the rest of the reply (the legitimate teaching content) is preserved.
+ * placeholder, then tidy the residual the removal leaves behind: collapse a run
+ * of adjacent placeholders (a "Dear [name] [name]," double-echo) into one, and
+ * squeeze doubled whitespace. Surgical by design: only the echoed PII values
+ * change; the rest of the reply (the legitimate teaching content) is preserved.
  */
 export function redactPiiEcho(reply: string, echoed: string[]): string {
   let out = reply;
@@ -227,30 +270,54 @@ export function redactPiiEcho(reply: string, echoed: string[]): string {
     );
     out = out.replace(re, REDACTION_PLACEHOLDER);
   }
-  return out;
+  // Post-pass tidy (matches the JSDoc): collapse adjacent placeholders left by
+  // a multi-token echo, then squeeze the doubled spaces the strip introduced.
+  return out
+    .replace(/\[removed\](?:\s+\[removed\])+/g, REDACTION_PLACEHOLDER)
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 /**
  * Apply the gate to a learner-visible tutor reply. Age-scoped by the caller:
  * enforcement runs only for minors (`isMinor: true`). Returns the reply
  * unchanged when the learner is an adult, when the learner volunteered no PII,
- * or when the reply echoes none of it; returns the redacted reply with
- * `redacted: true` and the echoed tokens on a hit.
+ * or when the reply echoes none of it; on a hit returns the redacted reply with
+ * `redacted: true`, the echoed literal tokens (`echoedTerms`, in-process only),
+ * and their de-duplicated coarse categories (`echoedKinds`, safe to observe).
  */
 export function applyMinorPiiEchoGate(
   reply: string,
   learnerText: string,
   opts: { isMinor: boolean },
-): { response: string; redacted: boolean; echoedTerms: string[] } {
+): {
+  response: string;
+  redacted: boolean;
+  echoedTerms: string[];
+  echoedKinds: PiiKind[];
+} {
   if (!opts.isMinor)
-    return { response: reply, redacted: false, echoedTerms: [] };
-  const echoed = detectVolunteeredPiiEcho(reply, learnerText);
+    return {
+      response: reply,
+      redacted: false,
+      echoedTerms: [],
+      echoedKinds: [],
+    };
+  const echoed = detectVolunteeredPiiEchoMatches(reply, learnerText);
   if (echoed.length === 0) {
-    return { response: reply, redacted: false, echoedTerms: [] };
+    return {
+      response: reply,
+      redacted: false,
+      echoedTerms: [],
+      echoedKinds: [],
+    };
   }
+  const echoedTerms = echoed.map((m) => m.value);
+  const echoedKinds = [...new Set(echoed.map((m) => m.kind))];
   return {
-    response: redactPiiEcho(reply, echoed),
+    response: redactPiiEcho(reply, echoedTerms),
     redacted: true,
-    echoedTerms: echoed,
+    echoedTerms,
+    echoedKinds,
   };
 }

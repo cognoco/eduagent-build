@@ -1,6 +1,8 @@
 import {
   extractVolunteeredPii,
+  extractVolunteeredPiiMatches,
   detectVolunteeredPiiEcho,
+  redactPiiEcho,
   applyMinorPiiEchoGate,
 } from './minor-pii-echo-gate';
 
@@ -107,6 +109,30 @@ describe('detectVolunteeredPiiEcho', () => {
   });
 });
 
+describe('extractVolunteeredPiiMatches (kind tagging)', () => {
+  it('tags each volunteered PII value with its coarse category', () => {
+    const matches = extractVolunteeredPiiMatches(
+      'my name is Ada, I go to Oakwood School, email ada@example.com',
+    );
+    const byValue = Object.fromEntries(matches.map((m) => [m.value, m.kind]));
+    expect(byValue['Ada']).toBe('name');
+    expect(byValue['Oakwood School']).toBe('school');
+    expect(byValue['ada@example.com']).toBe('email');
+  });
+});
+
+describe('redactPiiEcho (post-pass tidy)', () => {
+  it('collapses an adjacent double-echo of a placeholder and squeezes spaces', () => {
+    // Model echoed a two-token name ("Ada Lovelace") back-to-back.
+    const reply = 'Dear Ada Lovelace, welcome back to class!';
+    const out = redactPiiEcho(reply, ['Ada', 'Lovelace']);
+    // The two placeholders collapse to one; no doubled spaces remain.
+    expect(out).toBe('Dear [removed], welcome back to class!');
+    expect(out).not.toMatch(/\[removed\]\s+\[removed\]/);
+    expect(out).not.toMatch(/ {2,}/);
+  });
+});
+
 describe('applyMinorPiiEchoGate', () => {
   it('NEGATIVE-PATH BREAK TEST: redacts volunteered name+school echoed to a minor', () => {
     const result = applyMinorPiiEchoGate(
@@ -123,6 +149,11 @@ describe('applyMinorPiiEchoGate', () => {
     expect(result.response).toMatch(/leaf/);
     expect(result.echoedTerms).toEqual(
       expect.arrayContaining(['Ada', 'Oakwood School']),
+    );
+    // Coarse categories accompany the redaction for observability (no raw
+    // values leave the process via the event).
+    expect(result.echoedKinds).toEqual(
+      expect.arrayContaining(['name', 'school']),
     );
   });
 
