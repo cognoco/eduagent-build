@@ -86,3 +86,132 @@ dead-sweep" list above) is explicitly **not** addressed here — its test covera
 passes and stays; removing the dead prod fn itself is WI-1167/WI-1347 territory.
 
 **Recovery:** pre-retirement file state — `git show fb7a49f6a8acd316c2cd241bfb88f64f28c12992:apps/api/src/services/billing/subscription-core.integration.test.ts`.
+
+---
+
+## WI-1347 — getSubscriptionByAccountId (2026-07-03)
+
+WI-1347 (corpus seed migration ahead of the WI-1306/0130 legacy-table drop) requires
+the full integration corpus to pass with `accounts`/`profiles`/`family_links`/
+`consent_states`/`subscriptions` physically absent. The `getSubscriptionByAccountId`
+describe block in `subscription-core.integration.test.ts` (2 `it`s: "returns null
+when no subscription exists", "returns the subscription row when one exists")
+directly calls `getSubscriptionByAccountId` (`services/billing/subscription-core.ts`),
+which does an unconditional `repo.subscriptions.findFirst()` against the legacy
+`subscriptions` table — no `tableExists` gate, no v2 fallback. Both `it`s hard-fail
+once the table is dropped, regardless of test-seed gating (the *production* function
+itself throws).
+
+**Reachability confirmed dead**, independently re-derived via `git grep -nw` and
+cross-checked against the WI-1128 follow-up entry above (which already flagged this
+same fact and deferred acting on it to "WI-1167/WI-1347 territory"): `git grep -nw
+"getSubscriptionByAccountId("` finds live call sites only inside
+`findOrCreateAccount` (`services/account.ts:168`) and `createProfileWithLimitCheck`
+(`services/profile.ts:526`) — both already confirmed transitively dead (zero
+non-test callers; `account.ts:114-115` self-documents `findOrCreateAccount` has zero
+live callers, `accountMiddleware` resolves via `resolveIdentityV2` instead).
+
+Per shepherd ruling on WI-1347: the *test* block is retired (this WI's authority);
+the *production* function `getSubscriptionByAccountId` itself is **not** removed
+here — that dead-code removal is WI-1364 territory, tracked separately.
+
+**Recovery:** annotated tag `retired/wi-1347-getsubscriptionbyaccountid` (pushed)
+points at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-getsubscriptionbyaccountid:apps/api/src/services/billing/subscription-core.integration.test.ts
+```
+
+---
+
+## WI-1347 — tests/integration/consent-restore-archive.integration.test.ts (2026-07-03)
+
+Retired per explicit orchestrator ruling on WI-1347 (non-negotiable — not a builder
+judgment call). Whole file, one describe block: a
+`(isIdentityV2Enabled() ? describe.skip : describe)`-gated legacy-quarantine suite
+(2 `it`s: "restoreConsent clears archivedAt atomically",
+"archive-cleanup bails with consent_restored when consent is CONSENTED"). Its own
+header comment already documented the disposition: it exercises
+`services/consent.ts`, "whose DB layer is orphaned dead code (§7.3-confirmed; all DB
+exports have live V2 twins in services/identity-v2/consent-v2.ts)", and "fails
+post-0130 because consent.ts reads legacy tables WI-1128 drops." Its raw
+`accounts`/`profiles`/`family_links`/`consent_states` seeds were unconditional (no
+`tableExists` gate) and would hard-fail once those tables are dropped regardless.
+
+Coverage is not lost: `tests/integration/consent-restore-archive-v2.integration.test.ts`
+already exercises the same restore-vs-archive-cleanup race against the v2
+(person/organization/guardianship/consentGrant) graph — it is in fact the source the
+WI-1347 refine package cites as the canonical v2 seeding idiom for this WI.
+`archive-cleanup`'s "bails with consent_restored" behavior also has non-integration
+coverage in `apps/api/src/inngest/functions/archive-cleanup.test.ts`.
+
+**Recovery:** annotated tag `retired/wi-1347-consent-restore-archive` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-consent-restore-archive:tests/integration/consent-restore-archive.integration.test.ts
+```
+
+---
+
+## WI-1347 — billing/trial.integration.test.ts (2026-07-03)
+
+Shepherd-ruled disposition (option a, of two proposed). 4 of the file's 5 describe
+blocks retired: `transitionToExtendedTrial atomicity [CR-2026-05-19-M3 SITE 2a]`,
+`downgradeExtendedTrialQuotaIfStillExpired atomicity [F-121]`,
+`transitionToExtendedTrialFromRevenuecatEvent [WI-78 review]`,
+`expireTrialAndDowngradeQuota atomicity [CR-2026-05-19-M3 SITE 2b]`. All test exports
+of `apps/api/src/services/billing/trial.ts` (the legacy, non-V2 trial-lifecycle
+functions), confirmed transitively dead via `git grep -nw`: each has live call sites
+only inside `services/billing.ts` / `services/billing/index.ts` barrel re-exports —
+no real invocation anywhere else. The live Inngest cron
+(`apps/api/src/inngest/functions/trial-expiry.ts`) imports its trial-expiry logic
+exclusively from `services/billing/billing-v2`, not `services/billing/trial.ts`.
+
+Also trimmed 2 of 3 tests inside the surviving `Quota reset helpers (integration)
+[CR-2026-05-19-C7]` describe: the combined-transaction atomicity test and the
+standalone `resetExpiredQuotaCycles` test. Legacy `resetExpiredQuotaCycles` is
+likewise dead — the live `quota-reset.ts` cron pairs `resetDailyQuotas` with
+`resetExpiredQuotaCyclesV2` instead (per an in-code comment: "the legacy
+resetExpiredQuotaCycles joins the `subscriptions` table dropped at the cutover...
+and would FK/500"). `resetDailyQuotas` itself touches no legacy identity table
+(`quota_pools`/`profile_quota_usage` only) and is live-safe; its one test is kept.
+
+**Coverage gap, tracked separately:** there is currently zero integration coverage
+of the v2 trial-lifecycle twins (`services/billing/billing-v2/trial-v2.ts`:
+`transitionToExtendedTrialV2`, `downgradeExtendedTrialQuotaIfStillExpiredV2`,
+`transitionToExtendedTrialFromRevenuecatEventV2`, `expireTrialAndDowngradeQuotaV2`,
+`resetExpiredQuotaCyclesV2`) anywhere in the repo. Filed as **WI-1371**
+(trial-v2.ts integration coverage) by the shepherd.
+
+**Recovery:** annotated tag `retired/wi-1347-trial-dead-fn-blocks` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-trial-dead-fn-blocks:apps/api/src/services/billing/trial.integration.test.ts
+```
+
+---
+
+## WI-1347 — quota-reconcile.integration.test.ts (2026-07-03)
+
+Retired the `reconcileQuotaStateForSubscription` describe block's "returns null for
+an unknown subscription id" `it`. The legacy (non-V2) `reconcileQuotaStateForSubscription`
+(`apps/api/src/services/billing/quota-reconcile.ts:36`) is transitively dead per the
+file's own in-code comment (lines 21-24): "KEPT — it is transitively reachable from
+subscription-core.ts's createSubscription/ensureFreeSubscription, which are in turn
+only reachable from services/account.ts's findOrCreateAccount" — all three already
+confirmed dead (zero live callers) in the `getSubscriptionByAccountId` entry above.
+It reads the legacy `subscriptions` table unconditionally (no `tableExists` gate) and
+hard-fails once the table is dropped, regardless of test-seed gating.
+
+The sibling `it` ("resolves the effective tier of an active plus subscription and
+writes per-profile rows") in the same describe tests the live V2 twin,
+`reconcileQuotaStateForSubscriptionV2`, and is kept unchanged.
+
+**Recovery:** annotated tag `retired/wi-1347-quota-reconcile-dead-fn` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-quota-reconcile-dead-fn:apps/api/src/services/billing/quota-reconcile.integration.test.ts
+```

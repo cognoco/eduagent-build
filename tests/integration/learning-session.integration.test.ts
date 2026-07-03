@@ -35,6 +35,7 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
@@ -109,6 +110,8 @@ async function loadAccount(): Promise<{ id: string } | undefined> {
     if (membershipRow) return { id: membershipRow.organizationId };
   }
 
+  if (!(await legacyIdentityTableExistsForTest(db, 'accounts')))
+    return undefined;
   return db.query.accounts.findFirst({
     where: eq(accounts.clerkUserId, AUTH_USER_ID),
     columns: { id: true },
@@ -249,10 +252,15 @@ async function loadSubscriptionAndQuota(profileId: string) {
   // [WI-1145] Resolve the subscription v2-first — the owner bootstrap writes
   // subscription-v2 unconditionally post-WI-867 collapse (legacy `subscriptions`
   // empty on the flag-off main lane). Only `.id` is consumed downstream.
-  const legacySub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, account!.id),
-    columns: { id: true },
-  });
+  const legacySub = (await legacyIdentityTableExistsForTest(
+    db,
+    'subscriptions',
+  ))
+    ? await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.accountId, account!.id),
+        columns: { id: true },
+      })
+    : null;
   const [v2Sub] = legacySub
     ? []
     : await db
@@ -263,18 +271,22 @@ async function loadSubscriptionAndQuota(profileId: string) {
   const subscription = legacySub ?? v2Sub;
   expect(subscription).not.toBeNull();
 
+  // [WI-1347] profileQuota may be legitimately absent here: with the legacy
+  // tables dropped, quota is lazy-provisioned on first real use rather than
+  // eagerly at account/profile creation, so a "before any message" snapshot
+  // can observe no row yet. Callers must treat a missing row as zero usage,
+  // not an error.
   const profileQuota = await db.query.profileQuotaUsage.findFirst({
     where: and(
       eq(profileQuotaUsage.subscriptionId, subscription!.id),
       eq(profileQuotaUsage.profileId, profileId),
     ),
   });
-  expect(profileQuota).not.toBeNull();
 
   return {
     account: account!,
     subscription: subscription!,
-    profileQuota: profileQuota!,
+    profileQuota,
   };
 }
 
@@ -441,8 +453,11 @@ describe('Integration: Learning Session Lifecycle', () => {
 
       const quota = await loadSubscriptionAndQuota(profileId);
       expect(quota.subscription.id).toBe(before.subscription.id);
-      expect(quota.profileQuota.usedThisMonth).toBe(
-        before.profileQuota.usedThisMonth + 1,
+      expect(quota.profileQuota).not.toBeUndefined();
+      // [WI-1347] before.profileQuota may be undefined — lazy-provisioned on
+      // this first message, so "before" usage is implicitly 0.
+      expect(quota.profileQuota!.usedThisMonth).toBe(
+        (before.profileQuota?.usedThisMonth ?? 0) + 1,
       );
 
       const events = await loadSessionEvents(session.id);
@@ -619,7 +634,15 @@ describe('Integration: Learning Session Lifecycle', () => {
       expect(summary!.status).toBe('accepted');
       expect(summary!.content).toContain('sunlight');
 
-      expect(getCapturedInngestEvents()).toEqual([
+      // [WI-1347] Scoped to app/session.* — with the legacy tables dropped,
+      // quota is lazy-provisioned on first use and emits an unrelated
+      // app/billing.profile_quota.lazy_provisioned event earlier in this
+      // flow (a billing/quota concern this describe doesn't own). See
+      // getCapturedInngestEvents' doc comment, option 3 (scope by event name).
+      const sessionEventsCaptured = getCapturedInngestEvents().filter((e) =>
+        e.name.startsWith('app/session.'),
+      );
+      expect(sessionEventsCaptured).toEqual([
         expect.objectContaining({
           name: 'app/session.completed',
           data: expect.objectContaining({

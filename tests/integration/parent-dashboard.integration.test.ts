@@ -39,6 +39,7 @@ import {
   seedFamilyLinkForTest,
   seedSubject as seedSubjectForTest,
 } from './route-fixtures';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -115,10 +116,12 @@ async function seedFamilyLink(
   childProfileId: string,
 ): Promise<void> {
   const db = createIntegrationDb();
-  await db
-    .insert(familyLinks)
-    .values({ parentProfileId, childProfileId })
-    .onConflictDoNothing();
+  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+    await db
+      .insert(familyLinks)
+      .values({ parentProfileId, childProfileId })
+      .onConflictDoNothing();
+  }
 
   // [WI-1145] Seed the v2 guardianship edge + child cross-org membership
   // unconditionally. This file creates profiles through routes, but the
@@ -733,18 +736,20 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
     await seedFamilyLink(parentProfileId, childProfileId);
 
     const db = createIntegrationDb();
-    await db
-      .delete(consentStates)
-      .where(eq(consentStates.profileId, childProfileId));
-    await db.insert(consentStates).values({
-      profileId: childProfileId,
-      consentType: 'GDPR',
-      status: 'WITHDRAWN',
-      parentEmail: PARENT_EMAIL,
-      consentToken: `test-consent-${childProfileId}`,
-      respondedAt: new Date(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
+    if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
+      await db
+        .delete(consentStates)
+        .where(eq(consentStates.profileId, childProfileId));
+      await db.insert(consentStates).values({
+        profileId: childProfileId,
+        consentType: 'GDPR',
+        status: 'WITHDRAWN',
+        parentEmail: PARENT_EMAIL,
+        consentToken: `test-consent-${childProfileId}`,
+        respondedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+    }
 
     // [WI-1145] Seed the v2 consentGrant (withdrawn) unconditionally alongside the
     // legacy consentStates above — the collapsed dashboard consent read resolves via

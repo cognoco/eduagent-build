@@ -298,13 +298,13 @@ async function seedSubscriptionWithQuota(input: {
     })
     .returning();
 
-  // Mirror into legacy `subscriptions` under the SAME id — `subscriptions`
-  // is retained (not on the drop list); loadSubscriptionByAccountId and
-  // createSubscription/ensureFreeSubscription (legacy-store tests above)
-  // still read it.
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
+  // [WI-1347] Mirror into legacy `subscriptions` under the SAME id, gated —
+  // `subscriptions` IS on the WI-1306/0130 drop list despite the prior
+  // comment here; createSubscription/ensureFreeSubscription (tested below)
+  // are transitively dead (see docs/_archive/retired-code.md), so this
+  // anchor self-inerts once the table is dropped.
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
       id: subscriptionV2Row!.id,
       accountId: input.accountId,
       tier: input.tier,
@@ -317,13 +317,13 @@ async function seedSubscriptionWithQuota(input: {
       lastRevenuecatEventId: input.lastRevenuecatEventId ?? null,
       lastRevenuecatEventTimestampMs:
         input.lastRevenuecatEventTimestampMs ?? null,
-    })
-    .returning();
+    });
+  }
 
   const [quotaPool] = await db
     .insert(quotaPools)
     .values({
-      subscriptionId: subscription!.id,
+      subscriptionId: subscriptionV2Row!.id,
       monthlyLimit: input.monthlyLimit ?? tierConfig.monthlyQuota,
       usedThisMonth: input.usedThisMonth ?? 0,
       dailyLimit:
@@ -336,7 +336,7 @@ async function seedSubscriptionWithQuota(input: {
     .returning();
 
   return {
-    subscription: subscription!,
+    subscription: subscriptionV2Row!,
     quotaPool: quotaPool!,
   };
 }

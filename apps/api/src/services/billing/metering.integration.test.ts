@@ -145,16 +145,18 @@ async function seedSubscriptionWithQuota(input: {
     })
     .returning();
 
-  // [WI-1239 / 779-strip] Mirror the v2 subscription into the legacy
-  // `subscriptions` table under the SAME id — quota_pools' FK still points at
-  // the legacy table (pre-M-REPOINT), so a v2-only subscription row leaves
-  // nothing for the insert below to reference.
-  await db.insert(subscriptions).values({
-    id: subscription!.id,
-    accountId: input.organizationId,
-    tier,
-    status: input.status ?? 'active',
-  });
+  // [WI-1347] Mirror the v2 subscription into the legacy `subscriptions`
+  // table under the SAME id — an id-aligned anchor only; quota_pools' FK now
+  // targets v2 `subscription` (repointed by 0129 M-REPOINT), so this is a
+  // no-op once the legacy table is dropped.
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
+      id: subscription!.id,
+      accountId: input.organizationId,
+      tier,
+      status: input.status ?? 'active',
+    });
+  }
 
   const [quotaPool] = await db
     .insert(quotaPools)
