@@ -101,6 +101,35 @@ KEPT function). 13 test files, all validated green in the worktree
 Recovery for all of the above is the existing pre-sweep tag
 `retired/wi-1364-dead-legacy-readers` plus this commit's parent.
 
+### Guard-ratchet gap closure (completeness follow-up, 2026-07-04)
+
+Two tree-scanning guard tests went red in CI (they scan source, not import the
+changed files, so file-targeted jest never selected them). Both are direct
+consequences of the sweep:
+
+- **`inngest/functions/billing-trial-subscription-failed.ts` (+ its co-located
+  test + registration in `inngest/index.ts`) REMOVED.** This handler observed the
+  `app/billing.trial_subscription_failed` event, whose **sole** dispatcher was the
+  removed `findOrCreateAccount` (it created the trial subscription *separately,
+  after* the account, in a try/catch that let account creation succeed even when
+  the trial insert failed — the silent-recovery path the event escalated per
+  BUG-837). The v2 account-provisioning path (`identity-v2/identity-graph.ts`
+  `createIdentityGraph`, step 8) creates the trial subscription **inline and
+  atomically inside the graph transaction** — a failed insert throws and rolls the
+  whole account creation back (fail-loud), so there is no silent-recovery state to
+  escalate and no v2 equivalent event. The handler was a true inverse-orphan
+  (registered, zero production dispatchers). `orphan-handler.guard.test.ts` flagged
+  it; removal (not a `KNOWN_PENDING_INVERSE_ORPHANS` park) is the fix. No
+  dispatcher-orphan created (0 dispatchers).
+- **`multi-write-tx.guard.test.ts` target repointed** `services/deletion.ts` →
+  `services/identity-v2/deletion-v2.ts`. The WI-1060 multi-write-transaction
+  invariant that `executeDeletion` carried now lives in the `executeDeletionV2`
+  family of the live v2 twin (all writes wrapped in `db.transaction`); the guard
+  follows the invariant to the live code rather than dropping coverage.
+
+Recovery: same pre-sweep tag `retired/wi-1364-dead-legacy-readers` plus this
+commit's parent.
+
 ---
 
 ## WI-1128 — legacy identity integration suites (2026-07-03)
