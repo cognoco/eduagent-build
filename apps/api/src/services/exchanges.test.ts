@@ -310,9 +310,19 @@ describe('[WI-1349] processExchange — exact-date age gate (Gemini-under-18 ban
           stopReason: 'stop' as StopReason,
         };
       },
-      chatStream() {
+      chatStream(messages: ChatMessage[]) {
+        sink.calledBy.push(id);
+        const first = messages[0];
+        sink.systemPromptByProvider[id] =
+          first?.role === 'system' && typeof first.content === 'string'
+            ? first.content
+            : '';
+        const envelope = JSON.stringify({
+          reply: 'Photosynthesis converts light into chemical energy.',
+          signals: { understanding_check: false },
+        });
         const s = (async function* () {
-          yield '';
+          yield envelope;
         })();
         return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
@@ -339,6 +349,42 @@ describe('[WI-1349] processExchange — exact-date age gate (Gemini-under-18 ban
 
       // (a) Gemini config must NOT resolve — the under-18 vendor ban holds for a
       // learner whose EXACT age is still 17, routing to the approved provider.
+      expect(sink.calledBy).not.toContain('gemini');
+      expect(sink.calledBy).toContain('cerebras');
+      // (b) The young-learner safety preamble is selected, not the adult one.
+      const prompt = sink.systemPromptByProvider['cerebras'] ?? '';
+      expect(prompt).toContain('for young learners');
+      expect(prompt).not.toContain('The current learner is an adult');
+    } finally {
+      jest.useRealTimers();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
+  it('[WI-1349][SECURITY] streamExchange — still-17 learner routes OFF Gemini + young-learner preamble', async () => {
+    // The streamExchange seam carries the identical Gemini-under-18 ban +
+    // preamble bug and the identical fix — this proves the STREAM path
+    // independently (reverting only the streamExchange seam to year-only turns
+    // this RED while the processExchange test above stays GREEN).
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    const sink: RouteSink = { calledBy: [], systemPromptByProvider: {} };
+    registerProvider(capturingProvider('gemini', sink));
+    registerProvider(capturingProvider('cerebras', sink));
+    try {
+      const stillSeventeen: ExchangeContext = {
+        ...baseContext,
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      };
+      const result = await streamExchange(stillSeventeen, QUESTION);
+      // Consume the stream to completion so the provider is actually invoked.
+      for await (const _chunk of result.stream) {
+        void _chunk;
+      }
+
+      // (a) Gemini config must NOT resolve — the under-18 vendor ban holds.
       expect(sink.calledBy).not.toContain('gemini');
       expect(sink.calledBy).toContain('cerebras');
       // (b) The young-learner safety preamble is selected, not the adult one.

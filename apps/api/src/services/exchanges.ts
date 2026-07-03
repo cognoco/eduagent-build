@@ -1822,8 +1822,7 @@ export async function streamExchange(
     },
   ];
 
-  // [WI-1349] Safety-adjacent age gate — see the identical note in processExchange.
-  // Exact-date bracket drives the under-18 Gemini ban + safety-preamble selection.
+  // [WI-1349] Safety-adjacent age gate — identical rationale to processExchange above.
   const ageBracket = computeAgeBracketFromDate(
     context.birthYear,
     context.birthMonth,
