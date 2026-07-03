@@ -32,6 +32,7 @@ for `llm-models`, `docs/runbooks/llm-model-vetting.md`.
 | Register | Master | Trail | Migrates to | Backing ADR(s) |
 |---|---|---|---|---|
 | **llm-models** | [`llm-models/master.md`](llm-models/master.md) | [`llm-models/vetting/`](llm-models/vetting/) | policy-engine `allowed_models` | `MMT-ADR-0014` (router/vetting split), `MMT-ADR-0013` (engine), `MMT-ADR-0016` (safety/judge architecture) |
+| **safety-guards** | [`safety-guards/master.md`](safety-guards/master.md) | [`safety-guards/trail/`](safety-guards/trail/) | policy-engine (target TBD) | none yet — see `docs/adr/MMT-ADR-0000` for the ADR significance gate |
 | _policy-cells_ (planned) | — | — | policy-engine policy matrix | `MMT-ADR-0013` |
 
 ## Conventions
