@@ -74,7 +74,11 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { safeSend } from '../services/safe-non-core';
+import { safeSend, safeWrite } from '../services/safe-non-core';
+import {
+  recordActivationEvent,
+  deriveActivationProfileShape,
+} from '../services/activation-events';
 import { refundQuotaOrEscalate } from '../services/billing';
 import {
   startInterleavedSession,
@@ -126,6 +130,36 @@ function getErrorDebugFields(err: unknown): {
     causeName: cause instanceof Error ? cause.name : undefined,
     circuitKey,
   };
+}
+
+// WI-1504: launch activation instrumentation. occurrenceKey is deliberately
+// omitted — first_session_started should record only the FIRST session a
+// profile starts, not every session, so the default profile-scoped
+// dedupeKey (no occurrence suffix) lets onConflictDoNothing keep only the
+// earliest row per profile. (first_session_completed is recorded inside
+// dispatchSessionCompletedEvent — services/session/session-filing-dispatch.ts
+// — the single choke point all three completion routes share.)
+async function recordFirstSessionStarted(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  route: string,
+  profileMeta: { isOwner: boolean } | undefined,
+): Promise<void> {
+  await safeWrite(
+    () =>
+      recordActivationEvent(db, {
+        eventType: 'first_session_started',
+        profileId,
+        profileShape: profileMeta
+          ? deriveActivationProfileShape(profileMeta)
+          : null,
+        route,
+        metadata: { sessionId },
+      }),
+    'sessions.start.first_session_started',
+    { profileId, sessionId },
+  );
 }
 
 function isSafetyFilterError(err: unknown): boolean {
@@ -279,6 +313,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             matcherEnabled: isTopicIntentMatcherEnabled(c.env.MATCHER_ENABLED),
           },
         );
+        await recordFirstSessionStarted(
+          db,
+          profileId,
+          session.id,
+          'POST /subjects/:subjectId/sessions/first-curriculum',
+          c.get('profileMeta'),
+        );
         // [L8-F11] Validate response shape against the public contract.
         return c.json({ session: learningSessionSchema.parse(session) }, 201);
       } catch (err) {
@@ -303,6 +344,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const input = c.req.valid('json');
       try {
         const session = await startSession(db, profileId, subjectId, input);
+        await recordFirstSessionStarted(
+          db,
+          profileId,
+          session.id,
+          'POST /subjects/:subjectId/sessions',
+          c.get('profileMeta'),
+        );
         // [L8-F11] Validate response shape against the public contract.
         return c.json({ session: learningSessionSchema.parse(session) }, 201);
       } catch (err) {

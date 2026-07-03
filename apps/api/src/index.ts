@@ -87,6 +87,7 @@ import { dictationRoutes } from './routes/dictation';
 import { quizRoutes } from './routes/quiz';
 import { feedbackRoutes } from './routes/feedback';
 import { supportRoutes } from './routes/support';
+import { activationEventsRoutes } from './routes/activation-events';
 import { librarySearchRoutes } from './routes/library-search';
 import { maintenanceRoutes } from './routes/maintenance';
 import { challengeRoundRoutes } from './routes/challenge-round';
@@ -392,7 +393,8 @@ const routes = api
   .route('/', visibilityRoutes)
   .route('/', analyticsRoutes)
   .route('/', nowRoutes)
-  .route('/', challengeRoundRoutes);
+  .route('/', challengeRoundRoutes)
+  .route('/', activationEventsRoutes);
 
 // ---------------------------------------------------------------------------
 // App — mounts routes under /v1 for the actual Cloudflare Worker runtime.

@@ -1,0 +1,125 @@
+// ---------------------------------------------------------------------------
+// Activation Events Ingest — WI-1504
+//
+// A minimal first-party ingest route for activation-funnel events that are
+// purely client-observed and may fire before a profile (or even an account)
+// exists: app_opened, signup_started, onboarding_completed,
+// review_card_seen, review_card_tapped, day2_return. Server-reachable
+// touchpoints (signup_completed, first_subject_or_lesson_started,
+// first_session_started, first_session_completed) are recorded directly by
+// the route/service that owns that transition — NOT through this route —
+// so this handler rejects them (they would otherwise let a client spoof a
+// server-owned funnel step).
+//
+// Reachable pre-graph: the Clerk JWT must be valid (authMiddleware), but no
+// account/profile row needs to exist yet — see PRE_GRAPH_ALLOWLIST in
+// middleware/account.ts, which exempts this path from the account-required
+// 401.
+// ---------------------------------------------------------------------------
+
+import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
+import {
+  activationEventIngestRequestSchema,
+  activationEventIngestResponseSchema,
+  ERROR_CODES,
+} from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+import type { AuthUser } from '../middleware/auth';
+import type { ProfileMeta } from '../middleware/profile-scope';
+import { apiError } from '../errors';
+import { safeWrite } from '../services/safe-non-core';
+import {
+  recordActivationEvent,
+  deriveActivationProfileShape,
+} from '../services/activation-events';
+
+type ActivationEventsRouteEnv = {
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+  };
+  Variables: {
+    user: AuthUser;
+    db: Database;
+    profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
+  };
+};
+
+// Client-driven only — the server-owned touchpoints (signup_completed,
+// first_subject_or_lesson_started, first_session_started,
+// first_session_completed) are never accepted from the client.
+const CLIENT_DRIVEN_EVENT_TYPES = new Set([
+  'app_opened',
+  'signup_started',
+  'onboarding_completed',
+  'review_card_seen',
+  'review_card_tapped',
+  'day2_return',
+]);
+
+export const activationEventsRoutes = new Hono<ActivationEventsRouteEnv>().post(
+  '/activation-events',
+  zValidator('json', activationEventIngestRequestSchema),
+  async (c) => {
+    const db = c.get('db');
+    const input = c.req.valid('json');
+
+    if (!CLIENT_DRIVEN_EVENT_TYPES.has(input.eventType)) {
+      return apiError(
+        c,
+        422,
+        ERROR_CODES.VALIDATION_ERROR,
+        `eventType '${input.eventType}' is recorded server-side and cannot be reported via this route.`,
+      );
+    }
+
+    const profileId = c.get('profileId') ?? null;
+    const profileMeta = c.get('profileMeta');
+
+    // WI-1504: non-core write — a telemetry failure must never surface as an
+    // error to the client. `recorded` reflects whether the write is likely
+    // to have landed, but the client should never branch on it beyond
+    // logging; a `false` here (including from a dedupe no-op) is not
+    // actionable client-side.
+    const occurredAtDate = input.occurredAt
+      ? new Date(input.occurredAt)
+      : new Date();
+    // Per-occurrence dedupe. When the client supplies `occurrenceId` (e.g. a
+    // review card id), use it directly so distinct occurrences on the same
+    // day each land as their own row. Otherwise fall back to a UTC-day
+    // bucket, appropriate for "once per day" events (app_opened,
+    // day2_return, onboarding_completed, signup_started) and for collapsing
+    // a chatty client's repeated retries into one row per actor per day.
+    const occurrenceKey =
+      input.occurrenceId ?? occurredAtDate.toISOString().slice(0, 10);
+
+    let recorded = false;
+    await safeWrite(
+      async () => {
+        const row = await recordActivationEvent(db, {
+          eventType: input.eventType,
+          profileId,
+          anonymousId: input.anonymousId,
+          occurredAt: occurredAtDate,
+          environment: input.environment ?? null,
+          appVersion: input.appVersion ?? null,
+          platform: input.platform ?? null,
+          profileShape: profileMeta
+            ? deriveActivationProfileShape(profileMeta)
+            : null,
+          route: input.route ?? null,
+          occurrenceKey,
+          metadata: input.metadata ?? {},
+        });
+        recorded = row !== null;
+        return row;
+      },
+      'activation-events.ingest',
+      { eventType: input.eventType, profileId },
+    );
+
+    return c.json(activationEventIngestResponseSchema.parse({ recorded }), 201);
+  },
+);

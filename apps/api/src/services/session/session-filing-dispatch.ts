@@ -3,8 +3,9 @@ import { sessionAutoFileRequestedEventSchema } from '@eduagent/schemas';
 
 import { inngest } from '../../inngest/client';
 import { createLogger } from '../logger';
-import { safeSend } from '../safe-non-core';
+import { safeSend, safeWrite } from '../safe-non-core';
 import { captureException } from '../sentry';
+import { recordActivationEvent } from '../activation-events';
 import {
   getSession,
   getSessionCompletionContext,
@@ -139,6 +140,24 @@ export async function dispatchSessionCompletedEvent(
     });
     throw err;
   }
+
+  // WI-1504: launch activation instrumentation. occurrenceKey is
+  // deliberately omitted — first_session_completed should record only the
+  // FIRST session a profile completes, not every completion, so the
+  // default profile-scoped dedupeKey (no occurrence suffix) lets
+  // onConflictDoNothing keep only the earliest row. Non-core: must never
+  // affect the pipeline-queued result computed above.
+  await safeWrite(
+    () =>
+      recordActivationEvent(db, {
+        eventType: 'first_session_completed',
+        profileId,
+        route: 'app/session.completed',
+        metadata: { sessionId: completion.sessionId },
+      }),
+    'sessions.dispatch_completed.first_session_completed',
+    { profileId, sessionId: completion.sessionId },
+  );
 
   return { pipelineQueued: true };
 }
