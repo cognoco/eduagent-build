@@ -40,6 +40,7 @@ import {
   type CatastrophicCategory,
 } from './safety-tripwire';
 import { applyDangerousProcedureGate } from './dangerous-procedure-gate';
+import { applyMinorPiiEchoGate } from './minor-pii-echo-gate';
 import { computeAgeBracketFromDate } from '@eduagent/schemas';
 import { getOcrProvider } from './ocr';
 import {
@@ -1677,7 +1678,21 @@ export async function processExchange(
       model: result.model,
     });
   }
-  const gatedResponse = procedureGate.response;
+  // [WI-1348] Server-side minor-PII echo-back gate (fail-closed, same minor
+  // scope as the procedure gate above). Strips any PII the learner volunteered
+  // in THIS turn or recent turns that the model echoed back into the reply.
+  const learnerVolunteeredText = [
+    ...context.exchangeHistory
+      .filter((e) => e.role === 'user')
+      .map((e) => e.content),
+    userMessage,
+  ].join('\n');
+  const piiEchoGate = applyMinorPiiEchoGate(
+    procedureGate.response,
+    learnerVolunteeredText,
+    { isMinor: isMinorLearner },
+  );
+  const gatedResponse = piiEchoGate.response;
 
   return {
     response: gatedResponse,
