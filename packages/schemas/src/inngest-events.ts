@@ -617,3 +617,55 @@ export const subscriptionStoreTeardownRequestedDataSchema = z.object({
 export type SubscriptionStoreTeardownRequestedData = z.infer<
   typeof subscriptionStoreTeardownRequestedDataSchema
 >;
+
+// ---------------------------------------------------------------------------
+// app/safety.minor_pii_echo_redacted — minor-PII echo-back gate observability
+// (WI-1348)
+//
+// Emitted when the server-side minor-PII echo-back gate redacts a tutor reply
+// that repeated back PII the minor volunteered. Observability-only: the
+// learner-facing + persisted reply is already redacted server-side; this event
+// exists so ops can query the gate's fire rate, monitor recall, and hold an
+// audit trail for a privacy incident. No downstream handler is required.
+//
+// PII egress: NO raw redacted VALUES. Carrying the minor's actual name /
+// school / email into Inngest's third-party event store would re-leak exactly
+// the PII this gate exists to strip (same PII-egress rule the other schemas in
+// this file enforce). The payload carries only the coarse `redactedKinds`
+// (categories) + `redactedCount` + opaque ids; an incident investigator
+// rehydrates the raw values first-party from `session_events`, scoped by
+// profileId.
+// ---------------------------------------------------------------------------
+/**
+ * The six coarse categories of minor PII the echo-back gate detects (WI-1348).
+ * SINGLE SOURCE OF TRUTH: the gate (`minor-pii-echo-gate.ts`) imports `PiiKind`
+ * from here rather than re-declaring the union, so the detector categories and
+ * the observability event's enum cannot drift apart (a drift would make the
+ * event silently fail Inngest validation inside safeSend).
+ */
+export const piiKindSchema = z.enum([
+  'email',
+  'handle',
+  'phone',
+  'name',
+  'school',
+  'address',
+]);
+export type PiiKind = z.infer<typeof piiKindSchema>;
+
+export const minorPiiEchoRedactedEventSchema = z.object({
+  profileId: z.string().min(1),
+  sessionId: z.string().optional(),
+  flow: z.string().min(1),
+  provider: z.string().optional(),
+  /** The deterministic gate marker (MINOR_PII_ECHO_GATE_MODEL). */
+  model: z.string().min(1),
+  /** Coarse categories of the redacted PII — never the raw values. */
+  redactedKinds: z.array(piiKindSchema),
+  /** How many distinct PII tokens were redacted from the reply. */
+  redactedCount: z.number().int().nonnegative(),
+  timestamp: isoDateField,
+});
+export type MinorPiiEchoRedactedEvent = z.infer<
+  typeof minorPiiEchoRedactedEventSchema
+>;

@@ -58,7 +58,9 @@ import {
   classifyExchangeOutcome,
   auditExchangeSources,
   applySourceAuditSafetyFallback,
+  collectLearnerText,
   emitDangerousProcedureBlockedEvent,
+  emitMinorPiiEchoRedactedEvent,
   inferObviousReliableSourceForAudit,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -66,6 +68,7 @@ import {
   type ImageData,
 } from '../exchanges';
 import { applyDangerousProcedureGate } from '../dangerous-procedure-gate';
+import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
 import {
@@ -3842,7 +3845,31 @@ export async function streamMessage(
           model: result.model,
         });
       }
-      const gatedResponse = procedureGate.response;
+      // [WI-1348] Server-side minor-PII echo-back gate (fail-closed, same minor
+      // scope as the procedure gate above). Strips any PII the learner
+      // volunteered in this turn or recent turns that the model echoed back.
+      // Rides the same `sourceReplacement` rail so the client replaces the
+      // tokens it already streamed.
+      const learnerVolunteeredText = collectLearnerText(
+        context.exchangeHistory,
+        input.message,
+      );
+      const piiEchoGate = applyMinorPiiEchoGate(
+        procedureGate.response,
+        learnerVolunteeredText,
+        { isMinor: isMinorLearner },
+      );
+      if (piiEchoGate.redacted) {
+        await emitMinorPiiEchoRedactedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          redactedKinds: piiEchoGate.echoedKinds,
+          redactedCount: piiEchoGate.echoedTerms.length,
+        });
+      }
+      const gatedResponse = piiEchoGate.response;
       const sourceReplacement =
         gatedResponse !== parsed.cleanResponse ? gatedResponse : undefined;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
