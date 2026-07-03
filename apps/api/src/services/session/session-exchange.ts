@@ -33,6 +33,8 @@ import type {
   ChallengeRoundSessionState,
   TopicProbeRequestedEvent,
   ReviewCalibrationRequestedEvent,
+  LanguageActivityTelemetry,
+  LanguageComprehensionEvaluation,
 } from '@eduagent/schemas';
 import {
   computeAgeBracket,
@@ -129,8 +131,6 @@ import {
 import {
   buildLanguageSessionState,
   isLikelyLanguageLearningIntent,
-  type LanguageActivityTelemetry,
-  type LanguageComprehensionEvaluation,
 } from '../language-session-engine';
 import {
   findOwnedCurriculumTopic,

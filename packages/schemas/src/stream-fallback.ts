@@ -84,6 +84,7 @@ export const streamLanguageComprehensionQuestionSchema = z.object({
 export type StreamLanguageComprehensionQuestion = z.infer<
   typeof streamLanguageComprehensionQuestionSchema
 >;
+export type LanguageComprehensionQuestion = StreamLanguageComprehensionQuestion;
 
 export const streamLanguageGradedInputSchema = z.object({
   type: z.literal('graded_input'),
@@ -99,6 +100,8 @@ export const streamLanguageGradedInputSchema = z.object({
 export type StreamLanguageGradedInput = z.infer<
   typeof streamLanguageGradedInputSchema
 >;
+export type LanguageGradedInputModality = StreamLanguageGradedInput['modality'];
+export type LanguageGradedInputArtifact = StreamLanguageGradedInput;
 
 export const streamLanguageMeaningOutputTaskSchema = z.enum([
   'role_play',
@@ -136,6 +139,32 @@ export const streamLanguageMeaningOutputSchema = z.object({
 export type StreamLanguageMeaningOutput = z.infer<
   typeof streamLanguageMeaningOutputSchema
 >;
+export type LanguageMeaningOutputTaskType = StreamLanguageMeaningOutputTask;
+export type LanguageMeaningOutputResponseMode =
+  StreamLanguageMeaningOutputResponseMode;
+export type LanguageMeaningOutputArtifact = StreamLanguageMeaningOutput;
+
+export const languageComprehensionVerdictSchema = z.enum([
+  'understood',
+  'partial',
+  'missed',
+]);
+export type LanguageComprehensionVerdict = z.infer<
+  typeof languageComprehensionVerdictSchema
+>;
+
+export const languageComprehensionEvaluationSchema = z.object({
+  questionId: z.string().min(1),
+  prompt: z.string().min(1),
+  answerHint: z.string().min(1),
+  learnerAnswer: z.string(),
+  verdict: languageComprehensionVerdictSchema,
+  matchedTerms: z.array(z.string()),
+  missingTerms: z.array(z.string()),
+});
+export type LanguageComprehensionEvaluation = z.infer<
+  typeof languageComprehensionEvaluationSchema
+>;
 
 export const streamLanguageLearningActivitySchema = z.object({
   strand: z.enum([
@@ -159,6 +188,12 @@ export const streamLanguageLearningActivitySchema = z.object({
 export type StreamLanguageLearningActivity = z.infer<
   typeof streamLanguageLearningActivitySchema
 >;
+export type LanguageStrand = StreamLanguageLearningActivity['strand'];
+export type LanguageActivityType =
+  StreamLanguageLearningActivity['activityType'];
+export type LanguageActivityModality =
+  StreamLanguageLearningActivity['modality'];
+export type LanguageActivityTelemetry = StreamLanguageLearningActivity;
 
 /** Server-gated Challenge Round offer pitch. Mobile never parses raw envelope JSON. */
 export const streamChallengeOfferSchema = z.object({
