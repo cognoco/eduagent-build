@@ -78,12 +78,15 @@ jest.mock('../services/identity-v2/identity-graph', () => {
 // caller-identity-vs-X-Profile-Id-spoof distinction this guard exists to
 // enforce is covered by the real-DB break test in
 // tests/integration/profile-switch-elevation-idor.integration.test.ts.
-jest.mock(
-  '../services/identity-v2/ownership-v2' /* gc1-allow: route unit test — DB mocked; real DB covered by profile-switch-elevation-idor.integration.test.ts */,
-  () => ({
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
     verifyPersonIsOrgAdminV2: jest.fn(),
-  }),
-);
+  };
+});
 
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
