@@ -113,7 +113,7 @@ A second batch landed post-consolidation, sprint-tagged 'Execution Candidates' �
 |---|---|---|
 | WI-1503 dogfood prod build | MVP-in, cheap, highest value | WS-39, sequence with WI-1341 |
 | WI-1505 LLM spend guardrails + kill switch | MVP-in — aggregate guard + env-level shutoff genuinely absent (user-level dual-cap ≠ aggregate) | WS-39 or platform lane |
-| WI-1504 activation instrumentation | MVP-in — beta + launch are blind without it | WS-39 |
+| WI-1504 activation instrumentation | MVP-in — RULED 2026-07-03: sink = first-party events (API→Neon, SQL); PostHog = post-MVP fast-follow; ACs on the item | WS-39 (released) |
 | WI-1500 launch health dashboard | MVP-in as ALERTS on the 6 named signals; dashboard = fast-follow. Absorbs WI-1399 overlap | WS-39 |
 | WI-1506 closed beta (5-10 families) | Recommend YES — but it is a CALENDAR ruling (2-4 wks on critical path), decide first | operator + Zuzka, now |
 | WI-1507 compliance closure check | MVP-in — cross-check, not build; tie to WI-1442 | WS-30/29 |
