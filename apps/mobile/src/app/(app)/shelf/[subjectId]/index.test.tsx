@@ -10,6 +10,7 @@ import {
   createScreenWrapper,
   createTestProfile,
 } from '../../../../test-utils/screen-render';
+import { FEATURE_FLAGS } from '../../../../lib/feature-flags';
 import ShelfScreen from './index';
 
 jest.mock(
@@ -444,6 +445,55 @@ describe('ShelfScreen', () => {
     });
     fireEvent.press(getByTestId('shelf-back'));
     expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  // [WI-1283] handleBack hardcoded '/(app)/library' unconditionally, ignoring
+  // MODE_NAV_V2_ENABLED — unlike the flag-aware sibling
+  // subject-hub/[subjectId]'s goBack. Under V2 the Subjects tab lives at
+  // /(app)/subjects, so Back must land there instead of the legacy Library
+  // tab. Both flag states are asserted so a future regression that only
+  // fixes one direction is caught.
+  it('falls back to the V2 Subjects tab when MODE_NAV_V2_ENABLED is on', async () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      true;
+    try {
+      const { getByTestId } = render(<ShelfScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('shelf-screen');
+      });
+      fireEvent.press(getByTestId('shelf-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/subjects');
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
+  });
+
+  // [WI-1283] Legacy counterpart to the V2 test above — Back must still land
+  // on the legacy Library tab when MODE_NAV_V2_ENABLED is off, preserving
+  // today's shipped behavior for the flags-off / V0 / V1 states.
+  it('replaces to the legacy Library tab when MODE_NAV_V2_ENABLED is off', async () => {
+    const originalV2 = FEATURE_FLAGS.MODE_NAV_V2_ENABLED;
+    (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+      false;
+    try {
+      const { getByTestId } = render(<ShelfScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('shelf-screen');
+      });
+      fireEvent.press(getByTestId('shelf-back'));
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    } finally {
+      (FEATURE_FLAGS as { MODE_NAV_V2_ENABLED: boolean }).MODE_NAV_V2_ENABLED =
+        originalV2;
+    }
   });
 
   it('pressing a book card navigates to the book screen', async () => {

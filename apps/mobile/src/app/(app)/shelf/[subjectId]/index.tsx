@@ -53,7 +53,14 @@ export default function ShelfScreen() {
   const filing = useFiling();
 
   const handleBack = useCallback(() => {
-    router.replace('/(app)/library' as Href);
+    // [WI-1283] The Subjects tab moves to /(app)/subjects under the V2 shell;
+    // fall back to the legacy Library tab only when V2 nav is off, mirroring
+    // subject-hub/[subjectId]'s goBack (same Back-target-correctness fix,
+    // WI-1209 sibling).
+    const fallback = (
+      FEATURE_FLAGS.MODE_NAV_V2_ENABLED ? '/(app)/subjects' : '/(app)/library'
+    ) as Href;
+    router.replace(fallback);
   }, [router]);
 
   // Filing overlay: show spinner + skip button after 15s (same pattern as pick-book)
