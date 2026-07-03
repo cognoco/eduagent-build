@@ -58,7 +58,8 @@
     "check:adr-provenance": "tsx scripts/check-adr-provenance.ts",
     "check:decision-adr-link": "tsx scripts/check-decision-adr-link.ts",
     "check:migration-immutability": "tsx scripts/check-migration-immutability.ts",
-    "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts"
+    "check:no-gemini-runtime": "tsx scripts/check-no-gemini-runtime.ts",
+    "check:mode-nav-flag-combo": "tsx scripts/check-mode-nav-flag-combo.ts"
   },
   "private": true,
   "devDependencies": {
