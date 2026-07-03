@@ -35,11 +35,17 @@ Exactly **two** owned configurations, both on the **v2-identity backend**:
 | Rollback role | what ships to users | the rollback target if V2 must be pulled |
 | Status today | live on preview/staging; supporter half **shipped** (WI-1170/1171 closed to AC) | **UNPROVEN — must be verified.** No current env runs `V2=off/V1=on`; preview/dev set both V1 and V2 on, and V2 wins the tab shape (`use-navigation-contract.ts:185`). Config F is a capability to **build + prove** (M4), not one we have. |
 
-**Rollback is OTA/channel promotion, not a runtime flag flip.** The `MODE_NAV_*` flags are **build-time**
-`EXPO_PUBLIC_*`, read at module load (`feature-flags.ts:30`) — not a server-side runtime toggle. Pulling V2
-back to V1 means promoting a **prebuilt, tested V2=off/V1=on JS bundle** via OTA/channel (fast — ~5 min for
-JS-only — but not instant, not runtime; a binary if any native surface differs). So Config F must exist as a
-**built, E2E-verified artifact/channel** before it can be relied on (M4).
+**Rollback is a channel repoint to a pre-published fallback, not a runtime flag flip.** The `MODE_NAV_*`
+flags are **build-time** `EXPO_PUBLIC_*`, read at module load (`feature-flags.ts:30`) — not a server-side
+runtime toggle. The canonical mechanism (clarified 2026-07-03, WS-28 pre-flight; supersedes the earlier
+"promote via OTA to the production channel" wording): the **tested `V2=off/V1=on` JS bundle is published
+ahead of time to a dormant fallback branch/channel** (zero devices point at it), and rolling back = **repoint
+production → fallback** — one act at rollback time, fast (~minutes, JS-only; a binary if any native surface
+differs), production untouched until that moment. So Config F must exist as a **published, E2E-verified
+fallback artifact** before it can be relied on (M4) — and the E2E must run against the *published* artifact,
+not a local build. **Runtime-version coupling:** the fallback bundle targets the field binary's
+`runtimeVersion`; if the M6 ship changes it, the fallback is re-published + re-proven against the new binary
+**before M5 executes** (else the safety net is stale).
 
 **Not in the target — retired as tagged releases, not preserved as live code:** the V0 shell + flags-off
 legacy shell; the dead legacy-identity subtree; the legacy identity DB tables (dev's full legacy schema,
@@ -90,7 +96,7 @@ phantom schema (R3). prod pre-drop PITR marker confirmed intact (`pre-subscripti
 
 ## 4. The ordered collapse — milestones, gates, owners, reversibility
 
-Legend: **Rev** = reversible (git revert / OTA re-promote) · **IRREV** = irreversible (needs explicit human
+Legend: **Rev** = reversible (git revert / channel repoint) · **IRREV** = irreversible (needs explicit human
 confirmation + recorded rationale). Owners: **J** = Jörn (identity/backend/DB) · **Z** = Zuzka (shell/mobile/
 product) · **fleet** = mechanical agent execution under gates.
 
@@ -100,9 +106,9 @@ product) · **fleet** = mechanical agent execution under gates.
 | **M2a** | **Cutover: journal-prep** — author the catalog-gated forward migrations (repoint + drops) after the current journal tail | M1 not required | migrations authored, typecheck green, immutability guard satisfied | J | **Rev** |
 | **M2b** | **Cutover: env-apply** — apply the chain to dev/stg/CI (prod already applied), converge all to v2-only | M2a done | **per-env: fresh PITR marker + live-catalog spot-check + human-confirm** before each destructive apply | J | **IRREV** (catalog drops / journal promotion) |
 | **M3** | **Strip legacy** — tag current tree, delete dead legacy subtree + legacy schema defs (779 direction) | M2b green + tag pushed | typecheck + integration green on stripped tree; resurrection-500 surface gone | J + fleet | Rev (tag/revert) |
-| **M4** | **Prove the V1 fallback** — build a `V2=off/V1=on` channel/artifact; a **real V2-off/V1-on E2E pass** | M1 done | E2E green on the fallback artifact; artifact/channel is release-ready | Z + J | Rev |
+| **M4** | **Prove the V1 fallback** — publish the `V2=off/V1=on` bundle to the dormant fallback channel; a **real V2-off/V1-on E2E pass against the *published* artifact** (dev-client pointed at the fallback branch, not a local build) | M1 done | E2E green on the published fallback artifact; rollback = one production→fallback repoint, runbook documented | Z + J | Rev |
 | **M5** | **Retire V0 — BEFORE SHIP (RULED)** — remove flags-off + V0 behind a tag; V1 (M4) is now the sole net | **M4 proven** (a rollback must exist first) + explicit human irreversibility confirm | V2 default + V1 fallback are the only reachable configs; no V0 path | Z + J | **IRREV** |
-| **M6** | **Ship V2** | M1 + M4 + M5 done; 3 open WS-28 items closed/deferred with owners; seam smoke PR-gated | 7 publish-critical prompts green (already are) + fallback proven (M4) | Z (scope) + J | Rev (unship = OTA) |
+| **M6** | **Ship V2** | M1 + M4 + M5 done; 3 open WS-28 items closed/deferred with owners; seam smoke PR-gated | 7 publish-critical prompts green (already are) + fallback proven (M4); **if the ship changes `runtimeVersion`, the fallback bundle was re-published + re-proven against the new binary (before M5)** | Z (scope) + J | Rev (unship = repoint to fallback) |
 
 **Chain:** M1 (now, parallel) · M2a→M2b→M3 (DB/code collapse) · M4→M5→M6 (prove-fallback → retire-V0 →
 ship). M4 gates both M5 and M6 — you never remove V0 or ship V2 without a proven rollback.
