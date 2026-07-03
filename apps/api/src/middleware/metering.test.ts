@@ -313,6 +313,20 @@ jest.mock(
   }),
 );
 
+// [WI-1301] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership db.select() chain that resolves [] on the unit mock
+// DB (Proxy chain, not a real membership row) — the caller-owner scenarios
+// this file already exercises would otherwise flip from 200 to a false 403.
+// The caller-vs-X-Profile-Id-spoof distinction this guard exists to enforce
+// is covered by the real-DB break test in
+// tests/integration/account-billing-owner-idor.integration.test.ts.
+jest.mock(
+  '../services/identity-v2/ownership-v2' /* gc1-allow: route unit test — DB mocked; real DB covered by ownership-v2.integration.test.ts and account-billing-owner-idor.integration.test.ts */,
+  () => ({
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+  }),
+);
+
 // KV: use in-memory fake that exercises real services/kv Zod parsing.
 
 // [T-11 / BUG-753] Spy on logger so we can assert KV-failure observability.
