@@ -151,3 +151,42 @@ at the pre-removal commit on branch `WI-1347`. Retrieve with:
 ```
 git show retired/wi-1347-consent-restore-archive:tests/integration/consent-restore-archive.integration.test.ts
 ```
+
+---
+
+## WI-1347 — billing/trial.integration.test.ts (2026-07-03)
+
+Shepherd-ruled disposition (option a, of two proposed). 4 of the file's 5 describe
+blocks retired: `transitionToExtendedTrial atomicity [CR-2026-05-19-M3 SITE 2a]`,
+`downgradeExtendedTrialQuotaIfStillExpired atomicity [F-121]`,
+`transitionToExtendedTrialFromRevenuecatEvent [WI-78 review]`,
+`expireTrialAndDowngradeQuota atomicity [CR-2026-05-19-M3 SITE 2b]`. All test exports
+of `apps/api/src/services/billing/trial.ts` (the legacy, non-V2 trial-lifecycle
+functions), confirmed transitively dead via `git grep -nw`: each has live call sites
+only inside `services/billing.ts` / `services/billing/index.ts` barrel re-exports —
+no real invocation anywhere else. The live Inngest cron
+(`apps/api/src/inngest/functions/trial-expiry.ts`) imports its trial-expiry logic
+exclusively from `services/billing/billing-v2`, not `services/billing/trial.ts`.
+
+Also trimmed 2 of 3 tests inside the surviving `Quota reset helpers (integration)
+[CR-2026-05-19-C7]` describe: the combined-transaction atomicity test and the
+standalone `resetExpiredQuotaCycles` test. Legacy `resetExpiredQuotaCycles` is
+likewise dead — the live `quota-reset.ts` cron pairs `resetDailyQuotas` with
+`resetExpiredQuotaCyclesV2` instead (per an in-code comment: "the legacy
+resetExpiredQuotaCycles joins the `subscriptions` table dropped at the cutover...
+and would FK/500"). `resetDailyQuotas` itself touches no legacy identity table
+(`quota_pools`/`profile_quota_usage` only) and is live-safe; its one test is kept.
+
+**Coverage gap, tracked separately:** there is currently zero integration coverage
+of the v2 trial-lifecycle twins (`services/billing/billing-v2/trial-v2.ts`:
+`transitionToExtendedTrialV2`, `downgradeExtendedTrialQuotaIfStillExpiredV2`,
+`transitionToExtendedTrialFromRevenuecatEventV2`, `expireTrialAndDowngradeQuotaV2`,
+`resetExpiredQuotaCyclesV2`) anywhere in the repo. Filed as **WI-1371**
+(trial-v2.ts integration coverage) by the shepherd.
+
+**Recovery:** annotated tag `retired/wi-1347-trial-dead-fn-blocks` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-trial-dead-fn-blocks:apps/api/src/services/billing/trial.integration.test.ts
+```
