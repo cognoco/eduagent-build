@@ -1334,6 +1334,13 @@ export function applySourceAuditSafetyFallback(
       response: scrubbed.response,
       sourceAudit: {
         ...sourceAudit,
+        // [WI-1155] The server just proved the reply contained unsupported
+        // source-bound claims (it removed them). That is direct evidence
+        // that source support was insufficient for the original reply, so
+        // the audit must record insufficient=true even though the scrubbed
+        // response now stands on its own — the audit reflects what the
+        // model actually claimed, not the aftermath.
+        insufficient: true,
         reason: appendAuditReason(
           sourceAudit.reason,
           `Server removed unsupported source-bound phrase(s): ${scrubbed.removedTerms.join(', ')}.`,

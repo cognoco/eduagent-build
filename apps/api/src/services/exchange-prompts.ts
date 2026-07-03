@@ -100,6 +100,14 @@ export function getSessionTypeGuidance(
     const lengthCap = isYouth
       ? 'Hard cap: stay under about 120 words unless the learner explicitly asks for a full worked example.'
       : 'Avoid long worked solutions unless the learner explicitly asks for one.';
+    // [WI-1155] Incomplete-source guardrail. The homework_problem source is
+    // marked reliable_for_facts="true", but that only makes it reliable for
+    // what it ACTUALLY contains. When the learner signals the problem is
+    // partial (only copied a bit, cut off, blurry photo, "answer anyway"),
+    // reconstructing the missing part is inventing an answer. Withhold and
+    // ask for the complete/clearer source instead of solving from memory.
+    const incompleteSourceLine =
+      'INCOMPLETE SOURCE: If the learner signals the problem is only partially provided — they copied just a bit, the text is cut off / truncated, the photo is blurry, or they ask you to answer anyway despite a missing part (in any wording or language) — do NOT complete, guess, or reconstruct the missing part from memory. Set private_sources.insufficient=true, briefly say what you can actually see, and ask for the full or clearer worksheet/photo/problem text before answering that part. Answering from memory with a caveat is the wrong move.';
 
     if (homeworkMode === 'check_answer') {
       return (
@@ -113,7 +121,8 @@ export function getSessionTypeGuidance(
         'If you show a similar worked example, keep it tiny: one setup line and the key correction step only.\n' +
         "When possible, verify by substituting the learner's answer back into the original problem or by naming the inverse-operation check. For linear equations, the default self-check is: substitute the final x back into the original equation and confirm both sides match.\n" +
         'Do not reveal the final answer to the actual homework problem.\n' +
-        'Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.'
+        'Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.\n' +
+        incompleteSourceLine
       );
     }
 
@@ -130,7 +139,8 @@ export function getSessionTypeGuidance(
         'Do not give a full step-by-step worked example unless the learner asks for one or is stuck after trying.\n' +
         'Let the learner try the actual problem. Provide brief targeted feedback when they respond.\n' +
         'Do not reveal the final answer to the actual homework problem.\n' +
-        'Ask a question only when it genuinely helps unblock the learner.'
+        'Ask a question only when it genuinely helps unblock the learner.\n' +
+        incompleteSourceLine
       );
     }
 
@@ -146,7 +156,8 @@ export function getSessionTypeGuidance(
       'When explaining methods, use the smallest useful example; avoid full worked examples unless requested.\n' +
       'If the learner asks what mistake to watch for, give one concrete mistake and one concrete self-check, such as substituting the final answer back into the original problem or reversing the operation. For linear equations, default to: substitute x back in and confirm both sides match. Do not end with a vague abstract question.\n' +
       'Do not reveal the final answer unless the learner has already shown it.\n' +
-      'Ask a question only when it genuinely helps unblock the learner.'
+      'Ask a question only when it genuinely helps unblock the learner.\n' +
+      incompleteSourceLine
     );
   }
   if (sessionType === 'interleaved') {
@@ -1223,11 +1234,11 @@ export function buildSystemPrompt(
         '- "Let\'s flip roles for a minute — you teach, I listen."\n' +
         '- "Quick Feynman check: explain it to me from scratch."\n' +
         'After the transition phrase, on the same conversational turn:\n' +
-        'You are a curious but clueless student who wants to learn about the topic.\n' +
+        'You are a curious but clueless student who wants to learn about the topic. STAY in this role for the whole turn — do not slip back into teacher/explainer mode, do not correct or supplement their explanation, and do not answer your own follow-up question.\n' +
         'The learner is the teacher — they must explain the concept to you.\n' +
         'Ask naive follow-up questions. Probe for gaps in the explanation.\n' +
         'Never correct the learner directly — they are the teacher.\n' +
-        'Emit the rubric ONLY via the response envelope at signals.teach_back_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:\n' +
+        'MANDATORY EVERY TURN: this is a teach-back turn, so signals.teach_back_assessment is REQUIRED in your response envelope — there is no exception, even if the explanation was short, off-topic, incomplete, or you are unsure how to score it. Score honestly with the numbers you have; never omit the object. Emit the rubric ONLY via the response envelope at signals.teach_back_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:\n' +
         '  signals.teach_back_assessment: { "completeness": 0-5, "accuracy": 0-5, "clarity": 0-5, "overall_quality": 0-5, "weakest_area": "completeness"|"accuracy"|"clarity", "gap_identified": "short description or null" }\n' +
         'The `reply` field contains ONLY your naive follow-up question or reaction (the prose the learner sees).',
     );

@@ -207,6 +207,50 @@ const teachBackAssessmentSignalSchema = z.preprocess(
 );
 
 /**
+ * Verdict returned by the teach-back grader judge (WI-1155 B2 — server-side
+ * fallback for the Feynman teach-back rubric).
+ *
+ * Mirrors `challengeRoundGraderVerdictSchema`: a server-side judge is invoked
+ * when `verificationType==='teach_back'` AND the tutor model dropped
+ * `signals.teach_back_assessment` (proven to happen 4/4 on the live model even
+ * with mandatory-rubric prompt hardening). The four scores are REQUIRED here —
+ * unlike the tutor-emitted `teachBackAssessmentSignalSchema` where every field
+ * is optional — because the whole point of the fallback is to guarantee a
+ * numeric rubric. This is the envelope rule's server-side hard cap: the signal
+ * is produced deterministically even when the LLM never emits it.
+ */
+export const teachBackGraderVerdictSchema = z.object({
+  completeness: z.number().int().min(0).max(5),
+  accuracy: z.number().int().min(0).max(5),
+  clarity: z.number().int().min(0).max(5),
+  overall_quality: z.number().int().min(0).max(5),
+  weakest_area: teachBackWeakestAreaSchema,
+  gap_identified: z.preprocess((value) => {
+    if (value === null) return null;
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, z.string().max(1000).nullable().optional()),
+});
+export type TeachBackGraderVerdict = z.infer<
+  typeof teachBackGraderVerdictSchema
+>;
+
+/**
+ * Payload for the `app/teach-back.grader_degraded` Inngest observability event
+ * emitted via `safeSend` when `runTeachBackGrader` fails open. Opaque ids +
+ * reason code ONLY — no learner text (same privacy rule as the challenge-round
+ * grader degraded event above).
+ */
+export const teachBackGraderDegradedEventSchema = z.object({
+  sessionId: z.string().optional(),
+  reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
+});
+export type TeachBackGraderDegradedEvent = z.infer<
+  typeof teachBackGraderDegradedEventSchema
+>;
+
+/**
  * Per-concept evaluation produced during a Challenge Round. The LLM scores
  * each concept the learner explained back; the server uses these to draft a
  * note from `solid` items only and to persist weak spots for the rest.

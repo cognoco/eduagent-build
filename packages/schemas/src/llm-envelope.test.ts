@@ -5,6 +5,8 @@ import {
   llmResponseEnvelopeSchema,
   llmSummaryEvaluationSchema,
   normaliseSignals,
+  teachBackGraderDegradedEventSchema,
+  teachBackGraderVerdictSchema,
   type ChallengeRoundGraderVerdict,
   type NormalisedEnvelopeSignals,
 } from './llm-envelope.js';
@@ -1075,6 +1077,73 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
   it('rejects a payload missing reason', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
       sessionId: '00000000-0000-4000-8000-000000000001',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1155 B2 — teachBackGraderVerdictSchema + teachBackGraderDegradedEventSchema
+// Server-side teach-back rubric fallback: the four scores are REQUIRED (unlike
+// the tutor-emitted teach_back_assessment where all fields are optional).
+// ---------------------------------------------------------------------------
+
+describe('teachBackGraderVerdictSchema (WI-1155 B2 — server rubric)', () => {
+  it('accepts a full valid verdict', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      overall_quality: 4,
+      weakest_area: 'clarity',
+      gap_identified: 'missed rapid burial',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a null gap_identified and omitted weakest_area', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 5,
+      accuracy: 5,
+      clarity: 5,
+      overall_quality: 5,
+      gap_identified: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects when a required numeric score is missing (the fallback guarantee)', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      // overall_quality missing
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a score outside 0-5', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 7,
+      accuracy: 5,
+      clarity: 3,
+      overall_quality: 4,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('teachBackGraderDegradedEventSchema (WI-1155 B2)', () => {
+  it('accepts a payload with only reason', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an unknown reason value', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      reason: 'unknown_failure',
     });
     expect(result.success).toBe(false);
   });
