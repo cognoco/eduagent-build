@@ -85,10 +85,6 @@ import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
-  executeDeletion,
-  scheduleDeletion,
-} from '../../apps/api/src/services/deletion';
-import {
   executeDeletionV2,
   scheduleDeletionV2,
 } from '../../apps/api/src/services/identity-v2/deletion-v2';
@@ -526,8 +522,18 @@ legacyAccountDeletionCascadeDescribe(
         embedding: Array.from({ length: 1024 }, () => 0.01),
       });
 
-      await scheduleDeletion(db, accountId);
-      await executeDeletion(db, accountId);
+      // [WI-1128] Post-0129 the physical FKs are v2 (session_* / subjects →
+      // person), so the cascade only fires through executeDeletionV2 (which
+      // deletes person). Legacy executeDeletion (accounts → profiles) no longer
+      // reaches person-FK PII; accountId is the v2 organization id here.
+      await scheduleDeletionV2(db, accountId);
+      const result = await executeDeletionV2(db, {
+        organizationId: accountId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: null,
+      });
+      expect(result).toBe('deleted');
 
       const summaries = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
@@ -997,23 +1003,21 @@ legacyAccountDeletionCascadeDescribe(
         ).toBeGreaterThan(0);
 
         // -----------------------------------------------------------------------
-        // Act: delete the account. Cascade FKs do the work.
+        // Act: delete via executeDeletionV2 (deletes person → cascades every
+        // person-FK PII table below). [WI-1128] Post-0129 the DB is v2, so this
+        // is the only deletion path that reaches the repointed PII. Legacy
+        // accounts/profiles are NOT erased by v2 deletion (CUT-B3) and are
+        // dropped wholesale by 0130, so their post-deletion counts are no longer
+        // asserted here; accountId is the v2 organization id.
         // -----------------------------------------------------------------------
-        await scheduleDeletion(db, accountId);
-        await executeDeletion(db, accountId);
-
-        // -----------------------------------------------------------------------
-        // Assert: the account row is gone …
-        // -----------------------------------------------------------------------
-        const remaining = await db.execute(
-          sql`SELECT count(*)::int AS c FROM accounts WHERE id = ${accountId}`,
-        );
-        expect((remaining.rows as Array<{ c: number }>)[0].c).toBe(0);
-
-        const remainingProfile = await db.execute(
-          sql`SELECT count(*)::int AS c FROM profiles WHERE account_id = ${accountId}`,
-        );
-        expect((remainingProfile.rows as Array<{ c: number }>)[0].c).toBe(0);
+        await scheduleDeletionV2(db, accountId);
+        const result = await executeDeletionV2(db, {
+          organizationId: accountId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+        expect(result).toBe('deleted');
 
         // -----------------------------------------------------------------------
         // … and every PII-bearing table is empty for the deleted profile.
