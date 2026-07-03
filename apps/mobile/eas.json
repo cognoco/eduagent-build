@@ -12,7 +12,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.mentomate.com",
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false"
       }
     },
     "development": {
@@ -57,7 +57,7 @@
         "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "false",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "SENTRY_DISABLE_AUTO_UPLOAD": "false"
       }
     }
   },
