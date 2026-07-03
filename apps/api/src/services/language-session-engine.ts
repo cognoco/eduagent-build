@@ -2,6 +2,16 @@ import {
   streamLanguageLearningActivitySchema,
   type CefrLevel,
   type InputMode,
+  type LanguageActivityTelemetry,
+  type LanguageActivityModality,
+  type LanguageActivityType,
+  type LanguageComprehensionEvaluation,
+  type LanguageComprehensionVerdict,
+  type LanguageGradedInputArtifact,
+  type LanguageMeaningOutputArtifact,
+  type LanguageMeaningOutputResponseMode,
+  type LanguageMeaningOutputTaskType,
+  type LanguageStrand,
 } from '@eduagent/schemas';
 
 import { SUPPORTED_LANGUAGES } from '../data/languages';
@@ -11,91 +21,13 @@ export const LANGUAGE_STRANDS = [
   'meaning_output',
   'language_focus',
   'fluency',
-] as const;
-
-export type LanguageStrand = (typeof LANGUAGE_STRANDS)[number];
-
-export type LanguageActivityType =
-  | 'graded_input'
-  | 'free_response'
-  | 'correction_retry'
-  | 'timed_drill';
-
-export type LanguageActivityModality = 'text' | 'voice' | 'listening';
-
-export type LanguageGradedInputModality = 'reading' | 'listening';
-
-export type LanguageMeaningOutputTaskType =
-  | 'role_play'
-  | 'personal_answer'
-  | 'retell'
-  | 'describe'
-  | 'ask_question';
-
-export type LanguageMeaningOutputResponseMode =
-  | 'dialogue_turn'
-  | 'short_answer'
-  | 'short_retell'
-  | 'short_description'
-  | 'question';
-
-export interface LanguageComprehensionQuestion {
-  id: string;
-  prompt: string;
-  answerHint: string;
-}
-
-export interface LanguageGradedInputArtifact {
-  type: 'graded_input';
-  modality: LanguageGradedInputModality;
-  cefrLevel: CefrLevel;
-  knownWordRatioTarget: number;
-  knownWordEstimate: number;
-  targetWords: string[];
-  text: string;
-  comprehensionQuestions: LanguageComprehensionQuestion[];
-  audioEnabled: boolean;
-}
-
-export interface LanguageMeaningOutputArtifact {
-  type: 'meaning_output';
-  taskType: LanguageMeaningOutputTaskType;
-  communicativeGoal: string;
-  prompt: string;
-  responseMode: LanguageMeaningOutputResponseMode;
-  targetWords: string[];
-  targetGrammar: string[];
-  retryExpectation: 'retry_after_feedback';
-  correctionExpectation: 'meaning_first_then_form';
-}
+] as const satisfies readonly LanguageStrand[];
 
 export interface LanguageStrandCounts {
   meaning_input: number;
   meaning_output: number;
   language_focus: number;
   fluency: number;
-}
-
-export interface LanguageActivityTelemetry {
-  strand: LanguageStrand;
-  activityType: LanguageActivityType;
-  modality: LanguageActivityModality;
-  targetWords: string[];
-  targetGrammar: string[];
-  gradedInput?: LanguageGradedInputArtifact;
-  meaningOutput?: LanguageMeaningOutputArtifact;
-}
-
-export type LanguageComprehensionVerdict = 'understood' | 'partial' | 'missed';
-
-export interface LanguageComprehensionEvaluation {
-  questionId: string;
-  prompt: string;
-  answerHint: string;
-  learnerAnswer: string;
-  verdict: LanguageComprehensionVerdict;
-  matchedTerms: string[];
-  missingTerms: string[];
 }
 
 export interface LanguageSessionState {
