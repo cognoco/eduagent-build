@@ -73,10 +73,10 @@ export async function requestSelfUnlink(
         graceEndsAt: graceEndsAt.toISOString(),
       },
     });
-    // WI-1176: do NOT write a support_link_ended notice here. The Inngest
-    // function (inngest/functions/supportership-revocation.ts) is the sole
-    // producer, writing the schema-correct {..., graceDays} payload after
-    // the grace-window sleep. Writing it here with graceEndsAt fails
+    // Do NOT write a support_link_ended notice here. The Inngest function
+    // (inngest/functions/supportership-revocation.ts) is the sole producer,
+    // writing the schema-correct {..., graceDays} payload after the
+    // grace-window sleep. Writing it here with graceEndsAt fails
     // supportLinkEndedPayloadSchema post-insert and rolls back this tx.
   });
 
