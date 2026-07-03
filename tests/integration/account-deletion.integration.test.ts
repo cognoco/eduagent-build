@@ -985,11 +985,15 @@ legacyAccountDeletionCascadeDescribe(
           { table: 'celebration_events', col: 'profile_id' },
           { table: 'challenge_round_cooldowns', col: 'profile_id' },
           { table: 'support_messages', col: 'profile_id' },
-          { table: 'consent_states', col: 'profile_id' },
+          // [WI-1128] consent_states + family_links excluded from the v2
+          // cascade audit: both are 0129 drop-list legacy tables whose
+          // profile_id FK is deliberately NOT repointed to person (0129 skips
+          // drop-list conrelids), so they do not cascade under
+          // executeDeletionV2. Absent in prod; dropped wholesale by 0130. v2
+          // successor consent_grant is audited by the [WI-825] v2 suite below.
           { table: 'withdrawal_archive_preferences', col: 'owner_profile_id' },
           { table: 'family_preferences', col: 'owner_profile_id' },
           { table: 'pending_notices', col: 'owner_profile_id' },
-          { table: 'family_links', col: 'parent_profile_id' },
           { table: 'weekly_reports', col: 'profile_id' },
           { table: 'monthly_reports', col: 'profile_id' },
         ];
@@ -1043,14 +1047,11 @@ legacyAccountDeletionCascadeDescribe(
         );
         expect((nudgesTo.rows as Array<{ c: number }>)[0].c).toBe(0);
 
-        // family_links cascades from BOTH sides (parent_profile_id and
-        // child_profile_id both have onDelete: 'cascade'). Assert the
-        // child_profile_id side is also wiped after the deletion.
-        // (The parent_profile_id side is covered by the pii loop above.)
-        const familyLinksAsChild = await db.execute(
-          sql`SELECT count(*)::int AS c FROM family_links WHERE child_profile_id = ${profileId}`,
-        );
-        expect((familyLinksAsChild.rows as Array<{ c: number }>)[0].c).toBe(0);
+        // [WI-1128] family_links assertions removed: family_links is a 0129
+        // drop-list table (FK stays on profiles, not repointed to person), so
+        // it does not cascade under executeDeletionV2. Absent in prod; dropped
+        // by 0130. v2 guardianship/supportership edges are torn down by
+        // executeDeletionV2 step 2a (coverage tracked separately).
 
         // -----------------------------------------------------------------------
         // Cross-account break test: the OTHER account's own profile still
