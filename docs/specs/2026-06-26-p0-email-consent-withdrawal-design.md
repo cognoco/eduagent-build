@@ -1,5 +1,15 @@
 # P0 — Email-Parent Consent Withdrawal (bearer-token web flow)
 
+> **Status (updated 2026-07-03): SHIPPED.** Implemented and merged in PR #1530
+> (`services/consent-withdrawal-token.ts`, `routes/consent-web.ts`,
+> `services/identity-v2/consent-v2.ts`); withdrawal-authority model recorded in
+> [`MMT-ADR-0029`](../adr/MMT-ADR-0029-bearer-token-consent-withdrawal-authority.md).
+> An as-shipped copy of this design (without this status banner) is archived at
+> `docs/_archive/specs/Done/2026-06-26-p0-email-consent-withdrawal-design.md`.
+> Remaining launch-gate items (minting `CONSENT_WITHDRAWAL_TOKEN_SECRET` /
+> `ANALYTICS_HASH_KEY` in production, Resend SPF/DKIM, live E2E) are tracked
+> under `WI-1340` and are operator-gated, not design-incomplete.
+
 - **Date:** 2026-06-26
 - **Status:** Draft (design — awaiting review before plan). **Rev 2
   (2026-06-26):** durable withdrawal link relocated from the consent *request*

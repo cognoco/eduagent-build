@@ -345,6 +345,42 @@ describe('validateEnv', () => {
     expect(env.ENVIRONMENT).toBe('production');
   });
 
+  // [WI-1340] Regression guard: prod boot must fail loudly if either secret
+  // backing the GDPR Art. 7(3) consent-withdrawal link
+  // (CONSENT_WITHDRAWAL_TOKEN_SECRET) or the analytics HMAC key
+  // (ANALYTICS_HASH_KEY) is absent in production — a silent boot would ship a
+  // signable-but-unverifiable withdrawal link (or an unhashed analytics
+  // identifier) with no error surfaced anywhere.
+  it('throws when production env is missing ANALYTICS_HASH_KEY and CONSENT_WITHDRAWAL_TOKEN_SECRET only', () => {
+    // Every production-required key present EXCEPT the two secrets under test,
+    // so the throw is attributable to them and not to some other absent key.
+    const runValidate = () =>
+      validateEnv({
+        ENVIRONMENT: 'production',
+        DATABASE_URL: 'postgresql://prod/db',
+        CLERK_SECRET_KEY: 'sk_live_xxx',
+        CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
+        CLERK_AUDIENCE: 'eduagent-api',
+        INNGEST_SIGNING_KEY: 'signkey_prd_xxx',
+        INNGEST_EVENT_KEY: 'evtkey_prd_xxx',
+        GEMINI_API_KEY: 'gemini-key',
+        OPENAI_API_KEY: 'openai-key',
+        VOYAGE_API_KEY: 'voyage-key',
+        RESEND_API_KEY: 're_xxx',
+        RESEND_WEBHOOK_SECRET: 'whsec_resend_xxx',
+        API_ORIGIN: 'https://api.mentomate.com',
+        REVENUECAT_WEBHOOK_SECRET: 'whsec_xxx',
+        // ANALYTICS_HASH_KEY and CONSENT_WITHDRAWAL_TOKEN_SECRET intentionally omitted
+      });
+
+    // validateEnv must throw loudly (not warn / not boot) …
+    expect(runValidate).toThrow('Production environment missing required keys');
+    // … and name BOTH missing secrets in the message (.toThrow(string) is a
+    // substring match, so these assert each key is reported).
+    expect(runValidate).toThrow('ANALYTICS_HASH_KEY');
+    expect(runValidate).toThrow('CONSENT_WITHDRAWAL_TOKEN_SECRET');
+  });
+
   // [EMPTY-REPLY-GUARD-0] Kill-switch coverage — the flag must default ON
   // and parse both 'true' and 'false' verbatim. Any change to the default
   // needs to update both this test and the Doppler config.
