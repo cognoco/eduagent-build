@@ -104,3 +104,20 @@ WI-1494 (RLS umbrella — superseded by plan's own parked banner), WI-1495 (voca
 - [x] Phase 2 — this pack
 - [ ] Phase 3 — Zuzka + operator ruling session (over §3 + §4)
 - [ ] Phase 4 — execute fates (§2) + MVP delta → PGM-1 roadmap
+
+## 3b. Addendum (2026-07-03 ~21:20Z): Execution-Candidate batch (12 items)
+
+A second batch landed post-consolidation, sprint-tagged 'Execution Candidates' — launch-readiness gaps, not spec extraction. PM assessment:
+
+| Item | PM position | Routing |
+|---|---|---|
+| WI-1503 dogfood prod build | MVP-in, cheap, highest value | WS-39, sequence with WI-1341 |
+| WI-1505 LLM spend guardrails + kill switch | MVP-in — aggregate guard + env-level shutoff genuinely absent (user-level dual-cap ≠ aggregate) | WS-39 or platform lane |
+| WI-1504 activation instrumentation | MVP-in — beta + launch are blind without it | WS-39 |
+| WI-1500 launch health dashboard | MVP-in as ALERTS on the 6 named signals; dashboard = fast-follow. Absorbs WI-1399 overlap | WS-39 |
+| WI-1506 closed beta (5-10 families) | Recommend YES — but it is a CALENDAR ruling (2-4 wks on critical path), decide first | operator + Zuzka, now |
+| WI-1507 compliance closure check | MVP-in — cross-check, not build; tie to WI-1442 | WS-30/29 |
+| WI-1497/1498/1499/1501/1502 trust package | fast-follow default; exceptions to argue: WI-1499 minimal v1 (safety flag → telemetry) MVP-worthy for a minors product; WI-1501 v1 = support email link | Zuzka queue |
+| WI-1508 billing banner | KILL — duplicate of WI-1475 (fold its V2-re-anchor note into 1475) | dedupe |
+
+Ruling additions: Zuzka queue +2 (trust-package scope; WI-1499 minimal-v1). Operator queue +1 (closed-beta calendar ruling — this one sets the launch date; recommend ruling it before or at the Phase-3 session).
