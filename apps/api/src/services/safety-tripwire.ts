@@ -8,7 +8,7 @@
 // by one misspelling. See docs discussion + the `legitimate_sensitive` half of
 // the safety battery (apps/api/eval-llm/fixtures/safety/battery.ts).
 //
-// Instead this is a HIGH-PRECISION, intent-shaped tripwire scoped to the 2
+// Instead this is a HIGH-PRECISION, intent-shaped tripwire scoped to the
 // genuinely catastrophic categories where we want a deterministic floor that
 // does NOT depend on the model behaving (e.g. when jailbroken):
 //
@@ -17,6 +17,18 @@
 //                              analytical, NOT hyperbole like "this homework is
 //                              killing me").
 //   2. sexual_content_minor  — requests for sexual content involving a child.
+//   3. abuse_disclosure      — FIRST-PERSON disclosure of physical/sexual abuse
+//                              by a family member / caregiver / trusted adult
+//                              (e.g. "my dad hits me", "my uncle touched me down
+//                              there", "i was molested"). Requires the learner
+//                              to be the VICTIM (a first-person self-reference
+//                              anchor) AND an explicit physical/sexual-harm act
+//                              — so third-person analytical, historical,
+//                              literary, curriculum, and definitional discussion
+//                              of abuse topics (WI-1360's SL-AB battery) never
+//                              trips. Neglect and grooming are deterministically
+//                              undetectable (no reliable surface signature) and
+//                              are DELIBERATELY left to the model layer.
 //
 // On a hit we do NOT refuse-and-wall. We ESCALATE to the same crisis-redirect
 // path the model already uses (empathy + trusted adult + helpline for
@@ -31,7 +43,10 @@
 // safety-tripwire.test.ts proving it does not fire on legitimate learning.
 // ---------------------------------------------------------------------------
 
-export type CatastrophicCategory = 'self_harm_method' | 'sexual_content_minor';
+export type CatastrophicCategory =
+  | 'self_harm_method'
+  | 'sexual_content_minor'
+  | 'abuse_disclosure';
 
 export interface SafetyTripwireHit {
   category: CatastrophicCategory;
@@ -81,12 +96,63 @@ const SEXUAL_CONTENT_MINOR_PATTERNS: RegExp[] = [
   ),
 ];
 
+// First-person disclosure of physical/sexual abuse. The signature is
+// deliberately CONJUNCTIVE — an explicit physical/sexual-harm act AND the
+// learner as its first-person victim ("me" as the direct object, or "i
+// was/am/got + <abuse verb>"). A family/caregiver/trusted-adult perpetrator is
+// required for the ambiguous physical verbs (hit/beat/…) and optional for the
+// unambiguous ones (molested/raped/abused). This keeps third-person analytical,
+// historical, literary, and definitional abuse-topic questions — the WI-1360
+// SL-AB battery — from ever tripping. Idiom collisions ("hits me up" = contacts
+// me, "beats me at chess" = defeats me) are excluded with lookaheads.
+const ABUSE_PERP =
+  "(?:my |step-?)?(?:mum|mom|mummy|mommy|mother|dad|daddy|father|stepdad|step-?dad|stepmum|step-?mum|stepmom|step-?mom|stepfather|step-?father|stepmother|step-?mother|step-?parent|uncle|aunt|auntie|grandpa|grandad|grand-?dad|grandfather|grandma|granny|grandmother|guardian|foster (?:mum|mom|dad|father|mother|parent)|baby-?sitter|coach|(?:mum|mom|mother|dad|father)'?s (?:boyfriend|girlfriend|partner))";
+const ABUSE_DISCLOSURE_PATTERNS: RegExp[] = [
+  // 1. Family/caregiver perpetrator physically hurts the first-person learner;
+  //    "me" is the direct object. `(?!\s+up)` excludes "hits me up" (contacts).
+  new RegExp(
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\b(?:hits?|punch(?:es|ed)?|slap(?:s|ped)?|kick(?:s|ed)?|whip(?:s|ped)?|burn(?:s|ed|t)?|chok(?:es|ed)?|strangl(?:es|ed)?|molest(?:s|ed)?|rap(?:es|ed)?|assault(?:s|ed)?|abus(?:es|ed)?)\\b[^.?!]{0,15}\\bme\\b(?!\\s+up\\b)`,
+    'i',
+  ),
+  // 2. "beat(s|en) me" by a caregiver, excluding "beats me at <game>" (defeats).
+  new RegExp(
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\bbeat(?:s|en)? me\\b(?!\\s+at\\b)`,
+    'i',
+  ),
+  // 3. First-person victim of an UNAMBIGUOUS abuse act — verbs that do not
+  //    collide with sports/games idioms the way "hit"/"beat" do. Perpetrator
+  //    optional. "abused" (not "abusive") keeps third-person "an abusive parent"
+  //    from matching.
+  new RegExp(
+    `\\bi(?:'?m| am| was| get| got| keep getting| have been|'?ve been| am being| was being)\\b[^.?!]{0,15}\\b(?:molested|raped|sexually (?:abused|assaulted)|abused|assaulted|strangled)\\b`,
+    'i',
+  ),
+  // 4. Sexual abuse by a family/caregiver, or the child made to perform sexual
+  //    acts. An explicit sexual/inappropriate qualifier is REQUIRED so benign
+  //    "touch" (tickle, comfort, a hand on the shoulder) never trips.
+  new RegExp(
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\btouch(?:es|ed|ing)?\\b[^.?!]{0,20}\\b(?:me (?:there|down there|inappropriately|sexually|where (?:he|she|they) shouldn'?t)|my (?:private|privates|private parts|genitals|penis|vagina|butt|bum|breasts?|boobs?))\\b`,
+    'i',
+  ),
+  new RegExp(
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\b(?:makes?|made|forces?|forced)\\b[^.?!]{0,15}\\bme\\b[^.?!]{0,20}\\b(?:touch (?:him|her|them|his|their)|do sexual|have sex|perform sexual|give (?:him|her|them))\\b`,
+    'i',
+  ),
+  // 5. First-person explicit sexual touching; the sexual qualifier makes it
+  //    unambiguous, so a family perpetrator is not required.
+  new RegExp(
+    `\\btouch(?:es|ed|ing)?\\b[^.?!]{0,15}\\b(?:me (?:down there|inappropriately|sexually)|my (?:privates?|private parts|genitals|penis|vagina))\\b`,
+    'i',
+  ),
+];
+
 const TRIPWIRE_PATTERNS: Array<{
   category: CatastrophicCategory;
   patterns: RegExp[];
 }> = [
   { category: 'self_harm_method', patterns: SELF_HARM_METHOD_PATTERNS },
   { category: 'sexual_content_minor', patterns: SEXUAL_CONTENT_MINOR_PATTERNS },
+  { category: 'abuse_disclosure', patterns: ABUSE_DISCLOSURE_PATTERNS },
 ];
 
 /**
@@ -111,7 +177,13 @@ export function detectCatastrophicSafetyTrigger(
  * The deterministic safe response shown when the tripwire fires. Category-aware:
  * self-harm gets the same empathy + trusted-adult + helpline copy the model's
  * crisis rule uses (kept in sync with the SAFETY rule in exchange-prompts.ts);
- * the sexual-minor case gets a flat, non-graphic non-engagement that redirects.
+ * the sexual-minor case gets a flat, non-graphic non-engagement that redirects;
+ * the abuse-disclosure case validates the learner, makes clear it is not their
+ * fault, and points to a trusted adult / helpline. NOTE: the abuse reply
+ * deliberately does NOT default to "a parent or guardian" — in a first-person
+ * abuse disclosure the caregiver is frequently the perpetrator, so it names
+ * teacher / counsellor / a relative the learner feels safe with / a helpline
+ * instead. It does NOT repeat the disclosure, interrogate, or moralise.
  *
  * Intentionally NOT localized in this first pass — a safe English fallback is
  * better than a mistranslated safety message, and the structured event still
@@ -131,6 +203,14 @@ export function tripwireResponse(category: CatastrophicCategory): string {
         "I can't help with that. If someone has asked you for something like this, " +
         'please tell a parent, guardian, or trusted adult — it is not your fault. ' +
         "Let's get back to what you're learning."
+      );
+    case 'abuse_disclosure':
+      return (
+        "I'm really glad you told me, and I'm sorry this is happening to you. " +
+        'This is not your fault, and you deserve to be safe. Please talk to an ' +
+        'adult you trust — a teacher, a school counsellor, a relative you feel ' +
+        'safe with, or a helpline in your country — so someone can help you. ' +
+        "You don't have to handle this on your own."
       );
   }
 }
