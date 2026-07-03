@@ -1,4 +1,8 @@
-import type { CefrLevel, InputMode } from '@eduagent/schemas';
+import {
+  streamLanguageLearningActivitySchema,
+  type CefrLevel,
+  type InputMode,
+} from '@eduagent/schemas';
 
 import { SUPPORTED_LANGUAGES } from '../data/languages';
 
@@ -21,6 +25,20 @@ export type LanguageActivityModality = 'text' | 'voice' | 'listening';
 
 export type LanguageGradedInputModality = 'reading' | 'listening';
 
+export type LanguageMeaningOutputTaskType =
+  | 'role_play'
+  | 'personal_answer'
+  | 'retell'
+  | 'describe'
+  | 'ask_question';
+
+export type LanguageMeaningOutputResponseMode =
+  | 'dialogue_turn'
+  | 'short_answer'
+  | 'short_retell'
+  | 'short_description'
+  | 'question';
+
 export interface LanguageComprehensionQuestion {
   id: string;
   prompt: string;
@@ -39,6 +57,18 @@ export interface LanguageGradedInputArtifact {
   audioEnabled: boolean;
 }
 
+export interface LanguageMeaningOutputArtifact {
+  type: 'meaning_output';
+  taskType: LanguageMeaningOutputTaskType;
+  communicativeGoal: string;
+  prompt: string;
+  responseMode: LanguageMeaningOutputResponseMode;
+  targetWords: string[];
+  targetGrammar: string[];
+  retryExpectation: 'retry_after_feedback';
+  correctionExpectation: 'meaning_first_then_form';
+}
+
 export interface LanguageStrandCounts {
   meaning_input: number;
   meaning_output: number;
@@ -53,11 +83,25 @@ export interface LanguageActivityTelemetry {
   targetWords: string[];
   targetGrammar: string[];
   gradedInput?: LanguageGradedInputArtifact;
+  meaningOutput?: LanguageMeaningOutputArtifact;
+}
+
+export type LanguageComprehensionVerdict = 'understood' | 'partial' | 'missed';
+
+export interface LanguageComprehensionEvaluation {
+  questionId: string;
+  prompt: string;
+  answerHint: string;
+  learnerAnswer: string;
+  verdict: LanguageComprehensionVerdict;
+  matchedTerms: string[];
+  missingTerms: string[];
 }
 
 export interface LanguageSessionState {
   activeStrand: LanguageStrand;
   sessionStrandCounts: LanguageStrandCounts;
+  previousComprehension?: LanguageComprehensionEvaluation;
   nextActivity: LanguageActivityTelemetry;
 }
 
@@ -172,6 +216,80 @@ function cleanTerms(terms: string[] | undefined, limit: number): string[] {
   return cleaned;
 }
 
+const ANSWER_STOPWORDS = new Set([
+  'about',
+  'after',
+  'also',
+  'and',
+  'are',
+  'because',
+  'does',
+  'for',
+  'from',
+  'has',
+  'have',
+  'her',
+  'him',
+  'his',
+  'into',
+  'its',
+  'she',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'they',
+  'this',
+  'was',
+  'what',
+  'when',
+  'where',
+  'who',
+  'with',
+]);
+
+function tokenizeAnswerTerms(value: string): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const match of value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .matchAll(/[a-z0-9]+/g)) {
+    const term = match[0];
+    if (term.length < 4 || ANSWER_STOPWORDS.has(term) || seen.has(term)) {
+      continue;
+    }
+    seen.add(term);
+    terms.push(term);
+  }
+  return terms;
+}
+
+function findLatestGradedInputEvent(
+  events: Array<{ eventType: string; metadata: unknown }>,
+): LanguageActivityTelemetry | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if (event?.eventType !== 'ai_response') {
+      continue;
+    }
+    const metadata = event.metadata;
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      continue;
+    }
+    const parsed = streamLanguageLearningActivitySchema.safeParse(
+      (metadata as { languageLearning?: unknown }).languageLearning,
+    );
+    if (!parsed.success || !parsed.data.gradedInput) {
+      continue;
+    }
+    return parsed.data as LanguageActivityTelemetry;
+  }
+  return null;
+}
+
 function starterWordsForLanguage(languageCode?: string): string[] {
   switch (languageCode) {
     case 'es':
@@ -265,6 +383,107 @@ function buildGradedInputArtifact(input: {
   };
 }
 
+type MeaningOutputTaskDefinition = {
+  taskType: LanguageMeaningOutputTaskType;
+  responseMode: LanguageMeaningOutputResponseMode;
+  communicativeGoal: string;
+  buildPrompt: (targetWords: string[], targetGrammar: string[]) => string;
+};
+
+const MEANING_OUTPUT_TASKS = [
+  {
+    taskType: 'role_play',
+    responseMode: 'dialogue_turn',
+    communicativeGoal: 'Use the language to keep a simple conversation moving.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Role-play a real conversation. Reply with one short line using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'personal_answer',
+    responseMode: 'short_answer',
+    communicativeGoal:
+      'Share a true or imagined personal answer someone could respond to.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Answer personally in one or two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'retell',
+    responseMode: 'short_retell',
+    communicativeGoal: 'Retell familiar meaning in your own words.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Retell the idea in two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'describe',
+    responseMode: 'short_description',
+    communicativeGoal:
+      'Describe a concrete scene so another person understands it.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Describe a simple scene in two short sentences using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+  {
+    taskType: 'ask_question',
+    responseMode: 'question',
+    communicativeGoal: 'Ask a useful question in a real conversation.',
+    buildPrompt: (targetWords, targetGrammar) =>
+      `Ask one natural question using ${formatOutputTargets(
+        targetWords,
+        targetGrammar,
+      )}.`,
+  },
+] satisfies readonly [
+  MeaningOutputTaskDefinition,
+  ...MeaningOutputTaskDefinition[],
+];
+
+function formatOutputTargets(
+  targetWords: string[],
+  targetGrammar: string[],
+): string {
+  const parts: string[] = [];
+  if (targetWords.length > 0) {
+    parts.push(`word(s): ${targetWords.join(', ')}`);
+  }
+  if (targetGrammar.length > 0) {
+    parts.push(`grammar: ${targetGrammar.join(', ')}`);
+  }
+  return parts.length > 0 ? parts.join('; ') : 'language you already know';
+}
+
+function buildMeaningOutputArtifact(input: {
+  meaningOutputTurnIndex?: number;
+  targetWords: string[];
+  targetGrammar: string[];
+}): LanguageMeaningOutputArtifact {
+  const taskIndex =
+    Math.abs(input.meaningOutputTurnIndex ?? 0) % MEANING_OUTPUT_TASKS.length;
+  const task = MEANING_OUTPUT_TASKS[taskIndex] ?? MEANING_OUTPUT_TASKS[0];
+
+  return {
+    type: 'meaning_output',
+    taskType: task.taskType,
+    communicativeGoal: task.communicativeGoal,
+    prompt: task.buildPrompt(input.targetWords, input.targetGrammar),
+    responseMode: task.responseMode,
+    targetWords: input.targetWords,
+    targetGrammar: input.targetGrammar,
+    retryExpectation: 'retry_after_feedback',
+    correctionExpectation: 'meaning_first_then_form',
+  };
+}
+
 export function getLanguageStrandCounts(
   events: Array<{ eventType: string; metadata: unknown }>,
 ): LanguageStrandCounts {
@@ -294,6 +513,44 @@ export function getLanguageStrandCounts(
   return counts;
 }
 
+export function evaluatePendingGradedInputAnswer(input: {
+  events: Array<{ eventType: string; metadata: unknown }>;
+  learnerMessage: string;
+}): LanguageComprehensionEvaluation | undefined {
+  const activity = findLatestGradedInputEvent(input.events);
+  const gradedInput = activity?.gradedInput;
+  const question = gradedInput?.comprehensionQuestions[0];
+  if (!gradedInput || !question) {
+    return undefined;
+  }
+
+  const expectedTerms = tokenizeAnswerTerms(question.answerHint);
+  if (expectedTerms.length === 0) {
+    return undefined;
+  }
+
+  const answerTerms = new Set(tokenizeAnswerTerms(input.learnerMessage));
+  const matchedTerms = expectedTerms.filter((term) => answerTerms.has(term));
+  const missingTerms = expectedTerms.filter((term) => !answerTerms.has(term));
+  const matchRatio = matchedTerms.length / expectedTerms.length;
+  const verdict: LanguageComprehensionVerdict =
+    matchedTerms.length === 0
+      ? 'missed'
+      : matchRatio >= 0.67
+        ? 'understood'
+        : 'partial';
+
+  return {
+    questionId: question.id,
+    prompt: question.prompt,
+    answerHint: question.answerHint,
+    learnerAnswer: input.learnerMessage,
+    verdict,
+    matchedTerms,
+    missingTerms,
+  };
+}
+
 export function chooseNextLanguageStrand(input: {
   exchangeCount: number;
   priorCounts: Partial<LanguageStrandCounts>;
@@ -316,6 +573,7 @@ export function buildLanguageActivityTelemetry(input: {
   knownWords?: string[];
   targetWords?: string[];
   targetGrammar?: string[];
+  meaningOutputTurnIndex?: number;
 }): LanguageActivityTelemetry {
   const activityTypeByStrand: Record<LanguageStrand, LanguageActivityType> = {
     meaning_input: 'graded_input',
@@ -332,12 +590,14 @@ export function buildLanguageActivityTelemetry(input: {
         ? 'voice'
         : 'text';
 
+  const targetWords = input.targetWords?.slice(0, 8) ?? [];
+  const targetGrammar = input.targetGrammar?.slice(0, 8) ?? [];
   const activity: LanguageActivityTelemetry = {
     strand: input.strand,
     activityType: activityTypeByStrand[input.strand],
     modality,
-    targetWords: input.targetWords?.slice(0, 8) ?? [],
-    targetGrammar: input.targetGrammar?.slice(0, 8) ?? [],
+    targetWords,
+    targetGrammar,
   };
 
   if (input.strand === 'meaning_input') {
@@ -350,12 +610,21 @@ export function buildLanguageActivityTelemetry(input: {
     });
   }
 
+  if (input.strand === 'meaning_output') {
+    activity.meaningOutput = buildMeaningOutputArtifact({
+      meaningOutputTurnIndex: input.meaningOutputTurnIndex,
+      targetWords,
+      targetGrammar,
+    });
+  }
+
   return activity;
 }
 
 export function buildLanguageSessionState(input: {
   exchangeCount: number;
   events: Array<{ eventType: string; metadata: unknown }>;
+  learnerMessage?: string;
   inputMode?: InputMode;
   languageCode?: string;
   cefrLevel?: CefrLevel | null;
@@ -364,14 +633,24 @@ export function buildLanguageSessionState(input: {
   targetGrammar?: string[];
 }): LanguageSessionState {
   const sessionStrandCounts = getLanguageStrandCounts(input.events);
-  const activeStrand = chooseNextLanguageStrand({
-    exchangeCount: input.exchangeCount,
-    priorCounts: sessionStrandCounts,
-  });
+  const previousComprehension = input.learnerMessage
+    ? evaluatePendingGradedInputAnswer({
+        events: input.events,
+        learnerMessage: input.learnerMessage,
+      })
+    : undefined;
+  const activeStrand =
+    previousComprehension && previousComprehension.verdict !== 'understood'
+      ? 'language_focus'
+      : chooseNextLanguageStrand({
+          exchangeCount: input.exchangeCount,
+          priorCounts: sessionStrandCounts,
+        });
 
   return {
     activeStrand,
     sessionStrandCounts,
+    previousComprehension,
     nextActivity: buildLanguageActivityTelemetry({
       strand: activeStrand,
       inputMode: input.inputMode,
@@ -380,6 +659,7 @@ export function buildLanguageSessionState(input: {
       knownWords: input.knownWords,
       targetWords: input.targetWords,
       targetGrammar: input.targetGrammar,
+      meaningOutputTurnIndex: sessionStrandCounts.meaning_output,
     }),
   };
 }

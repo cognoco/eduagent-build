@@ -4,6 +4,7 @@ import {
   challengeRoundSessionStateSchema,
   escalationRungSchema,
 } from './sessions.ts';
+import { cefrLevelSchema } from './language.ts';
 
 // ---------------------------------------------------------------------------
 // Stream fallback contract — emitted as an SSE frame BEFORE the `done` frame
@@ -75,6 +76,90 @@ export const streamFluencyDrillSchema = z.object({
 });
 export type StreamFluencyDrill = z.infer<typeof streamFluencyDrillSchema>;
 
+export const streamLanguageComprehensionQuestionSchema = z.object({
+  id: z.string(),
+  prompt: z.string().min(1),
+  answerHint: z.string().min(1),
+});
+export type StreamLanguageComprehensionQuestion = z.infer<
+  typeof streamLanguageComprehensionQuestionSchema
+>;
+
+export const streamLanguageGradedInputSchema = z.object({
+  type: z.literal('graded_input'),
+  modality: z.enum(['reading', 'listening']),
+  cefrLevel: cefrLevelSchema,
+  knownWordRatioTarget: z.number().min(0).max(1),
+  knownWordEstimate: z.number().min(0).max(1),
+  targetWords: z.array(z.string()),
+  text: z.string().min(1),
+  comprehensionQuestions: z.array(streamLanguageComprehensionQuestionSchema),
+  audioEnabled: z.boolean(),
+});
+export type StreamLanguageGradedInput = z.infer<
+  typeof streamLanguageGradedInputSchema
+>;
+
+export const streamLanguageMeaningOutputTaskSchema = z.enum([
+  'role_play',
+  'personal_answer',
+  'retell',
+  'describe',
+  'ask_question',
+]);
+export type StreamLanguageMeaningOutputTask = z.infer<
+  typeof streamLanguageMeaningOutputTaskSchema
+>;
+
+export const streamLanguageMeaningOutputResponseModeSchema = z.enum([
+  'dialogue_turn',
+  'short_answer',
+  'short_retell',
+  'short_description',
+  'question',
+]);
+export type StreamLanguageMeaningOutputResponseMode = z.infer<
+  typeof streamLanguageMeaningOutputResponseModeSchema
+>;
+
+export const streamLanguageMeaningOutputSchema = z.object({
+  type: z.literal('meaning_output'),
+  taskType: streamLanguageMeaningOutputTaskSchema,
+  communicativeGoal: z.string().min(1),
+  prompt: z.string().min(1),
+  responseMode: streamLanguageMeaningOutputResponseModeSchema,
+  targetWords: z.array(z.string()),
+  targetGrammar: z.array(z.string()),
+  retryExpectation: z.enum(['retry_after_feedback']),
+  correctionExpectation: z.enum(['meaning_first_then_form']),
+});
+export type StreamLanguageMeaningOutput = z.infer<
+  typeof streamLanguageMeaningOutputSchema
+>;
+
+export const streamLanguageLearningActivitySchema = z.object({
+  strand: z.enum([
+    'meaning_input',
+    'meaning_output',
+    'language_focus',
+    'fluency',
+  ]),
+  activityType: z.enum([
+    'graded_input',
+    'free_response',
+    'correction_retry',
+    'timed_drill',
+  ]),
+  modality: z.enum(['text', 'voice', 'listening']),
+  targetWords: z.array(z.string()),
+  targetGrammar: z.array(z.string()),
+  gradedInput: streamLanguageGradedInputSchema.optional(),
+  meaningOutput: streamLanguageMeaningOutputSchema.optional(),
+});
+export type StreamLanguageLearningActivity = z.infer<
+  typeof streamLanguageLearningActivitySchema
+>;
+
 /** Server-gated Challenge Round offer pitch. Mobile never parses raw envelope JSON. */
 export const streamChallengeOfferSchema = z.object({
   pitch: z.string(),
@@ -104,6 +189,7 @@ export const streamDoneFrameSchema = z.object({
   notePrompt: z.boolean().optional(),
   notePromptPostSession: z.boolean().optional(),
   fluencyDrill: streamFluencyDrillSchema.optional(),
+  languageLearning: streamLanguageLearningActivitySchema.optional(),
   confidence: z.enum(['low', 'medium', 'high']).optional(),
   readyToFinish: z.boolean().optional(),
   challengeRound: challengeRoundSessionStateSchema.optional(),

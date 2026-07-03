@@ -130,6 +130,7 @@ import {
   buildLanguageSessionState,
   isLikelyLanguageLearningIntent,
   type LanguageActivityTelemetry,
+  type LanguageComprehensionEvaluation,
 } from '../language-session-engine';
 import {
   findOwnedCurriculumTopic,
@@ -290,6 +291,8 @@ export interface ExchangeBehavioralMetrics {
   llmRoutingRung?: EscalationRung;
   /** Four-strands activity selected by the server for this language turn. */
   languageLearning?: LanguageActivityTelemetry;
+  /** Deterministic comprehension check for the learner's answer to the prior graded input. */
+  languageComprehension?: LanguageComprehensionEvaluation;
   /** Provider that produced the response, or the initial streaming provider. */
   llmProvider?: string;
   /** Model that produced the response, or the initial streaming model. */
@@ -2324,6 +2327,7 @@ export async function prepareExchangeContext(
       ? buildLanguageSessionState({
           exchangeCount: session.exchangeCount,
           events,
+          learnerMessage: userMessage,
           inputMode: session.inputMode,
           languageCode: effectiveLanguageCode,
           cefrLevel: cefrLevelSchema
@@ -2976,6 +2980,9 @@ export async function persistExchangeResult(
       ...(behavioral.languageLearning !== undefined && {
         languageLearning: behavioral.languageLearning,
       }),
+      ...(behavioral.languageComprehension !== undefined && {
+        languageComprehension: behavioral.languageComprehension,
+      }),
       ...(behavioral.llmProvider !== undefined && {
         llmProvider: behavioral.llmProvider,
       }),
@@ -3463,6 +3470,8 @@ export async function processMessage(
       llmRoutingReason: context.llmRoutingReason,
       llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
       languageLearning: context.languageSessionState?.nextActivity,
+      languageComprehension:
+        context.languageSessionState?.previousComprehension,
       llmProvider: result.provider,
       llmModel: result.model,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
@@ -3867,6 +3876,8 @@ export async function streamMessage(
           llmRoutingReason: context.llmRoutingReason,
           llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
           languageLearning: context.languageSessionState?.nextActivity,
+          languageComprehension:
+            context.languageSessionState?.previousComprehension,
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,

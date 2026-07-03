@@ -66,6 +66,7 @@ import {
   type ChallengeRoundOfferEvent,
   type DraftedChallengeNoteEvent,
   type FluencyDrillEvent,
+  type LanguageLearningActivityEvent,
   type StreamFallbackReason,
 } from '../lib/sse';
 
@@ -128,6 +129,7 @@ type StreamMessageDoneResult = {
   notePrompt?: boolean;
   notePromptPostSession?: boolean;
   fluencyDrill?: FluencyDrillEvent;
+  languageLearning?: LanguageLearningActivityEvent;
   challengeRound?: ChallengeRoundSessionState;
   challengeOffer?: ChallengeRoundOfferEvent;
   draftedNote?: DraftedChallengeNoteEvent;
@@ -550,6 +552,7 @@ export function useStreamMessage(sessionId: string): {
                     notePrompt: event.notePrompt,
                     notePromptPostSession: event.notePromptPostSession,
                     fluencyDrill: event.fluencyDrill,
+                    languageLearning: event.languageLearning,
                     challengeRound: event.challengeRound,
                     challengeOffer: event.challengeOffer,
                     draftedNote: event.draftedNote,

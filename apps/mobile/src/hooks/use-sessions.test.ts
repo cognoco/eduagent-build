@@ -910,6 +910,69 @@ describe('useStreamMessage', () => {
     );
   });
 
+  it('forwards language-learning activity from the done event', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Read this.' };
+        yield {
+          type: 'done',
+          exchangeCount: 1,
+          escalationRung: 1,
+          languageLearning: {
+            strand: 'meaning_input',
+            activityType: 'graded_input',
+            modality: 'text',
+            targetWords: ['agua'],
+            targetGrammar: [],
+            gradedInput: {
+              type: 'graded_input',
+              modality: 'reading',
+              cefrLevel: 'A1',
+              knownWordRatioTarget: 0.85,
+              knownWordEstimate: 0.82,
+              targetWords: ['agua'],
+              text: 'Tengo agua en la mesa.',
+              comprehensionQuestions: [
+                {
+                  id: 'q1',
+                  prompt: 'What is on the table?',
+                  answerHint: 'agua',
+                },
+              ],
+              audioEnabled: true,
+            },
+          },
+        };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const onChunk = jest.fn();
+    const onDone = jest.fn();
+
+    await act(async () => {
+      await result.current.stream('Hola', onChunk, onDone, 'session-1');
+    });
+
+    expect(onDone).toHaveBeenCalledWith(
+      expect.objectContaining({
+        languageLearning: expect.objectContaining({
+          strand: 'meaning_input',
+          gradedInput: expect.objectContaining({
+            text: 'Tengo agua en la mesa.',
+          }),
+        }),
+      }),
+    );
+  });
+
   it('sends image payloads in the SSE request body when provided', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;

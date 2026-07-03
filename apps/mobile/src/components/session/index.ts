@@ -20,6 +20,12 @@ export { LibraryPrompt } from './LibraryPrompt';
 export { QuotaExceededCard } from './QuotaExceededCard';
 export type { QuotaExceededCardProps } from './QuotaExceededCard';
 export { FluencyDrillStrip } from './FluencyDrillStrip';
+export { GradedInputCard } from './GradedInputCard';
+export {
+  SpeakingPracticeCard,
+  compareSpeakingPracticeTranscript,
+  type SpeakingPracticeCardProps,
+} from './SpeakingPracticeCard';
 export {
   MilestoneDots,
   MILESTONE_DOTS_NARROW_BREAKPOINT_PT,

@@ -24,6 +24,7 @@ import {
   getModeConfig,
   getOpeningMessage,
   FluencyDrillStrip,
+  GradedInputCard,
   type ChatMessage,
 } from '../../../components/session';
 import { FirstSessionGreeting } from '../../../components/session/FirstSessionGreeting';
@@ -127,6 +128,7 @@ import { getSessionRouteParams } from './_view-models/session-route-params';
 import type {
   ChallengeRoundOfferEvent,
   DraftedChallengeNoteEvent,
+  LanguageLearningActivityEvent,
 } from '../../../lib/sse';
 
 function isChallengeRoundInFlight(
@@ -510,6 +512,8 @@ function SessionScreenInner() {
   const [fluencyDrill, setFluencyDrill] = useState<FluencyDrillEvent | null>(
     null,
   );
+  const [languageLearning, setLanguageLearning] =
+    useState<LanguageLearningActivityEvent | null>(null);
   const [challengeRound, setChallengeRound] =
     useState<ChallengeRoundSessionState | null>(null);
   const [challengeOffer, setChallengeOffer] =
@@ -865,6 +869,7 @@ function SessionScreenInner() {
     setResponseHistory,
     setHomeworkProblemsState,
     setFluencyDrill,
+    setLanguageLearning,
     setChallengeRound,
     setChallengeOffer,
     setDraftedNote,
@@ -1420,6 +1425,13 @@ function SessionScreenInner() {
       />
     </View>
   ) : null;
+  const gradedInputCard = languageLearning?.gradedInput ? (
+    <GradedInputCard
+      activity={languageLearning}
+      textToSpeechLanguage={languageVoiceLocale}
+      onDismiss={() => setLanguageLearning(null)}
+    />
+  ) : null;
   const firstSessionWrapUpCard = firstSessionWrapUp ? (
     <FirstSessionWrapUpCard
       value={firstSessionReflectionText}
@@ -1577,6 +1589,7 @@ function SessionScreenInner() {
         textToSpeechLanguage={languageVoiceLocale}
         footer={
           <>
+            {gradedInputCard}
             {challengeOfferCard}
             {draftedNoteReview}
             <BookmarkNudgeTooltip

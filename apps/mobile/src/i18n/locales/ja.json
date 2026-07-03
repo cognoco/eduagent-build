@@ -725,6 +725,29 @@
       "a11yScore": "ドリル完了：{{total}}問中{{correct}}問正解、正答率{{pct}}パーセント",
       "a11yTimer": "流暢さドリル：残り{{time}}"
     },
+    "gradedInput": {
+      "title": "読んで答える",
+      "subtitle": "レベル {{level}}",
+      "targetWords": "注目する語: {{words}}",
+      "questionLabel": "質問",
+      "playAudioLabel": "文章を再生",
+      "stopAudioLabel": "文章を停止",
+      "dismissLabel": "読解カードを閉じる"
+    },
+    "speakingPractice": {
+      "title": "まねして言う",
+      "subtitle": "文をくり返す",
+      "playAudioLabel": "目標文を再生",
+      "stopAudioLabel": "音声を停止",
+      "startRecordingLabel": "発話を始める",
+      "stopRecordingLabel": "発話を止める",
+      "listening": "聞いています...",
+      "transcriptLabel": "言ったこと",
+      "matched": "合っています",
+      "retryWithMissingWords": "もう一度: {{words}}",
+      "retry": "もう一度",
+      "retryLabel": "発話をやり直す"
+    },
     "chatShell": {
       "defaultSubtitle": "お手伝いします",
       "defaultPlaceholder": "メッセージを入力...",
