@@ -8,7 +8,6 @@ import {
 import type { RevocationNotice } from '@eduagent/schemas';
 
 import { ForbiddenError, NotFoundError } from '../errors';
-import { createVisibilityNotice } from './visibility-moment-projections';
 import { writeVisibilityAuditEvent } from './linking-ceremony';
 
 export const SUPPORTERSHIP_GRACE_DAYS = 7;
@@ -74,18 +73,11 @@ export async function requestSelfUnlink(
         graceEndsAt: graceEndsAt.toISOString(),
       },
     });
-    await createVisibilityNotice(txDb, {
-      supportershipId: row.edge.id,
-      contractId: row.contract?.id,
-      noticeType: 'support_link_ended',
-      targetAudience: 'supporter',
-      targetPersonId: row.edge.supporterPersonId,
-      payload: {
-        supporteePersonId: row.edge.supporteePersonId,
-        revokedAt: now.toISOString(),
-        graceEndsAt: graceEndsAt.toISOString(),
-      },
-    });
+    // Do NOT write a support_link_ended notice here. The Inngest function
+    // (inngest/functions/supportership-revocation.ts) is the sole producer,
+    // writing the schema-correct {..., graceDays} payload after the
+    // grace-window sleep. Writing it here with graceEndsAt fails
+    // supportLinkEndedPayloadSchema post-insert and rolls back this tx.
   });
 
   return {
