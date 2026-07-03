@@ -16,13 +16,7 @@ jest.mock(
     ) as typeof import('../services/profile');
     return {
       ...actual,
-      listProfiles: jest.fn(),
-      createProfileWithLimitCheck: jest.fn(),
-      assertProfileCreationAllowed: jest.fn(),
-      getProfile: jest.fn(),
-      updateProfile: jest.fn(),
       updateProfileAppContext: jest.fn(),
-      switchProfile: jest.fn(),
     };
   },
 );
@@ -95,12 +89,7 @@ import { ERROR_CODES, ForbiddenError } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import {
-  listProfiles,
-  assertProfileCreationAllowed,
   updateProfileAppContext,
-  // [WI-867] createProfileWithLimitCheck / getProfile / updateProfile / switchProfile
-  // no longer called post-collapse; kept as type-only to avoid unused-import TS errors.
-  // Remove when legacy mock bindings below are dropped.
   ProfileLimitError,
   ProfileValidationError,
 } from '../services/profile';
@@ -212,11 +201,6 @@ function makeApp(overrides?: {
   return app;
 }
 
-const listProfilesMock = jest.mocked(listProfiles);
-// [WI-867] assertProfileCreationAllowedMock still used by CUT-B2 tests below.
-const assertProfileCreationAllowedMock = jest.mocked(
-  assertProfileCreationAllowed,
-);
 const updateProfileAppContextMock = jest.mocked(updateProfileAppContext);
 const listProfilesV2Mock = jest.mocked(listProfilesV2);
 const getOwnerProfileV2Mock = jest.mocked(getOwnerProfileV2);
@@ -234,8 +218,6 @@ const verifyPersonIsOrgAdminV2Mock = jest.mocked(verifyPersonIsOrgAdminV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Default: authorization passes. Deny-path tests override per-case.
-  assertProfileCreationAllowedMock.mockResolvedValue(undefined);
   // [WI-1302] Default: the caller is the account owner (mirrors the prior
   // default isOwner:true happy-path convention below). Non-owner-caller break
   // tests override to false per-case.
@@ -321,8 +303,6 @@ describe('GET /v1/profiles', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ profiles: [] });
-    // Must short-circuit before the account-scoped service call.
-    expect(listProfilesMock).not.toHaveBeenCalled();
   });
 
   it('propagates service errors to 500', async () => {
@@ -356,8 +336,6 @@ describe('GET /v1/profiles', () => {
       expect.anything(),
       ACCOUNT_ID,
     );
-    // Legacy reader must NOT run on the v2 path.
-    expect(listProfilesMock).not.toHaveBeenCalled();
   });
 
   // [WI-867] CUT: legacy listProfiles path dropped — route always calls listProfilesV2 post-collapse.

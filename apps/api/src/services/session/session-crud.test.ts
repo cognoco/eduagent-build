@@ -25,7 +25,6 @@ import {
 import { FILING_CONFIG } from '../../config/filing';
 import * as llmModule from '../llm';
 import * as sentryModule from '../sentry';
-import * as profileService from '../profile';
 import * as identityV2Helpers from '../identity-v2/helpers';
 import * as bookGeneration from '../book-generation';
 import * as curriculumService from '../curriculum';
@@ -772,7 +771,6 @@ describe('startFirstCurriculumSession — deadline exhaustion', () => {
 // stubbed; materializeFocusedBookTopics itself runs real).
 
 describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
-  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
   let getPersonAgeSpy: jest.SpiedFunction<
     typeof identityV2Helpers.getPersonAge
   >;
@@ -826,9 +824,6 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
 
   beforeEach(() => {
     stubFlowDeps();
-    getProfileAgeSpy = jest
-      .spyOn(profileService, 'getProfileAge')
-      .mockResolvedValue(12);
     getPersonAgeSpy = jest
       .spyOn(identityV2Helpers, 'getPersonAge')
       .mockResolvedValue(12);
@@ -850,7 +845,6 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
   });
 
   afterEach(() => {
-    getProfileAgeSpy.mockRestore();
     getPersonAgeSpy.mockRestore();
     generateBookTopicsSpy.mockRestore();
     persistBookTopicsSpy.mockRestore();
@@ -865,7 +859,6 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
       { matcherEnabled: false },
     );
     expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
-    expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
 
   it('[WI-867] always resolves learner age via v2 getPersonAge, never legacy getProfileAge', async () => {
@@ -877,7 +870,6 @@ describe('[WI-586] materializeFocusedBookTopics learner-age v2 gating', () => {
       { matcherEnabled: false },
     );
     expect(getPersonAgeSpy).toHaveBeenCalledWith(expect.anything(), PROFILE_ID);
-    expect(getProfileAgeSpy).not.toHaveBeenCalled();
   });
 
   // [WI-481] Silent-recovery escalation: when generateBookTopics fails, the

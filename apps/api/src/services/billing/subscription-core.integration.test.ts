@@ -38,7 +38,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { legacyIdentityTableExistsForTest } from '../../test-utils/legacy-identity-anchors';
-import { getQuotaPool, resetMonthlyQuota } from './subscription-core';
+import { getQuotaPool } from './subscription-core';
 // [WI-1239 / 779-strip] updateSubscriptionFromWebhook, linkStripeCustomer,
 // markSubscriptionCancelled, and activateSubscriptionFromCheckout were removed
 // from subscription-core.ts — the Stripe webhook route dispatches exclusively
@@ -628,30 +628,14 @@ describe('getQuotaPool', () => {
 // resetMonthlyQuota
 // ---------------------------------------------------------------------------
 
-describe('resetMonthlyQuota', () => {
-  // [WI-1128 follow-up, 2026-07-03] "resets usedThisMonth to 0 and sets a new
-  // limit" test coverage retired — subject fn `resetMonthlyQuota` is orphaned
-  // dead code in services/subscription-core.ts (zero callers anywhere in
-  // apps/ or packages/, not even reachable via the dead
-  // findOrCreateAccount/createProfileWithLimitCheck paths), and its fixture
-  // seeded through the also-dead `createSubscription` (see the
-  // ensureFreeSubscription/createSubscription retirement note above for why
-  // the isIdentityV2Enabled()-gated quarantine that used to guard this test
-  // didn't make it CI-safe). See docs/_archive/retired-code.md ("Trimmed —
-  // subscription-core.integration.test.ts, follow-up"). This describe block's
-  // other test ("returns null when quota pool does not exist") does not seed
-  // through the dead path and is KEPT below.
-
-  it('returns null when quota pool does not exist', async () => {
-    const db = createIntegrationDb();
-    const result = await resetMonthlyQuota(
-      db,
-      '00000000-0000-0000-0000-000000000000',
-      700,
-    );
-    expect(result).toBeNull();
-  });
-});
+// [WI-1364 follow-up, 2026-07-04] resetMonthlyQuota describe block FULLY retired.
+// WI-1128 kept the "returns null when quota pool does not exist" test because its
+// fixture didn't seed through the dead createSubscription path — but the subject
+// function `resetMonthlyQuota` itself has since been removed from
+// services/billing/subscription-core.ts (WI-1364 dead-sweep; only getQuotaPool
+// remains). The kept test called `resetMonthlyQuota(...)`, which is now a runtime
+// TypeError ("resetMonthlyQuota is not a function"). Retired under the preservation
+// gate — see docs/_archive/retired-code.md ("Integration-test orphans").
 
 // [WI-1239 / 779-strip] markSubscriptionCancelled was removed; its v2 twin
 // (markSubscriptionCancelledV2, called by routes/billing.ts's cancel route)

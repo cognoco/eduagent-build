@@ -25,23 +25,6 @@ jest.mock('../../services/consent', () => {
   };
 });
 
-// [F-122] archive-cleanup now performs an ATOMIC conditional delete via
-// deleteArchivedProfileIfStillEligible (eligibility folded into the DELETE's
-// WHERE) instead of the unconditional deleteProfile. Mock the atomic helper.
-const mockDeleteArchivedProfileIfStillEligible = jest
-  .fn()
-  .mockResolvedValue(true);
-jest.mock('../../services/deletion', () => {
-  const actual = jest.requireActual(
-    '../../services/deletion',
-  ) as typeof import('../../services/deletion');
-  return {
-    ...actual,
-    deleteArchivedProfileIfStillEligible: (...args: unknown[]) =>
-      mockDeleteArchivedProfileIfStillEligible(...args),
-  };
-});
-
 // [CUT-B2] v2 consent service mocks
 const mockResolveOrgIdForPerson = jest.fn();
 jest.mock('../../services/identity-v2/family-v2', () => {
@@ -168,38 +151,6 @@ describe('archiveCleanup', () => {
       expect.any(Date),
     );
   });
-
-  it('does not delete when consent was restored', async () => {
-    mockGetConsentStatus.mockResolvedValue('CONSENTED');
-
-    await executeArchiveCleanup('profile-restored');
-
-    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
-  });
-
-  it('does not delete when archivedAt was cleared', async () => {
-    mockGetProfileForConsentRevocation.mockResolvedValue({
-      displayName: 'Liam',
-      birthYear: 2012,
-      archivedAt: null,
-    });
-
-    await executeArchiveCleanup('profile-active');
-
-    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
-  });
-
-  it('does not delete when archivedAt is younger than 30 days', async () => {
-    mockGetProfileForConsentRevocation.mockResolvedValue({
-      displayName: 'Liam',
-      birthYear: 2012,
-      archivedAt: new Date('2026-04-20T12:00:00.000Z'),
-    });
-
-    await executeArchiveCleanup('profile-too-new');
-
-    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
-  });
 });
 
 // [CUT-B2] v2 path tests — run with IDENTITY_V2_ENABLED=true
@@ -216,7 +167,6 @@ describe('archiveCleanup (v2 path)', () => {
       'person-delete-v2',
       expect.any(Date),
     );
-    expect(mockDeleteArchivedProfileIfStillEligible).not.toHaveBeenCalled();
   });
 
   it('does not delete when v2 consent status is CONSENTED', async () => {

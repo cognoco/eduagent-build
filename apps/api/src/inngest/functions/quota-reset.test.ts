@@ -71,7 +71,6 @@ import { quotaReset } from './quota-reset';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 // [WI-810] spy on the real billing helpers (NOT a jest.mock module mock — GC1
 // clean) to assert the quota-cycle reset routes to the v2 helper.
-import * as billing from '../../services/billing';
 import * as billingV2 from '../../services/billing/billing-v2';
 
 // ---------------------------------------------------------------------------
@@ -256,9 +255,6 @@ describe('quotaReset', () => {
   // -----------------------------------------------------------------------
   describe('[WI-810] monthly quota-cycle reset identity-v2 gating', () => {
     it('routes to resetExpiredQuotaCyclesV2 (joins the v2 subscription table, survives M-DROP)', async () => {
-      const legacy = jest
-        .spyOn(billing, 'resetExpiredQuotaCycles')
-        .mockResolvedValue(3);
       const v2 = jest
         .spyOn(billingV2, 'resetExpiredQuotaCyclesV2')
         .mockResolvedValue(7);
@@ -266,7 +262,6 @@ describe('quotaReset', () => {
       const { result } = await executeSteps();
 
       expect(v2).toHaveBeenCalledTimes(1);
-      expect(legacy).not.toHaveBeenCalled();
       expect(result.monthlyResetCount).toBe(7);
     });
   });
