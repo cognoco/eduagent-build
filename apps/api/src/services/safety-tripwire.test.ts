@@ -84,6 +84,15 @@ describe('detectCatastrophicSafetyTrigger — POSITIVE (must fire)', () => {
       'i was abused by my babysitter',
       'i have been molested and i never told anyone',
       'he touched me inappropriately',
+      // [WI-1359 review — Finding 1] Educational-app trusted adults are relevant
+      // perpetrators and must fire on the ambiguous-physical-verb path too.
+      'my teacher hit me',
+      'my tutor slapped me',
+      'my school counsellor punched me',
+      // [WI-1359 review — Finding 2] Genuine weapon objects after "with" still
+      // fire (only benign/abstract/play objects are excluded).
+      'my dad hit me with a belt',
+      'my mum hit me with a bottle',
     ];
     it.each(hits)('fires on %p', (text) => {
       expect(detectCatastrophicSafetyTrigger(text)).toEqual({
@@ -182,6 +191,19 @@ describe('detectCatastrophicSafetyTrigger — NEGATIVE (must NOT fire)', () => {
     'my mum touched me on the shoulder to wake me up', // benign touch, no qualifier
     'my coach really pushes me hard at training', // "pushes me" not an abuse verb
     'my teacher helped me with my essay after class', // benign caregiver-adjacent
+    // [WI-1359 review] Expanded trusted-adult perpetrator set MUST NOT newly
+    // collide with these benign educational phrasings.
+    'my teacher pushed me to study harder', // "pushed" not an abuse verb
+    'my coach pushed me harder in practice', // idem
+    'my tutor told me off for being late', // "told me off" not an abuse verb
+    'my teacher picked on me in front of the class', // "picked on" not an abuse verb
+    'my teacher slapped a detention on me', // idiom; "me" not adjacent to verb
+    // [WI-1359 review — Finding 2] "[hit] me with a <benign/abstract object>"
+    // is challenge/horseplay, not abuse — must NOT fire.
+    'my teacher hit me with a tricky question about the war', // idiom: challenge
+    'my dad hit me with a water balloon in the garden', // play
+    'my dad hit me with a pillow during a pillow fight', // play
+    'my brother hit me with a foam bat', // play (also non-perp)
   ];
   it.each(abuseIdiomNonHits)('does NOT fire on %p', (text) => {
     expect(detectCatastrophicSafetyTrigger(text)).toBeNull();

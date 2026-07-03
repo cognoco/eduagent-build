@@ -103,20 +103,34 @@ const SEXUAL_CONTENT_MINOR_PATTERNS: RegExp[] = [
 // required for the ambiguous physical verbs (hit/beat/…) and optional for the
 // unambiguous ones (molested/raped/abused). This keeps third-person analytical,
 // historical, literary, and definitional abuse-topic questions — the WI-1360
-// SL-AB battery — from ever tripping. Idiom collisions ("hits me up" = contacts
-// me, "beats me at chess" = defeats me) are excluded with lookaheads.
+// SL-AB battery — from ever tripping. Idiom collisions are excluded with
+// lookaheads: "hits me up" (contacts me), "beats me at chess" (defeats me), and
+// "[hit] me with a <benign/abstract object>" ("a tricky question", "a water
+// balloon", "a pillow") — while genuine weapon objects ("with a belt", "with a
+// bottle") still fire. The perpetrator set includes the app's high-frequency
+// trusted adults (teacher/tutor/counsellor/coach), who are also relevant
+// perpetrators in an educational setting [WI-1359 review].
 const ABUSE_PERP =
-  "(?:my |step-?)?(?:mum|mom|mummy|mommy|mother|dad|daddy|father|stepdad|step-?dad|stepmum|step-?mum|stepmom|step-?mom|stepfather|step-?father|stepmother|step-?mother|step-?parent|uncle|aunt|auntie|grandpa|grandad|grand-?dad|grandfather|grandma|granny|grandmother|guardian|foster (?:mum|mom|dad|father|mother|parent)|baby-?sitter|coach|(?:mum|mom|mother|dad|father)'?s (?:boyfriend|girlfriend|partner))";
+  "(?:my |step-?)?(?:mum|mom|mummy|mommy|mother|dad|daddy|father|stepdad|step-?dad|stepmum|step-?mum|stepmom|step-?mom|stepfather|step-?father|stepmother|step-?mother|step-?parent|uncle|aunt|auntie|grandpa|grandad|grand-?dad|grandfather|grandma|granny|grandmother|guardian|foster (?:mum|mom|dad|father|mother|parent)|baby-?sitter|coach|teacher|tutor|counsellor|counselor|(?:mum|mom|mother|dad|father)'?s (?:boyfriend|girlfriend|partner))";
+// Benign / abstract / play objects that follow "[harm-verb] me with …" in an
+// idiom or horseplay, NOT an abuse disclosure. Weapon/injury objects (belt,
+// bottle, stick, …) are deliberately absent so they still fire.
+const ABUSE_BENIGN_OBJECT =
+  'questions?|ideas?|news|facts?|jokes?|riddles?|problems?|answers?|knowledge|shots?|best shot|balloons?|pillows?|cushions?|foam (?:bat|sword|ball|noodle)|nerf|snowballs?|sponge|beach ?ball|water ?gun|water ?pistol|silly string|marshmallows?|feathers?|towel';
 const ABUSE_DISCLOSURE_PATTERNS: RegExp[] = [
-  // 1. Family/caregiver perpetrator physically hurts the first-person learner;
-  //    "me" is the direct object. `(?!\s+up)` excludes "hits me up" (contacts).
+  // 1. Family/caregiver/trusted-adult perpetrator physically hurts the
+  //    first-person learner; "me" is the direct object (adjacent to the verb so
+  //    "slapped a detention on me" cannot match). `(?!\s+up)` excludes "hits me
+  //    up" (contacts); the `(?!\s+with …benign)` guard excludes "hit me with a
+  //    tricky question / a water balloon" while keeping "hit me with a belt".
   new RegExp(
-    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\b(?:hits?|punch(?:es|ed)?|slap(?:s|ped)?|kick(?:s|ed)?|whip(?:s|ped)?|burn(?:s|ed|t)?|chok(?:es|ed)?|strangl(?:es|ed)?|molest(?:s|ed)?|rap(?:es|ed)?|assault(?:s|ed)?|abus(?:es|ed)?)\\b[^.?!]{0,15}\\bme\\b(?!\\s+up\\b)`,
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\b(?:hits?|punch(?:es|ed)?|slap(?:s|ped)?|kick(?:s|ed)?|whip(?:s|ped)?|burn(?:s|ed|t)?|chok(?:es|ed)?|strangl(?:es|ed)?|molest(?:s|ed)?|rap(?:es|ed)?|assault(?:s|ed)?|abus(?:es|ed)?)\\s+me\\b(?!\\s+up\\b)(?!\\s+with\\s+[^.?!]{0,20}?\\b(?:${ABUSE_BENIGN_OBJECT})\\b)`,
     'i',
   ),
-  // 2. "beat(s|en) me" by a caregiver, excluding "beats me at <game>" (defeats).
+  // 2. "beat(s|en) me" by a caregiver, excluding "beats me at <game>" (defeats)
+  //    and "beat me with a <benign object>" (pillow fight), keeping weapons.
   new RegExp(
-    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\bbeat(?:s|en)? me\\b(?!\\s+at\\b)`,
+    `\\b${ABUSE_PERP}\\b[^.?!]{0,30}\\bbeat(?:s|en)? me\\b(?!\\s+at\\b)(?!\\s+with\\s+[^.?!]{0,20}?\\b(?:${ABUSE_BENIGN_OBJECT})\\b)`,
     'i',
   ),
   // 3. First-person victim of an UNAMBIGUOUS abuse act — verbs that do not
