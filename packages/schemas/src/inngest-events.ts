@@ -636,6 +636,23 @@ export type SubscriptionStoreTeardownRequestedData = z.infer<
 // rehydrates the raw values first-party from `session_events`, scoped by
 // profileId.
 // ---------------------------------------------------------------------------
+/**
+ * The six coarse categories of minor PII the echo-back gate detects (WI-1348).
+ * SINGLE SOURCE OF TRUTH: the gate (`minor-pii-echo-gate.ts`) imports `PiiKind`
+ * from here rather than re-declaring the union, so the detector categories and
+ * the observability event's enum cannot drift apart (a drift would make the
+ * event silently fail Inngest validation inside safeSend).
+ */
+export const piiKindSchema = z.enum([
+  'email',
+  'handle',
+  'phone',
+  'name',
+  'school',
+  'address',
+]);
+export type PiiKind = z.infer<typeof piiKindSchema>;
+
 export const minorPiiEchoRedactedEventSchema = z.object({
   profileId: z.string().min(1),
   sessionId: z.string().optional(),
@@ -644,9 +661,7 @@ export const minorPiiEchoRedactedEventSchema = z.object({
   /** The deterministic gate marker (MINOR_PII_ECHO_GATE_MODEL). */
   model: z.string().min(1),
   /** Coarse categories of the redacted PII — never the raw values. */
-  redactedKinds: z.array(
-    z.enum(['email', 'handle', 'phone', 'name', 'school', 'address']),
-  ),
+  redactedKinds: z.array(piiKindSchema),
   /** How many distinct PII tokens were redacted from the reply. */
   redactedCount: z.number().int().nonnegative(),
   timestamp: isoDateField,

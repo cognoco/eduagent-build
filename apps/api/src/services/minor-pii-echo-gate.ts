@@ -1,3 +1,8 @@
+// PiiKind is single-sourced in @eduagent/schemas (the shared contract) so the
+// detector categories and the observability event's `piiKindSchema` enum cannot
+// drift apart — see the header note below.
+import type { PiiKind } from '@eduagent/schemas';
+
 // ---------------------------------------------------------------------------
 // Deterministic minor-PII echo-back reply gate [WI-1348]
 //
@@ -37,24 +42,14 @@
 /** Marker recorded in the persisted model field when the gate fires. */
 export const MINOR_PII_ECHO_GATE_MODEL = 'deterministic:minor_pii_echo';
 
+// The event carries the coarse PII KINDS (plus a count), NEVER the raw values —
+// the raw name / school / email must not egress into Inngest's third-party
+// event store (same PII-egress rule the event schemas enforce). An incident
+// investigator rehydrates the raw values first-party from `session_events`,
+// scoped by profileId.
+
 /** Neutral placeholder that replaces an echoed PII token in the reply. */
 const REDACTION_PLACEHOLDER = '[removed]';
-
-/**
- * Coarse CATEGORY of a volunteered PII token. The observability event carries
- * these kinds (plus a count), never the raw values — the raw name / school /
- * email must not egress into Inngest's third-party event store (same PII-egress
- * rule the event schemas in @eduagent/schemas enforce). An incident
- * investigator rehydrates the raw values first-party from `session_events`,
- * scoped by profileId.
- */
-export type PiiKind =
-  | 'email'
-  | 'handle'
-  | 'phone'
-  | 'name'
-  | 'school'
-  | 'address';
 
 export interface PiiMatch {
   value: string;

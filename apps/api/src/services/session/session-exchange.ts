@@ -58,6 +58,7 @@ import {
   classifyExchangeOutcome,
   auditExchangeSources,
   applySourceAuditSafetyFallback,
+  collectLearnerText,
   emitDangerousProcedureBlockedEvent,
   emitMinorPiiEchoRedactedEvent,
   inferObviousReliableSourceForAudit,
@@ -3849,12 +3850,10 @@ export async function streamMessage(
       // volunteered in this turn or recent turns that the model echoed back.
       // Rides the same `sourceReplacement` rail so the client replaces the
       // tokens it already streamed.
-      const learnerVolunteeredText = [
-        ...context.exchangeHistory
-          .filter((e) => e.role === 'user')
-          .map((e) => e.content),
+      const learnerVolunteeredText = collectLearnerText(
+        context.exchangeHistory,
         input.message,
-      ].join('\n');
+      );
       const piiEchoGate = applyMinorPiiEchoGate(
         procedureGate.response,
         learnerVolunteeredText,

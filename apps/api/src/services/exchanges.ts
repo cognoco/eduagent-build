@@ -43,9 +43,8 @@ import { applyDangerousProcedureGate } from './dangerous-procedure-gate';
 import {
   applyMinorPiiEchoGate,
   MINOR_PII_ECHO_GATE_MODEL,
-  type PiiKind,
 } from './minor-pii-echo-gate';
-import { computeAgeBracketFromDate } from '@eduagent/schemas';
+import { computeAgeBracketFromDate, type PiiKind } from '@eduagent/schemas';
 import { getOcrProvider } from './ocr';
 import {
   GENERAL_KNOWLEDGE_SOURCE_ID,
@@ -177,7 +176,11 @@ export async function emitDangerousProcedureBlockedEvent(context: {
  */
 export async function emitMinorPiiEchoRedactedEvent(context: {
   sessionId?: string;
-  profileId?: string;
+  // Required: the event schema mandates `profileId: z.string().min(1)`. An
+  // absent id would silently fail validation inside safeSend and DROP the
+  // event — the exact silent-observability-loss this round guards against.
+  // ExchangeContext.profileId is always `string`, so callers pass it directly.
+  profileId: string;
   flow: string;
   provider?: string;
   redactedKinds: PiiKind[];
@@ -211,6 +214,23 @@ export async function emitMinorPiiEchoRedactedEvent(context: {
     'safety.minor_pii_echo_redacted',
     { sessionId: context.sessionId, profileId: context.profileId },
   );
+}
+
+/**
+ * [WI-1348] Collect the learner's own volunteered text — the current message
+ * plus the learner (user-role) turns from the exchange history — for the
+ * minor-PII echo-back gate to scan. The gate compares the tutor reply only
+ * against THIS text (never the model's own prior turns), which keeps the
+ * echo-back scope narrow and protects the must-answer commitment.
+ */
+export function collectLearnerText(
+  exchangeHistory: ReadonlyArray<{ role: string; content: string }>,
+  currentMessage: string,
+): string {
+  return [
+    ...exchangeHistory.filter((e) => e.role === 'user').map((e) => e.content),
+    currentMessage,
+  ].join('\n');
 }
 
 /**
@@ -1733,12 +1753,10 @@ export async function processExchange(
   // [WI-1348] Server-side minor-PII echo-back gate (fail-closed, same minor
   // scope as the procedure gate above). Strips any PII the learner volunteered
   // in THIS turn or recent turns that the model echoed back into the reply.
-  const learnerVolunteeredText = [
-    ...context.exchangeHistory
-      .filter((e) => e.role === 'user')
-      .map((e) => e.content),
+  const learnerVolunteeredText = collectLearnerText(
+    context.exchangeHistory,
     userMessage,
-  ].join('\n');
+  );
   const piiEchoGate = applyMinorPiiEchoGate(
     procedureGate.response,
     learnerVolunteeredText,
