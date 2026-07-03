@@ -92,6 +92,7 @@ import {
   executeDeletionV2,
   scheduleDeletionV2,
 } from '../../apps/api/src/services/identity-v2/deletion-v2';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 import { app } from '../../apps/api/src/index';
 
@@ -116,10 +117,14 @@ async function loadDeletionState(accountId: string): Promise<{
     where: eq(organization.id, accountId),
     columns: { deletionScheduledAt: true, deletionCancelledAt: true },
   });
-  const acctRow = await db.query.accounts.findFirst({
-    where: eq(accounts.id, accountId),
-    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-  });
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
+  // table existence — the v2 `organization` row above is the real anchor.
+  const acctRow = (await legacyIdentityTableExistsForTest(db, 'accounts'))
+    ? await db.query.accounts.findFirst({
+        where: eq(accounts.id, accountId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      })
+    : undefined;
   if (!orgRow && !acctRow) return null;
   return {
     deletionScheduledAt:
@@ -174,6 +179,16 @@ async function createOwnerProfileRecord(): Promise<{
   });
   if (membershipRow) {
     return { profileId, accountId: membershipRow.organizationId };
+  }
+
+  // [WI-1128] Legacy `profiles` fallback — may already be dropped
+  // (post-M-DROP); skip it there instead of hard-failing. The create route is
+  // v2-unconditional, so this path is a pre-collapse-flag safety net, not the
+  // expected route in current runs.
+  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
+    throw new Error(
+      `Profile not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to: ${profileId}`,
+    );
   }
 
   const row = await db.query.profiles.findFirst({

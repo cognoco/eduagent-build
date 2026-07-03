@@ -17,15 +17,13 @@
  * once (reflectionMultiplierApplied is true on exactly 1 xp_ledger row).
  */
 
-import { eq, inArray, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   learningSessions,
-  profiles,
   sessionSummaries,
   subjects,
   xpLedger,
@@ -34,6 +32,10 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { generateUUIDv7 } from '@eduagent/database';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import {
   llmStructuredJson,
   registerLlmProviderFixture,
@@ -67,6 +69,10 @@ function createIntegrationDb(): Database {
 const RUN_ID = generateUUIDv7().slice(0, 8);
 const PREFIX = `integration-session-summary-${RUN_ID}`;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedFullSessionWithXpEntry(): Promise<{
   db: Database;
   profileId: string;
@@ -75,27 +81,30 @@ async function seedFullSessionWithXpEntry(): Promise<{
   sessionId: string;
 }> {
   const db = createIntegrationDb();
-  const clerkUserId = `${PREFIX}-clerk`;
-  const email = `${PREFIX}@integration.test`;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
-
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Summary Test User',
-      birthYear: 2005,
-      isOwner: true,
-    })
-    .returning();
+  // [WI-1128] Key clerkUserId/email off the freshly-generated accountId —
+  // this helper is called once per test via beforeEach cleanup; a fixed
+  // (RUN_ID-scoped but call-invariant) string collides with legacy
+  // `accounts` unique columns across calls (the onConflictDoNothing
+  // silently no-ops, leaving profiles.account_id FK dangling for the
+  // fresh accountId).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: `${PREFIX}-clerk-${accountId}`,
+    email: `${PREFIX}-${accountId}@integration.test`,
+    displayName: 'Summary Test User',
+    birthYear: 2005,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
-    .values({ profileId: profile!.id, name: 'Mathematics' })
+    .values({ profileId, name: 'Mathematics' })
     .returning();
 
   const [curriculum] = await db
@@ -123,7 +132,7 @@ async function seedFullSessionWithXpEntry(): Promise<{
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
       topicId: topic!.id,
       exchangeCount: 3,
@@ -132,7 +141,7 @@ async function seedFullSessionWithXpEntry(): Promise<{
 
   // Seed an XP ledger entry so applyReflectionMultiplier has something to act on
   await db.insert(xpLedger).values({
-    profileId: profile!.id,
+    profileId,
     topicId: topic!.id,
     subjectId: subject!.id,
     amount: 100,
@@ -141,7 +150,7 @@ async function seedFullSessionWithXpEntry(): Promise<{
 
   return {
     db,
-    profileId: profile!.id,
+    profileId,
     subjectId: subject!.id,
     topicId: topic!.id,
     sessionId: session!.id,
@@ -150,17 +159,12 @@ async function seedFullSessionWithXpEntry(): Promise<{
 
 async function cleanupByPrefix() {
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: like(accounts.clerkUserId, `${PREFIX}%`),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
   });
-  if (rows.length > 0) {
-    await db.delete(accounts).where(
-      inArray(
-        accounts.id,
-        rows.map((r) => r.id),
-      ),
-    );
-  }
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 describeIfDb(
@@ -274,26 +278,24 @@ describeIfDb('getSessionSummary ownership hardening [WI-80]', () => {
     const { db, profileId, subjectId, sessionId } =
       await seedFullSessionWithXpEntry();
 
-    const [foreignAccount] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `${PREFIX}-foreign-clerk`,
-        email: `${PREFIX}-foreign@integration.test`,
-      })
-      .returning();
-    const [foreignProfile] = await db
-      .insert(profiles)
-      .values({
-        accountId: foreignAccount!.id,
-        displayName: 'Foreign Summary User',
-        birthYear: 2005,
-        isOwner: true,
-      })
-      .returning();
+    const foreignAccountId = generateUUIDv7();
+    const foreignProfileId = generateUUIDv7();
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId: foreignAccountId,
+      profileId: foreignProfileId,
+      clerkUserId: `${PREFIX}-foreign-clerk`,
+      email: `${PREFIX}-foreign@integration.test`,
+      displayName: 'Foreign Summary User',
+      birthYear: 2005,
+      isOwner: true,
+    });
+    seededAccountIds.push(foreignAccountId);
+    seededProfileIds.push(foreignProfileId);
+
     const [foreignSubject] = await db
       .insert(subjects)
       .values({
-        profileId: foreignProfile!.id,
+        profileId: foreignProfileId,
         name: 'Foreign Curriculum Subject',
         status: 'active',
       })

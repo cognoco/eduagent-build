@@ -1,14 +1,15 @@
 import { resolve } from 'path';
-import { eq, like } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curriculumBooks,
   curriculumTopics,
   curricula,
   generateUUIDv7,
-  profiles,
+  membership,
+  organization,
+  person,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -22,6 +23,8 @@ let db: Database;
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `clerk_spc_integ_${RUN_ID}`;
 let seedCounter = 0;
+const createdAccountIds: string[] = [];
+const createdProfileIds: string[] = [];
 
 const BOOK_TOPIC_RESPONSE = JSON.stringify({
   topics: [
@@ -70,27 +73,33 @@ const BOOK_TOPIC_RESPONSE = JSON.stringify({
 
 async function seedAccount(): Promise<{ accountId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
+  const [org] = await db
+    .insert(organization)
     .values({
-      clerkUserId: `${CLERK_PREFIX}_${idx}`,
-      email: `spc-integ-${RUN_ID}-${idx}@test.invalid`,
+      name: `${CLERK_PREFIX}_${idx}`,
     })
-    .returning({ id: accounts.id });
-  return { accountId: account!.id };
+    .returning({ id: organization.id });
+  createdAccountIds.push(org!.id);
+  return { accountId: org!.id };
 }
 
 async function seedProfile(accountId: string): Promise<{ profileId: string }> {
-  const [profile] = await db
-    .insert(profiles)
+  const birthYear = new Date().getUTCFullYear() - 12;
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId,
       displayName: 'Test User',
-      birthYear: new Date().getUTCFullYear() - 12,
-      isOwner: true,
+      birthDate: `${birthYear}-01-01`,
+      residenceJurisdiction: 'EU',
     })
-    .returning({ id: profiles.id });
-  return { profileId: profile!.id };
+    .returning({ id: person.id });
+  await db.insert(membership).values({
+    personId: p!.id,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
+  createdProfileIds.push(p!.id);
+  return { profileId: p!.id };
 }
 
 async function seedSubject(profileId: string): Promise<{ subjectId: string }> {
@@ -140,9 +149,14 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  if (createdProfileIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, createdProfileIds));
+  }
+  if (createdAccountIds.length > 0) {
+    await db
+      .delete(organization)
+      .where(inArray(organization.id, createdAccountIds));
+  }
 }, 30_000);
 
 describe('subject-prewarm-curriculum integration', () => {

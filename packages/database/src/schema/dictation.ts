@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 
 export const dictationModeEnum = pgEnum('dictation_mode', [
   'homework',
@@ -26,7 +26,7 @@ export const dictationResults = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     completionKey: uuid('completion_key')
       .notNull()
       .default(sql`gen_random_uuid()`),

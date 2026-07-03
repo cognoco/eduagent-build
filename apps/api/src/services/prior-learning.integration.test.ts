@@ -18,21 +18,22 @@
  * subjects join was added.
  */
 
-import { like } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   curricula,
   curriculumBooks,
   curriculumTopics,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import {
   fetchCrossSubjectHighlights,
   fetchPriorTopics,
@@ -72,30 +73,24 @@ async function seedProfileWithCompletedSession(
   database: Database,
   label: string,
 ): Promise<SeededProfile> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  if (!account) throw new Error('account insert failed');
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account.id,
-      displayName: `CR059 ${label}`,
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  if (!profile) throw new Error('profile insert failed');
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `CR059 ${label}`,
+    birthYear: 2000,
+    clerkUserId: `${CLERK_PREFIX}-${label}`,
+    email: `${CLERK_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -130,7 +125,7 @@ async function seedProfileWithCompletedSession(
   if (!topic) throw new Error('topic insert failed');
 
   await database.insert(learningSessions).values({
-    profileId: profile.id,
+    profileId,
     subjectId: subject.id,
     topicId: topic.id,
     status: 'completed',
@@ -138,7 +133,7 @@ async function seedProfileWithCompletedSession(
   });
 
   return {
-    profileId: profile.id,
+    profileId,
     subjectId: subject.id,
     topicId: topic.id,
     topicTitle,
@@ -163,10 +158,17 @@ async function seedSubjectForProfile(
   return subject.id;
 }
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------

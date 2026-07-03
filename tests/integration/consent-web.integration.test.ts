@@ -6,12 +6,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import {
-  consentRequest,
-  consentStates,
-  person,
-  profiles,
-} from '@eduagent/database';
+import { consentRequest, person } from '@eduagent/database';
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
@@ -59,57 +54,35 @@ async function createProfileWithConsentToken(token: string) {
   return profile.id;
 }
 
+// [WI-1128] Legacy `consent_states` is dropped — the route resolves consent
+// exclusively via v2 `consent_request`/`consent_grant`, so this reads only
+// that store now (previously store-agnostic against legacy + v2).
 async function readConsentState(profileId: string) {
   const db = getIntegrationDb();
   const request = await db.query.consentRequest.findFirst({
     where: eq(consentRequest.chargePersonId, profileId),
   });
-  const legacyState = await db.query.consentStates.findFirst({
-    where: eq(consentStates.profileId, profileId),
-  });
+  if (!request) return undefined;
 
-  // [WI-1145] Store-agnostic read: this fixture dual-writes a pending request,
-  // but the flag-off route may still resolve legacy consentStates. Prefer a
-  // resolved v2 request, then a resolved legacy row, then pending v2, then legacy.
-  if (request?.status === 'approved' || request?.status === 'denied') {
-    return {
-      status:
-        request.status === 'approved'
-          ? 'CONSENTED'
-          : request.status === 'denied'
-            ? 'DENIED'
-            : 'PARENTAL_CONSENT_REQUESTED',
-      respondedAt: request.respondedAt,
-    };
+  if (request.status === 'approved') {
+    return { status: 'CONSENTED', respondedAt: request.respondedAt };
   }
-
-  if (
-    legacyState &&
-    legacyState.status !== 'PENDING' &&
-    legacyState.status !== 'PARENTAL_CONSENT_REQUESTED'
-  ) {
-    return legacyState;
+  if (request.status === 'denied') {
+    return { status: 'DENIED', respondedAt: request.respondedAt };
   }
-
-  if (request) {
-    return {
-      status: 'PARENTAL_CONSENT_REQUESTED',
-      respondedAt: request.respondedAt,
-    };
-  }
-
-  return legacyState;
+  return {
+    status: 'PARENTAL_CONSENT_REQUESTED',
+    respondedAt: request.respondedAt,
+  };
 }
 
+// [WI-1128] Legacy `profiles` is dropped — the route writes `person`
+// unconditionally, so this reads only that store now.
 async function readProfileRecord(profileId: string) {
   const db = getIntegrationDb();
-  // [WI-1145] v2-first: the route writes person unconditionally post-WI-867
-  // collapse; fall back to legacy profiles for the pre-collapse flag-off path.
-  const p = await db.query.person.findFirst({
+  return db.query.person.findFirst({
     where: eq(person.id, profileId),
   });
-  if (p) return p;
-  return db.query.profiles.findFirst({ where: eq(profiles.id, profileId) });
 }
 
 beforeEach(async () => {
@@ -254,40 +227,19 @@ describe('Integration: POST /v1/consent-page/confirm', () => {
     expect(html).toContain('Consent declined');
     expect(html).toContain("Emma's account will be removed");
 
-    // [WI-1145] Store-agnostic deletion assertion. The deny cascade is collapsed
-    // to v2 post-WI-867 (deletes the `person`), but pre-collapse flag-off it
-    // deletes the legacy `profiles` row instead. The flag is OFF in both states
-    // and can't distinguish them (only the code version can, which the test
-    // can't see), so assert the profile is gone from AT LEAST ONE store — the
-    // active one the running code targets. The vestigial store's row may linger
-    // on the journaled-chain test DB and is dropped in prod by M-DROP.
+    // [WI-1128] Legacy `profiles`/`consent_states` are dropped — the deny
+    // cascade deletes the v2 `person`, which cascades to `consent_request`
+    // (chargePersonId onDelete: cascade), so both must be gone.
     const db = getIntegrationDb();
     const personRow = await db.query.person.findFirst({
       where: eq(person.id, profileId),
     });
-    const legacyRow = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-    });
+    expect(personRow).toBeUndefined();
 
-    expect(personRow === undefined || legacyRow === undefined).toBe(true);
-
-    // [WI-1145] Store-agnostic consent-resolution assertion. Post-collapse the
-    // deny cascade-deletes the v2 `person`, which takes its `consent_request`
-    // with it (so the v2 request is GONE, not 'denied'); pre-collapse the legacy
-    // path clears the legacy `consentStates` row. readConsentState's legacy
-    // fallback would surface the untouched legacy row post-collapse, so assert
-    // directly: consent is resolved (no longer pending) in AT LEAST ONE store.
     const v2ConsentReq = await db.query.consentRequest.findFirst({
       where: eq(consentRequest.chargePersonId, profileId),
     });
-    const legacyConsentState = await db.query.consentStates.findFirst({
-      where: eq(consentStates.profileId, profileId),
-    });
-    const consentResolved =
-      legacyConsentState === undefined ||
-      v2ConsentReq === undefined ||
-      v2ConsentReq.status === 'denied';
-    expect(consentResolved).toBe(true);
+    expect(v2ConsentReq).toBeUndefined();
   });
 
   it('returns 404 when the consent token is invalid', async () => {

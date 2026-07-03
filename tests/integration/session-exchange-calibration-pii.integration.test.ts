@@ -15,25 +15,30 @@
  *
  * External boundary: inngest.send is spied (the event-store HTTP boundary).
  */
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionEvents,
   subjects,
 } from '@eduagent/database';
 
 import { createIntegrationDb } from './helpers';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { inngest } from '../../apps/api/src/inngest/client';
 import { maybeDispatchReviewCalibration } from '../../apps/api/src/services/session/session-exchange';
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 type IntegrationDb = ReturnType<typeof createIntegrationDb>;
 
@@ -47,29 +52,26 @@ async function seedReviewSession(
   learnerMessageEventId: string;
 }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_wi620_calib_${RUN_ID}_${idx}`,
-      email: `wi620-calib-${RUN_ID}-${idx}@integration.test`,
-    })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `WI620 Calibration ${idx}`,
-      // 12 years old — minor (the PII-egress concern is under-18 learners).
-      birthYear: new Date().getFullYear() - 12,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: `clerk_wi620_calib_${RUN_ID}_${idx}`,
+    email: `wi620-calib-${RUN_ID}-${idx}@integration.test`,
+    displayName: `WI620 Calibration ${idx}`,
+    // 12 years old — minor (the PII-egress concern is under-18 learners).
+    birthYear: new Date().getFullYear() - 12,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: 'Biology',
       status: 'active',
       pedagogyMode: 'socratic',
@@ -108,7 +110,7 @@ async function seedReviewSession(
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
       topicId: topic!.id,
       sessionType: 'learning',
@@ -126,7 +128,7 @@ async function seedReviewSession(
     .insert(sessionEvents)
     .values({
       sessionId: session!.id,
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
       topicId: topic!.id,
       eventType: 'user_message',
@@ -135,7 +137,7 @@ async function seedReviewSession(
     .returning({ id: sessionEvents.id });
 
   return {
-    profileId: profile!.id,
+    profileId,
     sessionId: session!.id,
     topicId: topic!.id,
     learnerMessageEventId: userEvent!.id,
@@ -161,10 +163,11 @@ describe('Integration: maybeDispatchReviewCalibration WI-620 PII egress', () => 
   });
 
   afterAll(async () => {
-    // ON DELETE CASCADE from accounts cleans the whole seeded chain.
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_wi620_calib_${RUN_ID}%`));
+    // [WI-1128] ON DELETE CASCADE from person cleans the whole seeded chain.
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   });
 
   it('[WI-620 break test] dispatched payload carries the opaque eventId, never the raw learner answer or topic title', async () => {

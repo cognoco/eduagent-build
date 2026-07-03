@@ -12,26 +12,22 @@
 // ownership-v2.integration.test.ts and consent-status-v2.integration.test.ts)
 // so no internal mock is needed anywhere in this file.
 //
-// Seeding: learning_sessions and subjects FK legacy profiles.id (pre-repoint
-// schema), so each person eligible for the activity scan needs a legacy
-// profile twin — the same pattern recap-parent-detail-v2.integration.test.ts
-// uses (profiles.id = personId).
+// Seeding: learning_sessions and subjects FK person.id directly (post-M-REPOINT
+// schema — WI-1128), so each person eligible for the activity scan just needs
+// its own person row; no legacy profile twin is required.
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   consentGrant,
   createDatabase,
-  generateUUIDv7,
   guardianship,
   learningSessions,
   membership,
   organization,
   person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -58,18 +54,13 @@ const UNDER_MINIMUM_AGE_BIRTH_DATE = `${new Date().getUTCFullYear() - 10}-01-01`
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
-    const accountIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
     });
 
     afterEach(async () => {
-      // accounts → profiles (cascade) → learning_sessions + subjects (cascade).
-      for (const aid of accountIds) {
-        await db.delete(accounts).where(eq(accounts.id, aid));
-      }
-      accountIds.length = 0;
+      // person ON DELETE CASCADE removes membership + learning_sessions + subjects.
       for (const pid of personIds) {
         await db
           .delete(guardianship)
@@ -123,24 +114,6 @@ const UNDER_MINIMUM_AGE_BIRTH_DATE = `${new Date().getUTCFullYear() - 10}-01-01`
       return p!.id;
     }
 
-    /** Legacy profile twin so learning_sessions/subjects FKs resolve. */
-    async function seedLegacyProfileTwin(personId: string): Promise<void> {
-      const accountId = generateUUIDv7();
-      await db.insert(accounts).values({
-        id: accountId,
-        clerkUserId: `wi905a-acct-${accountId}`,
-        email: `wi905a-acct-${accountId}@integration.test`,
-      });
-      await db.insert(profiles).values({
-        id: personId,
-        accountId,
-        displayName: 'WI905a-Twin',
-        birthYear: 1990,
-        isOwner: false,
-      });
-      accountIds.push(accountId);
-    }
-
     /** Seed one qualifying (or deliberately disqualifying) session for a person. */
     async function seedSession(
       personId: string,
@@ -150,7 +123,6 @@ const UNDER_MINIMUM_AGE_BIRTH_DATE = `${new Date().getUTCFullYear() - 10}-01-01`
         startedAt?: Date;
       } = {},
     ): Promise<void> {
-      await seedLegacyProfileTwin(personId);
       const [subject] = await db
         .insert(subjects)
         .values({ profileId: personId, name: 'WI905a-Subject' })

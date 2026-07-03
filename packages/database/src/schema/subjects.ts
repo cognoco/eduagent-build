@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const pedagogyModeEnum = pgEnum('pedagogy_mode', [
@@ -51,7 +51,7 @@ export const subjects = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     rawInput: text('raw_input'),
     status: subjectStatusEnum('status').notNull().default('active'),
@@ -223,7 +223,7 @@ export const curriculumTopics = pgTable(
     targetWordCount: integer('target_word_count'),
     targetChunkCount: integer('target_chunk_count'),
     sourceChildProfileId: uuid('source_child_profile_id').references(
-      () => profiles.id,
+      () => person.id,
       { onDelete: 'set null' },
     ),
     filedFrom: filedFromEnum('filed_from').notNull().default('pre_generated'),
@@ -294,7 +294,7 @@ export const topicConnections = pgTable(
 //   topic_connections.topic_b_id → curriculum_topics
 //   curriculum_topics.book_id    → curriculum_books
 //   curriculum_books.subject_id  → subjects
-//   subjects.profile_id          → profiles.id
+//   subjects.profile_id          → person.id
 //
 // Every reader MUST resolve topicIds via the profile-scoped curriculum_topics
 // path BEFORE querying topic_connections (canonical example:
@@ -336,7 +336,7 @@ export const curriculumAdaptations = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),

@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { vectorNullable } from './_pgvector';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -21,7 +21,7 @@ export const memoryFacts = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     category: text('category').notNull(),
     text: text('text').notNull(),
     textNormalized: text('text_normalized').notNull(),

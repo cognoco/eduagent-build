@@ -18,10 +18,8 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   consentGrant,
   consentRequest,
-  consentStates,
   createDatabase,
   curriculumBooks,
   curriculumTopics,
@@ -32,12 +30,11 @@ import {
   notificationPreferences,
   organization,
   person,
-  profiles,
   retentionCards,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { and, inArray, isNull, like } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 import { reviewDueScan } from './review-due-scan';
 
@@ -47,8 +44,14 @@ loadDatabaseEnv(resolve(__dirname, '../../../..'));
 let db: Database;
 
 const RUN_ID = generateUUIDv7();
-const CLERK_PREFIX = `clerk_rds_${RUN_ID}`;
 let seedCounter = 0;
+
+// [WI-1128] Legacy `accounts`/`profiles` dropped in migration 0130 — seed the
+// v2 identity graph (organization/person/membership) directly. Neither table
+// carries a distinguishing prefix column like legacy did, so track created
+// ids for cleanup instead of a `like()` sweep.
+const createdAccountIds: string[] = [];
+const createdProfileIds: string[] = [];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,50 +126,36 @@ async function seedAccount(opts?: {
   timezone?: string;
 }): Promise<{ accountId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
+  const [org] = await db
+    .insert(organization)
     .values({
-      clerkUserId: `${CLERK_PREFIX}_${idx}`,
-      email: `rds-${RUN_ID}-${idx}@test.invalid`,
+      name: `RDS Seed org ${RUN_ID}_${idx}`,
       timezone: opts?.timezone ?? null,
     })
-    .returning({ id: accounts.id });
+    .returning({ id: organization.id });
 
-  // [WI-867] v2 identity rows are unconditional (flag collapsed).
-  await db.insert(organization).values({
-    id: account!.id,
-    name: `RDS Seed org ${account!.id.slice(0, 8)}`,
-    timezone: opts?.timezone ?? null,
-  });
-
-  return { accountId: account!.id };
+  createdAccountIds.push(org!.id);
+  return { accountId: org!.id };
 }
 
 async function seedProfile(accountId: string): Promise<{ profileId: string }> {
-  const [profile] = await db
-    .insert(profiles)
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId,
       displayName: 'Review Test User',
-      birthYear: 1990,
-      isOwner: true,
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'ROW',
     })
-    .returning({ id: profiles.id });
+    .returning({ id: person.id });
 
-  // [WI-867] v2 identity rows are unconditional (flag collapsed).
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: 'Review Test User',
-    birthDate: '1990-01-01',
-    residenceJurisdiction: 'ROW',
-  });
   await db.insert(membership).values({
-    personId: profile!.id,
+    personId: p!.id,
     organizationId: accountId,
     roles: ['learner'],
   });
 
-  return { profileId: profile!.id };
+  createdProfileIds.push(p!.id);
+  return { profileId: p!.id };
 }
 
 async function seedNotificationPreferences(
@@ -251,32 +240,29 @@ async function seedConsentState(
     | 'PARENTAL_CONSENT_REQUESTED',
   accountId?: string,
 ): Promise<void> {
-  await db.insert(consentStates).values({
-    profileId,
-    consentType: 'GDPR',
-    status,
-  });
-
-  // [WI-867] v2 consent rows are unconditional. Skip only when no accountId
-  // (caller omits it for adult tests where "no rows" is the expected pass path).
+  // Skip entirely when no accountId — the caller omits it for adult tests
+  // where "no consent rows at all" is the expected pass-through path.
   if (!accountId) return;
 
-  if (status === 'CONSENTED') {
+  const basis = 'gdpr_parental_consent';
+
+  if (status === 'CONSENTED' || status === 'WITHDRAWN') {
     await db.insert(consentGrant).values({
       chargePersonId: profileId,
       organizationId: accountId,
       purpose: 'platform_use',
-      lawfulBasis: 'gdpr_parental_consent',
+      lawfulBasis: basis,
       granted: true,
+      withdrawnAt: status === 'WITHDRAWN' ? new Date() : null,
     });
   } else {
-    // PENDING / WITHDRAWN / NOT_CONSENTED — a pending request row is sufficient
-    // to block the "no rows at all" branch of the v2 gate.
+    // PENDING / PARENTAL_CONSENT_REQUESTED / NOT_CONSENTED — a request row is
+    // sufficient to block the "no rows at all" branch of the v2 gate.
     await db.insert(consentRequest).values({
       chargePersonId: profileId,
       organizationId: accountId,
-      requestedBasis: 'gdpr_parental_consent',
-      status: 'pending',
+      requestedBasis: basis,
+      status: status === 'PARENTAL_CONSENT_REQUESTED' ? 'requested' : 'pending',
     });
   }
 }
@@ -309,37 +295,20 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  // [WI-867] v2 identity cleanup is unconditional. The legacy accounts delete
-  // does not cascade to v2 tables (no FK from accounts to organization/person).
-  const testAccounts = await db.query.accounts.findMany({
-    where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
-    columns: { id: true },
-  });
-  const accountIds = testAccounts.map((a) => a.id);
-  if (accountIds.length > 0) {
-    const testProfiles = await db.query.profiles.findMany({
-      where: and(
-        inArray(profiles.accountId, accountIds),
-        isNull(profiles.archivedAt),
-      ),
-      columns: { id: true },
-    });
-    const profileIds = testProfiles.map((p) => p.id);
-    if (profileIds.length > 0) {
-      // consent_grant.chargePersonId → person.id RESTRICT: delete grants first.
-      await db
-        .delete(consentGrant)
-        .where(inArray(consentGrant.chargePersonId, profileIds));
-      // person cascade: membership, login (consent_request also cascades).
-      await db.delete(person).where(inArray(person.id, profileIds));
-    }
-    await db.delete(organization).where(inArray(organization.id, accountIds));
+  if (createdProfileIds.length > 0) {
+    // consent_grant.chargePersonId → person.id RESTRICT: delete grants first.
+    await db
+      .delete(consentGrant)
+      .where(inArray(consentGrant.chargePersonId, createdProfileIds));
+    // person cascade: membership, subjects, retention_cards,
+    // notification_preferences, notification_log, consent_request, etc.
+    await db.delete(person).where(inArray(person.id, createdProfileIds));
   }
-  // FK cascades clean all child rows: profiles → subjects → retention_cards,
-  // notification_preferences, notification_log, consent_states, curriculum_*, etc.
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  if (createdAccountIds.length > 0) {
+    await db
+      .delete(organization)
+      .where(inArray(organization.id, createdAccountIds));
+  }
 }, 30_000);
 
 // ── Tests ────────────────────────────────────────────────────────────────────

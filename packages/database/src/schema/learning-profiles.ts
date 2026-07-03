@@ -8,7 +8,7 @@ import {
   text,
   index,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { celebrationLevelEnum } from './progress';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -20,7 +20,7 @@ export const learningProfiles = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' })
+      .references(() => person.id, { onDelete: 'cascade' })
       .unique(),
     learningStyle: jsonb('learning_style'),
     interests: jsonb('interests').notNull().default([]),

@@ -9,14 +9,12 @@
 import { resolve } from 'path';
 import { and, eq, like } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   person,
-  profiles,
   retrievalEvents,
   subjects,
   type Database,
@@ -47,34 +45,18 @@ interface Seeded {
 }
 
 async function seedProfileWithTopic(database: Database): Promise<Seeded> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: CLERK_PREFIX,
-      email: `${CLERK_PREFIX}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
+  // [WI-1128] Legacy `accounts`/`profiles` dropped in migration 0130.
+  // retrievalEvents.profileId (and subjects.profileId) FKs to person, not
+  // profiles (see packages/database/src/schema/retrieval-events.ts) — seed
+  // the person row directly rather than bridging off a legacy profile.
   const [profile] = await database
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
-      displayName: 'Retention TTL Test',
-      birthYear: 2010,
-      isOwner: true,
+      displayName: CLERK_PREFIX,
+      birthDate: '2010-01-01',
+      residenceJurisdiction: 'EU',
     })
-    .returning({ id: profiles.id });
-
-  // [ic-362] retrievalEvents.profileId FKs to person, not profiles (see
-  // packages/database/src/schema/retrieval-events.ts) — the app writes
-  // person ids into this column. Seed a person row sharing the profile's id,
-  // mirroring the identity-v2 bridge in child-profile-v2.ts.
-  await database.insert(person).values({
-    id: profile!.id,
-    displayName: CLERK_PREFIX,
-    birthDate: '2010-01-01',
-    residenceJurisdiction: 'EU',
-  });
+    .returning({ id: person.id });
 
   const [subject] = await database
     .insert(subjects)
@@ -138,11 +120,8 @@ async function insertRowAged(
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
-  // person isn't reachable via the accounts cascade (it's a separate v2
-  // identity row sharing the profile's id) — clean it up explicitly.
+  // FK cascades clean child rows (person → subjects → curricula/books/topics
+  // → retrieval_events).
   await database
     .delete(person)
     .where(like(person.displayName, `${CLERK_PREFIX}%`));

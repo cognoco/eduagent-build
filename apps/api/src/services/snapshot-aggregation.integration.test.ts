@@ -18,17 +18,19 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   milestones,
   progressSnapshots,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { SubjectInventory } from '@eduagent/schemas';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import {
   buildKnowledgeInventory,
   listRecentMilestones,
@@ -40,28 +42,30 @@ let db: Database;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile(): Promise<string> {
   const idx = ++seedCounter;
   const clerkUserId = `clerk_snapshot_${RUN_ID}_${idx}`;
   const email = `snapshot-${RUN_ID}-${idx}@test.invalid`;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: `Test ${idx}`,
+    birthYear: 2010,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Test ${idx}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-
-  return profile!.id;
+  return profileId;
 }
 
 async function seedSubject(profileId: string, name: string): Promise<string> {
@@ -135,9 +139,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_snapshot_${RUN_ID}%`));
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 });
 
 describe('[BUG-872] buildKnowledgeInventory includes subjects added after the cached snapshot', () => {

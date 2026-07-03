@@ -1,12 +1,10 @@
 import { resolve } from 'path';
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   curricula,
   curriculumBooks,
@@ -14,6 +12,10 @@ import {
   sessionEvents,
   type Database,
 } from '@eduagent/database';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import { persistExchangeResult } from './session-exchange';
 import { createBookmark, listBookmarks } from '../bookmarks';
 import { mapSessionRow } from './session-events';
@@ -26,38 +28,38 @@ const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
 
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile(
   db: Database,
 ): Promise<{ profileId: string; subjectId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_exchange_idem_${RUN_ID}_${idx}`,
-      email: `exchange-idem-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Exchange Idempotency ${idx}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: `clerk_exchange_idem_${RUN_ID}_${idx}`,
+    email: `exchange-idem-${RUN_ID}-${idx}@test.invalid`,
+    displayName: `Exchange Idempotency ${idx}`,
+    birthYear: 2010,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Exchange Subject ${idx}`,
     })
     .returning({ id: subjects.id });
 
-  return { profileId: profile!.id, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id };
 }
 
 async function seedSession(
@@ -174,9 +176,10 @@ describeIfDb('persistExchangeResult idempotency side effects', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_exchange_idem_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   });
 
   it('[WI-78 review] applies continuation scoring only for newly persisted client turns', async () => {

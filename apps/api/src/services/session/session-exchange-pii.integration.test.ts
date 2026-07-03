@@ -8,10 +8,8 @@
  * system prompt); the adult-owner case pins the preserved personalization.
  */
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -21,10 +19,10 @@ import {
   membership,
   organization,
   person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
+import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
 import { prepareExchangeContext } from './session-exchange';
 import { buildSystemPrompt } from '../exchanges';
 
@@ -35,50 +33,41 @@ const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
 
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedLearner(
   db: Database,
   input: { displayName: string; birthYear: number; isOwner: boolean },
 ): Promise<{ profileId: string; sessionId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_wi580_pii_${RUN_ID}_${idx}`,
-      email: `wi580-pii-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: input.displayName,
-      birthYear: input.birthYear,
-      isOwner: input.isOwner,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await db
     .insert(organization)
-    .values({ id: account!.id, name: `PII Test Org ${idx}` });
+    .values({ id: accountId, name: `PII Test Org ${idx}` });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: input.displayName,
     birthDate: `${input.birthYear}-06-15`,
     residenceJurisdiction: 'US',
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
   });
+
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: 'Biology',
       status: 'active',
       pedagogyMode: 'socratic',
@@ -116,7 +105,7 @@ async function seedLearner(
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
       topicId: topic!.id,
       sessionType: 'learning',
@@ -128,7 +117,7 @@ async function seedLearner(
     })
     .returning({ id: learningSessions.id });
 
-  return { profileId: profile!.id, sessionId: session!.id };
+  return { profileId, sessionId: session!.id };
 }
 
 async function prepare(db: Database, profileId: string, sessionId: string) {
@@ -148,13 +137,15 @@ describeIfDb('prepareExchangeContext WI-580 minor-name egress (F-076)', () => {
   });
 
   afterAll(async () => {
-    // The whole seeded chain hangs off accounts via ON DELETE CASCADE:
-    // accounts → profiles (profiles.ts:71) → subjects (subjects.ts:54) →
+    // [WI-1128] The whole seeded chain hangs off person via ON DELETE CASCADE:
+    // person → subjects (subjects.ts:54) →
     // curricula/curriculumBooks/curriculumTopics (subjects.ts:100/128/179/188)
-    // and learningSessions (sessions.ts:95-98) — one delete cleans up all rows.
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_wi580_pii_${RUN_ID}%`));
+    // and learningSessions (sessions.ts:95-98) — deleting the v2 identities
+    // cleans up all rows.
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   });
 
   it('[F-076 break test] a minor owner profile sends no real name into the LLM prompt context', async () => {

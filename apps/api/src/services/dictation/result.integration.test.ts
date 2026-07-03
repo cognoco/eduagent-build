@@ -1,10 +1,9 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   dictationResults,
+  generateUUIDv7,
   practiceActivityEvents,
-  profiles,
   subjects,
 } from '@eduagent/database';
 import { SubjectNotFoundError } from '@eduagent/schemas';
@@ -16,6 +15,10 @@ import {
   getDictationStreak,
   getDictationHistory,
 } from './result';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -65,19 +68,18 @@ function completionKey(n: number): string {
   return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 }
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [ACCOUNT.email, VICTIM_ACCOUNT.email]),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
   });
-  if (rows.length > 0) {
-    await db.delete(accounts).where(
-      inArray(
-        accounts.id,
-        rows.map((r) => r.id),
-      ),
-    );
-  }
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 let accountId: string;
@@ -88,43 +90,34 @@ let victimSubjectId: string;
 beforeAll(async () => {
   await cleanupTestAccounts();
   const db = createIntegrationDb();
-  const [acct] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: ACCOUNT.clerkUserId,
-      email: ACCOUNT.email,
-    })
-    .returning();
-  accountId = acct!.id;
-  const [prof] = await db
-    .insert(profiles)
-    .values({
-      accountId,
-      displayName: 'Integration Learner',
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
-  profileId = prof!.id;
+  accountId = generateUUIDv7();
+  profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Integration Learner',
+    birthYear: 2010,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   // Victim account: owns the subject the attacker (profileId) tries to abuse.
-  const [victimAcct] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: VICTIM_ACCOUNT.clerkUserId,
-      email: VICTIM_ACCOUNT.email,
-    })
-    .returning();
-  const [victimProf] = await db
-    .insert(profiles)
-    .values({
-      accountId: victimAcct!.id,
-      displayName: 'Victim Learner',
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
-  victimProfileId = victimProf!.id;
+  const victimAccountId = generateUUIDv7();
+  victimProfileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: victimAccountId,
+    profileId: victimProfileId,
+    displayName: 'Victim Learner',
+    birthYear: 2010,
+    clerkUserId: VICTIM_ACCOUNT.clerkUserId,
+    email: VICTIM_ACCOUNT.email,
+    isOwner: true,
+  });
+  seededAccountIds.push(victimAccountId);
+  seededProfileIds.push(victimProfileId);
   const [victimSubject] = await db
     .insert(subjects)
     .values({
@@ -437,7 +430,7 @@ describe('recordDictationResult (integration)', () => {
       );
     expect(events).toHaveLength(1);
 
-    // Cleanup the subject we just created (afterAll cleans accounts cascade).
+    // Cleanup the subject we just created (afterAll cleans up the v2 identity graph).
     await db.delete(subjects).where(eq(subjects.id, ownSubject!.id));
   });
 });

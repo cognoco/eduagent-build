@@ -38,6 +38,7 @@ import {
   recordChildCapNotificationForAccountV2,
   recordChildCapNotificationForSubscriptionV2,
 } from './child-cap-notifications-v2';
+import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -59,28 +60,35 @@ const RUN = !!process.env.DATABASE_URL;
     });
 
     async function seedGraph(): Promise<void> {
-      // Legacy twins — child_cap_notifications FKs profiles.id.
-      await db.insert(accounts).values({
-        id: ORG_ID,
-        clerkUserId: `clerk_${ORG_ID}`,
-        email: `owner_${ORG_ID}@test.local`,
-      });
-      await db.insert(profiles).values([
-        {
-          id: OWNER_ID,
-          accountId: ORG_ID,
-          displayName: 'Owner',
-          birthYear: 1985,
-          isOwner: true,
-        },
-        {
-          id: CHILD_ID,
-          accountId: ORG_ID,
-          displayName: 'Child',
-          birthYear: 2014,
-          isOwner: false,
-        },
-      ]);
+      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
+      // (post-M-DROP); after M-REPOINT, child_cap_notifications FKs `person`
+      // directly, so this legacy twin mirror is a no-op there instead of
+      // hard-failing.
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: ORG_ID,
+          clerkUserId: `clerk_${ORG_ID}`,
+          email: `owner_${ORG_ID}@test.local`,
+        });
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.insert(profiles).values([
+          {
+            id: OWNER_ID,
+            accountId: ORG_ID,
+            displayName: 'Owner',
+            birthYear: 1985,
+            isOwner: true,
+          },
+          {
+            id: CHILD_ID,
+            accountId: ORG_ID,
+            displayName: 'Child',
+            birthYear: 2014,
+            isOwner: false,
+          },
+        ]);
+      }
 
       // v2 graph.
       await db.insert(organization).values({ id: ORG_ID, name: 'WI-905 Fam' });
@@ -115,8 +123,14 @@ const RUN = !!process.env.DATABASE_URL;
       await db.delete(person).where(eq(person.id, OWNER_ID));
       await db.delete(person).where(eq(person.id, CHILD_ID));
       await db.delete(organization).where(eq(organization.id, ORG_ID));
-      await db.delete(profiles).where(eq(profiles.accountId, ORG_ID));
-      await db.delete(accounts).where(eq(accounts.id, ORG_ID));
+      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
+      // (post-M-DROP); skip cleanup there instead of hard-failing.
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.delete(profiles).where(eq(profiles.accountId, ORG_ID));
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.delete(accounts).where(eq(accounts.id, ORG_ID));
+      }
     });
 
     // -------------------------------------------------------------------------

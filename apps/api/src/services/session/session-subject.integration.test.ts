@@ -11,21 +11,22 @@
  */
 
 import { resolve } from 'path';
-import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
 import type { SubjectSession } from '@eduagent/schemas';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import { getSubjectSessions } from './session-subject';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -50,36 +51,29 @@ describeIfDb('getSubjectSessions (integration)', () => {
   beforeAll(async () => {
     db = createDatabase(process.env.DATABASE_URL!);
 
-    const [account] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `clerk_integ_subjsess_${RUN_ID}`,
-        email: `subjsess_${RUN_ID}@test.invalid`,
-      })
-      .returning({ id: accounts.id });
-    accountId = account!.id;
+    accountId = generateUUIDv7();
+    profileId = generateUUIDv7();
+    otherProfileId = generateUUIDv7();
 
-    const [profile] = await db
-      .insert(profiles)
-      .values({
-        accountId,
-        displayName: 'Subject Sessions User',
-        birthYear: 2012,
-        isOwner: true,
-      })
-      .returning({ id: profiles.id });
-    profileId = profile!.id;
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId,
+      profileId,
+      clerkUserId: `clerk_integ_subjsess_${RUN_ID}`,
+      email: `subjsess_${RUN_ID}@test.invalid`,
+      displayName: 'Subject Sessions User',
+      birthYear: 2012,
+      isOwner: true,
+    });
 
-    const [otherProfile] = await db
-      .insert(profiles)
-      .values({
-        accountId,
-        displayName: 'Other User Same Account',
-        birthYear: 2014,
-        isOwner: false,
-      })
-      .returning({ id: profiles.id });
-    otherProfileId = otherProfile!.id;
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId,
+      profileId: otherProfileId,
+      clerkUserId: `clerk_integ_subjsess_other_${RUN_ID}`,
+      email: `subjsess_other_${RUN_ID}@test.invalid`,
+      displayName: 'Other User Same Account',
+      birthYear: 2014,
+      isOwner: false,
+    });
 
     const [subject] = await db
       .insert(subjects)
@@ -187,7 +181,10 @@ describeIfDb('getSubjectSessions (integration)', () => {
 
   afterAll(async () => {
     if (accountId) {
-      await db.delete(accounts).where(eq(accounts.id, accountId));
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: [accountId],
+        profileIds: [profileId, otherProfileId],
+      });
     }
   });
 

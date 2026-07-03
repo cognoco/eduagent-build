@@ -113,6 +113,18 @@ describeWire('identity reseed (0109) — legacy → 8-table model', () => {
       ],
     );
 
+    // [WI-1128] 0129_m_repoint.sql re-points `subscriptions.account_id` onto
+    // `organization(id)` (was `accounts(id)`) — organization is otherwise
+    // populated only by the reseed run below, which hasn't executed yet at
+    // this point in the fixture. Seed a placeholder row per account so the
+    // later `subscriptions` insert's FK is satisfiable; the reseed's
+    // `ON CONFLICT (id) DO UPDATE` unconditionally overwrites name/timezone/
+    // etc, so the placeholder values never leak into assertions below.
+    await client.query(
+      `INSERT INTO organization (id, name) VALUES ($1, 'placeholder'), ($2, 'placeholder'), ($3, 'placeholder'), ($4, 'placeholder')`,
+      [A1, A2, A3, A4],
+    );
+
     await client.query(
       `INSERT INTO profiles (id, account_id, display_name, birth_year, location, is_owner, created_at, updated_at, archived_at) VALUES
        ($1, $5, 'Parent One', 1990, 'EU', true,  '2025-01-01T01:00:00Z', '2025-06-01T01:00:00Z', NULL),

@@ -1,17 +1,19 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionEvents,
   sessionSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import {
   flagContent,
   getSession,
@@ -29,6 +31,9 @@ let db: Database;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile(): Promise<{
   accountId: string;
@@ -37,23 +42,23 @@ async function seedProfile(): Promise<{
   const idx = ++seedCounter;
   const clerkUserId = `clerk_session_ops_${RUN_ID}_${idx}`;
   const email = `session-ops-${RUN_ID}-${idx}@test.invalid`;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName: 'Integration Learner',
+    birthYear: 2010,
+    isOwner: true,
+  });
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Integration Learner',
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { accountId: account!.id, profileId: profile!.id };
+  return { accountId, profileId };
 }
 
 async function seedSubject(profileId: string): Promise<string> {
@@ -87,9 +92,10 @@ beforeEach(() => {
 
 afterAll(async () => {
   resetSessionStaticContextCache();
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_session_ops_${RUN_ID}%`));
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
 });
 
 describe('session operations integration', () => {

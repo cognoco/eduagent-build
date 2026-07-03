@@ -33,6 +33,7 @@ import {
 } from '../billing';
 import { getTierConfig } from '../subscription';
 import { inngest } from '../../inngest/client';
+import { legacyIdentityTableExistsForTest } from '../../test-utils/legacy-identity-anchors';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection, same pattern as tests/integration/helpers.ts
@@ -83,11 +84,16 @@ async function seedOrganization(index: number) {
   // `accounts` — seed a matching legacy account (same id as the org, the
   // "reseed identity contract") so seedSubscriptionWithQuota's legacy
   // subscription row below has somewhere to point.
-  await db.insert(accounts).values({
-    id: row!.id,
-    clerkUserId: `${ORG_NAMES[index]}-clerk`,
-    email: `${ORG_NAMES[index]}@integration.test`,
-  });
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
+  // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
+  // this seed is a no-op there instead of hard-failing.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.insert(accounts).values({
+      id: row!.id,
+      clerkUserId: `${ORG_NAMES[index]}-clerk`,
+      email: `${ORG_NAMES[index]}@integration.test`,
+    });
+  }
   return row!;
 }
 
@@ -212,13 +218,18 @@ async function seedPerson(input: {
   // [WI-1239 / 779-strip] profile_quota_usage.profileId still FKs to the
   // legacy `profiles` table (pre-M-REPOINT) — mirror the person under the
   // SAME id, same as the account/subscription dual-write above.
-  await db.insert(profiles).values({
-    id: row!.id,
-    accountId: input.organizationId,
-    displayName: input.displayName,
-    birthYear: input.isOwner ? 1990 : 2016,
-    isOwner: input.isOwner,
-  });
+  // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP); after
+  // M-REPOINT, `profile_quota_usage.profileId` targets `person` directly, so
+  // this seed is a no-op there instead of hard-failing.
+  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+    await db.insert(profiles).values({
+      id: row!.id,
+      accountId: input.organizationId,
+      displayName: input.displayName,
+      birthYear: input.isOwner ? 1990 : 2016,
+      isOwner: input.isOwner,
+    });
+  }
   return row!;
 }
 
@@ -305,7 +316,11 @@ async function cleanupTestAccounts() {
   // Legacy account (same id as the org — see seedOrganization) cascades to
   // its subscriptions row, which cascades to quota_pools/profile_quota_usage/
   // top_up_credits/usage_events.
-  await db.delete(accounts).where(inArray(accounts.id, orgIds));
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); skip
+  // the cleanup there instead of hard-failing.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.delete(accounts).where(inArray(accounts.id, orgIds));
+  }
 }
 
 // ---------------------------------------------------------------------------

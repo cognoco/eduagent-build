@@ -25,7 +25,11 @@ import {
   profiles,
 } from '@eduagent/database';
 
-import { cleanupAccounts, createIntegrationDb } from './helpers';
+import {
+  cleanupAccounts,
+  createIntegrationDb,
+  isIdentityV2Enabled,
+} from './helpers';
 import { restoreConsent } from '../../apps/api/src/services/consent';
 import { archiveCleanup } from '../../apps/api/src/inngest/functions/archive-cleanup';
 
@@ -108,65 +112,72 @@ afterAll(async () => {
   });
 });
 
-describe('Integration: consent restore vs archive-cleanup (C1)', () => {
-  it('restoreConsent clears archivedAt atomically', async () => {
-    const db = createIntegrationDb();
-    const { parentProfileId, childProfileId } = await seedParentChildPair();
+// WI-1128 quarantine: exercises services/consent.ts, whose DB layer is orphaned dead code (§7.3-confirmed; all DB exports have live V2 twins in services/identity-v2/consent-v2.ts, createGrantedConsentState reachable only via dead createProfile*). Fails post-0130 because consent.ts reads legacy tables WI-1128 drops. consent.ts deletion + un-skipping these tests are WI-1139 dead-sweep scope.
+(isIdentityV2Enabled() ? describe.skip : describe)(
+  'Integration: consent restore vs archive-cleanup (C1)',
+  () => {
+    it('restoreConsent clears archivedAt atomically', async () => {
+      const db = createIntegrationDb();
+      const { parentProfileId, childProfileId } = await seedParentChildPair();
 
-    // Precondition: archivedAt is set
-    const before = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-      columns: { archivedAt: true },
-    });
-    expect(before?.archivedAt).not.toBeNull();
+      // Precondition: archivedAt is set
+      const before = await db.query.profiles.findFirst({
+        where: eq(profiles.id, childProfileId),
+        columns: { archivedAt: true },
+      });
+      expect(before?.archivedAt).not.toBeNull();
 
-    // Act: restore consent
-    const result = await restoreConsent(db, childProfileId, parentProfileId);
-    expect(result.status).toBe('CONSENTED');
+      // Act: restore consent
+      const result = await restoreConsent(db, childProfileId, parentProfileId);
+      expect(result.status).toBe('CONSENTED');
 
-    // archivedAt must be cleared
-    const after = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-      columns: { archivedAt: true },
-    });
-    expect(after?.archivedAt).toBeNull();
-  });
-
-  it('archive-cleanup bails with consent_restored when consent is CONSENTED', async () => {
-    const db = createIntegrationDb();
-    const { parentProfileId, childProfileId } = await seedParentChildPair();
-
-    // Restore first (consent + archivedAt cleared)
-    await restoreConsent(db, childProfileId, parentProfileId);
-
-    // Simulate the archive-cleanup step body directly
-    const mockStep = {
-      sleep: jest.fn().mockResolvedValue(undefined),
-      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-      sendEvent: jest.fn().mockResolvedValue(undefined),
-    };
-
-    const handler = (
-      archiveCleanup as { fn: (ctx: unknown) => Promise<unknown> }
-    ).fn;
-
-    const result = await handler({
-      event: {
-        name: 'app/profile.archived',
-        data: { profileId: childProfileId, parentProfileId },
-      },
-      step: mockStep,
+      // archivedAt must be cleared
+      const after = await db.query.profiles.findFirst({
+        where: eq(profiles.id, childProfileId),
+        columns: { archivedAt: true },
+      });
+      expect(after?.archivedAt).toBeNull();
     });
 
-    // Should have bailed — not deleted
-    expect(result).toMatchObject({ status: 'complete', profileId: childProfileId });
+    it('archive-cleanup bails with consent_restored when consent is CONSENTED', async () => {
+      const db = createIntegrationDb();
+      const { parentProfileId, childProfileId } = await seedParentChildPair();
 
-    // Profile must still exist
-    const stillExists = await db.query.profiles.findFirst({
-      where: eq(profiles.id, childProfileId),
-      columns: { id: true, archivedAt: true },
+      // Restore first (consent + archivedAt cleared)
+      await restoreConsent(db, childProfileId, parentProfileId);
+
+      // Simulate the archive-cleanup step body directly
+      const mockStep = {
+        sleep: jest.fn().mockResolvedValue(undefined),
+        run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+        sendEvent: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const handler = (
+        archiveCleanup as { fn: (ctx: unknown) => Promise<unknown> }
+      ).fn;
+
+      const result = await handler({
+        event: {
+          name: 'app/profile.archived',
+          data: { profileId: childProfileId, parentProfileId },
+        },
+        step: mockStep,
+      });
+
+      // Should have bailed — not deleted
+      expect(result).toMatchObject({
+        status: 'complete',
+        profileId: childProfileId,
+      });
+
+      // Profile must still exist
+      const stillExists = await db.query.profiles.findFirst({
+        where: eq(profiles.id, childProfileId),
+        columns: { id: true, archivedAt: true },
+      });
+      expect(stillExists).not.toBeNull();
+      expect(stillExists?.archivedAt).toBeNull();
     });
-    expect(stillExists).not.toBeNull();
-    expect(stillExists?.archivedAt).toBeNull();
-  });
-});
+  },
+);

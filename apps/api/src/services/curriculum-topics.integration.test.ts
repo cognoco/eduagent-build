@@ -13,17 +13,14 @@
  * Uses a real database. No mocks of repository, services, or schema.
  */
 
-import { like } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   curricula,
   curriculumBooks,
   curriculumTopics,
   createDatabase,
   createScopedRepository,
   generateUUIDv7,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -31,6 +28,10 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { eq } from 'drizzle-orm';
 import { explainTopicOrdering, moveTopicToBook } from './curriculum';
 import { NotFoundError } from '../errors';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -64,6 +65,10 @@ function createIntegrationDb(): Database {
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integ-find-later-${RUN_ID}`;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 interface SeededBook {
   profileId: string;
   subjectId: string;
@@ -83,28 +88,24 @@ async function seedBook(
   topicTitles: string[],
   chapters?: (string | null)[],
 ): Promise<SeededBook> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `FindLater ${label}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `FindLater ${label}`,
+    birthYear: 2010,
+    clerkUserId: `${CLERK_PREFIX}-${label}`,
+    email: `${CLERK_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -143,7 +144,7 @@ async function seedBook(
   }
 
   return {
-    profileId: profile!.id,
+    profileId,
     subjectId: subject!.id,
     bookId: book!.id,
     topicIds,
@@ -151,9 +152,12 @@ async function seedBook(
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------

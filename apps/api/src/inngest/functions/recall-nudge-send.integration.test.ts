@@ -24,7 +24,6 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curriculumBooks,
   curriculumTopics,
@@ -34,11 +33,10 @@ import {
   notificationPreferences,
   organization,
   person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { inArray, like } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 
 import { recallNudgeSend } from './recall-nudge-send';
 
@@ -50,9 +48,15 @@ let fetchSpy: { mockRestore: () => void };
 let pushBodies: Array<{ title: string; body: string; to: string }>;
 
 const RUN_ID = generateUUIDv7();
-const CLERK_PREFIX = `clerk_rns_send_${RUN_ID}`;
 const EXPO_TOKEN = 'ExponentPushToken[rns-send-integration]';
 let seedCounter = 0;
+
+// [WI-1128] Legacy `accounts`/`profiles` dropped in migration 0130 — seed the
+// v2 identity graph (organization/person/membership) directly. Neither table
+// carries a distinguishing prefix column like legacy did, so track created
+// ids for cleanup instead of a `like()` sweep.
+const createdAccountIds: string[] = [];
+const createdProfileIds: string[] = [];
 
 // ── Step runner ──────────────────────────────────────────────────────────────
 
@@ -84,38 +88,25 @@ async function invokeHandler(data: {
 
 async function seedProfileWithPush(): Promise<{ profileId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}_${idx}`,
-      email: `rns-send-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  // [WI-867] v2 identity rows are unconditional (flag collapsed).
-  await db
+  const [org] = await db
     .insert(organization)
-    .values({ id: account!.id, name: `Recall Seed org ${idx}` });
+    .values({ name: `Recall Seed org ${idx}` })
+    .returning({ id: organization.id });
+  createdAccountIds.push(org!.id);
 
   const [profile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: 'Recall Test User',
-      birthYear: 1990,
-      isOwner: true,
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'ROW',
     })
-    .returning({ id: profiles.id });
+    .returning({ id: person.id });
+  createdProfileIds.push(profile!.id);
 
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: 'Recall Test User',
-    birthDate: '1990-01-01',
-    residenceJurisdiction: 'ROW',
-  });
   await db.insert(membership).values({
     personId: profile!.id,
-    organizationId: account!.id,
+    organizationId: org!.id,
     roles: ['learner'],
   });
 
@@ -222,28 +213,15 @@ afterEach(() => {
 });
 
 afterAll(async () => {
-  // [WI-867] v2 identity cleanup is unconditional.
-  const testAccounts = await db.query.accounts.findMany({
-    where: like(accounts.clerkUserId, `${CLERK_PREFIX}%`),
-    columns: { id: true },
-  });
-  const accountIds = testAccounts.map((a) => a.id);
-  if (accountIds.length > 0) {
-    const testProfiles = await db.query.profiles.findMany({
-      where: like(profiles.displayName, 'Recall Test User'),
-      columns: { id: true, accountId: true },
-    });
-    const ids = testProfiles
-      .filter((p) => accountIds.includes(p.accountId))
-      .map((p) => p.id);
-    if (ids.length > 0) {
-      await db.delete(person).where(inArray(person.id, ids));
-    }
-    await db.delete(organization).where(inArray(organization.id, accountIds));
+  // FK cascades clean child rows (person → subjects/notificationPreferences/membership).
+  if (createdProfileIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, createdProfileIds));
   }
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  if (createdAccountIds.length > 0) {
+    await db
+      .delete(organization)
+      .where(inArray(organization.id, createdAccountIds));
+  }
 }, 30_000);
 
 // ── Tests ────────────────────────────────────────────────────────────────────

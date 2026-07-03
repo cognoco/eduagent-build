@@ -1,16 +1,19 @@
 import { resolve } from 'path';
 
-import { eq, and, isNull, like, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
   subjects,
   bookSuggestions,
   createDatabase,
+  generateUUIDv7,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { _resetCircuits } from './llm';
 import { generateCategorizedBookSuggestions } from './book-suggestion-generation';
 
@@ -32,25 +35,26 @@ let counter = 0;
 const db = createIntegrationDb();
 const llmFixture = registerLlmProviderFixture();
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfile() {
   counter++;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `${PREFIX}-${counter}-${Date.now()}`,
-      email: `${PREFIX}-${counter}-${Date.now()}@integration.test`,
-    })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Test Profile ${counter}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
-  return profile!;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: `Test Profile ${counter}`,
+    birthYear: 2010,
+    clerkUserId: `${PREFIX}-${counter}-${Date.now()}`,
+    email: `${PREFIX}-${counter}-${Date.now()}@integration.test`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { id: profileId };
 }
 
 async function seedSubject(profileId: string, name: string) {
@@ -97,13 +101,12 @@ function deferred(): {
 }
 
 async function cleanup() {
-  const rows = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(like(accounts.clerkUserId, `${PREFIX}%`));
-  if (rows.length > 0) {
-    await db.delete(accounts).where(like(accounts.clerkUserId, `${PREFIX}%`));
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 const FOUR_SUGGESTIONS = {

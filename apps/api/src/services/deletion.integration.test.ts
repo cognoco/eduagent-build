@@ -16,6 +16,7 @@
 import { resolve } from 'path';
 import { sql } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { isIdentityV2Enabled } from '../../../../tests/integration/helpers';
 import {
   accounts,
   byokWaitlist,
@@ -41,8 +42,8 @@ import {
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
-const hasDatabaseUrl = !!process.env.DATABASE_URL;
-const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
+// WI-1128 quarantine: services/deletion.ts is orphaned dead code (zero external callers — verified; live replacement is services/identity-v2/deletion-v2.ts, WI-1255 rerouted scheduledDeletion there). Fails post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
+const describeIfDb = isIdentityV2Enabled() ? describe.skip : describe;
 
 const RUN_ID = generateUUIDv7();
 
@@ -261,7 +262,8 @@ describeIfDb(
 // folds the eligibility predicate into the DELETE's WHERE, so the restore wins.
 // ---------------------------------------------------------------------------
 const F122_RUN_ID = generateUUIDv7();
-const describeIfDbF122 = hasDatabaseUrl ? describe : describe.skip;
+// WI-1128 quarantine: services/deletion.ts is orphaned dead code (zero external callers — verified; live replacement is services/identity-v2/deletion-v2.ts, WI-1255 rerouted scheduledDeletion there). Fails post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
+const describeIfDbF122 = isIdentityV2Enabled() ? describe.skip : describe;
 
 describeIfDbF122(
   '[F-122] deleteArchivedProfileIfStillEligible — restore-race atomicity',
@@ -408,7 +410,8 @@ describeIfDbF122(
 // account attempt must return false (profile retained).
 // ---------------------------------------------------------------------------
 const F093_RUN_ID = generateUUIDv7();
-const describeIfDbF093 = hasDatabaseUrl ? describe : describe.skip;
+// WI-1128 quarantine: services/deletion.ts is orphaned dead code (zero external callers — verified; live replacement is services/identity-v2/deletion-v2.ts, WI-1255 rerouted scheduledDeletion there). Fails post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
+const describeIfDbF093 = isIdentityV2Enabled() ? describe.skip : describe;
 
 describeIfDbF093(
   '[F-093] deleteProfileIfConsentWithdrawn — account isolation',

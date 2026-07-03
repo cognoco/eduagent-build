@@ -1,18 +1,19 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   practiceActivityEvents,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { listPracticeActivityHistory } from './practice-activity-history';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -22,25 +23,28 @@ const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
 let db: Database;
 let counter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile(): Promise<{ profileId: string }> {
   const idx = ++counter;
   const clerkUserId = `clerk_pahistory_${RUN_ID}_${idx}`;
   const email = `pahistory-${RUN_ID}-${idx}@test.invalid`;
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Practice Learner',
-      birthYear: 2012,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  return { profileId: profile!.id };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Practice Learner',
+    birthYear: 2012,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { profileId };
 }
 
 async function seedTopic(
@@ -116,9 +120,10 @@ describeIfDb('listPracticeActivityHistory (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_pahistory_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
   });
 
   it('returns only the active profile’s events (profile-scoped)', async () => {

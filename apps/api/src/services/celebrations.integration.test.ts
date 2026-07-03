@@ -16,16 +16,19 @@
  */
 
 import { resolve } from 'path';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   celebrationEvents,
   coachingCardCache,
   createDatabase,
-  profiles,
+  generateUUIDv7,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import type { PendingCelebration } from '@eduagent/schemas';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 import { queueCelebration } from './celebrations';
 
@@ -45,40 +48,41 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-const PREFIX = 'integration-celebrations-bug467';
-const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user`,
-  email: `${PREFIX}@integration.test`,
-};
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedAccountAndProfile() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Celebration Test User',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
-  return { account: account!, profile: profile! };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  // [WI-1128] Key clerkUserId/email off the freshly-generated accountId —
+  // this is called once per test via beforeEach cleanup; a fixed string
+  // collides with legacy `accounts` unique columns across calls (the
+  // onConflictDoNothing silently no-ops, leaving profiles.account_id FK
+  // dangling for the fresh accountId).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Celebration Test User',
+    birthYear: 2000,
+    clerkUserId: `integration-celebrations-bug467-${accountId}`,
+    email: `integration-celebrations-bug467-${accountId}@integration.test`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { account: { id: accountId }, profile: { id: profileId } };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(eq(accounts.email, ACCOUNT.email));
-  const ids = found.map((a) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 beforeEach(async () => {

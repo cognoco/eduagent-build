@@ -1,85 +1,66 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   curricula,
   curriculumBooks,
   curriculumTopics,
-  familyLinks,
+  generateUUIDv7,
   guardianship,
-  profiles,
+  login,
+  membership,
+  organization,
+  person,
   subjects,
 } from '@eduagent/database';
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
-import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { cloneTopicFromChild } from '../../apps/api/src/services/family-bridge';
 
 const EMAIL = 'family-bridge-gdpr@integration.test';
 const CLERK_USER_ID = 'integration-family-bridge-gdpr-user';
 
+// [WI-1128] Legacy `accounts`/`profiles`/`family_links` are dropped — this is
+// a pure v2 seed now (organization/person/login/membership/guardianship),
+// mirroring the already-converted sibling `family-bridge.integration.test.ts`.
 async function seedFamilyBridgeTopic() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: CLERK_USER_ID, email: EMAIL })
-    .returning();
-  if (!account) throw new Error('Account seed failed');
+  const accountId = generateUUIDv7();
+  const adultId = generateUUIDv7();
+  const childId = generateUUIDv7();
 
-  const [adult] = await db
-    .insert(profiles)
-    .values({
-      accountId: account.id,
+  await db
+    .insert(organization)
+    .values({ id: accountId, name: `Family org ${accountId.slice(0, 8)}` });
+  await db.insert(person).values([
+    {
+      id: adultId,
       displayName: 'Parent',
-      birthYear: 1985,
-      isOwner: true,
-      conversationLanguage: 'en',
-    })
-    .returning();
-  const [child] = await db
-    .insert(profiles)
-    .values({
-      accountId: account.id,
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'EU',
+    },
+    {
+      id: childId,
       displayName: 'Ada',
-      birthYear: 2013,
-      isOwner: false,
-      conversationLanguage: 'en',
-    })
-    .returning();
-  if (!adult || !child) throw new Error('Profile seed failed');
-
-  await db.insert(familyLinks).values({
-    parentProfileId: adult.id,
-    childProfileId: child.id,
-  });
-
-  // [WI-1145] Seed the v2 identity graph + guardianship edge unconditionally —
-  // cloneTopicFromChild's active-edge guard reads `guardianship` (throwing
-  // ForbiddenError on no edge) regardless of the carved flag, so the legacy-only
-  // seed fails on the post-collapse flag-off main lane. Same ids as legacy
-  // (person.id == profile.id, organization.id == account.id).
-  await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account.id,
-    profileId: adult.id,
-    displayName: 'Parent',
-    birthYear: 1985,
+      birthDate: '2013-01-01',
+      residenceJurisdiction: 'EU',
+    },
+  ]);
+  await db.insert(login).values({
+    personId: adultId,
     clerkUserId: CLERK_USER_ID,
     email: EMAIL,
-    isOwner: true,
   });
-  await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account.id,
-    profileId: child.id,
-    displayName: 'Ada',
-    birthYear: 2013,
-    clerkUserId: `${CLERK_USER_ID}-child`,
-    email: `child-${EMAIL}`,
-    isOwner: false,
-  });
+  await db.insert(membership).values([
+    { personId: adultId, organizationId: accountId, roles: ['admin'] },
+    { personId: childId, organizationId: accountId, roles: ['learner'] },
+  ]);
   await db.insert(guardianship).values({
-    guardianPersonId: adult.id,
-    chargePersonId: child.id,
+    guardianPersonId: adultId,
+    chargePersonId: childId,
   });
+
+  const adult = { id: adultId, accountId };
+  const child = { id: childId, accountId };
 
   const [subject] = await db
     .insert(subjects)
@@ -153,15 +134,17 @@ describe('family bridge GDPR integration', () => {
     expect(beforeDelete?.source).toBe('parent_bridge');
     expect(beforeDelete?.sourceChildProfileId).toBe(child.id);
 
+    // [WI-1128] guardianship is ON DELETE RESTRICT on person (both directions)
+    // — must clear the edge before the child `person` row can be deleted.
     await db
-      .delete(familyLinks)
+      .delete(guardianship)
       .where(
         and(
-          eq(familyLinks.parentProfileId, adult.id),
-          eq(familyLinks.childProfileId, child.id),
+          eq(guardianship.guardianPersonId, adult.id),
+          eq(guardianship.chargePersonId, child.id),
         ),
       );
-    await db.delete(profiles).where(eq(profiles.id, child.id));
+    await db.delete(person).where(eq(person.id, child.id));
 
     const afterDelete = await db.query.curriculumTopics.findFirst({
       where: eq(curriculumTopics.id, clone.topicId),

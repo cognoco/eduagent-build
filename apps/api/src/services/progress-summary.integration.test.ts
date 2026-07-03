@@ -25,23 +25,22 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
-  familyLinks,
+  generateUUIDv7,
   guardianship,
   learningSessions,
   membership,
   organization,
   person,
-  profiles,
   progressSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
+import { deleteV2IdentitiesForTest } from '../test-utils/legacy-identity-anchors';
 import {
   findLatestCompletedLearningSession,
   getProgressSummary,
@@ -75,24 +74,19 @@ function createIntegrationDb(): Database {
 
 const PREFIX = 'integration-progress-summary';
 
+// [WI-1128] Legacy `accounts`/`profiles`/`family_links` dropped — track
+// seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function cleanup() {
   const db = createIntegrationDb();
-  const emailVariants = [
-    `${PREFIX}@integration.test`,
-    `${PREFIX}-child@integration.test`,
-    `${PREFIX}-sibling@integration.test`,
-    `${PREFIX}-parent@integration.test`,
-    `${PREFIX}-unrelated@integration.test`,
-  ];
-  for (const email of emailVariants) {
-    const rows = await db.query.accounts.findMany({
-      where: eq(accounts.email, email),
-    });
-    const ids = rows.map((a: typeof accounts.$inferSelect) => a.id);
-    if (ids.length > 0) {
-      await db.delete(accounts).where(inArray(accounts.id, ids));
-    }
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 interface SeedResult {
@@ -106,95 +100,68 @@ async function seedAccountWithProfileAndSubject(
   opts: { isOwner?: boolean } = {},
 ): Promise<SeedResult> {
   const db = createIntegrationDb();
-  const email = emailSuffix
-    ? `${PREFIX}${emailSuffix}@integration.test`
-    : `${PREFIX}@integration.test`;
-  const clerkUserId = emailSuffix
-    ? `${PREFIX}${emailSuffix}-user`
-    : `${PREFIX}-user`;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Test Learner',
-      birthYear: 2010,
-      isOwner: opts.isOwner ?? true,
-    })
-    .returning();
+  await db
+    .insert(organization)
+    .values({ id: accountId, name: `${PREFIX} Org` });
+  await db.insert(person).values({
+    id: profileId,
+    displayName: `Test Learner${emailSuffix}`,
+    birthDate: '2010-06-15',
+    residenceJurisdiction: 'EU',
+  });
+  await db.insert(membership).values({
+    personId: profileId,
+    organizationId: accountId,
+    roles: (opts.isOwner ?? true) ? ['admin', 'learner'] : ['learner'],
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `${PREFIX}-subject`,
       status: 'active',
     })
     .returning();
 
-  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
-  await db
-    .insert(organization)
-    .values({ id: account!.id, name: `${PREFIX} Org` });
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: 'Test Learner',
-    birthDate: '2010-06-15',
-    residenceJurisdiction: 'EU',
-  });
-  await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
-    roles: (opts.isOwner ?? true) ? ['admin', 'learner'] : ['learner'],
-  });
-
   return {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     subjectId: subject!.id,
   };
 }
 
-async function seedParentAccount(
-  emailSuffix = '-parent',
-): Promise<{ profileId: string; accountId: string }> {
+async function seedParentAccount(): Promise<{
+  profileId: string;
+  accountId: string;
+}> {
   const db = createIntegrationDb();
-  const email = `${PREFIX}${emailSuffix}@integration.test`;
-  const clerkUserId = `${PREFIX}${emailSuffix}-user`;
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Test Parent',
-      birthYear: 1985,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await db
     .insert(organization)
-    .values({ id: account!.id, name: `${PREFIX} Parent Org` });
+    .values({ id: accountId, name: `${PREFIX} Parent Org` });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: 'Test Parent',
     birthDate: '1985-06-15',
     residenceJurisdiction: 'EU',
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: ['admin', 'learner'],
   });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { profileId: profile!.id, accountId: account!.id };
+  return { profileId, accountId };
 }
 
 async function seedFamilyLink(
@@ -202,8 +169,6 @@ async function seedFamilyLink(
   childProfileId: string,
 ): Promise<void> {
   const db = createIntegrationDb();
-  await db.insert(familyLinks).values({ parentProfileId, childProfileId });
-  // [WI-867] guardianship mirrors familyLinks for v2 assertParentAccess.
   await db.insert(guardianship).values({
     guardianPersonId: parentProfileId,
     chargePersonId: childProfileId,
@@ -390,8 +355,7 @@ describe('getProgressSummary (integration)', () => {
   // bypassing the route-level assertOwnerAndParentAccess.
   it('[BUG-400 break test] throws ForbiddenError when requester has no family link to child', async () => {
     const child = await seedAccountWithProfileAndSubject('-child');
-    const { profileId: unrelatedParentId } =
-      await seedParentAccount('-unrelated');
+    const { profileId: unrelatedParentId } = await seedParentAccount();
     // Deliberately NO seedFamilyLink -- unrelated parent has no link to child.
     const db = createIntegrationDb();
 

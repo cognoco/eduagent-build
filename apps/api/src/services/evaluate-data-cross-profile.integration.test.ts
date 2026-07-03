@@ -14,21 +14,22 @@
  * added.
  */
 
-import { like } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   curricula,
   curriculumBooks,
   curriculumTopics,
   createDatabase,
   generateUUIDv7,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { checkEvaluateEligibility } from './evaluate-data';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -53,6 +54,10 @@ function createIntegrationDb(): Database {
 const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `integ-bug354-${RUN_ID}`;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 interface SeededProfile {
   profileId: string;
   topicId: string;
@@ -63,30 +68,24 @@ async function seedProfileWithTopic(
   database: Database,
   label: string,
 ): Promise<SeededProfile> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  if (!account) throw new Error('account insert failed');
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account.id,
-      displayName: `BUG354 ${label}`,
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  if (!profile) throw new Error('profile insert failed');
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `BUG354 ${label}`,
+    birthYear: 2000,
+    clerkUserId: `${CLERK_PREFIX}-${label}`,
+    email: `${CLERK_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -120,13 +119,16 @@ async function seedProfileWithTopic(
     .returning({ id: curriculumTopics.id });
   if (!topic) throw new Error('topic insert failed');
 
-  return { profileId: profile.id, topicId: topic.id, topicTitle };
+  return { profileId, topicId: topic.id, topicTitle };
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------

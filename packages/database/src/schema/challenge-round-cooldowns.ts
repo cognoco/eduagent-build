@@ -7,7 +7,7 @@ import {
   unique,
   check,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -37,7 +37,7 @@ export const challengeRoundCooldowns = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     topicId: uuid('topic_id')
       .notNull()
       .references(() => curriculumTopics.id, { onDelete: 'cascade' }),

@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { learningSessions } from './sessions';
 import { curriculumBooks, subjects } from './subjects';
 
@@ -23,7 +23,7 @@ export const progressSnapshots = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     snapshotDate: date('snapshot_date').notNull(),
     metrics: jsonb('metrics').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -53,7 +53,7 @@ export const progressSummaries = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     summary: text('summary').notNull(),
     generatedAt: timestamp('generated_at', { withTimezone: true })
       .notNull()
@@ -83,7 +83,7 @@ export const milestones = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     milestoneType: text('milestone_type').notNull(),
     threshold: integer('threshold').notNull(),
     subjectId: uuid('subject_id').references(() => subjects.id, {
@@ -123,10 +123,10 @@ export const weeklyReports = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     childProfileId: uuid('child_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     reportWeek: date('report_week').notNull(),
     reportData: jsonb('report_data').notNull(),
     viewedAt: timestamp('viewed_at', { withTimezone: true }),
@@ -155,10 +155,10 @@ export const monthlyReports = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     childProfileId: uuid('child_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     reportMonth: date('report_month').notNull(),
     reportData: jsonb('report_data').notNull(),
     viewedAt: timestamp('viewed_at', { withTimezone: true }),

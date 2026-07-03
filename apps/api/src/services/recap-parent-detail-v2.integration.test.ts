@@ -24,9 +24,8 @@
 //
 // Seeding: v2 READ needs person + membership + organization + guardianship.
 // getChildSessionDetail additionally needs learning_sessions + subjects, which
-// both FK legacy profiles.id on the pre-repoint CI schema. A legacy profile
-// twin (accounts → profiles) is seeded for the child only for Case 1.
-// The v2 assertParentAccess path reads guardianship, NOT family_links.
+// FK `person` directly post-M-REPOINT (WI-1128) — no legacy profile twin
+// needed. The v2 assertParentAccess path reads guardianship, NOT family_links.
 //
 // RED-GREEN-REVERT: remove the identityV2Enabled arg from the
 // getChildSessionDetail call in recaps.ts:305-310 → Case 1 must FAIL (recap
@@ -41,7 +40,6 @@ import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   guardianship,
@@ -49,7 +47,6 @@ import {
   membership,
   organization,
   person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -64,21 +61,12 @@ const RUN = !!process.env.DATABASE_URL;
     let db: Database;
     const personIds: string[] = [];
     const orgIds: string[] = [];
-    // Legacy account ids dual-written for learning_sessions + subjects profile FKs
-    // (pre-repoint CI flag-on DB: these tables still reference legacy profiles.id).
-    const accountIds: string[] = [];
 
     beforeAll(() => {
       db = createDatabase(process.env.DATABASE_URL!);
     });
 
     afterEach(async () => {
-      // Delete accounts first — account → profiles (cascade) → learning_sessions
-      // + subjects (cascade) clears the legacy twin chain.
-      for (const aid of accountIds) {
-        await db.delete(accounts).where(eq(accounts.id, aid));
-      }
-      accountIds.length = 0;
       // v2-only cleanup: guardianship RESTRICT → delete before person.
       // person ON DELETE CASCADE removes membership rows.
       for (const pid of personIds) {
@@ -139,27 +127,6 @@ const RUN = !!process.env.DATABASE_URL;
         .values({ guardianPersonId: guardianId, chargePersonId: chargeId });
     }
 
-    // Seed a legacy account + profile twin for `personId` so that
-    // learning_sessions and subjects (which FK legacy profiles.id on the
-    // pre-repoint CI flag-on DB) can be inserted. profiles.id is set to
-    // personId so the FK resolves. Cleaned in afterEach via accountIds cascade.
-    async function seedLegacyProfileTwin(personId: string): Promise<void> {
-      const accountId = generateUUIDv7();
-      await db.insert(accounts).values({
-        id: accountId,
-        clerkUserId: `wi823-acct-${accountId}`,
-        email: `wi823-acct-${accountId}@integration.test`,
-      });
-      await db.insert(profiles).values({
-        id: personId,
-        accountId,
-        displayName: 'WI823-Twin',
-        birthYear: 1990,
-        isOwner: false,
-      });
-      accountIds.push(accountId);
-    }
-
     // -------------------------------------------------------------------------
     // [FLAG-ON] Guardian holds a guardianship edge to the child who has a
     // completed learning session. getRecapForParent MUST return a non-null
@@ -186,10 +153,7 @@ const RUN = !!process.env.DATABASE_URL;
         // Grant ONLY a guardianship edge — no family_links row exists.
         await grantGuardianshipEdge(guardianPersonId, chargePersonId);
 
-        // Seed legacy profile twin for child so learning_sessions + subjects FKs resolve.
-        await seedLegacyProfileTwin(chargePersonId);
-
-        // Seed a subject for the child (FK: profiles.id).
+        // Seed a subject for the child (FK: person.id).
         const [subject] = await db
           .insert(subjects)
           .values({

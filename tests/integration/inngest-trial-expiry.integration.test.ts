@@ -11,12 +11,12 @@
 
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
-  accounts,
+  generateUUIDv7,
+  login,
   membership,
   notificationPreferences,
   organization,
   person,
-  profiles,
   quotaPools,
   subscription as subscriptionV2,
   subscriptions,
@@ -37,51 +37,49 @@ const EXTENDED_EMAIL = 'integration-trial-extended@integration.test';
 const WARNING_USER_ID = 'integration-trial-warning';
 const WARNING_EMAIL = 'integration-trial-warning@integration.test';
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — seed the v2 identity graph
+// (organization/person/login/membership) directly. `subscriptions.accountId`
+// was repointed onto `organization.id` by the 0129 M-REPOINT migration, so the
+// legacy `subscriptions` insert in seedSubscriptionWithQuota below (unchanged —
+// `subscriptions` itself is RETAINED, out of scope for this WI) still resolves
+// against the org id returned here. A `login` row is seeded (not otherwise
+// needed by trialExpiry, which reads the v2 store unconditionally) purely so
+// beforeEach/afterAll can resolve this run's seeded org/person ids by
+// clerkUserId for cleanup — mirroring the pre-drop accounts.clerkUserId lookup.
 async function seedAccountWithOwnerProfile(input: {
   clerkUserId: string;
   email: string;
   displayName: string;
 }) {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: input.clerkUserId,
-      email: input.email,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: input.displayName,
-      birthYear: 1990,
-      isOwner: true,
-    })
-    .returning();
-
-  // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await db.insert(organization).values({
-    id: account!.id,
-    name: `Seed org ${account!.id.slice(0, 8)}`,
+    id: accountId,
+    name: `Seed org ${accountId.slice(0, 8)}`,
   });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: input.displayName,
     birthDate: '1990-01-01',
     residenceJurisdiction: 'US',
   });
+  await db.insert(login).values({
+    personId: profileId,
+    clerkUserId: input.clerkUserId,
+    email: input.email,
+  });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: ['admin'],
   });
 
   // Seed notification preferences with an Expo push token so the
   // real sendPushNotification function can deliver notifications
   await db.insert(notificationPreferences).values({
-    profileId: profile!.id,
+    profileId,
     pushEnabled: true,
     expoPushToken: `ExponentPushToken[test-${input.clerkUserId}]`,
     reviewReminders: false,
@@ -91,8 +89,8 @@ async function seedAccountWithOwnerProfile(input: {
   });
 
   return {
-    account: account!,
-    profile: profile!,
+    account: { id: accountId },
+    profile: { id: profileId },
   };
 }
 
@@ -245,6 +243,25 @@ async function cleanupV2Rows(accountIds: string[]): Promise<void> {
   }
 }
 
+// [WI-1128] Legacy `accounts` dropped — resolve this run's seeded org ids for
+// these test users via the `login` row seeded in seedAccountWithOwnerProfile
+// (login.clerkUserId → membership.organizationId), mirroring the pre-drop
+// accounts.clerkUserId lookup.
+async function resolveTestOrgIds(clerkUserIds: string[]): Promise<string[]> {
+  const db = createIntegrationDb();
+  const loginRows = await db.query.login.findMany({
+    where: inArray(login.clerkUserId, clerkUserIds),
+    columns: { personId: true },
+  });
+  const personIds = loginRows.map((r) => r.personId);
+  if (personIds.length === 0) return [];
+  const memberRows = await db.query.membership.findMany({
+    where: inArray(membership.personId, personIds),
+    columns: { organizationId: true },
+  });
+  return [...new Set(memberRows.map((r) => r.organizationId))];
+}
+
 beforeAll(() => {
   mockExpoPush();
 });
@@ -252,20 +269,16 @@ beforeAll(() => {
 beforeEach(async () => {
   clearFetchCalls();
 
-  // Resolve the legacy account IDs for these test users so we can also
-  // clean up the v2 identity rows (organization/subscription) that share the
-  // same IDs. v2 cleanup must happen BEFORE cleanupAccounts because v2 tables
+  // Resolve this run's org ids for these test users so we can also clean up
+  // the v2 identity rows (organization/subscription) that share the same
+  // IDs. v2 cleanup must happen BEFORE cleanupAccounts because v2 tables
   // have no cascade from the legacy accounts delete.
-  const dbForLookup = createIntegrationDb();
-  const testAccountRows = await dbForLookup.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, [
-      JUST_EXPIRED_USER_ID,
-      EXTENDED_USER_ID,
-      WARNING_USER_ID,
-    ]),
-    columns: { id: true },
-  });
-  await cleanupV2Rows(testAccountRows.map((r) => r.id));
+  const testOrgIds = await resolveTestOrgIds([
+    JUST_EXPIRED_USER_ID,
+    EXTENDED_USER_ID,
+    WARNING_USER_ID,
+  ]);
+  await cleanupV2Rows(testOrgIds);
 
   await cleanupAccounts({
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
@@ -274,9 +287,12 @@ beforeEach(async () => {
 
   // The trial-expiry function queries ALL subscriptions in the DB matching
   // date-range criteria. Orphaned subscriptions from crashed/interrupted runs
-  // (whose accounts were deleted but whose subscriptions somehow survived) can
-  // inflate the counts. Clean up any orphaned extended-expired subscriptions
-  // that fall in the same date window this test seeds for EXTENDED_USER_ID.
+  // (whose orgs were deleted but whose legacy `subscriptions` rows somehow
+  // survived) can inflate the counts. Clean up any orphaned extended-expired
+  // subscriptions that fall in the same date window this test seeds for
+  // EXTENDED_USER_ID. [WI-1128] `subscriptions.accountId` was repointed onto
+  // `organization.id` by the 0129 M-REPOINT migration, so resolve org ids the
+  // same way as above rather than via the dropped legacy `accounts` table.
   const db = createIntegrationDb();
   const now = new Date();
   const targetDate = new Date(now);
@@ -287,42 +303,32 @@ beforeEach(async () => {
   const dayEnd = new Date(
     targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
   );
-  const testAccounts = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(
-      inArray(accounts.clerkUserId, [
-        JUST_EXPIRED_USER_ID,
-        EXTENDED_USER_ID,
-        WARNING_USER_ID,
-      ]),
-    );
-  if (testAccounts.length > 0) {
-    await db.delete(subscriptions).where(
-      and(
-        inArray(
-          subscriptions.accountId,
-          testAccounts.map((a) => a.id),
+  const orphanCandidateOrgIds = await resolveTestOrgIds([
+    JUST_EXPIRED_USER_ID,
+    EXTENDED_USER_ID,
+    WARNING_USER_ID,
+  ]);
+  if (orphanCandidateOrgIds.length > 0) {
+    await db
+      .delete(subscriptions)
+      .where(
+        and(
+          inArray(subscriptions.accountId, orphanCandidateOrgIds),
+          eq(subscriptions.status, 'expired'),
+          gte(subscriptions.trialEndsAt, dayStart),
+          lte(subscriptions.trialEndsAt, dayEnd),
         ),
-        eq(subscriptions.status, 'expired'),
-        gte(subscriptions.trialEndsAt, dayStart),
-        lte(subscriptions.trialEndsAt, dayEnd),
-      ),
-    );
+      );
   }
 });
 
 afterAll(async () => {
-  const dbForLookup = createIntegrationDb();
-  const testAccountRows = await dbForLookup.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, [
-      JUST_EXPIRED_USER_ID,
-      EXTENDED_USER_ID,
-      WARNING_USER_ID,
-    ]),
-    columns: { id: true },
-  });
-  await cleanupV2Rows(testAccountRows.map((r) => r.id));
+  const testOrgIds = await resolveTestOrgIds([
+    JUST_EXPIRED_USER_ID,
+    EXTENDED_USER_ID,
+    WARNING_USER_ID,
+  ]);
+  await cleanupV2Rows(testOrgIds);
   await cleanupAccounts({
     emails: [JUST_EXPIRED_EMAIL, EXTENDED_EMAIL, WARNING_EMAIL],
     clerkUserIds: [JUST_EXPIRED_USER_ID, EXTENDED_USER_ID, WARNING_USER_ID],

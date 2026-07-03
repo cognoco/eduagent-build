@@ -1,19 +1,21 @@
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curriculumBooks,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionEvents,
   sessionSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { NotFoundError } from '@eduagent/schemas';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import {
   closeSession,
   flagContent,
@@ -36,6 +38,9 @@ const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
 let db: Database;
 let counter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfileWithSubject(
   subjectName: string,
@@ -43,25 +48,36 @@ async function seedProfileWithSubject(
   const idx = ++counter;
   const clerkUserId = `clerk_session_archive_${RUN_ID}_${idx}`;
   const email = `session-archive-${RUN_ID}-${idx}@test.invalid`;
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Session Learner',
-      birthYear: 2012,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName: 'Session Learner',
+    birthYear: 2012,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
   const [subject] = await db
     .insert(subjects)
-    .values({ profileId: profile!.id, name: subjectName })
+    .values({ profileId, name: subjectName })
     .returning({ id: subjects.id });
 
-  return { profileId: profile!.id, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id };
+}
+
+async function cleanupSeededAccounts(): Promise<void> {
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 describeIfDb('listProfileSessions (integration)', () => {
@@ -70,9 +86,7 @@ describeIfDb('listProfileSessions (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+    await cleanupSeededAccounts();
   });
 
   it('is profile-scoped and cursor-paginates sessions', async () => {
@@ -202,9 +216,7 @@ describeIfDb('persistSessionMetadata (integration IDOR breaks)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+    await cleanupSeededAccounts();
   });
 
   it('merges metadata without clobbering sibling keys and rejects cross-profile writes', async () => {
@@ -286,9 +298,7 @@ describeIfDb('session-crud ownership gate (integration IDOR breaks)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+    await cleanupSeededAccounts();
   });
 
   it('[BREAK] getSession returns null when profile B reads profile A’s session', async () => {
@@ -475,9 +485,7 @@ describeIfDb('session-crud Library filing requests (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_session_archive_${RUN_ID}%`));
+    await cleanupSeededAccounts();
   });
 
   async function seedSession(input?: {

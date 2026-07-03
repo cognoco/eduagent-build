@@ -15,30 +15,30 @@
  * its v2 twin — the legacy function was deleted (routes/billing.ts already
  * dispatched exclusively to -V2). getUsageBreakdownForProfileV2 resolves the
  * viewer/family-owner/family-edge state via the v2
- * (organization/person/membership/guardianship) store, but usage_events and
- * family_preferences (the sharing flag) still FK to / are keyed on the legacy
- * profiles/subscriptions ids (pre-M-REPOINT), so this seeds BOTH stores with
- * the SAME ids for the shared subscription/profile rows — the "reseed
- * identity contract" used throughout billing-v2/*.integration.test.ts (see
- * family-usage-v2.integration.test.ts for the canonical example). Guardianship
- * edges (guardian_person_id x charge_person_id) are the v2 image of the
- * legacy family_links rows this file used to seed.
+ * (organization/person/membership/guardianship) store.
+ *
+ * [WI-1128] Previously this file also dual-seeded the legacy
+ * accounts/profiles/subscriptions tables (pre-M-REPOINT, when usage_events /
+ * quota_pools / family_preferences still FK'd them). Post-M-REPOINT those
+ * tables FK the v2 person/subscription tables directly, and
+ * getUsageBreakdownForProfileV2 reads only the v2 store — so the legacy seed
+ * served no purpose for this suite specifically (unlike
+ * family-usage-v2.integration.test.ts, which still exercises other
+ * legacy-path tests in its package) and has been dropped. Seeding is v2-only
+ * now.
  *
  * Mocked boundaries: none — all DB access is real.
  */
 
 import { eq, inArray } from 'drizzle-orm';
 import {
-  accounts,
   familyPreferences,
   guardianship,
   membership,
   organization,
   person,
-  profiles,
   quotaPools,
   subscription as subscriptionV2Table,
-  subscriptions,
   usageEvents,
 } from '@eduagent/database';
 
@@ -72,13 +72,9 @@ interface SeedResult {
 }
 
 /**
- * Seeds a single account with three profiles (owner, child, co-parent), one
- * shared subscription, and per-profile usage events — in BOTH the legacy
- * store (accounts/profiles/subscriptions, still FK-referenced by
- * usage_events/quota_pools/family_preferences) and the v2 store
- * (organization/person/membership/subscription/guardianship, which
- * getUsageBreakdownForProfileV2 actually reads). Every shared row uses the
- * SAME id in both stores.
+ * Seeds a family of three (owner, child, co-parent) directly into the v2
+ * store (organization/person/membership/subscription/guardianship), which is
+ * everything getUsageBreakdownForProfileV2 reads.
  *
  * Account layout:
  * - ownerProfile (admin membership, guardian of childProfile)
@@ -88,87 +84,38 @@ interface SeedResult {
 async function seedFamilyWithUsage(): Promise<SeedResult> {
   const db = createIntegrationDb();
 
-  // ---- legacy store (usage_events/quota_pools/family_preferences FKs) ----
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: OWNER_CLERK_ID, email: OWNER_EMAIL })
+  const [org] = await db
+    .insert(organization)
+    .values({ name: V2_ORG_NAME })
     .returning();
 
   const [ownerProfile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: 'Owner',
-      birthYear: 1980,
-      isOwner: true,
+      birthDate: '1980-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
 
   const [childProfile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: 'Child',
-      birthYear: 2013, // age 13
-      isOwner: false,
+      birthDate: '2013-01-01', // age 13
+      residenceJurisdiction: 'EU',
     })
     .returning();
 
   const [coParentProfile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
-      displayName: 'Co-parent',
-      birthYear: 1982,
-      isOwner: false,
-    })
-    .returning();
-
-  const [sub] = await db
-    .insert(subscriptions)
-    .values({
-      accountId: account!.id,
-      tier: 'family',
-      status: 'active',
-    })
-    .returning();
-
-  // Quota pool (required for usage_events/subscriptions FKs, not read by
-  // getUsageBreakdownForProfileV2 directly).
-  const cycleStart = new Date('2026-05-01T00:00:00.000Z');
-  await db.insert(quotaPools).values({
-    subscriptionId: sub!.id,
-    monthlyLimit: 700,
-    usedThisMonth: 0,
-    usedToday: 0,
-    cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
-  });
-
-  // ---- v2 store (id-aligned with the legacy rows above) ----
-  const [org] = await db
-    .insert(organization)
-    .values({ id: account!.id, name: V2_ORG_NAME })
-    .returning();
-  await db.insert(person).values([
-    {
-      id: ownerProfile!.id,
-      displayName: 'Owner',
-      birthDate: '1980-01-01',
-      residenceJurisdiction: 'EU',
-    },
-    {
-      id: childProfile!.id,
-      displayName: 'Child',
-      birthDate: '2013-01-01',
-      residenceJurisdiction: 'EU',
-    },
-    {
-      id: coParentProfile!.id,
       displayName: 'Co-parent',
       birthDate: '1982-01-01',
       residenceJurisdiction: 'EU',
-    },
-  ]);
+    })
+    .returning();
+
   await db.insert(membership).values([
     { personId: ownerProfile!.id, organizationId: org!.id, roles: ['admin'] },
     {
@@ -182,15 +129,29 @@ async function seedFamilyWithUsage(): Promise<SeedResult> {
       roles: ['learner'],
     },
   ]);
-  await db.insert(subscriptionV2Table).values({
-    id: sub!.id,
-    organizationId: org!.id,
-    planTier: 'family',
-    status: 'active',
-    payerPersonId: ownerProfile!.id,
+
+  const [sub] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: org!.id,
+      planTier: 'family',
+      status: 'active',
+      payerPersonId: ownerProfile!.id,
+    })
+    .returning();
+
+  // Quota pool (required for the subscription FK, not read by
+  // getUsageBreakdownForProfileV2 directly).
+  const cycleStart = new Date('2026-05-01T00:00:00.000Z');
+  await db.insert(quotaPools).values({
+    subscriptionId: sub!.id,
+    monthlyLimit: 700,
+    usedThisMonth: 0,
+    usedToday: 0,
+    cycleResetAt: new Date('2026-06-01T00:00:00.000Z'),
   });
-  // Guardianship edges — the v2 image of the legacy family_links rows this
-  // file used to seed: owner and co-parent are both guardians of the child.
+
+  // Guardianship edges — owner and co-parent are both guardians of the child.
   await db.insert(guardianship).values([
     { guardianPersonId: ownerProfile!.id, chargePersonId: childProfile!.id },
     {

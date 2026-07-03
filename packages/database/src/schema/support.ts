@@ -8,7 +8,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 
 // PII egress: app/feedback.delivery_failed events must not carry the user's
 // feedback free-text through Inngest's third-party event store. The feedback
@@ -19,7 +19,7 @@ import { profiles } from './profiles';
 // are purged by the webhook-idempotency-purge cron after 7 days.
 //
 // `profileId` is TEXT without an FK: the feedback route's profile context can
-// be the literal 'unknown', which a uuid FK to profiles.id would reject.
+// be the literal 'unknown', which a uuid FK to person.id would reject.
 // Retention is bounded by delete-on-success + the 7-day purge instead of an
 // ON DELETE CASCADE.
 //
@@ -48,7 +48,7 @@ export const supportMessages = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     clientId: text('client_id').notNull(),
     flow: text('flow').notNull(),
     surfaceKey: text('surface_key').notNull(),

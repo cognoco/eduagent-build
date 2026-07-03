@@ -10,8 +10,8 @@ import {
   accounts,
   generateUUIDv7,
   membership,
+  person,
   profileQuotaUsage,
-  profiles,
   quotaPools,
   subscription as subscriptionV2,
   subscriptions,
@@ -19,7 +19,10 @@ import {
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { quotaReset } from '../../apps/api/src/inngest/functions/quota-reset';
-import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import {
+  ensureV2IdentityForLegacyProfileTest,
+  legacyIdentityTableExistsForTest,
+} from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const FREE_USER_ID = 'integration-quota-reset-free';
@@ -31,14 +34,18 @@ const FAMILY_EMAIL = 'integration-quota-reset-family@integration.test';
 
 async function seedAccount(clerkUserId: string, email: string) {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
+  const accountId = generateUUIDv7();
+
+  // [WI-1128] `accounts` is dropped (post-M-DROP); gate the raw legacy
+  // insert on table existence — the v2 identity graph below is the real
+  // anchor post-drop.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.insert(accounts).values({ id: accountId, clerkUserId, email });
+  }
 
   // [WI-867] v2 identity always seeded (flag collapsed to v2-only).
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
+    accountId,
     profileId: generateUUIDv7(),
     displayName: 'Quota Reset Owner',
     birthYear: 1990,
@@ -48,7 +55,7 @@ async function seedAccount(clerkUserId: string, email: string) {
     seedBaselineSubscription: false,
   });
 
-  return account!;
+  return { id: accountId };
 }
 
 async function seedSubscriptionWithQuota(input: {
@@ -115,17 +122,26 @@ async function seedProfile(input: {
   isOwner: boolean;
 }) {
   const db = createIntegrationDb();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: input.accountId,
-      displayName: input.displayName,
-      birthYear: input.isOwner ? 1990 : 2016,
-      isOwner: input.isOwner,
-    })
-    .returning();
+  const profileId = generateUUIDv7();
+  const birthYear = input.isOwner ? 1990 : 2016;
 
-  return profile!;
+  // [WI-1128] `profiles` is dropped (post-M-DROP); seed the v2 person +
+  // membership rows directly. `profile_quota_usage.profile_id` FKs to
+  // `person.id` (repointed by 0129_m_repoint.sql).
+  await db.insert(person).values({
+    id: profileId,
+    displayName: input.displayName,
+    birthDate: `${birthYear}-01-01`,
+    residenceJurisdiction: 'EU',
+  });
+
+  await db.insert(membership).values({
+    personId: profileId,
+    organizationId: input.accountId,
+    roles: input.isOwner ? ['admin', 'learner'] : ['learner'],
+  });
+
+  return { id: profileId };
 }
 
 async function seedProfileQuotaUsage(input: {
