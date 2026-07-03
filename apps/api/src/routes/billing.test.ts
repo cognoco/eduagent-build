@@ -118,45 +118,9 @@ jest.mock('../services/profile', () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
-  // Match the id findOwnerProfile returns ('test-profile-id') so the active
-  // profileId is identical whether resolution was auto (legacy tests) or via
-  // an explicit owner X-Profile-Id (Issue 901). Downstream assertions on the
-  // active profileId therefore stay unchanged.
-  const ownerProfileId = 'test-profile-id';
   return {
     ...actual,
     findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-    getProfile: jest
-      .fn()
-      .mockImplementation(
-        (db: unknown, profileId: string, accountId: string) => {
-          if (profileId === ownerProfileId && accountId === 'test-account-id') {
-            return Promise.resolve({
-              id: ownerProfileId,
-              accountId: 'test-account-id',
-              displayName: 'Owner',
-              avatarUrl: null,
-              birthYear: 1985,
-              location: 'EU',
-              consentStatus: 'CONSENTED',
-              isOwner: true,
-              hasPremiumLlm: false,
-              conversationLanguage: null,
-              pronouns: null,
-              createdAt: new Date('2025-01-01T00:00:00.000Z'),
-              updatedAt: new Date('2025-01-01T00:00:00.000Z'),
-            });
-          }
-          // Delegate to the real getProfile (reads the mocked db.query) so the
-          // non-owner break tests, which set mockProfileFindFirst to a child,
-          // continue to resolve via the DB path unchanged.
-          return (
-            actual.getProfile as unknown as (
-              ...a: unknown[]
-            ) => Promise<unknown>
-          )(db, profileId, accountId);
-        },
-      ),
   };
 });
 

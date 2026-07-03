@@ -37,9 +37,9 @@ git show retired/wi-1364-dead-legacy-readers:<path>
 
 | File | Removed (dead) | Kept (live) |
 |------|----------------|-------------|
-| `services/account.ts` | `findOrCreateAccount` (+ private `findLegacyAccountByClerkId`, `hashEmail`) | `notifyAccountSecurityEvent`, `findAccountByClerkId` (now v2 via `resolveIdentityV2`), `updateAccountEmailFromClerk` |
+| `services/account.ts` | `findOrCreateAccount` (+ private `findLegacyAccountByClerkId`, `hashEmail`); **completeness follow-up (2026-07-03): `updateAccountEmailFromClerk`** (+ private `mapAccountRow`, `normalizeEmail`) — dead pre-sweep (0 non-test callers; v2 twin `updateLoginEmailFromClerk` in `identity-v2/account-v2.ts`); its removal drops the last `accounts` legacy-def import from the file | `notifyAccountSecurityEvent`, `findAccountByClerkId` (now v2 via `resolveIdentityV2`) |
 | `services/profile.ts` | `listProfiles`, `countProfiles`, `assertProfileCreationAllowed`, `findOwnerProfile`, `createProfile`, `createProfileWithLimitCheck`, `getProfile`, `updateProfile`, `switchProfile`, `getProfileAge`, `loadProfileRowById`, `getProfileDisplayName`, `getProfileAgeBracket`, `resolveProfileRole` (+ private `mapProfileRow`, `loadProfileFamilyMeta`) | `updateProfileAppContext` (v2: person+membership), `ProfileValidationError`, `ProfileLimitError` classes |
-| `services/consent.ts` | `createPendingConsentState`, `createGrantedConsentState`, `requestConsent`, `resendConsent`, `processConsentResponse`, `refreshConsentToken`, `refreshConsentTokenForRequest`, `getConsentStatus`, `isConsentRevocationGenerationCurrent`, `isGdprProcessingAllowed`, `getChildNameByToken`, `getProfileDisplayName`, `getProfileForConsentRevocation`, `getFamilyOwnerProfileId`, `getProfileConsentState`, `getChildConsentForParent`, `revokeConsent`, `restoreConsent` (+ `ConsentState` interface, `mapConsentRow`) | `checkConsentRequiredFromDate`, `checkConsentRequired`, `getLatestGdprConsentByProfile`, `isGdprProcessingAllowedBatch`, `RESTORE_CONSENT_GRACE_PERIOD_MS`, error classes, `age-utils` re-exports. Routes use v2 twins (`requestConsentV2` …). |
+| `services/consent.ts` | `createPendingConsentState`, `createGrantedConsentState`, `requestConsent`, `resendConsent`, `processConsentResponse`, `refreshConsentToken`, `refreshConsentTokenForRequest`, `getConsentStatus`, `isConsentRevocationGenerationCurrent`, `isGdprProcessingAllowed`, `getChildNameByToken`, `getProfileDisplayName`, `getProfileForConsentRevocation`, `getFamilyOwnerProfileId`, `getProfileConsentState`, `getChildConsentForParent`, `revokeConsent`, `restoreConsent` (+ `ConsentState` interface, `mapConsentRow`); **completeness follow-up (2026-07-03): `isGdprProcessingAllowedBatch`** (became dead in this sweep — its only prod caller `listEligibleSelfReportProfileIds` was removed) **+ `getLatestGdprConsentByProfile`** (transitively dead — its only caller was `isGdprProcessingAllowedBatch`); removing both drops the last `consentStates` legacy-def import from the file | `checkConsentRequiredFromDate`, `checkConsentRequired`, `RESTORE_CONSENT_GRACE_PERIOD_MS`, error classes, `age-utils` re-exports. Routes use v2 twins (`requestConsentV2` …). |
 | `services/billing/subscription-core.ts` | `getSubscriptionByAccountId`, `createSubscription`, `ensureFreeSubscription`, `resetMonthlyQuota`, `updateQuotaPoolLimit` | `getQuotaPool` (live: `inngest/session-completed.ts`) |
 | `services/billing/quota-reconcile.ts` | `reconcileQuotaStateForSubscription` (only caller was dead `ensureFreeSubscription`) | `reconcileQuotaStateForEffectiveTier` (live: `billing-v2/quota-reconcile-v2.ts`) |
 | `services/billing/family.ts` | `getProfileCountForSubscription`, `canAddProfile` | `addToByokWaitlist`, `getUsageEventsAvailableSince`, `buildUsageDateLabels` (live: `routes/billing.ts`) |
@@ -54,21 +54,52 @@ git show retired/wi-1364-dead-legacy-readers:<path>
 - `services/export.ts` `generateExport` — **live** (unconditionally called by
   `identity-v2/export-v2.ts` with `learningOnlyProfileIds`). Untouched.
 
-### Residual kept-live legacy-def readers (WI-1364 does NOT clear these for WI-1139)
+### Residual legacy-def readers — CLEARED (completeness follow-up, 2026-07-03)
 
-Two kept-live functions still import legacy table defs; WI-1139's "no code imports
-legacy defs" precondition stays **unmet for `accounts` + `consent_states`** after
-this sweep. Ownership of repointing them is the orchestrator's call:
+The initial sweep kept three functions that were in fact dead; the completeness
+follow-up removed them (see the `account.ts` / `consent.ts` rows above). After it,
+**`services/account.ts` and `services/consent.ts` import zero legacy table defs**
+— `accounts` and `consentStates` are no longer imported by either file. WI-1139's
+"no code imports legacy defs" precondition is now **met for `accounts` +
+`consent_states`** from this surface. The three removed functions were all dead
+code (0 live callers), not live paths — this was a small dead-removal, not a
+behavior-changing port.
 
-- `services/account.ts` `updateAccountEmailFromClerk` → legacy `accounts` (live
-  email-change path; also `mapAccountRow`).
-- `services/consent.ts` `getLatestGdprConsentByProfile` (reached via the live
-  `isGdprProcessingAllowedBatch`) → legacy `consent_states`.
-
-(`findAccountByClerkId` is **not** a legacy reader — it now resolves via
+(`findAccountByClerkId` was never a legacy reader — it resolves via
 `resolveIdentityV2`. The bucket-(c) `tableExists`-gated v2 dual-write files —
 `identity-graph.ts`, `subscription-core-v2.ts`, `child-profile-v2.ts` — remain
 WI-1398's scope, untouched here.)
+
+### Test-block retirements (completeness follow-up, 2026-07-03)
+
+The initial sweep removed ~40 prod functions but left co-located unit tests that
+still imported/exercised them, leaving the branch red in both CI jobs. The
+follow-up retired those orphaned test blocks (keeping every block that covers a
+KEPT function). 13 test files, all validated green in the worktree
+(`tsc --build tsconfig.spec.json` clean; targeted jest 477 passing):
+
+- **Rebuilt to keep only live-fn blocks:** `services/account.test.ts`
+  (`findAccountByClerkId`), `services/consent.test.ts`
+  (`calculateAge`/`checkConsentRequired*`), `services/profile.test.ts`
+  (`updateProfileAppContext` ×2), `services/solo-progress-reports.test.ts`
+  (`isLocalHour9ForTimezone`).
+- **Surgical retirement of removed-fn blocks/imports:** `services/billing.test.ts`
+  (removed subscription-core/family/trial blocks; kept `getQuotaPool`,
+  `decrementQuota`, top-up), `routes/profiles.test.ts` + `routes/sessions.test.ts`
+  (dropped legacy `listProfiles`/`assertProfileCreationAllowed`/`getProfileAgeBracket`
+  imports + obsolete legacy-not-called guards), `inngest/quota-reset.test.ts` +
+  `services/session/session-crud.test.ts` (removed legacy `resetExpiredQuotaCycles` /
+  `getProfileAge` spies; v2 spies retained).
+- **Deletion behavioral repoint (source is v2-collapsed on `identity-v2/deletion-v2`):**
+  `routes/account.test.ts` repointed the [Issue 901] privilege-escalation guards to
+  the v2 twins (`scheduleDeletionV2`/`cancelDeletionV2`/`getDeletionStatusV2`) and
+  dropped the deleted-`services/deletion` mock + inert `findOwnerProfile` setups;
+  `inngest/archive-cleanup.test.ts` + `inngest/account-deletion.test.ts` dropped
+  their mocks of the deleted `services/deletion` module (the legacy "not-called"
+  guards were vacuous post-collapse; live v2 assertions retained).
+
+Recovery for all of the above is the existing pre-sweep tag
+`retired/wi-1364-dead-legacy-readers` plus this commit's parent.
 
 ---
 

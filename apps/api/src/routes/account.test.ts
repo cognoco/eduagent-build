@@ -133,35 +133,12 @@ jest.mock('../services/profile', () => {
   };
   return {
     ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue(ownerProfile),
     getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
       if (profileId === ownerProfileId && accountId === 'test-account-id') {
         return Promise.resolve(ownerProfile);
       }
       return Promise.resolve(null);
     }),
-  };
-});
-
-jest.mock('../services/deletion', () => {
-  const actual = jest.requireActual(
-    '../services/deletion',
-  ) as typeof import('../services/deletion');
-  return {
-    ...actual,
-    scheduleDeletion: jest.fn().mockResolvedValue({
-      gracePeriodEnds: new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000,
-      ).toISOString(),
-      scheduledNow: true,
-    }),
-    cancelDeletion: jest.fn().mockResolvedValue('cancelled'),
-    getDeletionStatus: jest.fn().mockResolvedValue({
-      scheduled: true,
-      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
-      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
-    }),
-    getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
   };
 });
 
@@ -359,15 +336,9 @@ jest.mock('../services/identity-v2/ownership-v2', () => {
 import { app } from '../index';
 import { inngest } from '../inngest/client';
 import { captureException, captureMessage } from '../services/sentry';
-import {
-  cancelDeletion,
-  getDeletionStatus,
-  scheduleDeletion,
-} from '../services/deletion';
 import { generateExport } from '../services/export';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError } from '../errors';
-import { findOwnerProfile } from '../services/profile';
 import { ERROR_CODES } from '@eduagent/schemas';
 import {
   scheduleDeletionV2,
@@ -968,9 +939,7 @@ describe('account routes', () => {
 
     beforeEach(() => {
       mockUpdateAccountEmailFromClerk.mockClear();
-      // Override getProfile so X-Profile-Id resolves to a non-owner profile.
-      (findOwnerProfile as jest.Mock).mockResolvedValue(null);
-      // Also override via getProfile path for X-Profile-Id header.
+      // Override via getProfile path for X-Profile-Id header.
       const profileServiceMock = jest.requireMock(
         '../services/profile',
       ) as Record<string, jest.Mock>;
@@ -1163,22 +1132,10 @@ describe('account routes', () => {
       jest.clearAllMocks();
       restoreProfileScopeMocks();
       mockUpdateAccountEmailFromClerk.mockClear();
-      // Reproduce the EXACT attack: findOwnerProfile DOES succeed and returns
-      // the OWNER (isOwner:true) — the no-header auto-resolve path. The prior
-      // describe block leaves findOwnerProfile resolving null, so restore the
-      // owner here. The rejection must therefore come from resolvedVia:'auto',
-      // not from an absent profileMeta.
-      (findOwnerProfile as jest.Mock).mockResolvedValue({
-        id: OWNER_PROFILE_ID,
-        accountId: 'test-account-id',
-        displayName: 'Owner',
-        birthYear: 1990,
-        location: null,
-        consentStatus: null,
-        isOwner: true,
-        hasPremiumLlm: false,
-        conversationLanguage: 'en',
-      });
+      // Reproduce the EXACT attack: the no-header auto-resolve path DOES succeed
+      // and returns the OWNER (isOwner:true) via getPersonScope (restored above by
+      // restoreProfileScopeMocks). The rejection must therefore come from
+      // resolvedVia:'auto', not from an absent profileMeta.
     });
 
     it('[BREAK] POST /v1/account/delete returns 403 when X-Profile-Id is omitted', async () => {
@@ -1195,7 +1152,7 @@ describe('account routes', () => {
         message: 'Only the account owner can delete the account.',
       });
       // The destructive side effect must never have been scheduled.
-      expect(scheduleDeletion).not.toHaveBeenCalled();
+      expect(scheduleDeletionV2).not.toHaveBeenCalled();
       expect(inngest.send).not.toHaveBeenCalled();
     });
 
@@ -1228,7 +1185,7 @@ describe('account routes', () => {
         code: ERROR_CODES.FORBIDDEN,
         message: 'Only the account owner can cancel account deletion.',
       });
-      expect(cancelDeletion).not.toHaveBeenCalled();
+      expect(cancelDeletionV2).not.toHaveBeenCalled();
     });
 
     it('[BREAK] PATCH /v1/account/email returns 403 when X-Profile-Id is omitted', async () => {
@@ -1284,7 +1241,7 @@ describe('account routes', () => {
         code: ERROR_CODES.FORBIDDEN,
         message: 'Only the account owner can view deletion status.',
       });
-      expect(getDeletionStatus).not.toHaveBeenCalled();
+      expect(getDeletionStatusV2).not.toHaveBeenCalled();
     });
   });
 
