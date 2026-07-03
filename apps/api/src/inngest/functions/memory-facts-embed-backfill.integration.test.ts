@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolve } from 'path';
-import { asc, eq, isNotNull } from 'drizzle-orm';
+import { asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { generateUUIDv7, memoryFacts, type Database } from '@eduagent/database';
 import {
@@ -114,6 +114,20 @@ describe('memory-facts-embed-backfill cursor on failure (BUG-366)', () => {
   let generateEmbeddingSpy: jest.SpiedFunction<
     typeof embeddingsService.generateEmbedding
   >;
+
+  beforeEach(async () => {
+    // The backfill is GLOBAL (WHERE embedding IS NULL, eligibility-gated by a
+    // person row + granted consent). These tests assert on the function's global
+    // counters, so any pre-existing NULL-embedding memory_facts left by other
+    // suites sharing this DB would inflate the counts. Neutralise them (set a
+    // sentinel vector) so the backfill only ever processes THIS test's freshly
+    // seeded rows. (Surfaced under IDENTITY_V2_ENABLED: the v2-identity seeding
+    // in sibling suites makes more profiles backfill-eligible.)
+    await db
+      .update(memoryFacts)
+      .set({ embedding: okVector() })
+      .where(isNull(memoryFacts.embedding));
+  });
 
   afterEach(() => {
     generateEmbeddingSpy?.mockRestore();
