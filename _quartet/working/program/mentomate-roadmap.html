@@ -62,6 +62,9 @@
   .node .name{font-weight:600;font-size:13px;margin:1px 0 3px;text-wrap:balance}
   .node .meta{color:var(--ink-3);font-size:11.5px;line-height:1.35}
   .node .chip{margin-top:6px}
+  .szbar{margin-top:7px;height:4px;border-radius:2px;background:var(--chip-mut);overflow:hidden}
+  .szbar i{display:block;height:100%;border-radius:2px}
+  .szlbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin-top:2px}
   svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   svg.edges path{fill:none;stroke:var(--edge);stroke-width:1.5}
   svg.edges path.gatee{stroke:var(--warn);stroke-dasharray:4 4}
@@ -90,6 +93,7 @@
     <span class="chip s-pre">◇ pre-authorized</span><span class="chip s-gate">⬥ operator confirm</span>
     <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked</span>
     <span style="color:var(--ink-3)">— amber dashed arrow = crosses a live operator gate</span>
+    <span style="color:var(--ink-3)">— bottom bar = relative size of work, green 0 → red 100 (PM estimate)</span>
   </div>
   <div class="boardbox"><div class="board" id="board">
     <div class="colhead"></div><div class="colhead">Now</div><div class="colhead">Next</div>
@@ -129,23 +133,23 @@
     ['Hygiene','WS-34 / WS-35 — parked by design'],
   ];
   const NODES=[
-    {id:'m1',l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · all 5 closed — WS-37 graduated 2026-07-03',st:'done'},
-    {id:'m4',l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
-    {id:'m5',l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
-    {id:'m6',l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
-    {id:'m2a',l:1,c:0,code:'M2a',name:'Journal-prep',meta:'WI-1306 · CI builds the real prod schema',st:'run'},
-    {id:'m2b',l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
-    {id:'m3',l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
-    {id:'clerk',l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
-    {id:'store',l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
-    {id:'ops',l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry ✓ (WI-1336) · env-guard ✓ (WI-1340) · Inngest · email',st:'run'},
-    {id:'rc',l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
-    {id:'keys',l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
-    {id:'repub',l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
-    {id:'submit',l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
-    {id:'comp',l:3,c:0,code:'WS-30',name:'Legal chain',meta:'DPO done · policy fields → listing inputs · WI-1176 → Bug Lane',st:'run'},
-    {id:'surf',l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
-    {id:'hyg',l:5,c:0,code:'',name:'WS-34 · WS-35',meta:'refactor / infra hygiene — not ship-gating',st:'park'},
+    {id:'m1',sz:40,l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · all 5 closed — WS-37 graduated 2026-07-03',st:'done'},
+    {id:'m4',sz:30,l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
+    {id:'m5',sz:35,l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
+    {id:'m6',sz:50,l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
+    {id:'m2a',sz:25,l:1,c:0,code:'M2a',name:'Journal-prep',meta:'WI-1306 · CI builds the real prod schema',st:'run'},
+    {id:'m2b',sz:30,l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
+    {id:'m3',sz:70,l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
+    {id:'clerk',sz:10,l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
+    {id:'store',sz:55,l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
+    {id:'ops',sz:45,l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry ✓ (WI-1336) · env-guard ✓ (WI-1340) · Inngest · email',st:'run'},
+    {id:'rc',sz:35,l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
+    {id:'keys',sz:25,l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
+    {id:'repub',sz:40,l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
+    {id:'submit',sz:30,l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
+    {id:'comp',sz:60,l:3,c:0,code:'WS-30',name:'Legal chain',meta:'DPO done · policy fields → listing inputs · WI-1176 → Bug Lane',st:'run'},
+    {id:'surf',sz:65,l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
+    {id:'hyg',sz:50,l:5,c:0,code:'',name:'WS-34 · WS-35',meta:'refactor / infra hygiene — not ship-gating',st:'park'},
   ];
   const EDGES=[['m1','m4'],['m4','m5',1],['m5','m6',1],['m2a','m2b'],['m2b','m3'],
     ['clerk','m4'],['store','rc'],['rc','keys'],['keys','repub'],['repub','m6'],
@@ -164,7 +168,10 @@
     el.id='n-'+n.id;
     el.innerHTML=(n.code?'<span class="code">'+n.code+'</span>':'')+
       '<div class="name">'+n.name+'</div><div class="meta">'+n.meta+'</div>'+
-      '<span class="chip '+STATUS[n.st][0]+'">'+STATUS[n.st][1]+'</span>';
+      '<span class="chip '+STATUS[n.st][0]+'">'+STATUS[n.st][1]+'</span>'+
+      (n.sz!=null?'<div class="szbar" title="size of work: '+n.sz+'/100"><i style="width:'+n.sz+
+        '%;background:hsl('+Math.round(120-n.sz*1.2)+',65%,42%)"></i></div>'+
+        '<div class="szlbl">size '+n.sz+'/100</div>':'');
     cells[n.l+'-'+n.c].appendChild(el);
   });
 
