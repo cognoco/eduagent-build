@@ -121,3 +121,33 @@ points at the pre-removal commit on branch `WI-1347`. Retrieve with:
 ```
 git show retired/wi-1347-getsubscriptionbyaccountid:apps/api/src/services/billing/subscription-core.integration.test.ts
 ```
+
+---
+
+## WI-1347 — tests/integration/consent-restore-archive.integration.test.ts (2026-07-03)
+
+Retired per explicit orchestrator ruling on WI-1347 (non-negotiable — not a builder
+judgment call). Whole file, one describe block: a
+`(isIdentityV2Enabled() ? describe.skip : describe)`-gated legacy-quarantine suite
+(2 `it`s: "restoreConsent clears archivedAt atomically",
+"archive-cleanup bails with consent_restored when consent is CONSENTED"). Its own
+header comment already documented the disposition: it exercises
+`services/consent.ts`, "whose DB layer is orphaned dead code (§7.3-confirmed; all DB
+exports have live V2 twins in services/identity-v2/consent-v2.ts)", and "fails
+post-0130 because consent.ts reads legacy tables WI-1128 drops." Its raw
+`accounts`/`profiles`/`family_links`/`consent_states` seeds were unconditional (no
+`tableExists` gate) and would hard-fail once those tables are dropped regardless.
+
+Coverage is not lost: `tests/integration/consent-restore-archive-v2.integration.test.ts`
+already exercises the same restore-vs-archive-cleanup race against the v2
+(person/organization/guardianship/consentGrant) graph — it is in fact the source the
+WI-1347 refine package cites as the canonical v2 seeding idiom for this WI.
+`archive-cleanup`'s "bails with consent_restored" behavior also has non-integration
+coverage in `apps/api/src/inngest/functions/archive-cleanup.test.ts`.
+
+**Recovery:** annotated tag `retired/wi-1347-consent-restore-archive` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-consent-restore-archive:tests/integration/consent-restore-archive.integration.test.ts
+```

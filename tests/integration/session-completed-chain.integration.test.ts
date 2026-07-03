@@ -14,8 +14,7 @@
 
 import { eq, and } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  generateUUIDv7,
   subjects,
   curricula,
   curriculumBooks,
@@ -129,31 +128,17 @@ async function seedScenario(options?: {
   const email = `integration-session-completed+${identitySuffix}@integration.test`;
   createdScenarioIdentities.push({ clerkUserId, email });
 
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId,
-      email,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Integration Learner',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
-
-  // [WI-1145] Seed the v2 identity graph unconditionally alongside legacy — the
+  // [WI-1145] Seed the v2 identity graph unconditionally — the
   // session-completed pipeline resolves the profile via v2 (person) and aborts with
   // "Profile not found" when v2 is empty on the post-collapse flag-off main lane.
-  // Same ids as legacy (person.id == profile.id, organization.id == account.id).
+  // Dual-writes the gated legacy accounts/profiles anchor internally (same ids:
+  // person.id == profileId, organization.id == accountId).
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     displayName: 'Integration Learner',
     birthYear: 2000,
     clerkUserId,
@@ -164,7 +149,7 @@ async function seedScenario(options?: {
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: 'Biology',
       status: 'active',
       pedagogyMode: 'socratic',
@@ -205,7 +190,7 @@ async function seedScenario(options?: {
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId,
       sessionType: 'learning',
@@ -220,7 +205,7 @@ async function seedScenario(options?: {
   await db.insert(sessionEvents).values([
     {
       sessionId: session!.id,
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId: topicId ?? undefined,
       eventType: 'user_message',
@@ -229,7 +214,7 @@ async function seedScenario(options?: {
     },
     {
       sessionId: session!.id,
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId: topicId ?? undefined,
       eventType: 'ai_response',
@@ -238,7 +223,7 @@ async function seedScenario(options?: {
     },
     {
       sessionId: session!.id,
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId: topicId ?? undefined,
       eventType: 'user_message',
@@ -249,7 +234,7 @@ async function seedScenario(options?: {
 
   if (topicId) {
     await db.insert(retentionCards).values({
-      profileId: profile!.id,
+      profileId: profileId,
       topicId,
       easeFactor: '2.50',
       intervalDays: 3,
@@ -263,7 +248,7 @@ async function seedScenario(options?: {
     });
 
     await db.insert(assessments).values({
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId,
       sessionId: session!.id,
@@ -277,7 +262,7 @@ async function seedScenario(options?: {
   return {
     clerkUserId,
     email,
-    profileId: profile!.id,
+    profileId: profileId,
     subjectId: subject!.id,
     topicId,
     sessionId: session!.id,
