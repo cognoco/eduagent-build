@@ -1,10 +1,13 @@
 /**
  * Integration: subscription-core.ts — full public surface coverage
  *
- * Covers: getSubscriptionByAccountId, createSubscription,
- * updateSubscriptionFromWebhook, linkStripeCustomer, getQuotaPool,
- * resetMonthlyQuota, ensureFreeSubscription, markSubscriptionCancelled,
- * updateQuotaPoolLimit, activateSubscriptionFromCheckout
+ * Covers: getSubscriptionByAccountId, updateSubscriptionFromWebhook,
+ * linkStripeCustomer, getQuotaPool, resetMonthlyQuota,
+ * markSubscriptionCancelled, activateSubscriptionFromCheckout
+ *
+ * [WI-1128 follow-up, 2026-07-03] createSubscription, ensureFreeSubscription,
+ * and updateQuotaPoolLimit coverage was retired — see docs/_archive/retired-code.md
+ * ("Trimmed — subscription-core.integration.test.ts, follow-up") for why.
  *
  * No mocks of internal services or database — real DB only.
  * External-boundary Sentry calls are left real (no-op without DSN).
@@ -28,15 +31,10 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { legacyIdentityTableExistsForTest } from '../../test-utils/legacy-identity-anchors';
-import { isIdentityV2Enabled } from '../../../../../tests/integration/helpers';
-
 import {
   getSubscriptionByAccountId,
-  createSubscription,
   getQuotaPool,
   resetMonthlyQuota,
-  ensureFreeSubscription,
-  updateQuotaPoolLimit,
 } from './subscription-core';
 // [WI-1239 / 779-strip] updateSubscriptionFromWebhook, linkStripeCustomer,
 // markSubscriptionCancelled, and activateSubscriptionFromCheckout were removed
@@ -357,137 +355,30 @@ describe('getSubscriptionByAccountId', () => {
 });
 
 // ---------------------------------------------------------------------------
-// ensureFreeSubscription
+// ensureFreeSubscription / createSubscription
 // ---------------------------------------------------------------------------
 
-// WI-1128 quarantine: subject fn `ensureFreeSubscription` (legacy, not the
-// -V2 twin) is orphaned dead code in services/subscription-core.ts (reachable
-// only via findOrCreateAccount / createProfileWithLimitCheck, both zero live
-// callers — verified: grepped every apps/+packages/ call site of both names,
-// only their own definitions and comments remain; revenuecat-webhook.ts:323's
-// handlers.ensureFreeSubscription resolves to ensureFreeSubscriptionV2 via
-// dispatch.ts's always-v2 seam, not this fn). Fails post-0130/0129-repoint
-// (quota_pools insert targets the legacy subscription id, but its FK now
-// targets v2 `subscription`). Deletion + un-skip = WI-1139 dead-sweep.
-(isIdentityV2Enabled() ? describe.skip : describe)(
-  'ensureFreeSubscription',
-  () => {
-    it('creates a free subscription + quota pool for a new account', async () => {
-      const db = createIntegrationDb();
-      const acct = await seedAccount('ensure-new');
-
-      const sub = await ensureFreeSubscription(db, acct.id);
-
-      expect(sub.tier).toBe('free');
-      expect(sub.status).toBe('active');
-      expect(sub.accountId).toBe(acct.id);
-
-      // Quota pool created
-      const pool = await db.query.quotaPools.findFirst({
-        where: eq(quotaPools.subscriptionId, sub.id),
-      });
-      expect(pool).not.toBeNull();
-      expect(pool!.monthlyLimit).toBe(getTierConfig('free').monthlyQuota);
-      expect(pool!.usedThisMonth).toBe(0);
-    });
-
-    it('is idempotent — sequential calls return the same subscription ID', async () => {
-      const db = createIntegrationDb();
-      const acct = await seedAccount('ensure-idempotent');
-
-      const first = await ensureFreeSubscription(db, acct.id);
-      const second = await ensureFreeSubscription(db, acct.id);
-
-      expect(second.id).toBe(first.id);
-      expect(second.tier).toBe('free');
-
-      // Only one subscription row must exist
-      const rows = await db.query.subscriptions.findMany({
-        where: eq(subscriptions.accountId, acct.id),
-      });
-      expect(rows).toHaveLength(1);
-    });
-  },
-);
-
-// ---------------------------------------------------------------------------
-// createSubscription
-// ---------------------------------------------------------------------------
-
-// WI-1128 quarantine: subject fn `createSubscription` is orphaned dead code
-// in services/subscription-core.ts (reachable only via findOrCreateAccount /
-// createProfileWithLimitCheck, both zero live callers — verified: grepped
-// every apps/+packages/ call site of both names, only their own definitions
-// and comments remain). Fails post-0130/0129-repoint (quota_pools insert
-// targets the legacy subscription id, but its FK now targets v2
-// `subscription`). Deletion + un-skip = WI-1139 dead-sweep.
-(isIdentityV2Enabled() ? describe.skip : describe)('createSubscription', () => {
-  it('creates a subscription row and quota pool atomically', async () => {
-    const db = createIntegrationDb();
-    const acct = await seedAccount('create-happy');
-    const tierConfig = getTierConfig('plus');
-
-    const sub = await createSubscription(
-      db,
-      acct.id,
-      'plus',
-      tierConfig.monthlyQuota,
-    );
-
-    expect(sub.accountId).toBe(acct.id);
-    expect(sub.tier).toBe('plus');
-    expect(sub.status).toBe('trial'); // default when no options provided
-
-    const pool = await db.query.quotaPools.findFirst({
-      where: eq(quotaPools.subscriptionId, sub.id),
-    });
-    expect(pool).not.toBeNull();
-    expect(pool!.monthlyLimit).toBe(tierConfig.monthlyQuota);
-    expect(pool!.dailyLimit).toBe(tierConfig.dailyLimit);
-    expect(pool!.usedThisMonth).toBe(0);
-    expect(pool!.usedToday).toBe(0);
-  });
-
-  it('applies optional status, stripeCustomerId, stripeSubscriptionId', async () => {
-    const db = createIntegrationDb();
-    const acct = await seedAccount('create-options');
-
-    const sub = await createSubscription(
-      db,
-      acct.id,
-      'plus',
-      getTierConfig('plus').monthlyQuota,
-      {
-        status: 'active',
-        stripeCustomerId: 'cus_test_001',
-        stripeSubscriptionId: 'sub_test_001',
-      },
-    );
-
-    expect(sub.status).toBe('active');
-    expect(sub.stripeCustomerId).toBe('cus_test_001');
-    expect(sub.stripeSubscriptionId).toBe('sub_test_001');
-  });
-
-  it('applies correct tier config for family tier', async () => {
-    const db = createIntegrationDb();
-    const acct = await seedAccount('create-family');
-    const tierConfig = getTierConfig('family');
-
-    const sub = await createSubscription(
-      db,
-      acct.id,
-      'family',
-      tierConfig.monthlyQuota,
-    );
-
-    const pool = await db.query.quotaPools.findFirst({
-      where: eq(quotaPools.subscriptionId, sub.id),
-    });
-    expect(pool!.monthlyLimit).toBe(1500);
-    expect(pool!.dailyLimit).toBeNull(); // family has no daily limit
-  });
-});
+// [WI-1128 follow-up, 2026-07-03] `ensureFreeSubscription` and
+// `createSubscription` (legacy, not the -V2 twins) test coverage retired —
+// both are orphaned dead code in services/subscription-core.ts, reachable
+// only via services/profile.ts's `createProfileWithLimitCheck` and
+// services/account.ts's `findOrCreateAccount` respectively, and both of
+// those wrapper fns have zero live callers (re-verified via
+// `git grep -n "createProfileWithLimitCheck("` / `"findOrCreateAccount("`
+// excluding their own `export async function` lines and comments — no real
+// invocation exists anywhere in apps/ or packages/;
+// revenuecat-webhook.ts:323's `handlers.ensureFreeSubscription` resolves to
+// `ensureFreeSubscriptionV2` via dispatch.ts's always-v2 seam, not this fn).
+// The prior `isIdentityV2Enabled()`-gated quarantine did not make these
+// drop-safe: CI's `drizzle-kit migrate` applies the 0129/0130 legacy-table
+// repoint unconditionally in every lane (flag-ON and flag-OFF alike — schema
+// state isn't flag-gated), so the flag-OFF CI lane still ran these blocks
+// un-skipped against the post-repoint schema and FK-violated on
+// `quota_pools_subscription_id_subscription_id_fk`. Retired outright rather
+// than re-guarded. See docs/_archive/retired-code.md ("Trimmed —
+// subscription-core.integration.test.ts, follow-up") for the full register
+// entry; retiring the dead prod fns themselves is out of scope here
+// (WI-1167/WI-1347).
 
 // ---------------------------------------------------------------------------
 // updateSubscriptionFromWebhook
@@ -786,42 +677,18 @@ describe('getQuotaPool', () => {
 // ---------------------------------------------------------------------------
 
 describe('resetMonthlyQuota', () => {
-  // WI-1128 quarantine: subject fn `resetMonthlyQuota` is orphaned dead code
-  // in services/subscription-core.ts (zero callers anywhere in apps/ or
-  // packages/ — verified via grep; not even reachable via the
-  // findOrCreateAccount/createProfileWithLimitCheck dead paths). Its fixture
-  // also seeds through the dead createSubscription, so it fails
-  // post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
-  (isIdentityV2Enabled() ? it.skip : it)(
-    'resets usedThisMonth to 0 and sets a new limit',
-    async () => {
-      const db = createIntegrationDb();
-      const acct = await seedAccount('reset-quota');
-      const sub = await createSubscription(
-        db,
-        acct.id,
-        'plus',
-        getTierConfig('plus').monthlyQuota,
-      );
-
-      // Manually bump usedThisMonth to simulate prior usage
-      await db
-        .update(quotaPools)
-        .set({ usedThisMonth: 150, usedToday: 5 })
-        .where(eq(quotaPools.subscriptionId, sub.id));
-
-      const newLimit = 800;
-      const result = await resetMonthlyQuota(db, sub.id, newLimit);
-
-      expect(result).not.toBeNull();
-      expect(result!.usedThisMonth).toBe(0);
-      expect(result!.usedToday).toBe(0);
-      expect(result!.monthlyLimit).toBe(newLimit);
-      // cycleResetAt should be advanced ~1 month
-      const resetAt = new Date(result!.cycleResetAt);
-      expect(resetAt.getTime()).toBeGreaterThan(Date.now());
-    },
-  );
+  // [WI-1128 follow-up, 2026-07-03] "resets usedThisMonth to 0 and sets a new
+  // limit" test coverage retired — subject fn `resetMonthlyQuota` is orphaned
+  // dead code in services/subscription-core.ts (zero callers anywhere in
+  // apps/ or packages/, not even reachable via the dead
+  // findOrCreateAccount/createProfileWithLimitCheck paths), and its fixture
+  // seeded through the also-dead `createSubscription` (see the
+  // ensureFreeSubscription/createSubscription retirement note above for why
+  // the isIdentityV2Enabled()-gated quarantine that used to guard this test
+  // didn't make it CI-safe). See docs/_archive/retired-code.md ("Trimmed —
+  // subscription-core.integration.test.ts, follow-up"). This describe block's
+  // other test ("returns null when quota pool does not exist") does not seed
+  // through the dead path and is KEPT below.
 
   it('returns null when quota pool does not exist', async () => {
     const db = createIntegrationDb();
@@ -842,65 +709,16 @@ describe('resetMonthlyQuota', () => {
 // and a v2 read reflects it") — same assertion this test made, against the
 // v2 store. Dropped rather than duplicated.
 
-// ---------------------------------------------------------------------------
-// updateQuotaPoolLimit
-// ---------------------------------------------------------------------------
-
-// WI-1128 quarantine: subject fn `updateQuotaPoolLimit` (legacy, not the -V2
-// twin) is orphaned dead code in services/subscription-core.ts (zero callers
-// anywhere in apps/ or packages/ — verified via grep; not even reachable via
-// the findOrCreateAccount/createProfileWithLimitCheck dead paths). Its
-// fixture also seeds through the dead createSubscription, so it fails
-// post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
-(isIdentityV2Enabled() ? describe.skip : describe)(
-  'updateQuotaPoolLimit',
-  () => {
-    it('updates monthlyLimit and dailyLimit without resetting usedThisMonth', async () => {
-      const db = createIntegrationDb();
-      const acct = await seedAccount('update-pool-limit');
-      const sub = await createSubscription(
-        db,
-        acct.id,
-        'free',
-        getTierConfig('free').monthlyQuota,
-      );
-
-      // Simulate prior usage
-      await db
-        .update(quotaPools)
-        .set({ usedThisMonth: 50, usedToday: 3 })
-        .where(eq(quotaPools.subscriptionId, sub.id));
-
-      const newMonthlyLimit = 700;
-      await updateQuotaPoolLimit(db, sub.id, newMonthlyLimit, null);
-
-      const pool = await db.query.quotaPools.findFirst({
-        where: eq(quotaPools.subscriptionId, sub.id),
-      });
-      expect(pool!.monthlyLimit).toBe(newMonthlyLimit);
-      expect(pool!.dailyLimit).toBeNull();
-      // Usage counts preserved (mid-cycle change)
-      expect(pool!.usedThisMonth).toBe(50);
-      expect(pool!.usedToday).toBe(3);
-    });
-
-    it('[WI-78 review] rejects when quota pool is missing', async () => {
-      const db = createIntegrationDb();
-      const acct = await seedAccount('update-pool-limit-missing');
-      const sub = await createSubscription(
-        db,
-        acct.id,
-        'free',
-        getTierConfig('free').monthlyQuota,
-      );
-      await db.delete(quotaPools).where(eq(quotaPools.subscriptionId, sub.id));
-
-      await expect(updateQuotaPoolLimit(db, sub.id, 700, null)).rejects.toThrow(
-        'quota pool',
-      );
-    });
-  },
-);
+// [WI-1128 follow-up, 2026-07-03] `updateQuotaPoolLimit` (legacy, not the -V2
+// twin) test coverage retired — orphaned dead code in
+// services/subscription-core.ts, zero callers anywhere in apps/ or
+// packages/, not even reachable via the dead
+// findOrCreateAccount/createProfileWithLimitCheck paths. Its fixture also
+// seeded through the dead `createSubscription` (see the
+// ensureFreeSubscription/createSubscription retirement note above for why
+// the isIdentityV2Enabled()-gated quarantine that used to guard this block
+// didn't make it CI-safe). See docs/_archive/retired-code.md ("Trimmed —
+// subscription-core.integration.test.ts, follow-up").
 
 // ---------------------------------------------------------------------------
 // activateSubscriptionFromCheckout

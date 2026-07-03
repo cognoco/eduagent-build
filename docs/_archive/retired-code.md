@@ -37,7 +37,9 @@ git show retired/wi-1128-legacy-integration-suites:<path>
 | `apps/api/src/services/onboarding/onboarding.integration.test.ts` | `updateInterestsContext` (live; v2-anchored seed) | 2 `(isIdentityV2Enabled()?describe.skip:describe)` blocks for the dead `updateConversationLanguage` / `updatePronouns` (routes dispatch to the v2 twins per `[WI-867] v2 always`). |
 
 Left untouched (already drop-safe via runtime guards / pure-v2 seeds):
-`subscription-core.integration.test.ts`, `export.integration.test.ts`.
+`export.integration.test.ts`. `subscription-core.integration.test.ts` was **not**
+in fact drop-safe via its runtime guards — see the follow-up entry below (2026-07-03)
+for why and what was retired there instead.
 
 ### Follow-up dead-sweep (separate WI, home WS-18)
 
@@ -48,3 +50,36 @@ removed by a dead-code-sweep WI, with reachability evidence:
 - `createProfileWithLimitCheck` (`apps/api/src/services/profile.ts`) — v2 twin is
   `createChildProfileV2`; confirm reachability (billing/* doc-comments still name it an entry point).
 - `getSubscriptionByAccountId` + `resetMonthlyQuota` (`billing/subscription-core.ts`) — prior finding, both dead.
+
+---
+
+## WI-1128 — subscription-core.integration.test.ts, follow-up (2026-07-03)
+
+The `isIdentityV2Enabled()`-gated quarantine on 4 dead-fn test blocks in this file
+(added by the WI-1128 entry above) did NOT make them drop-safe: CI's
+`drizzle-kit migrate` applies 0129/0130 unconditionally in every lane (flag-ON and
+flag-OFF alike — schema state isn't flag-gated), so the flag-OFF lane still ran these
+blocks un-skipped against the post-repoint schema and FK-violated on
+`quota_pools_subscription_id_subscription_id_fk`. Retired outright rather than
+re-guarded — the guard mechanism was categorically wrong for a schema-level break,
+not a runtime-behavior difference. Verified via local Postgres with the full
+migration chain applied (matching CI's `drizzle-kit migrate`): full-file suite is
+20/20 passing in both `IDENTITY_V2_ENABLED=true` and `=false`.
+
+| Removed | Reachability evidence |
+|---|---|
+| `ensureFreeSubscription` describe block (2 `it`s) | Called only from `services/profile.ts`'s `createProfileWithLimitCheck`, confirmed zero live callers (`git grep -n "createProfileWithLimitCheck("` — no invocation outside its own definition). |
+| `createSubscription` describe block (3 `it`s) | Called only from `services/account.ts`'s `findOrCreateAccount`, confirmed zero live callers (`git grep -n "findOrCreateAccount("` — no invocation outside its own definition; `account.ts:114`'s own comment states this: accountMiddleware resolves via `resolveIdentityV2`, not `findOrCreateAccount`). |
+| `resetMonthlyQuota` guarded `it` ("resets usedThisMonth to 0 and sets a new limit") | Zero callers anywhere in `apps/` or `packages/` (not even reachable via the two dead wrappers above). The sibling "returns null when quota pool does not exist" `it` is KEPT — it doesn't route through the dead seed path and passes both flag states. |
+| `updateQuotaPoolLimit` describe block (2 `it`s) | Zero callers anywhere in `apps/` or `packages/`, same as `resetMonthlyQuota`. |
+
+`getSubscriptionByAccountId`, `getQuotaPool`, `updateSubscriptionFromWebhookV2`,
+`activateSubscriptionFromCheckoutV2` coverage is KEPT — all pass both flag-ON and
+flag-OFF against the post-0130 schema. The `isIdentityV2Enabled()` guard and its
+import are removed from the file entirely — no guarded blocks remain in it.
+
+`getSubscriptionByAccountId`'s own prod-fn deadness (flagged in the "Follow-up
+dead-sweep" list above) is explicitly **not** addressed here — its test coverage
+passes and stays; removing the dead prod fn itself is WI-1167/WI-1347 territory.
+
+**Recovery:** pre-retirement file state — `git show fb7a49f6a8acd316c2cd241bfb88f64f28c12992:apps/api/src/services/billing/subscription-core.integration.test.ts`.
