@@ -5,6 +5,8 @@ import {
   llmResponseEnvelopeSchema,
   llmSummaryEvaluationSchema,
   normaliseSignals,
+  teachBackGraderDegradedEventSchema,
+  teachBackGraderVerdictSchema,
   type ChallengeRoundGraderVerdict,
   type NormalisedEnvelopeSignals,
 } from './llm-envelope.js';
@@ -1037,8 +1039,15 @@ describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
 // ---------------------------------------------------------------------------
 
 describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload)', () => {
-  it('accepts a payload with only reason (all ids optional)', () => {
+  // WI-1155: profileId + timestamp are now REQUIRED (mid-session; profile exists).
+  const REQUIRED = {
+    profileId: '00000000-0000-4000-8000-0000000000aa',
+    timestamp: '2026-07-03T00:00:00.000Z',
+  };
+
+  it('accepts a payload with the required fields (sessionId/answerEventId optional)', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'route_error',
     });
     expect(result.success).toBe(true);
@@ -1046,6 +1055,7 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
 
   it('accepts a full payload with optional ids', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       sessionId: '00000000-0000-4000-8000-000000000001',
       answerEventId: '00000000-0000-4000-8000-000000000002',
       reason: 'schema_invalid',
@@ -1060,13 +1070,17 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
       'parse_error',
       'schema_invalid',
     ] as const) {
-      const r = challengeRoundGraderDegradedEventSchema.safeParse({ reason });
+      const r = challengeRoundGraderDegradedEventSchema.safeParse({
+        ...REQUIRED,
+        reason,
+      });
       expect(r.success).toBe(true);
     }
   });
 
   it('rejects an unknown reason value', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'unknown_failure',
     });
     expect(result.success).toBe(false);
@@ -1074,7 +1088,97 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
 
   it('rejects a payload missing reason', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
-      sessionId: '00000000-0000-4000-8000-000000000001',
+      ...REQUIRED,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a payload missing profileId (mid-session events must carry it)', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      timestamp: REQUIRED.timestamp,
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WI-1155 B2 — teachBackGraderVerdictSchema + teachBackGraderDegradedEventSchema
+// Server-side teach-back rubric fallback: the four scores are REQUIRED (unlike
+// the tutor-emitted teach_back_assessment where all fields are optional).
+// ---------------------------------------------------------------------------
+
+describe('teachBackGraderVerdictSchema (WI-1155 B2 — server rubric)', () => {
+  it('accepts a full valid verdict', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      overall_quality: 4,
+      weakest_area: 'clarity',
+      gap_identified: 'missed rapid burial',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a null gap_identified and omitted weakest_area', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 5,
+      accuracy: 5,
+      clarity: 5,
+      overall_quality: 5,
+      gap_identified: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects when a required numeric score is missing (the fallback guarantee)', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      // overall_quality missing
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a score outside 0-5', () => {
+    const result = teachBackGraderVerdictSchema.safeParse({
+      completeness: 7,
+      accuracy: 5,
+      clarity: 3,
+      overall_quality: 4,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('teachBackGraderDegradedEventSchema (WI-1155 B2)', () => {
+  const REQUIRED = {
+    profileId: '00000000-0000-4000-8000-0000000000bb',
+    timestamp: '2026-07-03T00:00:00.000Z',
+  };
+
+  it('accepts a payload with the required fields', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a payload missing profileId (mid-session events must carry it)', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      timestamp: REQUIRED.timestamp,
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown reason value', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
+      reason: 'unknown_failure',
     });
     expect(result.success).toBe(false);
   });

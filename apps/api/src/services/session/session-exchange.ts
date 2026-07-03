@@ -154,6 +154,7 @@ import {
 } from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 import { runChallengeRoundGrader } from '../challenge-round/grader';
+import { runTeachBackGrader } from '../teach-back-grader';
 
 // [WI-571 WP-W1-spine] Spine slice carved to session-exchange-spine.ts
 import { resolveReadyToFinish } from './session-exchange-spine';
@@ -1139,6 +1140,7 @@ async function applyChallengeRoundRuntimeSignals(
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
     const graderEvaluation = await runChallengeRoundGrader({
+      profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
@@ -3427,6 +3429,35 @@ export async function processMessage(
       challengeRoundGraderEnabled: options?.challengeRoundGraderEnabled,
     },
   );
+
+  // [WI-1155 B2] Teach-back rubric server-side hard cap. Prompt-only "mandatory
+  // rubric" hardening was proven insufficient (the tutor model dropped
+  // signals.teach_back_assessment 4/4 on the live model). When this is a
+  // teach-back turn AND the model emitted no rubric, grade the learner's
+  // explanation server-side so the envelope signal is guaranteed. Fail-open:
+  // runTeachBackGrader returns undefined on any error (leaving the field absent,
+  // exactly as before) and escalates via a degraded observability event.
+  if (
+    context.verificationType === 'teach_back' &&
+    result.teachBackAssessment === undefined
+  ) {
+    const ageBracket: AgeBracket = context.birthYear
+      ? computeAgeBracket(context.birthYear)
+      : 'adult';
+    const graded = await runTeachBackGrader({
+      profileId,
+      topic: [context.topicTitle, context.topicDescription]
+        .filter(Boolean)
+        .join(': '),
+      learnerExplanation: input.message,
+      conversationLanguage: context.conversationLanguage,
+      ageBracket,
+      sessionId: context.sessionId,
+    });
+    if (graded !== undefined) {
+      result.teachBackAssessment = graded;
+    }
+  }
 
   // Compute time-to-answer: ms between last AI response and now.
   // [BUG-391] Defensive cast: neon-serverless returns Date objects for

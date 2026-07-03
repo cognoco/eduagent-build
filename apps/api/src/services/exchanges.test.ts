@@ -2603,6 +2603,39 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
   });
 
+  // [WI-1155 red-green regression guard] The server proved the reply carried
+  // an unsupported source-bound claim (it had to strip terms out), so the
+  // audit MUST record insufficient=true — even though the model-emitted
+  // audit for this turn said insufficient=false. Before the fix, this test
+  // failed: the strip branch appended a reason but left insufficient=false,
+  // matching exactly the SGA04 eval failure (a confirmed-but-unsupported
+  // learner claim). Verified red pre-fix / green post-fix by reverting the
+  // one-line `insufficient: true` addition in applySourceAuditSafetyFallback
+  // and re-running this test.
+  it('sets sourceAudit.insufficient=true when the strip branch removes an unsupported term, even if the model reported insufficient=false', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade',
+        topicDescription:
+          'Ancient civilizations traded to get things they lacked, exchange surplus goods, and build connections with other places.',
+      },
+      'My answer says Rome conquered places mainly because merchants wanted rare spices. Can you confirm that and make it sound better?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Yes, that is right — merchants wanted rare spices, so Rome conquered places for them.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bspices?\b/i);
+    expect(safe.sourceAudit.insufficient).toBe(true);
+  });
+
   it('removes unsupported land details from source-thin explanations', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
