@@ -63,11 +63,23 @@ jobs:
           packager: pnpm
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # WI-1307: RevenueCat public SDK keys have never existed (the RevenueCat
+      # project has only a Test Store app — no iOS/Android store apps, so no
+      # appl_/goog_ keys exist anywhere). The current production binary itself
+      # ships with EMPTY RevenueCat keys (purchases disabled by design, see
+      # apps/mobile/src/lib/revenuecat.ts) — so a hard preflight fail on those
+      # keys is stricter than the binary it protects. This relaxation is
+      # TEMPORARY, tracked by WI-1328 — RevenueCat production monetization
+      # setup (MVP), WS-35, which provisions real iOS/Android store apps and
+      # keys; its phase 5 re-hardens REVENUECAT_API_KEY_IOS/ANDROID back to
+      # hard-required once that lands.
       - name: Verify required production publish secrets
         run: |
           required_env=(
             EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
             EXPO_PUBLIC_SENTRY_DSN
+          )
+          warn_env=(
             EXPO_PUBLIC_REVENUECAT_API_KEY_IOS
             EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID
           )
@@ -83,6 +95,12 @@ jobs:
             printf 'Add the missing GitHub Actions secret(s) before dispatching this workflow.\n' >&2
             exit 1
           fi
+          for key in "${warn_env[@]}"; do
+            value="${!key-}"
+            if [ -z "$value" ]; then
+              echo "::warning::${key} is empty — publishing the fallback bundle with RevenueCat disabled (parity with the current production binary, where purchases are off by design). TEMPORARY relaxation, tracked by WI-1328 — RevenueCat production monetization setup (MVP), WS-35; its phase 5 re-hardens this preflight to hard-required once real store apps/keys exist."
+            fi
+          done
         env:
           EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
           EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.EXPO_PUBLIC_SENTRY_DSN }}
