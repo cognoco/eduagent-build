@@ -22,14 +22,7 @@ export type {
 // ---------------------------------------------------------------------------
 
 export type { StripeCustomerCreator } from './billing/types';
-export {
-  getSubscriptionByAccountId,
-  createSubscription,
-  ensureFreeSubscription,
-  getQuotaPool,
-  resetMonthlyQuota,
-  updateQuotaPoolLimit,
-} from './billing/subscription-core';
+export { getQuotaPool } from './billing/subscription-core';
 
 // [WI-784] Identity-v2 twin re-exported here so callers import the v2
 // equivalent (`ensureFreeSubscriptionV2`) alongside its legacy sibling
@@ -49,19 +42,7 @@ export {
 // Trial expiry, quota cron helpers
 // ---------------------------------------------------------------------------
 
-export {
-  expireTrialSubscription,
-  downgradeQuotaPool,
-  downgradeExtendedTrialQuotaIfStillExpired,
-  expireTrialAndDowngradeQuota,
-  resetDailyQuotas,
-  resetExpiredQuotaCycles,
-  findExpiredTrials,
-  findSubscriptionsByTrialDateRange,
-  transitionToExtendedTrial,
-  transitionToExtendedTrialFromRevenuecatEvent,
-  findExpiredTrialsByDaysSinceEnd,
-} from './billing/trial';
+export { resetDailyQuotas } from './billing/trial';
 
 // ---------------------------------------------------------------------------
 // Quota decrement / increment (Phase 4)
@@ -114,8 +95,6 @@ export {
 
 export type { FamilyMember } from './billing/family';
 export {
-  getProfileCountForSubscription,
-  canAddProfile,
   addToByokWaitlist,
   getUsageEventsAvailableSince,
   buildUsageDateLabels,

@@ -12,7 +12,6 @@ import { trialNotificationSend } from './functions/trial-notification-send';
 import { quotaReset } from './functions/quota-reset';
 import { topupExpiryReminder } from './functions/topup-expiry-reminder';
 import { topupExpiryReminderSend } from './functions/topup-expiry-reminder-send';
-import { billingTrialSubscriptionFailed } from './functions/billing-trial-subscription-failed';
 import { billingSubscriptionStoreTeardown } from './functions/billing-subscription-store-teardown';
 import { trialExpiryFailureObserve } from './functions/trial-expiry-failure-observe';
 import { paymentFailedObserve } from './functions/payment-failed-observe';
@@ -136,7 +135,6 @@ export {
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
-  billingTrialSubscriptionFailed,
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,
@@ -228,7 +226,6 @@ export const functions = [
   quotaReset,
   topupExpiryReminder,
   topupExpiryReminderSend,
-  billingTrialSubscriptionFailed,
   billingSubscriptionStoreTeardown,
   trialExpiryFailureObserve,
   paymentFailedObserve,

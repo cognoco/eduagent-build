@@ -4,10 +4,6 @@ import * as sentry from '../../services/sentry';
 
 const mockGetStepDatabase = jest.fn();
 const mockGetStepClerkSecretKey = jest.fn();
-const mockAccountExists = jest.fn();
-const mockIsDeletionCancelled = jest.fn();
-const mockExecuteDeletion = jest.fn();
-const mockGetAccountClerkUserId = jest.fn();
 const mockDeleteClerkUser = jest.fn();
 // Controls the live-flag fallback inside the handler. Pinned to false in the
 // v1 suites (so their assertions on the legacy service functions hold) and to
@@ -61,24 +57,6 @@ jest.mock(
         mockGetOrganizationOwnerEmailV2(...args),
       getSubscriptionStoreTeardownTargetsV2: (...args: unknown[]) =>
         mockGetSubscriptionStoreTeardownTargetsV2(...args),
-    };
-  },
-);
-
-jest.mock(
-  '../../services/deletion' /* gc1-allow: prevents destructive account deletion in unit tests */,
-  () => {
-    const actual = jest.requireActual(
-      '../../services/deletion',
-    ) as typeof import('../../services/deletion');
-    return {
-      ...actual,
-      accountExists: (...args: unknown[]) => mockAccountExists(...args),
-      isDeletionCancelled: (...args: unknown[]) =>
-        mockIsDeletionCancelled(...args),
-      executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
-      getAccountClerkUserId: (...args: unknown[]) =>
-        mockGetAccountClerkUserId(...args),
     };
   },
 );
@@ -609,13 +587,6 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
     mockIsIdentityV2EnabledInStep.mockReturnValue(true);
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGetStepClerkSecretKey.mockReturnValue('sk_test_step');
-    // v1 doubles must never be reached on the v2 path; give them values that
-    // would pass so an accidental v1 call is caught by the explicit
-    // not-toHaveBeenCalled assertions rather than by an incidental throw.
-    mockAccountExists.mockResolvedValue(true);
-    mockIsDeletionCancelled.mockResolvedValue(false);
-    mockExecuteDeletion.mockResolvedValue('deleted');
-    mockGetAccountClerkUserId.mockResolvedValue('clerk_v1_should_not_be_used');
     // v2 doubles — happy path.
     mockOrganizationExistsV2.mockResolvedValue(true);
     mockIsDeletionCancelledV2.mockResolvedValue(false);
@@ -704,10 +675,6 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       userId: 'clerk_org_owner',
       clerkSecretKey: 'sk_test_step',
     });
-    // No legacy step touched.
-    expect(mockAccountExists).not.toHaveBeenCalled();
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
-    expect(mockGetAccountClerkUserId).not.toHaveBeenCalled();
   });
 
   it('calls getStepDatabase once per v2 DB step (6 total)', async () => {
@@ -743,8 +710,6 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       reason: 'user_initiated',
       deletedBy: null,
     });
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
-    expect(mockAccountExists).not.toHaveBeenCalled();
   });
 
   // [BREAK WI-1255] Prod dropped the legacy tables (accounts/profiles/
@@ -773,11 +738,6 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       reason: 'user_initiated',
       deletedBy: null,
     });
-    // The dropped-table legacy store must never be queried.
-    expect(mockAccountExists).not.toHaveBeenCalled();
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
-    expect(mockGetAccountClerkUserId).not.toHaveBeenCalled();
-    expect(mockIsDeletionCancelled).not.toHaveBeenCalled();
   });
 
   it('[BREAK WI-1255] pinned v1 whose v2 org is already gone completes as already_deleted, no error', async () => {
@@ -796,8 +756,6 @@ describe('[CUT-B2] v2 dispatch + schedule-time mode pinning', () => {
       status: 'already_deleted',
       accountId: 'acc-gone',
     });
-    expect(mockAccountExists).not.toHaveBeenCalled();
-    expect(mockExecuteDeletion).not.toHaveBeenCalled();
     expect(mockExecuteDeletionV2).not.toHaveBeenCalled();
   });
 });

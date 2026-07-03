@@ -19,7 +19,10 @@
  * any of the four target files will fail CI before it lands.
  *
  * Sites guarded (wrapped by WI-1060):
- *   - executeDeletion           apps/api/src/services/deletion.ts
+ *   - executeDeletionV2         apps/api/src/services/identity-v2/deletion-v2.ts
+ *                               (legacy deletion.ts whole-removed in WI-1364;
+ *                               the multi-write deletion invariant now lives in
+ *                               the executeDeletionV2 family of the v2 twin)
  *   - initiateLink              apps/api/src/services/linking-ceremony.ts
  *   - acceptLink                apps/api/src/services/linking-ceremony.ts
  *   - undoCloneFromChild        apps/api/src/services/family-bridge.ts
@@ -35,7 +38,7 @@ import * as ts from 'typescript';
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..', '..');
 
 const TARGET_FILES = [
-  'apps/api/src/services/deletion.ts',
+  'apps/api/src/services/identity-v2/deletion-v2.ts',
   'apps/api/src/services/linking-ceremony.ts',
   'apps/api/src/services/family-bridge.ts',
   'apps/api/src/services/session/session-exchange.ts',

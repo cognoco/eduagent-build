@@ -5,6 +5,171 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1364 — dead legacy identity/billing prod readers (2026-07-03)
+
+Dead-code sweep of the production service functions that still read/wrote the
+legacy `accounts` / `profiles` / `family_links` / `consent_states` /
+`subscriptions` tables. Every removed function was confirmed to have **zero live
+non-test callers** (routes and Inngest functions all dispatch to their v2 twins);
+the removals unblock WI-1139 (legacy schema-def removal). Verified per function
+via method-aware `git grep -nw` + route/Inngest dispatch tracing + alias-import
+sweep; `tsc -p tsconfig.app.json` clean afterward (the pre-existing
+`@eduagent/schemas`/language typecheck errors are a worktree build-order artifact,
+unrelated). **No test files were retired here** — the tests for these functions
+were already retired upstream in WI-1128 / WI-1347 (a clean `tsconfig.spec.json`
+typecheck confirms no surviving test statically references a removed function).
+
+**Recovery:** annotated tag `retired/wi-1364-dead-legacy-readers` points at the
+pre-sweep commit. Retrieve any removed file/function with:
+
+```
+git show retired/wi-1364-dead-legacy-readers:<path>
+```
+
+### Whole files deleted
+
+| File | Reachability evidence |
+|------|-----------------------|
+| `apps/api/src/services/deletion.ts` | All 11 exports (`scheduleDeletion`, `cancelDeletion`, `executeDeletion`, `deleteProfile`, `deleteProfileIfConsentWithdrawn`, …) prod-calls=0; no module importer, no method-style caller. Live path is `identity-v2/deletion-v2.ts` (`scheduleDeletionV2`/`executeDeletionV2`, wired in `routes/account.ts` + `inngest/functions/account-deletion.ts`). |
+| `apps/api/src/services/deletion.test.ts` | Tests only the above dead module. |
+
+### Gutted files (dead functions removed; live surface kept)
+
+| File | Removed (dead) | Kept (live) |
+|------|----------------|-------------|
+| `services/account.ts` | `findOrCreateAccount` (+ private `findLegacyAccountByClerkId`, `hashEmail`); **completeness follow-up (2026-07-03): `updateAccountEmailFromClerk`** (+ private `mapAccountRow`, `normalizeEmail`) — dead pre-sweep (0 non-test callers; v2 twin `updateLoginEmailFromClerk` in `identity-v2/account-v2.ts`); its removal drops the last `accounts` legacy-def import from the file | `notifyAccountSecurityEvent`, `findAccountByClerkId` (now v2 via `resolveIdentityV2`) |
+| `services/profile.ts` | `listProfiles`, `countProfiles`, `assertProfileCreationAllowed`, `findOwnerProfile`, `createProfile`, `createProfileWithLimitCheck`, `getProfile`, `updateProfile`, `switchProfile`, `getProfileAge`, `loadProfileRowById`, `getProfileDisplayName`, `getProfileAgeBracket`, `resolveProfileRole` (+ private `mapProfileRow`, `loadProfileFamilyMeta`) | `updateProfileAppContext` (v2: person+membership), `ProfileValidationError`, `ProfileLimitError` classes |
+| `services/consent.ts` | `createPendingConsentState`, `createGrantedConsentState`, `requestConsent`, `resendConsent`, `processConsentResponse`, `refreshConsentToken`, `refreshConsentTokenForRequest`, `getConsentStatus`, `isConsentRevocationGenerationCurrent`, `isGdprProcessingAllowed`, `getChildNameByToken`, `getProfileDisplayName`, `getProfileForConsentRevocation`, `getFamilyOwnerProfileId`, `getProfileConsentState`, `getChildConsentForParent`, `revokeConsent`, `restoreConsent` (+ `ConsentState` interface, `mapConsentRow`); **completeness follow-up (2026-07-03): `isGdprProcessingAllowedBatch`** (became dead in this sweep — its only prod caller `listEligibleSelfReportProfileIds` was removed) **+ `getLatestGdprConsentByProfile`** (transitively dead — its only caller was `isGdprProcessingAllowedBatch`); removing both drops the last `consentStates` legacy-def import from the file | `checkConsentRequiredFromDate`, `checkConsentRequired`, `RESTORE_CONSENT_GRACE_PERIOD_MS`, error classes, `age-utils` re-exports. Routes use v2 twins (`requestConsentV2` …). |
+| `services/billing/subscription-core.ts` | `getSubscriptionByAccountId`, `createSubscription`, `ensureFreeSubscription`, `resetMonthlyQuota`, `updateQuotaPoolLimit` | `getQuotaPool` (live: `inngest/session-completed.ts`) |
+| `services/billing/quota-reconcile.ts` | `reconcileQuotaStateForSubscription` (only caller was dead `ensureFreeSubscription`) | `reconcileQuotaStateForEffectiveTier` (live: `billing-v2/quota-reconcile-v2.ts`) |
+| `services/billing/family.ts` | `getProfileCountForSubscription`, `canAddProfile` | `addToByokWaitlist`, `getUsageEventsAvailableSince`, `buildUsageDateLabels` (live: `routes/billing.ts`) |
+| `services/billing/trial.ts` | `expireTrialSubscription`, `downgradeQuotaPool`, `resetExpiredQuotaCycles`, `findExpiredTrials`, `findSubscriptionsByTrialDateRange`, `transitionToExtendedTrial`, `downgradeExtendedTrialQuotaIfStillExpired`, `transitionToExtendedTrialFromRevenuecatEvent`, `expireTrialAndDowngradeQuota`, `findExpiredTrialsByDaysSinceEnd` | `resetDailyQuotas` (live: `inngest/quota-reset.ts`; v2 twins in `trial-v2.ts` power `trial-expiry.ts`) |
+| `services/child-cap-notifications.ts` | `listActiveChildCapNotifications`, `recordChildCapNotificationForSubscription`, `recordChildCapNotificationForAccount` (+ private `mapNotificationRow`, `findOwnerProfileIdBySubscription`, `childBelongsToSubscriptionAccount`, `findOwnerProfileIdByAccount`, `insertChildCapNotification`) | `dismissChildCapNotification` (live) |
+| `services/onboarding/index.ts` | `updateConversationLanguage`, `updatePronouns` (routes use v2 twins) | `sanitizeInterestLabel`, `assertPronounsSelfEditAllowed`, `updateInterestsContext` |
+| `services/solo-progress-reports.ts` | `listEligibleSelfReportProfileIds`, `listEligibleSelfReportProfileIdsAtLocalHour9` | `isLocalHour9ForTimezone` (live: `identity-v2/solo-progress-reports-v2.ts`) |
+| `services/billing.ts` + `services/billing/index.ts` | Barrel re-exports of every removed billing/trial/family/subscription-core function | Re-exports of the kept functions above |
+
+### NOT swept (out of scope, surfaced for follow-up)
+
+- `services/export.ts` `generateExport` — **live** (unconditionally called by
+  `identity-v2/export-v2.ts` with `learningOnlyProfileIds`). Untouched.
+
+### Residual legacy-def readers — CLEARED (completeness follow-up, 2026-07-03)
+
+The initial sweep kept three functions that were in fact dead; the completeness
+follow-up removed them (see the `account.ts` / `consent.ts` rows above). After it,
+**`services/account.ts` and `services/consent.ts` import zero legacy table defs**
+— `accounts` and `consentStates` are no longer imported by either file. WI-1139's
+"no code imports legacy defs" precondition is now **met for `accounts` +
+`consent_states`** from this surface. The three removed functions were all dead
+code (0 live callers), not live paths — this was a small dead-removal, not a
+behavior-changing port.
+
+(`findAccountByClerkId` was never a legacy reader — it resolves via
+`resolveIdentityV2`. The bucket-(c) `tableExists`-gated v2 dual-write files —
+`identity-graph.ts`, `subscription-core-v2.ts`, `child-profile-v2.ts` — remain
+WI-1398's scope, untouched here.)
+
+### Test-block retirements (completeness follow-up, 2026-07-03)
+
+The initial sweep removed ~40 prod functions but left co-located unit tests that
+still imported/exercised them, leaving the branch red in both CI jobs. The
+follow-up retired those orphaned test blocks (keeping every block that covers a
+KEPT function). 13 test files, all validated green in the worktree
+(`tsc --build tsconfig.spec.json` clean; targeted jest 477 passing):
+
+- **Rebuilt to keep only live-fn blocks:** `services/account.test.ts`
+  (`findAccountByClerkId`), `services/consent.test.ts`
+  (`calculateAge`/`checkConsentRequired*`), `services/profile.test.ts`
+  (`updateProfileAppContext` ×2), `services/solo-progress-reports.test.ts`
+  (`isLocalHour9ForTimezone`).
+- **Surgical retirement of removed-fn blocks/imports:** `services/billing.test.ts`
+  (removed subscription-core/family/trial blocks; kept `getQuotaPool`,
+  `decrementQuota`, top-up), `routes/profiles.test.ts` + `routes/sessions.test.ts`
+  (dropped legacy `listProfiles`/`assertProfileCreationAllowed`/`getProfileAgeBracket`
+  imports + obsolete legacy-not-called guards), `inngest/quota-reset.test.ts` +
+  `services/session/session-crud.test.ts` (removed legacy `resetExpiredQuotaCycles` /
+  `getProfileAge` spies; v2 spies retained).
+- **Deletion behavioral repoint (source is v2-collapsed on `identity-v2/deletion-v2`):**
+  `routes/account.test.ts` repointed the [Issue 901] privilege-escalation guards to
+  the v2 twins (`scheduleDeletionV2`/`cancelDeletionV2`/`getDeletionStatusV2`) and
+  dropped the deleted-`services/deletion` mock + inert `findOwnerProfile` setups;
+  `inngest/archive-cleanup.test.ts` + `inngest/account-deletion.test.ts` dropped
+  their mocks of the deleted `services/deletion` module (the legacy "not-called"
+  guards were vacuous post-collapse; live v2 assertions retained).
+
+Recovery for all of the above is the existing pre-sweep tag
+`retired/wi-1364-dead-legacy-readers` plus this commit's parent.
+
+### Guard-ratchet gap closure (completeness follow-up, 2026-07-04)
+
+Two tree-scanning guard tests went red in CI (they scan source, not import the
+changed files, so file-targeted jest never selected them). Both are direct
+consequences of the sweep:
+
+- **`inngest/functions/billing-trial-subscription-failed.ts` (+ its co-located
+  test + registration in `inngest/index.ts`) REMOVED.** This handler observed the
+  `app/billing.trial_subscription_failed` event, whose **sole** dispatcher was the
+  removed `findOrCreateAccount` (it created the trial subscription *separately,
+  after* the account, in a try/catch that let account creation succeed even when
+  the trial insert failed — the silent-recovery path the event escalated per
+  BUG-837). The v2 account-provisioning path (`identity-v2/identity-graph.ts`
+  `createIdentityGraph`, step 8) creates the trial subscription **inline and
+  atomically inside the graph transaction** — a failed insert throws and rolls the
+  whole account creation back (fail-loud), so there is no silent-recovery state to
+  escalate and no v2 equivalent event. The handler was a true inverse-orphan
+  (registered, zero production dispatchers). `orphan-handler.guard.test.ts` flagged
+  it; removal (not a `KNOWN_PENDING_INVERSE_ORPHANS` park) is the fix. No
+  dispatcher-orphan created (0 dispatchers).
+- **`multi-write-tx.guard.test.ts` target repointed** `services/deletion.ts` →
+  `services/identity-v2/deletion-v2.ts`. The WI-1060 multi-write-transaction
+  invariant that `executeDeletion` carried now lives in the `executeDeletionV2`
+  family of the live v2 twin (all writes wrapped in `db.transaction`); the guard
+  follows the invariant to the live code rather than dropping coverage.
+
+Recovery: same pre-sweep tag `retired/wi-1364-dead-legacy-readers` plus this
+commit's parent.
+
+### Integration-test orphans (completeness follow-up, 2026-07-04)
+
+A third failure class the in-worktree jest cannot see: co-located
+`*.integration.test.ts` files (they need a DB and only run in CI's integration
+jobs). Because the integration transform is `ts-jest` with `isolatedModules:
+true` (transpile-only, no cross-module type-check), a removed named import
+becomes `undefined` at runtime — so the only failure mode is a **live (non-skip)
+test that calls a removed fn** → runtime `TypeError: X is not a function`.
+
+- **`services/billing/subscription-core.integration.test.ts`** — retired the
+  `resetMonthlyQuota` describe block + dropped its import (kept `getQuotaPool`).
+  WI-1128 kept its "returns null when quota pool does not exist" test (the fixture
+  didn't seed through the dead `createSubscription` path), but the subject fn
+  `resetMonthlyQuota` was itself removed from `subscription-core.ts`, so the kept
+  test's call is now a runtime TypeError. Retired under the preservation gate.
+  Validated on a recreated WI-1347-style scratch Postgres (local pg17 + pgvector,
+  full `drizzle-kit migrate` chain, 89 tables): **17/17 tests pass**.
+
+Triage of the full removed-fn-name grep set (6 `*.integration.test.ts` files) —
+only the above is a genuine break; the other 5 are false positives, left
+untouched:
+- `tests/integration/parent-dashboard.integration.test.ts` &
+  `tests/integration/profile-isolation.integration.test.ts` — `createProfile` is a
+  **local `async function`** in each file, not the removed source export.
+- `services/billing/quota-reconcile.integration.test.ts` — imports the v2 twin
+  `reconcileQuotaStateForSubscriptionV2`; the removed name appears only in a
+  describe **title** + comments.
+- `services/identity-v2/consent-v2.integration.test.ts` — the single hit is a
+  **comment**.
+- `tests/integration/billing-service.integration.test.ts` — imports removed
+  `createSubscription`/`ensureFreeSubscription`, but every call sits inside
+  `it.skip` blocks (`SKIP_LEGACY_STORE_TESTS`, documented as deferred to
+  **WI-1139**); transpile-only + skipped ⇒ never executed ⇒ no runtime failure.
+  Left as WI-1139's tracked scope.
+
+Recovery: same pre-sweep tag `retired/wi-1364-dead-legacy-readers` plus this
+commit's parent.
+
+---
+
 ## WI-1128 — legacy identity integration suites (2026-07-03)
 
 The identity-v2 cutover's migration **0130 (`0130_m_drop_legacy.sql`)** physically

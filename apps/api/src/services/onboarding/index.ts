@@ -16,16 +16,11 @@
 
 import { eq, and, sql } from 'drizzle-orm';
 import {
-  profiles,
   learningProfiles,
   membership,
   type Database,
 } from '@eduagent/database';
-import type {
-  ConversationLanguage,
-  InterestEntry,
-  Pronouns,
-} from '@eduagent/schemas';
+import type { InterestEntry } from '@eduagent/schemas';
 import {
   ForbiddenError,
   ConflictError,
@@ -87,60 +82,6 @@ export function assertPronounsSelfEditAllowed(
     throw new ForbiddenError(
       'Pronouns cannot be self-set for profiles under the minimum age.',
     );
-  }
-}
-
-/**
- * Update a profile's tutor-language preference.
- *
- * The value is already validated against `conversationLanguageSchema` at the
- * route boundary; the DB CHECK constraint provides a second line of defense.
- *
- * The write also includes accountId in the WHERE clause so a forged
- * profileId from a rooted client (which bypassed the profile-scope guard)
- * cannot cross-account update.
- */
-export async function updateConversationLanguage(
-  db: Database,
-  profileId: string,
-  accountId: string,
-  conversationLanguage: ConversationLanguage,
-): Promise<void> {
-  const result = await db
-    .update(profiles)
-    .set({
-      conversationLanguage,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
-    .returning({ id: profiles.id });
-
-  if (result.length === 0) {
-    throw new OnboardingNotFoundError(profileId);
-  }
-}
-
-/**
- * Update a profile's pronouns. Pass `null` to clear the field. The 32-char
- * max is already enforced at the Zod boundary.
- */
-export async function updatePronouns(
-  db: Database,
-  profileId: string,
-  accountId: string,
-  pronouns: Pronouns | null,
-): Promise<void> {
-  const result = await db
-    .update(profiles)
-    .set({
-      pronouns,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(profiles.id, profileId), eq(profiles.accountId, accountId)))
-    .returning({ id: profiles.id });
-
-  if (result.length === 0) {
-    throw new OnboardingNotFoundError(profileId);
   }
 }
 

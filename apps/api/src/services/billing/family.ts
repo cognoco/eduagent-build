@@ -25,77 +25,14 @@
 //     check keeps compiling without touching the out-of-scope route file.
 // ---------------------------------------------------------------------------
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import {
-  byokWaitlist,
-  profiles,
-  type Database,
-  findSubscriptionById__unscoped,
-} from '@eduagent/database';
-import { getTierConfig } from '../subscription';
-import { getEffectiveAccessForSubscription } from './access';
+import { byokWaitlist, type Database } from '@eduagent/database';
+
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
 
 const logger = createLogger();
 
 export type { FamilyMember } from '@eduagent/schemas';
-
-// ---------------------------------------------------------------------------
-// getProfileCountForSubscription
-// ---------------------------------------------------------------------------
-
-/**
- * Counts profiles under the account that owns a subscription.
- */
-export async function getProfileCountForSubscription(
-  db: Database,
-  subscriptionId: string,
-): Promise<number> {
-  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
-
-  if (!sub) {
-    return 0;
-  }
-
-  const result = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(profiles)
-    .where(
-      and(eq(profiles.accountId, sub.accountId), isNull(profiles.archivedAt)),
-    );
-
-  return result[0]?.count ?? 0;
-}
-
-// ---------------------------------------------------------------------------
-// canAddProfile
-// ---------------------------------------------------------------------------
-
-/**
- * Checks whether a subscription can accept another profile.
- * Profile limits are defined per-tier in TierConfig.
- */
-export async function canAddProfile(
-  db: Database,
-  subscriptionId: string,
-): Promise<boolean> {
-  const sub = await findSubscriptionById__unscoped(db, subscriptionId);
-
-  if (!sub) {
-    return false;
-  }
-
-  const access = await getEffectiveAccessForSubscription(db, subscriptionId);
-  const tierConfig = getTierConfig(access?.effectiveAccessTier ?? sub.tier);
-  const current = await getProfileCountForSubscription(db, subscriptionId);
-
-  return current < tierConfig.maxProfiles;
-}
-
-// ---------------------------------------------------------------------------
-// addToByokWaitlist
-// ---------------------------------------------------------------------------
 
 /**
  * Adds an email to the BYOK (Bring Your Own Key) waitlist.

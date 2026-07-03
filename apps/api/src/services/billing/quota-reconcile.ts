@@ -2,12 +2,11 @@ import { eq, sql } from 'drizzle-orm';
 import {
   profileQuotaUsage,
   quotaPools,
-  subscriptions,
   type Database,
 } from '@eduagent/database';
 import type { SubscriptionTier } from '@eduagent/schemas';
 
-import { getTierConfig, resolveEffectiveAccessTier } from '../subscription';
+import { getTierConfig } from '../subscription';
 
 // [WI-1239 / 779-strip] The per-profile branch of
 // reconcileQuotaStateForEffectiveTier (legacy profiles×subscriptions join)
@@ -32,37 +31,6 @@ function nextMonthlyReset(now: Date): Date {
 type ReconcileQuotaOptions = {
   resetExpiredSharedPoolUsage?: boolean;
 };
-
-export async function reconcileQuotaStateForSubscription(
-  db: Database,
-  subscriptionId: string,
-  now = new Date(),
-  options?: ReconcileQuotaOptions,
-): Promise<SubscriptionTier | null> {
-  const subscription = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
-  if (!subscription) return null;
-
-  const { effectiveAccessTier } = resolveEffectiveAccessTier(
-    {
-      tier: subscription.tier,
-      status: subscription.status,
-      trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
-      currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
-    },
-    now,
-  );
-
-  await reconcileQuotaStateForEffectiveTier(
-    db,
-    subscriptionId,
-    effectiveAccessTier,
-    now,
-    options,
-  );
-  return effectiveAccessTier;
-}
 
 /**
  * Reconciles shared-pool quota state for a subscription's effective tier.

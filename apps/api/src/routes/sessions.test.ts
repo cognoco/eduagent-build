@@ -85,7 +85,6 @@ jest.mock('../services/profile', () => {
       location: null,
       consentStatus: 'CONSENTED',
     }),
-    getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
     findOwnerProfile: jest.fn().mockResolvedValue({
       id: 'test-profile-id',
       birthYear: null,
@@ -661,7 +660,6 @@ import {
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { NotFoundError, MAX_HOMEWORK_PROBLEMS } from '@eduagent/schemas';
-import { getProfileAgeBracket } from '../services/profile';
 import { getPersonAgeBracket } from '../services/identity-v2/helpers';
 import { FILING_CONFIG } from '../config/filing';
 
@@ -1067,7 +1065,6 @@ describe('session routes', () => {
     // accumulate calls across tests; clear their call history per test so the
     // flag-OFF / flag-ON "not.toHaveBeenCalled()" assertions are order-independent.
     beforeEach(() => {
-      (getProfileAgeBracket as jest.Mock).mockClear();
       (getPersonAgeBracket as jest.Mock).mockClear();
     });
 
@@ -1122,7 +1119,6 @@ describe('session routes', () => {
         expect.anything(),
         'test-profile-id',
       );
-      expect(getProfileAgeBracket).not.toHaveBeenCalled();
     });
   });
 
