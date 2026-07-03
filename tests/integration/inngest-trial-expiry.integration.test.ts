@@ -316,7 +316,10 @@ beforeEach(async () => {
     EXTENDED_USER_ID,
     WARNING_USER_ID,
   ]);
-  if (orphanCandidateOrgIds.length > 0) {
+  if (
+    orphanCandidateOrgIds.length > 0 &&
+    (await legacyIdentityTableExistsForTest(db, 'subscriptions'))
+  ) {
     await db
       .delete(subscriptions)
       .where(

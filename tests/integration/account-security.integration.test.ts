@@ -27,6 +27,7 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 
@@ -69,10 +70,12 @@ async function createOwnerProfile(): Promise<string> {
     columns: { personId: true },
   });
   if (!membershipRow) {
-    const row = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
-      columns: { accountId: true },
-    });
+    const row = (await legacyIdentityTableExistsForTest(db, 'profiles'))
+      ? await db.query.profiles.findFirst({
+          where: eq(profiles.id, profileId),
+          columns: { accountId: true },
+        })
+      : undefined;
     if (!row) {
       throw new Error(
         `Profile not found in v2 (membership) or legacy (profiles) after create: ${profileId}`,

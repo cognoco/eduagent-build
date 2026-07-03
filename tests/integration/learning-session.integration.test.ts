@@ -35,6 +35,7 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
@@ -109,6 +110,8 @@ async function loadAccount(): Promise<{ id: string } | undefined> {
     if (membershipRow) return { id: membershipRow.organizationId };
   }
 
+  if (!(await legacyIdentityTableExistsForTest(db, 'accounts')))
+    return undefined;
   return db.query.accounts.findFirst({
     where: eq(accounts.clerkUserId, AUTH_USER_ID),
     columns: { id: true },
@@ -249,10 +252,15 @@ async function loadSubscriptionAndQuota(profileId: string) {
   // [WI-1145] Resolve the subscription v2-first — the owner bootstrap writes
   // subscription-v2 unconditionally post-WI-867 collapse (legacy `subscriptions`
   // empty on the flag-off main lane). Only `.id` is consumed downstream.
-  const legacySub = await db.query.subscriptions.findFirst({
-    where: eq(subscriptions.accountId, account!.id),
-    columns: { id: true },
-  });
+  const legacySub = (await legacyIdentityTableExistsForTest(
+    db,
+    'subscriptions',
+  ))
+    ? await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.accountId, account!.id),
+        columns: { id: true },
+      })
+    : null;
   const [v2Sub] = legacySub
     ? []
     : await db

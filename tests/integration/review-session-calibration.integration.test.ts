@@ -17,6 +17,7 @@
 import { eq, and } from 'drizzle-orm';
 import {
   profiles,
+  person,
   subjects,
   curricula,
   curriculumBooks,
@@ -30,6 +31,7 @@ import {
   cleanupAccounts,
   createIntegrationDb,
 } from './helpers';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
@@ -474,12 +476,19 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const { subjectId, topicId } = await seedSubjectWithTopic(profileId);
     await seedRetentionCard(profileId, topicId);
 
-    // Set conversation language to Norwegian
+    // Set conversation language to Norwegian — both stores (v2 person is the
+    // live read post-collapse; legacy profiles gated for the flag-off lane).
     const db = createIntegrationDb();
+    if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+      await db
+        .update(profiles)
+        .set({ conversationLanguage: 'nb' })
+        .where(eq(profiles.id, profileId));
+    }
     await db
-      .update(profiles)
+      .update(person)
       .set({ conversationLanguage: 'nb' })
-      .where(eq(profiles.id, profileId));
+      .where(eq(person.id, profileId));
 
     const sessionId = await startReviewSession(profileId, subjectId, topicId);
 

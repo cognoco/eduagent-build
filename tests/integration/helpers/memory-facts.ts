@@ -14,6 +14,7 @@ import {
 } from '@eduagent/database';
 
 import { buildBackfillRowsForProfile } from '../../../apps/api/src/services/memory/backfill-mapping';
+import { legacyIdentityTableExistsForTest } from '../../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const seededAccountIds = new Set<string>();
 
@@ -40,7 +41,9 @@ export async function setupTestDb(): Promise<{
         }
         await db.delete(organization).where(eq(organization.id, accountId));
         // Also clean up the dual-write legacy rows (accounts + profiles cascade).
-        await db.delete(accounts).where(eq(accounts.id, accountId));
+        if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+          await db.delete(accounts).where(eq(accounts.id, accountId));
+        }
         seededAccountIds.delete(accountId);
       }
     },
@@ -87,18 +90,22 @@ export async function seedLearningProfile(
     organizationId: accountId,
     roles: ['learner'],
   });
-  await db.insert(accounts).values({
-    id: accountId,
-    clerkUserId: `integration-memory-${accountId}`,
-    email: `memory-${accountId}@integration.test`,
-  });
-  await db.insert(profiles).values({
-    id: profileId,
-    accountId,
-    displayName: 'Memory Fixture',
-    birthYear: 2012,
-    isOwner: false,
-  });
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.insert(accounts).values({
+      id: accountId,
+      clerkUserId: `integration-memory-${accountId}`,
+      email: `memory-${accountId}@integration.test`,
+    });
+  }
+  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+    await db.insert(profiles).values({
+      id: profileId,
+      accountId,
+      displayName: 'Memory Fixture',
+      birthYear: 2012,
+      isOwner: false,
+    });
+  }
   seededAccountIds.add(accountId);
 
   await db.insert(learningProfiles).values({
@@ -135,7 +142,9 @@ export async function cleanupSeededAccount(
     await db.delete(person).where(eq(person.id, row.personId));
   }
   await db.delete(organization).where(eq(organization.id, accountId));
-  await db.delete(accounts).where(eq(accounts.id, accountId));
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.delete(accounts).where(eq(accounts.id, accountId));
+  }
 }
 
 export async function runBackfillForOneProfile(

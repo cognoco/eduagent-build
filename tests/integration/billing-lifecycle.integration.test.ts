@@ -266,7 +266,10 @@ async function loadAccount() {
 
 async function loadSubscription(accountId: string) {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
+  if (
+    isIdentityV2Enabled() ||
+    !(await legacyIdentityTableExistsForTest(db, 'subscriptions'))
+  ) {
     const row = await db.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, accountId),
     });
@@ -456,9 +459,14 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Checkout = await checkoutDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCheckout = await checkoutDb.query.subscriptions.findFirst({
-      where: eq(subscriptions.accountId, account.id),
-    });
+    const legacyCheckout = (await legacyIdentityTableExistsForTest(
+      checkoutDb,
+      'subscriptions',
+    ))
+      ? await checkoutDb.query.subscriptions.findFirst({
+          where: eq(subscriptions.accountId, account.id),
+        })
+      : undefined;
     expect(
       v2Checkout?.stripeCustomerId === 'cus_checkout' ||
         legacyCheckout?.stripeCustomerId === 'cus_checkout',
@@ -506,9 +514,14 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Cancel = await cancelDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCancel = await cancelDb.query.subscriptions.findFirst({
-      where: eq(subscriptions.accountId, account.id),
-    });
+    const legacyCancel = (await legacyIdentityTableExistsForTest(
+      cancelDb,
+      'subscriptions',
+    ))
+      ? await cancelDb.query.subscriptions.findFirst({
+          where: eq(subscriptions.accountId, account.id),
+        })
+      : undefined;
     expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
       true,
     );

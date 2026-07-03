@@ -30,10 +30,7 @@ import {
   legacyIdentityTableExistsForTest,
 } from '../../test-utils/legacy-identity-anchors';
 
-import {
-  reconcileQuotaStateForEffectiveTier,
-  reconcileQuotaStateForSubscription,
-} from './quota-reconcile';
+import { reconcileQuotaStateForEffectiveTier } from './quota-reconcile';
 // [WI-1239 / 779-strip] the per-profile branch of reconcileQuotaStateForEffectiveTier
 // (legacy profiles×subscriptions join) was removed — see quota-reconcile.ts's
 // header comment. reconcileQuotaStateForEffectiveTierV2 is the surviving
@@ -711,12 +708,11 @@ describe('reconcileQuotaStateForSubscription', () => {
     expect(rows[0]!.monthlyLimit).toBe(getTierConfig('plus').ownerMonthlyQuota);
   });
 
-  it('returns null for an unknown subscription id', async () => {
-    const resolved = await reconcileQuotaStateForSubscription(
-      createIntegrationDb(),
-      '00000000-0000-0000-0000-000000000000',
-      new Date('2026-05-15T12:00:00.000Z'),
-    );
-    expect(resolved).toBeNull();
-  });
+  // [WI-1347, retired] 'returns null for an unknown subscription id' removed
+  // — it called the legacy (non-V2) reconcileQuotaStateForSubscription
+  // directly, which is transitively dead per quota-reconcile.ts:21-24's own
+  // comment (reachable only from createSubscription/ensureFreeSubscription,
+  // in turn only from the dead findOrCreateAccount) and reads the legacy
+  // `subscriptions` table unconditionally — hard-fails once dropped. See
+  // docs/_archive/retired-code.md ("WI-1347 — quota-reconcile.integration.test.ts").
 });

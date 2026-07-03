@@ -1063,8 +1063,10 @@ legacyAccountDeletionCascadeDescribe(
         // referenced the deleted profile, but the account row and its own
         // profile must survive.)
         // -----------------------------------------------------------------------
-        const otherStillThere = await db.query.profiles.findFirst({
-          where: eq(profiles.id, otherProfileId),
+        // [WI-1347] v2 person is the drop-safe equivalent of the legacy
+        // profiles row this originally asserted on.
+        const otherStillThere = await db.query.person.findFirst({
+          where: eq(person.id, otherProfileId),
         });
         expect(otherStillThere).not.toBeUndefined();
       } finally {

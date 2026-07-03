@@ -66,6 +66,7 @@ import {
 import {
   deleteV2IdentitiesForTest,
   ensureLegacyProfileAnchorForTest,
+  legacyIdentityTableExistsForTest,
 } from '../../test-utils/legacy-identity-anchors';
 import {
   _resetCircuits,
@@ -476,9 +477,11 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
       });
     }
     // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+    if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+      await db
+        .delete(accounts)
+        .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+    }
     // Unregister only our providers — leave the shared registry intact for
     // other suites in this worker.
     llm.dispose();

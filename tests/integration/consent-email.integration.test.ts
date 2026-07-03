@@ -27,6 +27,7 @@ import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { getFetchCalls, clearFetchCalls } from './fetch-interceptor';
 
 import { app } from '../../apps/api/src/index';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 // --- Constants ---
 const CONSENT_USER_ID = 'integration-consent-email';
@@ -139,9 +140,11 @@ describe('Integration: Consent email delivery', () => {
 
     // Clean up consent state from previous test so the insert isn't a resend
     const db = createIntegrationDb();
-    await db
-      .delete(consentStates)
-      .where(eq(consentStates.profileId, childProfileId));
+    if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
+      await db
+        .delete(consentStates)
+        .where(eq(consentStates.profileId, childProfileId));
+    }
 
     const res = await app.request(
       '/v1/consent/request',
