@@ -34,7 +34,6 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { generateExport } from './export';
-import { isIdentityV2Enabled } from '../../../../tests/integration/helpers';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -71,17 +70,12 @@ describeIfDb('generateExport learning-only billing skip (integration)', () => {
     await db.delete(organization).where(eq(organization.id, accountId));
   });
 
-  // WI-1128 quarantine: exercises generateExport's non-learningOnly branch, which is dead (its only caller, identity-v2/export-v2.ts:233, always passes learningOnlyProfileIds). Fails post-0130/0129-repoint. Un-skip = WI-1139 dead-sweep.
-  (isIdentityV2Enabled() ? it.skip : it)(
-    'surfaces the legacy subscription on the normal (flag-off) path',
-    async () => {
-      // Sanity: proves the seed is real and the legacy billing read still runs
-      // when opts are omitted — i.e. AC#8 flag-off behavior is byte-identical.
-      const result = await generateExport(db, accountId);
-      expect(result.subscriptions).toHaveLength(1);
-    },
-  );
-
+  // [WI-1128] The former 'surfaces the legacy subscription on the normal
+  // (flag-off) path' test exercised generateExport's non-learningOnly branch,
+  // which is dead — its only caller (identity-v2/export-v2.ts) always passes
+  // learningOnlyProfileIds. That branch fails on the 0129 repoint and is
+  // retired here; preserved at tag retired/wi-1128-subcore-export. The
+  // load-bearing learning-only guarantee below is the coverage that matters.
   it('does NOT read the legacy subscriptions table in learning-only mode', async () => {
     // The v2 twin's call shape. Post-0119-drop this same call must not 500;
     // the guarantee that makes that safe is that it issues no `subscriptions`

@@ -897,13 +897,6 @@
       "when": 1783002605440,
       "tag": "0129_m_repoint",
       "breakpoints": true
-    },
-    {
-      "idx": 130,
-      "version": "7",
-      "when": 1783089005440,
-      "tag": "0130_m_drop_legacy",
-      "breakpoints": true
     }
   ]
 }
