@@ -64,7 +64,10 @@ import { createStripeClient } from '../services/stripe';
 import { resolvePriceId } from '../services/billing-pricing';
 import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
 import { captureException } from '../services/sentry';
@@ -108,6 +111,9 @@ type BillingRouteEnv = {
     profileMeta: ProfileMeta | undefined;
     // [CUT-B1] Set on the v2 pre-graph path (no account yet) by accountMiddleware.
     clerkIdentity: ClerkIdentity | undefined;
+    // [WI-1301] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
   };
 };
 
@@ -124,6 +130,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // cancelAtPeriodEnd, monthlyLimit, dailyLimit — account-level billing
     // information that must not be exposed to children.
     assertOwnerProfile(
+      c,
+      'Only the account owner can view subscription details.',
+    );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
       c,
       'Only the account owner can view subscription details.',
     );
@@ -225,6 +236,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       // [CR-657] requireAccount() throws 401 if account is unset at runtime.
       const account = requireAccount(c.get('account'));
+      // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      // This route previously relied solely on assertNotProxyMode, which is
+      // itself vulnerable to the X-Profile-Id spoof.
+      await assertCallerIsAccountOwner(
+        c,
+        'Only the account owner can start a checkout.',
+      );
 
       // BUG-77: Return 404 (not 500) when Stripe is unconfigured -- these
       // endpoints are dormant for mobile. 404 communicates "feature not
@@ -320,6 +338,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
     assertOwnerProfile(c, 'Only the account owner can cancel a subscription.');
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can cancel a subscription.',
+    );
 
     const subscription = await getSubscriptionByAccountIdV2(db, account.id);
     if (!subscription?.stripeSubscriptionId) {
@@ -395,6 +418,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
       // [CR-2026-05-19-H1] Only the account owner can purchase top-up credits.
       assertOwnerProfile(
+        c,
+        'Only the account owner can purchase top-up credits.',
+      );
+      // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
         c,
         'Only the account owner can purchase top-up credits.',
       );
@@ -678,6 +706,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       c,
       'Only the account owner can access the billing portal.',
     );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can access the billing portal.',
+    );
 
     const subscription = await getSubscriptionByAccountIdV2(db, account.id);
     if (!subscription?.stripeCustomerId) {
@@ -736,6 +769,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     // exact account-level billing-state leak BUG-644 added owner-gating for
     // on /subscription. AGENTS.md billing rules forbid this class of leak.
     assertOwnerProfile(
+      c,
+      'Only the account owner can view subscription status.',
+    );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
       c,
       'Only the account owner can view subscription status.',
     );
@@ -874,6 +912,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       c,
       'Only the family owner can view family subscription details.',
     );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the family owner can view family subscription details.',
+    );
 
     const subscription = await getSubscriptionByAccountIdV2(db, account.id);
     if (!subscription) {
@@ -914,6 +957,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       // arbitrary profiles to the family subscription while only the parent
       // (owner) can remove them -- asymmetric and exploitable.
       assertOwnerProfile(
+        c,
+        'Only the family owner can add a profile to the family subscription.',
+      );
+      // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
         c,
         'Only the family owner can add a profile to the family subscription.',
       );
@@ -961,6 +1009,11 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const account = requireAccount(c.get('account'));
 
       assertOwnerProfile(
+        c,
+        'Only the family owner can remove a profile from the family subscription.',
+      );
+      // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+      await assertCallerIsAccountOwner(
         c,
         'Only the family owner can remove a profile from the family subscription.',
       );
@@ -1019,6 +1072,13 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const db = c.get('db');
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    // This route previously relied solely on assertNotProxyMode, which is
+    // itself vulnerable to the X-Profile-Id spoof.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can join the BYOK waitlist.',
+    );
     // Use the authenticated account's email -- never trust caller-supplied email
     const email = account.email;
 
