@@ -1,4 +1,5 @@
 import {
+  languageComprehensionEvaluationSchema,
   streamDoneFrameSchema,
   streamErrorFrameSchema,
   streamFallbackFrameSchema,
@@ -58,6 +59,54 @@ describe('streamFallbackFrameSchema', () => {
     });
     expect(result.type).toBe('fallback');
     expect(result.reason).toBe('empty_reply');
+  });
+});
+
+describe('languageComprehensionEvaluationSchema', () => {
+  it('parses deterministic language comprehension feedback', () => {
+    const result = languageComprehensionEvaluationSchema.parse({
+      questionId: 'q1',
+      prompt: 'What is on the table?',
+      answerHint: 'agua',
+      learnerAnswer: 'Water is on the table.',
+      verdict: 'understood',
+      matchedTerms: ['water'],
+      missingTerms: [],
+    });
+
+    expect(result.verdict).toBe('understood');
+    expect(result.matchedTerms).toEqual(['water']);
+  });
+
+  it('rejects unknown comprehension verdicts', () => {
+    expect(() =>
+      languageComprehensionEvaluationSchema.parse({
+        questionId: 'q1',
+        prompt: 'What is on the table?',
+        answerHint: 'agua',
+        learnerAnswer: 'Water is on the table.',
+        verdict: 'close',
+        matchedTerms: ['water'],
+        missingTerms: [],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects empty required prompt fields', () => {
+    for (const field of ['questionId', 'prompt', 'answerHint'] as const) {
+      expect(() =>
+        languageComprehensionEvaluationSchema.parse({
+          questionId: 'q1',
+          prompt: 'What is on the table?',
+          answerHint: 'agua',
+          learnerAnswer: 'Water is on the table.',
+          verdict: 'understood',
+          matchedTerms: ['water'],
+          missingTerms: [],
+          [field]: '',
+        }),
+      ).toThrow();
+    }
   });
 });
 
