@@ -30,11 +30,16 @@ work-item state. **One fact, one home** (§1.4).
 
 ## 1. Structure & vocabulary
 
-1.1 **The hierarchy** (top to bottom): **Program** (the umbrella) → **Initiative** (an in-flight
-effort with lifecycle *start → active → graduated / parked / killed*, typically with a
-`working/lanes/<slug>/` workspace) → **Cosmo Workstream(s)** (substrate containers an Initiative
-creates **at activation**, 0..n per Initiative — never assume 1:1) → **Work Package**
-(`Altitude=WP`, PR-sized bundle) → **Work Item / Sub-item**.
+1.1 **The hierarchy** (top to bottom): **Program** (the grouping layer) → **Initiative**
+(`INI-NN`, an in-flight effort with lifecycle *start → active → graduated / parked / killed*,
+typically with a `working/lanes/<slug>/` workspace) → **Cosmo Workstream(s)** (substrate
+containers an Initiative creates **at activation**, 0..n per Initiative — never assume 1:1) →
+**Work Package** (`Altitude=WP`, PR-sized executable brief; child Items optional) → **Work Item /
+Sub-item**.
+
+An Initiative realizes an **Asset**: the persistent deliverable that survives the effort and
+graduates to its productionized home. Use Initiative for the effort, Asset for the deliverable
+(canon: Nexus NEX-ADR-0001, initiative-workspace pattern).
 
 *That hierarchy is the **work** breakdown; the **execution roles** that drive it are the
 **Quartet** — orchestrator / shepherd / executor / reviewer (scaffolds: `roles/`) — coordinating
@@ -59,16 +64,19 @@ pointers / sequence + coarse status / current position / change log), its **Cosm
 its **slice** (plan → Cosmo entries).
 
 2.2 **Slice direct-to-WP.** Multi-item bundles instantiate as `Altitude=WP` with constituent detail
-absorbed into the WP body and pointed at their satellite register — no per-constituent child items.
-Flat by default; **sub-slice on demand** at execution if a WP proves too big. Never create empty
-containers: a single-constituent unit is an `Item`, not a WP.
+absorbed into the WP body and pointed at their satellite register — no per-constituent child items
+unless they add real execution value. Flat by default; **sub-slice on demand** at execution if a WP
+proves too big. A childless WP is canonical when the unit is a PR-sized executable brief whose AC
+lives on the WP itself; do not demote it only because it has no children. A genuinely
+single-constituent atomic unit is still an `Item`.
 
 2.3 **WPs are PR-sized.** PR-sized is an independent gate from "shares a pattern" — a coherent
 bundle that is not PR-sized gets split at plan level, not deferred to execution.
 
-2.4 **Ratified plans should encode per-unit priority** (and any other slice-time field), so slicing
-is pure transcription. A field the plan omits becomes a judgment call at slice time — record the
-derivation rule used.
+2.4 **Ratified plans should encode per-unit priority, Effort, and any other slice-time field**, so
+slicing is pure transcription. `Effort` is the Work Item t-shirt size (`XS` / `S` / `M` / `L` /
+`XL`) and is mandatory before `Ready` under the current ZDX DoR. A field the plan omits becomes a
+judgment call at slice time — record the derivation rule used.
 
 2.5 **Session model — one session per altitude.** A **program session** (orchestrator) steers the
 roster / queue / gates; a **shepherd session** per executing Initiative runs its day-to-day; and
@@ -135,6 +143,12 @@ time routes by class to an existing row; additions change row *contents*, never 
 4.2 The rule is a short decision list maintained with the roster (program-specific). Its last line
 is always: **fits nothing → the unrouted-intake line** — a holding row triaged at the next umbrella
 touch. Intake never blocks capture, and capture never forces a structural decision.
+
+4.3 **Carry your lane onto anything you file.** Work captured from inside an active lane must carry
+the lane's Cosmo Workstream context, plus Sprint when one is in use. If the capture tool supports an
+origin Work Item, inherit from that origin; otherwise set the Workstream/Sprint explicitly. Only file
+without lane context when the work is truly cross-lane or belongs to the program-level unrouted
+intake, and say that in the capture note.
 
 ## 5. Dependencies & sequencing
 

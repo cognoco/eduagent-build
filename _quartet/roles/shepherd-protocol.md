@@ -106,9 +106,16 @@ a check exception (see `roles/executor/builder.md` → scope boundary).
 
 ## Cosmo lifecycle
 Executors claim before they execute · `complete` → Reviewing · **never self-close** · bring a WP
-through the DoR bridge (`refine --to-ready` — author the bundle brief + link absorbed-provenance
-children) before it is claimed. A WP that will not decompose into children gets **demoted to
-Item**, not forced.
+through the DoR bridge (`refine --to-ready` — author the WP brief and link absorbed-provenance
+children only when they add execution value) before it is claimed. A childless WP is canonical when
+the WP carries its own PR-sized Acceptance Criteria; do not demote it solely because it has no
+children.
+
+**Carry your lane onto anything you file.** Any follow-up Work Item, bug, residue, or tooling
+friction captured while shepherding a lane must keep the current Cosmo Workstream context, plus
+Sprint when one is in use. Prefer capture from an origin WI so Project/Workstream/Sprint inherit;
+otherwise set those fields explicitly. If the work is deliberately cross-lane, say so in the
+capture note and route it to the program-level intake.
 
 **Workstream Order spacing.** When you instantiate or (re)order WPs in the workstream, set
 `Workstream Order` in spaced increments (×100: 100, 200, 300…), never 1,2,3 — so a new item slots
