@@ -24,7 +24,7 @@ import {
   xpLedger,
 } from '@eduagent/database';
 import type { ProgressMetrics, TopicProgress } from '@eduagent/schemas';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
   buildChildProgressSummariesBatch,
@@ -193,27 +193,19 @@ async function seedFamilyLink(
   // [WI-586] v2 same-org invariant: a guardian and their charge share one
   // organization. The v2 getChildrenForParent restricts charges to members of
   // the guardian's org (cross-org guardianship edges must not leak into the
-  // dashboard — WI-802 defense-in-depth). seedProfile placed the child in its
-  // own fresh org; co-add the child to the parent's org so the same-org read
-  // surfaces it. Idempotent: skip if the child is already a co-member.
+  // dashboard — WI-802 defense-in-depth). [WI-1303] The same-org membership is
+  // now the caller's responsibility — pass the parent's `orgId` into the
+  // child's `seedProfile()` call (mirroring the only real v2 write path,
+  // createChildProfileV2, which never gives a managed child a separate org).
+  // A second membership row co-adding the child into the parent's org here
+  // would violate the `membership_person_id_unique` DB constraint (one
+  // membership per person). This early-return is a no-op safety net, not a
+  // bridge — it intentionally does not insert.
   const parentMembership = await db.query.membership.findFirst({
     where: eq(membership.personId, parentProfileId),
     columns: { organizationId: true },
   });
   if (!parentMembership) return;
-  const existing = await db.query.membership.findFirst({
-    where: and(
-      eq(membership.personId, childProfileId),
-      eq(membership.organizationId, parentMembership.organizationId),
-    ),
-    columns: { id: true },
-  });
-  if (existing) return;
-  await db.insert(membership).values({
-    personId: childProfileId,
-    organizationId: parentMembership.organizationId,
-    roles: ['learner'],
-  });
 }
 
 async function seedSubject(input: {
@@ -761,13 +753,15 @@ describe('dashboard service integration', () => {
   });
 
   it('returns aggregated children with real progress, snapshots, streaks, and XP', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Parent',
-      birthYear: 1985,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Parent',
+        birthYear: 1985,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Alex',
       birthYear: 2010,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -1198,13 +1192,15 @@ describe('dashboard service integration', () => {
   });
 
   it('returns child detail for linked parents and rejects unlinked access', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Guardian',
-      birthYear: 1980,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Guardian',
+        birthYear: 1980,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Learner',
       birthYear: 2011,
+      orgId: parentOrgId,
     });
     const { profileId: strangerParentId } = await seedProfile({
       displayName: 'Stranger',
@@ -1245,13 +1241,15 @@ describe('dashboard service integration', () => {
   });
 
   it('returns real topic progress and live session counts for a child subject', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Parent',
-      birthYear: 1984,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Parent',
+        birthYear: 1984,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Maya',
       birthYear: 2010,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -1334,13 +1332,15 @@ describe('dashboard service integration', () => {
   });
 
   it('returns child sessions and a single-session detail with structured recap fields', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Parent',
-      birthYear: 1986,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Parent',
+        birthYear: 1986,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Luca',
       birthYear: 2012,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -1476,13 +1476,15 @@ describe('dashboard service integration', () => {
     // lexicographic order matches chronological for same-prefix UUIDs).
     expect(homeworkId > learningId).toBe(true);
 
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Ordering Parent',
-      birthYear: 1980,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Ordering Parent',
+        birthYear: 1980,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Ordering Child',
       birthYear: 2012,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -1563,13 +1565,15 @@ describe('dashboard service integration', () => {
     // A session exists but no session_summaries row was ever written (e.g.
     // LLM summary timed out or was skipped). highlight, narrative, and
     // conversationPrompt must be null — not a runtime crash.
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Null Recap Parent',
-      birthYear: 1979,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Null Recap Parent',
+        birthYear: 1979,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Null Recap Child',
       birthYear: 2013,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -1610,13 +1614,15 @@ describe('dashboard service integration', () => {
   });
 
   it('[WI-80] parent session detail suppresses mixed-parent topic metadata', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Detail Mixed Topic Parent',
-      birthYear: 1979,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Detail Mixed Topic Parent',
+        birthYear: 1979,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Detail Mixed Topic Child',
       birthYear: 2013,
+      orgId: parentOrgId,
     });
     const { profileId: foreignProfileId } = await seedProfile({
       displayName: 'Detail Mixed Topic Foreign',
@@ -1665,13 +1671,15 @@ describe('dashboard service integration', () => {
   });
 
   it('[WI-80] parent session detail rejects stale foreign subject ownership', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Detail Foreign Subject Parent',
-      birthYear: 1979,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Detail Foreign Subject Parent',
+        birthYear: 1979,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Detail Foreign Subject Child',
       birthYear: 2013,
+      orgId: parentOrgId,
     });
     const { profileId: foreignProfileId } = await seedProfile({
       displayName: 'Detail Foreign Subject Other',
@@ -1704,13 +1712,15 @@ describe('dashboard service integration', () => {
   });
 
   it('[WI-80] parent session list suppresses mixed-parent topic IDs and titles', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'List Mixed Topic Parent',
-      birthYear: 1979,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'List Mixed Topic Parent',
+        birthYear: 1979,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'List Mixed Topic Child',
       birthYear: 2013,
+      orgId: parentOrgId,
     });
     const { profileId: foreignProfileId } = await seedProfile({
       displayName: 'List Mixed Topic Foreign',
@@ -1759,13 +1769,15 @@ describe('dashboard service integration', () => {
   });
 
   it('[WI-80] parent session detail filters secondary rows by child profile', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Detail Secondary Parent',
-      birthYear: 1979,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Detail Secondary Parent',
+        birthYear: 1979,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Detail Secondary Child',
       birthYear: 2013,
+      orgId: parentOrgId,
     });
     const { profileId: siblingProfileId } = await seedProfile({
       displayName: 'Detail Secondary Sibling',
@@ -1841,21 +1853,23 @@ describe('dashboard service integration', () => {
     // and asserts that each parent's dashboard is completely isolated.
     //
     // BUG-CANDIDATE-CRITICAL if either assertion below fails: profile-scoping leak.
-    const { profileId: parentA } = await seedProfile({
+    const { profileId: parentA, orgId: parentAOrgId } = await seedProfile({
       displayName: 'Parent A',
       birthYear: 1975,
     });
     const { profileId: childA } = await seedProfile({
       displayName: 'Child A',
       birthYear: 2012,
+      orgId: parentAOrgId,
     });
-    const { profileId: parentB } = await seedProfile({
+    const { profileId: parentB, orgId: parentBOrgId } = await seedProfile({
       displayName: 'Parent B',
       birthYear: 1978,
     });
     const { profileId: childB } = await seedProfile({
       displayName: 'Child B',
       birthYear: 2013,
+      orgId: parentBOrgId,
     });
 
     await seedFamilyLink(parentA, childA);
@@ -1961,13 +1975,15 @@ describe('dashboard service integration', () => {
   it('mixed sessions: dashboard week counts include both homework and learning sessions', async () => {
     // Both session types must contribute to sessionsThisWeek when they each
     // have exchangeCount >= 1 and fall within the current week.
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'Mixed Parent',
-      birthYear: 1981,
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'Mixed Parent',
+        birthYear: 1981,
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'Mixed Child',
       birthYear: 2012,
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -2018,11 +2034,13 @@ describe('dashboard service integration', () => {
   // of snapshot rows per dashboard load. The function now applies a default
   // 90-day window — old snapshots must be excluded by default.
   it('B72: snapshot scan is bounded by default window — old snapshots are excluded', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'B72 Parent',
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'B72 Parent',
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'B72 Child',
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -2065,11 +2083,13 @@ describe('dashboard service integration', () => {
   // [B72] When the caller explicitly widens the window, ancient snapshots
   // become visible — proves the windowDays parameter is wired, not ignored.
   it('B72: explicit large windowDays surfaces ancient snapshots', async () => {
-    const { profileId: parentProfileId } = await seedProfile({
-      displayName: 'B72-Wide Parent',
-    });
+    const { profileId: parentProfileId, orgId: parentOrgId } =
+      await seedProfile({
+        displayName: 'B72-Wide Parent',
+      });
     const { profileId: childProfileId } = await seedProfile({
       displayName: 'B72-Wide Child',
+      orgId: parentOrgId,
     });
     await seedFamilyLink(parentProfileId, childProfileId);
 
