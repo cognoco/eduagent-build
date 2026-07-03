@@ -1,10 +1,10 @@
 /**
  * Integration: Onboarding PATCH routes (BKT-C.1 / BKT-C.2)
  *
- * Verifies the three onboarding update functions against a real database:
- * - updateConversationLanguage
- * - updatePronouns
- * - updateInterestsContext
+ * Verifies updateInterestsContext against a real database. The
+ * updateConversationLanguage / updatePronouns describe blocks were removed in
+ * WI-1128 — they exercised dead legacy-`profiles` code, superseded by the v2
+ * dispatch in services/identity-v2/onboarding-v2.ts (its own twin covers v2).
  *
  * Key security assertion: the accountId guard prevents cross-account writes.
  * No mocks of internal services or database.
@@ -16,19 +16,12 @@ import {
   membership,
   organization,
   person,
-  profiles,
   learningProfiles,
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv, TEST_NONEXISTENT_ID } from '@eduagent/test-utils';
 import { resolve } from 'path';
-import { isIdentityV2Enabled } from '../../../../../tests/integration/helpers';
-import {
-  updateConversationLanguage,
-  updatePronouns,
-  updateInterestsContext,
-  OnboardingNotFoundError,
-} from './index';
+import { updateInterestsContext, OnboardingNotFoundError } from './index';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -75,10 +68,9 @@ async function seedAccountAndProfile(index: number) {
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
 
-  // [WI-1128] Legacy `accounts`/`profiles` are dropped (0130_m_drop.sql) — this
-  // is now a pure v2 seed. `updateInterestsContext` (the only still-live
-  // subject function this file exercises — see the dead-code note on the
-  // updateConversationLanguage/updatePronouns describe blocks below) reads
+  // [WI-1128] Legacy `accounts`/`profiles` are dropped (0130_m_drop_legacy.sql) —
+  // this is now a pure v2 seed. `updateInterestsContext` (the only still-live
+  // subject function this file exercises after the WI-1128 trim) reads
   // membership unconditionally.
   await db.insert(organization).values({
     id: accountId,
@@ -136,122 +128,6 @@ beforeEach(async () => {
 afterAll(async () => {
   await cleanupTestAccounts();
 });
-
-// ---------------------------------------------------------------------------
-// Tests — updateConversationLanguage
-//
-// WI-1128 quarantine: `updateConversationLanguage` (services/onboarding/index.ts)
-// is orphaned dead code — it still writes directly to legacy `profiles`
-// (dropped by 0130_m_drop.sql). Reachability: apps/api/src/routes/onboarding.ts
-// imports `updateConversationLanguageV2` from services/identity-v2/onboarding-v2.ts
-// (not this legacy function) for its PATCH /onboarding/language handler — the
-// route dispatcher comment there reads "[WI-867] v2 always: collapsed from
-// dispatch-with-flag pattern." No other apps/**/*.ts or packages/**/*.ts
-// caller of the legacy `updateConversationLanguage` was found outside this
-// test file and generated dist output. The v2 twin has its own live coverage
-// in services/identity-v2/onboarding-v2.integration.test.ts. Fails
-// post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
-// ---------------------------------------------------------------------------
-
-(isIdentityV2Enabled() ? describe.skip : describe)(
-  'updateConversationLanguage (integration)',
-  () => {
-    it('updates language when profileId + accountId match', async () => {
-      const { account, profile } = await seedAccountAndProfile(0);
-      const db = createIntegrationDb();
-
-      await updateConversationLanguage(db, profile.id, account.id, 'cs');
-
-      const updated = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profile.id),
-      });
-      expect(updated?.conversationLanguage).toBe('cs');
-    });
-
-    it('accepts widened UI locales', async () => {
-      const { account, profile } = await seedAccountAndProfile(0);
-      const db = createIntegrationDb();
-
-      await updateConversationLanguage(db, profile.id, account.id, 'ja');
-      await updateConversationLanguage(db, profile.id, account.id, 'nb');
-
-      const updated = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profile.id),
-      });
-      expect(updated?.conversationLanguage).toBe('nb');
-    });
-
-    it('throws OnboardingNotFoundError when accountId does not match', async () => {
-      const { profile: profileA } = await seedAccountAndProfile(0);
-      const { account: accountB } = await seedAccountAndProfile(1);
-      const db = createIntegrationDb();
-
-      await expect(
-        updateConversationLanguage(db, profileA.id, accountB.id, 'es'),
-      ).rejects.toThrow(OnboardingNotFoundError);
-
-      // Verify the value was NOT changed
-      const unchanged = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileA.id),
-      });
-      expect(unchanged?.conversationLanguage).toBe('en');
-    });
-  },
-);
-
-// ---------------------------------------------------------------------------
-// Tests — updatePronouns
-//
-// WI-1128 quarantine: same DEAD verdict as updateConversationLanguage above:
-// `updatePronouns` (services/onboarding/index.ts) is orphaned dead code — it
-// still writes directly to legacy `profiles` (dropped by 0130_m_drop.sql), and
-// apps/api/src/routes/onboarding.ts dispatches PATCH /onboarding/pronouns to
-// `updatePronounsV2` (services/identity-v2/onboarding-v2.ts) instead, per the
-// same "[WI-867] v2 always" collapse. No other live caller found. See the
-// updateConversationLanguage note above for full reachability evidence. Fails
-// post-0130/0129-repoint. Deletion + un-skip = WI-1139 dead-sweep.
-// ---------------------------------------------------------------------------
-
-(isIdentityV2Enabled() ? describe.skip : describe)(
-  'updatePronouns (integration)',
-  () => {
-    it('updates pronouns when profileId + accountId match', async () => {
-      const { account, profile } = await seedAccountAndProfile(0);
-      const db = createIntegrationDb();
-
-      await updatePronouns(db, profile.id, account.id, 'they/them');
-
-      const updated = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profile.id),
-      });
-      expect(updated?.pronouns).toBe('they/them');
-    });
-
-    it('clears pronouns when null is passed', async () => {
-      const { account, profile } = await seedAccountAndProfile(0);
-      const db = createIntegrationDb();
-
-      // Set first, then clear
-      await updatePronouns(db, profile.id, account.id, 'she/her');
-      await updatePronouns(db, profile.id, account.id, null);
-
-      const updated = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profile.id),
-      });
-      expect(updated?.pronouns).toBeNull();
-    });
-
-    it('throws OnboardingNotFoundError when accountId does not match', async () => {
-      const { profile: profileA } = await seedAccountAndProfile(0);
-      const { account: accountB } = await seedAccountAndProfile(1);
-      const db = createIntegrationDb();
-
-      await expect(
-        updatePronouns(db, profileA.id, accountB.id, 'he/him'),
-      ).rejects.toThrow(OnboardingNotFoundError);
-    });
-  },
-);
 
 // ---------------------------------------------------------------------------
 // Tests — updateInterestsContext

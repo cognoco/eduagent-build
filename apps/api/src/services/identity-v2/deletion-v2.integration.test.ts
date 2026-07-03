@@ -49,7 +49,11 @@ import {
   supportership,
   type Database,
 } from '@eduagent/database';
-import { executeDeletionV2, scheduleDeletionV2 } from './deletion-v2';
+import {
+  cancelDeletionV2,
+  executeDeletionV2,
+  scheduleDeletionV2,
+} from './deletion-v2';
 import { scheduledDeletion } from '../../inngest/functions/account-deletion';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
@@ -163,6 +167,50 @@ const RUN = !!process.env.DATABASE_URL;
       });
       return p!.id;
     }
+
+    // -----------------------------------------------------------------------
+    // [WI-1128, port of Bug #494] TOCTOU cancellation-race guard, ported from
+    // the legacy deletion.integration.test.ts (services/deletion.ts is
+    // orphaned dead code — zero external callers — so its test suite is
+    // quarantined; executeDeletionV2 is the live replacement and carries the
+    // SAME atomic TOCTOU guard, see the "claim the org for deletion only if a
+    // non-cancelled schedule still holds" comment in deletion-v2.ts). No test
+    // in this twin previously exercised cancelDeletionV2 or the 'cancelled'
+    // result.
+    // -----------------------------------------------------------------------
+
+    it('[Bug #494] executeDeletionV2 returns "cancelled" and leaves the organization intact when cancellation raced ahead of execution', async () => {
+      const { orgId, ownerId } = await seedScheduledOrgWithOwner();
+
+      // User cancels during the grace period (sets deletionCancelledAt >
+      // deletionScheduledAt).
+      const cancelResult = await cancelDeletionV2(db, orgId);
+      expect(cancelResult).toBe('cancelled');
+
+      // A stale scheduledDeletion run still fires (e.g. an already-in-flight
+      // Inngest step arriving after cancelDeletionV2). The atomic WHERE guard
+      // must prevent the delete and return 'cancelled'; the org row must
+      // still exist.
+      const result = await executeDeletionV2(db, {
+        organizationId: orgId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: ownerId,
+      });
+      expect(result).toBe('cancelled');
+
+      const org = await db.query.organization.findFirst({
+        where: eq(organization.id, orgId),
+        columns: { id: true },
+      });
+      expect(org).toBeDefined();
+
+      const owner = await db.query.person.findFirst({
+        where: eq(person.id, ownerId),
+        columns: { id: true },
+      });
+      expect(owner).toBeDefined();
+    });
 
     // -----------------------------------------------------------------------
     // Gap 1 — a live subscription row must not block whole-org deletion.

@@ -1421,5 +1421,110 @@ if (isIdentityV2Enabled()) {
         );
       }
     });
+
+    // -------------------------------------------------------------------------
+    // [WI-1128, D2] Retention-pipeline cascade, v2-mode pin.
+    //
+    // The flag-off `legacyAccountDeletionCascadeDescribe` block above ("cascade-
+    // deletes all retention-pipeline rows for the deleted account") already
+    // exercises executeDeletionV2 (its own comment: "Post-0129 the physical FKs
+    // are v2 (session_* / subjects → person), so the cascade only fires through
+    // executeDeletionV2"), but it only RUNS when isIdentityV2Enabled() is false —
+    // so this exact assertion has zero coverage on the flag-on lane. subjects.
+    // profileId already `.references(() => person.id, { onDelete: 'cascade' })`
+    // (packages/database/src/schema/subjects.ts) confirms the FK is live, so
+    // this is a straight regression pin, not new behavior.
+    // -------------------------------------------------------------------------
+    it('[D2] cascade-deletes all retention-pipeline rows for the deleted v2 person', async () => {
+      const db = createIntegrationDb();
+      const { personId, organizationId } = await seedV2IdentityGraph(db);
+
+      try {
+        const [subject] = await db
+          .insert(subjects)
+          .values({
+            profileId: personId,
+            name: 'Mathematics',
+            status: 'active',
+            pedagogyMode: 'socratic',
+          })
+          .returning({ id: subjects.id });
+
+        const [session] = await db
+          .insert(learningSessions)
+          .values({
+            profileId: personId,
+            subjectId: subject!.id,
+            sessionType: 'learning',
+            inputMode: 'text',
+            status: 'completed',
+            escalationRung: 1,
+            exchangeCount: 1,
+            endedAt: new Date(),
+          })
+          .returning({ id: learningSessions.id });
+
+        await db.insert(sessionSummaries).values({
+          sessionId: session!.id,
+          profileId: personId,
+          topicId: null,
+          status: 'accepted',
+          learnerRecap: 'You connected the example back to the rule.',
+          llmSummary: {
+            narrative:
+              'Worked through algebra and balanced a one-step equation while naming each inverse operation.',
+            topicsCovered: ['algebra', 'inverse operations'],
+            sessionState: 'completed',
+            reEntryRecommendation:
+              'Resume with one more one-step equation and ask for the inverse-operation rule aloud.',
+          },
+          summaryGeneratedAt: new Date(),
+        });
+
+        await db.insert(sessionEvents).values({
+          sessionId: session!.id,
+          profileId: personId,
+          subjectId: subject!.id,
+          eventType: 'user_message',
+          content: 'Can we do algebra?',
+        });
+
+        await db.insert(sessionEmbeddings).values({
+          sessionId: session!.id,
+          profileId: personId,
+          topicId: null,
+          content: 'Algebra session summary',
+          embedding: Array.from({ length: 1024 }, () => 0.01),
+        });
+
+        await scheduleDeletionV2(db, organizationId);
+        const result = await executeDeletionV2(db, {
+          organizationId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+        expect(result).toBe('deleted');
+
+        const summaries = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${personId}`,
+        );
+        expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+        const embeddings = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${personId}`,
+        );
+        expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+        const events = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${personId}`,
+        );
+        expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
+      } finally {
+        await teardownV2Graph(db, personId, organizationId).catch(
+          () => undefined,
+        );
+      }
+    });
   });
 }

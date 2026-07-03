@@ -294,5 +294,112 @@ const RUN = !!process.env.DATABASE_URL;
         occurredOn: '2026-06-15',
       });
     });
+
+    // -------------------------------------------------------------------------
+    // [WI-1128, CC1] listActiveChildCapNotificationsV2 — 2-owner isolation.
+    // The test above only exercises a single owner/family; this proves the
+    // WHERE ownerProfileId scoping actually isolates across two distinct real
+    // families, not just a single-tenant happy path.
+    // -------------------------------------------------------------------------
+    it('listActiveChildCapNotificationsV2 isolates notifications across two distinct owners', async () => {
+      await seedGraph(); // family A: ORG_ID / OWNER_ID / CHILD_ID.
+
+      // Family B — a second, independent org/owner/child.
+      const orgB = generateUUIDv7();
+      const ownerB = generateUUIDv7();
+      const childB = generateUUIDv7();
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: orgB,
+          clerkUserId: `clerk_${orgB}`,
+          email: `owner_${orgB}@test.local`,
+        });
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.insert(profiles).values([
+          {
+            id: ownerB,
+            accountId: orgB,
+            displayName: 'Owner B',
+            birthYear: 1980,
+            isOwner: true,
+          },
+          {
+            id: childB,
+            accountId: orgB,
+            displayName: 'Child B',
+            birthYear: 2015,
+            isOwner: false,
+          },
+        ]);
+      }
+      await db.insert(organization).values({ id: orgB, name: 'WI-905 Fam B' });
+      await db.insert(person).values([
+        {
+          id: ownerB,
+          displayName: 'Owner B',
+          birthDate: '1980-01-01',
+          residenceJurisdiction: 'EU',
+        },
+        {
+          id: childB,
+          displayName: 'Child B',
+          birthDate: '2015-01-01',
+          residenceJurisdiction: 'EU',
+        },
+      ]);
+      await db.insert(membership).values([
+        { personId: ownerB, organizationId: orgB, roles: ['admin'] },
+        { personId: childB, organizationId: orgB, roles: ['learner'] },
+      ]);
+
+      try {
+        const resultA = await recordChildCapNotificationForAccountV2(db, {
+          accountId: ORG_ID,
+          childProfileId: CHILD_ID,
+          kind: 'daily_exceeded',
+          occurredAt: '2026-06-15T09:00:00.000Z',
+          resetsAt: '2026-06-16T00:00:00.000Z',
+        });
+        expect(resultA).toEqual({ inserted: true });
+
+        const resultB = await recordChildCapNotificationForAccountV2(db, {
+          accountId: orgB,
+          childProfileId: childB,
+          kind: 'daily_exceeded',
+          occurredAt: '2026-06-15T09:00:00.000Z',
+          resetsAt: '2026-06-16T00:00:00.000Z',
+        });
+        expect(resultB).toEqual({ inserted: true });
+
+        const listA = await listActiveChildCapNotificationsV2(db, OWNER_ID);
+        expect(listA).toHaveLength(1);
+        expect(listA[0]).toMatchObject({
+          ownerProfileId: OWNER_ID,
+          childProfileId: CHILD_ID,
+        });
+
+        const listB = await listActiveChildCapNotificationsV2(db, ownerB);
+        expect(listB).toHaveLength(1);
+        expect(listB[0]).toMatchObject({
+          ownerProfileId: ownerB,
+          childProfileId: childB,
+        });
+      } finally {
+        await db
+          .delete(childCapNotifications)
+          .where(eq(childCapNotifications.ownerProfileId, ownerB));
+        await db.delete(membership).where(eq(membership.organizationId, orgB));
+        await db.delete(person).where(eq(person.id, ownerB));
+        await db.delete(person).where(eq(person.id, childB));
+        await db.delete(organization).where(eq(organization.id, orgB));
+        if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+          await db.delete(profiles).where(eq(profiles.accountId, orgB));
+        }
+        if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+          await db.delete(accounts).where(eq(accounts.id, orgB));
+        }
+      }
+    });
   },
 );
