@@ -70,8 +70,8 @@ jobs:
       # apps/mobile/src/lib/revenuecat.ts) — so a hard preflight fail on those
       # keys is stricter than the binary it protects. This relaxation is
       # TEMPORARY, tracked by WI-1328 — RevenueCat production monetization
-      # setup (MVP), which provisions real iOS/Android store apps and keys;
-      # its phase 5 re-hardens REVENUECAT_API_KEY_IOS/ANDROID back to
+      # setup (MVP), WS-35, which provisions real iOS/Android store apps and
+      # keys; its phase 5 re-hardens REVENUECAT_API_KEY_IOS/ANDROID back to
       # hard-required once that lands.
       - name: Verify required production publish secrets
         run: |
@@ -98,7 +98,7 @@ jobs:
           for key in "${warn_env[@]}"; do
             value="${!key-}"
             if [ -z "$value" ]; then
-              echo "::warning::${key} is empty — publishing the fallback bundle with RevenueCat disabled (parity with the current production binary, where purchases are off by design). TEMPORARY relaxation, tracked by WI-1328 — RevenueCat production monetization setup (MVP); its phase 5 re-hardens this preflight to hard-required once real store apps/keys exist."
+              echo "::warning::${key} is empty — publishing the fallback bundle with RevenueCat disabled (parity with the current production binary, where purchases are off by design). TEMPORARY relaxation, tracked by WI-1328 — RevenueCat production monetization setup (MVP), WS-35; its phase 5 re-hardens this preflight to hard-required once real store apps/keys exist."
             fi
           done
         env:
