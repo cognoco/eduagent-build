@@ -14,9 +14,23 @@
  * This test exercises real INSERTs into Postgres and asserts that the scoped
  * repository's read methods cannot leak across profiles. It auto-skips when
  * DATABASE_URL is not set, mirroring `rls.integration.test.ts`.
+ *
+ * [WI-1347] The isolation guarantee under test is keyed on `subjects`/
+ * `quizRounds.profileId`, which currently FKs legacy `profiles.id` (not yet
+ * re-pointed to `person.id` — WI-586). The seeds below are therefore
+ * meaningless once `accounts`/`profiles` are dropped (WI-1306/0130): gated
+ * (self-inerting, not retired — this is live BUG-750 coverage while the
+ * legacy tables exist) rather than converted, since there is no v2
+ * equivalent to convert TO yet. Each `it` bails with an explicit warning
+ * (not a silent vacuous pass) if the legacy graph can't be seeded; a true
+ * `describe.skip` would require a synchronous pre-check this driver can't
+ * do. Disposition (retire vs. re-point) belongs to WI-1306/WI-1364 when the
+ * tables actually drop. This suite is not wired into any CI target today
+ * (the `database:test` target excludes `*.integration.test.ts`), so this
+ * gate is about AC1/claim-accuracy, not corpus breakage.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createDatabase, type Database } from './client.js';
 import { createScopedRepository } from './repository.js';
 import { accounts, profiles, subjects, quizRounds } from './schema/index.js';
@@ -28,19 +42,45 @@ function getDatabaseUrl(): string | null {
 const databaseUrl = getDatabaseUrl();
 const describeIntegration = databaseUrl ? describe : describe.skip;
 
+async function legacyIdentityTablesPresent(db: Database): Promise<boolean> {
+  const raw = (await db.execute(
+    sql`SELECT to_regclass('public.accounts') AS accounts, to_regclass('public.profiles') AS profiles`,
+  )) as unknown;
+  const rows = Array.isArray(raw)
+    ? (raw as Array<{ accounts: string | null; profiles: string | null }>)
+    : ((
+        raw as {
+          rows?: Array<{ accounts: string | null; profiles: string | null }>;
+        }
+      ).rows ?? []);
+  const row = rows[0];
+  return row?.accounts != null && row?.profiles != null;
+}
+
 describeIntegration('[BUG-750] profile isolation — real Postgres', () => {
   let db: Database;
   let accountA: string;
   let accountB: string;
   let profileA: string;
   let profileB: string;
+  let legacyReady = false;
   const createdAccountIds: string[] = [];
 
   beforeAll(async () => {
     db = createDatabase(databaseUrl!);
+    legacyReady = await legacyIdentityTablesPresent(db);
+    if (!legacyReady) {
+      console.warn(
+        '[BUG-750] skipping: legacy accounts/profiles tables are absent. ' +
+          'This suite tests isolation on the legacy-FK profileId path — ' +
+          'meaningless once those tables drop (WI-1306/0130). See file ' +
+          'header for disposition.',
+      );
+    }
   });
 
   beforeEach(async () => {
+    if (!legacyReady) return;
     // Create two distinct accounts + profiles. Cascade delete in afterEach.
     const suffix = `bug-750-${Date.now()}-${Math.random()
       .toString(36)
@@ -84,6 +124,7 @@ describeIntegration('[BUG-750] profile isolation — real Postgres', () => {
   });
 
   afterEach(async () => {
+    if (!legacyReady) return;
     // Cascade delete via account FK chain.
     while (createdAccountIds.length > 0) {
       const id = createdAccountIds.pop()!;
@@ -92,6 +133,7 @@ describeIntegration('[BUG-750] profile isolation — real Postgres', () => {
   });
 
   it('subjects.findMany returns only the rows owned by the scoping profile', async () => {
+    if (!legacyReady) return;
     await db.insert(subjects).values([
       { profileId: profileA, name: 'A-Math' },
       { profileId: profileA, name: 'A-History' },
@@ -120,6 +162,7 @@ describeIntegration('[BUG-750] profile isolation — real Postgres', () => {
   });
 
   it("subjects.findFirst cannot return another profile's row even when the id matches", async () => {
+    if (!legacyReady) return;
     const [aRow] = await db
       .insert(subjects)
       .values({ profileId: profileA, name: 'A-Secret' })
@@ -135,6 +178,7 @@ describeIntegration('[BUG-750] profile isolation — real Postgres', () => {
   });
 
   it("update with WHERE profileId guard cannot mutate another profile's row", async () => {
+    if (!legacyReady) return;
     // quizRounds.complete is the closest scoped-write surface today. We
     // insert a quizRound under profileA, then ask the scoped repo for
     // profileB to "complete" it. The atomic UPDATE WHERE id=… AND

@@ -190,3 +190,28 @@ at the pre-removal commit on branch `WI-1347`. Retrieve with:
 ```
 git show retired/wi-1347-trial-dead-fn-blocks:apps/api/src/services/billing/trial.integration.test.ts
 ```
+
+---
+
+## WI-1347 — quota-reconcile.integration.test.ts (2026-07-03)
+
+Retired the `reconcileQuotaStateForSubscription` describe block's "returns null for
+an unknown subscription id" `it`. The legacy (non-V2) `reconcileQuotaStateForSubscription`
+(`apps/api/src/services/billing/quota-reconcile.ts:36`) is transitively dead per the
+file's own in-code comment (lines 21-24): "KEPT — it is transitively reachable from
+subscription-core.ts's createSubscription/ensureFreeSubscription, which are in turn
+only reachable from services/account.ts's findOrCreateAccount" — all three already
+confirmed dead (zero live callers) in the `getSubscriptionByAccountId` entry above.
+It reads the legacy `subscriptions` table unconditionally (no `tableExists` gate) and
+hard-fails once the table is dropped, regardless of test-seed gating.
+
+The sibling `it` ("resolves the effective tier of an active plus subscription and
+writes per-profile rows") in the same describe tests the live V2 twin,
+`reconcileQuotaStateForSubscriptionV2`, and is kept unchanged.
+
+**Recovery:** annotated tag `retired/wi-1347-quota-reconcile-dead-fn` (pushed) points
+at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-quota-reconcile-dead-fn:apps/api/src/services/billing/quota-reconcile.integration.test.ts
+```
