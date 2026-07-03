@@ -60,6 +60,7 @@ import {
   deleteLegacyAccountsForTest,
   ensureLegacyProfileAnchorForTest,
   ensureLegacySubscriptionAnchorForTest,
+  legacyIdentityTableExistsForTest,
 } from '../../test-utils/legacy-identity-anchors';
 
 // ── Database env bootstrap ────────────────────────────────────────────────────
@@ -1204,10 +1205,12 @@ describe('session-completed integration', () => {
     // — without the familyLinks edge the legacy lookup returns no_parent_link
     // and no push fires. Mirrors the dual-seed in weekly-progress-push's
     // seedFamilyLink helper.
-    await db.insert(familyLinks).values({
-      parentProfileId,
-      childProfileId: profileId,
-    });
+    if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+      await db.insert(familyLinks).values({
+        parentProfileId,
+        childProfileId: profileId,
+      });
+    }
     await db.insert(guardianship).values({
       guardianPersonId: parentProfileId,
       chargePersonId: profileId,

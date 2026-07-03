@@ -193,13 +193,15 @@ describeIfDb(
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
-      await db.insert(subscriptions).values({
-        id: subId,
-        accountId: org!.id,
-        tier: 'family',
-        status: 'active',
-        stripeSubscriptionId: `${stripeSubscriptionId}_legacy`,
-      });
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.insert(subscriptions).values({
+          id: subId,
+          accountId: org!.id,
+          tier: 'family',
+          status: 'active',
+          stripeSubscriptionId: `${stripeSubscriptionId}_legacy`,
+        });
+      }
 
       await db.insert(subscription).values({
         id: subId,
