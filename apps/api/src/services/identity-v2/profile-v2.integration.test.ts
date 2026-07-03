@@ -26,7 +26,7 @@ import {
   person,
   type Database,
 } from '@eduagent/database';
-import { listProfilesV2 } from './profile-v2';
+import { listProfilesV2, getProfileV2, getPersonScope } from './profile-v2';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -270,5 +270,240 @@ const RUN = !!process.env.DATABASE_URL;
     const org = await seedOrg('Empty Org');
     const list = await listProfilesV2(db, org);
     expect(list).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1305 / R6] getProfileV2 — cross-boundary seam test against the REAL
+// adapter (real Postgres, not a jest.mock). `routes/profiles.ts` calls
+// `getProfileV2(db, c.req.param('id'), account.id)`: the `:id` is
+// caller-supplied (a URL param), `account.id` is server-resolved from the
+// authenticated session. The membership-scoped WHERE clause is the sole
+// caller-bound-authority guard on this read — this is the seam where the
+// three prior incidents (deletion-500, export-500, consent leak) originated.
+// Red-green-revert: GREEN with the membership.organizationId predicate
+// (org B's person is null under org A's organizationId); RED if that
+// predicate is dropped (org B's Profile leaks to a caller resolved to org A).
+// ---------------------------------------------------------------------------
+(RUN ? describe : describe.skip)('getProfileV2 (integration)', () => {
+  let db: Database;
+  const personIds: string[] = [];
+  const orgIds: string[] = [];
+
+  beforeAll(() => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterEach(async () => {
+    for (const pid of personIds) {
+      await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+      await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
+      await db
+        .delete(guardianship)
+        .where(eq(guardianship.guardianPersonId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of orgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+    personIds.length = 0;
+    orgIds.length = 0;
+  });
+
+  async function seedOrg(name: string): Promise<string> {
+    const [o] = await db.insert(organization).values({ name }).returning();
+    orgIds.push(o!.id);
+    return o!.id;
+  }
+
+  async function seedMember(
+    organizationId: string,
+    args: { name: string; roles: string[]; birthDate?: string },
+  ): Promise<string> {
+    const [p] = await db
+      .insert(person)
+      .values({
+        displayName: args.name,
+        birthDate: args.birthDate ?? '2000-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(p!.id);
+    await db.insert(membership).values({
+      personId: p!.id,
+      organizationId,
+      roles: args.roles,
+    });
+    return p!.id;
+  }
+
+  it("[IDOR] returns null for a person outside the caller's org", async () => {
+    const orgA = await seedOrg('Org A');
+    const orgB = await seedOrg('Org B');
+    const personB = await seedMember(orgB, {
+      name: 'Person B',
+      roles: ['admin'],
+    });
+
+    // The caller resolved to org A can never read org B's person, even
+    // knowing personB's id directly (the exact shape of a URL-param IDOR).
+    expect(await getProfileV2(db, personB, orgA)).toBeNull();
+  });
+
+  it('returns the byte-identical Profile DTO for a person within the caller org', async () => {
+    const org = await seedOrg('Org');
+    const owner = await seedMember(org, {
+      name: 'Owner',
+      roles: ['admin'],
+      birthDate: '1985-07-04',
+    });
+
+    const profile = await getProfileV2(db, owner, org);
+    expect(profile).toMatchObject({
+      id: owner,
+      accountId: org, // account.id = organization.id
+      displayName: 'Owner',
+      birthYear: 1985,
+      location: 'EU',
+      isOwner: true,
+      hasPremiumLlm: false,
+      hasFamilyLinks: false,
+      pronouns: null,
+      consentStatus: null,
+      linkCreatedAt: null,
+    });
+    expect(profile!.createdAt).toEqual(expect.any(String));
+    expect(profile!.updatedAt).toEqual(expect.any(String));
+  });
+
+  it('excludes an archived person (legacy archivedAt parity)', async () => {
+    const org = await seedOrg('Org');
+    const archived = await seedMember(org, {
+      name: 'Archived',
+      roles: ['learner'],
+    });
+    await db
+      .update(person)
+      .set({ archivedAt: new Date() })
+      .where(eq(person.id, archived));
+
+    expect(await getProfileV2(db, archived, org)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1305 / R6] getPersonScope — cross-boundary seam test against the REAL
+// adapter. This is the LITERAL profile-scope-middleware seam:
+// `middleware/profile-scope.ts` calls
+// `getPersonScope(db, X-Profile-Id header, account.id)` on every request that
+// sends an explicit X-Profile-Id — the header is caller-supplied, account.id
+// is server-resolved. `middleware/profile-scope.test.ts` jest.mocks this
+// function entirely (gc1-allow: continuity), so it cannot observe a real SQL
+// regression in the org-membership predicate — only this real-DB test can.
+// Red-green-revert: GREEN with the membership.organizationId predicate
+// (org B's person resolves to null under org A's organizationId); RED if that
+// predicate is dropped (org B's profile scope leaks to a caller resolved to
+// org A via a spoofed X-Profile-Id header).
+// ---------------------------------------------------------------------------
+(RUN ? describe : describe.skip)('getPersonScope (integration)', () => {
+  let db: Database;
+  const personIds: string[] = [];
+  const orgIds: string[] = [];
+
+  beforeAll(() => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterEach(async () => {
+    for (const pid of personIds) {
+      await db.delete(consentGrant).where(eq(consentGrant.chargePersonId, pid));
+      await db.delete(guardianship).where(eq(guardianship.chargePersonId, pid));
+      await db
+        .delete(guardianship)
+        .where(eq(guardianship.guardianPersonId, pid));
+      await db.delete(membership).where(eq(membership.personId, pid));
+      await db.delete(person).where(eq(person.id, pid));
+    }
+    for (const oid of orgIds) {
+      await db.delete(organization).where(eq(organization.id, oid));
+    }
+    personIds.length = 0;
+    orgIds.length = 0;
+  });
+
+  async function seedOrg(name: string): Promise<string> {
+    const [o] = await db.insert(organization).values({ name }).returning();
+    orgIds.push(o!.id);
+    return o!.id;
+  }
+
+  async function seedMember(
+    organizationId: string,
+    args: { name: string; roles: string[]; birthDate?: string },
+  ): Promise<string> {
+    const [p] = await db
+      .insert(person)
+      .values({
+        displayName: args.name,
+        birthDate: args.birthDate ?? '2000-01-01',
+        residenceJurisdiction: 'EU',
+      })
+      .returning();
+    personIds.push(p!.id);
+    await db.insert(membership).values({
+      personId: p!.id,
+      organizationId,
+      roles: args.roles,
+    });
+    return p!.id;
+  }
+
+  it("[IDOR] returns null for a person outside the caller's org (the X-Profile-Id seam)", async () => {
+    const orgA = await seedOrg('Org A');
+    const orgB = await seedOrg('Org B');
+    const personB = await seedMember(orgB, {
+      name: 'Person B',
+      roles: ['learner'],
+    });
+
+    // Simulates a caller resolved to org A sending X-Profile-Id=personB — the
+    // exact spoof shape profileScopeMiddleware must reject.
+    expect(await getPersonScope(db, personB, orgA)).toBeNull();
+  });
+
+  it('resolves profileId + byte-identical ProfileMeta for a person within the caller org', async () => {
+    const org = await seedOrg('Org');
+    const owner = await seedMember(org, {
+      name: 'Owner',
+      roles: ['admin'],
+      birthDate: '1990-02-14',
+    });
+
+    const scope = await getPersonScope(db, owner, org);
+    expect(scope).not.toBeNull();
+    expect(scope!.profileId).toBe(owner);
+    expect(scope!.meta).toMatchObject({
+      birthYear: 1990,
+      location: 'EU',
+      isOwner: true,
+      hasPremiumLlm: false,
+      consentStatus: null,
+      resolvedVia: 'explicit-header',
+    });
+  });
+
+  it('excludes an archived person', async () => {
+    const org = await seedOrg('Org');
+    const archived = await seedMember(org, {
+      name: 'Archived',
+      roles: ['learner'],
+    });
+    await db
+      .update(person)
+      .set({ archivedAt: new Date() })
+      .where(eq(person.id, archived));
+
+    expect(await getPersonScope(db, archived, org)).toBeNull();
   });
 });

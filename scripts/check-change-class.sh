@@ -311,6 +311,21 @@ if [[ -n "$API_SVC" ]]; then
   add_cmd fast  "pnpm test:api:unit"         "API unit tests"
 fi
 
+# ── Identity-v2 Seam (WI-1305 / R6) ──────────────────────────────────────
+# apps/api/src/services/identity-v2/ is the cross-boundary seam where
+# identity-v2 and the rest of the app touch (profile-scope middleware,
+# profiles routes, ownership guards). The generic api-services class above
+# only runs the FAST unit suite, which never executes *.integration.test.ts
+# files (apps/api/jest.config.cjs ignores them) — so a seam regression here
+# was previously invisible to the PR-gated router unless the same diff also
+# touched routes/ or middleware/. Prior incidents (WI-1255 deletion-500,
+# WI-1161 export-500, WI-1138 consent leak) all originated at this seam.
+if hit '^apps/api/src/services/identity-v2/'; then
+  CLASSES+=("identity-v2-seam")
+  add_cmd slow  "pnpm test:api:integration"  "API co-located integration tests (identity-v2 seam)"
+  note "identity-v2-seam: caller-bound authority changes need a break test (red-green-revert)"
+fi
+
 # ── Mobile Routes (Expo Router) ──────────────────────────────────────────
 if hit '^apps/mobile/src/app/'; then
   CLASSES+=("mobile-routes")
