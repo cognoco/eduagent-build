@@ -71,6 +71,20 @@ jest.mock('../services/identity-v2/identity-graph', () => {
   };
 });
 
+// [WI-1302] POST /v1/profiles/switch's owner-elevation gate now derives
+// "is the caller already the owner" from callerPersonId via
+// verifyPersonIsOrgAdminV2, which runs a raw membership db.select() the
+// `{}` mock DB these route tests inject cannot satisfy. The
+// caller-identity-vs-X-Profile-Id-spoof distinction this guard exists to
+// enforce is covered by the real-DB break test in
+// tests/integration/profile-switch-elevation-idor.integration.test.ts.
+jest.mock(
+  '../services/identity-v2/ownership-v2' /* gc1-allow: route unit test — DB mocked; real DB covered by profile-switch-elevation-idor.integration.test.ts */,
+  () => ({
+    verifyPersonIsOrgAdminV2: jest.fn(),
+  }),
+);
+
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { Database } from '@eduagent/database';
@@ -96,6 +110,7 @@ import {
 } from '../services/identity-v2/profile-v2';
 import { createChildProfileV2 } from '../services/identity-v2/child-profile-v2';
 import { createIdentityGraph } from '../services/identity-v2/identity-graph';
+import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
 import { ConflictError } from '../errors';
 import { profileRoutes } from './profiles';
 
@@ -106,6 +121,10 @@ import { profileRoutes } from './profiles';
 const ACCOUNT_ID = 'a0000000-0000-4000-a000-000000000001';
 const PROFILE_ID_A = 'a0000000-0000-4000-a000-000000000010';
 const PROFILE_ID_B = 'a0000000-0000-4000-a000-000000000011';
+// [WI-1302] Default authenticated-caller person id — distinct from the
+// PROFILE_ID_* targets, since callerPersonId is the CALLER's own identity,
+// never the profile being acted on.
+const CALLER_PERSON_ID = 'a0000000-0000-4000-a000-000000000099';
 
 // ---------------------------------------------------------------------------
 // Test app factory — bypasses auth, injects known account + db
@@ -121,6 +140,10 @@ type TestEnv = {
     account: Account;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-1302] The authenticated caller's own person id — server-resolved in
+    // production by accountMiddleware, injected directly here for route
+    // isolation.
+    callerPersonId: string | undefined;
   };
 };
 
@@ -130,6 +153,7 @@ function makeApp(overrides?: {
   profileMeta?: ProfileMeta | null;
   profileId?: string;
   user?: AuthUser & { factorVerificationAge?: [number, number] };
+  callerPersonId?: string | null;
 }) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
@@ -150,6 +174,12 @@ function makeApp(overrides?: {
       updatedAt: new Date().toISOString(),
     } as Account);
     c.set('profileId', overrides?.profileId);
+    c.set(
+      'callerPersonId',
+      overrides?.callerPersonId === null
+        ? undefined
+        : (overrides?.callerPersonId ?? CALLER_PERSON_ID),
+    );
     // [CR-2026-05-19-H1] Inject profileMeta so isOwner gate can evaluate.
     // Default isOwner:true for happy-path tests; override for break tests.
     const profileMeta =
@@ -194,11 +224,19 @@ const updateProfileV2Mock = jest.mocked(updateProfileV2);
 const getPersonScopeMock = jest.mocked(getPersonScope);
 const createChildProfileV2Mock = jest.mocked(createChildProfileV2);
 const createIdentityGraphMock = jest.mocked(createIdentityGraph);
+// [WI-1302] POST /v1/profiles/switch's owner-elevation gate consults this to
+// determine whether the CALLER (not the X-Profile-Id-resolved profile) is
+// already the owner.
+const verifyPersonIsOrgAdminV2Mock = jest.mocked(verifyPersonIsOrgAdminV2);
 
 beforeEach(() => {
   jest.clearAllMocks();
   // Default: authorization passes. Deny-path tests override per-case.
   assertProfileCreationAllowedMock.mockResolvedValue(undefined);
+  // [WI-1302] Default: the caller is the account owner (mirrors the prior
+  // default isOwner:true happy-path convention below). Non-owner-caller break
+  // tests override to false per-case.
+  verifyPersonIsOrgAdminV2Mock.mockResolvedValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -1304,6 +1342,9 @@ describe('POST /v1/profiles/switch', () => {
       },
     } as Awaited<ReturnType<typeof getPersonScope>>;
     getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+    // [WI-1302] The caller is genuinely NOT the owner — verified server-side
+    // via callerPersonId, not the (spoofable) profileMeta below.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1346,6 +1387,9 @@ describe('POST /v1/profiles/switch', () => {
       },
     } as Awaited<ReturnType<typeof getPersonScope>>;
     getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+    // [WI-1302] Genuinely not the owner — the fresh fva is what carries this
+    // request through the gate, not caller identity.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
@@ -1373,7 +1417,7 @@ describe('POST /v1/profiles/switch', () => {
     expect(body).toMatchObject({ profileId: PROFILE_ID_A });
   });
 
-  it('[WI-301] allows an explicit owner to switch to the owner profile without fresh fva', async () => {
+  it('[WI-1302] allows the real owner (callerPersonId resolves admin) to switch to the owner profile without fresh fva', async () => {
     const ownerSwitchResult = {
       profileId: PROFILE_ID_A,
       meta: {
@@ -1386,6 +1430,11 @@ describe('POST /v1/profiles/switch', () => {
       },
     } as Awaited<ReturnType<typeof getPersonScope>>;
     getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+    // [WI-1302] Authority now comes from callerPersonId resolving as an org
+    // admin (mocked here — the real query is covered by the integration
+    // break test), not from profileMeta below, which is left isOwner:true /
+    // resolvedVia:'explicit-header' only to prove it's no longer load-bearing.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(true);
 
     const res = await makeApp({
       profileId: PROFILE_ID_A,
@@ -1413,6 +1462,54 @@ describe('POST /v1/profiles/switch', () => {
     expect(body).toMatchObject({ profileId: PROFILE_ID_A });
   });
 
+  it('[BREAK][WI-1302] a non-owner spoofing X-Profile-Id=owner (profileMeta.isOwner:true/explicit-header) is still denied without fresh fva', async () => {
+    const ownerSwitchResult = {
+      profileId: PROFILE_ID_A,
+      meta: {
+        birthYear: 2000,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        isOwner: true,
+      },
+    } as Awaited<ReturnType<typeof getPersonScope>>;
+    getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+    // [WI-1302] The CALLER is genuinely not an org admin — this is the fact
+    // that must gate the request. profileMeta below claims isOwner:true /
+    // resolvedVia:'explicit-header' (exactly what a caller gets by sending
+    // X-Profile-Id: <owner's id>, which profileScopeMiddleware verifies only
+    // belongs to the account, not that it's the caller's own identity). Pre-fix,
+    // isExplicitOwnerContext(profileMeta) read that spoofed value and wrongly
+    // skipped the elevation gate; the fix ignores it entirely.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
+
+    const res = await makeApp({
+      profileId: PROFILE_ID_A, // spoofed: X-Profile-Id resolved to the owner
+      profileMeta: {
+        isOwner: true,
+        birthYear: 2012,
+        location: null,
+        consentStatus: null,
+        hasPremiumLlm: false,
+        resolvedVia: 'explicit-header',
+      },
+      user: {
+        userId: 'child_user',
+        email: 'child@example.com',
+        // No fresh fva — the only legitimate bypass is unavailable.
+      },
+    }).request('/v1/profiles/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: PROFILE_ID_A }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: 'OWNER_ELEVATION_REQUIRED' });
+  });
+
   it('[WI-301] allows a non-owner to switch to another non-owner without fva', async () => {
     const childSwitchResult = {
       profileId: PROFILE_ID_B,
@@ -1426,6 +1523,10 @@ describe('POST /v1/profiles/switch', () => {
       },
     } as Awaited<ReturnType<typeof getPersonScope>>;
     getPersonScopeMock.mockResolvedValue(childSwitchResult);
+    // [WI-1302] Genuinely not the owner — irrelevant here since the target
+    // isn't the owner either, but kept accurate rather than relying on the
+    // beforeEach default.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
 
     const res = await makeApp({
       profileId: PROFILE_ID_A,
@@ -1465,6 +1566,8 @@ describe('POST /v1/profiles/switch', () => {
       },
     } as Awaited<ReturnType<typeof getPersonScope>>;
     getPersonScopeMock.mockResolvedValue(ownerSwitchResult);
+    // [WI-1302] Genuinely not the owner — no fva, no caller-identity bypass.
+    verifyPersonIsOrgAdminV2Mock.mockResolvedValue(false);
 
     const res = await makeApp({
       profileId: PROFILE_ID_B,
