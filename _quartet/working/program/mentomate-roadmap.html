@@ -9,6 +9,7 @@
     --accent:#2DD4BF; --accent-dim:#2DD4BF22; --lav:#A78BFA;
     --ok:#4ADE80; --run:#60A5FA; --warn:#FBBF24;
     --chip-ok:#4ADE8022; --chip-run:#60A5FA22; --chip-warn:#FBBF2426; --chip-mut:#8B95A31A;
+    --ram:#A78BFA; --ori:#38BDF8;
     --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   }
@@ -19,6 +20,7 @@
     --accent:#0D9488; --accent-dim:#0D948818; --lav:#7C3AED;
     --ok:#15803D; --run:#1D4ED8; --warn:#B45309;
     --chip-ok:#15803D1A; --chip-run:#1D4ED815; --chip-warn:#B4530918; --chip-mut:#5B657214;
+    --ram:#7C3AED; --ori:#0369A1;
   }
   @media (prefers-color-scheme: light){ :root:not([data-theme]){
     --bg:#F3F5F7; --panel:#FFFFFF; --panel-2:#EBEEF2;
@@ -27,6 +29,7 @@
     --accent:#0D9488; --accent-dim:#0D948818; --lav:#7C3AED;
     --ok:#15803D; --run:#1D4ED8; --warn:#B45309;
     --chip-ok:#15803D1A; --chip-run:#1D4ED815; --chip-warn:#B4530918; --chip-mut:#5B657214;
+    --ram:#7C3AED; --ori:#0369A1;
   }}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
@@ -62,6 +65,10 @@
   .node .name{font-weight:600;font-size:13px;margin:1px 0 3px;text-wrap:balance}
   .node .meta{color:var(--ink-3);font-size:11.5px;line-height:1.35}
   .node .chip{margin-top:6px}
+  .node.own-r{border-left:3px solid var(--ram)}
+  .node.own-o{border-left:3px solid var(--ori)}
+  .owntag{position:absolute;top:8px;right:10px;font-family:var(--mono);font-size:9px;letter-spacing:.08em}
+  .own-r .owntag{color:var(--ram)} .own-o .owntag{color:var(--ori)}
   .szbar{margin-top:7px;height:4px;border-radius:2px;background:var(--chip-mut);overflow:hidden}
   .szbar i{display:block;height:100%;border-radius:2px}
   .szlbl{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin-top:2px}
@@ -94,6 +101,9 @@
     <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked</span>
     <span style="color:var(--ink-3)">— amber dashed arrow = crosses a live operator gate</span>
     <span style="color:var(--ink-3)">— bottom bar = relative size of work, green 0 → red 100 (PM estimate)</span>
+    <span style="color:var(--ram);font-family:var(--mono)">▎ramtop</span>
+    <span style="color:var(--ori);font-family:var(--mono)">▎orion</span>
+    <span style="color:var(--ink-3)">— left stripe = owning orchestrator</span>
   </div>
   <div class="boardbox"><div class="board" id="board">
     <div class="colhead"></div><div class="colhead">Now</div><div class="colhead">Next</div>
@@ -133,22 +143,22 @@
     ['Hygiene','WS-34 / WS-35 — parked by design'],
   ];
   const NODES=[
-    {id:'m1',sz:40,l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · all 5 closed — WS-37 graduated 2026-07-03',st:'done'},
-    {id:'m4',sz:30,l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
-    {id:'m5',sz:35,l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
-    {id:'m6',sz:50,l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
-    {id:'m2a',sz:25,l:1,c:0,code:'M2a',name:'Journal-prep',meta:'WI-1306 · CI builds the real prod schema',st:'run'},
-    {id:'m2b',sz:30,l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
-    {id:'m3',sz:70,l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
-    {id:'clerk',sz:10,l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
-    {id:'store',sz:55,l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
-    {id:'ops',sz:45,l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry ✓ (WI-1336) · env-guard ✓ (WI-1340) · Inngest · email',st:'run'},
-    {id:'rc',sz:35,l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
-    {id:'keys',sz:25,l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
-    {id:'repub',sz:40,l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
-    {id:'submit',sz:30,l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
+    {id:'m1',own:'r',sz:40,l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · all 5 closed — WS-37 graduated 2026-07-03',st:'done'},
+    {id:'m4',own:'r',sz:30,l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
+    {id:'m5',own:'r',sz:35,l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
+    {id:'m6',own:'r',sz:50,l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
+    {id:'m2a',own:'r',sz:25,l:1,c:0,code:'M2a',name:'Journal-prep',meta:'WI-1306 · CI builds the real prod schema',st:'run'},
+    {id:'m2b',own:'r',sz:30,l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
+    {id:'m3',own:'r',sz:70,l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
+    {id:'clerk',own:'o',sz:10,l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
+    {id:'store',own:'o',sz:55,l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
+    {id:'ops',own:'o',sz:45,l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry ✓ (WI-1336) · env-guard ✓ (WI-1340) · Inngest · email',st:'run'},
+    {id:'rc',own:'o',sz:35,l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
+    {id:'keys',own:'o',sz:25,l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
+    {id:'repub',own:'o',sz:40,l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
+    {id:'submit',own:'o',sz:30,l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
     {id:'comp',sz:60,l:3,c:0,code:'WS-30',name:'Legal chain',meta:'DPO done · policy fields → listing inputs · WI-1176 → Bug Lane',st:'run'},
-    {id:'surf',sz:65,l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
+    {id:'surf',own:'o',sz:65,l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
     {id:'hyg',sz:50,l:5,c:0,code:'',name:'WS-34 · WS-35',meta:'refactor / infra hygiene — not ship-gating',st:'park'},
   ];
   const EDGES=[['m1','m4'],['m4','m5',1],['m5','m6',1],['m2a','m2b'],['m2b','m3'],
@@ -164,9 +174,11 @@
     for(let c=0;c<5;c++){const d=document.createElement('div');d.className='cell';board.appendChild(d);cells[li+'-'+c]=d;}
   });
   NODES.forEach(n=>{
-    const el=document.createElement('div');el.className='node'+(n.gate?' gate':'')+(n.st==='done'?' done':'');
+    const el=document.createElement('div');el.className='node'+(n.gate?' gate':'')+(n.st==='done'?' done':'')+
+      (n.own==='r'?' own-r':n.own==='o'?' own-o':'');
     el.id='n-'+n.id;
-    el.innerHTML=(n.code?'<span class="code">'+n.code+'</span>':'')+
+    el.innerHTML=(n.own?'<span class="owntag">'+(n.own==='r'?'ramtop':'orion')+'</span>':'')+
+      (n.code?'<span class="code">'+n.code+'</span>':'')+
       '<div class="name">'+n.name+'</div><div class="meta">'+n.meta+'</div>'+
       '<span class="chip '+STATUS[n.st][0]+'">'+STATUS[n.st][1]+'</span>'+
       (n.sz!=null?'<div class="szbar" title="size of work: '+n.sz+'/100"><i style="width:'+n.sz+
