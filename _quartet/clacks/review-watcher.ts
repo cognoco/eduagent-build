@@ -13,12 +13,24 @@
 //   COSMO_WATCH_OUTDIR   (optional, default <repo>/.cosmo-watch — durable, not /tmp. Point at
 //                         durable program state, e.g. _quartet/working/program/review-watcher-state.
 //                         gitignore it.)
+//   COSMO_WATCH_BACKFILL_REVIEWING
+//                         (optional, default 1) launch reviews for items already in Reviewing on
+//                         startup unless the durable launch ledger shows the same transition was
+//                         already successfully started.
+//   COSMO_WATCH_CODEX_PS1 (optional) absolute path to codex.ps1. Windows default:
+//                         %APPDATA%\npm\codex.ps1.
 //
 // Workstream config JSON shape (array):
 //   [{ "name": "...", "slug": "...", "id": "<page-id>",
 //      "overrides": { "WI-NN": ["dod.rule.key", ...] } }]   // overrides optional; see below
 
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { spawn } from 'bun';
 
 const token = process.env.NOTION_TOKEN;
@@ -26,6 +38,7 @@ const repo = process.env.COSMO_WATCH_REPO;
 const db = process.env.COSMO_WATCH_DB;
 const configPath = process.env.COSMO_WATCH_CONFIG;
 const pollMs = Number(process.env.COSMO_WATCH_POLL_MS || 60000);
+const backfillReviewing = process.env.COSMO_WATCH_BACKFILL_REVIEWING !== '0';
 // Durable by default (not /tmp, which is cleaned on reboot and loses de-dupe/log history).
 const outDir = process.env.COSMO_WATCH_OUTDIR || `${repo}/.cosmo-watch`;
 
@@ -55,13 +68,14 @@ const workstreams = rawWorkstreams.map((ws) => ({
 const reviewDir = `${outDir}/reviews`;
 const logDir = `${outDir}/logs`;
 const watcherLog = `${logDir}/cosmo-reviewing-watcher.log`;
+const launchLedgerPath = `${outDir}/launched-transitions.json`;
 mkdirSync(reviewDir, { recursive: true });
 mkdirSync(logDir, { recursive: true });
 
 // All maps keyed by `${workstream.name}::${wiId}` so per-workstream state never collides.
 const previousStages = new Map<string, string>();
 const running = new Map<string, number | string>();
-const lastLaunchKey = new Map<string, string>();
+const launchedTransitions = new Map<string, unknown>();
 let initialised = false;
 let pollNo = 0;
 
@@ -71,6 +85,25 @@ function log(line: string) {
   const msg = `[${stamp()}] ${line}`;
   console.log(msg);
   appendFileSync(watcherLog, `${msg}\n`);
+}
+
+function loadLaunchLedger() {
+  if (!existsSync(launchLedgerPath)) return;
+  const parsed = JSON.parse(readFileSync(launchLedgerPath, 'utf8')) as Record<
+    string,
+    unknown
+  >;
+  for (const [key, value] of Object.entries(parsed)) {
+    launchedTransitions.set(key, value);
+  }
+}
+
+function saveLaunchLedger() {
+  writeFileSync(
+    launchLedgerPath,
+    `${JSON.stringify(Object.fromEntries(launchedTransitions), null, 2)}\n`,
+    'utf8',
+  );
 }
 
 async function notion(path: string, method = 'GET', body?: unknown) {
@@ -149,6 +182,31 @@ If DoD and QA evidence pass, apply disposition done. If evidence fails, apply re
 Do not edit code. Do not revert or overwrite unrelated edits. Return the disposition, evidence gathered, commands run, any override applied, and any Cosmo mutation made.`;
 }
 
+function codexCommand(args: string[]) {
+  const configuredPs1 = process.env.COSMO_WATCH_CODEX_PS1;
+  const appDataPs1 = process.env.APPDATA
+    ? `${process.env.APPDATA}\\npm\\codex.ps1`
+    : undefined;
+  const codexPs1 =
+    (configuredPs1 && existsSync(configuredPs1) && configuredPs1) ||
+    (appDataPs1 && existsSync(appDataPs1) && appDataPs1);
+
+  if (codexPs1) {
+    return [
+      'pwsh.exe',
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      codexPs1,
+      ...args,
+    ];
+  }
+
+  // Non-Windows environments normally have an executable shim on PATH.
+  return ['codex', ...args];
+}
+
 function launchReview(
   ws: { name: string; slug: string; overrides: Map<string, string[]> },
   id: string,
@@ -161,11 +219,11 @@ function launchReview(
     );
     return;
   }
-  if (lastLaunchKey.get(mapKey) === key) {
+  const ledgerKey = `${mapKey}::${key}`;
+  if (launchedTransitions.has(ledgerKey)) {
     log(`skip [${ws.name}] ${id}: transition key already launched (${key})`);
     return;
   }
-  lastLaunchKey.set(mapKey, key);
   const suffix = stamp().replace(/[:.]/g, '-');
   const out = `${reviewDir}/${id}.${ws.slug}.${suffix}.final.md`;
   const stdoutLog = `${reviewDir}/${id}.${ws.slug}.${suffix}.stdout.log`;
@@ -182,31 +240,48 @@ function launchReview(
   // with any write-capable QA forced into a throwaway worktree. NOT changed blind here: the QA pass
   // runs Doppler-wrapped tests that read $HOME config, which workspace-write would block — the
   // downgrade needs a live-verified review run. Tracked as reviewer-substrate work.
-  const proc = spawn(
-    [
-      'codex',
-      '-a',
-      'never',
-      'exec',
-      '--ephemeral',
-      '-C',
-      repo!,
-      '-s',
-      'danger-full-access',
-      '-c',
-      'shell_environment_policy.inherit="all"',
-      '-o',
-      out,
-      '-',
-    ],
-    {
-      cwd: repo!,
-      env: process.env,
-      stdin: 'pipe',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-  );
+  let proc;
+  try {
+    proc = spawn(
+      codexCommand([
+        '-a',
+        'never',
+        'exec',
+        '--ephemeral',
+        '-C',
+        repo!,
+        '-s',
+        'danger-full-access',
+        '-c',
+        'shell_environment_policy.inherit="all"',
+        '-o',
+        out,
+        '-',
+      ]),
+      {
+        cwd: repo!,
+        env: process.env,
+        stdin: 'pipe',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    );
+  } catch (err: any) {
+    log(
+      `launch failed [${ws.name}] ${id}: ${err?.message || err}; key=${key}; will retry`,
+    );
+    return;
+  }
+
+  launchedTransitions.set(ledgerKey, {
+    workstream: ws.name,
+    wi: id,
+    key,
+    final: out,
+    startedAt: stamp(),
+    pid: proc.pid ?? 'unknown',
+  });
+  saveLaunchLedger();
 
   running.set(mapKey, proc.pid ?? 'unknown');
   proc.stdin.write(promptFor(ws, id));
@@ -253,6 +328,13 @@ async function poll() {
         );
         launchReview(ws, id, key);
       }
+      if (!initialised && backfillReviewing && nowStage === 'Reviewing') {
+        const key = `<startup>->Reviewing@${modified(page)}`;
+        log(
+          `backfill [${ws.name}] ${id}: already Reviewing at startup (${plainTitle(page.properties?.Name)})`,
+        );
+        launchReview(ws, id, key);
+      }
       previousStages.set(mapKey, nowStage);
     }
     summaries.push(
@@ -263,7 +345,7 @@ async function poll() {
   if (!initialised) {
     initialised = true;
     log(
-      `baseline [${summaries.join(' | ')}]; pollMs=${pollMs}; de-dupe=transition-key`,
+      `baseline [${summaries.join(' | ')}]; pollMs=${pollMs}; de-dupe=durable-transition-ledger`,
     );
   } else {
     log(
@@ -272,8 +354,9 @@ async function poll() {
   }
 }
 
+loadLaunchLedger();
 log(
-  `starting review watcher: ${workstreams.map((ws) => `${ws.name} (${ws.id})`).join(' + ')}, Stage trigger=Reviewing`,
+  `starting review watcher: ${workstreams.map((ws) => `${ws.name} (${ws.id})`).join(' + ')}, Stage trigger=Reviewing, backfillReviewing=${backfillReviewing}, launchedTransitions=${launchedTransitions.size}`,
 );
 while (true) {
   try {
