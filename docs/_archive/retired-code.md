@@ -130,6 +130,44 @@ consequences of the sweep:
 Recovery: same pre-sweep tag `retired/wi-1364-dead-legacy-readers` plus this
 commit's parent.
 
+### Integration-test orphans (completeness follow-up, 2026-07-04)
+
+A third failure class the in-worktree jest cannot see: co-located
+`*.integration.test.ts` files (they need a DB and only run in CI's integration
+jobs). Because the integration transform is `ts-jest` with `isolatedModules:
+true` (transpile-only, no cross-module type-check), a removed named import
+becomes `undefined` at runtime — so the only failure mode is a **live (non-skip)
+test that calls a removed fn** → runtime `TypeError: X is not a function`.
+
+- **`services/billing/subscription-core.integration.test.ts`** — retired the
+  `resetMonthlyQuota` describe block + dropped its import (kept `getQuotaPool`).
+  WI-1128 kept its "returns null when quota pool does not exist" test (the fixture
+  didn't seed through the dead `createSubscription` path), but the subject fn
+  `resetMonthlyQuota` was itself removed from `subscription-core.ts`, so the kept
+  test's call is now a runtime TypeError. Retired under the preservation gate.
+  Validated on a recreated WI-1347-style scratch Postgres (local pg17 + pgvector,
+  full `drizzle-kit migrate` chain, 89 tables): **17/17 tests pass**.
+
+Triage of the full removed-fn-name grep set (6 `*.integration.test.ts` files) —
+only the above is a genuine break; the other 5 are false positives, left
+untouched:
+- `tests/integration/parent-dashboard.integration.test.ts` &
+  `tests/integration/profile-isolation.integration.test.ts` — `createProfile` is a
+  **local `async function`** in each file, not the removed source export.
+- `services/billing/quota-reconcile.integration.test.ts` — imports the v2 twin
+  `reconcileQuotaStateForSubscriptionV2`; the removed name appears only in a
+  describe **title** + comments.
+- `services/identity-v2/consent-v2.integration.test.ts` — the single hit is a
+  **comment**.
+- `tests/integration/billing-service.integration.test.ts` — imports removed
+  `createSubscription`/`ensureFreeSubscription`, but every call sits inside
+  `it.skip` blocks (`SKIP_LEGACY_STORE_TESTS`, documented as deferred to
+  **WI-1139**); transpile-only + skipped ⇒ never executed ⇒ no runtime failure.
+  Left as WI-1139's tracked scope.
+
+Recovery: same pre-sweep tag `retired/wi-1364-dead-legacy-readers` plus this
+commit's parent.
+
 ---
 
 ## WI-1128 — legacy identity integration suites (2026-07-03)
