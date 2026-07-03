@@ -1,0 +1,26 @@
+[
+  {
+    "site": ".github/workflows/ci.yml:ota-update:Publish OTA update to preview channel",
+    "v0": true,
+    "v1": true,
+    "v2": true
+  },
+  {
+    "site": "apps/mobile/eas.json:build.development",
+    "v0": true,
+    "v1": true,
+    "v2": true
+  },
+  {
+    "site": "apps/mobile/eas.json:build.fallback",
+    "v0": true,
+    "v1": true,
+    "v2": false
+  },
+  {
+    "site": "apps/mobile/eas.json:build.preview",
+    "v0": true,
+    "v1": true,
+    "v2": true
+  }
+]
