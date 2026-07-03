@@ -261,6 +261,99 @@ describe('processExchange — dangerous-procedure reply gate wiring [WI-1154]', 
 });
 
 // ---------------------------------------------------------------------------
+// [WI-1349] Exact-date age classification for the router: Gemini-under-18 ban
+// + safety-preamble selection.
+//
+// resolveAgeBracket() derived the router-config bracket from year-only
+// computeAgeBracket(), so a learner who is still 17 but born later in the year
+// (birthday not yet passed) read as 'adult' and was routed to (a) the
+// compliance-banned Gemini vendor (MMT-ADR-0016 §1.5) AND (b) the adult safety
+// preamble — while the dangerous-procedure gate (computeAgeBracketFromDate)
+// correctly treated the same learner as a minor. The fix threads the exact
+// birth date (birthMonth/birthDay) into the router-config bracket at the
+// routeAndCall / routeAndStream seams.
+//
+// Red-green-revert: swap computeAgeBracketFromDate back to
+// resolveAgeBracket(context.birthYear) at those two seams in exchanges.ts and
+// both assertions flip — the still-17 learner routes to the gemini provider
+// with the adult preamble.
+// ---------------------------------------------------------------------------
+
+describe('[WI-1349] processExchange — exact-date age gate (Gemini-under-18 ban + preamble)', () => {
+  // Benign, non-tripwire learning question so the LLM path runs through to the
+  // router (rather than short-circuiting on a safety floor).
+  const QUESTION = 'can you explain how photosynthesis works';
+
+  interface RouteSink {
+    calledBy: string[];
+    systemPromptByProvider: Record<string, string>;
+  }
+
+  function capturingProvider(
+    id: 'cerebras' | 'gemini',
+    sink: RouteSink,
+  ): LLMProvider {
+    return {
+      id,
+      async chat(messages: ChatMessage[]) {
+        sink.calledBy.push(id);
+        const first = messages[0];
+        sink.systemPromptByProvider[id] =
+          first?.role === 'system' && typeof first.content === 'string'
+            ? first.content
+            : '';
+        return {
+          content: JSON.stringify({
+            reply: 'Photosynthesis converts light into chemical energy.',
+            signals: { understanding_check: false },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  it('[WI-1349][SECURITY] a still-17 learner (year-only reads 18) routes OFF Gemini and gets the young-learner preamble', async () => {
+    // Pinned mid-year so the year-only/exact-date divergence is deterministic
+    // year-round (mirrors profile.test.ts § WI-367). Born 2008-12-31: year-only
+    // math reads 2026 - 2008 = 18 (adult); the exact date (Dec 31 not yet
+    // passed) reads 17 (adolescent).
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    const sink: RouteSink = { calledBy: [], systemPromptByProvider: {} };
+    registerProvider(capturingProvider('gemini', sink));
+    registerProvider(capturingProvider('cerebras', sink));
+    try {
+      const stillSeventeen: ExchangeContext = {
+        ...baseContext,
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      };
+      await processExchange(stillSeventeen, QUESTION);
+
+      // (a) Gemini config must NOT resolve — the under-18 vendor ban holds for a
+      // learner whose EXACT age is still 17, routing to the approved provider.
+      expect(sink.calledBy).not.toContain('gemini');
+      expect(sink.calledBy).toContain('cerebras');
+      // (b) The young-learner safety preamble is selected, not the adult one.
+      const prompt = sink.systemPromptByProvider['cerebras'] ?? '';
+      expect(prompt).toContain('for young learners');
+      expect(prompt).not.toContain('The current learner is an adult');
+    } finally {
+      jest.useRealTimers();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Deterministic safety tripwire — IMAGE / VISION input (Issue 894)
 //
 // [BREAK] The text-only tripwire runs on `userMessage` but the attached image
