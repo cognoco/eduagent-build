@@ -320,12 +320,15 @@ jest.mock(
 // The caller-vs-X-Profile-Id-spoof distinction this guard exists to enforce
 // is covered by the real-DB break test in
 // tests/integration/account-billing-owner-idor.integration.test.ts.
-jest.mock(
-  '../services/identity-v2/ownership-v2' /* gc1-allow: route unit test — DB mocked; real DB covered by ownership-v2.integration.test.ts and account-billing-owner-idor.integration.test.ts */,
-  () => ({
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
     verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
-  }),
-);
+  };
+});
 
 // KV: use in-memory fake that exercises real services/kv Zod parsing.
 
