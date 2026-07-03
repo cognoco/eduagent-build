@@ -16,10 +16,10 @@
 ## Provenance
 
 The rows below originate from the **WI-1285** audit — an inventory of eight
-prompt-only safety rules found in `exchange-prompts.ts`'s SAFETY block,
-recorded as an 8-site table appended to the WI-1285 Cosmo page. That audit
-classified each site as either **acceptable as prompt-only** or **needs a
-server-side gate**, and named the follow-up Work Items for the latter two.
+SAFETY-block sites found in `exchange-prompts.ts`'s SAFETY block, recorded as
+an 8-site table appended to the WI-1285 Cosmo page. That audit classified each
+site as either **acceptable as prompt-only** or **needs a server-side gate**,
+and named the follow-up Work Items for the latter two.
 This register transcribes and verifies the four rows with a settled,
 citable outcome (two gated, two justified-prompt-only) so that outcome is
 discoverable from the repo, not only from the Cosmo page. **This register
