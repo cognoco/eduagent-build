@@ -115,6 +115,35 @@ describe('processExchange — safety tripwire wiring', () => {
     }
   });
 
+  it('[BREAK] short-circuits the LLM and returns the safe abuse-disclosure reply', async () => {
+    registerProvider(throwingProvider);
+    try {
+      const result = await processExchange(baseContext, 'my dad hits me');
+      expect(result.response).toBe(tripwireResponse('abuse_disclosure'));
+      expect(result.provider).toBe('safety-tripwire');
+      expect(result.model).toBe('deterministic:abuse_disclosure');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('streamExchange short-circuits the LLM and streams the safe abuse-disclosure reply', async () => {
+    registerProvider(throwingProvider);
+    try {
+      const result = await streamExchange(baseContext, 'my dad hits me');
+      let streamed = '';
+      for await (const chunk of result.stream) streamed += chunk;
+      expect(streamed).toBe(tripwireResponse('abuse_disclosure'));
+      expect(result.provider).toBe('safety-tripwire');
+      const raw = await result.rawResponsePromise;
+      const parsed = parseExchangeEnvelope(raw);
+      expect(parsed.crisisRedirect).toBe(true);
+      expect(parsed.cleanResponse).toBe(tripwireResponse('abuse_disclosure'));
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
   it('does NOT trip on a legitimate curriculum question (LLM is used)', async () => {
     let called = false;
     const countingProvider: LLMProvider = {
