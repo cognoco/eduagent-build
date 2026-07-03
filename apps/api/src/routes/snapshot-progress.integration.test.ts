@@ -28,7 +28,6 @@ import {
 import { mockClerkJWKS } from '../../../../tests/integration/external-mocks';
 import { ERROR_CODES } from '@eduagent/schemas';
 import {
-  accounts,
   generateUUIDv7,
   guardianship,
   membership,
@@ -36,9 +35,9 @@ import {
   notificationLog,
   person,
   progressSnapshots,
-  profiles,
 } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
+import { ensureLegacyProfileAnchorForTest } from '../test-utils/legacy-identity-anchors';
 
 import { app } from '../index';
 import { clearJWKSCache } from '../middleware/jwt';
@@ -113,14 +112,6 @@ async function createChildProfile(owner: {
   const childId = generateUUIDv7();
   const birthYear = new Date().getFullYear() - 14;
 
-  await db
-    .insert(accounts)
-    .values({
-      id: owner.accountId,
-      clerkUserId: AUTH_USER_ID,
-      email: AUTH_EMAIL,
-    })
-    .onConflictDoNothing();
   await db.insert(person).values({
     id: childId,
     displayName: 'Snapshot Progress Child',
@@ -136,12 +127,14 @@ async function createChildProfile(owner: {
     guardianPersonId: owner.id,
     chargePersonId: childId,
   });
-  await db.insert(profiles).values({
-    id: childId,
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: childId,
     accountId: owner.accountId,
     displayName: 'Snapshot Progress Child',
     birthYear,
     isOwner: false,
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
   });
   return { id: childId };
 }

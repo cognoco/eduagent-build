@@ -1,13 +1,20 @@
 /**
  * Integration: subscription-core.ts — full public surface coverage
  *
- * Covers: getSubscriptionByAccountId, updateSubscriptionFromWebhook,
+ * Covers: updateSubscriptionFromWebhook,
  * linkStripeCustomer, getQuotaPool, resetMonthlyQuota,
  * markSubscriptionCancelled, activateSubscriptionFromCheckout
  *
  * [WI-1128 follow-up, 2026-07-03] createSubscription, ensureFreeSubscription,
  * and updateQuotaPoolLimit coverage was retired — see docs/_archive/retired-code.md
  * ("Trimmed — subscription-core.integration.test.ts, follow-up") for why.
+ *
+ * [WI-1347, retired below] getSubscriptionByAccountId coverage was retired —
+ * the fn reads the legacy `subscriptions` table unconditionally (no
+ * tableExists gate) and is transitively dead (zero live callers beyond the
+ * already-dead createSubscription/ensureFreeSubscription roots above), so its
+ * describe block hard-fails once the legacy tables are dropped. See
+ * docs/_archive/retired-code.md ("WI-1347 — getSubscriptionByAccountId").
  *
  * No mocks of internal services or database — real DB only.
  * External-boundary Sentry calls are left real (no-op without DSN).
@@ -31,11 +38,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { legacyIdentityTableExistsForTest } from '../../test-utils/legacy-identity-anchors';
-import {
-  getSubscriptionByAccountId,
-  getQuotaPool,
-  resetMonthlyQuota,
-} from './subscription-core';
+import { getQuotaPool, resetMonthlyQuota } from './subscription-core';
 // [WI-1239 / 779-strip] updateSubscriptionFromWebhook, linkStripeCustomer,
 // markSubscriptionCancelled, and activateSubscriptionFromCheckout were removed
 // from subscription-core.ts — the Stripe webhook route dispatches exclusively
@@ -228,15 +231,17 @@ async function seedV2SubscriptionDirect(input: {
       lastStripeEventId: input.lastStripeEventId ?? null,
     })
     .returning();
-  await db.insert(subscriptions).values({
-    id: subV2!.id,
-    accountId: input.organizationId,
-    tier: input.tier,
-    status: input.status,
-    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
-    lastStripeEventTimestamp: input.lastStripeEventTimestamp ?? null,
-    lastStripeEventId: input.lastStripeEventId ?? null,
-  });
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
+      id: subV2!.id,
+      accountId: input.organizationId,
+      tier: input.tier,
+      status: input.status,
+      stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+      lastStripeEventTimestamp: input.lastStripeEventTimestamp ?? null,
+      lastStripeEventId: input.lastStripeEventId ?? null,
+    });
+  }
   if (input.withQuotaPool) {
     const tierConfig = getTierConfig(input.tier);
     await db.insert(quotaPools).values({
@@ -289,70 +294,14 @@ afterAll(async () => {
 });
 
 // ---------------------------------------------------------------------------
-// getSubscriptionByAccountId
+// getSubscriptionByAccountId — RETIRED [WI-1347]. Transitively dead (zero
+// live callers: only reachable from the already-dead createSubscription /
+// ensureFreeSubscription roots per docs/_archive/retired-code.md); its
+// unconditional read of the legacy `subscriptions` table hard-fails once the
+// legacy identity tables are dropped. See docs/_archive/retired-code.md
+// ("WI-1347 — getSubscriptionByAccountId") for reachability evidence and
+// recovery (annotated tag retired/wi-1347-getsubscriptionbyaccountid).
 // ---------------------------------------------------------------------------
-
-describe('getSubscriptionByAccountId', () => {
-  it('returns null when no subscription exists', async () => {
-    const db = createIntegrationDb();
-    const acct = await seedAccount('get-missing');
-    const result = await getSubscriptionByAccountId(db, acct.id);
-    expect(result).toBeNull();
-  });
-
-  it('returns the subscription row when one exists', async () => {
-    const db = createIntegrationDb();
-    const acct = await seedAccount('get-happy');
-    // seed subscription directly
-    const tierConfig = getTierConfig('free');
-    // [WI-1128] quota_pools.subscriptionId now FKs to the v2 `subscription`
-    // table (post-M-REPOINT) — seed a v2 counterpart under an auto-provisioned
-    // throwaway payer (subscription.payerPersonId is NOT NULL) with the SAME
-    // id as the legacy row, mirroring seedV2SubscriptionDirect's pattern.
-    const [payer] = await db
-      .insert(person)
-      .values({
-        displayName: 'Auto Payer',
-        birthDate: '1990-01-01',
-        residenceJurisdiction: 'EU',
-      })
-      .returning();
-    await db.insert(membership).values({
-      personId: payer!.id,
-      organizationId: acct.id,
-      roles: ['admin'],
-    });
-    const [subV2] = await db
-      .insert(subscriptionV2Table)
-      .values({
-        organizationId: acct.id,
-        planTier: 'free',
-        status: 'active',
-        payerPersonId: payer!.id,
-      })
-      .returning();
-    await db.insert(subscriptions).values({
-      id: subV2!.id,
-      accountId: acct.id,
-      tier: 'free',
-      status: 'active',
-    });
-    await db.insert(quotaPools).values({
-      subscriptionId: subV2!.id,
-      monthlyLimit: tierConfig.monthlyQuota,
-      usedThisMonth: 0,
-      dailyLimit: tierConfig.dailyLimit,
-      usedToday: 0,
-      cycleResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
-    const result = await getSubscriptionByAccountId(db, acct.id);
-    expect(result).not.toBeNull();
-    expect(result!.accountId).toBe(acct.id);
-    expect(result!.tier).toBe('free');
-    expect(result!.status).toBe('active');
-  });
-});
 
 // ---------------------------------------------------------------------------
 // ensureFreeSubscription / createSubscription

@@ -892,11 +892,13 @@ legacyAccountDeletionCascadeDescribe(
         });
 
         // ---- Consent + family preference rows ----
-        await db.insert(consentStates).values({
-          profileId,
-          consentType: 'GDPR',
-          status: 'CONSENTED',
-        });
+        if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
+          await db.insert(consentStates).values({
+            profileId,
+            consentType: 'GDPR',
+            status: 'CONSENTED',
+          });
+        }
 
         await db.insert(withdrawalArchivePreferences).values({
           ownerProfileId: profileId,
@@ -915,10 +917,12 @@ legacyAccountDeletionCascadeDescribe(
         });
 
         // ---- Cross-account-shaped rows (the deleted user is parent of the other) ----
-        await db.insert(familyLinks).values({
-          parentProfileId: profileId,
-          childProfileId: otherProfileId,
-        });
+        if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+          await db.insert(familyLinks).values({
+            parentProfileId: profileId,
+            childProfileId: otherProfileId,
+          });
+        }
 
         await db.insert(nudges).values({
           fromProfileId: profileId,
@@ -1059,8 +1063,10 @@ legacyAccountDeletionCascadeDescribe(
         // referenced the deleted profile, but the account row and its own
         // profile must survive.)
         // -----------------------------------------------------------------------
-        const otherStillThere = await db.query.profiles.findFirst({
-          where: eq(profiles.id, otherProfileId),
+        // [WI-1347] v2 person is the drop-safe equivalent of the legacy
+        // profiles row this originally asserted on.
+        const otherStillThere = await db.query.person.findFirst({
+          where: eq(person.id, otherProfileId),
         });
         expect(otherStillThere).not.toBeUndefined();
       } finally {

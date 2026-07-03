@@ -9,12 +9,12 @@
  * - Stripe SDK wrapper
  */
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   generateUUIDv7,
+  login,
+  membership,
   profileQuotaUsage,
-  profiles,
   quotaPools,
   subscription as subscriptionV2,
   subscriptions,
@@ -75,7 +75,12 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
-import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import {
+  ensureV2IdentityForLegacyProfileTest,
+  ensureLegacyProfileAnchorForTest,
+  legacyIdentityTableExistsForTest,
+} from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import { findOwnerPersonId } from '../../apps/api/src/services/identity-v2/helpers';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const TEST_ENV = {
@@ -98,21 +103,15 @@ async function seedAccount() {
   const db = createIntegrationDb();
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      id: accountId,
-      clerkUserId: AUTH_USER_ID,
-      email: AUTH_EMAIL,
-    })
-    .returning();
 
-  await db.insert(profiles).values({
-    id: profileId,
-    accountId: account!.id,
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId,
+    accountId,
     displayName: 'Billing Owner',
     birthYear: 1990,
     isOwner: true,
+    clerkUserId: AUTH_USER_ID,
+    email: AUTH_EMAIL,
   });
 
   // [WI-1145] Seed the v2 identity graph unconditionally — the collapsed account
@@ -126,7 +125,7 @@ async function seedAccount() {
   // sub id (== legacy sub id) — the legacy `subscriptions` seed alone leaves the
   // v2 read empty and the FK on `profile_quota_usage` unsatisfiable.
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
+    accountId,
     profileId,
     displayName: 'Billing Owner',
     birthYear: 1990,
@@ -143,7 +142,7 @@ async function seedAccount() {
   // Return the seeded owner profileId so callers can supply X-Profile-Id, the
   // explicit-header resolution the owner-only billing gates now require (the
   // real mobile client always sends it). profiles.id === person.id under v2.
-  return { account: account!, ownerProfileId: profileId };
+  return { account: { id: accountId }, ownerProfileId: profileId };
 }
 
 async function seedSubscription(
@@ -163,9 +162,11 @@ async function seedSubscription(
 ) {
   const db = createIntegrationDb();
   const tier = overrides?.tier ?? 'plus';
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
+  const subId = generateUUIDv7();
+
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
+      id: subId,
       accountId,
       tier,
       status: overrides?.status ?? 'active',
@@ -174,8 +175,8 @@ async function seedSubscription(
       currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
       currentPeriodEnd:
         overrides?.currentPeriodEnd ?? new Date('2026-05-01T00:00:00.000Z'),
-    })
-    .returning();
+    });
+  }
 
   // [WI-1145] Seed the v2 subscription UNCONDITIONALLY (was gated on
   // isIdentityV2Enabled()), with the SAME id as the legacy row. Billing GET
@@ -185,27 +186,17 @@ async function seedSubscription(
   // baseline sub, so this pair is the only subscription for the org. Pre-collapse
   // the legacy read ignores the v2 row, so it is inert and safe there.
   {
-    const [ownerProfile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(
-        and(
-          eq(profiles.accountId, accountId),
-          eq(profiles.isOwner, true),
-          isNull(profiles.archivedAt),
-        ),
-      )
-      .limit(1);
-    if (!ownerProfile) {
+    const ownerPersonId = await findOwnerPersonId(db, accountId);
+    if (!ownerPersonId) {
       throw new Error('Owner profile not found for v2 subscription seed');
     }
 
     await db.insert(subscriptionV2).values({
-      id: subscription!.id,
+      id: subId,
       organizationId: accountId,
       planTier: tier,
       status: overrides?.status ?? 'active',
-      payerPersonId: ownerProfile.id,
+      payerPersonId: ownerPersonId,
       stripeCustomerId: overrides?.stripeCustomerId ?? 'cus_existing',
       stripeSubscriptionId: overrides?.stripeSubscriptionId ?? 'sub_existing',
       periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
@@ -217,7 +208,7 @@ async function seedSubscription(
   const [quotaPool] = await db
     .insert(quotaPools)
     .values({
-      subscriptionId: subscription!.id,
+      subscriptionId: subId,
       monthlyLimit: overrides?.monthlyLimit ?? getTierConfig(tier).monthlyQuota,
       usedThisMonth: overrides?.usedThisMonth ?? 0,
       dailyLimit:
@@ -230,22 +221,12 @@ async function seedSubscription(
 
   const config = getTierConfig(tier);
   if (config.quotaModel === 'per-profile') {
-    const [ownerProfile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(
-        and(
-          eq(profiles.accountId, accountId),
-          eq(profiles.isOwner, true),
-          isNull(profiles.archivedAt),
-        ),
-      )
-      .limit(1);
+    const ownerPersonId = await findOwnerPersonId(db, accountId);
 
-    if (ownerProfile) {
+    if (ownerPersonId) {
       await db.insert(profileQuotaUsage).values({
-        subscriptionId: subscription!.id,
-        profileId: ownerProfile.id,
+        subscriptionId: subId,
+        profileId: ownerPersonId,
         role: 'owner',
         monthlyLimit:
           overrides?.monthlyLimit ??
@@ -264,21 +245,31 @@ async function seedSubscription(
   }
 
   return {
-    subscription: subscription!,
+    subscription: { id: subId },
     quotaPool: quotaPool!,
   };
 }
 
 async function loadAccount() {
   const db = createIntegrationDb();
-  return db.query.accounts.findFirst({
-    where: eq(accounts.clerkUserId, AUTH_USER_ID),
+  const loginRow = await db.query.login.findFirst({
+    where: eq(login.clerkUserId, AUTH_USER_ID),
+    columns: { personId: true },
   });
+  if (!loginRow) return undefined;
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, loginRow.personId),
+    columns: { organizationId: true },
+  });
+  return membershipRow ? { id: membershipRow.organizationId } : undefined;
 }
 
 async function loadSubscription(accountId: string) {
   const db = createIntegrationDb();
-  if (isIdentityV2Enabled()) {
+  if (
+    isIdentityV2Enabled() ||
+    !(await legacyIdentityTableExistsForTest(db, 'subscriptions'))
+  ) {
     const row = await db.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, accountId),
     });
@@ -468,9 +459,14 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Checkout = await checkoutDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCheckout = await checkoutDb.query.subscriptions.findFirst({
-      where: eq(subscriptions.accountId, account.id),
-    });
+    const legacyCheckout = (await legacyIdentityTableExistsForTest(
+      checkoutDb,
+      'subscriptions',
+    ))
+      ? await checkoutDb.query.subscriptions.findFirst({
+          where: eq(subscriptions.accountId, account.id),
+        })
+      : undefined;
     expect(
       v2Checkout?.stripeCustomerId === 'cus_checkout' ||
         legacyCheckout?.stripeCustomerId === 'cus_checkout',
@@ -518,9 +514,14 @@ describe('Integration: billing lifecycle routes', () => {
     const v2Cancel = await cancelDb.query.subscription.findFirst({
       where: eq(subscriptionV2.organizationId, account.id),
     });
-    const legacyCancel = await cancelDb.query.subscriptions.findFirst({
-      where: eq(subscriptions.accountId, account.id),
-    });
+    const legacyCancel = (await legacyIdentityTableExistsForTest(
+      cancelDb,
+      'subscriptions',
+    ))
+      ? await cancelDb.query.subscriptions.findFirst({
+          where: eq(subscriptions.accountId, account.id),
+        })
+      : undefined;
     expect((v2Cancel?.cancelledAt ?? legacyCancel?.cancelledAt) != null).toBe(
       true,
     );

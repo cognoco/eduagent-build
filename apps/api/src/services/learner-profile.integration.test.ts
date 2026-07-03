@@ -19,14 +19,20 @@
 import { resolve } from 'path';
 import { eq, inArray } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
+  generateUUIDv7,
   learningProfiles,
+  login,
+  membership,
   memoryFacts,
-  profiles,
   type Database,
 } from '@eduagent/database';
-import { ensureV2IdentityForLegacyProfileTest } from '../test-utils/legacy-identity-anchors';
+import {
+  ensureV2IdentityForLegacyProfileTest,
+  ensureLegacyProfileAnchorForTest,
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+} from '../test-utils/legacy-identity-anchors';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import type { SessionAnalysisOutput } from '@eduagent/schemas';
 
@@ -70,13 +76,23 @@ const EMAILS = [
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: inArray(accounts.email, EMAILS),
+  // Discover ids via the v2 `login` table (by email), which always exists —
+  // unlike legacy `accounts`, which may already be dropped.
+  const loginRows = await db.query.login.findMany({
+    where: inArray(login.email, EMAILS),
+    columns: { personId: true },
   });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+  const profileIds = loginRows.map((r) => r.personId);
+  let accountIds: string[] = [];
+  if (profileIds.length > 0) {
+    const membershipRows = await db.query.membership.findMany({
+      where: inArray(membership.personId, profileIds),
+      columns: { organizationId: true },
+    });
+    accountIds = [...new Set(membershipRows.map((r) => r.organizationId))];
   }
+  await deleteLegacyAccountsForTest(db, accountIds);
+  await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 
 interface SeedAccount {
@@ -89,25 +105,23 @@ async function seedAccountAndProfile(emailIndex: 0 | 1): Promise<SeedAccount> {
   const db = createIntegrationDb();
   const email = EMAILS[emailIndex]!;
   const clerkUserId = `${PREFIX}-clerk-${emailIndex}`;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Learner ${emailIndex}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId,
+    accountId,
+    displayName: `Learner ${emailIndex}`,
+    birthYear: 2010,
+    isOwner: true,
+    clerkUserId,
+    email,
+  });
 
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     displayName: `Learner ${emailIndex}`,
     birthYear: 2010,
     clerkUserId,
@@ -117,8 +131,8 @@ async function seedAccountAndProfile(emailIndex: 0 | 1): Promise<SeedAccount> {
   });
 
   return {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     email,
   };
 }

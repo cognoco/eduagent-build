@@ -32,6 +32,7 @@ import { buildAuthHeaders } from './test-keys';
 import { resolveAccountId } from './route-fixtures';
 
 import { app } from '../../apps/api/src/index';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_ENV = buildIntegrationEnv();
 
@@ -111,10 +112,12 @@ async function seedFamilySubscription(profileId: string) {
 
   // Account creation auto-provisions a 'plus' trial subscription,
   // so we UPDATE the existing row to 'family' tier instead of inserting.
-  await db
-    .update(subscriptions)
-    .set({ tier: 'family', status: 'active' })
-    .where(eq(subscriptions.accountId, accountId));
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db
+      .update(subscriptions)
+      .set({ tier: 'family', status: 'active' })
+      .where(eq(subscriptions.accountId, accountId));
+  }
 
   // [WI-1145] Update the v2 subscription unconditionally (dual-store consistency) —
   // the product reads subscription-v2 unconditionally post-collapse.

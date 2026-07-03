@@ -59,12 +59,15 @@ import {
   membership,
   organization,
   person,
-  profiles,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
+import {
+  deleteV2IdentitiesForTest,
+  ensureLegacyProfileAnchorForTest,
+  legacyIdentityTableExistsForTest,
+} from '../../test-utils/legacy-identity-anchors';
 import {
   _resetCircuits,
   registerProvider,
@@ -235,51 +238,48 @@ async function seedProfileAndSubject(
   db: Database,
 ): Promise<{ profileId: string; subjectId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_grader_integ_${RUN_ID}_${idx}`,
-      email: `grader-integ-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  const clerkUserId = `clerk_grader_integ_${RUN_ID}_${idx}`;
+  const email = `grader-integ-${RUN_ID}-${idx}@test.invalid`;
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Grader Tester ${idx}`,
-      birthYear: 2006, // Under 18 → ageBracket='teen'
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId,
+    accountId,
+    displayName: `Grader Tester ${idx}`,
+    birthYear: 2006, // Under 18 → ageBracket='teen'
+    isOwner: true,
+    clerkUserId,
+    email,
+  });
 
   // [WI-867] v2 identity graph — loadProfileRowByIdV2 reads person unconditionally.
   await db
     .insert(organization)
-    .values({ id: account!.id, name: `Grader Org ${idx}` });
+    .values({ id: accountId, name: `Grader Org ${idx}` });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: `Grader Tester ${idx}`,
     birthDate: '2006-01-01',
     residenceJurisdiction: 'US',
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: ['learner'],
   });
-  seededV2AccountIds.push(account!.id);
-  seededV2ProfileIds.push(profile!.id);
+  seededV2AccountIds.push(accountId);
+  seededV2ProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Biology ${idx}`,
     })
     .returning({ id: subjects.id });
 
-  return { profileId: profile!.id, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id };
 }
 
 async function seedCurriculumTopic(
@@ -477,9 +477,11 @@ describeIfDb('Challenge Round grader integration (T7)', () => {
       });
     }
     // Cascade-delete test accounts; related rows follow FK ON DELETE CASCADE.
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+    if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+      await db
+        .delete(accounts)
+        .where(like(accounts.clerkUserId, `clerk_grader_integ_${RUN_ID}%`));
+    }
     // Unregister only our providers — leave the shared registry intact for
     // other suites in this worker.
     llm.dispose();

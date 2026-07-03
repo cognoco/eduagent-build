@@ -34,6 +34,7 @@ import {
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { generateExport } from './export';
+import { legacyIdentityTableExistsForTest } from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -59,14 +60,20 @@ describeIfDb('generateExport learning-only billing skip (integration)', () => {
     accountId = org!.id;
 
     // A legacy subscription the export WOULD surface on the normal path.
-    await db.insert(subscriptions).values({ accountId });
+    // Gated: post-drop there is no legacy row to leak, so the assertion below
+    // holds trivially instead of hard-failing on a dropped table.
+    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+      await db.insert(subscriptions).values({ accountId });
+    }
   });
 
   afterAll(async () => {
     // subscriptions cascades on organization delete, but be explicit + FK-safe.
-    await db
-      .delete(subscriptions)
-      .where(eq(subscriptions.accountId, accountId));
+    if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+      await db
+        .delete(subscriptions)
+        .where(eq(subscriptions.accountId, accountId));
+    }
     await db.delete(organization).where(eq(organization.id, accountId));
   });
 

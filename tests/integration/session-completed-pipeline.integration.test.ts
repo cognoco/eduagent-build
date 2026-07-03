@@ -27,10 +27,9 @@
 
 import { eq, and } from 'drizzle-orm';
 import {
-  accounts,
   familyLinks,
   guardianship,
-  profiles,
+  generateUUIDv7,
   subjects,
   curricula,
   curriculumBooks,
@@ -40,7 +39,10 @@ import {
   retentionCards,
   sessionSummaries,
 } from '@eduagent/database';
-import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import {
+  ensureV2IdentityForLegacyProfileTest,
+  legacyIdentityTableExistsForTest,
+} from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { registerProvider } from '../../apps/api/src/services/llm';
 import { createMockProvider } from '../../apps/api/src/services/llm/test-utils';
 import { getChildSessionDetail } from '../../apps/api/src/services/dashboard';
@@ -140,28 +142,17 @@ async function seedScenario(options?: {
 }): Promise<Scenario> {
   const db = createIntegrationDb();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: AUTH_USER_ID, email: AUTH_EMAIL })
-    .returning();
-
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'STAB Pipeline Learner',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
   // [WI-1145] Seed the v2 identity graph unconditionally — the session-completed
   // pipeline resolves the profile via v2 (person) and aborts "Profile not found"
-  // when v2 is empty on the post-collapse flag-off main lane. Same ids as legacy
-  // (person.id == profile.id, organization.id == account.id).
+  // when v2 is empty on the post-collapse flag-off main lane. Dual-writes the
+  // gated legacy accounts/profiles anchor internally (same ids: person.id ==
+  // profileId, organization.id == accountId).
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     displayName: 'STAB Pipeline Learner',
     birthYear: 2000,
     clerkUserId: AUTH_USER_ID,
@@ -172,7 +163,7 @@ async function seedScenario(options?: {
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: 'Biology',
       status: 'active',
       pedagogyMode: 'socratic',
@@ -208,7 +199,7 @@ async function seedScenario(options?: {
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId: profileId,
       subjectId: subject!.id,
       topicId: topic!.id,
       sessionType: 'learning',
@@ -243,7 +234,7 @@ async function seedScenario(options?: {
     await db.insert(sessionEvents).values(
       exchanges.map((ex) => ({
         sessionId: session!.id,
-        profileId: profile!.id,
+        profileId: profileId,
         subjectId: subject!.id,
         topicId: topic!.id,
         eventType: ex.eventType,
@@ -259,7 +250,7 @@ async function seedScenario(options?: {
   // Optionally seed a pre-existing retention card (simulates a topic reviewed before)
   if (options?.includePreExistingRetentionCard) {
     await db.insert(retentionCards).values({
-      profileId: profile!.id,
+      profileId: profileId,
       topicId: topic!.id,
       easeFactor: '2.50',
       intervalDays: 3,
@@ -274,7 +265,7 @@ async function seedScenario(options?: {
   }
 
   return {
-    profileId: profile!.id,
+    profileId: profileId,
     subjectId: subject!.id,
     topicId: topic!.id,
     sessionId: session!.id,
@@ -283,48 +274,38 @@ async function seedScenario(options?: {
 
 async function seedParentLink(childProfileId: string) {
   const db = createIntegrationDb();
-
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: PARENT_AUTH_USER_ID,
-      email: PARENT_AUTH_EMAIL,
-    })
-    .returning();
-
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'STAB Pipeline Parent',
-      birthYear: 1985,
-      isOwner: true,
-    })
-    .returning();
-
-  await db.insert(familyLinks).values({
-    parentProfileId: profile!.id,
-    childProfileId,
-  });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
   // [WI-1145] Seed the parent's v2 identity + guardianship edge to the child
   // unconditionally — the pipeline's parent/guardian reads resolve via v2 on the
   // post-collapse flag-off main lane (child person seeded by seedScenario).
+  // Dual-writes the gated legacy accounts/profiles anchor internally — the
+  // familyLinks insert below depends on that legacy profiles row existing, so
+  // it must run AFTER this call.
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     displayName: 'STAB Pipeline Parent',
     birthYear: 1985,
     clerkUserId: PARENT_AUTH_USER_ID,
     email: PARENT_AUTH_EMAIL,
     isOwner: true,
   });
+
+  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+    await db.insert(familyLinks).values({
+      parentProfileId: profileId,
+      childProfileId,
+    });
+  }
+
   await db.insert(guardianship).values({
-    guardianPersonId: profile!.id,
+    guardianPersonId: profileId,
     chargePersonId: childProfileId,
   });
 
-  return profile!.id;
+  return profileId;
 }
 
 // ---------------------------------------------------------------------------

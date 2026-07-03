@@ -164,12 +164,14 @@ const RUN = !!process.env.DATABASE_URL;
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
-      await db.insert(subscriptions).values({
-        id: subId,
-        accountId: org!.id,
-        tier: 'family',
-        status: 'active',
-      });
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.insert(subscriptions).values({
+          id: subId,
+          accountId: org!.id,
+          tier: 'family',
+          status: 'active',
+        });
+      }
 
       await db.insert(subscription).values({
         id: subId,
@@ -307,12 +309,14 @@ const RUN = !!process.env.DATABASE_URL;
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
-      await db.insert(subscriptions).values({
-        id: subId,
-        accountId: org!.id,
-        tier: 'free',
-        status: 'active',
-      });
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.insert(subscriptions).values({
+          id: subId,
+          accountId: org!.id,
+          tier: 'free',
+          status: 'active',
+        });
+      }
 
       await db.insert(subscription).values({
         id: subId,

@@ -106,8 +106,9 @@ const RUN = !!process.env.DATABASE_URL;
       // [WI-1128] Legacy `accounts`/`profiles`/`family_links` may already be
       // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
       // FK `person`/v2 `subscription` directly, so this legacy-store cleanup
-      // is a no-op there instead of hard-failing. `subscriptions` (legacy) is
-      // retained (not on the drop list) — no gate needed for it.
+      // is a no-op there instead of hard-failing. [WI-1347] `subscriptions`
+      // (legacy) IS on the drop list — gated below (a prior comment here was
+      // stale).
       if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
         await db
           .delete(familyLinks)
@@ -116,7 +117,9 @@ const RUN = !!process.env.DATABASE_URL;
           .delete(familyLinks)
           .where(inArray(familyLinks.childProfileId, personIds));
       }
-      await db.delete(subscriptions).where(eq(subscriptions.id, SUB_ID));
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.delete(subscriptions).where(eq(subscriptions.id, SUB_ID));
+      }
       if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
         await db.delete(profiles).where(inArray(profiles.id, personIds));
       }
@@ -189,7 +192,7 @@ const RUN = !!process.env.DATABASE_URL;
       // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
       // FK `person`/v2 `subscription` directly (not the legacy tables), so
       // this legacy-store seed is a no-op there instead of hard-failing.
-      // `subscriptions` (legacy) is retained (not on the drop list).
+      // [WI-1347] `subscriptions` (legacy) IS on the drop list — gated below.
       if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
         await db.insert(accounts).values({
           id: ACCOUNT_ID,
@@ -228,12 +231,14 @@ const RUN = !!process.env.DATABASE_URL;
           { parentProfileId: COPARENT_ID, childProfileId: CHILD_ID },
         ]);
       }
-      await db.insert(subscriptions).values({
-        id: SUB_ID,
-        accountId: ACCOUNT_ID,
-        tier: 'family',
-        status: 'active',
-      });
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.insert(subscriptions).values({
+          id: SUB_ID,
+          accountId: ACCOUNT_ID,
+          tier: 'family',
+          status: 'active',
+        });
+      }
       await db.insert(familyPreferences).values({
         ownerProfileId: OWNER_ID,
         poolBreakdownShared: opts.ownerSharing,
@@ -425,7 +430,7 @@ const RUN = !!process.env.DATABASE_URL;
       // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
       // FK `person`/v2 `subscription` directly (not the legacy tables), so
       // this legacy-store seed is a no-op there instead of hard-failing.
-      // `subscriptions` (legacy) is retained (not on the drop list).
+      // [WI-1347] `subscriptions` (legacy) IS on the drop list — gated below.
       if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
         await db.insert(accounts).values({
           id: ACCOUNT_ID,
@@ -464,12 +469,14 @@ const RUN = !!process.env.DATABASE_URL;
           .insert(familyLinks)
           .values([{ parentProfileId: OWNER_ID, childProfileId: CHILD_ID }]);
       }
-      await db.insert(subscriptions).values({
-        id: SUB_ID,
-        accountId: ACCOUNT_ID,
-        tier: 'family',
-        status: 'active',
-      });
+      if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+        await db.insert(subscriptions).values({
+          id: SUB_ID,
+          accountId: ACCOUNT_ID,
+          tier: 'family',
+          status: 'active',
+        });
+      }
       await db.insert(familyPreferences).values({
         ownerProfileId: OWNER_ID,
         poolBreakdownShared: true, // sharing ON — a leak would surface here
