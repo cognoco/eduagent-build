@@ -234,7 +234,7 @@ async function seedSubscriptionForAccount(input: {
     .returning();
 
   return {
-    subscription: { id: subscriptionId },
+    subscription: { id: subscriptionId, stripeSubscriptionId },
     quotaPool: quotaPool!,
   };
 }

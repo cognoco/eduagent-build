@@ -277,17 +277,12 @@ async function seedParentLink(childProfileId: string) {
   const accountId = generateUUIDv7();
   const profileId = generateUUIDv7();
 
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db.insert(familyLinks).values({
-      parentProfileId: profileId,
-      childProfileId,
-    });
-  }
-
   // [WI-1145] Seed the parent's v2 identity + guardianship edge to the child
   // unconditionally — the pipeline's parent/guardian reads resolve via v2 on the
   // post-collapse flag-off main lane (child person seeded by seedScenario).
-  // Dual-writes the gated legacy accounts/profiles anchor internally.
+  // Dual-writes the gated legacy accounts/profiles anchor internally — the
+  // familyLinks insert below depends on that legacy profiles row existing, so
+  // it must run AFTER this call.
   await ensureV2IdentityForLegacyProfileTest(db, {
     accountId,
     profileId,
@@ -297,6 +292,14 @@ async function seedParentLink(childProfileId: string) {
     email: PARENT_AUTH_EMAIL,
     isOwner: true,
   });
+
+  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+    await db.insert(familyLinks).values({
+      parentProfileId: profileId,
+      childProfileId,
+    });
+  }
+
   await db.insert(guardianship).values({
     guardianPersonId: profileId,
     chargePersonId: childProfileId,
