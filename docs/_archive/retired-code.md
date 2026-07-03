@@ -5,6 +5,73 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1364 — dead legacy identity/billing prod readers (2026-07-03)
+
+Dead-code sweep of the production service functions that still read/wrote the
+legacy `accounts` / `profiles` / `family_links` / `consent_states` /
+`subscriptions` tables. Every removed function was confirmed to have **zero live
+non-test callers** (routes and Inngest functions all dispatch to their v2 twins);
+the removals unblock WI-1139 (legacy schema-def removal). Verified per function
+via method-aware `git grep -nw` + route/Inngest dispatch tracing + alias-import
+sweep; `tsc -p tsconfig.app.json` clean afterward (the pre-existing
+`@eduagent/schemas`/language typecheck errors are a worktree build-order artifact,
+unrelated). **No test files were retired here** — the tests for these functions
+were already retired upstream in WI-1128 / WI-1347 (a clean `tsconfig.spec.json`
+typecheck confirms no surviving test statically references a removed function).
+
+**Recovery:** annotated tag `retired/wi-1364-dead-legacy-readers` points at the
+pre-sweep commit. Retrieve any removed file/function with:
+
+```
+git show retired/wi-1364-dead-legacy-readers:<path>
+```
+
+### Whole files deleted
+
+| File | Reachability evidence |
+|------|-----------------------|
+| `apps/api/src/services/deletion.ts` | All 11 exports (`scheduleDeletion`, `cancelDeletion`, `executeDeletion`, `deleteProfile`, `deleteProfileIfConsentWithdrawn`, …) prod-calls=0; no module importer, no method-style caller. Live path is `identity-v2/deletion-v2.ts` (`scheduleDeletionV2`/`executeDeletionV2`, wired in `routes/account.ts` + `inngest/functions/account-deletion.ts`). |
+| `apps/api/src/services/deletion.test.ts` | Tests only the above dead module. |
+
+### Gutted files (dead functions removed; live surface kept)
+
+| File | Removed (dead) | Kept (live) |
+|------|----------------|-------------|
+| `services/account.ts` | `findOrCreateAccount` (+ private `findLegacyAccountByClerkId`, `hashEmail`) | `notifyAccountSecurityEvent`, `findAccountByClerkId` (now v2 via `resolveIdentityV2`), `updateAccountEmailFromClerk` |
+| `services/profile.ts` | `listProfiles`, `countProfiles`, `assertProfileCreationAllowed`, `findOwnerProfile`, `createProfile`, `createProfileWithLimitCheck`, `getProfile`, `updateProfile`, `switchProfile`, `getProfileAge`, `loadProfileRowById`, `getProfileDisplayName`, `getProfileAgeBracket`, `resolveProfileRole` (+ private `mapProfileRow`, `loadProfileFamilyMeta`) | `updateProfileAppContext` (v2: person+membership), `ProfileValidationError`, `ProfileLimitError` classes |
+| `services/consent.ts` | `createPendingConsentState`, `createGrantedConsentState`, `requestConsent`, `resendConsent`, `processConsentResponse`, `refreshConsentToken`, `refreshConsentTokenForRequest`, `getConsentStatus`, `isConsentRevocationGenerationCurrent`, `isGdprProcessingAllowed`, `getChildNameByToken`, `getProfileDisplayName`, `getProfileForConsentRevocation`, `getFamilyOwnerProfileId`, `getProfileConsentState`, `getChildConsentForParent`, `revokeConsent`, `restoreConsent` (+ `ConsentState` interface, `mapConsentRow`) | `checkConsentRequiredFromDate`, `checkConsentRequired`, `getLatestGdprConsentByProfile`, `isGdprProcessingAllowedBatch`, `RESTORE_CONSENT_GRACE_PERIOD_MS`, error classes, `age-utils` re-exports. Routes use v2 twins (`requestConsentV2` …). |
+| `services/billing/subscription-core.ts` | `getSubscriptionByAccountId`, `createSubscription`, `ensureFreeSubscription`, `resetMonthlyQuota`, `updateQuotaPoolLimit` | `getQuotaPool` (live: `inngest/session-completed.ts`) |
+| `services/billing/quota-reconcile.ts` | `reconcileQuotaStateForSubscription` (only caller was dead `ensureFreeSubscription`) | `reconcileQuotaStateForEffectiveTier` (live: `billing-v2/quota-reconcile-v2.ts`) |
+| `services/billing/family.ts` | `getProfileCountForSubscription`, `canAddProfile` | `addToByokWaitlist`, `getUsageEventsAvailableSince`, `buildUsageDateLabels` (live: `routes/billing.ts`) |
+| `services/billing/trial.ts` | `expireTrialSubscription`, `downgradeQuotaPool`, `resetExpiredQuotaCycles`, `findExpiredTrials`, `findSubscriptionsByTrialDateRange`, `transitionToExtendedTrial`, `downgradeExtendedTrialQuotaIfStillExpired`, `transitionToExtendedTrialFromRevenuecatEvent`, `expireTrialAndDowngradeQuota`, `findExpiredTrialsByDaysSinceEnd` | `resetDailyQuotas` (live: `inngest/quota-reset.ts`; v2 twins in `trial-v2.ts` power `trial-expiry.ts`) |
+| `services/child-cap-notifications.ts` | `listActiveChildCapNotifications`, `recordChildCapNotificationForSubscription`, `recordChildCapNotificationForAccount` (+ private `mapNotificationRow`, `findOwnerProfileIdBySubscription`, `childBelongsToSubscriptionAccount`, `findOwnerProfileIdByAccount`, `insertChildCapNotification`) | `dismissChildCapNotification` (live) |
+| `services/onboarding/index.ts` | `updateConversationLanguage`, `updatePronouns` (routes use v2 twins) | `sanitizeInterestLabel`, `assertPronounsSelfEditAllowed`, `updateInterestsContext` |
+| `services/solo-progress-reports.ts` | `listEligibleSelfReportProfileIds`, `listEligibleSelfReportProfileIdsAtLocalHour9` | `isLocalHour9ForTimezone` (live: `identity-v2/solo-progress-reports-v2.ts`) |
+| `services/billing.ts` + `services/billing/index.ts` | Barrel re-exports of every removed billing/trial/family/subscription-core function | Re-exports of the kept functions above |
+
+### NOT swept (out of scope, surfaced for follow-up)
+
+- `services/export.ts` `generateExport` — **live** (unconditionally called by
+  `identity-v2/export-v2.ts` with `learningOnlyProfileIds`). Untouched.
+
+### Residual kept-live legacy-def readers (WI-1364 does NOT clear these for WI-1139)
+
+Two kept-live functions still import legacy table defs; WI-1139's "no code imports
+legacy defs" precondition stays **unmet for `accounts` + `consent_states`** after
+this sweep. Ownership of repointing them is the orchestrator's call:
+
+- `services/account.ts` `updateAccountEmailFromClerk` → legacy `accounts` (live
+  email-change path; also `mapAccountRow`).
+- `services/consent.ts` `getLatestGdprConsentByProfile` (reached via the live
+  `isGdprProcessingAllowedBatch`) → legacy `consent_states`.
+
+(`findAccountByClerkId` is **not** a legacy reader — it now resolves via
+`resolveIdentityV2`. The bucket-(c) `tableExists`-gated v2 dual-write files —
+`identity-graph.ts`, `subscription-core-v2.ts`, `child-profile-v2.ts` — remain
+WI-1398's scope, untouched here.)
+
+---
+
 ## WI-1128 — legacy identity integration suites (2026-07-03)
 
 The identity-v2 cutover's migration **0130 (`0130_m_drop_legacy.sql`)** physically

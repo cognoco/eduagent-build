@@ -14,29 +14,10 @@ export type {
 // Quota pool read/write (subscriptionId-keyed, store-agnostic) + the
 // legacy-reachable subscription CRUD subset kept for out-of-scope callers
 // (services/account.ts, services/profile.ts — see subscription-core.ts header)
-export {
-  getSubscriptionByAccountId,
-  createSubscription,
-  ensureFreeSubscription,
-  getQuotaPool,
-  resetMonthlyQuota,
-  updateQuotaPoolLimit,
-} from './subscription-core';
+export { getQuotaPool } from './subscription-core';
 
 // Trial expiry, quota cron helpers
-export {
-  expireTrialSubscription,
-  downgradeQuotaPool,
-  downgradeExtendedTrialQuotaIfStillExpired,
-  expireTrialAndDowngradeQuota,
-  resetDailyQuotas,
-  resetExpiredQuotaCycles,
-  findExpiredTrials,
-  findSubscriptionsByTrialDateRange,
-  transitionToExtendedTrial,
-  transitionToExtendedTrialFromRevenuecatEvent,
-  findExpiredTrialsByDaysSinceEnd,
-} from './trial';
+export { resetDailyQuotas } from './trial';
 
 // Quota decrement / increment (hot path)
 export type { DecrementResult, MeteringErrorCode } from './metering';
@@ -73,9 +54,4 @@ export { getTimeZoneOffsetMs, getStartOfTodayInTimeZone } from './timezone';
 
 // Family billing (Story 5.5)
 export type { FamilyMember } from './family';
-export {
-  getProfileCountForSubscription,
-  canAddProfile,
-  addToByokWaitlist,
-  ProfileRemovalNotImplementedError,
-} from './family';
+export { addToByokWaitlist, ProfileRemovalNotImplementedError } from './family';
