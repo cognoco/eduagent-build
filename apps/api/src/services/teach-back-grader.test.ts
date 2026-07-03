@@ -68,6 +68,7 @@ const VALID_VERDICT_JSON = JSON.stringify({
 });
 
 const BASE_INPUT: RunTeachBackGraderInput = {
+  profileId: '00000000-0000-4000-8000-0000000000bb',
   topic: 'fossilization',
   learnerExplanation:
     'Fossilization is when an animal dies and gets buried, then minerals replace the bones over millions of years.',
@@ -143,7 +144,11 @@ describe('runTeachBackGrader', () => {
       expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'app/teach-back.grader_degraded',
-          data: expect.objectContaining({ reason: 'route_error' }),
+          data: expect.objectContaining({
+            reason: 'route_error',
+            profileId: BASE_INPUT.profileId,
+            timestamp: expect.any(String),
+          }),
         }),
       );
     });

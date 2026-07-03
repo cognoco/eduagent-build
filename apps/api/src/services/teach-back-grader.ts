@@ -48,6 +48,8 @@ type TeachBackAssessmentSignal = NonNullable<
 >;
 
 export interface RunTeachBackGraderInput {
+  /** Owning profile — required (the grader fires mid-session; profile exists). */
+  profileId: string;
   /** The topic the learner was teaching back (grading context). */
   topic: string;
   /** The learner's verbatim teach-back explanation. */
@@ -68,10 +70,12 @@ type DegradedReason =
 
 async function emitDegradedEvent(
   reason: DegradedReason,
-  input: Pick<RunTeachBackGraderInput, 'sessionId'>,
+  input: Pick<RunTeachBackGraderInput, 'profileId' | 'sessionId'>,
 ): Promise<void> {
   const payload = teachBackGraderDegradedEventSchema.parse({
+    profileId: input.profileId,
     sessionId: input.sessionId,
+    timestamp: new Date().toISOString(),
     reason,
   });
 

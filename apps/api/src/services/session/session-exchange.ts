@@ -1137,6 +1137,7 @@ async function applyChallengeRoundRuntimeSignals(
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
     const graderEvaluation = await runChallengeRoundGrader({
+      profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
@@ -3437,6 +3438,7 @@ export async function processMessage(
       ? computeAgeBracket(context.birthYear)
       : 'adult';
     const graded = await runTeachBackGrader({
+      profileId,
       topic: [context.topicTitle, context.topicDescription]
         .filter(Boolean)
         .join(': '),

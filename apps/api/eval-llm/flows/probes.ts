@@ -914,6 +914,7 @@ async function applyProductionTeachBackFallback(
   if (hasNumericRubric) return response;
 
   const graded = await runTeachBackGrader({
+    profileId: input.context.profileId,
     topic: [input.context.topicTitle, input.context.topicDescription]
       .filter(Boolean)
       .join(': '),

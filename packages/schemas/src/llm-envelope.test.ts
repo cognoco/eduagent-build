@@ -1039,8 +1039,15 @@ describe('challengeRoundGraderVerdictSchema (T1 — grader verdict)', () => {
 // ---------------------------------------------------------------------------
 
 describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload)', () => {
-  it('accepts a payload with only reason (all ids optional)', () => {
+  // WI-1155: profileId + timestamp are now REQUIRED (mid-session; profile exists).
+  const REQUIRED = {
+    profileId: '00000000-0000-4000-8000-0000000000aa',
+    timestamp: '2026-07-03T00:00:00.000Z',
+  };
+
+  it('accepts a payload with the required fields (sessionId/answerEventId optional)', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'route_error',
     });
     expect(result.success).toBe(true);
@@ -1048,6 +1055,7 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
 
   it('accepts a full payload with optional ids', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       sessionId: '00000000-0000-4000-8000-000000000001',
       answerEventId: '00000000-0000-4000-8000-000000000002',
       reason: 'schema_invalid',
@@ -1062,13 +1070,17 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
       'parse_error',
       'schema_invalid',
     ] as const) {
-      const r = challengeRoundGraderDegradedEventSchema.safeParse({ reason });
+      const r = challengeRoundGraderDegradedEventSchema.safeParse({
+        ...REQUIRED,
+        reason,
+      });
       expect(r.success).toBe(true);
     }
   });
 
   it('rejects an unknown reason value', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'unknown_failure',
     });
     expect(result.success).toBe(false);
@@ -1076,7 +1088,15 @@ describe('challengeRoundGraderDegradedEventSchema (T1 — degraded event payload
 
   it('rejects a payload missing reason', () => {
     const result = challengeRoundGraderDegradedEventSchema.safeParse({
-      sessionId: '00000000-0000-4000-8000-000000000001',
+      ...REQUIRED,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a payload missing profileId (mid-session events must carry it)', () => {
+    const result = challengeRoundGraderDegradedEventSchema.safeParse({
+      timestamp: REQUIRED.timestamp,
+      reason: 'route_error',
     });
     expect(result.success).toBe(false);
   });
@@ -1134,15 +1154,30 @@ describe('teachBackGraderVerdictSchema (WI-1155 B2 — server rubric)', () => {
 });
 
 describe('teachBackGraderDegradedEventSchema (WI-1155 B2)', () => {
-  it('accepts a payload with only reason', () => {
+  const REQUIRED = {
+    profileId: '00000000-0000-4000-8000-0000000000bb',
+    timestamp: '2026-07-03T00:00:00.000Z',
+  };
+
+  it('accepts a payload with the required fields', () => {
     const result = teachBackGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'route_error',
     });
     expect(result.success).toBe(true);
   });
 
+  it('rejects a payload missing profileId (mid-session events must carry it)', () => {
+    const result = teachBackGraderDegradedEventSchema.safeParse({
+      timestamp: REQUIRED.timestamp,
+      reason: 'route_error',
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects an unknown reason value', () => {
     const result = teachBackGraderDegradedEventSchema.safeParse({
+      ...REQUIRED,
       reason: 'unknown_failure',
     });
     expect(result.success).toBe(false);

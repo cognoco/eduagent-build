@@ -225,12 +225,15 @@ export const teachBackGraderVerdictSchema = z.object({
   clarity: z.number().int().min(0).max(5),
   overall_quality: z.number().int().min(0).max(5),
   weakest_area: teachBackWeakestAreaSchema,
+  // Collapsed to `.nullable()` only (no `.optional()`): the preprocess coerces
+  // absent / non-string / empty → null, so the field is always present as a
+  // string-or-null. Aligns with challengeRoundGraderVerdictSchema (no
+  // `.nullable().optional()` field) — no AGENTS.md Known-Exception needed.
   gap_identified: z.preprocess((value) => {
-    if (value === null) return null;
-    if (typeof value !== 'string') return undefined;
+    if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
-  }, z.string().max(1000).nullable().optional()),
+  }, z.string().max(1000).nullable()),
 });
 export type TeachBackGraderVerdict = z.infer<
   typeof teachBackGraderVerdictSchema
@@ -241,9 +244,15 @@ export type TeachBackGraderVerdict = z.infer<
  * emitted via `safeSend` when `runTeachBackGrader` fails open. Opaque ids +
  * reason code ONLY — no learner text (same privacy rule as the challenge-round
  * grader degraded event above).
+ *
+ * `profileId` is required: the grader fires mid-session where a profile
+ * unambiguously exists, so the account-level carve-out (events that fire
+ * before any profile exists) does not apply — payloads always carry profileId.
  */
 export const teachBackGraderDegradedEventSchema = z.object({
+  profileId: z.string(),
   sessionId: z.string().optional(),
+  timestamp: z.string(),
   reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
 });
 export type TeachBackGraderDegradedEvent = z.infer<
@@ -308,8 +317,13 @@ export type ChallengeRoundGraderVerdict = z.infer<
  * Future grader-related event schemas should follow this file's pattern.
  */
 export const challengeRoundGraderDegradedEventSchema = z.object({
+  // profileId is required: the grader fires mid-session where a profile
+  // unambiguously exists (WI-1155 — closed the same gap flagged on the
+  // teach-back mirror). The account-level carve-out does not apply here.
+  profileId: z.string(),
   sessionId: z.string().optional(),
   answerEventId: z.string().optional(),
+  timestamp: z.string(),
   reason: z.enum(['route_error', 'no_json', 'parse_error', 'schema_invalid']),
 });
 export type ChallengeRoundGraderDegradedEvent = z.infer<
