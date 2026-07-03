@@ -20,18 +20,7 @@ const mockDbInsert = jest.fn().mockReturnValue({
 const mockProfileFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockFamilyLinksFindFirst = jest.fn().mockResolvedValue(undefined);
 const mockConsentStateFindFirst = jest.fn().mockResolvedValue(undefined);
-const mockFindOwnerProfile = jest.fn().mockResolvedValue({
-  id: 'test-profile-id',
-  birthYear: 1985,
-  location: 'NO',
-  consentStatus: 'CONSENTED',
-  hasPremiumLlm: false,
-  conversationLanguage: null,
-  isOwner: true,
-});
-
 // [WI-867] v2 profile-scope seam continuity mock.
-// birthYear: 1985 mirrors the legacy findOwnerProfile mock value.
 const mockFindOwnerPersonScope = jest
   .fn()
   .mockResolvedValue(personScope({ birthYear: 1985 }));
@@ -110,19 +99,12 @@ jest.mock('../services/account', () => {
 //
 // [Issue 901] After the no-header auto-resolve fix, owner privileges require an
 // EXPLICITLY selected, verified owner profile (resolvedVia:'explicit-header').
-// Owner-gated success tests therefore send OWNER_AUTH_HEADERS (an explicit
-// X-Profile-Id = OWNER_PROFILE_ID); getProfile resolves that id to the owner.
-// findOwnerProfile (the auto-resolve path) is still mocked so the no-header
-// path is exercised by tests that deliberately assert it (e.g. BUG-825).
-jest.mock('../services/profile', () => {
-  const actual = jest.requireActual(
-    '../services/profile',
-  ) as typeof import('../services/profile');
-  return {
-    ...actual,
-    findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-  };
-});
+// Owner-gated success tests send OWNER_AUTH_HEADERS (an explicit
+// X-Profile-Id = OWNER_PROFILE_ID); the v2 explicit-header path
+// (mockGetPersonScope) resolves that id to the owner. The no-header
+// auto-resolve path is driven by the v2 mockFindOwnerPersonScope mock above
+// (both mocked on ../services/identity-v2/profile-v2). ../services/profile is
+// used only for its live types/exports and is no longer mocked here.
 
 // ---------------------------------------------------------------------------
 // Mock billing service
@@ -430,15 +412,6 @@ beforeEach(() => {
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
   mockGetFamilyPoolStatus.mockResolvedValue(null);
   mockGetUsageBreakdownForProfile.mockResolvedValue(null);
-  mockFindOwnerProfile.mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 1985,
-    location: 'NO',
-    consentStatus: 'CONSENTED',
-    hasPremiumLlm: false,
-    conversationLanguage: null,
-    isOwner: true,
-  });
   // [WI-867] re-arm v2 profile-scope mock after clearAllMocks().
   mockFindOwnerPersonScope.mockResolvedValue(personScope({ birthYear: 1985 }));
   mockGetPersonScope.mockResolvedValue(personScope({ birthYear: 1985 }));
@@ -696,7 +669,7 @@ describe('billing routes', () => {
 
     // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
     // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
-    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // OWNER profile (isOwner:true via the v2 person-scope mocks) — before the fix
     // this synthesized identity passed assertNotProxyMode's isOwner check and
     // the checkout session would have been created (privilege escalation). The
     // fix in assertNotProxyMode also requires resolvedVia:'explicit-header',
@@ -804,7 +777,7 @@ describe('billing routes', () => {
 
     // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
     // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
-    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // OWNER profile (isOwner:true via the v2 person-scope mocks) — before the fix
     // this satisfied assertNotProxyMode + assertOwnerProfile and the
     // subscription was cancelled (privilege escalation). The fix tags
     // auto-resolved identity resolvedVia:'auto', which the owner gates reject.
@@ -941,7 +914,7 @@ describe('billing routes', () => {
 
     // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
     // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
-    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // OWNER profile (isOwner:true via the v2 person-scope mocks) — before the fix
     // this auto-resolved identity satisfied assertOwnerProfile and the top-up
     // payment intent would have been created (privilege escalation). The fix
     // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
@@ -1030,7 +1003,6 @@ describe('billing routes', () => {
     });
 
     it('does not fall back to shared-pool reads when per-profile usage has no active profile', async () => {
-      mockFindOwnerProfile.mockResolvedValueOnce(null);
       // [WI-867] v2: findOwnerPersonScope null → no profileId set → 400 (profile required for per-profile quota).
       mockFindOwnerPersonScope.mockResolvedValueOnce(null);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
@@ -1039,9 +1011,9 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/usage',
         // [Issue 901] /usage is intentionally NOT owner-gated; this test
-        // exercises the no-X-Profile-Id auto-resolve path (findOwnerProfile
+        // exercises the no-X-Profile-Id auto-resolve path (findOwnerPersonScope
         // returns null → no active profile → 400). Must NOT send an explicit
-        // owner header or getProfile would resolve an active profile.
+        // owner header or the v2 explicit-header path would resolve one.
         { headers: AUTH_HEADERS },
         TEST_ENV,
       );
@@ -1056,7 +1028,6 @@ describe('billing routes', () => {
     it.each(['family', 'pro'] as const)(
       '%s tier requires active profile and does not leak shared-pool aggregates',
       async (tier) => {
-        mockFindOwnerProfile.mockResolvedValueOnce(null);
         // [WI-867] v2: findOwnerPersonScope null → no profileId → 400 (profile required).
         mockFindOwnerPersonScope.mockResolvedValueOnce(null);
         mockGetSubscriptionByAccountId.mockResolvedValue(
@@ -1075,7 +1046,7 @@ describe('billing routes', () => {
         const res = await app.request(
           '/v1/usage',
           // [Issue 901] /usage not owner-gated; auto-resolve path with no owner
-          // (findOwnerProfile null) → no active profile → 400. Keep AUTH_HEADERS.
+          // (findOwnerPersonScope null) → no active profile → 400. Keep AUTH_HEADERS.
           { headers: AUTH_HEADERS },
           TEST_ENV,
         );
@@ -1216,7 +1187,7 @@ describe('billing routes', () => {
 
     // [Issue 901 / BREAK] An authenticated NON-OWNER caller can simply OMIT
     // X-Profile-Id. profileScopeMiddleware then auto-resolves the account
-    // OWNER profile (isOwner:true via mockFindOwnerProfile) — before the fix
+    // OWNER profile (isOwner:true via the v2 person-scope mocks) — before the fix
     // this auto-resolved identity satisfied assertOwnerProfile and the billing
     // portal session would have been created (privilege escalation). The fix
     // tags auto-resolved identity resolvedVia:'auto', which assertOwnerProfile
@@ -1481,7 +1452,6 @@ describe('billing routes', () => {
     });
 
     it('does not fall back to shared-pool reads when per-profile status has no active profile', async () => {
-      mockFindOwnerProfile.mockResolvedValueOnce(null);
       // [WI-867] v2: findOwnerPersonScope null → profileMeta stays undefined → assertOwnerProfile → 403.
       mockFindOwnerPersonScope.mockResolvedValueOnce(null);
       mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
@@ -1489,8 +1459,8 @@ describe('billing routes', () => {
 
       const res = await app.request(
         '/v1/subscription/status',
-        // [Issue 901] No X-Profile-Id → auto-resolve, and findOwnerProfile is
-        // null so no owner is resolved → 403. Keep AUTH_HEADERS to exercise the
+        // [Issue 901] No X-Profile-Id → auto-resolve, and findOwnerPersonScope
+        // is null so no owner is resolved → 403. Keep AUTH_HEADERS to exercise the
         // no-owner-resolvable path this test asserts.
         { headers: AUTH_HEADERS },
         TEST_ENV,
