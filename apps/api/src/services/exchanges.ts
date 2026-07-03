@@ -27,7 +27,6 @@ import {
 } from '@eduagent/schemas';
 import {
   buildSystemPrompt as _buildSystemPrompt,
-  resolveAgeBracket,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
@@ -1590,7 +1589,18 @@ export async function processExchange(
     },
   ];
 
-  const ageBracket = resolveAgeBracket(context.birthYear);
+  // [WI-1349] Safety-adjacent age gate. The router consumes this bracket to
+  // enforce the under-18 Gemini vendor ban (MMT-ADR-0016 §1.5) AND to select the
+  // safety preamble (getSafetyPreamble). Both are safety-adjacent, so the bracket
+  // MUST come from the EXACT birth date (AGENTS.md § Profile Shapes): a still-17
+  // learner born later in the year reads 'adult' by year-only math and would
+  // otherwise leak to a policy-banned vendor and receive the adult preamble.
+  // computeAgeBracketFromDate falls back to year-only when month/day are absent.
+  const ageBracket = computeAgeBracketFromDate(
+    context.birthYear,
+    context.birthMonth,
+    context.birthDay,
+  );
   const routingRung = context.llmRoutingRung ?? context.escalationRung;
   const result: RouteResult = await routeAndCall(messages, routingRung, {
     llmTier: context.llmTier,
@@ -1812,7 +1822,12 @@ export async function streamExchange(
     },
   ];
 
-  const ageBracket = resolveAgeBracket(context.birthYear);
+  // [WI-1349] Safety-adjacent age gate — identical rationale to processExchange above.
+  const ageBracket = computeAgeBracketFromDate(
+    context.birthYear,
+    context.birthMonth,
+    context.birthDay,
+  );
   const routingRung = context.llmRoutingRung ?? context.escalationRung;
   const result: StreamResult = await routeAndStream(messages, routingRung, {
     llmTier: context.llmTier,
