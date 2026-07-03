@@ -58,6 +58,7 @@ export const LLM_CALL_SITE_FILES: readonly string[] = [
   'apps/api/src/services/subject-classify.ts',
   'apps/api/src/services/subject-resolve.ts',
   'apps/api/src/services/summaries.ts',
+  'apps/api/src/services/teach-back-grader.ts',
 ];
 
 /**
