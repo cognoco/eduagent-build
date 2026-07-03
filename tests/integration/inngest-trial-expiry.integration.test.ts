@@ -24,6 +24,7 @@ import {
 
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 import { clearFetchCalls, getFetchCalls } from './fetch-interceptor';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { mockExpoPush } from './external-mocks';
 import { trialExpiry } from '../../apps/api/src/inngest/functions/trial-expiry';
 import { trialNotificationSend } from '../../apps/api/src/inngest/functions/trial-notification-send';
@@ -106,36 +107,43 @@ async function seedSubscriptionWithQuota(input: {
   usedToday: number;
 }) {
   const db = createIntegrationDb();
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
+  const subscriptionId = generateUUIDv7();
+
+  // [WI-1347] Legacy `subscriptions` may already be dropped; quota_pools no
+  // longer FKs to it (repointed onto v2 `subscription` by 0129 M-REPOINT), so
+  // this dual-write is an id-aligned anchor only — a no-op post-drop.
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
+      id: subscriptionId,
       accountId: input.accountId,
       tier: input.tier,
       status: input.status,
       trialEndsAt: input.trialEndsAt,
       currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
       currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    })
-    .returning();
+    });
+  }
 
   // [WI-867] v2 subscription row — always seeded (flag collapsed to v2-only).
-  // REUSES subscription.id so quota_pools (quota_pools.subscription_id →
-  // subscriptions) still resolves against the legacy row.
-  await db.insert(subscriptionV2).values({
-    id: subscription!.id,
-    organizationId: input.accountId,
-    payerPersonId: input.payerPersonId,
-    planTier: input.tier,
-    status: input.status,
-    trialEndsAt: input.trialEndsAt,
-    periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
-    periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
-  });
+  // REUSES the same id as the legacy anchor above (when seeded).
+  const [subscription] = await db
+    .insert(subscriptionV2)
+    .values({
+      id: subscriptionId,
+      organizationId: input.accountId,
+      payerPersonId: input.payerPersonId,
+      planTier: input.tier,
+      status: input.status,
+      trialEndsAt: input.trialEndsAt,
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
 
   const [quotaPool] = await db
     .insert(quotaPools)
     .values({
-      subscriptionId: subscription!.id,
+      subscriptionId,
       monthlyLimit: input.monthlyLimit,
       usedThisMonth: input.usedThisMonth,
       dailyLimit: input.dailyLimit,

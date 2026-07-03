@@ -86,3 +86,38 @@ dead-sweep" list above) is explicitly **not** addressed here — its test covera
 passes and stays; removing the dead prod fn itself is WI-1167/WI-1347 territory.
 
 **Recovery:** pre-retirement file state — `git show fb7a49f6a8acd316c2cd241bfb88f64f28c12992:apps/api/src/services/billing/subscription-core.integration.test.ts`.
+
+---
+
+## WI-1347 — getSubscriptionByAccountId (2026-07-03)
+
+WI-1347 (corpus seed migration ahead of the WI-1306/0130 legacy-table drop) requires
+the full integration corpus to pass with `accounts`/`profiles`/`family_links`/
+`consent_states`/`subscriptions` physically absent. The `getSubscriptionByAccountId`
+describe block in `subscription-core.integration.test.ts` (2 `it`s: "returns null
+when no subscription exists", "returns the subscription row when one exists")
+directly calls `getSubscriptionByAccountId` (`services/billing/subscription-core.ts`),
+which does an unconditional `repo.subscriptions.findFirst()` against the legacy
+`subscriptions` table — no `tableExists` gate, no v2 fallback. Both `it`s hard-fail
+once the table is dropped, regardless of test-seed gating (the *production* function
+itself throws).
+
+**Reachability confirmed dead**, independently re-derived via `git grep -nw` and
+cross-checked against the WI-1128 follow-up entry above (which already flagged this
+same fact and deferred acting on it to "WI-1167/WI-1347 territory"): `git grep -nw
+"getSubscriptionByAccountId("` finds live call sites only inside
+`findOrCreateAccount` (`services/account.ts:168`) and `createProfileWithLimitCheck`
+(`services/profile.ts:526`) — both already confirmed transitively dead (zero
+non-test callers; `account.ts:114-115` self-documents `findOrCreateAccount` has zero
+live callers, `accountMiddleware` resolves via `resolveIdentityV2` instead).
+
+Per shepherd ruling on WI-1347: the *test* block is retired (this WI's authority);
+the *production* function `getSubscriptionByAccountId` itself is **not** removed
+here — that dead-code removal is WI-1364 territory, tracked separately.
+
+**Recovery:** annotated tag `retired/wi-1347-getsubscriptionbyaccountid` (pushed)
+points at the pre-removal commit on branch `WI-1347`. Retrieve with:
+
+```
+git show retired/wi-1347-getsubscriptionbyaccountid:apps/api/src/services/billing/subscription-core.integration.test.ts
+```
