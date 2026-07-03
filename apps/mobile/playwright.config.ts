@@ -221,6 +221,24 @@ export default defineConfig({
         /flows[\\/](journeys[\\/](j0[89]|j[1-9][0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
     {
+      // [WI-1317] child-subject route real e2e coverage
+      // (apps/mobile/src/app/(app)/child/[profileId]/subjects/[subjectId].tsx).
+      // Asserts against the route's actual rendered testIDs
+      // (subject-topics-scroll, topic-card-*) using the real
+      // `parent-multi-child` seed (owner-with-children storage state).
+      //
+      // **Opt-in / non-gating.** Deliberately NOT matched by 'later-phases'
+      // (that project's navigation testMatch is scoped to w0[1-5], not w06)
+      // and NOT part of `test:e2e:web:smoke` in package.json, so it is not
+      // exercised by the "Playwright web smoke" CI job at all — it only runs
+      // when explicitly targeted. Run manually against staging via:
+      //   doppler run -c stg -- pnpm exec playwright test \
+      //     -c apps/mobile/playwright.config.ts --project=child-subject-detail
+      name: 'child-subject-detail',
+      dependencies: ['setup'],
+      testMatch: /flows[\\/]navigation[\\/]w06-child-subject-detail\.spec\.ts/,
+    },
+    {
       // [Mentor Chrome audit seed pack — Task 5]
       // docs/plans/2026-05-25-mentor-chrome-audit-seed-pack.md
       //
