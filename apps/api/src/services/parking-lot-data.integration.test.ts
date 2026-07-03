@@ -18,10 +18,9 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray, and, count } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  generateUUIDv7,
   subjects,
   learningSessions,
   parkingLotItems,
@@ -30,6 +29,10 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { addParkingLotItem, MAX_ITEMS_PER_TOPIC } from './parking-lot-data';
 
 // ---------------------------------------------------------------------------
@@ -66,25 +69,30 @@ const ACCOUNT = {
 // Seed helpers
 // ---------------------------------------------------------------------------
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedFixture() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'ParkingLot Test User',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'ParkingLot Test User',
+    birthYear: 2000,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `${PREFIX}-subject`,
       status: 'active',
     })
@@ -92,13 +100,13 @@ async function seedFixture() {
   const [session] = await db
     .insert(learningSessions)
     .values({
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
     })
     .returning();
   return {
-    account: account!,
-    profile: profile!,
+    account: { id: accountId },
+    profile: { id: profileId },
     subject: subject!,
     session: session!,
   };
@@ -106,13 +114,12 @@ async function seedFixture() {
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
   });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -185,9 +185,12 @@ jest.mock('../services/export', () => {
 
 // [CUT-B2] v2 identity resolver — returns the same account as the v1 path so
 // account-middleware resolveIdentityV2 does not hit the unmocked DB.
-jest.mock(
-  '../services/identity-v2/identity-resolve' /* gc1-allow: route unit test — DB mocked; resolver covered by identity integration tests */,
-  () => ({
+jest.mock('../services/identity-v2/identity-resolve', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/identity-resolve',
+  ) as typeof import('../services/identity-v2/identity-resolve');
+  return {
+    ...actual,
     resolveIdentityV2: jest.fn().mockResolvedValue({
       account: {
         id: 'test-account-id',
@@ -201,8 +204,8 @@ jest.mock(
       isOwner: true,
       roles: ['admin'],
     }),
-  }),
-);
+  };
+});
 
 // [WI-867] billing-v2 seam — account middleware calls ensureInitialTrialSubscriptionV2
 // unconditionally post-collapse. Continuity mock resolves cleanly.
@@ -259,13 +262,16 @@ const mockGetPersonScope = jest
     }
     return Promise.resolve(null);
   });
-jest.mock(
-  '../services/identity-v2/profile-v2' /* gc1-allow: route unit test — DB mocked; profile scope covered by identity integration tests */,
-  () => ({
+jest.mock('../services/identity-v2/profile-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/profile-v2',
+  ) as typeof import('../services/identity-v2/profile-v2');
+  return {
+    ...actual,
     findOwnerPersonScope: (...a: unknown[]) => mockFindOwnerPersonScope(...a),
     getPersonScope: (...a: unknown[]) => mockGetPersonScope(...a),
-  }),
-);
+  };
+});
 
 // [WI-867] jest.clearAllMocks() wipes the module-ref mock implementations above;
 // call this in every beforeEach that clears, so the post-collapse v2-default
@@ -292,9 +298,12 @@ const restoreProfileScopeMocks = () => {
 
 // [CUT-B2] v2 twins — mocked so route unit tests can assert dispatch without
 // a real DB. External-DB tests live in integration suites.
-jest.mock(
-  '../services/identity-v2/deletion-v2' /* gc1-allow: route unit test — DB mocked; v2 covered by integration tests */,
-  () => ({
+jest.mock('../services/identity-v2/deletion-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/deletion-v2',
+  ) as typeof import('../services/identity-v2/deletion-v2');
+  return {
+    ...actual,
     scheduleDeletionV2: jest.fn().mockResolvedValue({
       gracePeriodEnds: new Date(
         Date.now() + 7 * 24 * 60 * 60 * 1000,
@@ -308,12 +317,15 @@ jest.mock(
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
     }),
     getPersonIdsForOrganizationV2: jest.fn().mockResolvedValue(['person-1']),
-  }),
-);
+  };
+});
 
-jest.mock(
-  '../services/identity-v2/export-v2' /* gc1-allow: route unit test — DB mocked; v2 covered by integration tests */,
-  () => ({
+jest.mock('../services/identity-v2/export-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/export-v2',
+  ) as typeof import('../services/identity-v2/export-v2');
+  return {
+    ...actual,
     generateExportV2: jest.fn().mockResolvedValue({
       account: {
         email: 'test@example.com',
@@ -323,8 +335,26 @@ jest.mock(
       consentStates: [],
       exportedAt: new Date().toISOString(),
     }),
-  }),
-);
+  };
+});
+
+// [WI-1301] assertCallerIsAccountOwner calls verifyPersonIsOrgAdminV2, which
+// runs a raw membership query the fully-mocked DB module cannot satisfy.
+// Every scenario in this file that currently reaches assertCallerIsAccountOwner
+// is a caller-owner scenario (the non-owner break tests below are rejected
+// earlier by assertOwnerProfile's X-Profile-Id-resolved isOwner check, before
+// this guard runs) — the caller-vs-X-Profile-Id-spoof distinction this guard
+// exists to enforce is covered by the real-DB break test in
+// tests/integration/account-billing-owner-idor.integration.test.ts.
+jest.mock('../services/identity-v2/ownership-v2', () => {
+  const actual = jest.requireActual(
+    '../services/identity-v2/ownership-v2',
+  ) as typeof import('../services/identity-v2/ownership-v2');
+  return {
+    ...actual,
+    verifyPersonIsOrgAdminV2: jest.fn().mockResolvedValue(true),
+  };
+});
 
 import { app } from '../index';
 import { inngest } from '../inngest/client';

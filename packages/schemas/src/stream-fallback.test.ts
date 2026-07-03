@@ -1,4 +1,5 @@
 import {
+  languageComprehensionEvaluationSchema,
   streamDoneFrameSchema,
   streamErrorFrameSchema,
   streamFallbackFrameSchema,
@@ -61,6 +62,54 @@ describe('streamFallbackFrameSchema', () => {
   });
 });
 
+describe('languageComprehensionEvaluationSchema', () => {
+  it('parses deterministic language comprehension feedback', () => {
+    const result = languageComprehensionEvaluationSchema.parse({
+      questionId: 'q1',
+      prompt: 'What is on the table?',
+      answerHint: 'agua',
+      learnerAnswer: 'Water is on the table.',
+      verdict: 'understood',
+      matchedTerms: ['water'],
+      missingTerms: [],
+    });
+
+    expect(result.verdict).toBe('understood');
+    expect(result.matchedTerms).toEqual(['water']);
+  });
+
+  it('rejects unknown comprehension verdicts', () => {
+    expect(() =>
+      languageComprehensionEvaluationSchema.parse({
+        questionId: 'q1',
+        prompt: 'What is on the table?',
+        answerHint: 'agua',
+        learnerAnswer: 'Water is on the table.',
+        verdict: 'close',
+        matchedTerms: ['water'],
+        missingTerms: [],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects empty required prompt fields', () => {
+    for (const field of ['questionId', 'prompt', 'answerHint'] as const) {
+      expect(() =>
+        languageComprehensionEvaluationSchema.parse({
+          questionId: 'q1',
+          prompt: 'What is on the table?',
+          answerHint: 'agua',
+          learnerAnswer: 'Water is on the table.',
+          verdict: 'understood',
+          matchedTerms: ['water'],
+          missingTerms: [],
+          [field]: '',
+        }),
+      ).toThrow();
+    }
+  });
+});
+
 describe('streamDoneFrameSchema', () => {
   it('parses a minimal done frame (required fields only)', () => {
     const result = streamDoneFrameSchema.parse({
@@ -73,7 +122,7 @@ describe('streamDoneFrameSchema', () => {
     expect(result.escalationRung).toBe(2);
   });
 
-  it('parses the full 12-field done frame with all nested sub-shapes', () => {
+  it('parses the full done frame with all nested sub-shapes', () => {
     const result = streamDoneFrameSchema.parse({
       type: 'done',
       exchangeCount: 5,
@@ -86,6 +135,30 @@ describe('streamDoneFrameSchema', () => {
         active: true,
         durationSeconds: 90,
         score: { correct: 4, total: 5 },
+      },
+      languageLearning: {
+        strand: 'meaning_input',
+        activityType: 'graded_input',
+        modality: 'text',
+        targetWords: ['agua'],
+        targetGrammar: ['tener + noun'],
+        gradedInput: {
+          type: 'graded_input',
+          modality: 'reading',
+          cefrLevel: 'A1',
+          knownWordRatioTarget: 0.85,
+          knownWordEstimate: 0.82,
+          targetWords: ['agua'],
+          text: 'Tengo agua en la mesa.',
+          comprehensionQuestions: [
+            {
+              id: 'q1',
+              prompt: 'What is on the table?',
+              answerHint: 'agua',
+            },
+          ],
+          audioEnabled: true,
+        },
       },
       confidence: 'low',
       readyToFinish: true,
@@ -104,6 +177,9 @@ describe('streamDoneFrameSchema', () => {
       },
     });
     expect(result.fluencyDrill?.score).toEqual({ correct: 4, total: 5 });
+    expect(result.languageLearning?.gradedInput?.text).toBe(
+      'Tengo agua en la mesa.',
+    );
     expect(result.challengeRound?.state).toBe('active');
     expect(result.challengeOffer?.pitch).toBe('Want a quick challenge?');
     expect(result.draftedNote?.body).toBe('A drafted note');
@@ -125,6 +201,52 @@ describe('streamDoneFrameSchema', () => {
       },
     });
     expect(result.draftedNote?.body).toBeNull();
+  });
+
+  it('parses meaning-output activity metadata while preserving legacy payload compatibility', () => {
+    const result = streamDoneFrameSchema.parse({
+      type: 'done',
+      exchangeCount: 2,
+      escalationRung: 1,
+      languageLearning: {
+        strand: 'meaning_output',
+        activityType: 'free_response',
+        modality: 'voice',
+        targetWords: ['coffee'],
+        targetGrammar: ['I would like + noun'],
+        meaningOutput: {
+          type: 'meaning_output',
+          taskType: 'ask_question',
+          communicativeGoal: 'Ask a useful question in a real conversation.',
+          prompt: 'Ask one question about ordering coffee.',
+          responseMode: 'question',
+          targetWords: ['coffee'],
+          targetGrammar: ['I would like + noun'],
+          retryExpectation: 'retry_after_feedback',
+          correctionExpectation: 'meaning_first_then_form',
+        },
+      },
+    });
+
+    expect(result.languageLearning?.meaningOutput).toMatchObject({
+      taskType: 'ask_question',
+      responseMode: 'question',
+      prompt: 'Ask one question about ordering coffee.',
+    });
+
+    const legacy = streamDoneFrameSchema.parse({
+      type: 'done',
+      exchangeCount: 2,
+      escalationRung: 1,
+      languageLearning: {
+        strand: 'meaning_output',
+        activityType: 'free_response',
+        modality: 'text',
+        targetWords: [],
+        targetGrammar: [],
+      },
+    });
+    expect(legacy.languageLearning?.gradedInput).toBeUndefined();
   });
 
   it('rejects a frame with the wrong type literal', () => {

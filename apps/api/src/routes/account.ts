@@ -28,7 +28,10 @@ import { generateExportV2 } from '../services/identity-v2/export-v2';
 import { inngest } from '../inngest/client';
 import { captureException, captureMessage } from '../services/sentry';
 import { NotFoundError, apiError, validationError } from '../errors';
-import { assertOwnerProfile } from '../services/family-access';
+import {
+  assertOwnerProfile,
+  assertCallerIsAccountOwner,
+} from '../services/family-access';
 
 type AccountRouteEnv = {
   Bindings: {
@@ -40,6 +43,9 @@ type AccountRouteEnv = {
     user: AuthUser;
     db: Database;
     account: Account;
+    // [WI-1301] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by assertCallerIsAccountOwner.
+    callerPersonId: string | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
   };
@@ -55,6 +61,12 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // A non-owner profile (child on a family account) must not be able to read
     // the account owner's deletion schedule.
     assertOwnerProfile(c, 'Only the account owner can view deletion status.');
+    // [WI-1301] Caller-identity gate — closes the X-Profile-Id spoof IDOR that
+    // assertOwnerProfile alone does not (see assertCallerIsAccountOwner doc).
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can view deletion status.',
+    );
     try {
       const status = await getDeletionStatusV2(db, account.id);
       return c.json(accountDeletionStatusResponseSchema.parse(status));
@@ -72,6 +84,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   .get('/account/email', async (c) => {
     const account = requireAccount(c.get('account'));
     assertOwnerProfile(c, 'Only the account owner can view the account email.');
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can view the account email.',
+    );
     return c.json(
       accountEmailUpdateResponseSchema.parse({ email: account.email }),
     );
@@ -84,6 +101,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   .post('/account/security-event', async (c) => {
     const account = requireAccount(c.get('account'));
     assertOwnerProfile(
+      c,
+      'Only the account owner can manage account security.',
+    );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
       c,
       'Only the account owner can manage account security.',
     );
@@ -108,6 +130,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     // [CR-657] requireAccount() throws 401 if account is unset at runtime.
     const account = requireAccount(c.get('account'));
     assertOwnerProfile(c, 'Only the account owner can change account email.');
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can change account email.',
+    );
 
     const body = await c.req.json().catch(() => null);
     const parsed = accountEmailUpdateRequestSchema.safeParse(body);
@@ -134,6 +161,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can schedule account deletion.
     assertOwnerProfile(c, 'Only the account owner can delete the account.');
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can delete the account.',
+    );
 
     const { gracePeriodEnds, scheduledNow } = await scheduleDeletionV2(
       db,
@@ -235,6 +267,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
       c,
       'Only the account owner can cancel account deletion.',
     );
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can cancel account deletion.',
+    );
 
     // [BUG-412] cancelDeletion now returns a typed result. Return 409 when
     // there is no active scheduled deletion to cancel.
@@ -258,6 +295,11 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
 
     // [CR-2026-05-19-H1] Only the account owner can export account data.
     assertOwnerProfile(c, 'Only the account owner can export account data.');
+    // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
+    await assertCallerIsAccountOwner(
+      c,
+      'Only the account owner can export account data.',
+    );
 
     const data = await generateExportV2(db, account.id);
     return c.json(dataExportSchema.parse(data));

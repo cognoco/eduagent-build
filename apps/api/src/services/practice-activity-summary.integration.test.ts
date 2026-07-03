@@ -1,15 +1,17 @@
 import { resolve } from 'path';
-import { inArray } from 'drizzle-orm';
 import {
-  accounts,
   celebrationEvents,
   createDatabase,
+  generateUUIDv7,
   practiceActivityEvents,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 import { getPracticeActivitySummary } from './practice-activity-summary';
 
@@ -39,26 +41,18 @@ const OTHER_TEST_ACCOUNT = {
   email: `${PREFIX}-other@integration.test`,
 };
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function cleanupTestAccounts(): Promise<void> {
   const db = createIntegrationDb();
-  const rows = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(
-      inArray(accounts.clerkUserId, [
-        TEST_ACCOUNT.clerkUserId,
-        OTHER_TEST_ACCOUNT.clerkUserId,
-      ]),
-    );
-
-  if (rows.length > 0) {
-    await db.delete(accounts).where(
-      inArray(
-        accounts.id,
-        rows.map((row) => row.id),
-      ),
-    );
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 async function seedProfile(
@@ -66,18 +60,21 @@ async function seedProfile(
   displayName = 'Practice Summary Integration',
 ): Promise<string> {
   const db = createIntegrationDb();
-  const [account] = await db.insert(accounts).values(accountInput).returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName,
-      birthYear: 2008,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName,
+    birthYear: 2008,
+    clerkUserId: accountInput.clerkUserId,
+    email: accountInput.email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return profile!.id;
+  return profileId;
 }
 
 async function seedSubject(profileId: string, name: string): Promise<string> {

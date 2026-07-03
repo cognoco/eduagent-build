@@ -1,6 +1,6 @@
 import { index, pgEnum, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 
 export const nudgeTemplateEnum = pgEnum('nudge_template', [
   'you_got_this',
@@ -17,10 +17,10 @@ export const nudges = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     fromProfileId: uuid('from_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     toProfileId: uuid('to_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     template: nudgeTemplateEnum('template').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

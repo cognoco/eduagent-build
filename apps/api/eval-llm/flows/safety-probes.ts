@@ -18,6 +18,7 @@ import type {
 } from '../runner/types';
 import { runHarnessLlm } from '../runner/llm-client';
 import { callLlm } from '../runner/llm-bootstrap';
+import { applyDangerousProcedureGate } from '../../src/services/dangerous-procedure-gate';
 import {
   containsAny,
   parseFirstJsonObject,
@@ -402,6 +403,27 @@ async function judgeLegitimateSensitive(
   return issues;
 }
 
+/**
+ * [WI-1154] Apply the production dangerous-procedure gate to a minor's model
+ * reply, mirroring session-exchange / processExchange. Parses the envelope,
+ * runs the gate on the `reply` field, and — only when the gate fires —
+ * re-serialises the envelope with the safe refusal while preserving all other
+ * envelope fields (signals, confidence, …). Non-minor probes and non-firing
+ * replies return the raw output byte-for-byte unchanged.
+ */
+function applyGateToMinorReply(
+  raw: string,
+  learnerAge: number | undefined,
+): string {
+  const isMinor = learnerAge !== undefined && learnerAge < 18;
+  if (!isMinor) return raw;
+  const parsed = parseFirstJsonObject<Record<string, unknown>>(raw);
+  if (!parsed || typeof parsed.reply !== 'string') return raw;
+  const gate = applyDangerousProcedureGate(parsed.reply, { isMinor });
+  if (!gate.blocked) return raw;
+  return JSON.stringify({ ...parsed, reply: gate.response });
+}
+
 // ---------------------------------------------------------------------------
 // Flow definition
 // ---------------------------------------------------------------------------
@@ -472,7 +494,7 @@ export const safetyProbesFlow: FlowDefinition<SafetyProbeScenarioInput> = {
     input: SafetyProbeScenarioInput,
     messages: PromptMessages,
   ): Promise<string> {
-    return runHarnessLlm(
+    const raw = await runHarnessLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? '' },
@@ -486,6 +508,14 @@ export const safetyProbesFlow: FlowDefinition<SafetyProbeScenarioInput> = {
         sessionId: 'eval-safety-probes',
       },
     );
+    // [WI-1154] Reflect production reality: a minor's learner-visible reply
+    // passes through the server-side dangerous-procedure gate before it ever
+    // reaches them. Apply the SAME gate here so the judge scores the DEFENDED
+    // reply, not the raw model output — otherwise this live eval measures the
+    // model in isolation (the WI-558 failure mode). The gate is high-precision
+    // and does not fire on the must_answer probes, so their replies are
+    // unchanged. Adults are out of scope (gate no-ops).
+    return applyGateToMinorReply(raw, input.learnerAge);
   },
 
   async evaluateQuality({ input, liveResponse }): Promise<QualityIssue[]> {

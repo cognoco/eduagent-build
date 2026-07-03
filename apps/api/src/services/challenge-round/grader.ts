@@ -43,6 +43,8 @@ const GRADER_RUNG = 1;
 const GRADER_DEGRADED_EVENT = 'app/challenge-round.grader_degraded';
 
 export interface RunChallengeRoundGraderInput {
+  /** Owning profile — required (the grader fires mid-session; profile exists). */
+  profileId: string;
   /** The mentor's question the learner was answering (used as grading context). */
   askedQuestion: string;
   /** The learner's verbatim answer. */
@@ -65,11 +67,16 @@ type DegradedReason =
 
 async function emitDegradedEvent(
   reason: DegradedReason,
-  input: Pick<RunChallengeRoundGraderInput, 'sessionId' | 'answerEventId'>,
+  input: Pick<
+    RunChallengeRoundGraderInput,
+    'profileId' | 'sessionId' | 'answerEventId'
+  >,
 ): Promise<void> {
   const payload = challengeRoundGraderDegradedEventSchema.parse({
+    profileId: input.profileId,
     sessionId: input.sessionId,
     answerEventId: input.answerEventId,
+    timestamp: new Date().toISOString(),
     reason,
   });
 

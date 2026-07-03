@@ -10,6 +10,7 @@ import {
 import { buildMemoryBlock } from '../../src/services/learner-profile';
 import { llmResponseEnvelopeSchema } from '@eduagent/schemas';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
+import { runTeachBackGrader } from '../../src/services/teach-back-grader';
 import { PROBE_BATTERY, type ProbeSpec } from '../fixtures/probes/battery';
 import { substituteHistory } from '../fixtures/exchange-histories';
 import type { EvalProfile } from '../fixtures/profiles';
@@ -451,7 +452,24 @@ function evaluateHomeworkProbe(
       'HW02.too-little-text',
       'The worksheet text is incomplete, so the model should ask for the missing source/photo.',
     );
-    if (/\bquestion 4 (is|means|answer)\b/i.test(lowerReply)) {
+    // Content-anchored, not surface-phrase [WI-1316]: the prior regex
+    // (`/\bquestion 4 (is|means|answer)\b/i`) false-positived on CORRECT
+    // clarifying replies ("question 4 is asking for the missing numbers" /
+    // "question 4 is cut off"). Mirrors the HW04.photo-invention guard
+    // below — match the specific cell-biology answer content the cut-off
+    // "question 4 about cells" would elicit if solved from memory instead
+    // of asking for the missing source.
+    if (
+      containsAny(lowerReply, [
+        /\bcell membrane\b/i,
+        /\bnucleus\b/i,
+        /\bmitochondri(a|on)\b/i,
+        /\bcytoplasm\b/i,
+        /\borganelle\b/i,
+        /\bbasic unit of life\b/i,
+        /\bcells are\b/i,
+      ])
+    ) {
       issues.push(
         qualityError(
           'HW02.solved-from-memory',
@@ -875,6 +893,65 @@ function applyProductionSourceSafety(
   );
 }
 
+/**
+ * [WI-1155 B2] Mirror the production teach-back server fallback in the harness.
+ *
+ * Production wires `runTeachBackGrader` into session-exchange.ts: on a
+ * teach-back turn where the tutor model dropped `signals.teach_back_assessment`
+ * (proven 4/4 on the live model even with mandatory-rubric prompt hardening),
+ * the server grades the learner's explanation and fills the signal. The probe
+ * harness calls the model directly (not through session-exchange), so — exactly
+ * as it already does for the source-audit safety fallback via
+ * `applyProductionSourceSafety` — it must apply the same server post-processing
+ * here for the `--live` evidence to reflect production behavior.
+ *
+ * Fail-open: `runTeachBackGrader` returns undefined on any error, leaving the
+ * response untouched (rubric-missing then legitimately fails, as in production).
+ */
+async function applyProductionTeachBackFallback(
+  input: ProbeScenarioInput,
+  response: string,
+): Promise<string> {
+  if (input.context.verificationType !== 'teach_back') return response;
+
+  const parsed = parseFirstJsonObject<Record<string, unknown>>(response);
+  if (!parsed) return response;
+
+  const signals =
+    parsed.signals && typeof parsed.signals === 'object'
+      ? (parsed.signals as Record<string, unknown>)
+      : {};
+  const existing = signals.teach_back_assessment;
+  const hasNumericRubric =
+    existing != null &&
+    typeof existing === 'object' &&
+    ['completeness', 'accuracy', 'clarity', 'overall_quality'].every(
+      (k) => typeof (existing as Record<string, unknown>)[k] === 'number',
+    );
+  if (hasNumericRubric) return response;
+
+  const graded = await runTeachBackGrader({
+    profileId: input.context.profileId,
+    topic: [input.context.topicTitle, input.context.topicDescription]
+      .filter(Boolean)
+      .join(': '),
+    learnerExplanation: input.userMessage,
+    conversationLanguage: input.context.conversationLanguage,
+    ageBracket: resolveAgeBracket(input.context.birthYear),
+    sessionId: 'eval-probes',
+  });
+  if (!graded) return response;
+
+  return JSON.stringify(
+    {
+      ...parsed,
+      signals: { ...signals, teach_back_assessment: graded },
+    },
+    null,
+    2,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Flow definition
 // ---------------------------------------------------------------------------
@@ -978,7 +1055,8 @@ export const probesFlow: FlowDefinition<ProbeScenarioInput> = {
         sessionId: 'eval-probes',
       },
     );
-    return applyProductionSourceSafety(input, rawResponse);
+    const sourceSafe = applyProductionSourceSafety(input, rawResponse);
+    return applyProductionTeachBackFallback(input, sourceSafe);
   },
 
   evaluateQuality({ input, liveResponse }): QualityIssue[] {

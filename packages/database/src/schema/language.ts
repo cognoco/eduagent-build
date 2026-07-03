@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { numericAsNumber } from './_numeric-as-number';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -26,7 +26,7 @@ export const vocabulary = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),
@@ -67,7 +67,7 @@ export const vocabularyRetentionCards = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     vocabularyId: uuid('vocabulary_id')
       .notNull()
       .references(() => vocabulary.id, { onDelete: 'cascade' }),

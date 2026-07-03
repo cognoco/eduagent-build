@@ -46,6 +46,10 @@ Every dispatch brief must specify these, regardless of type:
    sole-writer orchestrator↔shepherd channel). Even a long-running executor checkpoints to a
    **durable state file the parent reads**, never to a channel file. The only thing an executor
    knows about the Clacks: *report to your spawner; never write channel files.*
+7. **Carry lane context on captures.** If the brief authorizes filing follow-up work, carry the
+   current lane onto anything you file: preserve the origin WI's Project/Workstream/Sprint where the
+   capture tool can inherit them, or name those fields explicitly in the hand-back for the spawner
+   to file. If the work is intentionally cross-lane, say so instead of silently dropping context.
 
 **Tiering.** Nested delegation is allowed: every tier carries this standard *down* (include the
 rails in the nested brief), and the parent owns its child's DoD at every level.

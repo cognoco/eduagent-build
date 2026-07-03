@@ -1,15 +1,16 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
+  membership,
+  organization,
+  person,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { eq, like } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 import { filingTimedOutObserve } from './filing-timed-out-observe';
 import { filingCompletedObserve } from './filing-completed-observe';
@@ -23,33 +24,45 @@ const RUN_ID = generateUUIDv7();
 const CLERK_PREFIX = `clerk_filing_obs_${RUN_ID}`;
 let seedCounter = 0;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped in migration 0130 — seed the
+// v2 identity graph (organization/person/membership) directly. Neither table
+// carries a distinguishing prefix column like legacy did, so track created
+// ids for cleanup instead of a `like()` sweep.
+const createdAccountIds: string[] = [];
+const createdProfileIds: string[] = [];
+
 // ── Seed helpers ────────────────────────────────────────────────────────────
 
 async function seedAccount(): Promise<{ accountId: string }> {
   const idx = ++seedCounter;
-  const clerkUserId = `${CLERK_PREFIX}_${idx}`;
-  const email = `filing-obs-${RUN_ID}-${idx}@test.invalid`;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `${CLERK_PREFIX}_${idx}` })
+    .returning({ id: organization.id });
 
-  return { accountId: account!.id };
+  createdAccountIds.push(org!.id);
+  return { accountId: org!.id };
 }
 
 async function seedProfile(accountId: string): Promise<{ profileId: string }> {
-  const [profile] = await db
-    .insert(profiles)
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId,
       displayName: 'Test User',
-      birthYear: 1990,
-      isOwner: true,
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
     })
-    .returning({ id: profiles.id });
+    .returning({ id: person.id });
 
-  return { profileId: profile!.id };
+  await db.insert(membership).values({
+    personId: p!.id,
+    organizationId: accountId,
+    roles: ['admin', 'learner'],
+  });
+
+  createdProfileIds.push(p!.id);
+  return { profileId: p!.id };
 }
 
 async function seedSubject(profileId: string): Promise<{ subjectId: string }> {
@@ -63,7 +76,7 @@ async function seedSubject(profileId: string): Promise<{ subjectId: string }> {
 
 async function seedSession(
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<{ sessionId: string }> {
   const [session] = await db
     .insert(learningSessions)
@@ -145,7 +158,7 @@ beforeAll(async () => {
   const databaseUrl = process.env['DATABASE_URL'];
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for filing-timed-out-observer integration tests'
+      'DATABASE_URL is not set for filing-timed-out-observer integration tests',
     );
   }
   db = createDatabase(databaseUrl);
@@ -156,10 +169,15 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  // FK cascades clean child rows (profiles → subjects → sessions)
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  // FK cascades clean child rows (person → subjects → sessions → membership)
+  if (createdProfileIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, createdProfileIds));
+  }
+  if (createdAccountIds.length > 0) {
+    await db
+      .delete(organization)
+      .where(inArray(organization.id, createdAccountIds));
+  }
 }, 30_000);
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -288,7 +306,7 @@ describe('filing-timed-out observer integration', () => {
           profileId,
           resolution: 'recovered',
         }),
-      })
+      }),
     );
   });
 });

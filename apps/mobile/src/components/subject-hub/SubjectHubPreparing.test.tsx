@@ -21,10 +21,21 @@ describe('SubjectHubPreparing', () => {
     render(<SubjectHubPreparing onRetry={jest.fn()} onBack={jest.fn()} />);
 
     screen.getByText('subjectHub.preparing.title');
+    screen.getByTestId('subject-hub-preparing-book-animation');
     screen.getByTestId('subject-hub-preparing-back');
     // Pre-timeout: the building state must not offer retry — the hub poll is
     // still expected to resolve it on its own.
     expect(screen.queryByTestId('subject-hub-preparing-retry')).toBeNull();
+  });
+
+  it('renders the book-flip animation, not the magic-pen animation', () => {
+    render(<SubjectHubPreparing onRetry={jest.fn()} onBack={jest.fn()} />);
+
+    // The animation is hidden from screen readers (decorative), so it must be
+    // queried with includeHiddenElements — see BookPageFlipAnimation.test.tsx.
+    screen.getByTestId('subject-hub-preparing-animation', {
+      includeHiddenElements: true,
+    });
   });
 
   it('escalates to a retry affordance after the stall timeout and calls onRetry', () => {

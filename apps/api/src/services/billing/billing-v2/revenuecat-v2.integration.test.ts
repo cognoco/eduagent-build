@@ -42,6 +42,7 @@ import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromRevenuecatWebhookV2 } from './revenuecat-v2';
 import { handleInitialPurchaseV2 } from './revenuecat-webhook-handler-v2';
 import type { RevenueCatEvent } from '../revenuecat-shared';
+import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -147,21 +148,25 @@ const RUN = !!process.env.DATABASE_URL;
         roles: ['admin', 'learner'],
       });
 
-      const [acct] = await db
-        .insert(accounts)
-        .values({
+      // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP);
+      // after M-REPOINT, `subscriptions.accountId` targets `organization`
+      // directly (see below), so this mirror (same id as the org, the
+      // "reseed identity contract") is a no-op there instead of hard-failing.
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: org!.id,
           clerkUserId: `${clerkUserId}_legacy`,
           email: `legacy_${email}`,
-        })
-        .returning();
-      createdAccountIds.push(acct!.id);
+        });
+        createdAccountIds.push(org!.id);
+      }
 
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
       await db.insert(subscriptions).values({
         id: subId,
-        accountId: acct!.id,
+        accountId: org!.id,
         tier: 'family',
         status: 'active',
       });
@@ -275,38 +280,36 @@ const RUN = !!process.env.DATABASE_URL;
         roles: ['admin', 'learner'],
       });
 
-      // Legacy accounts + subscriptions (id-aligned) — only to satisfy the
-      // pre-M-REPOINT quota_pools FK to subscriptions(id). The v2 handler never
-      // reads these.
-      const [acct] = await db
-        .insert(accounts)
-        .values({
+      // [WI-1128] Legacy `accounts`/`profiles` may already be dropped
+      // (post-M-DROP); after M-REPOINT, `subscriptions.accountId` targets
+      // `organization` directly (see below) and `profile_quota_usage.profileId`
+      // targets `person` directly, so these legacy mirrors are a no-op there
+      // instead of hard-failing. Id-aligned to the org/person (the "reseed
+      // identity contract") — same convention as seedAlignedSubscription.
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: org!.id,
           clerkUserId: `${clerkUserId}_legacy`,
           email: `legacy_${email}`,
-        })
-        .returning();
-      createdAccountIds.push(acct!.id);
-
-      // Legacy `profiles` row, id-aligned to person.id (the org admin), so the
-      // grant path's profile_quota_usage INSERT
-      // (reconcileQuotaStateForSubscriptionV2 → provisionProfileQuotaUsageV2,
-      // profile_id = person.id) satisfies its FK to legacy profiles(id). Same
-      // dual-store id-alignment the seed already applies to subscriptions; the
-      // v2 handler never reads this row. Cascades away with `acct` in afterEach.
-      await db.insert(profiles).values({
-        id: personRow!.id,
-        accountId: acct!.id,
-        displayName: 'Owner',
-        birthYear: 1990,
-        isOwner: true,
-      });
+        });
+        createdAccountIds.push(org!.id);
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.insert(profiles).values({
+          id: personRow!.id,
+          accountId: org!.id,
+          displayName: 'Owner',
+          birthYear: 1990,
+          isOwner: true,
+        });
+      }
 
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
       await db.insert(subscriptions).values({
         id: subId,
-        accountId: acct!.id,
+        accountId: org!.id,
         tier: 'free',
         status: 'active',
       });

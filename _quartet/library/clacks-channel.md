@@ -40,7 +40,7 @@ One JSON object per line:
 to the original `id` and `msg:"resolved: …"`. That closes the loop without an FYI channel.
 
 ```json
-{"id":"prg11t2-007","ts":"2026-06-14T10:32:00Z","lane":"PRG-11 T2","wi":"WI-727","level":"needs-operator","ref":null,"msg":"F-105 fix could bump the retry cap 3→5 to match config — product-visible. Keep at 3 or bump?"}
+{"id":"ini11t2-007","ts":"2026-06-14T10:32:00Z","lane":"INI-11 T2","wi":"WI-727","level":"needs-operator","ref":null,"msg":"F-105 fix could bump the retry cap 3→5 to match config — product-visible. Keep at 3 or bump?"}
 ```
 
 ## Inbox line schema (orchestrator → shepherd)

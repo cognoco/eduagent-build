@@ -27,7 +27,6 @@ import {
 } from '@eduagent/schemas';
 import {
   buildSystemPrompt as _buildSystemPrompt,
-  resolveAgeBracket,
   allowsGeneralKnowledgeSource,
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
@@ -40,6 +39,12 @@ import {
   IMAGE_UNSCREENED_MODEL,
   type CatastrophicCategory,
 } from './safety-tripwire';
+import { applyDangerousProcedureGate } from './dangerous-procedure-gate';
+import {
+  applyMinorPiiEchoGate,
+  MINOR_PII_ECHO_GATE_MODEL,
+} from './minor-pii-echo-gate';
+import { computeAgeBracketFromDate, type PiiKind } from '@eduagent/schemas';
 import { getOcrProvider } from './ocr';
 import {
   GENERAL_KNOWLEDGE_SOURCE_ID,
@@ -110,6 +115,122 @@ export async function emitCrisisRedirectEvent(context: {
     'safety.crisis_redirect_fired',
     { sessionId: context.sessionId, profileId: context.profileId },
   );
+}
+
+/**
+ * [WI-1154] Structured safety event when the server-side dangerous-procedure
+ * reply gate fires (a minor-routed model leaked actionable produce / extract /
+ * synthesise / refine / acquire / dose how-to for a controlled or dangerous
+ * item, and the server replaced it with a safe harm-education refusal).
+ *
+ * Silent recovery is banned on safety paths — this is the required escalation
+ * signal (logger.warn + a queryable Inngest event), NOT a bare console.warn.
+ * Deliberately METADATA ONLY — never the learner message or the leaked reply.
+ */
+export async function emitDangerousProcedureBlockedEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+}): Promise<void> {
+  logger.warn('safety.dangerous_procedure_blocked', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety marker (WI-1154). The
+        // learner-facing response (safe harm-education refusal) already
+        // replaced the leaked reply server-side; this event exists so ops can
+        // query "dangerous-procedure blocks per week" and monitor the gate's
+        // fire rate. No downstream handler is required or intended.
+        name: 'app/safety.dangerous_procedure_blocked',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: context.model,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.dangerous_procedure_blocked',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1348] Observability escalation for the minor-PII echo-back gate. Silent
+ * recovery is banned on safety paths — this is the required escalation signal
+ * (logger.warn + a queryable Inngest event), NOT a bare console.warn. The
+ * learner-facing + persisted reply is already redacted server-side; this event
+ * lets ops query the gate's fire rate, monitor recall, and hold an audit trail.
+ * METADATA ONLY: carries the coarse PII KINDS + a count, NEVER the raw redacted
+ * values — shipping a minor's actual name / school / email into Inngest's
+ * third-party event store would re-leak the very PII this gate strips.
+ */
+export async function emitMinorPiiEchoRedactedEvent(context: {
+  sessionId?: string;
+  // Required: the event schema mandates `profileId: z.string().min(1)`. An
+  // absent id would silently fail validation inside safeSend and DROP the
+  // event — the exact silent-observability-loss this round guards against.
+  // ExchangeContext.profileId is always `string`, so callers pass it directly.
+  profileId: string;
+  flow: string;
+  provider?: string;
+  redactedKinds: PiiKind[];
+  redactedCount: number;
+}): Promise<void> {
+  logger.warn('safety.minor_pii_echo_redacted', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    redacted_kinds: context.redactedKinds,
+    redacted_count: context.redactedCount,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety marker (WI-1348). No
+        // downstream handler is required or intended.
+        name: 'app/safety.minor_pii_echo_redacted',
+        data: {
+          profileId: context.profileId,
+          sessionId: context.sessionId,
+          flow: context.flow,
+          provider: context.provider,
+          model: MINOR_PII_ECHO_GATE_MODEL,
+          redactedKinds: context.redactedKinds,
+          redactedCount: context.redactedCount,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.minor_pii_echo_redacted',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1348] Collect the learner's own volunteered text — the current message
+ * plus the learner (user-role) turns from the exchange history — for the
+ * minor-PII echo-back gate to scan. The gate compares the tutor reply only
+ * against THIS text (never the model's own prior turns), which keeps the
+ * echo-back scope narrow and protects the must-answer commitment.
+ */
+export function collectLearnerText(
+  exchangeHistory: ReadonlyArray<{ role: string; content: string }>,
+  currentMessage: string,
+): string {
+  return [
+    ...exchangeHistory.filter((e) => e.role === 'user').map((e) => e.content),
+    currentMessage,
+  ].join('\n');
 }
 
 /**
@@ -1285,6 +1406,13 @@ export function applySourceAuditSafetyFallback(
       response: scrubbed.response,
       sourceAudit: {
         ...sourceAudit,
+        // [WI-1155] The server just proved the reply contained unsupported
+        // source-bound claims (it removed them). That is direct evidence
+        // that source support was insufficient for the original reply, so
+        // the audit must record insufficient=true even though the scrubbed
+        // response now stands on its own — the audit reflects what the
+        // model actually claimed, not the aftermath.
+        insufficient: true,
         reason: appendAuditReason(
           sourceAudit.reason,
           `Server removed unsupported source-bound phrase(s): ${scrubbed.removedTerms.join(', ')}.`,
@@ -1534,7 +1662,18 @@ export async function processExchange(
     },
   ];
 
-  const ageBracket = resolveAgeBracket(context.birthYear);
+  // [WI-1349] Safety-adjacent age gate. The router consumes this bracket to
+  // enforce the under-18 Gemini vendor ban (MMT-ADR-0016 §1.5) AND to select the
+  // safety preamble (getSafetyPreamble). Both are safety-adjacent, so the bracket
+  // MUST come from the EXACT birth date (AGENTS.md § Profile Shapes): a still-17
+  // learner born later in the year reads 'adult' by year-only math and would
+  // otherwise leak to a policy-banned vendor and receive the adult preamble.
+  // computeAgeBracketFromDate falls back to year-only when month/day are absent.
+  const ageBracket = computeAgeBracketFromDate(
+    context.birthYear,
+    context.birthMonth,
+    context.birthDay,
+  );
   const routingRung = context.llmRoutingRung ?? context.escalationRung;
   const result: RouteResult = await routeAndCall(messages, routingRung, {
     llmTier: context.llmTier,
@@ -1587,12 +1726,60 @@ export async function processExchange(
     sourceAudit,
   );
 
+  // [WI-1154] Server-side dangerous-procedure reply gate (fail-closed). Runs
+  // AFTER the source-audit fallback so it is the final word on the tutor reply.
+  // Scoped to minors via the exact-date age bracket (safety-adjacent decision).
+  // Fail-closed on unknown/NaN birthYear: treat unprovable-adult as minor so a
+  // missing age never silently disables the safety floor.
+  const isMinorLearner =
+    !Number.isFinite(context.birthYear) ||
+    computeAgeBracketFromDate(
+      context.birthYear,
+      context.birthMonth,
+      context.birthDay,
+    ) !== 'adult';
+  const procedureGate = applyDangerousProcedureGate(sourceSafe.response, {
+    isMinor: isMinorLearner,
+  });
+  if (procedureGate.blocked) {
+    await emitDangerousProcedureBlockedEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+    });
+  }
+  // [WI-1348] Server-side minor-PII echo-back gate (fail-closed, same minor
+  // scope as the procedure gate above). Strips any PII the learner volunteered
+  // in THIS turn or recent turns that the model echoed back into the reply.
+  const learnerVolunteeredText = collectLearnerText(
+    context.exchangeHistory,
+    userMessage,
+  );
+  const piiEchoGate = applyMinorPiiEchoGate(
+    procedureGate.response,
+    learnerVolunteeredText,
+    { isMinor: isMinorLearner },
+  );
+  if (piiEchoGate.redacted) {
+    await emitMinorPiiEchoRedactedEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      redactedKinds: piiEchoGate.echoedKinds,
+      redactedCount: piiEchoGate.echoedTerms.length,
+    });
+  }
+  const gatedResponse = piiEchoGate.response;
+
   return {
-    response: sourceSafe.response,
+    response: gatedResponse,
     newEscalationRung: context.escalationRung,
     isUnderstandingCheck: finalParsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
-      sourceSafe.response,
+      gatedResponse,
       context,
     ),
     needsDeepening: finalParsed.needsDeepening,
@@ -1730,7 +1917,12 @@ export async function streamExchange(
     },
   ];
 
-  const ageBracket = resolveAgeBracket(context.birthYear);
+  // [WI-1349] Safety-adjacent age gate — identical rationale to processExchange above.
+  const ageBracket = computeAgeBracketFromDate(
+    context.birthYear,
+    context.birthMonth,
+    context.birthDay,
+  );
   const routingRung = context.llmRoutingRung ?? context.escalationRung;
   const result: StreamResult = await routeAndStream(messages, routingRung, {
     llmTier: context.llmTier,

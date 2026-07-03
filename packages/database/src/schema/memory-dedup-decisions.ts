@@ -6,7 +6,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 
 // BUG-363: `category` scopes pair_key to prevent cross-category false-positive
 // dedup collisions (e.g. an 'interest' pair_key shadowing a 'struggle' decision).
@@ -15,7 +15,7 @@ export const memoryDedupDecisions = pgTable(
   {
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     pairKey: text('pair_key').notNull(),
     category: text('category').notNull().default('unknown'),
     decision: text('decision', {

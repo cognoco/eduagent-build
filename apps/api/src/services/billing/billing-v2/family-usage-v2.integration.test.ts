@@ -47,6 +47,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { getUsageBreakdownForProfileV2 } from './family-usage-v2';
+import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -99,19 +100,29 @@ const RUN = !!process.env.DATABASE_URL;
       await db
         .delete(organization)
         .where(inArray(organization.id, [ACCOUNT_ID, OTHER_ORG_ID]));
-      // legacy store
       await db
         .delete(familyPreferences)
         .where(inArray(familyPreferences.ownerProfileId, personIds));
-      await db
-        .delete(familyLinks)
-        .where(inArray(familyLinks.parentProfileId, personIds));
-      await db
-        .delete(familyLinks)
-        .where(inArray(familyLinks.childProfileId, personIds));
+      // [WI-1128] Legacy `accounts`/`profiles`/`family_links` may already be
+      // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
+      // FK `person`/v2 `subscription` directly, so this legacy-store cleanup
+      // is a no-op there instead of hard-failing. `subscriptions` (legacy) is
+      // retained (not on the drop list) — no gate needed for it.
+      if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+        await db
+          .delete(familyLinks)
+          .where(inArray(familyLinks.parentProfileId, personIds));
+        await db
+          .delete(familyLinks)
+          .where(inArray(familyLinks.childProfileId, personIds));
+      }
       await db.delete(subscriptions).where(eq(subscriptions.id, SUB_ID));
-      await db.delete(profiles).where(inArray(profiles.id, personIds));
-      await db.delete(accounts).where(eq(accounts.id, ACCOUNT_ID));
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.delete(profiles).where(inArray(profiles.id, personIds));
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.delete(accounts).where(eq(accounts.id, ACCOUNT_ID));
+      }
     }
 
     /**
@@ -122,51 +133,11 @@ const RUN = !!process.env.DATABASE_URL;
      * (used/usedToday).
      */
     async function seedFamily(opts: { ownerSharing: boolean }) {
-      // ---- legacy store ----
-      await db.insert(accounts).values({
-        id: ACCOUNT_ID,
-        clerkUserId: `clerk_${ACCOUNT_ID}`,
-        email: `owner_${ACCOUNT_ID}@test.local`,
-      });
-      await db.insert(profiles).values([
-        {
-          id: OWNER_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Owner',
-          birthYear: 1985,
-          isOwner: true,
-        },
-        {
-          id: COPARENT_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Co-parent',
-          birthYear: 1986,
-          isOwner: false,
-        },
-        {
-          id: CHILD_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Child',
-          birthYear: 2014,
-          isOwner: false,
-        },
-      ]);
-      await db.insert(familyLinks).values([
-        { parentProfileId: OWNER_ID, childProfileId: CHILD_ID },
-        { parentProfileId: COPARENT_ID, childProfileId: CHILD_ID },
-      ]);
-      await db.insert(subscriptions).values({
-        id: SUB_ID,
-        accountId: ACCOUNT_ID,
-        tier: 'family',
-        status: 'active',
-      });
-      await db.insert(familyPreferences).values({
-        ownerProfileId: OWNER_ID,
-        poolBreakdownShared: opts.ownerSharing,
-      });
-
       // ---- v2 store (same ids by the reseed contract) ----
+      // [WI-1128] Seeded FIRST — post-M-REPOINT, the legacy `subscriptions`
+      // row below FKs `organization` (not `accounts`), and
+      // `family_preferences` FKs `person` directly, so both need the v2 rows
+      // to exist first.
       await db.insert(organization).values({ id: ACCOUNT_ID, name: 'Fam' });
       await db.insert(person).values([
         {
@@ -213,8 +184,64 @@ const RUN = !!process.env.DATABASE_URL;
         { guardianPersonId: COPARENT_ID, chargePersonId: CHILD_ID },
       ]);
 
-      // ---- shared usage_events (FK → legacy subscriptions/profiles; profileId
-      // = person.id by the reseed, so the v2 enumeration aggregates the same) ----
+      // ---- legacy store ----
+      // [WI-1128] Legacy `accounts`/`profiles`/`family_links` may already be
+      // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
+      // FK `person`/v2 `subscription` directly (not the legacy tables), so
+      // this legacy-store seed is a no-op there instead of hard-failing.
+      // `subscriptions` (legacy) is retained (not on the drop list).
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: ACCOUNT_ID,
+          clerkUserId: `clerk_${ACCOUNT_ID}`,
+          email: `owner_${ACCOUNT_ID}@test.local`,
+        });
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.insert(profiles).values([
+          {
+            id: OWNER_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Owner',
+            birthYear: 1985,
+            isOwner: true,
+          },
+          {
+            id: COPARENT_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Co-parent',
+            birthYear: 1986,
+            isOwner: false,
+          },
+          {
+            id: CHILD_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Child',
+            birthYear: 2014,
+            isOwner: false,
+          },
+        ]);
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+        await db.insert(familyLinks).values([
+          { parentProfileId: OWNER_ID, childProfileId: CHILD_ID },
+          { parentProfileId: COPARENT_ID, childProfileId: CHILD_ID },
+        ]);
+      }
+      await db.insert(subscriptions).values({
+        id: SUB_ID,
+        accountId: ACCOUNT_ID,
+        tier: 'family',
+        status: 'active',
+      });
+      await db.insert(familyPreferences).values({
+        ownerProfileId: OWNER_ID,
+        poolBreakdownShared: opts.ownerSharing,
+      });
+
+      // ---- shared usage_events (FK → v2 person/subscription directly,
+      // post-M-REPOINT; profileId = person.id by the reseed, so the v2
+      // enumeration aggregates the same) ----
       const within = new Date('2026-05-05T12:00:00.000Z'); // in cycle, before DAY_START
       const today = new Date('2026-05-06T12:00:00.000Z'); // in cycle, after DAY_START
       const events: Array<{
@@ -324,51 +351,11 @@ const RUN = !!process.env.DATABASE_URL;
      * out-of-org edge wrongly counted — would surface as the full breakdown.
      */
     async function seedAdversarial() {
-      // ---- legacy store: only the owner→child link exists in-org ----
-      await db.insert(accounts).values({
-        id: ACCOUNT_ID,
-        clerkUserId: `clerk_${ACCOUNT_ID}`,
-        email: `owner_${ACCOUNT_ID}@test.local`,
-      });
-      await db.insert(profiles).values([
-        {
-          id: OWNER_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Owner',
-          birthYear: 1985,
-          isOwner: true,
-        },
-        {
-          id: COPARENT_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Co-parent',
-          birthYear: 1986,
-          isOwner: false,
-        },
-        {
-          id: CHILD_ID,
-          accountId: ACCOUNT_ID,
-          displayName: 'Child',
-          birthYear: 2014,
-          isOwner: false,
-        },
-      ]);
-      // NOTE: no COPARENT→CHILD link — the co-parent has no in-org family link.
-      await db
-        .insert(familyLinks)
-        .values([{ parentProfileId: OWNER_ID, childProfileId: CHILD_ID }]);
-      await db.insert(subscriptions).values({
-        id: SUB_ID,
-        accountId: ACCOUNT_ID,
-        tier: 'family',
-        status: 'active',
-      });
-      await db.insert(familyPreferences).values({
-        ownerProfileId: OWNER_ID,
-        poolBreakdownShared: true, // sharing ON — a leak would surface here
-      });
-
       // ---- v2 store ----
+      // [WI-1128] Seeded FIRST — post-M-REPOINT, the legacy `subscriptions`
+      // row below FKs `organization` (not `accounts`), and
+      // `family_preferences` FKs `person` directly, so both need the v2 rows
+      // to exist first.
       await db.insert(organization).values([
         { id: ACCOUNT_ID, name: 'Fam' },
         { id: OTHER_ORG_ID, name: 'OtherOrg' },
@@ -432,6 +419,61 @@ const RUN = !!process.env.DATABASE_URL;
         // reader returns this; the in-org intersection must drop it.
         { guardianPersonId: COPARENT_ID, chargePersonId: OUTSIDER_ID },
       ]);
+
+      // ---- legacy store: only the owner→child link exists in-org ----
+      // [WI-1128] Legacy `accounts`/`profiles`/`family_links` may already be
+      // dropped (post-M-DROP); after M-REPOINT, usage_events/family_preferences
+      // FK `person`/v2 `subscription` directly (not the legacy tables), so
+      // this legacy-store seed is a no-op there instead of hard-failing.
+      // `subscriptions` (legacy) is retained (not on the drop list).
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: ACCOUNT_ID,
+          clerkUserId: `clerk_${ACCOUNT_ID}`,
+          email: `owner_${ACCOUNT_ID}@test.local`,
+        });
+      }
+      if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+        await db.insert(profiles).values([
+          {
+            id: OWNER_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Owner',
+            birthYear: 1985,
+            isOwner: true,
+          },
+          {
+            id: COPARENT_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Co-parent',
+            birthYear: 1986,
+            isOwner: false,
+          },
+          {
+            id: CHILD_ID,
+            accountId: ACCOUNT_ID,
+            displayName: 'Child',
+            birthYear: 2014,
+            isOwner: false,
+          },
+        ]);
+      }
+      // NOTE: no COPARENT→CHILD link — the co-parent has no in-org family link.
+      if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+        await db
+          .insert(familyLinks)
+          .values([{ parentProfileId: OWNER_ID, childProfileId: CHILD_ID }]);
+      }
+      await db.insert(subscriptions).values({
+        id: SUB_ID,
+        accountId: ACCOUNT_ID,
+        tier: 'family',
+        status: 'active',
+      });
+      await db.insert(familyPreferences).values({
+        ownerProfileId: OWNER_ID,
+        poolBreakdownShared: true, // sharing ON — a leak would surface here
+      });
 
       // ---- shared usage_events (in-org members only) ----
       const within = new Date('2026-05-05T12:00:00.000Z');

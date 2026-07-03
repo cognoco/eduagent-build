@@ -2427,6 +2427,30 @@ describe('session routes', () => {
         notePrompt: true,
         notePromptPostSession: true,
         fluencyDrill: { active: true, durationSeconds: 60 },
+        languageLearning: {
+          strand: 'meaning_input',
+          activityType: 'graded_input',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          gradedInput: {
+            type: 'graded_input',
+            modality: 'reading',
+            cefrLevel: 'A1',
+            knownWordRatioTarget: 0.85,
+            knownWordEstimate: 0.82,
+            targetWords: ['agua'],
+            text: 'Tengo agua en la mesa.',
+            comprehensionQuestions: [
+              {
+                id: 'q1',
+                prompt: 'What is on the table?',
+                answerHint: 'agua',
+              },
+            ],
+            audioEnabled: true,
+          },
+        },
         confidence: 'high',
       });
 
@@ -2459,6 +2483,9 @@ describe('session routes', () => {
       expect(body).toContain('"confidence":"high"');
       expect(body).toContain('"fluencyDrill"');
       expect(body).toContain('"active":true');
+      expect(body).toContain('"languageLearning"');
+      expect(body).toContain('"gradedInput"');
+      expect(body).toContain('Tengo agua en la mesa.');
     });
 
     it('[BUG-797] pre-stream fallback done frame includes completion/UI signals from processMessage', async () => {
@@ -2478,6 +2505,30 @@ describe('session routes', () => {
         notePrompt: true,
         notePromptPostSession: true,
         fluencyDrill: { active: true, durationSeconds: 45 },
+        languageLearning: {
+          strand: 'meaning_input',
+          activityType: 'graded_input',
+          modality: 'text',
+          targetWords: ['agua'],
+          targetGrammar: [],
+          gradedInput: {
+            type: 'graded_input',
+            modality: 'reading',
+            cefrLevel: 'A1',
+            knownWordRatioTarget: 0.85,
+            knownWordEstimate: 0.82,
+            targetWords: ['agua'],
+            text: 'Tengo agua en la mesa.',
+            comprehensionQuestions: [
+              {
+                id: 'q1',
+                prompt: 'What is on the table?',
+                answerHint: 'agua',
+              },
+            ],
+            audioEnabled: true,
+          },
+        },
         confidence: 'medium',
       });
 
@@ -2500,6 +2551,9 @@ describe('session routes', () => {
       expect(body).toContain('"confidence":"medium"');
       expect(body).toContain('"fluencyDrill"');
       expect(body).toContain('"active":true');
+      expect(body).toContain('"languageLearning"');
+      expect(body).toContain('"gradedInput"');
+      expect(body).toContain('Tengo agua en la mesa.');
     });
 
     it('returns 400 with empty message', async () => {

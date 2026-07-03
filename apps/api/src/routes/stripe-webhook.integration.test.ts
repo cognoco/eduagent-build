@@ -45,6 +45,7 @@ import {
   updateQuotaPoolLimitV2,
 } from '../services/billing/billing-v2/subscription-core-v2';
 import { getTierConfig } from '../services/subscription';
+import { legacyIdentityTableExistsForTest } from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -176,21 +177,25 @@ describeIfDb(
         roles: ['admin', 'learner'],
       });
 
-      const [acct] = await db
-        .insert(accounts)
-        .values({
+      // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP);
+      // after M-REPOINT, `subscriptions.accountId` targets `organization`
+      // directly (see below), so this mirror (same id as the org, the
+      // "reseed identity contract") is a no-op there instead of hard-failing.
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: org!.id,
           clerkUserId: `${clerkUserId}_legacy`,
           email: `legacy_${email}`,
-        })
-        .returning();
-      createdAccountIds.push(acct!.id);
+        });
+        createdAccountIds.push(org!.id);
+      }
 
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
       await db.insert(subscriptions).values({
         id: subId,
-        accountId: acct!.id,
+        accountId: org!.id,
         tier: 'family',
         status: 'active',
         stripeSubscriptionId: `${stripeSubscriptionId}_legacy`,

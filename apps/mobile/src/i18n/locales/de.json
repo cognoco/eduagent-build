@@ -725,6 +725,29 @@
       "a11yScore": "Übung abgeschlossen: {{correct}} von {{total}} richtig, {{pct}} Prozent",
       "a11yTimer": "Fließend-Übung: {{time}} verbleibend"
     },
+    "gradedInput": {
+      "title": "Lesen und antworten",
+      "subtitle": "Niveau {{level}}",
+      "targetWords": "Achte auf: {{words}}",
+      "questionLabel": "Frage",
+      "playAudioLabel": "Text abspielen",
+      "stopAudioLabel": "Text stoppen",
+      "dismissLabel": "Lesekarte schließen"
+    },
+    "speakingPractice": {
+      "title": "Sprich es nach",
+      "subtitle": "Wiederhole den Satz",
+      "playAudioLabel": "Zielsatz abspielen",
+      "stopAudioLabel": "Audio stoppen",
+      "startRecordingLabel": "Sprechversuch starten",
+      "stopRecordingLabel": "Sprechversuch stoppen",
+      "listening": "Höre zu...",
+      "transcriptLabel": "Du hast gesagt",
+      "matched": "Passt",
+      "retryWithMissingWords": "Versuch es nochmal: {{words}}",
+      "retry": "Nochmal",
+      "retryLabel": "Sprechversuch wiederholen"
+    },
     "chatShell": {
       "defaultSubtitle": "Ich bin hier, um zu helfen",
       "defaultPlaceholder": "Nachricht eingeben...",

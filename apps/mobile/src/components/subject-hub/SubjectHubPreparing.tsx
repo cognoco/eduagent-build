@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { MagicPenAnimation } from '../common';
+import { BookPageFlipAnimation } from '../common';
 import { resolveLoadingMotionPreset } from '../../lib/motion-presets';
 import { useThemeColors } from '../../lib/theme';
 
@@ -63,7 +63,13 @@ export function SubjectHubPreparing({
 
   return (
     <View className="flex-1 items-center justify-center px-5" testID={testID}>
-      <MagicPenAnimation size={motion.size} color={themeColors.accent} />
+      <View testID="subject-hub-preparing-book-animation">
+        <BookPageFlipAnimation
+          size={motion.size}
+          color={themeColors.accent}
+          testID="subject-hub-preparing-animation"
+        />
+      </View>
       <Text className="mt-4 text-h2 font-bold text-text-primary text-center">
         {subjectName
           ? t('subjectHub.preparing.titleNamed', { subject: subjectName })

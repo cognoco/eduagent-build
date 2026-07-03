@@ -74,6 +74,7 @@ const SOLID_VERDICT_JSON = JSON.stringify({
 });
 
 const BASE_INPUT: RunChallengeRoundGraderInput = {
+  profileId: '00000000-0000-4000-8000-0000000000aa',
   askedQuestion: 'Why does increasing temperature speed up most reactions?',
   learnerAnswer:
     'Because the particles move faster and collide more often with enough energy.',
@@ -231,7 +232,11 @@ describe('runChallengeRoundGrader', () => {
       expect(mockInngestSend).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'app/challenge-round.grader_degraded',
-          data: expect.objectContaining({ reason: 'route_error' }),
+          data: expect.objectContaining({
+            reason: 'route_error',
+            profileId: BASE_INPUT.profileId,
+            timestamp: expect.any(String),
+          }),
         }),
       );
     });

@@ -2,9 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
-  familyLinks,
   generateUUIDv7,
   guardianship,
   login,
@@ -13,14 +11,13 @@ import {
   notificationPreferences,
   organization,
   person,
-  profiles,
   progressSnapshots,
   subjects,
   weeklyReports,
   type Database,
 } from '@eduagent/database';
 import type { ProgressMetrics } from '@eduagent/schemas';
-import { and, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import {
   weeklyProgressPushCron,
@@ -54,6 +51,8 @@ let db: Database;
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+const createdAccountIds: string[] = [];
+const createdProfileIds: string[] = [];
 
 // Fixed-offset IANA zones — immune to DST shifts. Covers every hour offset
 // from UTC-12 to UTC+14, guaranteeing that at any moment of the year every
@@ -202,51 +201,37 @@ async function seedProfile(input: {
   const clerkUserId = `clerk_weekly_push_${RUN_ID}_${idx}`;
   const email = `weekly-push-${RUN_ID}-${idx}@test.invalid`;
 
-  const [account] = await db
-    .insert(accounts)
+  const [org] = await db
+    .insert(organization)
     .values({
-      clerkUserId,
-      email,
+      name: `WPP Seed org ${idx}`,
       timezone: input.timezone ?? null,
     })
-    .returning({ id: accounts.id });
-
-  const [profile] = await db
-    .insert(profiles)
+    .returning({ id: organization.id });
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: input.displayName,
-      birthYear: 1985,
-      isOwner: true,
+      birthDate: '1985-01-01',
+      residenceJurisdiction: 'ROW',
     })
-    .returning({ id: profiles.id });
-
-  // [WI-867] v2 identity rows are unconditional (flag collapsed).
-  await db.insert(organization).values({
-    id: account!.id,
-    name: `WPP Seed org ${account!.id.slice(0, 8)}`,
-    timezone: input.timezone ?? null,
-  });
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: input.displayName,
-    birthDate: '1985-01-01',
-    residenceJurisdiction: 'ROW',
-  });
+    .returning({ id: person.id });
   const loginId = generateUUIDv7();
   await db.insert(login).values({
     id: loginId,
-    personId: profile!.id,
+    personId: p!.id,
     clerkUserId,
     email,
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: p!.id,
+    organizationId: org!.id,
     roles: ['admin', 'learner'],
   });
 
-  return { accountId: account!.id, profileId: profile!.id };
+  createdAccountIds.push(org!.id);
+  createdProfileIds.push(p!.id);
+  return { accountId: org!.id, profileId: p!.id };
 }
 
 async function seedWeeklyPushPrefs(profileId: string): Promise<void> {
@@ -279,9 +264,6 @@ async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
 ): Promise<void> {
-  await db.insert(familyLinks).values({ parentProfileId, childProfileId });
-
-  // [WI-867] v2 guardianship edge is unconditional (flag collapsed).
   await db.insert(guardianship).values({
     guardianPersonId: parentProfileId,
     chargePersonId: childProfileId,
@@ -467,37 +449,25 @@ afterAll(async () => {
     process.env['RESEND_API_KEY'] = originalResendApiKey;
   }
 
-  // [WI-867] v2 identity cleanup is unconditional. The legacy accounts delete
-  // does not cascade to v2 tables (no FK from accounts → organization/person).
-  const testAccounts = await db.query.accounts.findMany({
-    where: like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`),
-    columns: { id: true },
-  });
-  const accountIds = testAccounts.map((a) => a.id);
-  if (accountIds.length > 0) {
-    const testProfiles = await db.query.profiles.findMany({
-      where: inArray(profiles.accountId, accountIds),
-      columns: { id: true },
-    });
-    const profileIds = testProfiles.map((p) => p.id);
-    if (profileIds.length > 0) {
-      // guardianship.guardianPersonId / chargePersonId → person.id RESTRICT:
-      // delete guardianship edges before person.
-      await db
-        .delete(guardianship)
-        .where(inArray(guardianship.guardianPersonId, profileIds));
-      await db
-        .delete(guardianship)
-        .where(inArray(guardianship.chargePersonId, profileIds));
-      // person cascade: membership, login (consentRequest also cascades).
-      await db.delete(person).where(inArray(person.id, profileIds));
-    }
-    await db.delete(organization).where(inArray(organization.id, accountIds));
+  // [WI-867] v2 identity cleanup, tracked at seed time (legacy accounts/
+  // profiles lookup removed — those tables no longer exist).
+  if (createdProfileIds.length > 0) {
+    // guardianship.guardianPersonId / chargePersonId → person.id RESTRICT:
+    // delete guardianship edges before person.
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, createdProfileIds));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, createdProfileIds));
+    // person cascade: membership, login (consentRequest also cascades).
+    await db.delete(person).where(inArray(person.id, createdProfileIds));
   }
-
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_weekly_push_${RUN_ID}%`));
+  if (createdAccountIds.length > 0) {
+    await db
+      .delete(organization)
+      .where(inArray(organization.id, createdAccountIds));
+  }
 }, 30_000);
 
 describe('weekly progress push integration', () => {

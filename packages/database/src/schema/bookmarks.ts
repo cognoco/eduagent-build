@@ -6,7 +6,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -18,7 +18,7 @@ export const bookmarks = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     // Stored as raw IDs instead of FKs so bookmarks survive session/event TTL cleanup.
     sessionId: uuid('session_id').notNull(),
     eventId: uuid('event_id').notNull(),

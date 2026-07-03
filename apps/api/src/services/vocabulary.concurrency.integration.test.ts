@@ -18,17 +18,20 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
-  profiles,
+  generateUUIDv7,
   subjects,
   vocabulary,
   vocabularyRetentionCards,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { reviewVocabulary } from './vocabulary';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -56,25 +59,30 @@ const ACCOUNT = {
   email: `${PREFIX}-${RUN_SUFFIX}@integration.test`,
 };
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedVocabulary() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Vocab Race Test User',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Vocab Race Test User',
+    birthYear: 2000,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: 'Spanish',
       pedagogyMode: 'four_strands',
     })
@@ -82,7 +90,7 @@ async function seedVocabulary() {
   const [vocab] = await db
     .insert(vocabulary)
     .values({
-      profileId: profile!.id,
+      profileId,
       subjectId: subject!.id,
       term: 'hola',
       termNormalized: 'hola',
@@ -90,19 +98,17 @@ async function seedVocabulary() {
       type: 'word',
     })
     .returning();
-  return { profile: profile!, subject: subject!, vocab: vocab! };
+  return { profile: { id: profileId }, subject: subject!, vocab: vocab! };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(eq(accounts.email, ACCOUNT.email));
-  const ids = found.map((a) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 beforeEach(async () => {

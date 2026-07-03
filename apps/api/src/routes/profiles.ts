@@ -26,6 +26,7 @@ import {
   getPersonScope,
   updateProfileV2,
 } from '../services/identity-v2/profile-v2';
+import { verifyPersonIsOrgAdminV2 } from '../services/identity-v2/ownership-v2';
 
 import {
   notFound,
@@ -57,6 +58,10 @@ type ProfileEnv = {
     account: Account | undefined;
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
+    // [WI-1302] The authenticated caller's own person id, resolved server-side
+    // by accountMiddleware — required by isCallerAlreadyOwner (never
+    // request-supplied, unlike X-Profile-Id).
+    callerPersonId: string | undefined;
     // [CUT-B1] Set on the v2 pre-graph path (no account yet).
     clerkIdentity: ClerkIdentity | undefined;
   };
@@ -77,11 +82,32 @@ function hasRecentOwnerElevation(user: AuthUser | undefined): boolean {
   );
 }
 
-function isExplicitOwnerContext(profileMeta: ProfileMeta | undefined): boolean {
-  return (
-    profileMeta?.isOwner === true &&
-    profileMeta.resolvedVia === 'explicit-header'
-  );
+/**
+ * [WI-1302 — R2 elevation-bypass] Whether the CALLER already holds owner
+ * authority over the account — resolved from `callerPersonId` (the
+ * authenticated login->person binding, set server-side by accountMiddleware),
+ * never from the client-supplied X-Profile-Id header.
+ *
+ * SECURITY (P1). The prior guard here, isExplicitOwnerContext, read
+ * `profileMeta.isOwner` + `resolvedVia === 'explicit-header'` — both derived
+ * from the profile the CLIENT SELECTED via X-Profile-Id. profileScopeMiddleware
+ * verifies X-Profile-Id belongs to the caller's account, but not that it is
+ * the caller's OWN identity. A non-owner caller could therefore send
+ * `X-Profile-Id: <owner profile id>` to make isExplicitOwnerContext return
+ * true and skip the fresh-reverification requirement below while actually
+ * switching into the owner profile as someone else — the exact elevation
+ * bypass this WI closes. This guard instead asks whether callerPersonId is
+ * itself an admin member of the account, mirroring the WI-1301
+ * assertCallerIsAccountOwner pattern via the same verifyPersonIsOrgAdminV2
+ * primitive.
+ */
+async function isCallerAlreadyOwner(
+  db: Database,
+  callerPersonId: string | undefined,
+  organizationId: string,
+): Promise<boolean> {
+  if (!callerPersonId) return false;
+  return verifyPersonIsOrgAdminV2(db, callerPersonId, organizationId);
 }
 
 /**
@@ -420,7 +446,11 @@ export const profileRoutes = new Hono<ProfileEnv>()
       if (
         isOwnerElevationGateEnabled(c.env?.OWNER_ELEVATION_GATE_ENABLED) &&
         targetIsOwner &&
-        !isExplicitOwnerContext(c.get('profileMeta')) &&
+        !(await isCallerAlreadyOwner(
+          db,
+          c.get('callerPersonId'),
+          account.id,
+        )) &&
         !hasRecentOwnerElevation(c.get('user'))
       ) {
         return apiError(

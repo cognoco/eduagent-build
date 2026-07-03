@@ -45,6 +45,20 @@
         "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "true",
         "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
+    },
+    "fallback": {
+      "channel": "fallback",
+      "environment": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.mentomate.com",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V1": "true",
+        "EXPO_PUBLIC_ENABLE_MODE_NAV_V2": "false",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
     }
   },
   "submit": {

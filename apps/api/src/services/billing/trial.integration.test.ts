@@ -14,13 +14,18 @@
 import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
+  membership,
+  organization,
+  person,
   quotaPools,
+  subscription as subscriptionV2Table,
   subscriptions,
   createDatabase,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
+import { legacyIdentityTableExistsForTest } from '../../test-utils/legacy-identity-anchors';
 
 import {
   resetDailyQuotas,
@@ -68,17 +73,62 @@ const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-m3-04`, email: `${PREFIX}-m3-04@integration.test` },
   { clerkUserId: `${PREFIX}-m3-05`, email: `${PREFIX}-m3-05@integration.test` },
 ];
-const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
 
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
   const account = TEST_ACCOUNTS[index]!;
-  const [row] = await db
-    .insert(accounts)
-    .values({ clerkUserId: account.clerkUserId, email: account.email })
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `${PREFIX}-org-${index}` })
     .returning();
-  return row!;
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
+  // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
+  // this mirror (same id as the org) is a no-op there instead of hard-failing.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.insert(accounts).values({
+      id: org!.id,
+      clerkUserId: account.clerkUserId,
+      email: account.email,
+    });
+  }
+  return org!;
+}
+
+// [WI-1128] `quota_pools.subscriptionId` now FKs to the v2 `subscription`
+// table (post-M-REPOINT). Auto-provision a throwaway payer (subscription.
+// payerPersonId is NOT NULL — these tests don't care about payer identity),
+// and return the v2 subscription id so callers mirror the legacy
+// `subscriptions` row under the SAME id (resetExpiredQuotaCycles' raw-SQL
+// join on `qp.subscription_id = s.id` depends on the two ids matching).
+async function seedV2SubscriptionCounterpart(
+  db: Database,
+  organizationId: string,
+  tier: 'free' | 'plus' | 'family' | 'pro',
+  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired',
+): Promise<string> {
+  const [payer] = await db
+    .insert(person)
+    .values({
+      displayName: 'Auto Payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
+    })
+    .returning();
+  await db.insert(membership).values({
+    personId: payer!.id,
+    organizationId,
+    roles: ['admin'],
+  });
+  const [subV2] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId,
+      planTier: tier,
+      status,
+      payerPersonId: payer!.id,
+    })
+    .returning();
+  return subV2!.id;
 }
 
 async function seedSubscriptionWithQuota(input: {
@@ -92,9 +142,17 @@ async function seedSubscriptionWithQuota(input: {
   const tier = input.tier ?? 'plus';
   const tierConfig = getTierConfig(tier);
 
+  const subV2Id = await seedV2SubscriptionCounterpart(
+    db,
+    input.accountId,
+    tier,
+    'active',
+  );
+
   const [subscription] = await db
     .insert(subscriptions)
     .values({
+      id: subV2Id,
       accountId: input.accountId,
       tier,
       status: 'active',
@@ -141,9 +199,17 @@ async function seedTrialSubscriptionWithPlusQuota(
   const futureDate = new Date();
   futureDate.setMonth(futureDate.getMonth() + 1);
 
+  const subV2Id = await seedV2SubscriptionCounterpart(
+    db,
+    accountId,
+    'plus',
+    status,
+  );
+
   const [sub] = await db
     .insert(subscriptions)
     .values({
+      id: subV2Id,
       accountId,
       tier: 'plus',
       status,
@@ -168,15 +234,37 @@ async function seedTrialSubscriptionWithPlusQuota(
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
+  const orgs = await db.query.organization.findMany({
+    where: inArray(
+      organization.name,
+      TEST_ACCOUNTS.map((_, i) => `${PREFIX}-org-${i}`),
+    ),
   });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) return;
+
+  const memberships = await db
+    .select({ personId: membership.personId })
+    .from(membership)
+    .where(inArray(membership.organizationId, orgIds));
+  const personIds = [...new Set(memberships.map((m) => m.personId))];
+
+  // subscription.organizationId / .payerPersonId are both RESTRICT — the
+  // v2 subscription must go before organization/person.
+  await db
+    .delete(subscriptionV2Table)
+    .where(inArray(subscriptionV2Table.organizationId, orgIds));
+  await db.delete(membership).where(inArray(membership.organizationId, orgIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); its
+  // `subscriptions` row (same id as the org) cascades away via the
+  // M-REPOINT'd account_id->organization FK when the org itself is deleted
+  // above.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.delete(accounts).where(inArray(accounts.id, orgIds));
   }
 }
 
@@ -630,9 +718,20 @@ describe('expireTrialAndDowngradeQuota atomicity [CR-2026-05-19-M3 SITE 2b]', ()
     const db = createIntegrationDb();
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 1);
+    const subV2Id = await seedV2SubscriptionCounterpart(
+      db,
+      account.id,
+      'free',
+      'expired',
+    );
     const [sub] = await db
       .insert(subscriptions)
-      .values({ accountId: account.id, tier: 'free', status: 'expired' })
+      .values({
+        id: subV2Id,
+        accountId: account.id,
+        tier: 'free',
+        status: 'expired',
+      })
       .returning();
     await db.insert(quotaPools).values({
       subscriptionId: sub!.id,

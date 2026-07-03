@@ -1142,6 +1142,38 @@ describe('buildSystemPrompt — CRITICAL THINKING block', () => {
   });
 });
 
+describe('buildSystemPrompt — language mode verification gates', () => {
+  it('does not inject Devil Advocate instructions into four-strands prompts', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        pedagogyMode: 'four_strands',
+        languageCode: 'fr',
+        verificationType: 'evaluate',
+      }),
+    );
+
+    expect(prompt).toContain('Nation Four Strands');
+    expect(prompt).toContain('Correct errors clearly and immediately');
+    expect(prompt).not.toContain("Devil's Advocate");
+    expect(prompt).not.toContain('Present a plausibly flawed explanation');
+  });
+
+  it('does not inject Teach Back no-correction instructions into four-strands prompts', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        pedagogyMode: 'four_strands',
+        languageCode: 'fr',
+        verificationType: 'teach_back',
+      }),
+    );
+
+    expect(prompt).toContain('Nation Four Strands');
+    expect(prompt).toContain('Correct errors clearly and immediately');
+    expect(prompt).not.toContain('Feynman Technique');
+    expect(prompt).not.toContain('Never correct the learner directly');
+  });
+});
+
 describe('buildSystemPrompt — ASK ANYTHING (freeform) guidance', () => {
   it('uses freeform guidance and drops the lead-the-teaching cycle for topicless freeform sessions', () => {
     const prompt = buildSystemPrompt(

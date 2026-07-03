@@ -725,6 +725,29 @@
       "a11yScore": "Ejercicio completado: {{correct}} de {{total}} correctas, {{pct}} por ciento",
       "a11yTimer": "Ejercicio de fluidez: {{time}} restantes"
     },
+    "gradedInput": {
+      "title": "Lee y responde",
+      "subtitle": "Nivel {{level}}",
+      "targetWords": "Fíjate en: {{words}}",
+      "questionLabel": "Pregunta",
+      "playAudioLabel": "Reproducir el texto",
+      "stopAudioLabel": "Detener el texto",
+      "dismissLabel": "Descartar tarjeta de lectura"
+    },
+    "speakingPractice": {
+      "title": "Repítelo",
+      "subtitle": "Repite la frase",
+      "playAudioLabel": "Reproducir frase objetivo",
+      "stopAudioLabel": "Detener audio",
+      "startRecordingLabel": "Empezar intento hablado",
+      "stopRecordingLabel": "Detener intento hablado",
+      "listening": "Escuchando...",
+      "transcriptLabel": "Dijiste",
+      "matched": "Coincide",
+      "retryWithMissingWords": "Inténtalo otra vez: {{words}}",
+      "retry": "Reintentar",
+      "retryLabel": "Reintentar intento hablado"
+    },
     "chatShell": {
       "defaultSubtitle": "Estoy aquí para ayudar",
       "defaultPlaceholder": "Escribe un mensaje...",

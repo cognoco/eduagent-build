@@ -243,6 +243,55 @@ describe('parseSSEStream', () => {
     ]);
   });
 
+  it('parses language-learning activity from done events', async () => {
+    const languageLearning = {
+      strand: 'meaning_input',
+      activityType: 'graded_input',
+      modality: 'text',
+      targetWords: ['agua'],
+      targetGrammar: [],
+      gradedInput: {
+        type: 'graded_input',
+        modality: 'reading',
+        cefrLevel: 'A1',
+        knownWordRatioTarget: 0.85,
+        knownWordEstimate: 0.82,
+        targetWords: ['agua'],
+        text: 'Tengo agua en la mesa.',
+        comprehensionQuestions: [
+          {
+            id: 'q1',
+            prompt: 'What is on the table?',
+            answerHint: 'agua',
+          },
+        ],
+        audioEnabled: true,
+      },
+    };
+    const stream = createMockStream([
+      `data: ${JSON.stringify({
+        type: 'done',
+        exchangeCount: 4,
+        escalationRung: 2,
+        languageLearning,
+      })}\n\n`,
+    ]);
+
+    const events: StreamEvent[] = [];
+    for await (const event of parseSSEStream(mockResponse(stream))) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      {
+        type: 'done',
+        exchangeCount: 4,
+        escalationRung: 2,
+        languageLearning,
+      },
+    ]);
+  });
+
   it('parses fallback events from SSE stream', async () => {
     const stream = createMockStream([
       'data: {"type":"fallback","reason":"empty_reply","fallbackText":"Try again"}\n\n',

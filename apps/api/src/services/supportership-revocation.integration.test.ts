@@ -24,7 +24,7 @@ type SeededSupportLink = {
   contractId: string;
 };
 
-type FailureMode = 'contract-update' | 'notice-insert';
+type FailureMode = 'contract-update';
 
 function createIntegrationDb(): Database {
   return createDatabase(process.env.DATABASE_URL!);
@@ -50,20 +50,6 @@ function withInjectedFailure(db: Database, mode: FailureMode): Database {
               throw new Error('Injected contract update failure');
             }
             return (target as { update(table: unknown): unknown }).update(
-              table,
-            );
-          };
-        }
-
-        if (prop === 'insert') {
-          return (table: unknown) => {
-            if (
-              mode === 'notice-insert' &&
-              table === supportVisibilityNotices
-            ) {
-              throw new Error('Injected notice insert failure');
-            }
-            return (target as { insert(table: unknown): unknown }).insert(
               table,
             );
           };
@@ -199,61 +185,33 @@ function withInjectedFailure(db: Database, mode: FailureMode): Database {
       expect(edge!.revokedAt).toBeNull();
     });
 
-    it('rolls back edge and contract state when the notice write fails after audit', async () => {
+    it('WI-1176: resolves and revokes without a schema-invalid synchronous notice write', async () => {
       const seeded = await seedAcceptedSupportLink();
-      const failingDb = withInjectedFailure(db, 'notice-insert');
 
-      await expect(
-        requestSelfUnlink(failingDb, {
-          supportershipId: seeded.supportershipId,
-          callerPersonId: seeded.supporteeId,
-          now: NOW,
-        }),
-      ).rejects.toThrow('Injected notice insert failure');
+      const notice = await requestSelfUnlink(db, {
+        supportershipId: seeded.supportershipId,
+        callerPersonId: seeded.supporteeId,
+        now: NOW,
+      });
+      expect(notice.supportershipId).toBe(seeded.supportershipId);
 
       const edge = await db.query.supportership.findFirst({
         where: eq(supportership.id, seeded.supportershipId),
       });
-      expect(edge!.revokedAt).toBeNull();
+      expect(edge!.revokedAt).toEqual(NOW);
 
       const contract = await db.query.supportVisibilityContracts.findFirst({
         where: eq(supportVisibilityContracts.id, seeded.contractId),
       });
-      expect(contract!.status).toBe('accepted');
+      expect(contract!.status).toBe('revoked');
 
-      const auditEvents = await db.query.supportVisibilityAuditEvents.findMany({
+      const notices = await db.query.supportVisibilityNotices.findMany({
         where: eq(
-          supportVisibilityAuditEvents.supportershipId,
+          supportVisibilityNotices.supportershipId,
           seeded.supportershipId,
         ),
       });
-      expect(auditEvents).toHaveLength(0);
-    });
-
-    it('rolls back a ghost-edge revocation when the notice write fails with no contract row', async () => {
-      const seeded = await seedSupportershipEdge();
-      const failingDb = withInjectedFailure(db, 'notice-insert');
-
-      await expect(
-        requestSelfUnlink(failingDb, {
-          supportershipId: seeded.supportershipId,
-          callerPersonId: seeded.supporteeId,
-          now: NOW,
-        }),
-      ).rejects.toThrow('Injected notice insert failure');
-
-      const edge = await db.query.supportership.findFirst({
-        where: eq(supportership.id, seeded.supportershipId),
-      });
-      expect(edge!.revokedAt).toBeNull();
-
-      const auditEvents = await db.query.supportVisibilityAuditEvents.findMany({
-        where: eq(
-          supportVisibilityAuditEvents.supportershipId,
-          seeded.supportershipId,
-        ),
-      });
-      expect(auditEvents).toHaveLength(0);
+      expect(notices).toHaveLength(0);
     });
   },
 );

@@ -85,13 +85,10 @@ import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
 import {
-  executeDeletion,
-  scheduleDeletion,
-} from '../../apps/api/src/services/deletion';
-import {
   executeDeletionV2,
   scheduleDeletionV2,
 } from '../../apps/api/src/services/identity-v2/deletion-v2';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 import { app } from '../../apps/api/src/index';
 
@@ -116,10 +113,14 @@ async function loadDeletionState(accountId: string): Promise<{
     where: eq(organization.id, accountId),
     columns: { deletionScheduledAt: true, deletionCancelledAt: true },
   });
-  const acctRow = await db.query.accounts.findFirst({
-    where: eq(accounts.id, accountId),
-    columns: { deletionScheduledAt: true, deletionCancelledAt: true },
-  });
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); gate on
+  // table existence — the v2 `organization` row above is the real anchor.
+  const acctRow = (await legacyIdentityTableExistsForTest(db, 'accounts'))
+    ? await db.query.accounts.findFirst({
+        where: eq(accounts.id, accountId),
+        columns: { deletionScheduledAt: true, deletionCancelledAt: true },
+      })
+    : undefined;
   if (!orgRow && !acctRow) return null;
   return {
     deletionScheduledAt:
@@ -174,6 +175,16 @@ async function createOwnerProfileRecord(): Promise<{
   });
   if (membershipRow) {
     return { profileId, accountId: membershipRow.organizationId };
+  }
+
+  // [WI-1128] Legacy `profiles` fallback — may already be dropped
+  // (post-M-DROP); skip it there instead of hard-failing. The create route is
+  // v2-unconditional, so this path is a pre-collapse-flag safety net, not the
+  // expected route in current runs.
+  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
+    throw new Error(
+      `Profile not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to: ${profileId}`,
+    );
   }
 
   const row = await db.query.profiles.findFirst({
@@ -511,8 +522,18 @@ legacyAccountDeletionCascadeDescribe(
         embedding: Array.from({ length: 1024 }, () => 0.01),
       });
 
-      await scheduleDeletion(db, accountId);
-      await executeDeletion(db, accountId);
+      // [WI-1128] Post-0129 the physical FKs are v2 (session_* / subjects →
+      // person), so the cascade only fires through executeDeletionV2 (which
+      // deletes person). Legacy executeDeletion (accounts → profiles) no longer
+      // reaches person-FK PII; accountId is the v2 organization id here.
+      await scheduleDeletionV2(db, accountId);
+      const result = await executeDeletionV2(db, {
+        organizationId: accountId,
+        ownerEmail: null,
+        reason: 'user_initiated',
+        deletedBy: null,
+      });
+      expect(result).toBe('deleted');
 
       const summaries = await db.execute(
         sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${profileId}`,
@@ -964,11 +985,15 @@ legacyAccountDeletionCascadeDescribe(
           { table: 'celebration_events', col: 'profile_id' },
           { table: 'challenge_round_cooldowns', col: 'profile_id' },
           { table: 'support_messages', col: 'profile_id' },
-          { table: 'consent_states', col: 'profile_id' },
+          // [WI-1128] consent_states + family_links excluded from the v2
+          // cascade audit: both are 0129 drop-list legacy tables whose
+          // profile_id FK is deliberately NOT repointed to person (0129 skips
+          // drop-list conrelids), so they do not cascade under
+          // executeDeletionV2. Absent in prod; dropped wholesale by 0130. v2
+          // successor consent_grant is audited by the [WI-825] v2 suite below.
           { table: 'withdrawal_archive_preferences', col: 'owner_profile_id' },
           { table: 'family_preferences', col: 'owner_profile_id' },
           { table: 'pending_notices', col: 'owner_profile_id' },
-          { table: 'family_links', col: 'parent_profile_id' },
           { table: 'weekly_reports', col: 'profile_id' },
           { table: 'monthly_reports', col: 'profile_id' },
         ];
@@ -982,23 +1007,21 @@ legacyAccountDeletionCascadeDescribe(
         ).toBeGreaterThan(0);
 
         // -----------------------------------------------------------------------
-        // Act: delete the account. Cascade FKs do the work.
+        // Act: delete via executeDeletionV2 (deletes person → cascades every
+        // person-FK PII table below). [WI-1128] Post-0129 the DB is v2, so this
+        // is the only deletion path that reaches the repointed PII. Legacy
+        // accounts/profiles are NOT erased by v2 deletion (CUT-B3) and are
+        // dropped wholesale by 0130, so their post-deletion counts are no longer
+        // asserted here; accountId is the v2 organization id.
         // -----------------------------------------------------------------------
-        await scheduleDeletion(db, accountId);
-        await executeDeletion(db, accountId);
-
-        // -----------------------------------------------------------------------
-        // Assert: the account row is gone …
-        // -----------------------------------------------------------------------
-        const remaining = await db.execute(
-          sql`SELECT count(*)::int AS c FROM accounts WHERE id = ${accountId}`,
-        );
-        expect((remaining.rows as Array<{ c: number }>)[0].c).toBe(0);
-
-        const remainingProfile = await db.execute(
-          sql`SELECT count(*)::int AS c FROM profiles WHERE account_id = ${accountId}`,
-        );
-        expect((remainingProfile.rows as Array<{ c: number }>)[0].c).toBe(0);
+        await scheduleDeletionV2(db, accountId);
+        const result = await executeDeletionV2(db, {
+          organizationId: accountId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+        expect(result).toBe('deleted');
 
         // -----------------------------------------------------------------------
         // … and every PII-bearing table is empty for the deleted profile.
@@ -1024,14 +1047,11 @@ legacyAccountDeletionCascadeDescribe(
         );
         expect((nudgesTo.rows as Array<{ c: number }>)[0].c).toBe(0);
 
-        // family_links cascades from BOTH sides (parent_profile_id and
-        // child_profile_id both have onDelete: 'cascade'). Assert the
-        // child_profile_id side is also wiped after the deletion.
-        // (The parent_profile_id side is covered by the pii loop above.)
-        const familyLinksAsChild = await db.execute(
-          sql`SELECT count(*)::int AS c FROM family_links WHERE child_profile_id = ${profileId}`,
-        );
-        expect((familyLinksAsChild.rows as Array<{ c: number }>)[0].c).toBe(0);
+        // [WI-1128] family_links assertions removed: family_links is a 0129
+        // drop-list table (FK stays on profiles, not repointed to person), so
+        // it does not cascade under executeDeletionV2. Absent in prod; dropped
+        // by 0130. v2 guardianship/supportership edges are torn down by
+        // executeDeletionV2 step 2a (coverage tracked separately).
 
         // -----------------------------------------------------------------------
         // Cross-account break test: the OTHER account's own profile still
@@ -1396,6 +1416,111 @@ if (isIdentityV2Enabled()) {
         }
       } finally {
         // Best-effort cleanup of any seed rows not deleted by the act step.
+        await teardownV2Graph(db, personId, organizationId).catch(
+          () => undefined,
+        );
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1128, D2] Retention-pipeline cascade, v2-mode pin.
+    //
+    // The flag-off `legacyAccountDeletionCascadeDescribe` block above ("cascade-
+    // deletes all retention-pipeline rows for the deleted account") already
+    // exercises executeDeletionV2 (its own comment: "Post-0129 the physical FKs
+    // are v2 (session_* / subjects → person), so the cascade only fires through
+    // executeDeletionV2"), but it only RUNS when isIdentityV2Enabled() is false —
+    // so this exact assertion has zero coverage on the flag-on lane. subjects.
+    // profileId already `.references(() => person.id, { onDelete: 'cascade' })`
+    // (packages/database/src/schema/subjects.ts) confirms the FK is live, so
+    // this is a straight regression pin, not new behavior.
+    // -------------------------------------------------------------------------
+    it('[D2] cascade-deletes all retention-pipeline rows for the deleted v2 person', async () => {
+      const db = createIntegrationDb();
+      const { personId, organizationId } = await seedV2IdentityGraph(db);
+
+      try {
+        const [subject] = await db
+          .insert(subjects)
+          .values({
+            profileId: personId,
+            name: 'Mathematics',
+            status: 'active',
+            pedagogyMode: 'socratic',
+          })
+          .returning({ id: subjects.id });
+
+        const [session] = await db
+          .insert(learningSessions)
+          .values({
+            profileId: personId,
+            subjectId: subject!.id,
+            sessionType: 'learning',
+            inputMode: 'text',
+            status: 'completed',
+            escalationRung: 1,
+            exchangeCount: 1,
+            endedAt: new Date(),
+          })
+          .returning({ id: learningSessions.id });
+
+        await db.insert(sessionSummaries).values({
+          sessionId: session!.id,
+          profileId: personId,
+          topicId: null,
+          status: 'accepted',
+          learnerRecap: 'You connected the example back to the rule.',
+          llmSummary: {
+            narrative:
+              'Worked through algebra and balanced a one-step equation while naming each inverse operation.',
+            topicsCovered: ['algebra', 'inverse operations'],
+            sessionState: 'completed',
+            reEntryRecommendation:
+              'Resume with one more one-step equation and ask for the inverse-operation rule aloud.',
+          },
+          summaryGeneratedAt: new Date(),
+        });
+
+        await db.insert(sessionEvents).values({
+          sessionId: session!.id,
+          profileId: personId,
+          subjectId: subject!.id,
+          eventType: 'user_message',
+          content: 'Can we do algebra?',
+        });
+
+        await db.insert(sessionEmbeddings).values({
+          sessionId: session!.id,
+          profileId: personId,
+          topicId: null,
+          content: 'Algebra session summary',
+          embedding: Array.from({ length: 1024 }, () => 0.01),
+        });
+
+        await scheduleDeletionV2(db, organizationId);
+        const result = await executeDeletionV2(db, {
+          organizationId,
+          ownerEmail: null,
+          reason: 'user_initiated',
+          deletedBy: null,
+        });
+        expect(result).toBe('deleted');
+
+        const summaries = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_summaries WHERE profile_id = ${personId}`,
+        );
+        expect((summaries.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+        const embeddings = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_embeddings WHERE profile_id = ${personId}`,
+        );
+        expect((embeddings.rows as Array<{ c: number }>)[0].c).toBe(0);
+
+        const events = await db.execute(
+          sql`SELECT count(*)::int AS c FROM session_events WHERE profile_id = ${personId}`,
+        );
+        expect((events.rows as Array<{ c: number }>)[0].c).toBe(0);
+      } finally {
         await teardownV2Graph(db, personId, organizationId).catch(
           () => undefined,
         );

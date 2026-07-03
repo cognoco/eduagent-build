@@ -1,10 +1,9 @@
 import { eq, inArray } from 'drizzle-orm';
 import { resolve } from 'path';
 import {
-  accounts,
   createDatabase,
+  person,
   practiceActivityEvents,
-  profiles,
   quizRounds,
   subjects,
 } from '@eduagent/database';
@@ -30,27 +29,21 @@ function createIntegrationDb() {
 }
 
 const PREFIX = 'integration-orchestrate-round';
-const ATTACKER_ACCOUNT = {
-  clerkUserId: `${PREFIX}-attacker`,
-  email: `${PREFIX}-attacker@integration.test`,
-};
-const VICTIM_ACCOUNT = {
-  clerkUserId: `${PREFIX}-victim`,
-  email: `${PREFIX}-victim@integration.test`,
-};
+const ATTACKER_DISPLAY_NAME = `${PREFIX}-attacker`;
+const VICTIM_DISPLAY_NAME = `${PREFIX}-victim`;
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [
-      ATTACKER_ACCOUNT.email,
-      VICTIM_ACCOUNT.email,
+  const rows = await db.query.person.findMany({
+    where: inArray(person.displayName, [
+      ATTACKER_DISPLAY_NAME,
+      VICTIM_DISPLAY_NAME,
     ]),
   });
   if (rows.length > 0) {
-    await db.delete(accounts).where(
+    await db.delete(person).where(
       inArray(
-        accounts.id,
+        person.id,
         rows.map((r: { id: string }) => r.id),
       ),
     );
@@ -64,38 +57,22 @@ let victimSubjectId: string;
 beforeAll(async () => {
   await cleanupTestAccounts();
   const db = createIntegrationDb();
-  const [attackerAcct] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: ATTACKER_ACCOUNT.clerkUserId,
-      email: ATTACKER_ACCOUNT.email,
-    })
-    .returning();
   const [attackerProf] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: attackerAcct!.id,
-      displayName: 'Attacker Profile',
-      birthYear: 2010,
-      isOwner: true,
+      displayName: ATTACKER_DISPLAY_NAME,
+      birthDate: '2010-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
   attackerProfileId = attackerProf!.id;
 
-  const [victimAcct] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: VICTIM_ACCOUNT.clerkUserId,
-      email: VICTIM_ACCOUNT.email,
-    })
-    .returning();
   const [victimProf] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: victimAcct!.id,
-      displayName: 'Victim Profile',
-      birthYear: 2010,
-      isOwner: true,
+      displayName: VICTIM_DISPLAY_NAME,
+      birthDate: '2010-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
   victimProfileId = victimProf!.id;

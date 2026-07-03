@@ -8,7 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { profiles } from './profiles';
+import { person } from './identity';
 import { learningSessions } from './sessions';
 import { curriculumTopics, subjects } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -28,7 +28,7 @@ export const concepts = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),
@@ -66,7 +66,7 @@ export const conceptMastery = pgTable(
       .references(() => concepts.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     status: conceptMasteryStatusEnum('status').notNull(),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     lastEvaluatedAt: timestamp('last_evaluated_at', {

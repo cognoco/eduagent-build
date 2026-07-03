@@ -8,8 +8,7 @@
 
 import { asc, eq } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  generateUUIDv7,
   subjects,
   curricula,
   curriculumBooks,
@@ -35,6 +34,7 @@ import {
   setSessionInputMode,
   syncHomeworkState,
 } from '../../apps/api/src/services/session';
+import { ensureV2IdentityForLegacyProfileTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { cleanupAccounts, createIntegrationDb } from './helpers';
 
 const TEST_ACCOUNTS = [
@@ -67,36 +67,25 @@ const TEST_ACCOUNTS = [
 const ALL_EMAILS = TEST_ACCOUNTS.map((account) => account.email);
 const ALL_CLERK_USER_IDS = TEST_ACCOUNTS.map((account) => account.clerkUserId);
 
-async function seedAccount(index: number) {
-  const db = createIntegrationDb();
-  const account = TEST_ACCOUNTS[index]!;
-  const [row] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: account.clerkUserId,
-      email: account.email,
-    })
-    .returning();
-
-  return row!;
-}
-
 async function seedProfile(index: number) {
   const db = createIntegrationDb();
-  const account = await seedAccount(index);
-  const [row] = await db
-    .insert(profiles)
-    .values({
-      accountId: account.id,
-      displayName: `Integration Learner ${index + 1}`,
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
+  const testAccount = TEST_ACCOUNTS[index]!;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: testAccount.clerkUserId,
+    email: testAccount.email,
+    displayName: `Integration Learner ${index + 1}`,
+    birthYear: 2000,
+    isOwner: true,
+  });
 
   return {
-    account,
-    profile: row!,
+    account: { id: accountId },
+    profile: { id: profileId },
   };
 }
 

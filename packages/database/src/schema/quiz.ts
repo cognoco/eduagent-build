@@ -10,7 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects } from './subjects';
 
 export const quizActivityTypeEnum = pgEnum('quiz_activity_type', [
@@ -33,7 +33,7 @@ export const quizRounds = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id').references(() => subjects.id, {
       onDelete: 'set null',
     }),
@@ -77,7 +77,7 @@ export const quizMissedItems = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     activityType: quizActivityTypeEnum('activity_type').notNull(),
     questionText: text('question_text').notNull(),
     correctAnswer: text('correct_answer').notNull(),

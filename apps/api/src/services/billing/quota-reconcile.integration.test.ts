@@ -21,11 +21,14 @@ import {
   profiles,
   quotaPools,
   subscription as subscriptionV2Table,
-  subscriptions,
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
+import {
+  ensureLegacySubscriptionAnchorForTest,
+  legacyIdentityTableExistsForTest,
+} from '../../test-utils/legacy-identity-anchors';
 
 import {
   reconcileQuotaStateForEffectiveTier,
@@ -73,8 +76,10 @@ const TEST_ACCOUNTS = Array.from({ length: 8 }, (_, i) => ({
   clerkUserId: `${PREFIX}-${String(i).padStart(2, '0')}`,
   email: `${PREFIX}-${String(i).padStart(2, '0')}@integration.test`,
 }));
-const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
+// [WI-1128] `accounts` (legacy) is on the drop list; the seed/cleanup anchor
+// is now the v2 `organization`, keyed by name (same pattern as
+// metering.integration.test.ts's ORG_NAMES).
+const ORG_NAMES = Array.from({ length: 8 }, (_, i) => `${PREFIX}-org-${i}`);
 
 function expectedNextReset(now: Date): Date {
   const d = new Date(now);
@@ -85,11 +90,22 @@ function expectedNextReset(now: Date): Date {
 async function seedAccount(index: number) {
   const db = createIntegrationDb();
   const account = TEST_ACCOUNTS[index]!;
-  const [row] = await db
-    .insert(accounts)
-    .values({ clerkUserId: account.clerkUserId, email: account.email })
+  const [org] = await db
+    .insert(organization)
+    .values({ name: ORG_NAMES[index]! })
     .returning();
-  return row!;
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); after
+  // M-REPOINT, `subscriptions.accountId` targets `organization` directly, so
+  // this mirror (same id as the org, the "reseed identity contract") is a
+  // no-op there instead of hard-failing.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.insert(accounts).values({
+      id: org!.id,
+      clerkUserId: account.clerkUserId,
+      email: account.email,
+    });
+  }
+  return org!;
 }
 
 async function seedSubscription(input: {
@@ -98,14 +114,50 @@ async function seedSubscription(input: {
   status?: 'active' | 'trial' | 'expired';
 }) {
   const db = createIntegrationDb();
-  const [sub] = await db
-    .insert(subscriptions)
+  const tier = input.tier ?? 'family';
+  const status = input.status ?? 'active';
+
+  // [WI-1128] `quota_pools`/`profile_quota_usage`.subscriptionId now FK to
+  // the v2 `subscription` table (post-M-REPOINT), not legacy `subscriptions`.
+  // `subscription.payerPersonId` is NOT NULL — auto-provision a throwaway
+  // payer (same pattern as metering.integration.test.ts's
+  // seedSubscriptionWithQuota) since the shared-pool describe block below
+  // doesn't care about payer identity.
+  const [payer] = await db
+    .insert(person)
     .values({
-      accountId: input.accountId,
-      tier: input.tier ?? 'family',
-      status: input.status ?? 'active',
+      displayName: 'Auto Payer',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
+  await db.insert(membership).values({
+    personId: payer!.id,
+    organizationId: input.accountId,
+    roles: ['admin'],
+  });
+
+  const [sub] = await db
+    .insert(subscriptionV2Table)
+    .values({
+      organizationId: input.accountId,
+      planTier: tier,
+      status,
+      payerPersonId: payer!.id,
+    })
+    .returning();
+
+  // Mirror into legacy `subscriptions` under the SAME id so
+  // reconcileQuotaStateForSubscription (which still reads the legacy table)
+  // resolves a row. Gated — a no-op once `subscriptions` itself is dropped
+  // (WI-805, not this WI).
+  await ensureLegacySubscriptionAnchorForTest(db, {
+    subscriptionId: sub!.id,
+    accountId: input.accountId,
+    tier,
+    status,
+  });
+
   return sub!;
 }
 
@@ -130,16 +182,31 @@ async function seedProfile(input: {
   archivedAt?: Date | null;
 }) {
   const db = createIntegrationDb();
+  // [WI-1128] `profile_quota_usage.profileId` now FKs to `person` directly
+  // (post-M-REPOINT) — seed the v2 person first (the shared-pool "deletes
+  // per-profile usage rows" test uses this id directly with no v2 counterpart
+  // seeded), then mirror legacy `profiles` under the SAME id, gated (a no-op
+  // once the table is dropped).
   const [row] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
+      displayName: input.displayName,
+      birthDate: `${input.birthYear}-01-01`,
+      residenceJurisdiction: 'EU',
+      archivedAt: input.archivedAt ?? null,
+    })
+    .returning();
+
+  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+    await db.insert(profiles).values({
+      id: row!.id,
       accountId: input.accountId,
       displayName: input.displayName,
       birthYear: input.birthYear,
       isOwner: input.isOwner,
       archivedAt: input.archivedAt ?? null,
-    })
-    .returning();
+    });
+  }
   return row!;
 }
 
@@ -159,24 +226,50 @@ async function loadProfileQuotaRows(subscriptionId: string) {
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
+  const orgs = await db.query.organization.findMany({
+    where: inArray(organization.name, ORG_NAMES),
   });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) return;
+
+  // Capture member person ids BEFORE deleting membership (same ordering
+  // rationale as metering.integration.test.ts's cleanupTestAccounts).
+  const memberships = await db
+    .select({ personId: membership.personId })
+    .from(membership)
+    .where(inArray(membership.organizationId, orgIds));
+  const personIds = [...new Set(memberships.map((m) => m.personId))];
+
+  // subscription.organizationId / .payerPersonId are both RESTRICT — the
+  // v2 subscription must go before organization/person.
+  await db
+    .delete(subscriptionV2Table)
+    .where(inArray(subscriptionV2Table.organizationId, orgIds));
+  await db.delete(membership).where(inArray(membership.organizationId, orgIds));
+  if (personIds.length > 0) {
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
+  // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP); skip
+  // the cleanup there instead of hard-failing. Its `subscriptions` row (same
+  // id as the org) cascades away via the M-REPOINT'd account_id->organization
+  // FK when the org itself is deleted above.
+  if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+    await db.delete(accounts).where(inArray(accounts.id, orgIds));
   }
 }
 
 // [WI-1239 / 779-strip] v2 dual-store seeding for the per-profile describe
 // block below. reconcileQuotaStateForEffectiveTierV2 reads owner/child
-// enumeration via person×membership×subscription (v2), but profile_quota_usage
-// still FKs to the legacy profiles/subscriptions tables (pre-M-REPOINT) — seed
-// BOTH stores with the SAME ids for the shared subscription/profile rows, the
-// "reseed identity contract" used throughout billing-v2/*.integration.test.ts.
+// enumeration via person×membership×subscription (v2) scoped to ITS OWN
+// organization — distinct from the shared-pool "account" org that
+// seedSubscription/seedProfile above already anchored the same ids under.
+// [WI-1128] post-M-REPOINT, profile_quota_usage/quota_pools FK directly to
+// v2 person/subscription, so seedProfile already created the v2 `person` row
+// for legacyProfileId and seedSubscription already created the v2
+// `subscription` row for legacySubscriptionId (under the shared-pool org) —
+// this helper re-points that subscription row's org/payer onto its own
+// per-profile org (upsert) and no-ops the now-duplicate person insert.
 const V2_ORG_NAMES = [
   'integration-quota-reconcile-v2-provisions',
   'integration-quota-reconcile-v2-archived',
@@ -200,26 +293,45 @@ async function seedV2Counterpart(input: {
     .returning();
   const owner = input.persons.find((p) => p.isOwner)!;
   for (const p of input.persons) {
-    await db.insert(person).values({
-      id: p.legacyProfileId,
-      displayName: p.isOwner ? 'Owner' : 'Child',
-      birthDate: p.isOwner ? '1985-01-01' : '2015-01-01',
-      residenceJurisdiction: 'EU',
-      archivedAt: p.archivedAt ?? null,
-    });
+    // [WI-1128] seedProfile already inserted this person (same id) under the
+    // shared-pool org; here we're only adding it to a second organization.
+    await db
+      .insert(person)
+      .values({
+        id: p.legacyProfileId,
+        displayName: p.isOwner ? 'Owner' : 'Child',
+        birthDate: p.isOwner ? '1985-01-01' : '2015-01-01',
+        residenceJurisdiction: 'EU',
+        archivedAt: p.archivedAt ?? null,
+      })
+      .onConflictDoNothing();
     await db.insert(membership).values({
       personId: p.legacyProfileId,
       organizationId: org!.id,
       roles: p.isOwner ? ['admin'] : ['learner'],
     });
   }
-  await db.insert(subscriptionV2Table).values({
-    id: input.legacySubscriptionId,
-    organizationId: org!.id,
-    planTier: input.tier,
-    status: 'active',
-    payerPersonId: owner.legacyProfileId,
-  });
+  // [WI-1128] seedSubscription already created the v2 subscription row (same
+  // id) scoped to the shared-pool org with a throwaway payer — re-point it
+  // onto this per-profile org and the real owner as payer.
+  await db
+    .insert(subscriptionV2Table)
+    .values({
+      id: input.legacySubscriptionId,
+      organizationId: org!.id,
+      planTier: input.tier,
+      status: 'active',
+      payerPersonId: owner.legacyProfileId,
+    })
+    .onConflictDoUpdate({
+      target: subscriptionV2Table.id,
+      set: {
+        organizationId: org!.id,
+        planTier: input.tier,
+        status: 'active',
+        payerPersonId: owner.legacyProfileId,
+      },
+    });
   return org!;
 }
 

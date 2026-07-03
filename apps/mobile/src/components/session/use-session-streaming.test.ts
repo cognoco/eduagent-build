@@ -93,6 +93,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     setResponseHistory: jest.fn(),
     setHomeworkProblemsState: jest.fn(),
     setFluencyDrill: jest.fn(),
+    setLanguageLearning: jest.fn(),
     setChallengeRound: jest.fn(),
     setChallengeOffer: jest.fn(),
     setDraftedNote: jest.fn(),
@@ -809,6 +810,58 @@ describe('useSessionStreaming', () => {
       expect(opts.trigger).toHaveBeenCalledWith(
         expect.objectContaining({ reason: 'first_exchange' }),
       );
+    });
+
+    it('surfaces graded-input activity from a completed language turn', async () => {
+      const languageLearning = {
+        strand: 'meaning_input',
+        activityType: 'graded_input',
+        modality: 'text',
+        targetWords: ['agua'],
+        targetGrammar: [],
+        gradedInput: {
+          type: 'graded_input',
+          modality: 'reading',
+          cefrLevel: 'A1',
+          knownWordRatioTarget: 0.85,
+          knownWordEstimate: 0.82,
+          targetWords: ['agua'],
+          text: 'Tengo agua en la mesa.',
+          comprehensionQuestions: [
+            {
+              id: 'q1',
+              prompt: 'What is on the table?',
+              answerHint: 'agua',
+            },
+          ],
+          audioEnabled: true,
+        },
+      };
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+          ) => {
+            onChunk('Read this.');
+            await onComplete({
+              aiEventId: 'ai-event-graded-input',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+              languageLearning,
+            });
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Hola');
+      });
+
+      expect(opts.setLanguageLearning).toHaveBeenCalledWith(languageLearning);
     });
 
     it('shows error message when session creation fails', async () => {

@@ -8,7 +8,13 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { accounts, learningSessions, profiles } from '@eduagent/database';
+import {
+  learningSessions,
+  login,
+  membership,
+  organization,
+  person,
+} from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -29,18 +35,41 @@ const RESET_PREFIX_EMAIL = `${RESET_PREFIX}target@test.invalid`;
 const RESET_OTHER_EMAIL = 'integration-seed-reset-other@integration.test';
 const MANUAL_EMAIL = 'integration-seed-manual@integration.test';
 
-async function findAccountByEmail(email: string) {
+// [WI-1128] Legacy `accounts`/`profiles` dropped — the seed route now writes
+// the v2 identity graph (organization/person/login/membership) unconditionally
+// (reseed invariant: organization.id === legacy accounts.id, person.id ===
+// legacy profiles.id). Resolve the same shapes via the v2 tables.
+async function findAccountByEmail(
+  email: string,
+): Promise<{ id: string; clerkUserId: string; email: string } | undefined> {
   const db = createIntegrationDb();
-  return db.query.accounts.findFirst({
-    where: eq(accounts.email, email),
+  const loginRow = await db.query.login.findFirst({
+    where: eq(login.email, email),
   });
+  if (!loginRow) return undefined;
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, loginRow.personId),
+  });
+  if (!membershipRow) return undefined;
+  return {
+    id: membershipRow.organizationId,
+    clerkUserId: loginRow.clerkUserId,
+    email: loginRow.email,
+  };
 }
 
-async function findProfile(id: string) {
+async function findProfile(
+  id: string,
+): Promise<{ accountId: string | undefined } | undefined> {
   const db = createIntegrationDb();
-  return db.query.profiles.findFirst({
-    where: eq(profiles.id, id),
+  const personRow = await db.query.person.findFirst({
+    where: eq(person.id, id),
   });
+  if (!personRow) return undefined;
+  const membershipRow = await db.query.membership.findFirst({
+    where: eq(membership.personId, id),
+  });
+  return { ...personRow, accountId: membershipRow?.organizationId };
 }
 
 async function findSession(id: string) {
@@ -50,17 +79,32 @@ async function findSession(id: string) {
   });
 }
 
-async function seedManualNonSeedAccount() {
+async function seedManualNonSeedAccount(): Promise<{ id: string }> {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
+  const [org] = await db
+    .insert(organization)
+    .values({ name: 'Manual Non-Seed Org' })
+    .returning({ id: organization.id });
+  const [personRow] = await db
+    .insert(person)
     .values({
-      clerkUserId: 'manual_non_seed_account',
-      email: MANUAL_EMAIL,
+      displayName: 'Manual Non-Seed',
+      birthDate: '1990-01-01',
+      residenceJurisdiction: 'EU',
     })
-    .returning();
+    .returning({ id: person.id });
+  await db.insert(login).values({
+    personId: personRow!.id,
+    clerkUserId: 'manual_non_seed_account',
+    email: MANUAL_EMAIL,
+  });
+  await db.insert(membership).values({
+    personId: personRow!.id,
+    organizationId: org!.id,
+    roles: ['admin', 'learner'],
+  });
 
-  return account!;
+  return { id: org!.id };
 }
 
 beforeEach(async () => {
@@ -101,7 +145,7 @@ describe('Integration: test-seed routes', () => {
           email: LEARNING_EMAIL,
         }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     expect(res.status).toBe(201);
@@ -136,7 +180,7 @@ describe('Integration: test-seed routes', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: 'not-a-real-scenario' }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -153,7 +197,7 @@ describe('Integration: test-seed routes', () => {
           email: LEARNING_EMAIL,
         }),
       },
-      PROD_ENV
+      PROD_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -167,7 +211,7 @@ describe('Integration: test-seed routes', () => {
       {
         method: 'GET',
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -186,7 +230,7 @@ describe('Integration: test-seed routes', () => {
           email: RESET_A_EMAIL,
         }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
     await app.request(
       '/v1/__test/seed',
@@ -198,7 +242,7 @@ describe('Integration: test-seed routes', () => {
           email: RESET_B_EMAIL,
         }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
     await seedManualNonSeedAccount();
 
@@ -207,7 +251,7 @@ describe('Integration: test-seed routes', () => {
       {
         method: 'POST',
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     expect(resetRes.status).toBe(200);
@@ -231,7 +275,7 @@ describe('Integration: test-seed routes', () => {
           email: RESET_PREFIX_EMAIL,
         }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
     await app.request(
       '/v1/__test/seed',
@@ -243,7 +287,7 @@ describe('Integration: test-seed routes', () => {
           email: RESET_OTHER_EMAIL,
         }),
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     const resetRes = await app.request(
@@ -251,7 +295,7 @@ describe('Integration: test-seed routes', () => {
       {
         method: 'POST',
       },
-      DEV_ENV
+      DEV_ENV,
     );
 
     expect(resetRes.status).toBe(200);

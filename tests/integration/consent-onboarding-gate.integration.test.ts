@@ -16,9 +16,6 @@
  * No internal mocks — real DB via doppler run -c dev DATABASE_URL.
  */
 
-import { eq } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
-
 import {
   buildIntegrationEnv,
   cleanupAccounts,
@@ -27,6 +24,7 @@ import {
 import {
   buildAuthHeaders,
   createProfileViaRoute,
+  resolveAccountId,
   setProfileConsentStatusForTest,
 } from './route-fixtures';
 
@@ -47,15 +45,12 @@ async function setConsentStatus(
   status: 'PENDING' | 'PARENTAL_CONSENT_REQUESTED' | 'CONSENTED' | 'WITHDRAWN',
 ): Promise<void> {
   const db = createIntegrationDb();
-  const [profile] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, profileId));
-  if (!profile) throw new Error(`Profile ${profileId} not found`);
+  const accountId = await resolveAccountId(db, profileId);
+  if (!accountId) throw new Error(`Profile ${profileId} not found`);
 
   await setProfileConsentStatusForTest({
     profileId,
-    accountId: profile.accountId,
+    accountId,
     status,
     parentEmail: 'parent@wi130.test.invalid',
   });

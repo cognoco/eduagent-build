@@ -1,0 +1,10 @@
+[2026-07-02T16:23:58.809Z] starting review watcher: Mobile UX & Navigation (3918bce9-1f7c-81ae-97c1-d15ad8951beb), Stage trigger=Reviewing
+[2026-07-02T16:23:59.277Z] baseline [Mobile UX & Navigation: 8 items, Reviewing=none]; pollMs=60000; de-dupe=transition-key
+[2026-07-02T16:24:59.787Z] poll 2: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:26:00.181Z] poll 3: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:27:00.694Z] poll 4: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:28:01.951Z] poll 5: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:29:03.576Z] poll 6: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:30:04.022Z] poll 7: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:31:05.220Z] poll 8: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none
+[2026-07-02T16:32:05.638Z] poll 9: [Mobile UX & Navigation: 8 items, Reviewing=none]; running=none

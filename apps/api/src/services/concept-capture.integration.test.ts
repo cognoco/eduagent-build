@@ -1,8 +1,7 @@
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import {
-  accounts,
   conceptMastery,
   concepts,
   createDatabase,
@@ -11,7 +10,6 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -21,6 +19,10 @@ import type {
 } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { captureConceptMastery } from './concept-capture';
 import { getConceptMasterySignalsForTopics } from './concept-mastery';
 
@@ -34,26 +36,27 @@ const CLERK_PREFIX = `concept-capture-${RUN_ID}`;
 let db: Database;
 let counter = 0;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfile(): Promise<{ profileId: string }> {
   const idx = ++counter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${idx}`,
-      email: `${CLERK_PREFIX}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Concept Capture Learner',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Concept Capture Learner',
+    birthYear: 2011,
+    clerkUserId: `${CLERK_PREFIX}-${idx}`,
+    email: `${CLERK_PREFIX}-${idx}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { profileId: profile!.id };
+  return { profileId };
 }
 
 async function seedTopic(
@@ -179,9 +182,12 @@ describeIfDb('captureConceptMastery (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   });
 
   it('captures solid, partial, missing, and misconception verdicts from enriched evaluations', async () => {

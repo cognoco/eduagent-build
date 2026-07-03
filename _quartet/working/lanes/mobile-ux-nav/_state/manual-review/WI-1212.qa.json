@@ -1,0 +1,77 @@
+{
+  "mode": "verify",
+  "wi_id": "WI-1212",
+  "page_id": "38f8bce9-1f7c-810a-a326-db85254bc588",
+  "stage": "Reviewing",
+  "repo": ".",
+  "disposition": "verified",
+  "verdicts": [
+    {
+      "claim": {
+        "kind": "commit",
+        "ref": "349a7356905e30a4eab2db0d5ed699142073a62c",
+        "text": "Fixed In cites commit 349a7356905e30a4eab2db0d5ed699142073a62c",
+        "source": "fixed_in"
+      },
+      "status": "verified",
+      "evidence": "commit 349a7356905e30a4eab2db0d5ed699142073a62c exists in ."
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/components/subject-hub/SubjectHubPreparing.tsx",
+        "text": "summary cites `apps/mobile/src/components/subject-hub/SubjectHubPreparing.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/components/subject-hub/SubjectHubPreparing.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/shelf/[subjectId]/index.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/app/(app)/pick-book/[subjectId].tsx",
+        "text": "summary cites `apps/mobile/src/app/(app)/pick-book/[subjectId].tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/app/(app)/pick-book/[subjectId].tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "file",
+        "ref": "apps/mobile/src/components/subject-hub/SubjectHubPreparing.test.tsx",
+        "text": "summary cites `apps/mobile/src/components/subject-hub/SubjectHubPreparing.test.tsx`",
+        "source": "summary"
+      },
+      "status": "verified",
+      "evidence": "`apps/mobile/src/components/subject-hub/SubjectHubPreparing.test.tsx` exists"
+    },
+    {
+      "claim": {
+        "kind": "ac",
+        "ref": "Swap MagicPenAnimation -> BookPageFlipAnimation in apps/mobile/src/components/subject-hub/SubjectHubPreparing.tsx (current import/usage at lines 5 and 66), using the same props shape (size, color, testID) as the existing usage in apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:656-660 (filing overlay). Update the corresponding assertion in apps/mobile/src/components/subject-hub/SubjectHubPreparing.test.tsx to match the new animation component. Scope is strictly the component swap plus the test-assertion update -- no other behavior change. Bounded, low-regression, precedented (same-shape component already used elsewhere in this feature area).",
+        "text": "Swap MagicPenAnimation -> BookPageFlipAnimation in apps/mobile/src/components/subject-hub/SubjectHubPreparing.tsx (current import/usage at lines 5 and 66), using the same props shape (size, color, testID) as the existing usage in apps/mobile/src/app/(app)/pick-book/[subjectId].tsx:656-660 (filing overlay). Update the corresponding assertion in apps/mobile/src/components/subject-hub/SubjectHubPreparing.test.tsx to match the new animation component. Scope is strictly the component swap plus the test-assertion update -- no other behavior change. Bounded, low-regression, precedented (same-shape component already used elsewhere in this feature area).",
+        "source": "ac"
+      },
+      "status": "cannot-verify",
+      "evidence": "requires judgment — map this criterion to concrete evidence (interactive reviewer or sub-agent; see SKILL.md)"
+    }
+  ],
+  "counts": {
+    "verified": 5,
+    "failed": 0,
+    "cannot_verify": 0,
+    "needs_judgment": 1
+  },
+  "comment_id": null
+}

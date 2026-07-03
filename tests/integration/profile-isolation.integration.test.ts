@@ -313,8 +313,10 @@ describe('Integration: Profile Isolation (P0-006)', () => {
  * transaction rolls back atomically, dropping the ephemeral role and any
  * inserted rows.
  *
- * CONCEPT_CAPTURE_ENABLED is false so no live traffic targets these tables;
- * the tests validate the policy predicate before the flag is flipped true.
+ * CONCEPT_CAPTURE_ENABLED is now true (WI-781), so the concept-capture write
+ * path is live-capable; these tests validate the RLS policy predicate that
+ * isolates the rows it writes. (Actual production traffic through the gated
+ * call site additionally requires CHALLENGE_ROUND_RUNTIME_ENABLED.)
  */
 describe('concepts RLS policy enforcement (WI-1104)', () => {
   it('USING: row written under profile A not visible under profile B GUC (non-owner role)', async () => {

@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
+import { person } from './identity';
 
 export const locationTypeEnum = pgEnum('location_type', ['EU', 'US', 'OTHER']);
 export const consentTypeEnum = pgEnum('consent_type', ['GDPR', 'COPPA']);
@@ -159,7 +160,7 @@ export const withdrawalArchivePreferences = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     ownerProfileId: uuid('owner_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' })
+      .references(() => person.id, { onDelete: 'cascade' })
       .unique(),
     preference: withdrawalArchivePreferenceEnum('preference')
       .notNull()
@@ -186,7 +187,7 @@ export const familyPreferences = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     ownerProfileId: uuid('owner_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' })
+      .references(() => person.id, { onDelete: 'cascade' })
       .unique(),
     poolBreakdownShared: boolean('pool_breakdown_shared')
       .notNull()
@@ -214,7 +215,7 @@ export const pendingNotices = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     ownerProfileId: uuid('owner_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     type: pendingNoticeTypeEnum('type').notNull(),
     payloadJson: jsonb('payload_json').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })

@@ -15,18 +15,20 @@
  */
 
 import { resolve } from 'path';
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import { parseEvaluateAssessment } from '../evaluate';
 import { parseTeachBackAssessment } from '../teach-back';
 import { persistExchangeResult } from './session-exchange';
@@ -40,38 +42,38 @@ const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 const RUN_ID = generateUUIDv7();
 
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile(
   db: Database,
 ): Promise<{ profileId: string; subjectId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_assess_integ_${RUN_ID}_${idx}`,
-      email: `assess-integ-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Assessment Tester ${idx}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: `clerk_assess_integ_${RUN_ID}_${idx}`,
+    email: `assess-integ-${RUN_ID}-${idx}@test.invalid`,
+    displayName: `Assessment Tester ${idx}`,
+    birthYear: 2010,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${idx}`,
     })
     .returning({ id: subjects.id });
 
-  return { profileId: profile!.id, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id };
 }
 
 async function seedSession(db: Database, profileId: string, subjectId: string) {
@@ -101,9 +103,10 @@ describeIfDb(
     });
 
     afterAll(async () => {
-      await db
-        .delete(accounts)
-        .where(like(accounts.clerkUserId, `clerk_assess_integ_${RUN_ID}%`));
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: seededAccountIds,
+        profileIds: seededProfileIds,
+      });
     });
 
     it('round-trips signals.evaluate_assessment through aiMetadata.signals so parseEvaluateAssessment reads it back', async () => {

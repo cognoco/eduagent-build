@@ -23,11 +23,11 @@ import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
   learningSessions,
-  profiles,
+  organization,
+  person,
   sessionEmbeddings,
   sessionEvents,
   sessionSummaries,
@@ -62,24 +62,25 @@ describeIfDb(
     beforeAll(async () => {
       db = createDatabase(process.env.DATABASE_URL!);
 
-      const [account] = await db
-        .insert(accounts)
+      // [WI-1128] Legacy `accounts`/`profiles` are dropped post-M-DROP;
+      // learning_sessions.profileId (and the rest of the retention chain)
+      // FKs `person` directly post-M-REPOINT, so seed the v2 store only.
+      const [org] = await db
+        .insert(organization)
         .values({
-          clerkUserId: `clerk_integ_cascade_${RUN_ID}`,
-          email: `cascade_${RUN_ID}@test.invalid`,
+          name: `Cascade Test Org ${RUN_ID}`,
         })
-        .returning({ id: accounts.id });
-      accountId = account!.id;
+        .returning({ id: organization.id });
+      accountId = org!.id;
 
       const [profile] = await db
-        .insert(profiles)
+        .insert(person)
         .values({
-          accountId,
           displayName: 'Cascade Test User',
-          birthYear: 2012,
-          isOwner: true,
+          birthDate: '2012-01-01',
+          residenceJurisdiction: 'EU',
         })
-        .returning({ id: profiles.id });
+        .returning({ id: person.id });
       profileId = profile!.id;
 
       const [subject] = await db
@@ -141,8 +142,11 @@ describeIfDb(
 
     afterAll(async () => {
       // Belt-and-braces cleanup in case the test failed mid-flight.
+      if (profileId) {
+        await db.delete(person).where(eq(person.id, profileId));
+      }
       if (accountId) {
-        await db.delete(accounts).where(eq(accounts.id, accountId));
+        await db.delete(organization).where(eq(organization.id, accountId));
       }
     });
 
@@ -173,7 +177,7 @@ describeIfDb(
     });
 
     it('deleting the profile removes every row referencing it across the chain', async () => {
-      await db.delete(profiles).where(eq(profiles.id, profileId));
+      await db.delete(person).where(eq(person.id, profileId));
 
       const sessionsAfter = await db
         .select({ id: learningSessions.id })
@@ -199,5 +203,5 @@ describeIfDb(
         .where(eq(sessionEmbeddings.profileId, profileId));
       expect(embeddingsAfter).toEqual([]);
     });
-  }
+  },
 );

@@ -1,0 +1,30 @@
+-- 0130_membership_person_unique.sql
+-- WI-1303 (WS-37 Seam Hardening, audit doc 06 finding R8) — promote the
+-- one-membership-per-person invariant (one org = one household,
+-- MMT-ADR-0010) from convention + the identity-resolve fail-closed read
+-- guard (resolveIdentityV2 in identity-resolve.ts) to a DB-layer constraint.
+--
+-- The existing "membership_person_org_unique" composite index only rejects a
+-- duplicate row for the SAME (person_id, organization_id) pair; it does
+-- nothing to stop a second membership row for the same person in a
+-- DIFFERENT org. This migration adds a plain UNIQUE index on person_id
+-- alone, which is a strict superset of the composite constraint (so the
+-- composite index is left in place rather than removed — no behavior
+-- depends on its removal and dropping it is out of scope for this WI).
+--
+-- Data safety: verified pre-migration that no current test-seed helper or
+-- integration-test fixture inserts two membership rows for the same
+-- person_id with different organization_id values (static scan of every
+-- `db.insert(membership).values(...)` call site + review of the shared seed
+-- helpers in test-seed.ts / test-seed-v2.ts, WI-1303). On this pre-launch
+-- schema there is no known production path that creates multi-org
+-- memberships either — v1 only ever writes one membership per person
+-- (identity-resolve.ts, "v1: a single home org per person").
+--
+-- ## Rollback
+-- Fully reversible, no data loss: DROP INDEX "membership_person_id_unique".
+-- The composite "membership_person_org_unique" index is untouched by this
+-- migration and continues to guard against exact-duplicate rows regardless
+-- of rollback.
+
+CREATE UNIQUE INDEX "membership_person_id_unique" ON "membership" USING btree ("person_id");

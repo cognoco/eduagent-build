@@ -16,7 +16,7 @@ import type {
   OnboardingDraftExchangeHistory,
   OnboardingDraftExtractedSignals,
 } from '@eduagent/schemas';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -92,7 +92,7 @@ export const onboardingDrafts = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),
@@ -130,7 +130,7 @@ export const learningSessions = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),
@@ -189,7 +189,7 @@ export const sessionEvents = pgTable(
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id')
       .notNull()
       .references(() => subjects.id, { onDelete: 'cascade' }),
@@ -245,7 +245,7 @@ export const sessionSummaries = pgTable(
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     topicId: uuid('topic_id').references(() => curriculumTopics.id, {
       onDelete: 'cascade',
     }),
@@ -314,7 +314,7 @@ export const parkingLotItems = pgTable(
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     topicId: uuid('topic_id').references(() => curriculumTopics.id, {
       onDelete: 'cascade',
     }),

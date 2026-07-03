@@ -12,7 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { subjects } from './subjects';
 
 export const practiceActivityTypeEnum = pgEnum('practice_activity_type', [
@@ -32,7 +32,7 @@ export const practiceActivityEvents = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     subjectId: uuid('subject_id').references(() => subjects.id, {
       onDelete: 'set null',
     }),
@@ -91,7 +91,7 @@ export const celebrationEvents = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     celebratedAt: timestamp('celebrated_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -1,17 +1,19 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   generateUUIDv7,
-  profiles,
   sessionSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { ChatMessage, LLMProvider, ModelConfig } from './llm';
 import { _resetCircuits, registerProvider, unregisterProvider } from './llm';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 import {
   closeSession,
@@ -32,6 +34,9 @@ const llmProviderCalls: Array<{
 
 const RUN_ID = generateUUIDv7();
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 function createSessionSummaryProvider(): LLMProvider {
   return {
@@ -53,23 +58,23 @@ async function seedProfile(): Promise<{
   const idx = ++seedCounter;
   const clerkUserId = `clerk_session_summary_${RUN_ID}_${idx}`;
   const email = `session-summary-${RUN_ID}-${idx}@test.invalid`;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId,
+    email,
+    displayName: 'Summary Learner',
+    birthYear: 2011,
+    isOwner: true,
+  });
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Summary Learner',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { accountId: account!.id, profileId: profile!.id };
+  return { accountId, profileId };
 }
 
 async function seedSubject(profileId: string): Promise<string> {
@@ -112,9 +117,10 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  await db
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `clerk_session_summary_${RUN_ID}%`));
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
   unregisterProvider('gemini');
   _resetCircuits();
 });

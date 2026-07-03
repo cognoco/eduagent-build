@@ -249,6 +249,18 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         run: pnpm run check:no-gemini-runtime
 
+      # [R9 / WI-1304 / WS-37 M1 "Seam Hardening"] Forward-only ratchet:
+      # pins the build-time MODE_NAV_V0/V1/V2 flag triple in
+      # apps/mobile/eas.json + .github/workflows/ci.yml to the 3 sanctioned
+      # rows (fable audit 08-convergence-spine.md:118-126). Existing
+      # non-sanctioned sites are grandfathered in
+      # scripts/mode-nav-flag-combo-baseline.json, keyed to their exact
+      # combo; drift to a different combo (esp. toward the V2=on/V1=off
+      # dead zone) is unbaselined and fails.
+      - name: MODE_NAV flag-combo ratchet (R9)
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pnpm run check:mode-nav-flag-combo
+
       # [G11 / WI-452] Test-only-exports ratchet (D-TTL-6: *ForTesting/__test*
       # symbols must not be imported from production code). It already ran
       # inside the bundled "scripts/* tests" step below, but invisibly — a

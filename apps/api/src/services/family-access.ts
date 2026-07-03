@@ -14,10 +14,19 @@ import {
   validateGuardianshipEdgeV2,
   validateGuardianChargeRelationshipV2,
 } from './identity-v2/family-bridge-v2';
+import { verifyPersonIsOrgAdminV2 } from './identity-v2/ownership-v2';
 
 type ProfileMetaContextEnv = Env & {
   Variables: {
     profileMeta: ProfileMeta | undefined;
+  };
+};
+
+type CallerOwnerContextEnv = Env & {
+  Variables: {
+    db: Database;
+    account: { id: string } | undefined;
+    callerPersonId: string | undefined;
   };
 };
 
@@ -182,6 +191,65 @@ export function assertOwnerProfile<
   // to satisfy the isOwner check above (privilege escalation). Owner privileges
   // require an explicitly selected, verified owner profile.
   if (profileMeta.resolvedVia !== 'explicit-header') {
+    throw new ForbiddenError(message);
+  }
+}
+
+/**
+ * [WI-1301 — R1 IDOR] Caller-identity owner gate for /account/* and
+ * /billing/* surfaces.
+ *
+ * SECURITY (P1). assertOwnerProfile (above) derives owner authority from
+ * `profileMeta.isOwner`, which reflects the profile RESOLVED FROM the
+ * client-supplied X-Profile-Id header. profileScopeMiddleware verifies that
+ * X-Profile-Id belongs to the caller's organization, but NOT that it is the
+ * caller's OWN identity — in any multi-person org (every family org: owner +
+ * non-owner children), an authenticated non-owner member can set
+ * X-Profile-Id to a DIFFERENT member's id (e.g. the owner's) and pass
+ * assertOwnerProfile's isOwner + resolvedVia checks while acting as
+ * themselves. That is the exact IDOR this guard closes: it derives authority
+ * from `callerPersonId` — resolved server-side from the authenticated
+ * login->person binding by accountMiddleware, NEVER request-supplied — via
+ * verifyPersonIsOrgAdminV2 (the v2 twin of the legacy `profiles.isOwner`
+ * read, scoped to the caller's OWN person id, not the X-Profile-Id-selected
+ * one).
+ *
+ * Deviation note: the WI-1301 AC names verifyPersonOwnershipV2 as the
+ * reference primitive. That guard authorizes write authority over a TARGET
+ * person (self-or-guardian) and requires a target person id; account/billing
+ * routes act on the account/org itself, not on a target person, so
+ * verifyPersonOwnershipV2(callerPersonId, callerPersonId) would be a
+ * self===self tautology. verifyPersonIsOrgAdminV2(callerPersonId,
+ * organizationId) is the primitive that actually expresses "is the caller an
+ * org admin" and satisfies the AC's underlying requirement (authority from
+ * server callerPersonId, never client X-Profile-Id).
+ *
+ * Used ALONGSIDE assertOwnerProfile / assertNotProxyMode at every
+ * /account/* and /billing/* owner-or-proxy gate — both checks must pass.
+ * assertOwnerProfile's own body is intentionally untouched (its X-Profile-Id
+ * based pattern is shared by ~30 other route files outside this WI's AC
+ * scope; a repo-wide sweep is a separate, tracked follow-up).
+ */
+export async function assertCallerIsAccountOwner<
+  E extends CallerOwnerContextEnv,
+  P extends string,
+  I extends Input,
+>(
+  c: Context<E, P, I>,
+  message = 'Only the account owner can perform this action.',
+): Promise<void> {
+  const account = c.get('account');
+  const callerPersonId = c.get('callerPersonId');
+  if (!account || !callerPersonId) {
+    throw new ForbiddenError(message);
+  }
+  const db = c.get('db');
+  const isCallerAdmin = await verifyPersonIsOrgAdminV2(
+    db,
+    callerPersonId,
+    account.id,
+  );
+  if (!isCallerAdmin) {
     throw new ForbiddenError(message);
   }
 }

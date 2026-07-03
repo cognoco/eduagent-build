@@ -35,6 +35,9 @@ import {
 import {
   ensureV2ProfileAnchorForTest,
   resolveAccountId,
+  seedDirectChildProfileForTest,
+  seedFamilyLinkForTest,
+  seedSubject as seedSubjectForTest,
 } from './route-fixtures';
 import { buildAuthHeaders } from './test-keys';
 
@@ -197,26 +200,37 @@ describe('Integration: GET /v1/dashboard', () => {
       'Test Parent',
       1985,
     );
+
+    // [WI-1303] Seed the child as a managed dependent directly in the
+    // parent's org, mirroring the only real v2 write path
+    // (createChildProfileV2), which never gives a managed child a separate
+    // org/login of their own. The previous version created the child via an
+    // independent-account onboarding route and bridged it into the parent's
+    // org with a second membership row — a pattern the
+    // `membership_person_id_unique` DB constraint (WI-1303, one membership
+    // per person) now rejects, and one no real onboarding flow produces.
+    const db = createIntegrationDb();
+    const parentAccountId = await resolveAccountId(db, parentProfileId);
+    if (!parentAccountId) {
+      throw new Error(`parent account missing for ${parentProfileId}`);
+    }
     // birthYear 2004 avoids GDPR consent block (age 22) while still
     // being a valid "child" in the family-link sense.
-    const childProfileId = await createProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      'Test Child',
-      2004,
-    );
+    const child = await seedDirectChildProfileForTest({
+      parentProfileId,
+      accountId: parentAccountId,
+      displayName: 'Test Child',
+      birthYear: 2004,
+    });
+    const childProfileId = child.id;
+    await seedFamilyLinkForTest({ parentProfileId, childProfileId });
 
-    // Create a subject for the child so dashboard has data
-    const subjectId = await createSubjectForProfile(
-      CHILD_USER_ID,
-      CHILD_EMAIL,
-      childProfileId,
-      'Mathematics',
-    );
+    // Create a subject for the child so dashboard has data (direct DB seed —
+    // a managed child has no login/JWT to create it via the route).
+    const subject = await seedSubjectForTest(childProfileId, 'Mathematics');
 
     // Seed a session so session counts are non-zero
-    await seedSession(childProfileId, subjectId);
-    await seedFamilyLink(parentProfileId, childProfileId);
+    await seedSession(childProfileId, subject.id);
 
     // Now request dashboard as parent
     const res = await app.request(

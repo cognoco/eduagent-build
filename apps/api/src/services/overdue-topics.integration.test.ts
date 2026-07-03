@@ -8,21 +8,22 @@
  */
 
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   needsDeepeningTopics,
-  profiles,
   retentionCards,
   subjects,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { getOverdueTopicsGrouped } from './overdue-topics';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -51,28 +52,24 @@ async function seedProfileWithTopic(
   database: Database,
   label: string,
 ): Promise<SeededProfile> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Merge Test ${label}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `Merge Test ${label}`,
+    birthYear: 2010,
+    clerkUserId: `${CLERK_PREFIX}-${label}`,
+    email: `${CLERK_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -102,16 +99,23 @@ async function seedProfileWithTopic(
     .returning({ id: curriculumTopics.id });
 
   return {
-    profileId: profile!.id,
+    profileId,
     subjectId: subject!.id,
     topicId: topic!.id,
   };
 }
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 let db: Database;
@@ -120,7 +124,6 @@ let profileB: SeededProfile;
 
 beforeAll(async () => {
   db = createDatabase(requireDatabaseUrl());
-  await cleanupByPrefix(db);
 
   profileA = await seedProfileWithTopic(db, 'A');
   profileB = await seedProfileWithTopic(db, 'B');

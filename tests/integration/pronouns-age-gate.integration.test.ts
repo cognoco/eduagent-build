@@ -17,8 +17,6 @@
  * No internal mocks — real DB via doppler run -c dev DATABASE_URL.
  */
 
-import { eq } from 'drizzle-orm';
-import { profiles } from '@eduagent/database';
 import {
   buildIntegrationEnv,
   cleanupAccounts,
@@ -27,6 +25,7 @@ import {
 import {
   buildAuthHeaders,
   createProfileViaRoute,
+  resolveAccountId,
   seedDirectChildProfileForTest,
   seedFamilyLinkForTest,
   setProfileConsentStatusForTest,
@@ -51,15 +50,12 @@ function birthYearAge(age: number): number {
  */
 async function forceConsented(profileId: string): Promise<void> {
   const db = createIntegrationDb();
-  const [profile] = await db
-    .select({ accountId: profiles.accountId })
-    .from(profiles)
-    .where(eq(profiles.id, profileId));
-  if (!profile) throw new Error(`Profile ${profileId} not found`);
+  const accountId = await resolveAccountId(db, profileId);
+  if (!accountId) throw new Error(`Profile ${profileId} not found`);
 
   await setProfileConsentStatusForTest({
     profileId,
-    accountId: profile.accountId,
+    accountId,
     status: 'CONSENTED',
     parentEmail: 'parent@wi278.test.invalid',
   });
@@ -92,7 +88,6 @@ describe('Integration: WI-278 — pronouns SELF route age gate', () => {
 
     // Insert a child profile directly (age 12 — below PRONOUNS_PROMPT_MIN_AGE=13).
     // birthYearAge(12) = currentYear - 12, which gives year-only age 12.
-    const db = createIntegrationDb();
     const child = await seedDirectChildProfileForTest({
       parentProfileId: ownerProfile.id,
       accountId: ownerProfile.accountId,

@@ -36,6 +36,7 @@ import {
   type TestJWTClaims,
 } from './test-keys';
 import { createIntegrationDb } from './helpers';
+import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 
 const TEST_CONSENT_PURPOSE = 'platform_use';
 
@@ -55,15 +56,21 @@ export async function ensureV2ProfileAnchorForTest(
     location?: 'EU' | 'US' | 'OTHER' | null;
   },
 ): Promise<{ accountId?: string }> {
-  const legacyProfile = await db.query.profiles.findFirst({
-    where: eq(profiles.id, input.profileId),
-    columns: {
-      accountId: true,
-      displayName: true,
-      birthYear: true,
-      location: true,
-    },
-  });
+  // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP); this
+  // read is only a best-effort default-backfill for callers that omit
+  // displayName/birthYear/location/accountId, so skip it (fall through to the
+  // literal fallbacks below) when the table is gone instead of hard-failing.
+  const legacyProfile = (await legacyIdentityTableExistsForTest(db, 'profiles'))
+    ? await db.query.profiles.findFirst({
+        where: eq(profiles.id, input.profileId),
+        columns: {
+          accountId: true,
+          displayName: true,
+          birthYear: true,
+          location: true,
+        },
+      })
+    : undefined;
   const accountId = input.accountId ?? legacyProfile?.accountId;
 
   if (accountId) {
@@ -210,6 +217,15 @@ export async function createProfileViaRoute(input: {
     return { ...apiProfile, accountId: membershipRow.organizationId };
   }
 
+  // [WI-1128] Legacy `profiles` fallback — may already be dropped
+  // (post-M-DROP); skip it there instead of hard-failing. The route is
+  // v2-unconditional (see comment above), so this path is a pre-collapse-flag
+  // safety net, not the expected route in current runs.
+  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
+    throw new Error(
+      `createProfileViaRoute: profile ${apiProfile.id} not found in v2 (membership) store after create, and legacy 'profiles' is unavailable to fall back to`,
+    );
+  }
   const row = await db.query.profiles.findFirst({
     where: eq(profiles.id, apiProfile.id),
     columns: { accountId: true },
@@ -234,17 +250,22 @@ export async function seedDirectChildProfileForTest(input: {
   const childId = input.profileId ?? generateUUIDv7();
   const location = input.location ?? 'EU';
 
-  await db
-    .insert(profiles)
-    .values({
-      id: childId,
-      accountId: input.accountId,
-      displayName: input.displayName,
-      birthYear: input.birthYear,
-      location,
-      isOwner: false,
-    })
-    .onConflictDoNothing();
+  // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP). Gate on
+  // table existence so this seed stays a no-op there instead of hard-failing
+  // on "relation does not exist" — the v2 dual-seed below is the real anchor.
+  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
+    await db
+      .insert(profiles)
+      .values({
+        id: childId,
+        accountId: input.accountId,
+        displayName: input.displayName,
+        birthYear: input.birthYear,
+        location,
+        isOwner: false,
+      })
+      .onConflictDoNothing();
+  }
 
   // [WI-1145] Dual-seed the v2 graph UNCONDITIONALLY alongside legacy. The
   // product reads v2 unconditionally post-WI-867-collapse, and the flag-on lane
@@ -280,13 +301,17 @@ export async function seedFamilyLinkForTest(input: {
   await ensureV2ProfileAnchorForTest(db, { profileId: input.parentProfileId });
   await ensureV2ProfileAnchorForTest(db, { profileId: input.childProfileId });
 
-  await db
-    .insert(familyLinks)
-    .values({
-      parentProfileId: input.parentProfileId,
-      childProfileId: input.childProfileId,
-    })
-    .onConflictDoNothing();
+  // [WI-1128] Legacy `family_links` may already be dropped (post-M-DROP);
+  // gate on table existence — the v2 guardianship edge below is the real anchor.
+  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+    await db
+      .insert(familyLinks)
+      .values({
+        parentProfileId: input.parentProfileId,
+        childProfileId: input.childProfileId,
+      })
+      .onConflictDoNothing();
+  }
 
   // [WI-1145] Dual-seed the v2 guardianship edge unconditionally — the product's
   // validateGuardianshipEdgeV2 reads it on the post-collapse main lane (flag-off),
@@ -315,18 +340,23 @@ export async function setProfileConsentStatusForTest(input: {
       ? new Date()
       : null;
 
-  await db
-    .delete(consentStates)
-    .where(eq(consentStates.profileId, input.profileId));
-  await db.insert(consentStates).values({
-    profileId: input.profileId,
-    consentType,
-    status: input.status,
-    parentEmail: input.parentEmail ?? null,
-    consentToken: `integration-consent-${input.profileId}-${input.status}`,
-    respondedAt,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  });
+  // [WI-1128] Legacy `consent_states` may already be dropped (post-M-DROP);
+  // gate on table existence — the v2 consent_request/consent_grant rows below
+  // are the real anchor.
+  if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
+    await db
+      .delete(consentStates)
+      .where(eq(consentStates.profileId, input.profileId));
+    await db.insert(consentStates).values({
+      profileId: input.profileId,
+      consentType,
+      status: input.status,
+      parentEmail: input.parentEmail ?? null,
+      consentToken: `integration-consent-${input.profileId}-${input.status}`,
+      respondedAt,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+  }
 
   // [WI-1145] Seed the v2 consent rows unconditionally alongside legacy
   // consentStates — the product resolves consent via consent_request/grant on
@@ -441,6 +471,11 @@ export async function resolveAccountId(
     columns: { organizationId: true },
   });
   if (membershipRow) return membershipRow.organizationId;
+  // [WI-1128] Legacy `profiles` fallback — may already be dropped
+  // (post-M-DROP); skip it there instead of hard-failing.
+  if (!(await legacyIdentityTableExistsForTest(db, 'profiles'))) {
+    return undefined;
+  }
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.id, profileId),
     columns: { accountId: true },
@@ -630,15 +665,19 @@ export async function seedConsentRequest(input: {
   const expiresAt =
     input.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  await db.insert(consentStates).values({
-    profileId: input.profileId,
-    consentType,
-    status,
-    parentEmail,
-    consentToken: input.token,
-    respondedAt: input.respondedAt ?? null,
-    expiresAt,
-  });
+  // [WI-1128] Legacy `consent_states` may already be dropped (post-M-DROP);
+  // gate on table existence — the v2 consent rows below are the real anchor.
+  if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
+    await db.insert(consentStates).values({
+      profileId: input.profileId,
+      consentType,
+      status,
+      parentEmail,
+      consentToken: input.token,
+      respondedAt: input.respondedAt ?? null,
+      expiresAt,
+    });
+  }
 
   // [WI-1145] Seed the v2 consent rows unconditionally; resolve org via the
   // shared membership-first resolver (legacy `profiles` may be empty for a

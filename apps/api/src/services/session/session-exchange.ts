@@ -33,13 +33,19 @@ import type {
   ChallengeRoundSessionState,
   TopicProbeRequestedEvent,
   ReviewCalibrationRequestedEvent,
+  LanguageActivityTelemetry,
+  LanguageComprehensionEvaluation,
 } from '@eduagent/schemas';
-import { computeAgeBracket } from '@eduagent/schemas';
+import {
+  computeAgeBracket,
+  computeAgeBracketFromDate,
+} from '@eduagent/schemas';
 import {
   ConflictError,
   NotFoundError,
   LlmStreamError,
   classifyOrphanError,
+  cefrLevelSchema,
   challengeRoundSessionStateSchema,
   extractedInterviewSignalsSchema,
   isUnambiguouslyAdult,
@@ -52,12 +58,17 @@ import {
   classifyExchangeOutcome,
   auditExchangeSources,
   applySourceAuditSafetyFallback,
+  collectLearnerText,
+  emitDangerousProcedureBlockedEvent,
+  emitMinorPiiEchoRedactedEvent,
   inferObviousReliableSourceForAudit,
   type ExchangeFallback,
   type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
+import { applyDangerousProcedureGate } from '../dangerous-procedure-gate';
+import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
 import {
@@ -121,6 +132,10 @@ import {
   type RecordPracticeActivityEventInput,
 } from '../practice-activity-events';
 import {
+  buildLanguageSessionState,
+  isLikelyLanguageLearningIntent,
+} from '../language-session-engine';
+import {
   findOwnedCurriculumTopic,
   findOwnedCurriculumTopics,
 } from '../curriculum-topic-ownership';
@@ -142,6 +157,7 @@ import {
 } from '../challenge-round/state';
 import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 import { runChallengeRoundGrader } from '../challenge-round/grader';
+import { runTeachBackGrader } from '../teach-back-grader';
 
 // [WI-571 WP-W1-spine] Spine slice carved to session-exchange-spine.ts
 import { resolveReadyToFinish } from './session-exchange-spine';
@@ -160,13 +176,6 @@ const BANNED_FILLER_OPENERS = [
   'perfect',
   "that's a great question",
 ] as const;
-
-/**
- * English-language intent pre-classifier used to fast-path four-strands
- * pedagogy for obvious translation / "how do you say" asks.
- */
-const LANGUAGE_REGEX =
-  /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
 // [WI-571 WP-W1-spine] Routing slice carved to session-exchange-router.ts
 import {
@@ -284,6 +293,10 @@ export interface ExchangeBehavioralMetrics {
   llmRoutingReason?: string;
   /** Effective rung sent to the LLM router; may differ from escalationRung for Challenge Round. */
   llmRoutingRung?: EscalationRung;
+  /** Four-strands activity selected by the server for this language turn. */
+  languageLearning?: LanguageActivityTelemetry;
+  /** Deterministic comprehension check for the learner's answer to the prior graded input. */
+  languageComprehension?: LanguageComprehensionEvaluation;
   /** Provider that produced the response, or the initial streaming provider. */
   llmProvider?: string;
   /** Model that produced the response, or the initial streaming model. */
@@ -1130,6 +1143,7 @@ async function applyChallengeRoundRuntimeSignals(
     // Call the judge (fail-open: emits a structured degraded event and returns
     // [] on any error — never throws into this path).
     const graderEvaluation = await runChallengeRoundGrader({
+      profileId,
       askedQuestion: payload.askedQuestion ?? '',
       learnerAnswer: payload.currentUserMessage.content,
       answerEventId: payload.currentUserMessage.id,
@@ -2117,12 +2131,6 @@ export async function prepareExchangeContext(
     }
   }
 
-  // Load evaluateDifficultyRung from retention card for evaluate sessions
-  const evaluateDifficultyRung =
-    verificationType === 'evaluate' && retentionCard
-      ? ((retentionCard.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4)
-      : undefined;
-
   // FR92: Resolve interleaved topic details (titles + descriptions)
   let interleavedTopics: ExchangeContext['interleavedTopics'];
   if (isInterleaved && metadataRows[0]?.metadata) {
@@ -2195,14 +2203,14 @@ export async function prepareExchangeContext(
 
   let likelyLanguage = false;
   if (isFreeform && session.exchangeCount === 0) {
-    likelyLanguage = LANGUAGE_REGEX.test(userMessage);
+    likelyLanguage = isLikelyLanguageLearningIntent(userMessage);
     if (likelyLanguage) {
       // [PR-FIX-05] Telemetry-only: no Inngest handler exists for this signal.
       // Emit via structured logger so it is queryable in Cloudflare Logpush /
       // wrangler tail without routing through the Inngest event queue.
       logger.info('ask.language_preclassified', {
         sessionId,
-        matchedPattern: userMessage.match(LANGUAGE_REGEX)?.[0] ?? '',
+        detector: 'language-learning-intent',
       });
     }
   }
@@ -2289,7 +2297,7 @@ export async function prepareExchangeContext(
   const knownVocabularyRows =
     effectivePedagogyMode === 'four_strands' && effectiveVocabularySubjectId
       ? await db
-          .select({ term: vocabulary.term })
+          .select({ term: vocabulary.term, cefrLevel: vocabulary.cefrLevel })
           .from(vocabulary)
           .where(
             and(
@@ -2301,6 +2309,48 @@ export async function prepareExchangeContext(
           .orderBy(desc(vocabulary.updatedAt))
           .limit(60)
       : [];
+  const targetVocabularyRows =
+    effectivePedagogyMode === 'four_strands' && effectiveVocabularySubjectId
+      ? await db
+          .select({ term: vocabulary.term, cefrLevel: vocabulary.cefrLevel })
+          .from(vocabulary)
+          .where(
+            and(
+              eq(vocabulary.profileId, profileId),
+              eq(vocabulary.subjectId, effectiveVocabularySubjectId),
+              eq(vocabulary.mastered, false),
+            ),
+          )
+          .orderBy(desc(vocabulary.updatedAt))
+          .limit(8)
+      : [];
+  if (effectivePedagogyMode === 'four_strands') {
+    verificationType = undefined;
+  }
+  const languageSessionState =
+    effectivePedagogyMode === 'four_strands'
+      ? buildLanguageSessionState({
+          exchangeCount: session.exchangeCount,
+          events,
+          learnerMessage: userMessage,
+          inputMode: session.inputMode,
+          languageCode: effectiveLanguageCode,
+          cefrLevel: cefrLevelSchema
+            .nullable()
+            .catch(null)
+            .parse(
+              targetVocabularyRows[0]?.cefrLevel ??
+                knownVocabularyRows[0]?.cefrLevel ??
+                null,
+            ),
+          knownWords: knownVocabularyRows.map((row) => row.term).slice(0, 8),
+          targetWords: targetVocabularyRows.map((row) => row.term).slice(0, 8),
+        })
+      : undefined;
+  const effectiveEvaluateDifficultyRung =
+    verificationType === 'evaluate' && retentionCard
+      ? ((retentionCard.evaluateDifficultyRung ?? 1) as 1 | 2 | 3 | 4)
+      : undefined;
 
   // 3b. Compute SM-2 retention status from retention card (Gap 4)
   let retentionStatusValue:
@@ -2796,11 +2846,12 @@ export async function prepareExchangeContext(
     nativeLanguage: effectiveTeachingPref?.nativeLanguage ?? undefined,
     languageCode: effectiveLanguageCode,
     knownVocabulary: knownVocabularyRows.map((row) => row.term).slice(0, 60),
+    languageSessionState,
     teachingPreference: effectiveTeachingPref?.method,
     analogyDomain: effectiveTeachingPref?.analogyDomain ?? undefined,
     interleavedTopics,
     verificationType,
-    evaluateDifficultyRung,
+    evaluateDifficultyRung: effectiveEvaluateDifficultyRung,
     // Gap 4: Populate retention status for prompt-level awareness
     retentionStatus: retentionStatusValue
       ? {
@@ -2930,6 +2981,12 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.llmRoutingRung !== undefined && {
         llmRoutingRung: behavioral.llmRoutingRung,
+      }),
+      ...(behavioral.languageLearning !== undefined && {
+        languageLearning: behavioral.languageLearning,
+      }),
+      ...(behavioral.languageComprehension !== undefined && {
+        languageComprehension: behavioral.languageComprehension,
       }),
       ...(behavioral.llmProvider !== undefined && {
         llmProvider: behavioral.llmProvider,
@@ -3376,6 +3433,35 @@ export async function processMessage(
     },
   );
 
+  // [WI-1155 B2] Teach-back rubric server-side hard cap. Prompt-only "mandatory
+  // rubric" hardening was proven insufficient (the tutor model dropped
+  // signals.teach_back_assessment 4/4 on the live model). When this is a
+  // teach-back turn AND the model emitted no rubric, grade the learner's
+  // explanation server-side so the envelope signal is guaranteed. Fail-open:
+  // runTeachBackGrader returns undefined on any error (leaving the field absent,
+  // exactly as before) and escalates via a degraded observability event.
+  if (
+    context.verificationType === 'teach_back' &&
+    result.teachBackAssessment === undefined
+  ) {
+    const ageBracket: AgeBracket = context.birthYear
+      ? computeAgeBracket(context.birthYear)
+      : 'adult';
+    const graded = await runTeachBackGrader({
+      profileId,
+      topic: [context.topicTitle, context.topicDescription]
+        .filter(Boolean)
+        .join(': '),
+      learnerExplanation: input.message,
+      conversationLanguage: context.conversationLanguage,
+      ageBracket,
+      sessionId: context.sessionId,
+    });
+    if (graded !== undefined) {
+      result.teachBackAssessment = graded;
+    }
+  }
+
   // Compute time-to-answer: ms between last AI response and now.
   // [BUG-391] Defensive cast: neon-serverless returns Date objects for
   // timestamp columns, but belt-and-braces — ensure we always call .getTime()
@@ -3417,6 +3503,9 @@ export async function processMessage(
       llmProviderPolicy: context.llmProviderPolicy,
       llmRoutingReason: context.llmRoutingReason,
       llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
+      languageLearning: context.languageSessionState?.nextActivity,
+      languageComprehension:
+        context.languageSessionState?.previousComprehension,
       llmProvider: result.provider,
       llmModel: result.model,
       // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
@@ -3730,12 +3819,61 @@ export async function streamMessage(
         parsed.cleanResponse,
         sourceAudit,
       );
+      // [WI-1154] Server-side dangerous-procedure reply gate (fail-closed).
+      // Runs AFTER the source-audit fallback so it is the final word on the
+      // reply. Scoped to minors via the exact-date age bracket. When it fires,
+      // the safe refusal rides the existing `sourceReplacement` rail so the
+      // client replaces the tokens it already streamed.
+      // Fail-closed on unknown/NaN birthYear: treat unprovable-adult as minor
+      // so a missing age never silently disables the safety floor.
+      const isMinorLearner =
+        !Number.isFinite(context.birthYear) ||
+        computeAgeBracketFromDate(
+          context.birthYear,
+          context.birthMonth,
+          context.birthDay,
+        ) !== 'adult';
+      const procedureGate = applyDangerousProcedureGate(sourceSafe.response, {
+        isMinor: isMinorLearner,
+      });
+      if (procedureGate.blocked) {
+        await emitDangerousProcedureBlockedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          model: result.model,
+        });
+      }
+      // [WI-1348] Server-side minor-PII echo-back gate (fail-closed, same minor
+      // scope as the procedure gate above). Strips any PII the learner
+      // volunteered in this turn or recent turns that the model echoed back.
+      // Rides the same `sourceReplacement` rail so the client replaces the
+      // tokens it already streamed.
+      const learnerVolunteeredText = collectLearnerText(
+        context.exchangeHistory,
+        input.message,
+      );
+      const piiEchoGate = applyMinorPiiEchoGate(
+        procedureGate.response,
+        learnerVolunteeredText,
+        { isMinor: isMinorLearner },
+      );
+      if (piiEchoGate.redacted) {
+        await emitMinorPiiEchoRedactedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          redactedKinds: piiEchoGate.echoedKinds,
+          redactedCount: piiEchoGate.echoedTerms.length,
+        });
+      }
+      const gatedResponse = piiEchoGate.response;
       const sourceReplacement =
-        sourceSafe.response !== parsed.cleanResponse
-          ? sourceSafe.response
-          : undefined;
+        gatedResponse !== parsed.cleanResponse ? gatedResponse : undefined;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
-        sourceSafe.response,
+        gatedResponse,
         context,
       );
       // T6: source the asked-question from the last assistant turn in history.
@@ -3757,7 +3895,7 @@ export async function streamMessage(
         session,
         context,
         {
-          response: sourceSafe.response,
+          response: gatedResponse,
           challengeRoundOffer: parsed.challengeRoundOffer,
           challengeRoundEvaluation: parsed.challengeRoundEvaluation,
           noteDraft: parsed.noteDraft,
@@ -3775,7 +3913,7 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        sourceSafe.response,
+        gatedResponse,
         effectiveRung,
         {
           isUnderstandingCheck: parsed.understandingCheck,
@@ -3795,6 +3933,9 @@ export async function streamMessage(
           llmProviderPolicy: context.llmProviderPolicy,
           llmRoutingReason: context.llmRoutingReason,
           llmRoutingRung: context.llmRoutingRung ?? context.escalationRung,
+          languageLearning: context.languageSessionState?.nextActivity,
+          languageComprehension:
+            context.languageSessionState?.previousComprehension,
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,
@@ -3867,7 +4008,7 @@ export async function streamMessage(
       });
 
       return {
-        response: sourceSafe.response,
+        response: gatedResponse,
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,

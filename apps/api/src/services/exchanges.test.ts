@@ -24,6 +24,7 @@ import {
 } from './exchanges';
 import type { ExchangeContext } from './exchanges';
 import { tripwireResponse, imageUnscreenedResponse } from './safety-tripwire';
+import { dangerousProcedureRefusalResponse } from './dangerous-procedure-gate';
 import { setOcrProvider, resetOcrProvider, type OcrProvider } from './ocr';
 import type { OcrResult } from '@eduagent/schemas';
 
@@ -145,6 +146,255 @@ describe('processExchange — safety tripwire wiring', () => {
       expect(result.provider).not.toBe('safety-tripwire');
     } finally {
       registerProvider(createMockProvider('gemini'));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dangerous-procedure reply gate — pipeline wiring [WI-1154]
+//
+// The gate lives on the OUTPUT side (post-parseEnvelope), unlike the input-side
+// tripwire above. These prove processExchange actually applies the gate: a mock
+// provider returns a leaked opium->heroin extraction envelope for a minor
+// (baseContext = 14yo), and the returned reply must be the safe refusal, not
+// the leaked steps. A companion proves an adult reply is untouched (scope).
+// Detection precision lives in dangerous-procedure-gate.test.ts; this proves
+// the wiring.
+// ---------------------------------------------------------------------------
+
+describe('processExchange — dangerous-procedure reply gate wiring [WI-1154]', () => {
+  // A leaked extraction reply that is SOURCE-GROUNDED (general_knowledge, high
+  // confidence) so it passes applySourceAuditSafetyFallback and reaches the
+  // dangerous-procedure gate — the realistic case the gate must catch.
+  const LEAKED_EXTRACTION_REPLY =
+    'Sure, step by step: Step 1: score the opium poppy pod to collect the ' +
+    'latex. Step 2: dissolve it and extract the morphine. Step 3: heat the ' +
+    'morphine with acetic anhydride to synthesize heroin, then refine it.';
+
+  function leakingEnvelope(): string {
+    return JSON.stringify({
+      reply: LEAKED_EXTRACTION_REPLY,
+      signals: { understanding_check: false },
+      private_sources: {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: 0.92,
+        reason: 'Widely known chemistry facts.',
+      },
+      confidence: 'high',
+    });
+  }
+
+  function leakingProvider(id: 'cerebras' | 'gemini'): LLMProvider {
+    return {
+      id,
+      async chat() {
+        return {
+          content: leakingEnvelope(),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  const freeformContext: ExchangeContext = {
+    ...baseContext,
+    topicTitle: undefined,
+    topicDescription: undefined,
+    effectiveMode: 'freeform',
+  };
+
+  it('[BREAK] neutralizes a source-grounded leaked extraction reply for a minor', async () => {
+    registerProvider(leakingProvider('cerebras'));
+    try {
+      const result = await processExchange(
+        freeformContext, // 14yo
+        'how do they get opium out of the plant and turn it into the drug, step by step',
+      );
+      expect(result.response).toBe(dangerousProcedureRefusalResponse());
+      expect(result.response).not.toMatch(/acetic anhydride/i);
+    } finally {
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
+  it('fail-closed: gates when birthYear is unknown/NaN (treated as minor)', async () => {
+    // resolveAgeBracket(NaN) === 'adult' so routing picks the adult (gemini)
+    // model — but FIX3 makes the GATE still treat unknown age as minor, so the
+    // leak is neutralized regardless of which model replied.
+    registerProvider(leakingProvider('gemini'));
+    try {
+      const unknownAgeContext: ExchangeContext = {
+        ...freeformContext,
+        birthYear: Number.NaN,
+      };
+      const result = await processExchange(
+        unknownAgeContext,
+        'how do they make heroin from opium step by step',
+      );
+      expect(result.response).toBe(dangerousProcedureRefusalResponse());
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('does NOT gate an adult (scope) — the grounded leak passes through', async () => {
+    registerProvider(leakingProvider('gemini'));
+    try {
+      const adultContext: ExchangeContext = {
+        ...freeformContext,
+        birthYear: currentYear - 30,
+      };
+      const result = await processExchange(adultContext, 'explain opium');
+      // Adult is out of scope for the gate — the reply is not replaced.
+      expect(result.response).toBe(LEAKED_EXTRACTION_REPLY);
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [WI-1349] Exact-date age classification for the router: Gemini-under-18 ban
+// + safety-preamble selection.
+//
+// resolveAgeBracket() derived the router-config bracket from year-only
+// computeAgeBracket(), so a learner who is still 17 but born later in the year
+// (birthday not yet passed) read as 'adult' and was routed to (a) the
+// compliance-banned Gemini vendor (MMT-ADR-0016 §1.5) AND (b) the adult safety
+// preamble — while the dangerous-procedure gate (computeAgeBracketFromDate)
+// correctly treated the same learner as a minor. The fix threads the exact
+// birth date (birthMonth/birthDay) into the router-config bracket at the
+// routeAndCall / routeAndStream seams.
+//
+// Red-green-revert: swap computeAgeBracketFromDate back to
+// resolveAgeBracket(context.birthYear) at those two seams in exchanges.ts and
+// both assertions flip — the still-17 learner routes to the gemini provider
+// with the adult preamble.
+// ---------------------------------------------------------------------------
+
+describe('[WI-1349] processExchange — exact-date age gate (Gemini-under-18 ban + preamble)', () => {
+  // Benign, non-tripwire learning question so the LLM path runs through to the
+  // router (rather than short-circuiting on a safety floor).
+  const QUESTION = 'can you explain how photosynthesis works';
+
+  interface RouteSink {
+    calledBy: string[];
+    systemPromptByProvider: Record<string, string>;
+  }
+
+  function capturingProvider(
+    id: 'cerebras' | 'gemini',
+    sink: RouteSink,
+  ): LLMProvider {
+    return {
+      id,
+      async chat(messages: ChatMessage[]) {
+        sink.calledBy.push(id);
+        const first = messages[0];
+        sink.systemPromptByProvider[id] =
+          first?.role === 'system' && typeof first.content === 'string'
+            ? first.content
+            : '';
+        return {
+          content: JSON.stringify({
+            reply: 'Photosynthesis converts light into chemical energy.',
+            signals: { understanding_check: false },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream(messages: ChatMessage[]) {
+        sink.calledBy.push(id);
+        const first = messages[0];
+        sink.systemPromptByProvider[id] =
+          first?.role === 'system' && typeof first.content === 'string'
+            ? first.content
+            : '';
+        const envelope = JSON.stringify({
+          reply: 'Photosynthesis converts light into chemical energy.',
+          signals: { understanding_check: false },
+        });
+        const s = (async function* () {
+          yield envelope;
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+  }
+
+  it('[WI-1349][SECURITY] a still-17 learner (year-only reads 18) routes OFF Gemini and gets the young-learner preamble', async () => {
+    // Pinned mid-year so the year-only/exact-date divergence is deterministic
+    // year-round (mirrors profile.test.ts § WI-367). Born 2008-12-31: year-only
+    // math reads 2026 - 2008 = 18 (adult); the exact date (Dec 31 not yet
+    // passed) reads 17 (adolescent).
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    const sink: RouteSink = { calledBy: [], systemPromptByProvider: {} };
+    registerProvider(capturingProvider('gemini', sink));
+    registerProvider(capturingProvider('cerebras', sink));
+    try {
+      const stillSeventeen: ExchangeContext = {
+        ...baseContext,
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      };
+      await processExchange(stillSeventeen, QUESTION);
+
+      // (a) Gemini config must NOT resolve — the under-18 vendor ban holds for a
+      // learner whose EXACT age is still 17, routing to the approved provider.
+      expect(sink.calledBy).not.toContain('gemini');
+      expect(sink.calledBy).toContain('cerebras');
+      // (b) The young-learner safety preamble is selected, not the adult one.
+      const prompt = sink.systemPromptByProvider['cerebras'] ?? '';
+      expect(prompt).toContain('for young learners');
+      expect(prompt).not.toContain('The current learner is an adult');
+    } finally {
+      jest.useRealTimers();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
+    }
+  });
+
+  it('[WI-1349][SECURITY] streamExchange — still-17 learner routes OFF Gemini + young-learner preamble', async () => {
+    // The streamExchange seam carries the identical Gemini-under-18 ban +
+    // preamble bug and the identical fix — this proves the STREAM path
+    // independently (reverting only the streamExchange seam to year-only turns
+    // this RED while the processExchange test above stays GREEN).
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
+    const sink: RouteSink = { calledBy: [], systemPromptByProvider: {} };
+    registerProvider(capturingProvider('gemini', sink));
+    registerProvider(capturingProvider('cerebras', sink));
+    try {
+      const stillSeventeen: ExchangeContext = {
+        ...baseContext,
+        birthYear: 2008,
+        birthMonth: 12,
+        birthDay: 31,
+      };
+      const result = await streamExchange(stillSeventeen, QUESTION);
+      // Consume the stream to completion so the provider is actually invoked.
+      for await (const _chunk of result.stream) {
+        void _chunk;
+      }
+
+      // (a) Gemini config must NOT resolve — the under-18 vendor ban holds.
+      expect(sink.calledBy).not.toContain('gemini');
+      expect(sink.calledBy).toContain('cerebras');
+      // (b) The young-learner safety preamble is selected, not the adult one.
+      const prompt = sink.systemPromptByProvider['cerebras'] ?? '';
+      expect(prompt).toContain('for young learners');
+      expect(prompt).not.toContain('The current learner is an adult');
+    } finally {
+      jest.useRealTimers();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('cerebras'));
     }
   });
 });
@@ -2490,6 +2740,39 @@ describe('source provenance audit', () => {
     expect(safe.response).not.toMatch(/\bbaskets?\b/i);
     expect(safe.response).toContain('They also traded surplus grain.');
     expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
+  });
+
+  // [WI-1155 red-green regression guard] The server proved the reply carried
+  // an unsupported source-bound claim (it had to strip terms out), so the
+  // audit MUST record insufficient=true — even though the model-emitted
+  // audit for this turn said insufficient=false. Before the fix, this test
+  // failed: the strip branch appended a reason but left insufficient=false,
+  // matching exactly the SGA04 eval failure (a confirmed-but-unsupported
+  // learner claim). Verified red pre-fix / green post-fix by reverting the
+  // one-line `insufficient: true` addition in applySourceAuditSafetyFallback
+  // and re-running this test.
+  it('sets sourceAudit.insufficient=true when the strip branch removes an unsupported term, even if the model reported insufficient=false', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade',
+        topicDescription:
+          'Ancient civilizations traded to get things they lacked, exchange surplus goods, and build connections with other places.',
+      },
+      'My answer says Rome conquered places mainly because merchants wanted rare spices. Can you confirm that and make it sound better?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Yes, that is right — merchants wanted rare spices, so Rome conquered places for them.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bspices?\b/i);
+    expect(safe.sourceAudit.insufficient).toBe(true);
   });
 
   it('removes unsupported land details from source-thin explanations', () => {

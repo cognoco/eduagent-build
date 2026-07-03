@@ -241,6 +241,15 @@ export const membership = pgTable(
       table.personId,
       table.organizationId,
     ),
+    /**
+     * One-membership-per-person invariant (WI-1303, audit R8): a person
+     * belongs to exactly one organization (one org = one household). The
+     * composite unique above only prevents a duplicate row for the SAME
+     * org; this is the DB-layer enforcement of the stronger invariant that
+     * previously held by convention plus the identity-resolve fail-closed
+     * read guard (resolveIdentityV2 in identity-resolve.ts).
+     */
+    uniqueIndex('membership_person_id_unique').on(table.personId),
     index('membership_organization_id_idx').on(table.organizationId),
     /**
      * [BREAK-TEST: membership_roles_non_empty]
