@@ -11,7 +11,6 @@
 
 import { eq } from 'drizzle-orm';
 import {
-  accounts,
   generateUUIDv7,
   login,
   membership,
@@ -50,7 +49,10 @@ jest.mock(
 );
 
 import { app } from '../../apps/api/src/index';
-import { ensureLegacyProfileAnchorForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
+import {
+  ensureLegacyProfileAnchorForTest,
+  legacyIdentityTableExistsForTest,
+} from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
 
 const mockKvPut = jest.fn().mockResolvedValue(undefined);
@@ -146,14 +148,6 @@ async function seedAccount(prefix: string) {
     organizationId: accountId,
     roles: ['admin', 'learner'],
   });
-  await db
-    .insert(accounts)
-    .values({
-      id: accountId,
-      clerkUserId: identity.clerkUserId,
-      email: identity.email,
-    })
-    .onConflictDoNothing();
   await ensureLegacyProfileAnchorForTest(db, {
     profileId: personId,
     accountId,
@@ -203,17 +197,16 @@ async function seedSubscriptionForAccount(input: {
         ? new Date(input.lastStripeEventTimestamp)
         : null;
 
-  const [legacySubscription] = await input.db
-    .insert(subscriptions)
-    .values({
+  if (await legacyIdentityTableExistsForTest(input.db, 'subscriptions')) {
+    await input.db.insert(subscriptions).values({
       id: subscriptionId,
       accountId: input.account.id,
       stripeSubscriptionId,
       tier,
       status,
       lastStripeEventTimestamp,
-    })
-    .returning();
+    });
+  }
 
   if (!input.ownerPersonId) {
     throw new Error('ownerPersonId is required for v2 Stripe seed');
@@ -231,7 +224,7 @@ async function seedSubscriptionForAccount(input: {
   const [quotaPool] = await input.db
     .insert(quotaPools)
     .values({
-      subscriptionId: legacySubscription!.id,
+      subscriptionId,
       monthlyLimit: tierConfig.monthlyQuota,
       usedThisMonth: input.usedThisMonth ?? 0,
       dailyLimit: tierConfig.dailyLimit,
@@ -241,7 +234,7 @@ async function seedSubscriptionForAccount(input: {
     .returning();
 
   return {
-    subscription: legacySubscription!,
+    subscription: { id: subscriptionId },
     quotaPool: quotaPool!,
   };
 }
