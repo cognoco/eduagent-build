@@ -12,7 +12,7 @@ a condition on a named event, never a calendar position.
 One line per Initiative (every Initiative appears, including "much later" ones —
 `planning-rules.md` §6.1):
 
-`PRG-NN · gate condition(s) · blast-radius class · notes`
+`INI-NN · gate condition(s) · blast-radius class · notes`
 
 ## The standard activation gates (all must clear — `planning-rules.md` §6.3)
 - **Blast-radius class** — out-of-radius work may run parallel to a rewrite anytime; in-radius work

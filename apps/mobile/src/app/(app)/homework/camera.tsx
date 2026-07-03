@@ -1139,8 +1139,8 @@ export default function CameraScreen(): React.ReactNode {
     return (
       <ScrollView
         className="flex-1 bg-background px-6"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        style={{ paddingTop: insets.top }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="result-scroll"
       >
         <Pressable

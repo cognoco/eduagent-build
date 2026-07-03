@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
-import type { DictationPace, DictationSentence } from '@eduagent/schemas';
+import type {
+  AgeBracket,
+  DictationPace,
+  DictationSentence,
+} from '@eduagent/schemas';
 
 export type PlaybackState =
   | 'idle'
@@ -24,6 +28,8 @@ export interface PlaybackConfig {
   language: string;
   /** Words per spoken chunk. Young children get 2-3, older learners 4-5. Defaults to 3. */
   chunkSize?: number;
+  /** Learner age bracket. Defaults to `adult` when omitted. */
+  ageBracket?: AgeBracket;
 }
 
 export interface PlaybackControls {
@@ -42,20 +48,46 @@ export interface PlaybackControls {
 
 type VoiceAvailabilityResult = boolean | Promise<boolean>;
 
-// [WI-904] The gaps between chunks/sentences (writing time) were too short:
-// learners reported the default 'normal' pace felt rushed. The pauses are
-// lengthened by one notch — the old 'slow' pause budget is now 'normal' — while
-// the articulation `rate` is left unchanged (the words are NOT drawn out, only
-// the silence between them grows). `chunkPausePerWord` is multiplied by the
-// chunk's word count to size the writing pause.
+// Natural clear-speech pacing:
+// - `rate` controls articulation. Keep it near normal so words do not sound
+//   stretched or robotic.
+// - `phrasePause` is the short audible boundary between chunks.
+// - `sentencePause` is the larger response window after a complete sentence.
 const PACE_CONFIG: Record<
   DictationPace,
-  { rate: number; chunkPausePerWord: number; sentencePause: number }
+  { rate: number; phrasePause: number; sentencePause: number }
 > = {
-  slow: { rate: 0.5, chunkPausePerWord: 4000, sentencePause: 5500 },
-  normal: { rate: 0.6, chunkPausePerWord: 3000, sentencePause: 4000 },
-  fast: { rate: 0.75, chunkPausePerWord: 2000, sentencePause: 3000 },
+  slow: { rate: 0.9, phrasePause: 700, sentencePause: 1400 },
+  normal: { rate: 1.0, phrasePause: 600, sentencePause: 1200 },
+  fast: { rate: 1.0, phrasePause: 400, sentencePause: 800 },
 };
+
+// Younger learners get more response time after complete sentence boundaries.
+// Phrase pauses stay short; age/profile support primarily comes from chunking
+// and sentence/item windows, not long silence after every spoken phrase.
+const AGE_PAUSE_MULTIPLIER: Record<AgeBracket, number> = {
+  child: 1.45,
+  adolescent: 1.15,
+  adult: 1.0,
+};
+
+export function computeChunkPauseMs(
+  chunkText: string,
+  pace: DictationPace,
+  _ageBracket: AgeBracket,
+): number {
+  const words = chunkText.split(/\s+/).filter(Boolean);
+  return words.length === 0 ? 0 : PACE_CONFIG[pace].phrasePause;
+}
+
+export function computeSentencePauseMs(
+  pace: DictationPace,
+  ageBracket: AgeBracket,
+): number {
+  return Math.round(
+    PACE_CONFIG[pace].sentencePause * AGE_PAUSE_MULTIPLIER[ageBracket],
+  );
+}
 
 // 3-second countdown before first sentence
 const COUNTDOWN_MS = 3500;
@@ -302,9 +334,6 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
         onDone: () => {
           if (stateRef.current === 'paused') return;
 
-          // RF-02: Read pace config fresh — user may have changed pace mid-speech
-          const paceConfig = PACE_CONFIG[configRef.current.pace];
-
           const isLastChunk = chunkIndex >= chunks.length - 1;
           const isLastSentence =
             sentenceIndex >= configRef.current.sentences.length - 1;
@@ -316,6 +345,11 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
 
           setState('waiting');
 
+          // RF-02: Read pace + age fresh so a mid-playback config change is
+          // picked up on the next chunk boundary.
+          const pace = configRef.current.pace;
+          const ageBracket = configRef.current.ageBracket ?? 'adult';
+
           if (isLastChunk) {
             // Sentence boundary — longer pause, advance to next sentence
             const nextSentenceIndex = sentenceIndex + 1;
@@ -326,14 +360,15 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
             nextActionRef.current = action;
             pauseTimerRef.current = setTimeout(
               action,
-              paceConfig.sentencePause,
+              computeSentencePauseMs(pace, ageBracket),
             );
           } else {
-            // Chunk boundary — writing pause proportional to chunk word count
-            const chunkWordCount = (chunks[chunkIndex] ?? '')
-              .split(/\s+/)
-              .filter(Boolean).length;
-            const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
+            // Chunk boundary: short phrase pause, not writing-time silence.
+            const chunkPause = computeChunkPauseMs(
+              chunks[chunkIndex] ?? '',
+              pace,
+              ageBracket,
+            );
             const nextChunkIndex = chunkIndex + 1;
             const action = () => {
               speakChunkRef.current(sentenceIndex, nextChunkIndex);

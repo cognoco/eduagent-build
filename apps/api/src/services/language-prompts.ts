@@ -27,6 +27,72 @@ function formatKnownVocabulary(knownVocabulary: string[] | undefined): string {
   return `Known vocabulary examples: ${safe}. Prefer these when creating input passages and drills.`;
 }
 
+function formatLanguageSessionState(context: ExchangeContext): string {
+  const state = context.languageSessionState;
+  if (!state) {
+    return [
+      'Server-selected language activity:',
+      '- Active strand: meaning_input',
+      '- Activity type: graded_input',
+      '- Modality: text',
+      '- Session strand counts: not available yet.',
+    ].join('\n');
+  }
+
+  const counts = state.sessionStrandCounts;
+  const activity = state.nextActivity;
+  const targetWords =
+    activity.targetWords.length > 0
+      ? activity.targetWords
+          .map((word) => sanitizeXmlValue(word, 80))
+          .join(', ')
+      : 'none selected';
+  const targetGrammar =
+    activity.targetGrammar.length > 0
+      ? activity.targetGrammar
+          .map((pattern) => sanitizeXmlValue(pattern, 120))
+          .join(', ')
+      : 'none selected';
+  const gradedInput = activity.gradedInput;
+  const gradedInputLines = gradedInput
+    ? [
+        'Graded input artifact:',
+        `- Modality: ${gradedInput.modality}`,
+        `- CEFR level: ${gradedInput.cefrLevel}`,
+        `- Known-word target: ${Math.round(
+          gradedInput.knownWordRatioTarget * 100,
+        )}%`,
+        `- Known-word estimate: ${Math.round(
+          gradedInput.knownWordEstimate * 100,
+        )}%`,
+        `- Passage: ${sanitizeXmlValue(gradedInput.text, 700)}`,
+        `- Comprehension question: ${sanitizeXmlValue(
+          gradedInput.comprehensionQuestions[0]?.prompt ??
+            'What is the main thing happening in this passage?',
+          240,
+        )}`,
+        `- Answer hint: ${sanitizeXmlValue(
+          gradedInput.comprehensionQuestions[0]?.answerHint ?? '',
+          300,
+        )}`,
+        `- Audio enabled: ${gradedInput.audioEnabled ? 'yes' : 'no'}`,
+        '- Use this exact passage as the input seed. You may lightly smooth grammar, but do not add unrelated vocabulary.',
+      ]
+    : [];
+
+  return [
+    'Server-selected language activity:',
+    `- Active strand: ${state.activeStrand}`,
+    `- Activity type: ${activity.activityType}`,
+    `- Modality: ${activity.modality}`,
+    `- Target words/chunks: ${targetWords}`,
+    `- Target grammar/patterns: ${targetGrammar}`,
+    `- Session strand counts: meaning_input=${counts.meaning_input}, meaning_output=${counts.meaning_output}, language_focus=${counts.language_focus}, fluency=${counts.fluency}.`,
+    '- Follow this activity brief for the current turn. Do not switch strands unless the learner asks for something urgent or safety-related.',
+    ...gradedInputLines,
+  ].join('\n');
+}
+
 export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
   const language =
     context.languageCode != null
@@ -47,7 +113,8 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
     `Role: You are a direct language teacher for ${safeTargetLanguageName}. Do not use the default Socratic ladder for this session.`,
     [
       'Language pedagogy: Nation Four Strands.',
-      '- Balance meaning-focused input, meaning-focused output, language-focused learning, and fluency development.',
+      '- The backend, not the LLM, selects the active strand for each turn.',
+      '- Balance meaning-focused input, meaning-focused output, language-focused learning, and fluency development over the session.',
       '- Teach directly. Correct errors clearly and immediately.',
       `- Explain grammar using the learner's native language when helpful${
         safeNativeLanguage
@@ -57,6 +124,7 @@ export function buildFourStrandsPrompt(context: ExchangeContext): string[] {
       '- Keep examples in the target language, but make explanations comprehensible.',
       '- Prefer short, high-frequency chunks and collocations, not only isolated words.',
     ].join('\n'),
+    formatLanguageSessionState(context),
     [
       'Direct correction rules:',
       '- If the learner says or writes something incorrect, show the corrected form.',

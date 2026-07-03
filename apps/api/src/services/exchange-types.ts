@@ -25,6 +25,7 @@ import type {
   PreferredLlmProvider,
 } from './llm';
 import type { LLMTier } from './subscription';
+import type { LanguageSessionState } from './language-session-engine';
 
 // ---------------------------------------------------------------------------
 // Source evidence types
@@ -155,6 +156,8 @@ export interface ExchangeContext {
   languageCode?: string;
   /** Known vocabulary to bias comprehensible input */
   knownVocabulary?: string[];
+  /** Server-selected language activity state for four-strands sessions. */
+  languageSessionState?: LanguageSessionState;
   /** EVALUATE difficulty rung 1-4 (FR128-133) */
   evaluateDifficultyRung?: 1 | 2 | 3 | 4;
   /** SM-2 retention status for the current topic */

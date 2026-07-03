@@ -40,6 +40,8 @@ export default function PlaybackScreen(): React.ReactElement {
     punctuationReadAloud: prefs.punctuationReadAloud,
     language: data?.language ?? 'en',
     chunkSize,
+    // Younger learners keep smaller chunks and get longer sentence windows.
+    ageBracket,
   });
 
   // RF-08: Guard prevents auto-start from re-triggering on re-renders.

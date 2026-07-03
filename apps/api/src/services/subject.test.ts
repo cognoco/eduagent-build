@@ -1,5 +1,8 @@
 import type { Database } from '@eduagent/database';
-import { SubjectNotFoundError } from '@eduagent/schemas';
+import {
+  SubjectNotFoundError,
+  type SubjectCurriculumStatus,
+} from '@eduagent/schemas';
 import {
   listSubjects,
   createSubject,
@@ -132,6 +135,7 @@ function createMockDb({
   readyBook = null as ReturnType<typeof mockBookRow> | null,
   readyBooks = [] as Array<Pick<ReturnType<typeof mockBookRow>, 'subjectId'>>,
   failedBooks = [] as Array<{ subjectId: string }>,
+  inFlightBooks = [] as Array<{ subjectId: string }>,
   bookSuggestion = null as { id: string } | null,
   bookSuggestions = [] as Array<{ subjectId: string }>,
 } = {}): Database {
@@ -140,13 +144,20 @@ function createMockDb({
       subjects: createSubjectQueryMocks(),
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(readyBook),
-        // [Tier A] getSubjectCurriculumStatuses now issues TWO curriculumBooks
-        // batches: ready (filters on `topics_generated`) and failed (filters on
-        // `failed_at` via isNotNull — the single authoritative failure signal).
-        // Discriminate by which column the WHERE references; extractSqlTextAndValues
-        // surfaces the column names (`failed_at` only appears in the failed batch).
+        // [Tier A / WI-1210] getSubjectCurriculumStatuses now issues THREE
+        // curriculumBooks batches: ready (filters on `topics_generated = true`),
+        // failed (filters on `failed_at` via isNotNull), and in-flight (filters
+        // on `topics_generated = false` AND `failed_at IS NULL`). Discriminate
+        // by which columns the WHERE references — the in-flight batch is the
+        // only one referencing BOTH columns.
         findMany: jest.fn((options?: { where?: unknown }) => {
-          if (extractSqlTextAndValues(options?.where).includes('failed_at')) {
+          const clause = extractSqlTextAndValues(options?.where);
+          const hasFailedAt = clause.includes('failed_at');
+          const hasTopicsGenerated = clause.includes('topics_generated');
+          if (hasFailedAt && hasTopicsGenerated) {
+            return Promise.resolve(inFlightBooks);
+          }
+          if (hasFailedAt) {
             return Promise.resolve(failedBooks);
           }
           return Promise.resolve(readyBooks);
@@ -344,9 +355,10 @@ describe('listSubjects', () => {
 
     const result = await listSubjects(db, profileId, { includeInactive: true });
 
-    // Two batched curriculumBooks lookups (ready + failed), one bookSuggestions
-    // batch — still O(1) queries per category regardless of subject count.
-    expect(db.query.curriculumBooks.findMany).toHaveBeenCalledTimes(2);
+    // Three batched curriculumBooks lookups (ready + failed + in-flight,
+    // WI-1210), one bookSuggestions batch — still O(1) queries per category
+    // regardless of subject count.
+    expect(db.query.curriculumBooks.findMany).toHaveBeenCalledTimes(3);
     expect(db.query.bookSuggestions.findMany).toHaveBeenCalledTimes(1);
     expect(result.find((subject) => subject.id === 'ready-book')).toMatchObject(
       {
@@ -398,14 +410,49 @@ describe('[Tier A] getSubjectCurriculumStatuses 3-way rollup (via listSubjects)'
     setupScopedRepo({
       findManyResult: [mockSubjectRow({ id: 'subj-blocked' })],
     });
-    // A consent-blocked book sets NO failed_at, so the failed batch (isNotNull
-    // failedAt) never returns it; with no ready content it falls to 'preparing'.
-    const db = createMockDb();
+    // A consent-blocked book row exists but has topics_generated=false and NO
+    // failed_at (schema/subjects.ts: consent-block never writes failed_at), so
+    // in production it is returned by the IN-FLIGHT batch (topics_generated=false
+    // AND failed_at IS NULL) — NOT the ready or failed batches. Populate
+    // inFlightBooks so this test exercises the real in-flight code path rather
+    // than the unrelated default fallback. Per the schema's documented intent
+    // ("the book stays derived-'preparing' until consent is granted... or the
+    // consent domain surfaces its own blocked state"), it derives 'preparing'.
+    const db = createMockDb({
+      inFlightBooks: [{ subjectId: 'subj-blocked' }],
+    });
 
     const result = await listSubjects(db, profileId);
 
     expect(result[0]).toMatchObject({
       id: 'subj-blocked',
+      curriculumStatus: 'preparing',
+    });
+  });
+
+  it("in-flight beats suggestion even for a consent-blocked book with a leftover suggestion — derives 'preparing' (schema intent, not 'ready')", async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-blocked-sugg' })],
+    });
+    // Reachable combination: a minor picks a book (creating the curriculum_books
+    // row) while other unpicked bookSuggestions rows survive (picking only stamps
+    // picked_at; siblings remain). The picked book is consent-blocked, so it
+    // keeps the in-flight row shape (topics_generated=false, failed_at=null).
+    // A consent-blocked book is indistinguishable at the DB level from an
+    // actively-generating one — by deliberate schema design (no persisted,
+    // liveness-coupled 'generating' flag). The precedence therefore derives
+    // 'preparing' here, matching BOTH the schema's documented consent-block
+    // intent AND the consent-blocked-without-suggestion case above; the
+    // consent-specific UX is owned by the consent domain, not this rollup.
+    const db = createMockDb({
+      inFlightBooks: [{ subjectId: 'subj-blocked-sugg' }],
+      bookSuggestions: [{ subjectId: 'subj-blocked-sugg' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-blocked-sugg',
       curriculumStatus: 'preparing',
     });
   });
@@ -458,6 +505,48 @@ describe('[Tier A] getSubjectCurriculumStatuses 3-way rollup (via listSubjects)'
     });
   });
 
+  // [WI-1210] Root cause: a bookSuggestions row survives being picked (picking
+  // only stamps `picked_at`; the row is never deleted), so a subject whose
+  // just-picked book is still generating can still carry a leftover/sibling
+  // suggestion row. Before this fix, that leftover suggestion made the subject
+  // read as 'ready' (→ mobile 'pick-book'/'stuck') while the picked book was
+  // actively generating — masking real progress and disabling the hub's
+  // preparing-poll (which only re-enables on curriculumStatus === 'preparing').
+  it("in-flight book (picked, not yet generated, not failed) beats a leftover suggestion — must read 'preparing', not 'ready'", async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-inflight' })],
+    });
+    const db = createMockDb({
+      inFlightBooks: [{ subjectId: 'subj-inflight' }],
+      bookSuggestions: [{ subjectId: 'subj-inflight' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-inflight',
+      curriculumStatus: 'preparing',
+    });
+  });
+
+  it('a generated-ready book still beats an in-flight sibling and a leftover suggestion', async () => {
+    setupScopedRepo({
+      findManyResult: [mockSubjectRow({ id: 'subj-ready-and-inflight' })],
+    });
+    const db = createMockDb({
+      readyBooks: [{ subjectId: 'subj-ready-and-inflight' }],
+      inFlightBooks: [{ subjectId: 'subj-ready-and-inflight' }],
+      bookSuggestions: [{ subjectId: 'subj-ready-and-inflight' }],
+    });
+
+    const result = await listSubjects(db, profileId);
+
+    expect(result[0]).toMatchObject({
+      id: 'subj-ready-and-inflight',
+      curriculumStatus: 'ready',
+    });
+  });
+
   it('the failed batch filters on failed_at (isNotNull), distinct from the ready batch on topics_generated', async () => {
     setupScopedRepo({
       findManyResult: [mockSubjectRow({ id: 'subj-prep' })],
@@ -479,6 +568,72 @@ describe('[Tier A] getSubjectCurriculumStatuses 3-way rollup (via listSubjects)'
     expect(failedClause).not.toContain('consent_blocked');
     expect(failedClause).not.toContain('topics_status');
   });
+
+  // Precedence truth table (WI-1210): generated-ready > in-flight(preparing) >
+  // suggestion(ready) > failed > default(preparing). Locks the strict ordering
+  // so a future reorder of the ternary chain fails loudly. `R` = generated-ready
+  // book, `X` = in-flight book, `S` = leftover suggestion, `F` = failed book.
+  type PresenceFlags = {
+    readyBooks?: boolean;
+    inFlightBooks?: boolean;
+    bookSuggestions?: boolean;
+    failedBooks?: boolean;
+  };
+  const precedenceCases: Array<
+    [string, PresenceFlags, SubjectCurriculumStatus]
+  > = [
+    ['R only', { readyBooks: true }, 'ready'],
+    ['X only', { inFlightBooks: true }, 'preparing'],
+    ['S only', { bookSuggestions: true }, 'ready'],
+    ['F only', { failedBooks: true }, 'failed'],
+    ['none (default)', {}, 'preparing'],
+    ['R+X → ready', { readyBooks: true, inFlightBooks: true }, 'ready'],
+    ['R+S → ready', { readyBooks: true, bookSuggestions: true }, 'ready'],
+    ['R+F → ready', { readyBooks: true, failedBooks: true }, 'ready'],
+    [
+      'X+S → preparing',
+      { inFlightBooks: true, bookSuggestions: true },
+      'preparing',
+    ],
+    [
+      'X+F → preparing',
+      { inFlightBooks: true, failedBooks: true },
+      'preparing',
+    ],
+    ['S+F → ready', { bookSuggestions: true, failedBooks: true }, 'ready'],
+    [
+      'X+S+F → preparing',
+      { inFlightBooks: true, bookSuggestions: true, failedBooks: true },
+      'preparing',
+    ],
+    [
+      'R+X+S+F → ready',
+      {
+        readyBooks: true,
+        inFlightBooks: true,
+        bookSuggestions: true,
+        failedBooks: true,
+      },
+      'ready',
+    ],
+  ];
+  it.each(precedenceCases)(
+    'precedence: %s',
+    async (_label, presence, expected) => {
+      const id = 'subj-precedence';
+      setupScopedRepo({ findManyResult: [mockSubjectRow({ id })] });
+      const db = createMockDb({
+        readyBooks: presence.readyBooks ? [{ subjectId: id }] : [],
+        inFlightBooks: presence.inFlightBooks ? [{ subjectId: id }] : [],
+        bookSuggestions: presence.bookSuggestions ? [{ subjectId: id }] : [],
+        failedBooks: presence.failedBooks ? [{ subjectId: id }] : [],
+      });
+
+      const result = await listSubjects(db, profileId);
+
+      expect(result[0]).toMatchObject({ id, curriculumStatus: expected });
+    },
+  );
 });
 
 describe('createSubject', () => {

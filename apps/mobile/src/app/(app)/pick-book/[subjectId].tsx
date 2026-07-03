@@ -20,6 +20,7 @@ import {
   formatApiError,
 } from '../../../lib/format-api-error';
 import { resolveLoadingMotionPreset } from '../../../lib/motion-presets';
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { LoadingMomentOverlay } from '../../../components/common/LoadingMomentOverlay';
 import {
@@ -122,6 +123,14 @@ export default function PickBookScreen(): React.ReactElement {
 
   const handleBack = useCallback(() => {
     if (subjectId) {
+      if (FEATURE_FLAGS.MODE_NAV_V2_ENABLED) {
+        router.replace({
+          pathname: '/(app)/subject-hub/[subjectId]',
+          params: { subjectId },
+        } as Href);
+        return;
+      }
+
       router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
@@ -129,7 +138,11 @@ export default function PickBookScreen(): React.ReactElement {
       return;
     }
 
-    router.replace('/(app)/library' as Href);
+    router.replace(
+      FEATURE_FLAGS.MODE_NAV_V2_ENABLED
+        ? ('/(app)/subjects' as Href)
+        : ('/(app)/library' as Href),
+    );
   }, [router, subjectId]);
 
   // M12: Filing overlay timeout — show skip button after 8 seconds (was 15)
