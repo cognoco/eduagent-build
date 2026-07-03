@@ -91,6 +91,23 @@ describe('languageComprehensionEvaluationSchema', () => {
       }),
     ).toThrow();
   });
+
+  it('rejects empty required prompt fields', () => {
+    for (const field of ['questionId', 'prompt', 'answerHint'] as const) {
+      expect(() =>
+        languageComprehensionEvaluationSchema.parse({
+          questionId: 'q1',
+          prompt: 'What is on the table?',
+          answerHint: 'agua',
+          learnerAnswer: 'Water is on the table.',
+          verdict: 'understood',
+          matchedTerms: ['water'],
+          missingTerms: [],
+          [field]: '',
+        }),
+      ).toThrow();
+    }
+  });
 });
 
 describe('streamDoneFrameSchema', () => {
