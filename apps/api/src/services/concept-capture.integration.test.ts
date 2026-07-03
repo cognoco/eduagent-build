@@ -1,8 +1,7 @@
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import {
-  accounts,
   conceptMastery,
   concepts,
   createDatabase,
@@ -11,8 +10,6 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  person,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -22,6 +19,10 @@ import type {
 } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { captureConceptMastery } from './concept-capture';
 import { getConceptMasterySignalsForTopics } from './concept-mastery';
 
@@ -35,38 +36,27 @@ const CLERK_PREFIX = `concept-capture-${RUN_ID}`;
 let db: Database;
 let counter = 0;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfile(): Promise<{ profileId: string }> {
   const idx = ++counter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${idx}`,
-      email: `${CLERK_PREFIX}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Concept Capture Learner',
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-
-  // WI-781: concepts.profileId / conceptMastery.profileId FK to person, not
-  // profiles (see packages/database/src/schema/concept-mastery.ts) — the app
-  // writes person ids into these columns. Seed a person row sharing the
-  // profile's id, mirroring retrieval-events.integration.test.ts's identity-v2
-  // bridge.
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: `${CLERK_PREFIX}-${idx}`,
-    birthDate: '2011-01-01',
-    residenceJurisdiction: 'EU',
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Concept Capture Learner',
+    birthYear: 2011,
+    clerkUserId: `${CLERK_PREFIX}-${idx}`,
+    email: `${CLERK_PREFIX}-${idx}@test.invalid`,
+    isOwner: true,
   });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return { profileId: profile!.id };
+  return { profileId };
 }
 
 async function seedTopic(
@@ -192,13 +182,12 @@ describeIfDb('captureConceptMastery (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
-    // WI-781: person isn't reachable via the accounts cascade (it's a separate
-    // v2 identity row sharing the profile's id) — clean it up explicitly,
-    // mirroring retrieval-events.integration.test.ts.
-    await db.delete(person).where(like(person.displayName, `${CLERK_PREFIX}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   });
 
   it('captures solid, partial, missing, and misconception verdicts from enriched evaluations', async () => {

@@ -13,7 +13,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { learningProfiles, person, profiles } from '@eduagent/database';
+import { learningProfiles, person } from '@eduagent/database';
 
 import {
   buildIntegrationEnv,
@@ -471,10 +471,13 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
   });
 
   // [BREAK / BUG-978 / CCR-PR123-DB-1] Direct DB write that bypasses the API
-  // layer must still be rejected by the profiles_pronouns_length_check
+  // layer must still be rejected by the person_pronouns_length_check
   // constraint. The Zod schema is the primary boundary; this CHECK is the
   // last-resort guard for paths that bypass the API (raw SQL, seed scripts,
   // admin patches). Without the CHECK, a 33-char string would land in the row.
+  // [WI-1128] Legacy `profiles` is dropped — this now writes/reads `person`,
+  // whose `person_pronouns_length_check` mirrors the legacy
+  // `profiles_pronouns_length_check` constraint.
   it('[BREAK] Postgres CHECK rejects pronouns > 32 chars on direct DB write', async () => {
     const profileId = await createProfileForUser(
       USER_A_CLERK_ID,
@@ -490,9 +493,9 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
     // helper the production 23505 handlers use).
     const rejection = await Promise.resolve(
       db
-        .update(profiles)
+        .update(person)
         .set({ pronouns: 'a'.repeat(33) })
-        .where(eq(profiles.id, profileId)),
+        .where(eq(person.id, profileId)),
     ).then(
       () => {
         throw new Error(
@@ -502,17 +505,17 @@ describe('Integration: Onboarding Dimensions PATCH routes', () => {
       (error: unknown) => error,
     );
     const driverError = unwrapDbError(rejection) as { message?: string };
-    expect(driverError.message ?? '').toMatch(/profiles_pronouns_length_check/);
+    expect(driverError.message ?? '').toMatch(/person_pronouns_length_check/);
 
     // Sanity: 32 chars exactly is allowed.
     await db
-      .update(profiles)
+      .update(person)
       .set({ pronouns: 'a'.repeat(32) })
-      .where(eq(profiles.id, profileId));
+      .where(eq(person.id, profileId));
     const [row] = await db
-      .select({ pronouns: profiles.pronouns })
-      .from(profiles)
-      .where(eq(profiles.id, profileId));
+      .select({ pronouns: person.pronouns })
+      .from(person)
+      .where(eq(person.id, profileId));
     expect(row!.pronouns).toBe('a'.repeat(32));
   });
 

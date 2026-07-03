@@ -432,4 +432,145 @@ const itGraph = RUN && REPOINTED ? it : it.skip;
     });
     expect(grant).toBeUndefined();
   });
+
+  // [WI-1128, port of BUG-862] Concurrent-create cap race, ported from the
+  // legacy pg_advisory_xact_lock proof (services/profile.integration.test.ts).
+  // createChildProfileV2 takes the SAME per-org advisory lock
+  // (hashtext(organizationId)) inside its transaction, so this is the v2
+  // analog of the legacy concurrency proof. 'plus' tier caps at 2 profiles;
+  // the owner already occupies slot 1, so exactly one slot remains — firing 3
+  // concurrent creates for that one slot is a tighter race than legacy's
+  // cap-1-of-4 setup, but proves the same invariant.
+  itGraph(
+    '[BUG-862] concurrent createChildProfileV2 calls for the same org do not exceed the per-tier cap',
+    async () => {
+      const { organizationId } = await seedOwnerGraph({ birthYear: 1988 });
+      const sub = await getSubscriptionByAccountIdV2(db, organizationId);
+      expect(sub).not.toBeNull();
+      expect(await canAddProfileV2(db, sub!.id)).toBe(true);
+
+      const results = await Promise.allSettled([
+        addChild(organizationId, {
+          displayName: 'Racing Child A',
+          birthYear: 2012,
+        }),
+        addChild(organizationId, {
+          displayName: 'Racing Child B',
+          birthYear: 2012,
+        }),
+        addChild(organizationId, {
+          displayName: 'Racing Child C',
+          birthYear: 2012,
+        }),
+      ]);
+
+      const successes = results.filter((r) => r.status === 'fulfilled');
+      const limitErrors = results.filter(
+        (r) => r.status === 'rejected' && r.reason instanceof ProfileLimitError,
+      );
+      const unexpectedErrors = results.filter(
+        (r) =>
+          r.status === 'rejected' && !(r.reason instanceof ProfileLimitError),
+      );
+
+      // No unexpected errors.
+      expect(unexpectedErrors).toHaveLength(0);
+
+      // Hard invariant: total membership count must not exceed the tier cap (2).
+      const members = await db.query.membership.findMany({
+        where: eq(membership.organizationId, organizationId),
+      });
+      expect(members.length).toBeLessThanOrEqual(2);
+
+      if (successes.length > 1) {
+        console.warn(
+          `[BUG-862] ${successes.length} out of 3 concurrent creates succeeded ` +
+            `(expected 1). Final membership count: ${members.length}/2. ` +
+            'The per-org advisory lock may not be scoped to a real transaction.',
+        );
+      }
+
+      // Advisory: every attempt is accounted for (succeeded or capped).
+      expect(successes.length + limitErrors.length).toBe(3);
+    },
+  );
+
+  // [WI-1128, port of OPT-C boundary] Positive counterpart to the twin's
+  // existing negative/exact-17 adult-owner-gate cases: a year-only owner at
+  // EXACTLY 18 (no birthMonth/birthDay persisted, so calculateAgeFromParts
+  // falls back to year-diff) must still be allowed to add a child.
+  itGraph(
+    '[OPT-C boundary] allows child creation when owner is exactly 18 (year-only, no month/day)',
+    async () => {
+      const currentYear = new Date().getFullYear();
+      const { organizationId } = await seedOwnerGraph({
+        birthYear: currentYear - 18,
+      });
+
+      await expect(
+        addChild(organizationId, { displayName: 'Kid', birthYear: 2012 }),
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    },
+  );
+
+  // [WI-1128, port of OPT-C flag-off] The twin's addChild() helper always
+  // passes adultOwnerGateEnabled:true; this is the only coverage of the
+  // flag-off path — an underage owner must still be allowed to add a child
+  // when the gate is explicitly disabled (identical to pre-OPT-C behaviour).
+  itGraph(
+    '[OPT-C flag-off] allows child creation regardless of owner age when the gate is disabled',
+    async () => {
+      // Owner born 2010 → underage (~16), same as the ADULT_OWNER_REQUIRED test.
+      const { organizationId } = await seedOwnerGraph({ birthYear: 2010 });
+
+      const child = await createChildProfileV2(db, {
+        organizationId,
+        input: {
+          displayName: 'Kid',
+          birthYear: 2012,
+          location: 'EU',
+          conversationLanguage: 'en',
+        },
+        adultOwnerGateEnabled: false,
+      });
+      personIds.push(child.id);
+
+      expect(child.id).toEqual(expect.any(String));
+    },
+  );
+
+  // [WI-1128, P3] WI-367 full birth-date persistence for the CHILD-create
+  // path (buildValidatedBirthDate in child-profile-v2.ts:166-174) — no
+  // existing test exercises this; addChild() never passes birthMonth/
+  // birthDay. Ported intent from the retired profile.integration.test.ts's
+  // "[WI-367 persistence] stores birth_month / birth_day on the created
+  // profile" (there, exercised via the OWNER path; here, the CHILD path,
+  // since createChildProfileV2 is what actually calls
+  // buildValidatedBirthDate for a child).
+  itGraph(
+    '[WI-367 persistence] stores the full birth date (month/day) on the created child',
+    async () => {
+      const { organizationId } = await seedOwnerGraph({ birthYear: 1985 });
+
+      const child = await createChildProfileV2(db, {
+        organizationId,
+        input: {
+          displayName: 'Kid',
+          birthYear: 2012,
+          birthMonth: 7,
+          birthDay: 22,
+          location: 'EU',
+          conversationLanguage: 'en',
+        },
+        adultOwnerGateEnabled: true,
+      });
+      personIds.push(child.id);
+
+      const personRow = await db.query.person.findFirst({
+        where: eq(person.id, child.id),
+        columns: { birthDate: true },
+      });
+      expect(personRow?.birthDate).toBe('2012-07-22');
+    },
+  );
 });

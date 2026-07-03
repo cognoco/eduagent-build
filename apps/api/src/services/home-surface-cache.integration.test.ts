@@ -15,13 +15,8 @@
  * No mocks of internal services or database.
  */
 
-import { eq, inArray } from 'drizzle-orm';
-import {
-  accounts,
-  profiles,
-  coachingCardCache,
-  createDatabase,
-} from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { coachingCardCache, createDatabase, person } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
@@ -56,11 +51,12 @@ function createIntegrationDb() {
 // Test identifiers
 // ---------------------------------------------------------------------------
 
-const PREFIX = 'integration-home-cache-bug859';
-const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user`,
-  email: `${PREFIX}@integration.test`,
-};
+// [WI-1128] Legacy `accounts`/`profiles` are dropped post-M-DROP, and v2
+// `person` has no email column (email lives on `login`, which this test
+// doesn't need — coaching_card_cache.profile_id FKs `person` directly). Use a
+// deterministic id instead of an email-based lookup so cleanup() can find the
+// row before the seed has run (beforeEach cleanup precedes the first seed).
+const PROFILE_ID = 'a0000000-0000-4000-8000-000000000859';
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -68,31 +64,22 @@ const ACCOUNT = {
 
 async function seedAccountAndProfile() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
   const [profile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
+      id: PROFILE_ID,
       displayName: 'Cache Test User',
-      birthYear: 2000,
-      isOwner: true,
+      birthDate: '2000-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
-  return { account: account!, profile: profile! };
+  return { profile: profile! };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
-  });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  // Deleting person cascades coaching_card_cache (onDelete: 'cascade').
+  await db.delete(person).where(eq(person.id, PROFILE_ID));
 }
 
 // ---------------------------------------------------------------------------

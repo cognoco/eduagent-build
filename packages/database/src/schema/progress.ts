@@ -14,7 +14,7 @@ import type {
   CoachingCardCacheData,
   CoachingCardPendingCelebrations,
 } from '@eduagent/schemas';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { curriculumTopics, subjects } from './subjects';
 import { learningSessions } from './sessions';
 import { xpStatusEnum } from './assessments';
@@ -32,7 +32,7 @@ export const streaks = pgTable('streaks', {
     .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' })
+    .references(() => person.id, { onDelete: 'cascade' })
     .unique(),
   currentStreak: integer('current_streak').notNull().default(0),
   longestStreak: integer('longest_streak').notNull().default(0),
@@ -54,7 +54,7 @@ export const xpLedger = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     topicId: uuid('topic_id')
       .notNull()
       .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
@@ -99,7 +99,7 @@ export const notificationPreferences = pgTable('notification_preferences', {
     .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' })
+    .references(() => person.id, { onDelete: 'cascade' })
     .unique(),
   reviewReminders: boolean('review_reminders').notNull().default(false),
   dailyReminders: boolean('daily_reminders').notNull().default(false),
@@ -159,7 +159,7 @@ export const notificationLog = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     type: notificationTypeEnum('type').notNull(),
     ticketId: text('ticket_id'),
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
@@ -186,7 +186,7 @@ export const learningModes = pgTable('learning_modes', {
     .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' })
+    .references(() => person.id, { onDelete: 'cascade' })
     .unique(),
   medianResponseSeconds: integer('median_response_seconds'),
   celebrationLevel: celebrationLevelEnum('celebration_level')
@@ -215,7 +215,7 @@ export const coachingCardCache = pgTable('coaching_card_cache', {
     .$defaultFn(() => generateUUIDv7()),
   profileId: uuid('profile_id')
     .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' })
+    .references(() => person.id, { onDelete: 'cascade' })
     .unique(),
   cardData: jsonb('card_data').notNull().$type<CoachingCardCacheData>(),
   pendingCelebrations: jsonb('pending_celebrations')

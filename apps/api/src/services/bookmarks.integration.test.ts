@@ -1,7 +1,6 @@
 import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   bookmarks,
   createDatabase,
   curricula,
@@ -9,12 +8,15 @@ import {
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
-import { eq, like } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import {
   createBookmark,
   deleteBookmark,
@@ -27,7 +29,6 @@ loadDatabaseEnv(resolve(__dirname, '../../../..'));
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
 
-const RUN_ID = generateUUIDv7();
 let db: Database;
 
 let profileId: string;
@@ -39,44 +40,44 @@ let aiEventId: string;
 let aiEventId2: string;
 let topicId: string;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedTestData(): Promise<void> {
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_integ_bkmk_${RUN_ID}_1`,
-      email: `bkmk_${RUN_ID}_1@test.invalid`,
-    })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Bookmark Test User',
+    birthYear: 2012,
+    // [WI-1128] seedTestData() is called from multiple beforeAll blocks in
+    // this file. Legacy `accounts` has unique clerkUserId/email columns; a
+    // RUN_ID-only (file-scoped, not call-scoped) suffix collided across
+    // calls when the legacy tables are present (the 2nd+ call's onConflictDoNothing
+    // silently no-op'd on the email collision, leaving profiles' account_id FK
+    // dangling). Keyed on the freshly-generated accountId so every call is unique.
+    clerkUserId: `clerk_integ_bkmk_${accountId}_1`,
+    email: `bkmk_${accountId}_1@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Bookmark Test User',
-      birthYear: 2012,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  profileId = profile!.id;
-
-  const [otherAccount] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_integ_bkmk_${RUN_ID}_2`,
-      email: `bkmk_${RUN_ID}_2@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [otherProfile] = await db
-    .insert(profiles)
-    .values({
-      accountId: otherAccount!.id,
-      displayName: 'Other User',
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  otherProfileId = otherProfile!.id;
+  const otherAccountId = generateUUIDv7();
+  otherProfileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId: otherAccountId,
+    profileId: otherProfileId,
+    displayName: 'Other User',
+    birthYear: 2010,
+    clerkUserId: `clerk_integ_bkmk_${otherAccountId}_2`,
+    email: `bkmk_${otherAccountId}_2@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(otherAccountId);
+  seededProfileIds.push(otherProfileId);
 
   const [subject] = await db
     .insert(subjects)
@@ -176,9 +177,12 @@ describeIfDb('Bookmarks (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   });
   let createdBookmarkId: string;
 
@@ -399,9 +403,12 @@ describeIfDb('Bookmarks — pagination stability (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   });
 
   it('cursor pagination across multiple pages yields no duplicates', async () => {
@@ -492,9 +499,12 @@ describeIfDb('Bookmarks — orphaned topic references (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   });
 
   it('listBookmarks includes bookmark even when topicId is null (ON DELETE SET NULL)', async () => {
@@ -545,9 +555,12 @@ describeIfDb(
     });
 
     afterAll(async () => {
-      await db
-        .delete(accounts)
-        .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: [...seededAccountIds],
+        profileIds: [...seededProfileIds],
+      });
+      seededAccountIds.length = 0;
+      seededProfileIds.length = 0;
     });
 
     it('subjectId filter does not leak cross-profile bookmarks sharing a subjectId row', async () => {

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { curriculumTopics } from './subjects';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { learningSessions } from './sessions';
 import { generateUUIDv7 } from '../utils/uuid';
 
@@ -16,7 +16,7 @@ export const topicNotes = pgTable(
       .references(() => curriculumTopics.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     sessionId: uuid('session_id').references(() => learningSessions.id, {
       onDelete: 'set null',
     }),

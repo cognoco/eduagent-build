@@ -10,11 +10,9 @@ import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { createDatabase } from '@eduagent/database';
 import {
-  accounts,
   membership,
   organization,
   person,
-  profiles,
   subjects,
   learningSessions,
   sessionEvents,
@@ -22,7 +20,8 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
-import { eq, and, like } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { deleteV2IdentitiesForTest } from '../test-utils/legacy-identity-anchors';
 import { registerProvider, unregisterProvider } from './llm';
 import { createMockProvider } from './llm/test-utils';
 import {
@@ -51,55 +50,38 @@ loadDatabaseEnv(resolve(__dirname, '../../../..'));
 let db: Database;
 
 // ---------------------------------------------------------------------------
-// Unique test-run prefix to avoid collisions between concurrent test runs
-// ---------------------------------------------------------------------------
-
-const RUN_ID = generateUUIDv7();
-
-// ---------------------------------------------------------------------------
 // Seed helpers — direct Drizzle inserts for lightweight per-test data
 // ---------------------------------------------------------------------------
 
-// Monotonic counter ensures each seedProfile call within the same run is unique
-let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile() {
-  const idx = ++seedCounter;
-  const clerkUserId = `clerk_integ_sess_${RUN_ID}_${idx}`;
-  const email = `integ-sess-${RUN_ID}-${idx}@test.invalid`;
-
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
   const birthYear = new Date().getFullYear() - 15;
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Integration Test Learner',
-      birthYear,
-    })
-    .returning({ id: profiles.id });
 
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await db
     .insert(organization)
-    .values({ id: account!.id, name: 'Lifecycle Test Org' });
+    .values({ id: accountId, name: 'Lifecycle Test Org' });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: 'Integration Test Learner',
     birthDate: `${birthYear}-06-15`,
     residenceJurisdiction: 'US',
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: ['learner'],
   });
 
-  return { accountId: account!.id, profileId: profile!.id };
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
+  return { accountId, profileId };
 }
 
 async function seedSubject(
@@ -144,12 +126,12 @@ beforeAll(async () => {
 afterAll(async () => {
   // Clean up all test data seeded during this run.
   // Foreign key cascades handle child records (sessions, events, etc.)
-  // when we delete accounts. We delete by the unique clerk_user_id prefix.
-  // Use `like` to match all per-test accounts: clerk_integ_sess_<RUN_ID>_<idx>
+  // when we delete the v2 organization/person rows.
   if (db) {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_integ_sess_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   }
 
   // Reset in-process caches to avoid cross-test pollution

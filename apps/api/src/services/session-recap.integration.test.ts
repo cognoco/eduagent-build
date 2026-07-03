@@ -7,10 +7,9 @@
  * Uses a real database. No mocks of repository, services, or schema.
  */
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
+  generateUUIDv7,
   subjects,
   curricula,
   curriculumBooks,
@@ -23,6 +22,10 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { resolveNextTopic, matchFreeformTopic } from './session-recap';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -31,7 +34,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -41,15 +44,12 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-// Single source of truth for test identifiers — do not hand-maintain parallel
-// lists of emails and clerk IDs.
 const PREFIX = 'integration-recap-scope';
-const TEST_ACCOUNTS = [
-  { clerkUserId: `${PREFIX}-a`, email: `${PREFIX}-a@integration.test` },
-  { clerkUserId: `${PREFIX}-b`, email: `${PREFIX}-b@integration.test` },
-] as const;
-const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = TEST_ACCOUNTS.map((a) => a.clerkUserId);
+
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2
+// cleanup instead of looking accounts up by email/clerkUserId.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 interface SeededTree {
   profileId: string;
@@ -60,28 +60,33 @@ interface SeededTree {
 
 async function seedProfileWithCurriculum(
   index: number,
-  topicTitles: string[]
+  topicTitles: string[],
 ): Promise<SeededTree> {
   const db = createIntegrationDb();
-  const acc = TEST_ACCOUNTS[index]!;
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: acc.clerkUserId, email: acc.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Recap Scope ${index}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
+  // [WI-1128] Key clerkUserId/email off the freshly-generated accountId —
+  // this helper is called repeatedly across tests via beforeEach cleanup;
+  // a fixed per-index string collides with legacy `accounts` unique
+  // columns across calls (the onConflictDoNothing silently no-ops,
+  // leaving profiles.account_id FK dangling for the fresh accountId).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    clerkUserId: `${PREFIX}-${index}-${accountId}`,
+    email: `${PREFIX}-${index}-${accountId}@integration.test`,
+    displayName: `Recap Scope ${index}`,
+    birthYear: 2010,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${index}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -120,7 +125,7 @@ async function seedProfileWithCurriculum(
   }
 
   return {
-    profileId: profile!.id,
+    profileId,
     subjectId: subject!.id,
     bookId: book!.id,
     topicIds,
@@ -129,16 +134,12 @@ async function seedProfileWithCurriculum(
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
   });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 beforeEach(async () => {
@@ -335,25 +336,27 @@ describe('session-recap topic selection coverage (integration)', () => {
 
   it('falls through to the next book when the current book is exhausted', async () => {
     const db = createIntegrationDb();
-    const acc = TEST_ACCOUNTS[0]!;
+    const accountId = generateUUIDv7();
+    const profileId = generateUUIDv7();
 
-    const [account] = await db
-      .insert(accounts)
-      .values({ clerkUserId: acc.clerkUserId, email: acc.email })
-      .returning();
-    const [profile] = await db
-      .insert(profiles)
-      .values({
-        accountId: account!.id,
-        displayName: 'Cross-Book',
-        birthYear: 2010,
-        isOwner: true,
-      })
-      .returning();
+    // [WI-1128] Key clerkUserId/email off accountId — see the note on
+    // seedProfileWithCurriculum above for why a fixed string collides.
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId,
+      profileId,
+      clerkUserId: `${PREFIX}-crossbook-${accountId}`,
+      email: `${PREFIX}-crossbook-${accountId}@integration.test`,
+      displayName: 'Cross-Book',
+      birthYear: 2010,
+      isOwner: true,
+    });
+    seededAccountIds.push(accountId);
+    seededProfileIds.push(profileId);
+
     const [subject] = await db
       .insert(subjects)
       .values({
-        profileId: profile!.id,
+        profileId,
         name: 'Biology',
         status: 'active',
         pedagogyMode: 'socratic',
@@ -395,7 +398,7 @@ describe('session-recap topic selection coverage (integration)', () => {
       })
       .returning();
 
-    const repo = createScopedRepository(db, profile!.id);
+    const repo = createScopedRepository(db, profileId);
     const next = await resolveNextTopic(repo, bookOneLast!.id);
     expect(next).not.toBeNull();
     expect(next!.id).toBe(bookTwoFirst!.id);

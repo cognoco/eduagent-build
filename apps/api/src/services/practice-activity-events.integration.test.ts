@@ -1,13 +1,16 @@
 import { resolve } from 'path';
 import { inArray } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
+  generateUUIDv7,
   practiceActivityEvents,
-  profiles,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 import { recordPracticeActivityEvent } from './practice-activity-events';
 
@@ -28,51 +31,44 @@ function createIntegrationDb(): Database {
 }
 
 const PREFIX = 'integration-practice-activity-events';
-const TEST_ACCOUNT = {
-  clerkUserId: `${PREFIX}-user`,
-  email: `${PREFIX}@integration.test`,
-};
-const OTHER_TEST_ACCOUNT = {
-  clerkUserId: `${PREFIX}-other-user`,
-  email: `${PREFIX}-other@integration.test`,
-};
+
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function cleanupTestAccount(): Promise<void> {
   const db = createIntegrationDb();
-  const rows = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(
-      inArray(accounts.clerkUserId, [
-        TEST_ACCOUNT.clerkUserId,
-        OTHER_TEST_ACCOUNT.clerkUserId,
-      ]),
-    );
-
-  if (rows.length > 0) {
-    await db.delete(accounts).where(
-      inArray(
-        accounts.id,
-        rows.map((row) => row.id),
-      ),
-    );
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
-async function seedProfile(accountInput = TEST_ACCOUNT): Promise<string> {
+// [WI-1128] Key clerkUserId/email off the freshly-generated accountId —
+// seedProfile() is called from multiple tests via beforeEach cleanup; a
+// fixed string (even per "kind": test vs other) collides with legacy
+// `accounts` unique columns across calls (the onConflictDoNothing
+// silently no-ops, leaving profiles.account_id FK dangling for the fresh
+// accountId).
+async function seedProfile(kind: 'test' | 'other' = 'test'): Promise<string> {
   const db = createIntegrationDb();
-  const [account] = await db.insert(accounts).values(accountInput).returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Practice Activity Integration',
-      birthYear: 2008,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Practice Activity Integration',
+    birthYear: 2008,
+    clerkUserId: `${PREFIX}-${kind}-${accountId}`,
+    email: `${PREFIX}-${kind}-${accountId}@integration.test`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  return profile!.id;
+  return profileId;
 }
 
 beforeEach(async () => {
@@ -116,7 +112,7 @@ describe('recordPracticeActivityEvent (integration)', () => {
 
   it('isolates dedupe keys by profile so one learner cannot suppress another learner activity', async () => {
     const profileId = await seedProfile();
-    const otherProfileId = await seedProfile(OTHER_TEST_ACCOUNT);
+    const otherProfileId = await seedProfile('other');
     const db = createIntegrationDb();
     const sharedInput = {
       activityType: 'review' as const,

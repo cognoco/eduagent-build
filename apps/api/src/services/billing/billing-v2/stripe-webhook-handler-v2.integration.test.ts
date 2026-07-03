@@ -213,9 +213,14 @@ function stripeSub(input: {
           isOwner: true,
         });
 
+        // [WI-1128] Legacy `subscriptions.account_id` FK was repointed by
+        // migration 0129 from accounts(id) to organization(id) — the
+        // legacy `accounts` row itself is still seeded (profiles.account_id
+        // is unrepointed, on the drop list), but this insert must target
+        // the v2 organization id, not the legacy account's own id.
         await db.insert(subscriptions).values({
           id: subId,
-          accountId: acct!.id,
+          accountId: org!.id,
           tier: input.tier,
           status: 'active',
           stripeSubscriptionId: `${input.stripeSubscriptionId}_legacy`,

@@ -8,7 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
-import { profiles } from './profiles';
+import { person } from './identity';
 
 export const childCapNotifications = pgTable(
   'child_cap_notifications',
@@ -18,10 +18,10 @@ export const childCapNotifications = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     ownerProfileId: uuid('owner_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     childProfileId: uuid('child_profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     kind: text('kind', {
       enum: ['daily_exceeded', 'monthly_exceeded'],
     }).notNull(),

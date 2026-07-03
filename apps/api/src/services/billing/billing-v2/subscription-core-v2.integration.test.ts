@@ -48,6 +48,7 @@ import {
 } from '@eduagent/database';
 import { getTierConfig } from '../../subscription';
 import { updateSubscriptionFromWebhookV2 } from './subscription-core-v2';
+import { legacyIdentityTableExistsForTest } from '../../../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../../..'));
 const RUN = !!process.env.DATABASE_URL;
@@ -159,24 +160,25 @@ const RUN = !!process.env.DATABASE_URL;
         roles: ['admin', 'learner'],
       });
 
-      // Legacy accounts + subscriptions (id-aligned) — only to satisfy the
-      // pre-M-REPOINT quota_pools FK to subscriptions(id). The v2 handler never
-      // reads these.
-      const [acct] = await db
-        .insert(accounts)
-        .values({
+      // [WI-1128] Legacy `accounts` may already be dropped (post-M-DROP);
+      // after M-REPOINT, `subscriptions.accountId` targets `organization`
+      // directly (see below), so this mirror (same id as the org, the
+      // "reseed identity contract") is a no-op there instead of hard-failing.
+      if (await legacyIdentityTableExistsForTest(db, 'accounts')) {
+        await db.insert(accounts).values({
+          id: org!.id,
           clerkUserId: `${clerkUserId}_legacy`,
           email: `legacy_${email}`,
-        })
-        .returning();
-      createdAccountIds.push(acct!.id);
+        });
+        createdAccountIds.push(org!.id);
+      }
 
       const subId = generateUUIDv7();
       seededSubIds.push(subId);
 
       await db.insert(subscriptions).values({
         id: subId,
-        accountId: acct!.id,
+        accountId: org!.id,
         tier: 'family',
         status: 'active',
         stripeSubscriptionId: `${opts.stripeSubscriptionId}_legacy`,

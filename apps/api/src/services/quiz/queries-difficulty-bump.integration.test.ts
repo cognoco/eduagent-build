@@ -1,8 +1,7 @@
 import { inArray } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
-  profiles,
+  person,
   quizRounds,
   subjects,
 } from '@eduagent/database';
@@ -42,22 +41,19 @@ function createIntegrationDb() {
 }
 
 const PREFIX = 'integration-quiz-difficulty-bump';
-const ACCOUNT = {
-  clerkUserId: `${PREFIX}-01`,
-  email: `${PREFIX}-01@integration.test`,
-};
+const PROFILE_DISPLAY_NAME = `${PREFIX}-profile`;
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const rows = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [ACCOUNT.email]),
+  const rows = await db.query.person.findMany({
+    where: inArray(person.displayName, [PROFILE_DISPLAY_NAME]),
   });
 
   if (rows.length > 0) {
-    await db.delete(accounts).where(
+    await db.delete(person).where(
       inArray(
-        accounts.id,
-        rows.map((row: typeof accounts.$inferSelect) => row.id),
+        person.id,
+        rows.map((row: typeof person.$inferSelect) => row.id),
       ),
     );
   }
@@ -65,20 +61,12 @@ async function cleanupTestAccounts() {
 
 async function seedProfileAndSubject() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: ACCOUNT.clerkUserId,
-      email: ACCOUNT.email,
-    })
-    .returning();
   const [profile] = await db
-    .insert(profiles)
+    .insert(person)
     .values({
-      accountId: account!.id,
-      displayName: 'Difficulty Bump Integration Profile',
-      birthYear: 2012,
-      isOwner: true,
+      displayName: PROFILE_DISPLAY_NAME,
+      birthDate: '2012-01-01',
+      residenceJurisdiction: 'EU',
     })
     .returning();
   const [subject] = await db

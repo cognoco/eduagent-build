@@ -6,7 +6,7 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { learningSessions } from './sessions';
 import { curriculumTopics } from './subjects';
 import { vector } from './_pgvector';
@@ -23,7 +23,7 @@ export const sessionEmbeddings = pgTable(
       .references(() => learningSessions.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     topicId: uuid('topic_id').references(() => curriculumTopics.id, {
       onDelete: 'cascade',
     }),

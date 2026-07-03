@@ -20,8 +20,6 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
   consentGrant,
   consentRequest,
   membership,
@@ -98,10 +96,12 @@ interface SeededConsent {
 
 /**
  * Seeds the minimal chain needed to exercise the consent-web routes:
- *   account → profile (child) → v2 identity graph → consentRequest with a token.
+ *   organization → person (child) → membership → consentRequest with a token.
  *
  * [WI-867] Route now calls processConsentResponseV2 which reads consentRequest.
- * Replaced legacy consentStates seed with v2 person/org/membership/consentRequest.
+ * [WI-1128] Legacy `accounts`/`profiles` are dropped — this is now a pure v2
+ * seed (organization/person/membership/consentRequest); previously it also
+ * dual-seeded legacy accounts/profiles rows sharing the same ids.
  */
 async function seedConsentToken(opts: {
   displayName: string;
@@ -109,45 +109,30 @@ async function seedConsentToken(opts: {
   expiresAt?: Date;
 }): Promise<SeededConsent> {
   const db = createIntegrationDb();
-  const clerkId = `${PREFIX}-clerk-${crypto.randomUUID()}`;
-  const email = `${PREFIX}-${crypto.randomUUID()}@integration.test`;
   const token = freshToken();
   const expiresAt =
     opts.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: clerkId, email })
+  const [org] = await db
+    .insert(organization)
+    .values({ name: `${PREFIX} Org` })
     .returning();
-
-  const [profile] = await db
-    .insert(profiles)
+  const [p] = await db
+    .insert(person)
     .values({
-      accountId: account!.id,
       displayName: opts.displayName,
-      birthYear: 2013,
-      isOwner: false,
+      birthDate: '2013-06-15',
+      residenceJurisdiction: 'EU',
     })
     .returning();
-
-  // [WI-867] v2 identity rows required by processConsentResponseV2.
-  await db
-    .insert(organization)
-    .values({ id: account!.id, name: `${PREFIX} Org` });
-  await db.insert(person).values({
-    id: profile!.id,
-    displayName: opts.displayName,
-    birthDate: '2013-06-15',
-    residenceJurisdiction: 'EU',
-  });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: p!.id,
+    organizationId: org!.id,
     roles: ['learner'],
   });
   await db.insert(consentRequest).values({
-    chargePersonId: profile!.id,
-    organizationId: account!.id,
+    chargePersonId: p!.id,
+    organizationId: org!.id,
     requestedBasis: 'gdpr_parental_consent',
     token,
     tokenExpiresAt: expiresAt,
@@ -155,7 +140,7 @@ async function seedConsentToken(opts: {
     guardianEmail: 'parent@example.com',
   });
 
-  return { accountId: account!.id, profileId: profile!.id, token };
+  return { accountId: org!.id, profileId: p!.id, token };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,12 +149,33 @@ async function seedConsentToken(opts: {
 
 const seededAccountIds: string[] = [];
 
+/**
+ * [WI-1128] Legacy `accounts` cascade-deleted `profiles` for free; the v2
+ * graph has no such cascade from organization → person, so resolve the
+ * seeded personIds via membership before tearing down in FK-safe order:
+ * consentRequest/consentGrant (restrict/cascade off person) → membership →
+ * person → organization.
+ */
 async function cleanupAll() {
   if (seededAccountIds.length === 0) return;
   const db = createIntegrationDb();
-  await db
-    .delete(accounts)
-    .where(inArray(accounts.id, [...new Set(seededAccountIds)]));
+  const orgIds = [...new Set(seededAccountIds)];
+  const memberships = await db.query.membership.findMany({
+    where: inArray(membership.organizationId, orgIds),
+    columns: { personId: true },
+  });
+  const personIds = memberships.map((m) => m.personId);
+  if (personIds.length > 0) {
+    await db
+      .delete(consentRequest)
+      .where(inArray(consentRequest.chargePersonId, personIds));
+    await db
+      .delete(consentGrant)
+      .where(inArray(consentGrant.chargePersonId, personIds));
+    await db.delete(membership).where(inArray(membership.personId, personIds));
+    await db.delete(person).where(inArray(person.id, personIds));
+  }
+  await db.delete(organization).where(inArray(organization.id, orgIds));
 }
 
 // ---------------------------------------------------------------------------
@@ -419,8 +425,8 @@ describe('POST /v1/consent-page/confirm', () => {
       // Critical: profile must still exist. Pre-fix the route silently
       // treated this as denial and cascade-deleted the profile.
       const db = createIntegrationDb();
-      const profile = await db.query.profiles.findFirst({
-        where: eq(profiles.id, profileId),
+      const profile = await db.query.person.findFirst({
+        where: eq(person.id, profileId),
       });
       expect(profile).toBeDefined();
 
@@ -470,8 +476,8 @@ describe('POST /v1/consent-page/confirm', () => {
     expect(grant?.granted).toBe(true);
 
     // Profile must still exist after approval
-    const profile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, profileId),
+    const profile = await db.query.person.findFirst({
+      where: eq(person.id, profileId),
     });
     expect(profile).not.toBeNull();
   });

@@ -20,6 +20,7 @@ type LegacyIdentityTableName =
   | 'accounts'
   | 'profiles'
   | 'family_links'
+  | 'consent_states'
   | 'subscriptions';
 
 async function tableExists(db: Database, table: LegacyIdentityTableName) {

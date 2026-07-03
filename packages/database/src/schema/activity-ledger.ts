@@ -8,7 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-import { profiles } from './profiles';
+import { person } from './identity';
 import { generateUUIDv7 } from '../utils/uuid';
 
 // MMT-ADR-0022 (activity feed = derive-on-read + thin seen-state): the table is
@@ -24,7 +24,7 @@ export const mentorActivityLedger = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     actorJob: text('actor_job').notNull(),
     kind: text('kind').notNull(),
     params: jsonb('params')

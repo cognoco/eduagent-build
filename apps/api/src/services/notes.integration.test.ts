@@ -1,15 +1,12 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   topicNotes,
   type Database,
@@ -25,6 +22,10 @@ import {
   listAllNotes,
   updateNote,
 } from './notes';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -34,24 +35,36 @@ const RUN_ID = generateUUIDv7();
 let db: Database;
 let counter = 0;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for
+// cleanup (shared across every describeIfDb block in this file).
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfile(): Promise<{ profileId: string }> {
   const idx = ++counter;
   const clerkUserId = `clerk_allnotes_${RUN_ID}_${idx}`;
   const email = `allnotes-${RUN_ID}-${idx}@test.invalid`;
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Notes Learner',
-      birthYear: 2012,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  return { profileId: profile!.id };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Notes Learner',
+    birthYear: 2012,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { profileId };
+}
+
+async function cleanupSeededProfiles(): Promise<void> {
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: seededAccountIds,
+    profileIds: seededProfileIds,
+  });
 }
 
 async function seedTopic(
@@ -110,9 +123,7 @@ describeIfDb('listAllNotes (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+    await cleanupSeededProfiles();
   });
 
   it('is profile-scoped and includes topic context', async () => {
@@ -281,9 +292,7 @@ describeIfDb('listAllNotes — cross-topic archive order (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+    await cleanupSeededProfiles();
   });
 
   it('orders notes globally by descending id, not per-topic', async () => {
@@ -326,9 +335,7 @@ describeIfDb('listAllNotes — orphaned session references (integration)', () =>
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+    await cleanupSeededProfiles();
   });
 
   it('returns notes with null sessionId without crashing', async () => {
@@ -375,9 +382,7 @@ describeIfDb('listAllNotes — pagination stability (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+    await cleanupSeededProfiles();
   });
 
   it('cursor pagination yields no duplicates and no skips across all pages', async () => {
@@ -458,9 +463,7 @@ describeIfDb('notes profile isolation (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+    await cleanupSeededProfiles();
   });
 
   it('getNote — rejects cross-profile access (NotFoundError)', async () => {

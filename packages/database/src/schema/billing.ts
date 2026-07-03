@@ -10,7 +10,7 @@ import {
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { accounts, profiles } from './profiles';
+import { person, organization, subscription } from './identity';
 import { generateUUIDv7 } from '../utils/uuid';
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
@@ -37,7 +37,7 @@ export const subscriptions = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .unique()
-      .references(() => accounts.id, { onDelete: 'cascade' }),
+      .references(() => organization.id, { onDelete: 'cascade' }),
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
     tier: subscriptionTierEnum('tier').notNull().default('free'),
@@ -100,7 +100,7 @@ export const quotaPools = pgTable(
     subscriptionId: uuid('subscription_id')
       .notNull()
       .unique()
-      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+      .references(() => subscription.id, { onDelete: 'cascade' }),
     monthlyLimit: integer('monthly_limit').notNull().default(100),
     usedThisMonth: integer('used_this_month').notNull().default(0),
     dailyLimit: integer('daily_limit'),
@@ -129,10 +129,10 @@ export const profileQuotaUsage = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     subscriptionId: uuid('subscription_id')
       .notNull()
-      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+      .references(() => subscription.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     role: text('role', { enum: ['owner', 'child'] }).notNull(),
     monthlyLimit: integer('monthly_limit').notNull(),
     usedThisMonth: integer('used_this_month').notNull().default(0),
@@ -188,10 +188,10 @@ export const usageEvents = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     subscriptionId: uuid('subscription_id')
       .notNull()
-      .references(() => subscriptions.id, { onDelete: 'cascade' }),
+      .references(() => subscription.id, { onDelete: 'cascade' }),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     occurredAt: timestamp('occurred_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -218,8 +218,8 @@ export const topUpCredits = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     subscriptionId: uuid('subscription_id')
       .notNull()
-      .references(() => subscriptions.id, { onDelete: 'cascade' }),
-    profileId: uuid('profile_id').references(() => profiles.id, {
+      .references(() => subscription.id, { onDelete: 'cascade' }),
+    profileId: uuid('profile_id').references(() => person.id, {
       onDelete: 'cascade',
     }),
     amount: integer('amount').notNull(),

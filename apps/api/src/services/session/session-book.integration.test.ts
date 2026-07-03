@@ -2,17 +2,19 @@ import { resolve } from 'path';
 import { eq } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   subjects,
   type Database,
 } from '@eduagent/database';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../../test-utils/legacy-identity-anchors';
 import { getBookSessions, markSessionFiled } from './session-book';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -30,29 +32,23 @@ describeIfDb('getBookSessions (integration)', () => {
   let ownedTopicId: string;
   let ownedSessionId: string;
   let foreignBookId: string;
+  let foreignProfileId: string;
 
   beforeAll(async () => {
     db = createDatabase(process.env.DATABASE_URL!);
 
-    const [account] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `clerk_integ_booksess_${RUN_ID}`,
-        email: `booksess_${RUN_ID}@test.invalid`,
-      })
-      .returning({ id: accounts.id });
-    accountId = account!.id;
+    accountId = generateUUIDv7();
+    profileId = generateUUIDv7();
 
-    const [profile] = await db
-      .insert(profiles)
-      .values({
-        accountId,
-        displayName: 'Book Sessions User',
-        birthYear: 2012,
-        isOwner: true,
-      })
-      .returning({ id: profiles.id });
-    profileId = profile!.id;
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId,
+      profileId,
+      clerkUserId: `clerk_integ_booksess_${RUN_ID}`,
+      email: `booksess_${RUN_ID}@test.invalid`,
+      displayName: 'Book Sessions User',
+      birthYear: 2012,
+      isOwner: true,
+    });
 
     const [subject] = await db
       .insert(subjects)
@@ -104,19 +100,20 @@ describeIfDb('getBookSessions (integration)', () => {
       .returning({ id: learningSessions.id });
     ownedSessionId = ownedSession!.id;
 
-    const [foreignProfile] = await db
-      .insert(profiles)
-      .values({
-        accountId,
-        displayName: 'Foreign Book User',
-        birthYear: 2013,
-        isOwner: false,
-      })
-      .returning({ id: profiles.id });
+    foreignProfileId = generateUUIDv7();
+    await ensureV2IdentityForLegacyProfileTest(db, {
+      accountId,
+      profileId: foreignProfileId,
+      clerkUserId: `clerk_integ_booksess_foreign_${RUN_ID}`,
+      email: `booksess_foreign_${RUN_ID}@test.invalid`,
+      displayName: 'Foreign Book User',
+      birthYear: 2013,
+      isOwner: false,
+    });
     const [foreignSubject] = await db
       .insert(subjects)
       .values({
-        profileId: foreignProfile!.id,
+        profileId: foreignProfileId,
         name: 'Private History',
         status: 'active',
         pedagogyMode: 'socratic',
@@ -158,7 +155,10 @@ describeIfDb('getBookSessions (integration)', () => {
 
   afterAll(async () => {
     if (accountId) {
-      await db.delete(accounts).where(eq(accounts.id, accountId));
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: [accountId],
+        profileIds: [profileId, foreignProfileId],
+      });
     }
   });
 

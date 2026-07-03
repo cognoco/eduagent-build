@@ -1,15 +1,12 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   createDatabase,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
   learningSessions,
-  profiles,
   sessionSummaries,
   subjects,
   topicNotes,
@@ -18,6 +15,10 @@ import {
 
 import type { LibrarySearchResult } from '@eduagent/schemas';
 import { searchLibrary } from './library-search';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -27,24 +28,28 @@ const RUN_ID = generateUUIDv7();
 let counter = 0;
 let db: Database;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfile(): Promise<{ profileId: string }> {
   const idx = ++counter;
   const clerkUserId = `clerk_libsearch_${RUN_ID}_${idx}`;
   const email = `libsearch-${RUN_ID}-${idx}@test.invalid`;
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Search Learner',
-      birthYear: 2012,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
-  return { profileId: profile!.id };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Search Learner',
+    birthYear: 2012,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { profileId };
 }
 
 async function seedLibrary(
@@ -92,9 +97,10 @@ describeIfDb('searchLibrary (integration)', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_libsearch_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   });
 
   describe('ILIKE pattern escaping (BUG-857)', () => {

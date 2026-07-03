@@ -1,15 +1,22 @@
 /**
- * Integration: profiles_conversation_language_check constraint guard [BUG-405]
+ * Integration: person_conversation_language_check constraint guard [BUG-405]
  *
- * Verifies that the DB-layer CHECK constraint on profiles.conversation_language
+ * Verifies that the DB-layer CHECK constraint on person.conversation_language
  * is correctly wired to the full 10-language set: en, cs, es, fr, de, it, pt,
  * pl, ja, nb.
  *
- * Background: Migration 0035 created the constraint with only 8 languages.
- * Migration 0061 widened it to 10. Dev DBs that push-synced between these two
- * migrations retain the stale 8-language CHECK, causing INSERT failures for any
- * profile with conversation_language IN ('ja','nb'). Migration 0087 idempotently
+ * Background: Migration 0035 created the constraint (then on legacy
+ * `profiles.conversation_language`) with only 8 languages. Migration 0061
+ * widened it to 10. Dev DBs that push-synced between these two migrations
+ * retain the stale 8-language CHECK, causing INSERT failures for any profile
+ * with conversation_language IN ('ja','nb'). Migration 0087 idempotently
  * rebuilds the constraint to recover affected DBs.
+ *
+ * [WI-1128] Legacy `profiles`/`accounts` are dropped by migration 0130. The
+ * v2 `person` table (packages/database/src/schema/identity.ts) carries a
+ * `person_conversation_language_check` constraint that mirrors the legacy
+ * one 1:1 (see the comment at that check's declaration) — this test now
+ * targets that live v2 twin instead of the dropped legacy table.
  *
  * This test is a forward-only guard: any future migration that narrows the
  * constraint will fail here before reaching CI.
@@ -18,7 +25,7 @@
  */
 
 import { sql } from 'drizzle-orm';
-import { accounts, profiles, createDatabase } from '@eduagent/database';
+import { person, createDatabase } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
@@ -49,8 +56,7 @@ function createIntegrationDb() {
 // ---------------------------------------------------------------------------
 
 const PREFIX = 'integration-bug405-lang-check';
-const TEST_EMAIL = `${PREFIX}@integration.test`;
-const TEST_CLERK = `${PREFIX}-clerk`;
+const TEST_DISPLAY_NAME = `${PREFIX}-person`;
 
 // ---------------------------------------------------------------------------
 // Cleanup
@@ -58,38 +64,18 @@ const TEST_CLERK = `${PREFIX}-clerk`;
 
 async function cleanup() {
   const db = createIntegrationDb();
-  // Delete in correct FK order: profiles → accounts
-  const accs = await db.query.accounts.findMany({
-    where: (t, { eq: _eq }) => _eq(t.email, TEST_EMAIL),
-  });
-  if (accs.length > 0) {
-    const accountIds = accs.map((a) => a.id);
-    // Profiles cascade-delete with accounts (ON DELETE CASCADE) but we delete
-    // explicitly to be safe in test isolation.
-    for (const accountId of accountIds) {
-      await db
-        .delete(profiles)
-        .where(sql`${profiles.accountId} = ${accountId}`);
-    }
-    await db.delete(accounts).where(sql`${accounts.email} = ${TEST_EMAIL}`);
-  }
+  await db
+    .delete(person)
+    .where(sql`${person.displayName} = ${TEST_DISPLAY_NAME}`);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('Integration: profiles_conversation_language_check guard [BUG-405]', () => {
-  let testAccountId: string;
-
+describe('Integration: person_conversation_language_check guard [BUG-405]', () => {
   beforeAll(async () => {
     await cleanup();
-    const db = createIntegrationDb();
-    const [account] = await db
-      .insert(accounts)
-      .values({ clerkUserId: TEST_CLERK, email: TEST_EMAIL })
-      .returning();
-    testAccountId = account!.id;
   });
 
   afterAll(async () => {
@@ -100,15 +86,15 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
   // Schema introspection
   // -------------------------------------------------------------------------
 
-  it('pg_constraint lists exactly 10 languages in profiles_conversation_language_check', async () => {
+  it('pg_constraint lists exactly 10 languages in person_conversation_language_check', async () => {
     const db = createIntegrationDb();
 
     const rows = await db.execute<{ constraintdef: string }>(
       sql`
         SELECT pg_get_constraintdef(oid) AS constraintdef
         FROM pg_constraint
-        WHERE conname = 'profiles_conversation_language_check'
-          AND conrelid = 'profiles'::regclass
+        WHERE conname = 'person_conversation_language_check'
+          AND conrelid = 'person'::regclass
       `,
     );
 
@@ -148,12 +134,11 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
     const db = createIntegrationDb();
 
     const [inserted] = await db
-      .insert(profiles)
+      .insert(person)
       .values({
-        accountId: testAccountId,
-        displayName: 'Test Learner JA',
-        birthYear: 2005,
-        isOwner: true,
+        displayName: TEST_DISPLAY_NAME,
+        birthDate: '2005-01-01',
+        residenceJurisdiction: 'EU',
         conversationLanguage: 'ja',
       })
       .returning();
@@ -162,19 +147,18 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
     expect(inserted!.conversationLanguage).toBe('ja');
 
     // Cleanup the inserted row so afterAll cleanup is simpler
-    await db.delete(profiles).where(sql`${profiles.id} = ${inserted!.id}`);
+    await db.delete(person).where(sql`${person.id} = ${inserted!.id}`);
   });
 
   it('INSERT with conversation_language = "nb" succeeds', async () => {
     const db = createIntegrationDb();
 
     const [inserted] = await db
-      .insert(profiles)
+      .insert(person)
       .values({
-        accountId: testAccountId,
-        displayName: 'Test Learner NB',
-        birthYear: 2005,
-        isOwner: true,
+        displayName: TEST_DISPLAY_NAME,
+        birthDate: '2005-01-01',
+        residenceJurisdiction: 'EU',
         conversationLanguage: 'nb',
       })
       .returning();
@@ -182,7 +166,7 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
     expect(inserted).toBeDefined();
     expect(inserted!.conversationLanguage).toBe('nb');
 
-    await db.delete(profiles).where(sql`${profiles.id} = ${inserted!.id}`);
+    await db.delete(person).where(sql`${person.id} = ${inserted!.id}`);
   });
 
   // -------------------------------------------------------------------------
@@ -203,13 +187,12 @@ describe('Integration: profiles_conversation_language_check guard [BUG-405]', ()
     const rejection = await Promise.resolve(
       db.execute(
         sql`
-          INSERT INTO profiles (id, account_id, display_name, birth_year, is_owner, conversation_language)
+          INSERT INTO person (id, display_name, birth_date, residence_jurisdiction, conversation_language)
           VALUES (
             gen_random_uuid(),
-            ${testAccountId},
             'Bad Language Test',
-            2005,
-            true,
+            '2005-01-01',
+            'EU',
             'xx'
           )
         `,

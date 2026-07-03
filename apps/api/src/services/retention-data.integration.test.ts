@@ -9,16 +9,14 @@
  */
 
 import { resolve } from 'path';
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
   createDatabase,
   createScopedRepository,
   curricula,
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
-  profiles,
   retentionCards,
   subjects,
   type Database,
@@ -27,6 +25,10 @@ import { NotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { getProfileOverdueCount, processRecallTest } from './retention-data';
 import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { _resetCircuits } from './llm';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -62,33 +64,33 @@ interface SeededProfile {
  * Seeds an account → profile → subject → curriculum → book → N topics.
  * Returns the profileId, subjectId, and ordered topicIds.
  */
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedProfileWithTopics(
   database: Database,
   label: string,
   topicCount: number,
 ): Promise<SeededProfile> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${CLERK_PREFIX}-${label}`,
-      email: `${CLERK_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Overdue Test ${label}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `Overdue Test ${label}`,
+    birthYear: 2010,
+    clerkUserId: `${CLERK_PREFIX}-${label}`,
+    email: `${CLERK_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -126,7 +128,7 @@ async function seedProfileWithTopics(
   }
 
   return {
-    profileId: profile!.id,
+    profileId,
     subjectId: subject!.id,
     topicIds,
   };
@@ -151,9 +153,12 @@ async function seedOverdueCard(
 }
 
 async function cleanupByPrefix(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${CLERK_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +281,8 @@ describe('getProfileOverdueCount SQL correctness (integration) [BUG-473]', () =>
 // ---------------------------------------------------------------------------
 
 const LEARN13_PREFIX = `integ-learn13-${RUN_ID}`;
+const learn13AccountIds: string[] = [];
+const learn13ProfileIds: string[] = [];
 
 /**
  * Seeds a minimal account → profile → subject → curriculum → book → 1 topic.
@@ -285,28 +292,24 @@ async function seedProfileWithOneTopic(
   database: Database,
   label: string,
 ): Promise<{ profileId: string; topicId: string }> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${LEARN13_PREFIX}-${label}`,
-      email: `${LEARN13_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `LEARN13 ${label}`,
-      birthYear: 2005,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `LEARN13 ${label}`,
+    birthYear: 2005,
+    clerkUserId: `${LEARN13_PREFIX}-${label}`,
+    email: `${LEARN13_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  learn13AccountIds.push(accountId);
+  learn13ProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -339,13 +342,16 @@ async function seedProfileWithOneTopic(
     })
     .returning({ id: curriculumTopics.id });
 
-  return { profileId: profile!.id, topicId: topic!.id };
+  return { profileId, topicId: topic!.id };
 }
 
 async function cleanupLearn13(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${LEARN13_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...learn13AccountIds],
+    profileIds: [...learn13ProfileIds],
+  });
+  learn13AccountIds.length = 0;
+  learn13ProfileIds.length = 0;
 }
 
 describe('processRecallTest IDOR ownership guard [LEARN-13]', () => {
@@ -392,33 +398,31 @@ describe('processRecallTest IDOR ownership guard [LEARN-13]', () => {
 // ---------------------------------------------------------------------------
 
 const WI234_PREFIX = `integ-wi234-${RUN_ID}`;
+const wi234AccountIds: string[] = [];
+const wi234ProfileIds: string[] = [];
 
 async function seedWi234ProfileTopic(
   database: Database,
   label: string,
 ): Promise<{ profileId: string; topicId: string }> {
-  const [account] = await database
-    .insert(accounts)
-    .values({
-      clerkUserId: `${WI234_PREFIX}-${label}`,
-      email: `${WI234_PREFIX}-${label}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await database
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `WI-234 ${label}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(database, {
+    accountId,
+    profileId,
+    displayName: `WI-234 ${label}`,
+    birthYear: 2010,
+    clerkUserId: `${WI234_PREFIX}-${label}`,
+    email: `${WI234_PREFIX}-${label}@test.invalid`,
+    isOwner: true,
+  });
+  wi234AccountIds.push(accountId);
+  wi234ProfileIds.push(profileId);
 
   const [subject] = await database
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: `Subject ${label}`,
       status: 'active',
       pedagogyMode: 'socratic',
@@ -451,13 +455,16 @@ async function seedWi234ProfileTopic(
     })
     .returning({ id: curriculumTopics.id });
 
-  return { profileId: profile!.id, topicId: topic!.id };
+  return { profileId, topicId: topic!.id };
 }
 
 async function cleanupWi234(database: Database): Promise<void> {
-  await database
-    .delete(accounts)
-    .where(like(accounts.clerkUserId, `${WI234_PREFIX}%`));
+  await deleteV2IdentitiesForTest(database, {
+    accountIds: [...wi234AccountIds],
+    profileIds: [...wi234ProfileIds],
+  });
+  wi234AccountIds.length = 0;
+  wi234ProfileIds.length = 0;
 }
 
 describe('processRecallTest concurrent LLM serialization [WI-234]', () => {

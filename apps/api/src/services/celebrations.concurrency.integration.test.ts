@@ -17,13 +17,12 @@
  */
 
 import { resolve } from 'path';
-import { eq, inArray } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import {
-  accounts,
   celebrationEvents,
   coachingCardCache,
   createDatabase,
-  profiles,
+  generateUUIDv7,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import type {
@@ -31,6 +30,10 @@ import type {
   CelebrationReason,
   PendingCelebration,
 } from '@eduagent/schemas';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 import {
   getPendingCelebrations,
@@ -54,43 +57,42 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-// Per-run unique suffix so concurrent runs on a shared DB cannot delete each
-// other's fixtures during cleanup().
-const PREFIX = 'integration-celebrations-race';
-const RUN_SUFFIX = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const ACCOUNT = {
-  clerkUserId: `${PREFIX}-${RUN_SUFFIX}-user`,
-  email: `${PREFIX}-${RUN_SUFFIX}@integration.test`,
-};
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedAccountAndProfile() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Celebration Race User',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
-  return { account: account!, profile: profile! };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  // [WI-1128] Key clerkUserId/email off the freshly-generated accountId —
+  // this is called once per test via beforeEach cleanup; a fixed string
+  // (even with a per-run suffix) collides with legacy `accounts` unique
+  // columns across calls within the same run (the onConflictDoNothing
+  // silently no-ops, leaving profiles.account_id FK dangling for the
+  // fresh accountId).
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Celebration Race User',
+    birthYear: 2000,
+    clerkUserId: `integration-celebrations-race-${accountId}`,
+    email: `integration-celebrations-race-${accountId}@integration.test`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
+  return { account: { id: accountId }, profile: { id: profileId } };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db
-    .select({ id: accounts.id })
-    .from(accounts)
-    .where(eq(accounts.email, ACCOUNT.email));
-  const ids = found.map((a) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
+  });
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 async function readPending(

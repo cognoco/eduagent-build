@@ -1,8 +1,6 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
-  accounts,
   challengeRoundCooldowns,
   createDatabase,
   curricula,
@@ -14,72 +12,62 @@ import {
   membership,
   organization,
   person,
-  profiles,
   retentionCards,
   sessionEvents,
   subjects,
   type Database,
 } from '@eduagent/database';
+import { deleteV2IdentitiesForTest } from '../../test-utils/legacy-identity-anchors';
 import { prepareExchangeContext } from './session-exchange';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
 const hasDatabaseUrl = !!process.env.DATABASE_URL;
 const describeIfDb = hasDatabaseUrl ? describe : describe.skip;
-const RUN_ID = generateUUIDv7();
 
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded ids for v2 cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfileWithSubject(
   db: Database,
   subjectName: string,
 ): Promise<{ profileId: string; subjectId: string }> {
   const idx = ++seedCounter;
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `clerk_wi80_exchange_${RUN_ID}_${idx}`,
-      email: `wi80-exchange-${RUN_ID}-${idx}@test.invalid`,
-    })
-    .returning({ id: accounts.id });
-
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `WI-80 Learner ${idx}`,
-      birthYear: 2011,
-      isOwner: true,
-    })
-    .returning({ id: profiles.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
 
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
   await db
     .insert(organization)
-    .values({ id: account!.id, name: `WI-80 Org ${idx}` });
+    .values({ id: accountId, name: `WI-80 Org ${idx}` });
   await db.insert(person).values({
-    id: profile!.id,
+    id: profileId,
     displayName: `WI-80 Learner ${idx}`,
     birthDate: '2011-06-15',
     residenceJurisdiction: 'US',
   });
   await db.insert(membership).values({
-    personId: profile!.id,
-    organizationId: account!.id,
+    personId: profileId,
+    organizationId: accountId,
     roles: ['admin', 'learner'],
   });
+
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
   const [subject] = await db
     .insert(subjects)
     .values({
-      profileId: profile!.id,
+      profileId,
       name: subjectName,
       status: 'active',
       pedagogyMode: 'socratic',
     })
     .returning({ id: subjects.id });
 
-  return { profileId: profile!.id, subjectId: subject!.id };
+  return { profileId, subjectId: subject!.id };
 }
 
 async function seedTopic(
@@ -211,9 +199,10 @@ describeIfDb('prepareExchangeContext WI-80 ownership hardening', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `clerk_wi80_exchange_${RUN_ID}%`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: seededAccountIds,
+      profileIds: seededProfileIds,
+    });
   });
 
   it('[WI-80] suppresses current-topic prompt metadata when a stale session topic belongs to another profile', async () => {

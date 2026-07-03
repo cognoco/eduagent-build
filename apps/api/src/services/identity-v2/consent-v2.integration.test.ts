@@ -30,6 +30,7 @@ import {
   guardianship,
   login,
   membership,
+  nudges,
   organization,
   person,
   subscription,
@@ -37,12 +38,16 @@ import {
 } from '@eduagent/database';
 import {
   ConsentNotAuthorizedError,
+  ConsentRecipientChangeLimitError,
   ConsentRecordNotFoundError,
+  ConsentRequestNotFoundError,
+  ConsentResendLimitError,
   createDirectConsentGrant,
   createPendingConsentRequest,
   getOrgMemberDisplayNameV2,
   processConsentResponseV2,
   requestConsentV2,
+  resendConsentV2,
   restoreConsentByToken,
   restoreConsentV2,
   revokeConsentV2,
@@ -599,6 +604,454 @@ const COPPA = 'coppa_parental_consent';
           where: eq(consentGrant.chargePersonId, childId),
         });
         expect(grants).toHaveLength(0);
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1128] nudge-suppression on revoke, ported from the legacy
+    // consent.integration.test.ts revokeConsent coverage (services/consent.ts
+    // is being retired; stampWithdrawal in consent-v2.ts is the live
+    // equivalent — see the "Clears the child's unread nudges, as legacy"
+    // doc comment there). This twin previously had zero nudge tests.
+    // -------------------------------------------------------------------------
+    describe('nudge suppression on revoke (via revokeConsentV2 → stampWithdrawal)', () => {
+      async function seedGuardianChildWithNudges(
+        nudgeCount: number,
+      ): Promise<{ orgId: string; guardianId: string; childId: string }> {
+        const orgId = await seedOrg();
+        const guardianId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Parent',
+        });
+        const childId = await seedPerson(orgId);
+        await seedGuardianEdge(guardianId, childId);
+        await createDirectConsentGrant(db, childId, orgId, 'GDPR', guardianId);
+        for (let i = 0; i < nudgeCount; i++) {
+          await db.insert(nudges).values({
+            fromProfileId: guardianId,
+            toProfileId: childId,
+            template: 'you_got_this',
+          });
+        }
+        return { orgId, guardianId, childId };
+      }
+
+      it('marks all unread nudges readAt when consent is revoked', async () => {
+        const { orgId, guardianId, childId } =
+          await seedGuardianChildWithNudges(3);
+
+        const result = await revokeConsentV2(
+          db,
+          childId,
+          guardianId,
+          orgId,
+          'GDPR',
+        );
+
+        const rows = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        expect(rows).toHaveLength(3);
+        for (const row of rows) {
+          expect(row.readAt).not.toBeNull();
+          expect(
+            Math.abs(row.readAt!.getTime() - result.withdrawnAt.getTime()),
+          ).toBeLessThan(1000);
+        }
+      });
+
+      it('second revokeConsentV2 call does NOT update already-read nudges', async () => {
+        const { orgId, guardianId, childId } =
+          await seedGuardianChildWithNudges(2);
+
+        await revokeConsentV2(db, childId, guardianId, orgId, 'GDPR');
+        const afterFirst = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        const firstReadAts = afterFirst.map((r) => r.readAt!.getTime());
+
+        await revokeConsentV2(db, childId, guardianId, orgId, 'GDPR');
+        const afterSecond = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        const secondReadAts = afterSecond.map((r) => r.readAt!.getTime());
+
+        expect(secondReadAts).toEqual(firstReadAts);
+      });
+
+      it('only marks the targeted child nudges read — sibling nudges stay unread', async () => {
+        const { orgId, guardianId, childId } =
+          await seedGuardianChildWithNudges(2);
+        const siblingId = await seedPerson(orgId, { displayName: 'Sibling' });
+        await seedGuardianEdge(guardianId, siblingId);
+        await createDirectConsentGrant(
+          db,
+          siblingId,
+          orgId,
+          'GDPR',
+          guardianId,
+        );
+        await db.insert(nudges).values({
+          fromProfileId: guardianId,
+          toProfileId: siblingId,
+          template: 'proud_of_you',
+        });
+
+        await revokeConsentV2(db, childId, guardianId, orgId, 'GDPR');
+
+        const childNudges = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        for (const row of childNudges) {
+          expect(row.readAt).not.toBeNull();
+        }
+
+        const siblingNudges = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, siblingId),
+        });
+        expect(siblingNudges.length).toBeGreaterThan(0);
+        for (const row of siblingNudges) {
+          expect(row.readAt).toBeNull();
+        }
+      });
+
+      it('does NOT touch nudges when the grant is already withdrawn (stampWithdrawal early-return guard)', async () => {
+        const { orgId, guardianId, childId } =
+          await seedGuardianChildWithNudges(1);
+
+        // Stamp the grant withdrawn directly (bypassing stampWithdrawal), so
+        // the subsequent revokeConsentV2 call must hit the early-return
+        // branch and never reach the nudges UPDATE.
+        await db
+          .update(consentGrant)
+          .set({ withdrawnAt: new Date(), priorValue: true })
+          .where(eq(consentGrant.chargePersonId, childId));
+
+        const before = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        expect(before[0]!.readAt).toBeNull();
+
+        const result = await revokeConsentV2(
+          db,
+          childId,
+          guardianId,
+          orgId,
+          'GDPR',
+        );
+        expect(result.withdrawnAt).toBeTruthy();
+
+        const after = await db.query.nudges.findMany({
+          where: eq(nudges.toProfileId, childId),
+        });
+        expect(after[0]!.readAt).toBeNull();
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // [WI-1128, port of WI-374] Resend/recipient-rotation caps are request-keyed,
+    // ported from the legacy consent.integration.test.ts WI-374 break tests.
+    // requestConsentV2/resendConsentV2 carry the SAME MAX_CONSENT_RESENDS /
+    // MAX_RECIPIENT_CHANGES caps and error classes 1:1 from legacy (imported
+    // from ../consent, not reimplemented). No emailOptions is passed, so
+    // sendEmail degrades to {sent:false, reason:'no_api_key'} and the request
+    // row persists — the cap logic is driven purely by DB state.
+    // -------------------------------------------------------------------------
+    describe('[WI-374] request-keyed resend + capped recipient change (v2)', () => {
+      it('resend is capped per request and reuses the stored email (never changes the recipient)', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'real-parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+
+        // MAX_CONSENT_RESENDS (consent-v2.ts:110) resends succeed; each reuses
+        // the stored email.
+        for (let i = 0; i < 3; i++) {
+          await resendConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+        }
+
+        // The 4th resend exceeds the cap.
+        await expect(
+          resendConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentResendLimitError);
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.guardianEmail).toBe('real-parent@example.com');
+        expect(row!.resendCount).toBe(3);
+        expect(row!.recipientChangeCount).toBe(0);
+      });
+
+      it('[BREAK] rotating the recipient is bounded by MAX_RECIPIENT_CHANGES — rotation cannot reset the resend cap indefinitely', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'a@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+
+        for (const email of [
+          'b@example.com',
+          'c@example.com',
+          'd@example.com',
+        ]) {
+          await requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: email,
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+        }
+
+        await expect(
+          requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'e@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentRecipientChangeLimitError);
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        // Recipient stuck at the last accepted change (D); E was rejected.
+        expect(row!.guardianEmail).toBe('d@example.com');
+        expect(row!.recipientChangeCount).toBe(3);
+      });
+
+      it('[CodeRabbit break] a resend does NOT revive a terminal approved request (no consent-state corruption)', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        // Seed an already-decided (approved) request with budget remaining.
+        await db.insert(consentRequest).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          requestedBasis: GDPR,
+          status: 'approved',
+          guardianEmail: 'granted@example.com',
+          resendCount: 0,
+          recipientChangeCount: 0,
+        });
+
+        await expect(
+          resendConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.status).toBe('approved');
+        expect(row!.resendCount).toBe(0);
+      });
+
+      it('[BUG-791 break] requestConsentV2 CANNOT revive a terminal approved request with a null guardianEmail', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        // A parent-created (direct-grant) child: the request row (if any) never
+        // got a guardianEmail. Mirrors legacy's "CONSENTED inline with no
+        // parentEmail on record" scenario.
+        await db.insert(consentRequest).values({
+          chargePersonId: childId,
+          organizationId: orgId,
+          purpose: PURPOSE,
+          requestedBasis: GDPR,
+          status: 'approved',
+          guardianEmail: null,
+          resendCount: 0,
+          recipientChangeCount: 0,
+        });
+
+        await expect(
+          requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'attacker@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.status).toBe('approved');
+        expect(row!.guardianEmail).toBeNull();
+      });
+
+      it('[BUG-791 break] requestConsentV2 CANNOT revive a request after a real approve + revoke (terminal request row is immutable)', async () => {
+        const orgId = await seedOrg();
+        const guardianId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Parent',
+        });
+        const childId = await seedPerson(orgId);
+        await seedGuardianEdge(guardianId, childId);
+        await createPendingConsentRequest(db, childId, orgId, 'GDPR');
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'former-parent@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const req = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        await processConsentResponseV2(db, req!.token!, true);
+        // Revoke the resulting grant — the request row stays 'approved'
+        // (withdrawal only touches consent_grant, never consent_request).
+        await revokeConsentV2(db, childId, guardianId, orgId, 'GDPR');
+
+        await expect(
+          requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'attacker@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentRequestNotFoundError);
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.status).toBe('approved');
+        expect(row!.guardianEmail).toBe('former-parent@example.com');
+      });
+
+      it('the first real email after a pending (null-recipient) row is the initial request, not a recipient change', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+        // Self-register flow seeds a PENDING row with no recipient yet.
+        await createPendingConsentRequest(db, childId, orgId, 'GDPR');
+
+        // First real send assigns the recipient — must NOT burn a change slot.
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'first@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.guardianEmail).toBe('first@example.com');
+        expect(row!.recipientChangeCount).toBe(0);
+
+        // The full MAX_RECIPIENT_CHANGES budget (3) is still available afterwards.
+        for (const email of [
+          'b@example.com',
+          'c@example.com',
+          'd@example.com',
+        ]) {
+          await requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: email,
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          });
+        }
+        await expect(
+          requestConsentV2(db, {
+            chargePersonId: childId,
+            organizationId: orgId,
+            consentType: 'GDPR',
+            guardianEmail: 'e@example.com',
+            childName: 'Kid',
+            appUrl: 'https://api.test',
+          }),
+        ).rejects.toBeInstanceOf(ConsentRecipientChangeLimitError);
+      });
+
+      it('a single legitimate "wrong email" correction still works (AC3)', async () => {
+        const orgId = await seedOrg();
+        const childId = await seedPerson(orgId);
+
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'typo@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+
+        // Correct the typo once — allowed, and the corrected address gets a
+        // fresh resend budget.
+        await requestConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          guardianEmail: 'correct@example.com',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+
+        const row = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(row!.guardianEmail).toBe('correct@example.com');
+        expect(row!.recipientChangeCount).toBe(1);
+        expect(row!.resendCount).toBe(0);
+
+        // And the corrected address can still be resent to.
+        await resendConsentV2(db, {
+          chargePersonId: childId,
+          organizationId: orgId,
+          consentType: 'GDPR',
+          childName: 'Kid',
+          appUrl: 'https://api.test',
+        });
+        const after = await db.query.consentRequest.findFirst({
+          where: eq(consentRequest.chargePersonId, childId),
+        });
+        expect(after!.guardianEmail).toBe('correct@example.com');
+        expect(after!.resendCount).toBe(1);
       });
     });
 
@@ -1315,6 +1768,50 @@ const COPPA = 'coppa_parental_consent';
         });
         expect(personRow).toBeTruthy();
         expect(personRow?.archivedAt).toBeNull();
+      });
+
+      // -----------------------------------------------------------------------
+      // [WI-1128, D3] deleteArchivedPersonIfStillEligibleV2 — the SECOND
+      // eligibility predicate (an archived person with a LIVE, un-withdrawn
+      // consent grant is not deleted), distinct from the "archived variant"
+      // test above (which exercises the FIRST predicate — archivedAt cleared
+      // by a full restore). Ported from the retired
+      // deletion.integration.test.ts's "does NOT delete when only the
+      // consent state was restored (archivedAt still set)".
+      // -----------------------------------------------------------------------
+      it('[D3] does NOT delete an archived person whose consent grant is live (archivedAt still set)', async () => {
+        const orgId = await seedOrg();
+        const guardianId = await seedPerson(orgId, {
+          roles: ['admin', 'learner'],
+          displayName: 'Parent',
+        });
+        const childId = await seedPerson(orgId);
+        await seedGuardianEdge(guardianId, childId);
+        await createDirectConsentGrant(db, childId, orgId, 'GDPR', guardianId);
+
+        // Archive the child, past the retention cutoff — archivedAt alone
+        // would make this eligible, but the live (un-withdrawn) grant must
+        // block it.
+        const archivedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+        await db
+          .update(person)
+          .set({ archivedAt })
+          .where(eq(person.id, childId));
+        const retentionCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+        const deleted = await deleteArchivedPersonIfStillEligibleV2(
+          db,
+          childId,
+          retentionCutoff,
+        );
+
+        expect(deleted).toBe(false);
+        const personRow = await db.query.person.findFirst({
+          where: eq(person.id, childId),
+          columns: { id: true, archivedAt: true },
+        });
+        expect(personRow).toBeTruthy();
+        expect(personRow?.archivedAt).not.toBeNull();
       });
     });
 

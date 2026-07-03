@@ -9,7 +9,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
 import { numericAsNumber } from './_numeric-as-number';
-import { profiles } from './profiles';
+import { person } from './identity';
 import { quizActivityTypeEnum } from './quiz';
 
 export const quizMasteryItems = pgTable(
@@ -20,7 +20,7 @@ export const quizMasteryItems = pgTable(
       .$defaultFn(() => generateUUIDv7()),
     profileId: uuid('profile_id')
       .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
+      .references(() => person.id, { onDelete: 'cascade' }),
     activityType: quizActivityTypeEnum('activity_type').notNull(),
     itemKey: text('item_key').notNull(),
     itemAnswer: text('item_answer').notNull(),

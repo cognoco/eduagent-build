@@ -10,8 +10,6 @@ import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { createDatabase } from '@eduagent/database';
 import {
-  accounts,
-  profiles,
   subjects,
   curricula,
   curriculumBooks,
@@ -20,7 +18,10 @@ import {
   generateUUIDv7,
   type Database,
 } from '@eduagent/database';
-import { like } from 'drizzle-orm';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { registerProvider, unregisterProvider } from './llm';
 import { createMockProvider } from './llm/test-utils';
 import { generateRecallBridge } from './recall-bridge';
@@ -65,27 +66,30 @@ const RUN_ID = generateUUIDv7();
 
 let db: Database;
 let seedCounter = 0;
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 async function seedProfile() {
   const idx = ++seedCounter;
   const clerkUserId = `clerk_integ_recall_${RUN_ID}_${idx}`;
   const email = `integ-recall-${RUN_ID}-${idx}@test.invalid`;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning({ id: accounts.id });
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: 'Recall Bridge Test Learner',
+    birthYear: new Date().getFullYear() - 15,
+    clerkUserId,
+    email,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Recall Bridge Test Learner',
-      birthYear: new Date().getFullYear() - 15,
-    })
-    .returning({ id: profiles.id });
-
-  return { accountId: account!.id, profileId: profile!.id };
+  return { accountId, profileId };
 }
 
 async function seedSubject(profileId: string) {
@@ -169,12 +173,13 @@ describe('generateRecallBridge (integration)', () => {
 
   afterAll(async () => {
     // Clean up all test data seeded during this run.
-    // Foreign key cascades handle child records (sessions, topics, etc.)
-    // when we delete accounts. We delete by the unique clerk_user_id prefix.
     if (db) {
-      await db
-        .delete(accounts)
-        .where(like(accounts.clerkUserId, `clerk_integ_recall_${RUN_ID}%`));
+      await deleteV2IdentitiesForTest(db, {
+        accountIds: [...seededAccountIds],
+        profileIds: [...seededProfileIds],
+      });
+      seededAccountIds.length = 0;
+      seededProfileIds.length = 0;
     }
 
     unregisterProvider('gemini');

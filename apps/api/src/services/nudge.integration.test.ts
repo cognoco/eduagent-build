@@ -19,11 +19,8 @@ import { resolve } from 'path';
 
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import {
-  accounts,
   consentGrant,
-  consentStates,
   createDatabase,
-  familyLinks,
   generateUUIDv7,
   guardianship,
   membership,
@@ -31,7 +28,6 @@ import {
   notificationPreferences,
   organization,
   person,
-  profiles,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -70,6 +66,9 @@ const RUN_ID = generateUUIDv7();
 
 let db: Database;
 
+let orgAId: string;
+let orgBId: string;
+let orgChildId: string;
 let parentAProfileId: string;
 let parentBProfileId: string;
 let childXProfileId: string;
@@ -96,11 +95,20 @@ async function seedNudgeRow(
   return row!.id;
 }
 
-async function seedConsent(childProfileId: string): Promise<void> {
-  await db.insert(consentStates).values({
-    profileId: childProfileId,
-    consentType: 'GDPR',
-    status: 'CONSENTED',
+// [WI-1128] Legacy `consent_states` is dropped; createNudge's consent gate
+// (isGdprProcessingAllowedV2) is unconditional v2, so seed a v2 consentGrant
+// row directly instead of the legacy consent_states row.
+async function seedConsent(
+  childProfileId: string,
+  organizationId: string,
+): Promise<void> {
+  await db.insert(consentGrant).values({
+    chargePersonId: childProfileId,
+    organizationId,
+    purpose: 'platform_use',
+    lawfulBasis: 'gdpr_parental_consent',
+    granted: true,
+    grantedAt: new Date(),
   });
 }
 
@@ -112,27 +120,43 @@ async function seedPushToken(profileId: string): Promise<void> {
   });
 }
 
-async function seedFamilyLink(
-  parentProfileId: string,
-  childProfileId: string,
-): Promise<void> {
-  await db.insert(familyLinks).values({ parentProfileId, childProfileId });
-}
-
 // ---------------------------------------------------------------------------
 // Teardown
 // ---------------------------------------------------------------------------
 
 async function cleanup(): Promise<void> {
-  await db
-    .delete(accounts)
-    .where(
-      inArray(accounts.clerkUserId, [
-        `nudge-integ-${RUN_ID}-parentA`,
-        `nudge-integ-${RUN_ID}-parentB`,
-        `nudge-integ-${RUN_ID}-child`,
-      ]),
-    );
+  const profileIds = [
+    parentAProfileId,
+    parentBProfileId,
+    childXProfileId,
+    childYProfileId,
+  ].filter((id): id is string => !!id);
+  const orgIds = [orgAId, orgBId, orgChildId].filter(
+    (id): id is string => !!id,
+  );
+  if (profileIds.length === 0 && orgIds.length === 0) return;
+
+  // FK-safe order: edges/leaves before person/organization.
+  if (profileIds.length > 0) {
+    await db.delete(nudges).where(inArray(nudges.toProfileId, profileIds));
+    await db
+      .delete(notificationPreferences)
+      .where(inArray(notificationPreferences.profileId, profileIds));
+    await db
+      .delete(consentGrant)
+      .where(inArray(consentGrant.chargePersonId, profileIds));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.guardianPersonId, profileIds));
+    await db
+      .delete(guardianship)
+      .where(inArray(guardianship.chargePersonId, profileIds));
+    await db.delete(membership).where(inArray(membership.personId, profileIds));
+    await db.delete(person).where(inArray(person.id, profileIds));
+  }
+  if (orgIds.length > 0) {
+    await db.delete(organization).where(inArray(organization.id, orgIds));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -145,88 +169,21 @@ describeIfDb('nudge service (integration)', () => {
     mockExpoPush();
     db = createDatabase(process.env.DATABASE_URL!);
 
-    const [accA] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `nudge-integ-${RUN_ID}-parentA`,
-        email: `nudge-integ-${RUN_ID}-parentA@test.invalid`,
-      })
-      .returning({ id: accounts.id });
+    orgAId = generateUUIDv7();
+    orgBId = generateUUIDv7();
+    orgChildId = generateUUIDv7();
+    parentAProfileId = generateUUIDv7();
+    parentBProfileId = generateUUIDv7();
+    childXProfileId = generateUUIDv7();
+    childYProfileId = generateUUIDv7();
 
-    const [accB] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `nudge-integ-${RUN_ID}-parentB`,
-        email: `nudge-integ-${RUN_ID}-parentB@test.invalid`,
-      })
-      .returning({ id: accounts.id });
-
-    const [accChild] = await db
-      .insert(accounts)
-      .values({
-        clerkUserId: `nudge-integ-${RUN_ID}-child`,
-        email: `nudge-integ-${RUN_ID}-child@test.invalid`,
-      })
-      .returning({ id: accounts.id });
-
-    const [parentA] = await db
-      .insert(profiles)
-      .values({
-        accountId: accA!.id,
-        displayName: 'Parent A',
-        birthYear: 1980,
-        isOwner: true,
-      })
-      .returning({ id: profiles.id });
-    parentAProfileId = parentA!.id;
-
-    const [parentB] = await db
-      .insert(profiles)
-      .values({
-        accountId: accB!.id,
-        displayName: 'Parent B',
-        birthYear: 1982,
-        isOwner: true,
-      })
-      .returning({ id: profiles.id });
-    parentBProfileId = parentB!.id;
-
-    const [childX] = await db
-      .insert(profiles)
-      .values({
-        accountId: accChild!.id,
-        displayName: 'Child X',
-        birthYear: 2013,
-        isOwner: false,
-      })
-      .returning({ id: profiles.id });
-    childXProfileId = childX!.id;
-
-    const [childY] = await db
-      .insert(profiles)
-      .values({
-        accountId: accChild!.id,
-        displayName: 'Child Y',
-        birthYear: 2015,
-        isOwner: false,
-      })
-      .returning({ id: profiles.id });
-    childYProfileId = childY!.id;
-
-    await seedFamilyLink(parentAProfileId, childXProfileId);
-    await seedFamilyLink(parentBProfileId, childXProfileId);
-    await seedFamilyLink(parentAProfileId, childYProfileId);
-
-    await seedConsent(childXProfileId);
-    await seedConsent(childYProfileId);
-    await seedPushToken(childXProfileId);
-
-    // [WI-867] v2 identity rows — assertParentAccess now reads guardianship
-    // (flag collapsed to v2-only). Mirror the familyLinks seeded above.
+    // [WI-1128] Legacy `accounts`/`profiles`/`family_links`/`consent_states`
+    // are dropped (0130_m_drop.sql) — this is now a pure v2 seed
+    // (organization/person/membership/guardianship/consent_grant).
     await db.insert(organization).values([
-      { id: accA!.id, name: 'Nudge Test Org A' },
-      { id: accB!.id, name: 'Nudge Test Org B' },
-      { id: accChild!.id, name: 'Nudge Test Org Child' },
+      { id: orgAId, name: 'Nudge Test Org A' },
+      { id: orgBId, name: 'Nudge Test Org B' },
+      { id: orgChildId, name: 'Nudge Test Org Child' },
     ]);
     await db.insert(person).values([
       {
@@ -257,22 +214,22 @@ describeIfDb('nudge service (integration)', () => {
     await db.insert(membership).values([
       {
         personId: parentAProfileId,
-        organizationId: accA!.id,
+        organizationId: orgAId,
         roles: ['admin', 'learner'],
       },
       {
         personId: parentBProfileId,
-        organizationId: accB!.id,
+        organizationId: orgBId,
         roles: ['admin', 'learner'],
       },
       {
         personId: childXProfileId,
-        organizationId: accChild!.id,
+        organizationId: orgChildId,
         roles: ['learner'],
       },
       {
         personId: childYProfileId,
-        organizationId: accChild!.id,
+        organizationId: orgChildId,
         roles: ['learner'],
       },
     ]);
@@ -281,6 +238,10 @@ describeIfDb('nudge service (integration)', () => {
       { guardianPersonId: parentBProfileId, chargePersonId: childXProfileId },
       { guardianPersonId: parentAProfileId, chargePersonId: childYProfileId },
     ]);
+
+    await seedConsent(childXProfileId, orgChildId);
+    await seedConsent(childYProfileId, orgChildId);
+    await seedPushToken(childXProfileId);
   });
 
   afterAll(async () => {

@@ -2,11 +2,11 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import {
   createDatabase,
-  accounts,
-  profiles,
+  generateUUIDv7,
   supportMessages,
 } from '@eduagent/database';
 import { eq, and } from 'drizzle-orm';
+import { ensureV2IdentityForLegacyProfileTest } from '../../test-utils/legacy-identity-anchors';
 import { recordOutboxSpillover, type OutboxSpilloverEntry } from './spillover';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -23,23 +23,18 @@ function createIntegrationDb() {
 
 async function seedProfile(suffix = '') {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: `integ-spill-${suffix}-${Date.now()}`,
-      email: `spill-${suffix}-${Date.now()}@test.local`,
-    })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Spillover Test ${suffix}`,
-      birthYear: 2010,
-      isOwner: true,
-    })
-    .returning();
-  return { db, profile: profile! };
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: `Spillover Test ${suffix}`,
+    birthYear: 2010,
+    clerkUserId: `integ-spill-${suffix}-${Date.now()}`,
+    email: `spill-${suffix}-${Date.now()}@test.local`,
+    isOwner: true,
+  });
+  return { db, profile: { id: profileId } };
 }
 
 function makeEntry(

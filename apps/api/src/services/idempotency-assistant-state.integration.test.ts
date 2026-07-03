@@ -2,16 +2,17 @@ import { resolve } from 'path';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   createDatabase,
-  accounts,
-  profiles,
   subjects,
   learningSessions,
   sessionEvents,
   generateUUIDv7,
 } from '@eduagent/database';
-import { like } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import { lookupAssistantTurnState } from './idempotency-assistant-state';
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -19,25 +20,29 @@ const RUN_ID = generateUUIDv7();
 
 let db: Database;
 
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
+
 async function seedAccountAndProfile(suffix = '') {
   const clerkUserId = `integ-idem-${suffix}-${RUN_ID}`;
   const email = `idem-${suffix}-${RUN_ID}@test.local`;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId, email })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: `Idem Test ${suffix}`,
+    birthYear: 2010,
+    clerkUserId,
+    email,
+    isOwner: false,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Idem Test ${suffix}`,
-      birthYear: 2010,
-    })
-    .returning();
-
-  return { account: account!, profile: profile! };
+  return { profile: { id: profileId } };
 }
 
 async function seedSubject(profileId: string) {
@@ -64,9 +69,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (db) {
-    await db
-      .delete(accounts)
-      .where(like(accounts.clerkUserId, `integ-idem-%-${RUN_ID}`));
+    await deleteV2IdentitiesForTest(db, {
+      accountIds: [...seededAccountIds],
+      profileIds: [...seededProfileIds],
+    });
+    seededAccountIds.length = 0;
+    seededProfileIds.length = 0;
   }
 });
 

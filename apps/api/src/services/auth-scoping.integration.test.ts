@@ -8,19 +8,22 @@
  * bug fixed in commit a75ef375.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
   subjects,
   learningSessions,
   vocabulary,
   createDatabase,
+  generateUUIDv7,
 } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
+import {
+  deleteV2IdentitiesForTest,
+  ensureV2IdentityForLegacyProfileTest,
+} from '../test-utils/legacy-identity-anchors';
 import { deleteVocabulary } from './vocabulary';
 
 // ---------------------------------------------------------------------------
@@ -33,7 +36,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -43,18 +46,9 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-// ---------------------------------------------------------------------------
-// Test account identifiers — unique prefix prevents collisions
-// ---------------------------------------------------------------------------
-
-const PREFIX = 'integration-auth-scope';
-const ACCOUNTS = [
-  { clerkUserId: `${PREFIX}-a1`, email: `${PREFIX}-a1@integration.test` },
-  { clerkUserId: `${PREFIX}-b1`, email: `${PREFIX}-b1@integration.test` },
-];
-
-const ALL_EMAILS = ACCOUNTS.map((a) => a.email);
-const ALL_CLERK_IDS = ACCOUNTS.map((a) => a.clerkUserId);
+// [WI-1128] Legacy `accounts`/`profiles` dropped — track seeded v2 ids for cleanup.
+const seededAccountIds: string[] = [];
+const seededProfileIds: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -62,24 +56,32 @@ const ALL_CLERK_IDS = ACCOUNTS.map((a) => a.clerkUserId);
 
 async function seedAccountAndProfile(index: number) {
   const db = createIntegrationDb();
-  const acc = ACCOUNTS[index]!;
 
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: acc.clerkUserId, email: acc.email })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
+  // [WI-1128] Key clerkUserId/email off the freshly-generated accountId
+  // rather than a fixed per-index string. This function is called
+  // repeatedly (once per test, per beforeEach cleanup cycle) with the
+  // same `index`; legacy `accounts` has unique clerkUserId/email columns,
+  // so a fixed-string collision across calls silently no-ops the legacy
+  // insert (onConflictDoNothing), leaving the fresh profiles.account_id
+  // FK dangling. Per-call uniqueness avoids the collision.
+  await ensureV2IdentityForLegacyProfileTest(db, {
+    accountId,
+    profileId,
+    displayName: `Test Profile ${index}`,
+    birthYear: 2000,
+    clerkUserId: `integration-auth-scope-${accountId}`,
+    email: `integration-auth-scope-${accountId}@integration.test`,
+    isOwner: true,
+  });
+  seededAccountIds.push(accountId);
+  seededProfileIds.push(profileId);
 
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: `Test Profile ${index}`,
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
-
-  return { account: account!, profile: profile! };
+  return {
+    account: { id: accountId },
+    profile: { id: profileId },
+  };
 }
 
 async function seedSubject(profileId: string, name: string) {
@@ -116,7 +118,7 @@ async function seedSession(profileId: string, subjectId: string) {
 async function seedVocabularyItem(
   profileId: string,
   subjectId: string,
-  term: string
+  term: string,
 ) {
   const db = createIntegrationDb();
   const [item] = await db
@@ -135,17 +137,12 @@ async function seedVocabularyItem(
 
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
-  const byEmail = await db.query.accounts.findMany({
-    where: inArray(accounts.email, ALL_EMAILS),
+  await deleteV2IdentitiesForTest(db, {
+    accountIds: [...seededAccountIds],
+    profileIds: [...seededProfileIds],
   });
-  const byClerk = await db.query.accounts.findMany({
-    where: inArray(accounts.clerkUserId, ALL_CLERK_IDS),
-  });
-  const ids = [...new Set([...byEmail, ...byClerk].map((r) => r.id))];
-
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  seededAccountIds.length = 0;
+  seededProfileIds.length = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +231,7 @@ describe('Profile data scoping (integration)', () => {
     const vocabY = await seedVocabularyItem(
       profileA.id,
       subjectY.id,
-      'bonjour'
+      'bonjour',
     );
 
     // Delete vocab item from subject X — should NOT affect subject Y's vocab
@@ -242,7 +239,7 @@ describe('Profile data scoping (integration)', () => {
       createIntegrationDb(),
       profileA.id,
       subjectX.id,
-      vocabX.id
+      vocabX.id,
     );
 
     expect(deleted).toBe(true);
@@ -253,7 +250,7 @@ describe('Profile data scoping (integration)', () => {
       where: and(
         eq(vocabulary.id, vocabY.id),
         eq(vocabulary.profileId, profileA.id),
-        eq(vocabulary.subjectId, subjectY.id)
+        eq(vocabulary.subjectId, subjectY.id),
       ),
     });
 
@@ -265,7 +262,7 @@ describe('Profile data scoping (integration)', () => {
       createIntegrationDb(),
       profileA.id,
       subjectX.id,
-      vocabY.id
+      vocabY.id,
     );
 
     expect(crossDeleteResult).toBe(false);
