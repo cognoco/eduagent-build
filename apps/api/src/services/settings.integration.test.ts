@@ -19,6 +19,7 @@
 import { eq, inArray, and, count, gte } from 'drizzle-orm';
 import {
   guardianship,
+  organization,
   person,
   login,
   membership,
@@ -368,6 +369,35 @@ async function seedCelebrationFixture() {
     guardianPersonId: profileAId,
     chargePersonId: childProfileId,
   });
+
+  // v2 `login` + `membership` rows for both parents — required for
+  // cleanupCelebration's login-table lookup (findSeededIdsByEmail) to find
+  // this fixture's rows on a later beforeEach/afterAll: it resolves
+  // profileIds via login.email, then accountIds via membership.personId.
+  // Without membership, accountIds always resolves empty, cleanup silently
+  // no-ops, and the fixed clerkUserId/email constants collide with stale
+  // rows across runs (this exact FK-violation bug, verified via the
+  // AC2 tables-present corpus run).
+  await db.insert(organization).values([
+    { id: accountAId, name: 'Celebration Family A' },
+    { id: accountBId, name: 'Celebration Family B' },
+  ]);
+  await db.insert(login).values([
+    {
+      personId: profileAId,
+      clerkUserId: CELEB_PARENT_A.clerkUserId,
+      email: CELEB_PARENT_A.email,
+    },
+    {
+      personId: profileBId,
+      clerkUserId: CELEB_PARENT_B.clerkUserId,
+      email: CELEB_PARENT_B.email,
+    },
+  ]);
+  await db.insert(membership).values([
+    { personId: profileAId, organizationId: accountAId, roles: ['admin'] },
+    { personId: profileBId, organizationId: accountBId, roles: ['admin'] },
+  ]);
 
   return {
     parentA: { id: profileAId },
