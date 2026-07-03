@@ -15,6 +15,7 @@ import type { AgeBracket, ConversationLanguage } from '@eduagent/schemas';
 import { SafetyFilterError } from '../../errors';
 import type { LLMTier } from '../subscription';
 import { createLogger } from '../logger';
+import { captureMessage } from '../sentry';
 import {
   resolveExchangeRouter,
   resolveJudgeConfig,
@@ -135,6 +136,9 @@ function logStopReason(fields: {
     flow: fields.flow,
     session_id: fields.sessionId,
     response_chars: fields.responseChars,
+    // WI-1505 — environment tag so an external log/metrics pipeline can sum
+    // this line by (provider, environment) for aggregate daily spend/volume.
+    environment: llmEnvironment,
   });
 }
 
@@ -408,6 +412,121 @@ export function setLlmRoutingV2Enabled(enabled: boolean): void {
 /** Exported for testing only — read/reset the V2 routing flag. */
 export function _getLlmRoutingV2Enabled(): boolean {
   return routingV2Enabled;
+}
+
+// ---------------------------------------------------------------------------
+// WI-1505 — Aggregate LLM traffic kill switch (operator override).
+//
+// Mirrors the routingV2Enabled pattern above: router.ts is a pure module with
+// no Hono context, so the flag is injected at the TOP of every request by
+// middleware/llm.ts, which does a per-request KV read
+// (services/kv.ts readLlmKillSwitch, backed by SUBSCRIPTION_KV, key
+// `llm:kill-switch`). Because the read happens on every request (not once at
+// worker boot), a KV write takes effect on the NEXT request with no mobile
+// release and no Worker redeploy. Default `false` (off) so this is inert
+// until an operator explicitly flips the KV key — see
+// docs/runbooks/llm-kill-switch.md.
+// ---------------------------------------------------------------------------
+let llmKillSwitchActive = false;
+
+export function setLlmKillSwitchActive(active: boolean): void {
+  llmKillSwitchActive = active;
+}
+
+/** Exported for testing only — read the kill-switch flag. */
+export function _getLlmKillSwitchActive(): boolean {
+  return llmKillSwitchActive;
+}
+
+/**
+ * Checked BEFORE any provider/model selection or network call in both
+ * routeAndCall and routeAndStream, so degraded mode never leaks a raw
+ * provider error and never depends on provider config (a killed request
+ * costs zero tokens and zero latency beyond this check). Reuses
+ * CircuitOpenError — the same type the existing circuit breaker throws on a
+ * real provider outage — so every one of the ~20 routeAndCall/routeAndStream
+ * callers, and the existing CircuitOpenError → 503 LLM_UNAVAILABLE handlers
+ * in index.ts and routes/sessions.ts, degrade traffic identically without any
+ * new per-call-site plumbing. `provider: 'kill-switch'` distinguishes an
+ * operator-triggered block from an organic provider circuit trip in
+ * Sentry/logs.
+ */
+function checkLlmKillSwitch(): void {
+  if (!llmKillSwitchActive) return;
+  logger.warn('llm.kill_switch.active', {
+    event: 'llm.kill_switch.blocked',
+  });
+  throw new CircuitOpenError('kill-switch', 'llm:kill-switch');
+}
+
+// ---------------------------------------------------------------------------
+// WI-1505 — Aggregate LLM spend/request-volume observability.
+//
+// `environment` is injected the same way as the kill switch (per-request, via
+// middleware/llm.ts) purely for metric tagging — it does not affect routing.
+// The primary aggregate signal is the environment-tagged `llm.stop_reason`
+// structured log line (see logStopReason below): an external log/metrics
+// pipeline sums that line by (provider, environment) for the authoritative
+// daily total and alert threshold.
+//
+// `recordVolumeMetric` below is a SECONDARY, best-effort in-process signal:
+// Cloudflare Workers isolates are ephemeral and do not share memory, so this
+// counter is per-isolate, not a globally accurate daily total. It exists so a
+// single hot isolate that blows past the threshold gets an immediate Sentry
+// warning without waiting on the external pipeline. See
+// docs/runbooks/llm-kill-switch.md for the alerting recipe and threshold
+// rationale.
+// ---------------------------------------------------------------------------
+let llmEnvironment = 'development';
+
+export function setLlmEnvironment(environment: string): void {
+  llmEnvironment = environment;
+}
+
+/** Per (provider, environment), per isolate, per UTC day. */
+export const LLM_DAILY_VOLUME_ALERT_THRESHOLD = 5000;
+
+interface VolumeCounter {
+  utcDate: string;
+  count: number;
+  alerted: boolean;
+}
+const volumeCounters = new Map<string, VolumeCounter>();
+
+function currentUtcDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function recordVolumeMetric(provider: string): void {
+  const key = `${provider}:${llmEnvironment}`;
+  const today = currentUtcDate();
+  let counter = volumeCounters.get(key);
+  if (!counter || counter.utcDate !== today) {
+    counter = { utcDate: today, count: 0, alerted: false };
+    volumeCounters.set(key, counter);
+  }
+  counter.count += 1;
+  if (counter.count >= LLM_DAILY_VOLUME_ALERT_THRESHOLD && !counter.alerted) {
+    counter.alerted = true;
+    captureMessage('llm.volume.daily_threshold_exceeded', {
+      level: 'warning',
+      tags: {
+        surface: 'llm_volume_alert',
+        provider,
+        environment: llmEnvironment,
+      },
+      extra: {
+        count: counter.count,
+        threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
+        utcDate: today,
+      },
+    });
+  }
+}
+
+/** Exported for testing only — clear per-isolate volume counters. */
+export function _resetVolumeCounters(): void {
+  volumeCounters.clear();
 }
 
 // MMT-ADR-0016 §1.5 model IDs — selected only under LLM_ROUTING_V2_ENABLED.
@@ -1334,6 +1453,9 @@ export async function routeAndCall(
     capability?: 'judge';
   },
 ): Promise<RouteResult> {
+  // WI-1505 — kill switch is the FIRST thing routeAndCall does: before the
+  // i18n tripwire, before getModelConfig, before any provider is touched.
+  checkLlmKillSwitch();
   // i18n Phase 1 — runtime tripwire. The static ratchet test is the primary
   // defence; this warn catches any call site that ships with `flow:` but
   // without `conversationLanguage:` (e.g. via a partial revert).
@@ -1387,6 +1509,7 @@ export async function routeAndCall(
       );
       const result = normalizeChatResult(raw);
       recordSuccess(circuitKey);
+      recordVolumeMetric(config.provider);
       logStopReason({
         provider: config.provider,
         model: config.model,
@@ -1515,6 +1638,7 @@ async function attemptProvider(
     );
     const result = normalizeChatResult(raw);
     recordSuccess(circuitKey);
+    recordVolumeMetric(config.provider);
     logStopReason({
       provider: config.provider,
       model: config.model,
@@ -1653,6 +1777,7 @@ async function* wrapStreamWithCircuitBreaker(
     }
 
     recordSuccess(circuitKey);
+    recordVolumeMetric(providerId);
     onStopReason(await innerStopReasonPromise);
     forwardedStopReason = true;
   } catch (err) {
@@ -1759,6 +1884,10 @@ export async function routeAndStream(
     responseFormat?: 'json';
   },
 ): Promise<StreamResult> {
+  // WI-1505 — same kill-switch check as routeAndCall, duplicated here because
+  // routeAndStream is a separate entry point (does not call routeAndCall)
+  // that the highest-traffic learner-facing flow (exchanges.ts) uses.
+  checkLlmKillSwitch();
   // i18n Phase 1 — same tripwire as routeAndCall. Streaming flows go through
   // their own entry point, so the warn block has to be duplicated here to
   // cover learner-facing surfaces that stream (e.g. exchange.process) from

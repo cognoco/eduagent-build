@@ -114,3 +114,63 @@ export async function readSubscriptionStatus(
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// WI-1505 — Aggregate LLM traffic kill switch
+//
+// Per-request KV read at the routeAndCall/routeAndStream choke point
+// (services/llm/router.ts) so an operator can stop or degrade learner-facing
+// LLM traffic on the NEXT request without a mobile release or a Worker
+// redeploy. Reuses SUBSCRIPTION_KV (no new namespace/binding needed) — see
+// docs/runbooks/llm-kill-switch.md for the operator flip procedure.
+// ---------------------------------------------------------------------------
+
+/** Exported so callers/tests/the runbook reference the same literal key. */
+export const LLM_KILL_SWITCH_KEY = 'llm:kill-switch';
+
+/**
+ * Writes (or clears) the aggregate LLM kill switch. `active: true` stores a
+ * sentinel value; `active: false` deletes the key so a stale value can never
+ * be misread as "on" — absence is the canonical "off" state.
+ */
+export async function writeLlmKillSwitch(
+  kv: KVNamespace,
+  active: boolean,
+): Promise<void> {
+  if (active) {
+    await kv.put(LLM_KILL_SWITCH_KEY, '1');
+  } else {
+    await kv.delete(LLM_KILL_SWITCH_KEY);
+  }
+}
+
+/**
+ * Reads the aggregate LLM kill switch. Returns `false` (traffic continues)
+ * on cache miss OR on a KV read error — a read failure must never itself
+ * take down learner-facing traffic. The kill switch is an operator-triggered
+ * override, not a safety invariant, so on ambiguity it fails OPEN ("keep
+ * serving"), not closed.
+ *
+ * A read failure emits a structured, queryable `kv.llm_kill_switch.read_error`
+ * log line — NOT a Sentry `captureException`. This path is LLM-routing infra,
+ * not billing/auth/webhook code (where AGENTS.md bans silent recovery without
+ * a Sentry/Inngest escalation), so the structured log is the appropriate and
+ * sufficient signal; firing captureException here would also double Sentry
+ * noise on every request (this runs in the global llmMiddleware) during any
+ * transient KV blip.
+ */
+export async function readLlmKillSwitch(kv: KVNamespace): Promise<boolean> {
+  try {
+    const raw = await kv.get(LLM_KILL_SWITCH_KEY);
+    return raw === '1';
+  } catch (err) {
+    logger.warn(
+      '[kv] llm_kill_switch read failed — failing open (traffic continues)',
+      {
+        event: 'kv.llm_kill_switch.read_error',
+        error: err instanceof Error ? err.message : String(err),
+      },
+    );
+    return false;
+  }
+}
