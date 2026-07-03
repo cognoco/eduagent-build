@@ -232,6 +232,10 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       // account-level; a parent-proxy session must not initiate them on a
       // child profile context.
       assertNotProxyMode(c);
+      const { tier, interval } = c.req.valid('json');
+      const db = c.get('db');
+      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+      const account = requireAccount(c.get('account'));
       // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
       // This route previously relied solely on assertNotProxyMode, which is
       // itself vulnerable to the X-Profile-Id spoof.
@@ -239,10 +243,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         c,
         'Only the account owner can start a checkout.',
       );
-      const { tier, interval } = c.req.valid('json');
-      const db = c.get('db');
-      // [CR-657] requireAccount() throws 401 if account is unset at runtime.
-      const account = requireAccount(c.get('account'));
 
       // BUG-77: Return 404 (not 500) when Stripe is unconfigured -- these
       // endpoints are dormant for mobile. 404 communicates "feature not
@@ -1069,6 +1069,9 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
     // [WI-137 / DS-048] Owner-profile authorization for waitlist signup.
     assertNotProxyMode(c);
+    const db = c.get('db');
+    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
+    const account = requireAccount(c.get('account'));
     // [WI-1301] Caller-identity gate — see assertCallerIsAccountOwner doc.
     // This route previously relied solely on assertNotProxyMode, which is
     // itself vulnerable to the X-Profile-Id spoof.
@@ -1076,9 +1079,6 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       c,
       'Only the account owner can join the BYOK waitlist.',
     );
-    const db = c.get('db');
-    // [CR-657] requireAccount() throws 401 if account is unset at runtime.
-    const account = requireAccount(c.get('account'));
     // Use the authenticated account's email -- never trust caller-supplied email
     const email = account.email;
 

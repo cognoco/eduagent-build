@@ -21,7 +21,6 @@ import {
   generateUUIDv7,
   login,
   membership,
-  organization,
   person,
   type Database,
 } from '@eduagent/database';
