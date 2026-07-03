@@ -452,7 +452,24 @@ function evaluateHomeworkProbe(
       'HW02.too-little-text',
       'The worksheet text is incomplete, so the model should ask for the missing source/photo.',
     );
-    if (/\bquestion 4 (is|means|answer)\b/i.test(lowerReply)) {
+    // Content-anchored, not surface-phrase [WI-1316]: the prior regex
+    // (`/\bquestion 4 (is|means|answer)\b/i`) false-positived on CORRECT
+    // clarifying replies ("question 4 is asking for the missing numbers" /
+    // "question 4 is cut off"). Mirrors the HW04.photo-invention guard
+    // below — match the specific cell-biology answer content the cut-off
+    // "question 4 about cells" would elicit if solved from memory instead
+    // of asking for the missing source.
+    if (
+      containsAny(lowerReply, [
+        /\bcell membrane\b/i,
+        /\bnucleus\b/i,
+        /\bmitochondri(a|on)\b/i,
+        /\bcytoplasm\b/i,
+        /\borganelle\b/i,
+        /\bbasic unit of life\b/i,
+        /\bcells are\b/i,
+      ])
+    ) {
       issues.push(
         qualityError(
           'HW02.solved-from-memory',

@@ -153,6 +153,35 @@ describe('probes quality heuristics — P08 (worked-example fading)', () => {
   });
 });
 
+describe('probes quality heuristics — HW02 (too-little-text, solved-from-memory) [WI-1316]', () => {
+  // False positive surfaced 2026-07-02: the old surface-phrase regex
+  // (`/\bquestion 4 (is|means|answer)\b/i`) flagged CORRECT clarifying
+  // replies ("question 4 is asking for the missing numbers") as if the
+  // model had solved the cut-off cell-biology question from memory. The
+  // fix content-anchors the check on the specific answer text a real
+  // from-memory leak would contain, mirroring HW04.photo-invention.
+
+  it('accepts a clarifying reply that does not solve from memory', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply:
+        'It looks like question 4 is asking for the missing worksheet text — can you send a photo of the rest, or tell me what it says?',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.filter((i) => i.code === 'HW02.solved-from-memory')).toEqual(
+      [],
+    );
+  });
+
+  it('still flags a reply that answers the cut-off question from memory', async () => {
+    const issues = await evaluate('12yo-dinosaurs', 'HW02', {
+      reply:
+        'No problem — cells are the basic unit of life. The nucleus controls the cell, and the cell membrane holds everything in.',
+      private_sources: { relied_on: [], insufficient: true },
+    });
+    expect(issues.some((i) => i.code === 'HW02.solved-from-memory')).toBe(true);
+  });
+});
+
 describe('probes quality heuristics — HW01 (solvable problem, first step)', () => {
   const fullSources = {
     relied_on: ['homework_problem', 'deterministic_reasoning'],
