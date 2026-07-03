@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MentoMate Productization — Roadmap</title>
+<style>
+  :root{
+    --bg:#14181F; --panel:#1B212B; --panel-2:#20293580;
+    --ink:#E8ECF1; --ink-2:#A9B4C0; --ink-3:#6E7A88;
+    --line:#2C3644; --edge:#4A5768;
+    --accent:#2DD4BF; --accent-dim:#2DD4BF22; --lav:#A78BFA;
+    --ok:#4ADE80; --run:#60A5FA; --warn:#FBBF24;
+    --chip-ok:#4ADE8022; --chip-run:#60A5FA22; --chip-warn:#FBBF2426; --chip-mut:#8B95A31A;
+    --mono:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  :root[data-theme="light"]{
+    --bg:#F3F5F7; --panel:#FFFFFF; --panel-2:#EBEEF2;
+    --ink:#1C2530; --ink-2:#4C5A69; --ink-3:#7C8896;
+    --line:#D8DEE5; --edge:#9AA6B4;
+    --accent:#0D9488; --accent-dim:#0D948818; --lav:#7C3AED;
+    --ok:#15803D; --run:#1D4ED8; --warn:#B45309;
+    --chip-ok:#15803D1A; --chip-run:#1D4ED815; --chip-warn:#B4530918; --chip-mut:#5B657214;
+  }
+  @media (prefers-color-scheme: light){ :root:not([data-theme]){
+    --bg:#F3F5F7; --panel:#FFFFFF; --panel-2:#EBEEF2;
+    --ink:#1C2530; --ink-2:#4C5A69; --ink-3:#7C8896;
+    --line:#D8DEE5; --edge:#9AA6B4;
+    --accent:#0D9488; --accent-dim:#0D948818; --lav:#7C3AED;
+    --ok:#15803D; --run:#1D4ED8; --warn:#B45309;
+    --chip-ok:#15803D1A; --chip-run:#1D4ED815; --chip-warn:#B4530918; --chip-mut:#5B657214;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px 24px 56px}
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-size:19px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;margin:0}
+  h1 .pgm{color:var(--accent);font-family:var(--mono);letter-spacing:.05em}
+  .stamp{color:var(--ink-3);font-family:var(--mono);font-size:11.5px;margin-left:auto}
+  button.theme{background:var(--panel);color:var(--ink-2);border:1px solid var(--line);border-radius:6px;
+    padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+  button.theme:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .sub{color:var(--ink-2);margin:0 0 18px;max-width:70ch}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 20px;color:var(--ink-2);font-size:12px}
+  .chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11.5px;
+    font-family:var(--mono);white-space:nowrap;border:1px solid transparent}
+  .s-done{background:var(--chip-ok);color:var(--ok)} .s-run{background:var(--chip-run);color:var(--run)}
+  .s-pre{background:var(--accent-dim);color:var(--accent)}
+  .s-gate{background:var(--chip-warn);color:var(--warn);border-color:var(--warn)}
+  .s-q{background:var(--chip-mut);color:var(--ink-3)} .s-park{background:transparent;color:var(--ink-3);border-color:var(--line)}
+  .boardbox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+  .board{position:relative;min-width:1080px;padding:10px 14px 18px;
+    display:grid;grid-template-columns:170px repeat(5,1fr);gap:10px 18px;align-items:start}
+  .colhead{color:var(--ink-3);font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;
+    padding:6px 2px;border-bottom:1px solid var(--line)}
+  .lanehead{color:var(--ink-2);font-size:12px;padding:10px 6px 0 2px;line-height:1.35}
+  .lanehead b{display:block;color:var(--ink);font-size:12.5px}
+  .lanehead .who{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+  .cell{display:flex;flex-direction:column;gap:10px;padding-top:8px;min-height:10px}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 11px;position:relative}
+  .node.gate{border-color:var(--warn)}
+  .node.done{opacity:.85}
+  .node .code{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em}
+  .node .name{font-weight:600;font-size:13px;margin:1px 0 3px;text-wrap:balance}
+  .node .meta{color:var(--ink-3);font-size:11.5px;line-height:1.35}
+  .node .chip{margin-top:6px}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  svg.edges path{fill:none;stroke:var(--edge);stroke-width:1.5}
+  svg.edges path.gatee{stroke:var(--warn);stroke-dasharray:4 4}
+  svg.edges polygon{fill:var(--edge)} svg.edges polygon.gatee{fill:var(--warn)}
+  .lanerule{grid-column:1/-1;border-top:1px dashed var(--line);height:0;margin:2px 0}
+  section.gates{margin-top:26px}
+  h2{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+  .gatelist{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+  .gatecard{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:10px 12px}
+  .gatecard.auto{border-left-color:var(--accent)}
+  .gatecard b{font-size:12.5px} .gatecard p{margin:4px 0 0;color:var(--ink-2);font-size:12px}
+  footer{margin-top:26px;color:var(--ink-3);font-size:12px;max-width:80ch}
+  footer a{color:var(--accent)}
+</style>
+</head><body>
+<div class="wrap">
+  <header>
+    <h1><span class="pgm">PGM-1</span> MentoMate Productization — Roadmap</h1>
+    <span class="stamp" id="stamp">state as of 2026-07-03 · maintained by program-manager:fable</span>
+    <button class="theme" id="themeBtn" aria-label="Toggle color theme">theme</button>
+  </header>
+  <p class="sub">Left → right is sequence, not calendar time. Arrows are hard dependencies. The single ordering rule:
+  <b>no rollback proven (M4) → no V0 retirement (M5) → no ship (M6)</b>. Android / Google Play only at MVP.</p>
+  <div class="legend" role="list">
+    <span class="chip s-done">✓ done</span><span class="chip s-run">▶ executing</span>
+    <span class="chip s-pre">◇ pre-authorized</span><span class="chip s-gate">⬥ operator confirm</span>
+    <span class="chip s-q">○ queued</span><span class="chip s-park">⏸ parked</span>
+    <span style="color:var(--ink-3)">— amber dashed arrow = crosses a live operator gate</span>
+  </div>
+  <div class="boardbox"><div class="board" id="board">
+    <div class="colhead"></div><div class="colhead">Now</div><div class="colhead">Next</div>
+    <div class="colhead">Then</div><div class="colhead">Pre-ship</div><div class="colhead">Ship</div>
+  </div></div>
+  <section class="gates">
+    <h2>Gate ledger — where a human is required</h2>
+    <div class="gatelist">
+      <div class="gatecard auto"><b>M2b — destructive env-apply</b><p>PRE-AUTHORIZED 2026-07-03. Runs unattended once M2a lands; per-env Neon branch snapshot + PITR marker + live-catalog check, evidence on the item.</p></div>
+      <div class="gatecard"><b>M5 — retire V0</b><p>LIVE confirm (ruled 2026-07-03, not pre-authorized). Orchestrator presents: M4 proven + tag pushed + retired-code register entry. Removes the flag-flip path back to V0.</p></div>
+      <div class="gatecard auto"><b>Preservation gate (spine §6.6)</b><p>Every strip delete (M3, M5) requires a pushed annotated tag + docs/archive/retired-code.md entry before it lands. Standing; enforced as AC.</p></div>
+      <div class="gatecard auto"><b>runtimeVersion coupling</b><p>If the M6 ship changes runtimeVersion, the V1 fallback bundle is re-published + re-proven against the new binary before M5 executes.</p></div>
+    </div>
+  </section>
+  <footer>Operational detail (owners, item stages, rulings queue) lives in the roadmap page — the body of the
+  <b>PGM-1</b> row in the Cosmo Programs DB. This chart is the sequencing view; it is redeployed by the program
+  manager when program state changes, at this same URL.</footer>
+</div>
+<script>
+(function(){
+  const root=document.documentElement, KEY='mm-roadmap-theme';
+  const saved=localStorage.getItem(KEY);
+  root.setAttribute('data-theme', saved || root.getAttribute('data-theme') || 'dark');
+  document.getElementById('themeBtn').addEventListener('click',()=>{
+    const next=root.getAttribute('data-theme')==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next); localStorage.setItem(KEY,next); draw();
+  });
+
+  const STATUS={done:['s-done','✓ done'],run:['s-run','▶ executing'],pre:['s-pre','◇ pre-authorized'],
+    gate:['s-gate','⬥ your confirm'],q:['s-q','○ queued'],park:['s-park','⏸ parked']};
+  const LANES=[
+    ['Ship path','WS-37 + WS-28 · orchestrator:ramtop'],
+    ['DB collapse','WS-18 · orchestrator:ramtop'],
+    ['Launch readiness','WS-39 · orchestrator:orion'],
+    ['Compliance','WS-30 legal · WS-29 eng (hold)'],
+    ['Product surfaces','WS-33 · orchestrator:orion'],
+    ['Hygiene','WS-34 / WS-35 — parked by design'],
+  ];
+  const NODES=[
+    {id:'m1',l:0,c:0,code:'M1',name:'Harden the seam',meta:'WI-1301…1305 · caller-bound authority, ratchet, seam test',st:'run'},
+    {id:'m4',l:0,c:1,code:'M4',name:'Prove the V1 fallback',meta:'WI-1307 · E2E on the published artifact — verdict due today',st:'run'},
+    {id:'m5',l:0,c:3,code:'M5',name:'Retire V0',meta:'WI-1308 · irreversible — live operator confirm',st:'gate',gate:true},
+    {id:'m6',l:0,c:4,code:'M6',name:'Ship V2',meta:'Config T on Google Play · supporter scope in',st:'q'},
+    {id:'m2a',l:1,c:0,code:'M2a',name:'Journal-prep',meta:'WI-1306 · CI builds the real prod schema',st:'run'},
+    {id:'m2b',l:1,c:1,code:'M2b',name:'Env-apply (destructive)',meta:'WI-1141/1250/1292 · snapshot rider · kills staging-red',st:'pre'},
+    {id:'m3',l:1,c:2,code:'M3',name:'Strip legacy code',meta:'WI-779/1139 · behind pushed tag + register',st:'q'},
+    {id:'clerk',l:2,c:0,code:'WI-1310',name:'Prod Clerk key',meta:'GH secret piped 2026-07-03 · EAS-half verify pending',st:'done'},
+    {id:'store',l:2,c:0,code:'WI-1335',name:'Play Console account + listing',meta:'operator + orion · longest external lead — start now',st:'q'},
+    {id:'ops',l:2,c:1,code:'×4',name:'Prod-ops hardening',meta:'Sentry · Inngest · GH env · email (WI-1336–1340) — independent',st:'q'},
+    {id:'rc',l:2,c:1,code:'WI-1328·1-2',name:'RevenueCat products + offering',meta:'Option A ruled · all 7 products, Plus-only offering',st:'q'},
+    {id:'keys',l:2,c:2,code:'WI-1328·3-4',name:'Webhook + RC keys',meta:'Doppler → GH → EAS · webhook E2E',st:'q'},
+    {id:'repub',l:2,c:3,code:'WI-1328·5-6',name:'Re-publish both bundles',meta:'prod + fallback carry RC keys · preflight re-hardened · sandbox E2E',st:'q'},
+    {id:'submit',l:2,c:4,code:'WI-1341',name:'Store submission',meta:'eas submit · Config T flags · internal-track dry run',st:'q'},
+    {id:'comp',l:3,c:0,code:'WS-30',name:'Legal chain',meta:'DPO done · policy fields → listing inputs · WI-1176 → Bug Lane',st:'run'},
+    {id:'surf',l:4,c:1,code:'WS-33',name:'V2 surface polish',meta:'nav fixes · supporter surfaces (MVP scope)',st:'run'},
+    {id:'hyg',l:5,c:0,code:'',name:'WS-34 · WS-35',meta:'refactor / infra hygiene — not ship-gating',st:'park'},
+  ];
+  const EDGES=[['m1','m4'],['m4','m5',1],['m5','m6',1],['m2a','m2b'],['m2b','m3'],
+    ['clerk','m4'],['store','rc'],['rc','keys'],['keys','repub'],['repub','m6'],
+    ['submit','m6'],['comp','store'],['surf','m6']];
+
+  const board=document.getElementById('board');
+  const cells={};
+  LANES.forEach((ln,li)=>{
+    if(li>0){const r=document.createElement('div');r.className='lanerule';board.appendChild(r);}
+    const lh=document.createElement('div');lh.className='lanehead';
+    lh.innerHTML='<b>'+ln[0]+'</b><span class="who">'+ln[1]+'</span>';board.appendChild(lh);
+    for(let c=0;c<5;c++){const d=document.createElement('div');d.className='cell';board.appendChild(d);cells[li+'-'+c]=d;}
+  });
+  NODES.forEach(n=>{
+    const el=document.createElement('div');el.className='node'+(n.gate?' gate':'')+(n.st==='done'?' done':'');
+    el.id='n-'+n.id;
+    el.innerHTML=(n.code?'<span class="code">'+n.code+'</span>':'')+
+      '<div class="name">'+n.name+'</div><div class="meta">'+n.meta+'</div>'+
+      '<span class="chip '+STATUS[n.st][0]+'">'+STATUS[n.st][1]+'</span>';
+    cells[n.l+'-'+n.c].appendChild(el);
+  });
+
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','edges');board.appendChild(svg);
+  function draw(){
+    svg.innerHTML='';const br=board.getBoundingClientRect();
+    EDGES.forEach(e=>{
+      const a=document.getElementById('n-'+e[0]).getBoundingClientRect();
+      const b=document.getElementById('n-'+e[1]).getBoundingClientRect();
+      const x1=a.right-br.left, y1=a.top+a.height/2-br.top;
+      const x2=b.left-br.left-7, y2=b.top+b.height/2-br.top;
+      const dx=Math.max(24,(x2-x1)/2);
+      const p=document.createElementNS(svg.namespaceURI,'path');
+      p.setAttribute('d',`M${x1},${y1} C${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`);
+      if(e[2])p.setAttribute('class','gatee');
+      svg.appendChild(p);
+      const g=document.createElementNS(svg.namespaceURI,'polygon');
+      g.setAttribute('points',`${x2},${y2} ${x2-7},${y2-4} ${x2-7},${y2+4}`);
+      if(e[2])g.setAttribute('class','gatee');
+      svg.appendChild(g);
+    });
+  }
+  new ResizeObserver(draw).observe(board);
+  requestAnimationFrame(draw);
+})();
+</script>
+</body></html>
