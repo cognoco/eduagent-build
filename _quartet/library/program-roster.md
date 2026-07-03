@@ -15,7 +15,7 @@ delivery detail (that lives in each lane's tracker) or live WI state (that lives
 
 | Field | Meaning |
 |---|---|
-| **ID** | roster-local Initiative id (`PRG-NN`) |
+| **ID** | roster-local Initiative id (`INI-NN`) |
 | **Status** | lifecycle: `proposed` / `active` / `graduated` / `parked` / `killed` |
 | **Owner** | who drives it |
 | **Outcome** | the one-line result that defines "done" |
