@@ -18,15 +18,44 @@
 
 import { eq, inArray, and, count, gte } from 'drizzle-orm';
 import {
-  accounts,
   guardianship,
   person,
-  profiles,
+  login,
+  membership,
+  generateUUIDv7,
   familyLinks,
   notificationLog,
   createDatabase,
 } from '@eduagent/database';
-import { ensureV2IdentityForLegacyProfileTest } from '../test-utils/legacy-identity-anchors';
+import {
+  ensureV2IdentityForLegacyProfileTest,
+  ensureLegacyProfileAnchorForTest,
+  deleteLegacyAccountsForTest,
+  deleteV2IdentitiesForTest,
+  legacyIdentityTableExistsForTest,
+} from '../test-utils/legacy-identity-anchors';
+
+// Discovers the account/profile ids a prior run of seedFixture-shaped helpers
+// left behind, by email — via the v2 `login` table, which (unlike legacy
+// `accounts`) always exists. Returns the v2 organizationId (== accountId,
+// reseed-identity-contract) and personId (== profileId) for each match.
+async function findSeededIdsByEmail(
+  db: ReturnType<typeof createIntegrationDb>,
+  emails: string[],
+): Promise<{ accountIds: string[]; profileIds: string[] }> {
+  const loginRows = await db.query.login.findMany({
+    where: inArray(login.email, emails),
+    columns: { personId: true },
+  });
+  const profileIds = loginRows.map((r) => r.personId);
+  if (profileIds.length === 0) return { accountIds: [], profileIds: [] };
+  const membershipRows = await db.query.membership.findMany({
+    where: inArray(membership.personId, profileIds),
+    columns: { organizationId: true },
+  });
+  const accountIds = [...new Set(membershipRows.map((r) => r.organizationId))];
+  return { accountIds, profileIds };
+}
 import { ForbiddenError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
@@ -69,23 +98,24 @@ const ACCOUNT = {
 
 async function seedFixture() {
   const db = createIntegrationDb();
-  const [account] = await db
-    .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
-    .returning();
-  const [profile] = await db
-    .insert(profiles)
-    .values({
-      accountId: account!.id,
-      displayName: 'Settings Test User',
-      birthYear: 2000,
-      isOwner: true,
-    })
-    .returning();
+  const accountId = generateUUIDv7();
+  const profileId = generateUUIDv7();
   // [WI-867] v2 identity rows — always seeded (flag collapsed to v2-only).
+  // Gated internally: dual-writes the legacy accounts/profiles anchor when
+  // the legacy tables exist (seedBaselineSubscription:false skips the v2
+  // helper's own anchor call, so this explicit one is load-bearing).
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId,
+    accountId,
+    displayName: 'Settings Test User',
+    birthYear: 2000,
+    isOwner: true,
+    clerkUserId: ACCOUNT.clerkUserId,
+    email: ACCOUNT.email,
+  });
   await ensureV2IdentityForLegacyProfileTest(db, {
-    accountId: account!.id,
-    profileId: profile!.id,
+    accountId,
+    profileId,
     displayName: 'Settings Test User',
     birthYear: 2000,
     clerkUserId: ACCOUNT.clerkUserId,
@@ -93,18 +123,19 @@ async function seedFixture() {
     isOwner: true,
     seedBaselineSubscription: false,
   });
-  return { account: account!, profile: profile! };
+  return {
+    account: { id: accountId },
+    profile: { id: profileId },
+  };
 }
 
 async function cleanup() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
-  });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  const { accountIds, profileIds } = await findSeededIdsByEmail(db, [
+    ACCOUNT.email,
+  ]);
+  await deleteLegacyAccountsForTest(db, accountIds);
+  await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 
 // ---------------------------------------------------------------------------
@@ -271,102 +302,88 @@ const CELEB_PARENT_B = {
 async function seedCelebrationFixture() {
   const db = createIntegrationDb();
 
-  const [accountA] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: CELEB_PARENT_A.clerkUserId,
-      email: CELEB_PARENT_A.email,
-    })
-    .returning();
-  const [profileA] = await db
-    .insert(profiles)
-    .values({
-      accountId: accountA!.id,
-      displayName: 'Parent A',
-      birthYear: 1985,
-      isOwner: true,
-    })
-    .returning();
+  const accountAId = generateUUIDv7();
+  const profileAId = generateUUIDv7();
+  const accountBId = generateUUIDv7();
+  const profileBId = generateUUIDv7();
+  const childProfileId = generateUUIDv7();
 
-  const [accountB] = await db
-    .insert(accounts)
-    .values({
-      clerkUserId: CELEB_PARENT_B.clerkUserId,
-      email: CELEB_PARENT_B.email,
-    })
-    .returning();
-  const [profileB] = await db
-    .insert(profiles)
-    .values({
-      accountId: accountB!.id,
-      displayName: 'Parent B',
-      birthYear: 1986,
-      isOwner: true,
-    })
-    .returning();
-
-  // Child profile belongs to parent A's account
-  const [childProfile] = await db
-    .insert(profiles)
-    .values({
-      accountId: accountA!.id,
-      displayName: 'Child',
-      birthYear: 2014,
-      isOwner: false,
-    })
-    .returning();
-
-  // Link child only to parent A (legacy table — kept for legacy-path callers)
-  await db.insert(familyLinks).values({
-    parentProfileId: profileA!.id,
-    childProfileId: childProfile!.id,
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: profileAId,
+    accountId: accountAId,
+    displayName: 'Parent A',
+    birthYear: 1985,
+    isOwner: true,
+    clerkUserId: CELEB_PARENT_A.clerkUserId,
+    email: CELEB_PARENT_A.email,
   });
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: profileBId,
+    accountId: accountBId,
+    displayName: 'Parent B',
+    birthYear: 1986,
+    isOwner: true,
+    clerkUserId: CELEB_PARENT_B.clerkUserId,
+    email: CELEB_PARENT_B.email,
+  });
+  // Child profile belongs to parent A's account.
+  await ensureLegacyProfileAnchorForTest(db, {
+    profileId: childProfileId,
+    accountId: accountAId,
+    displayName: 'Child',
+    birthYear: 2014,
+    isOwner: false,
+  });
+
+  // Link child only to parent A (legacy table — kept for legacy-path callers).
+  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
+    await db.insert(familyLinks).values({
+      parentProfileId: profileAId,
+      childProfileId,
+    });
+  }
 
   // [WI-867] v2 identity rows — assertParentAccess now reads guardianship.
   await db.insert(person).values([
     {
-      id: profileA!.id,
+      id: profileAId,
       displayName: 'Parent A',
       birthDate: '1985-06-15',
       residenceJurisdiction: 'EU',
     },
     {
-      id: profileB!.id,
+      id: profileBId,
       displayName: 'Parent B',
       birthDate: '1986-06-15',
       residenceJurisdiction: 'EU',
     },
     {
-      id: childProfile!.id,
+      id: childProfileId,
       displayName: 'Child',
       birthDate: '2014-06-15',
       residenceJurisdiction: 'EU',
     },
   ]);
   await db.insert(guardianship).values({
-    guardianPersonId: profileA!.id,
-    chargePersonId: childProfile!.id,
+    guardianPersonId: profileAId,
+    chargePersonId: childProfileId,
   });
 
   return {
-    parentA: profileA!,
-    parentB: profileB!,
-    child: childProfile!,
+    parentA: { id: profileAId },
+    parentB: { id: profileBId },
+    child: { id: childProfileId },
   };
 }
 
 async function cleanupCelebration() {
   const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [
-      CELEB_PARENT_A.email,
-      CELEB_PARENT_B.email,
-    ]),
-  });
-  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
+  const { accountIds, profileIds } = await findSeededIdsByEmail(db, [
+    CELEB_PARENT_A.email,
+    CELEB_PARENT_B.email,
+  ]);
+  await deleteLegacyAccountsForTest(db, accountIds);
+  await deleteV2IdentitiesForTest(db, { accountIds, profileIds });
 }
 
 describe('getChildCelebrationLevel authorization boundary (integration)', () => {

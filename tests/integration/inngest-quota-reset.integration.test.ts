@@ -68,16 +68,18 @@ async function seedSubscriptionWithQuota(input: {
   cycleResetAt: Date;
 }) {
   const db = createIntegrationDb();
-  const [subscription] = await db
-    .insert(subscriptions)
-    .values({
+  const subscriptionId = generateUUIDv7();
+
+  if (await legacyIdentityTableExistsForTest(db, 'subscriptions')) {
+    await db.insert(subscriptions).values({
+      id: subscriptionId,
       accountId: input.accountId,
       tier: input.tier,
       status: 'active',
       currentPeriodStart: new Date('2026-04-01T00:00:00.000Z'),
       currentPeriodEnd: new Date('2026-05-01T00:00:00.000Z'),
-    })
-    .returning();
+    });
+  }
 
   // [WI-867] v2 subscription always seeded (flag collapsed to v2-only).
   const ownerMembership = await db.query.membership.findFirst({
@@ -88,20 +90,23 @@ async function seedSubscriptionWithQuota(input: {
     throw new Error('Owner membership not found for v2 quota reset seed');
   }
 
-  await db.insert(subscriptionV2).values({
-    id: subscription!.id,
-    organizationId: input.accountId,
-    planTier: input.tier,
-    status: 'active',
-    payerPersonId: ownerMembership.personId,
-    periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
-    periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
-  });
+  const [subscription] = await db
+    .insert(subscriptionV2)
+    .values({
+      id: subscriptionId,
+      organizationId: input.accountId,
+      planTier: input.tier,
+      status: 'active',
+      payerPersonId: ownerMembership.personId,
+      periodStartAt: new Date('2026-04-01T00:00:00.000Z'),
+      periodEndAt: new Date('2026-05-01T00:00:00.000Z'),
+    })
+    .returning();
 
   const [quotaPool] = await db
     .insert(quotaPools)
     .values({
-      subscriptionId: subscription!.id,
+      subscriptionId,
       monthlyLimit: input.monthlyLimit,
       usedThisMonth: input.usedThisMonth,
       dailyLimit: input.dailyLimit,
