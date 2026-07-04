@@ -16,13 +16,19 @@ Two related pieces:
    deployment's log sink is) sums that line by `(provider, environment)` for
    the authoritative daily request-volume/spend total. A secondary,
    best-effort **in-process** signal (`recordVolumeMetric` in `router.ts`)
-   fires a Sentry warning (`llm.volume.daily_threshold_exceeded`, tag
-   `surface: llm_volume_alert`) when a single Worker isolate's own count for
-   a `(provider, environment)` pair crosses `LLM_DAILY_VOLUME_ALERT_THRESHOLD`
-   (`5000`, exported from `router.ts`) within a UTC day. This is NOT a
-   globally accurate daily total — Cloudflare Workers isolates are ephemeral
-   and do not share memory — it is an early-warning signal for a single hot
-   isolate; treat the external log-pipeline sum as authoritative.
+   emits a structured `logger.warn` **log line** with
+   `event: llm.volume.daily_threshold_exceeded` (plus `surface`, `provider`,
+   `environment`, `count`, `threshold`, `utc_date` fields) when a single Worker
+   isolate's own count for a `(provider, environment)` pair crosses
+   `LLM_DAILY_VOLUME_ALERT_THRESHOLD` (`5000`, exported from `router.ts`)
+   within a UTC day. This is a **queryable log line** on the deployment's log
+   sink (Sentry Logs / Cloudflare Logpush) — **not** a Sentry error or
+   captureMessage event. This is NOT a globally accurate daily total —
+   Cloudflare Workers isolates are ephemeral and do not share memory — it is
+   an early-warning signal for a single hot isolate; treat the external
+   log-pipeline sum as authoritative. The operator **alert rule** that pages on
+   `event: llm.volume.daily_threshold_exceeded` lives on the WI-1500 operator-
+   console alert-rules, not in this codebase.
 
 2. **Kill switch** — a KV-backed boolean, read fresh on every request, that
    blocks learner-facing LLM traffic before any provider is contacted.
@@ -114,11 +120,13 @@ error type already wired everywhere:
 | Signal | Threshold | Where |
 |---|---|---|
 | Aggregate daily volume (authoritative) | Operator-configured on the external log/metrics pipeline over the `llm.stop_reason` log line, grouped by `(provider, environment)` | Sentry Logs / Cloudflare Logpush query — no fixed number shipped in code; set per deployment's traffic baseline |
-| Per-isolate early warning (best-effort) | `LLM_DAILY_VOLUME_ALERT_THRESHOLD = 5000` requests, per `(provider, environment)`, per isolate, per UTC day | `apps/api/src/services/llm/router.ts` — fires `captureMessage('llm.volume.daily_threshold_exceeded', ...)` (Sentry, level `warning`) |
+| Per-isolate early warning (best-effort) | `LLM_DAILY_VOLUME_ALERT_THRESHOLD = 5000` requests, per `(provider, environment)`, per isolate, per UTC day | `apps/api/src/services/llm/router.ts` — emits a structured `logger.warn` **log line** with `event: llm.volume.daily_threshold_exceeded` (a queryable log record on Sentry Logs / Cloudflare Logpush, **not** a Sentry error/captureMessage event) |
 
 Tune `LLM_DAILY_VOLUME_ALERT_THRESHOLD` in `router.ts` if the per-isolate
 signal is too noisy or too quiet once real traffic volume is known; it is a
-named exported constant, not a magic number.
+named exported constant, not a magic number. The **alert rule** that fires on
+this log event is configured on the WI-1500 operator-console alert-rules (a
+metric-emission hook here + an alert rule there), not in this repo.
 
 ## 6. Rollback / recovery
 
@@ -131,8 +139,10 @@ mobile release are involved in either direction.
 
 If `readLlmKillSwitch` itself fails (a KV outage, not an operator flip), it
 **fails OPEN** — traffic continues rather than being silently blocked by an
-infra gap — and the read error is logged (`kv.llm_kill_switch.read_error`)
-and escalated to Sentry so a persistent KV outage is visible. This is a
-deliberate asymmetry: the kill switch is an operator-triggered override, not
-a safety invariant, so on ambiguity the safer default is "keep serving"
-rather than "silently kill all learner traffic because KV hiccuped."
+infra gap — and the read error is emitted as a structured `logger.warn` **log
+line** with `event: kv.llm_kill_switch.read_error` (a queryable log record on
+the log sink — Sentry Logs / Cloudflare Logpush — **not** a Sentry error
+event), so a persistent KV outage is visible to whoever queries/alerts on that
+event. This is a deliberate asymmetry: the kill switch is an operator-triggered
+override, not a safety invariant, so on ambiguity the safer default is "keep
+serving" rather than "silently kill all learner traffic because KV hiccuped."

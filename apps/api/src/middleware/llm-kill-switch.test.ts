@@ -62,12 +62,16 @@ function createInMemoryKV(): KVNamespace {
 import { llmMiddleware, resetLlmMiddleware } from './llm';
 import {
   routeAndCall,
+  routeAndStream,
   registerProvider,
   _clearProviders,
   _resetCircuits,
   CircuitOpenError,
 } from '../services/llm';
-import { createMockProvider } from '../services/llm/test-utils';
+import {
+  createMockProvider,
+  _resetVolumeCounters,
+} from '../services/llm/test-utils';
 import { writeLlmKillSwitch, LLM_KILL_SWITCH_KEY } from '../services/kv';
 
 function createMockContext(env: Record<string, unknown>) {
@@ -92,6 +96,7 @@ describe('LLM kill switch (WI-1505)', () => {
     resetLlmMiddleware();
     _clearProviders();
     _resetCircuits();
+    _resetVolumeCounters();
     kv = createInMemoryKV();
     // Registered directly (not via llmMiddleware's key-based registration,
     // which we deliberately skip by using ENVIRONMENT: 'test' with no API
@@ -123,6 +128,22 @@ describe('LLM kill switch (WI-1505)', () => {
 
     await expect(
       routeAndCall([{ role: 'user', content: 'hello' }]),
+    ).rejects.toThrow(CircuitOpenError);
+  });
+
+  it('(b2) switch ON — routeAndStream (streaming choke point) also blocks on the next request', async () => {
+    // routeAndStream is the highest-traffic path (learner chat SSE) and a
+    // SEPARATE entry point from routeAndCall, so the switch must be proven on
+    // it independently.
+    await simulateRequest(kv); // switch off — streaming works
+    const ok = await routeAndStream([{ role: 'user', content: 'hello' }]);
+    expect(ok.provider).toBe('gemini');
+
+    await writeLlmKillSwitch(kv, true);
+    await simulateRequest(kv); // next request re-reads KV, no redeploy
+
+    await expect(
+      routeAndStream([{ role: 'user', content: 'hello' }]),
     ).rejects.toThrow(CircuitOpenError);
   });
 
