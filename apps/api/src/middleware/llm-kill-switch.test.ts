@@ -106,7 +106,7 @@ describe('LLM kill switch (WI-1505)', () => {
     // which we deliberately skip by using ENVIRONMENT: 'test' with no API
     // keys) so routeAndCall has a real provider to select without making a
     // real network call.
-    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('openai'));
   });
 
   it('(a) switch OFF (no key in KV) — routeAndCall behaves unchanged', async () => {
@@ -115,13 +115,13 @@ describe('LLM kill switch (WI-1505)', () => {
     const result = await routeAndCall([{ role: 'user', content: 'hello' }]);
 
     expect(result.response).toContain('Mock response to');
-    expect(result.provider).toBe('gemini');
+    expect(result.provider).toBe('openai');
   });
 
   it('(b) switch ON — the NEXT request blocks before any provider is touched, no redeploy', async () => {
     await simulateRequest(kv); // request #1 — switch off
     const before = await routeAndCall([{ role: 'user', content: 'hello' }]);
-    expect(before.provider).toBe('gemini');
+    expect(before.provider).toBe('openai');
 
     // Operator flips the switch — a real KV write via the real kv.ts helper.
     await writeLlmKillSwitch(kv, true);
@@ -141,7 +141,7 @@ describe('LLM kill switch (WI-1505)', () => {
     // it independently.
     await simulateRequest(kv); // switch off — streaming works
     const ok = await routeAndStream([{ role: 'user', content: 'hello' }]);
-    expect(ok.provider).toBe('gemini');
+    expect(ok.provider).toBe('openai');
 
     await writeLlmKillSwitch(kv, true);
     await simulateRequest(kv); // next request re-reads KV, no redeploy
@@ -173,7 +173,7 @@ describe('LLM kill switch (WI-1505)', () => {
     await simulateRequest(kv); // request #3
     const result = await routeAndCall([{ role: 'user', content: 'hello' }]);
     expect(result.response).toContain('Mock response to');
-    expect(result.provider).toBe('gemini');
+    expect(result.provider).toBe('openai');
   });
 
   it('degraded mode is a user-safe, already-handled 503 error — no raw provider error, no hang', async () => {
@@ -222,7 +222,7 @@ describe('LLM aggregate volume alert (WI-1505)', () => {
     _resetCircuits();
     _resetVolumeCounters();
     setLlmEnvironment('test');
-    registerProvider(createMockProvider('gemini'));
+    registerProvider(createMockProvider('openai'));
     // Silence + capture structured log output. Mock console.log too so the
     // multi-thousand-call loops don't spew logStopReason JSON and stay fast.
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -266,7 +266,7 @@ describe('LLM aggregate volume alert (WI-1505)', () => {
     expect(entry.context).toMatchObject({
       event: 'llm.volume.daily_threshold_exceeded',
       surface: 'llm_volume_alert',
-      provider: 'gemini',
+      provider: 'openai',
       environment: 'test',
       threshold: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
       count: LLM_DAILY_VOLUME_ALERT_THRESHOLD,
