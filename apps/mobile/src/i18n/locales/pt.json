@@ -4235,7 +4235,8 @@
         "mastery": "Domínio",
         "effort": "Esforço",
         "observable_engagement": "Participação"
-      }
+      },
+      "addSupporterLabel": "Começar a apoiar"
     },
     "subjects": {
       "title": "Disciplinas",
@@ -4249,7 +4250,8 @@
       "bookCount": "{{count}} livro",
       "bookCount_other": "{{count}} livros",
       "errorTitle": "Não foi possível carregar as disciplinas",
-      "errorMessage": "Tente novamente daqui a pouco."
+      "errorMessage": "Tente novamente daqui a pouco.",
+      "addSupporterLabel": "Começar a apoiar"
     },
     "journal": {
       "title": "Diário",
@@ -4258,6 +4260,15 @@
       "personPlaceholderTitle": "Ainda não há atualizações partilháveis",
       "emptyMessage": "Quando {{name}} terminar uma sessão ou relatório, as atualizações partilhadas consigo aparecerão aqui.",
       "personPlaceholderMessage": "Conversas privadas, notas e memória do mentor não são mostradas aqui."
+    },
+    "picker": {
+      "title": "Escolha um aprendiz",
+      "subtitle": "Escolha com quem gostaria de iniciar um vínculo de apoio.",
+      "optionHint": "Iniciar um vínculo de apoio com {{name}}",
+      "emptyTitle": "Nenhum aprendiz disponível ainda",
+      "emptyDescription": "Primeiro, adicione uma criança à sua conta e depois volte para começar a apoiá-la.",
+      "addChildAction": "Adicionar uma criança",
+      "closeLabel": "Fechar"
     }
   },
   "visibility": {

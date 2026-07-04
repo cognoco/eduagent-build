@@ -192,3 +192,44 @@ export function pushChildReports(
     params: { profileId },
   } as Href);
 }
+
+/**
+ * [WI-1393] Push a managed person (an owner's linked, not-yet-supported
+ * child) into the link-ceremony create screen. `link/new` is a
+ * `FULL_SCREEN_ROUTES` entry with no nested dynamic child (its sibling
+ * `link/[contractId]` is a separate leaf, not a descendant) — a single push
+ * is enough, matching the direct-push precedent already used for
+ * quiz/dictation/homework-camera from Mentor.
+ *
+ * `relation: 'parent'` reflects the only relationship this MVP entry point
+ * expresses: the adult account owner starting a support link for their own
+ * linked child. Cross-account / non-owner relations are out of scope
+ * (deferred follow-on WI).
+ */
+export function pushLinkNewForManagedPerson(
+  router: Pick<Router, 'push'>,
+  person: { id: string; displayName: string },
+): void {
+  router.push({
+    pathname: '/(app)/link/new',
+    params: {
+      supporteePersonId: person.id,
+      supporteeName: person.displayName,
+      relation: 'parent',
+    },
+  } as Href);
+}
+
+/**
+ * [WI-1393] Graceful degrade for the "start supporting" picker when there
+ * are zero eligible managed persons: guide the owner to add a child first
+ * instead of pushing `/link/new` param-less (which would land on its
+ * missing-param `ErrorFallback`). Mirrors the add-child destination used by
+ * `AccountAdminSheet`'s "Add child" row.
+ */
+export function pushAddChildForSupport(router: Pick<Router, 'push'>): void {
+  router.push({
+    pathname: '/create-profile',
+    params: { for: 'child' },
+  } as Href);
+}

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
 import type { SubjectIndexItem } from '../../hooks/use-subjects-index';
 
 const mockPush = jest.fn();
@@ -9,6 +10,7 @@ let mockSubjectsIndex: {
   isError: boolean;
   refetch: jest.Mock;
 };
+let mockEligiblePersons: EligibleManagedPerson[] = [];
 let mockScopeContext: {
   activeScope:
     | { kind: 'me' }
@@ -46,6 +48,14 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  // gc1-allow: route orchestration test pins the eligible-person list directly; the hook's own computation is covered in use-eligible-supportees.test.ts
+  '../../hooks/use-eligible-supportees',
+  () => ({
+    useEligibleManagedPersons: () => mockEligiblePersons,
+  }),
+);
+
 jest.mock('../../hooks/use-library-search', () => ({
   ...jest.requireActual('../../hooks/use-library-search'),
   useLibrarySearch: () => ({
@@ -60,17 +70,41 @@ jest.mock('../../hooks/use-library-search', () => ({
 jest.mock(
   '../../components/support' /* gc1-allow: route branch test asserts delegation without coupling to support surface layout */,
   () => {
-    const { Text, View } = require('react-native');
+    const { Pressable, Text, View } = require('react-native');
     return {
       SupportHubSubjectsTab: ({
         personScopes,
+        eligiblePersons,
+        onSelectEligiblePerson,
+        onAddChildFallback,
       }: {
         personScopes: Array<{ personId: string; displayName: string }>;
+        eligiblePersons?: Array<{ id: string; displayName: string }>;
+        onSelectEligiblePerson?: (person: {
+          id: string;
+          displayName: string;
+        }) => void;
+        onAddChildFallback?: () => void;
       }) => (
         <View testID="support-hub-subjects-tab">
           {personScopes.map((scope) => (
             <Text key={scope.personId}>{scope.displayName}</Text>
           ))}
+          {(eligiblePersons ?? []).map((person) => (
+            <Pressable
+              key={person.id}
+              testID={`support-hub-subjects-eligible-${person.id}`}
+              onPress={() => onSelectEligiblePerson?.(person)}
+            >
+              <Text>{person.displayName}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            testID="support-hub-subjects-add-child-fallback"
+            onPress={() => onAddChildFallback?.()}
+          >
+            <Text>Add a child</Text>
+          </Pressable>
         </View>
       ),
       PersonScopeStructuralSubjects: ({
@@ -111,6 +145,7 @@ describe('SubjectsScreen', () => {
       isError: false,
       refetch: jest.fn(),
     };
+    mockEligiblePersons = [];
     mockScopeContext = {
       activeScope: { kind: 'me' },
       availableScopes: [
@@ -185,5 +220,54 @@ describe('SubjectsScreen', () => {
     screen.getByTestId('person-scope-structural-subjects');
     screen.getByText('Emma');
     expect(screen.queryByText('Notes')).toBeNull();
+  });
+
+  // WI-1393 A3: the Subjects empty-state anchor reaches /(app)/link/new with
+  // a supporteePersonId when an eligible managed person exists.
+  it('[WI-1393] pushes /(app)/link/new with supporteePersonId when the Subjects picker selects an eligible person', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+    mockEligiblePersons = [{ id: 'child-new', displayName: 'Liam' }];
+
+    render(<SubjectsScreen />);
+
+    fireEvent.press(
+      screen.getByTestId('support-hub-subjects-eligible-child-new'),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/link/new',
+      params: {
+        supporteePersonId: 'child-new',
+        supporteeName: 'Liam',
+        relation: 'parent',
+      },
+    });
+  });
+
+  // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
+  // never a param-less push to /(app)/link/new.
+  it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
+    mockScopeContext = {
+      ...mockScopeContext,
+      activeScope: { kind: 'supporter-hub' },
+    };
+    mockEligiblePersons = [];
+
+    render(<SubjectsScreen />);
+
+    fireEvent.press(
+      screen.getByTestId('support-hub-subjects-add-child-fallback'),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/link/new' }),
+    );
   });
 });

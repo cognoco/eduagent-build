@@ -4235,7 +4235,8 @@
         "mastery": "Beherrschung",
         "effort": "Einsatz",
         "observable_engagement": "Engagement"
-      }
+      },
+      "addSupporterLabel": "Unterstützung starten"
     },
     "subjects": {
       "title": "Fächer",
@@ -4249,7 +4250,8 @@
       "bookCount": "{{count}} Buch",
       "bookCount_other": "{{count}} Bücher",
       "errorTitle": "Fächer konnten nicht geladen werden",
-      "errorMessage": "Gleich erneut versuchen."
+      "errorMessage": "Gleich erneut versuchen.",
+      "addSupporterLabel": "Unterstützung starten"
     },
     "journal": {
       "title": "Journal",
@@ -4258,6 +4260,15 @@
       "personPlaceholderTitle": "Noch keine teilbaren Updates",
       "emptyMessage": "Wenn {{name}} eine Sitzung oder einen Bericht abschließt, erscheinen hier die mit dir geteilten Updates.",
       "personPlaceholderMessage": "Private Chats, Notizen und Mentor-Gedächtnis werden hier nicht angezeigt."
+    },
+    "picker": {
+      "title": "Lernenden auswählen",
+      "subtitle": "Wähle aus, mit wem du eine Unterstützungsverbindung starten möchtest.",
+      "optionHint": "Unterstützungsverbindung mit {{name}} starten",
+      "emptyTitle": "Noch keine Lernenden verfügbar",
+      "emptyDescription": "Füge zuerst ein Kind zu deinem Konto hinzu und komm dann zurück, um es zu unterstützen.",
+      "addChildAction": "Kind hinzufügen",
+      "closeLabel": "Schließen"
     }
   },
   "visibility": {

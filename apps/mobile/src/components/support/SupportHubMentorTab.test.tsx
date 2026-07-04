@@ -250,4 +250,59 @@ describe('SupportHubMentorTab', () => {
     });
     expect(attempts).toBe(2);
   });
+
+  // WI-1393: the persistent header "Start supporting" anchor (A2) opens the
+  // eligible-person picker and, once a person is selected, hands it to the
+  // caller-provided navigation callback — proving the forward trigger into
+  // /(app)/link/new actually fires (never a dead-end, never param-less).
+  it('opens the eligible-person picker from the header anchor and forwards the selection', () => {
+    const onSelectEligiblePerson = jest.fn();
+
+    queryClient = renderWithProfile(
+      <SupportHubMentorTab
+        personScopes={[EMMA_SCOPE]}
+        eligiblePersons={[{ id: 'child-new', displayName: 'Liam' }]}
+        onSelectEligiblePerson={onSelectEligiblePerson}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('support-person-picker-option-child-new'),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByTestId('support-hub-mentor-add-supporter'));
+    fireEvent.press(
+      screen.getByTestId('support-person-picker-option-child-new'),
+    );
+
+    expect(onSelectEligiblePerson).toHaveBeenCalledWith({
+      id: 'child-new',
+      displayName: 'Liam',
+    });
+  });
+
+  // WI-1393 AC2: with zero eligible persons, the cold-start empty-state anchor
+  // (A1) must guide the owner to add a child instead of reaching /link/new
+  // param-less.
+  it('degrades the cold-start empty state to add-a-child when there are no eligible persons', () => {
+    const onAddChildFallback = jest.fn();
+    const onSelectEligiblePerson = jest.fn();
+
+    queryClient = renderWithProfile(
+      <SupportHubMentorTab
+        personScopes={[]}
+        eligiblePersons={[]}
+        onSelectEligiblePerson={onSelectEligiblePerson}
+        onAddChildFallback={onAddChildFallback}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('support-hub-mentor-empty-add'));
+    screen.getByTestId('support-person-picker-empty');
+
+    fireEvent.press(screen.getByTestId('support-person-picker-add-child'));
+
+    expect(onAddChildFallback).toHaveBeenCalledTimes(1);
+    expect(onSelectEligiblePerson).not.toHaveBeenCalled();
+  });
 });

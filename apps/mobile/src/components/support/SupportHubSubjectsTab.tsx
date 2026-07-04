@@ -1,19 +1,43 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { ScopeDescriptor } from '@eduagent/schemas';
+
+import type { EligibleManagedPerson } from '../../hooks/use-eligible-supportees';
+import { SupportPersonPickerSheet } from './SupportPersonPickerSheet';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
 interface SupportHubSubjectsTabProps {
   personScopes: readonly PersonScope[];
   onOpenPersonScope: (scope: PersonScope) => void;
+  /** WI-1393 — managed persons without an existing visibility contract. */
+  eligiblePersons?: readonly EligibleManagedPerson[];
+  /** WI-1393 — navigates to `/(app)/link/new` with the selected person. */
+  onSelectEligiblePerson?: (person: EligibleManagedPerson) => void;
+  /** WI-1393 — 0-eligible degrade: guides the owner to add a child first. */
+  onAddChildFallback?: () => void;
 }
 
 export function SupportHubSubjectsTab({
   personScopes,
   onOpenPersonScope,
+  eligiblePersons = [],
+  onSelectEligiblePerson,
+  onAddChildFallback,
 }: SupportHubSubjectsTabProps): React.ReactElement {
   const { t } = useTranslation();
+  const [isPickerVisible, setIsPickerVisible] = useState(false);
+
+  const handleSelectPerson = (person: EligibleManagedPerson): void => {
+    setIsPickerVisible(false);
+    onSelectEligiblePerson?.(person);
+  };
+
+  const handleAddChild = (): void => {
+    setIsPickerVisible(false);
+    onAddChildFallback?.();
+  };
 
   return (
     <ScrollView
@@ -34,6 +58,17 @@ export function SupportHubSubjectsTab({
             <Text className="text-body text-text-secondary">
               {t('supportHub.subjects.empty')}
             </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('supportHub.subjects.addSupporterLabel')}
+              onPress={() => setIsPickerVisible(true)}
+              className="mt-3 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-3"
+              testID="support-hub-subjects-empty-add"
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('supportHub.subjects.addSupporterLabel')}
+              </Text>
+            </Pressable>
           </View>
         ) : (
           personScopes.map((scope) => (
@@ -57,6 +92,14 @@ export function SupportHubSubjectsTab({
           ))
         )}
       </View>
+
+      <SupportPersonPickerSheet
+        visible={isPickerVisible}
+        eligiblePersons={eligiblePersons}
+        onSelectPerson={handleSelectPerson}
+        onAddChild={handleAddChild}
+        onClose={() => setIsPickerVisible(false)}
+      />
     </ScrollView>
   );
 }

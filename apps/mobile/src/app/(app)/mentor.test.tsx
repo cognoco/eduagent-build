@@ -6,7 +6,11 @@ import type {
   SharedRecord,
 } from '@eduagent/schemas';
 
-import { renderScreen } from '../../test-utils/screen-render';
+import {
+  NAMED_PROFILES,
+  renderScreen,
+  type RenderScreenOptions,
+} from '../../test-utils/screen-render';
 
 type PersonScope = Extract<ScopeDescriptor, { kind: 'person' }>;
 
@@ -125,11 +129,14 @@ function feed(cards: NowCard[], overflowCount = 0): NowResponse {
   };
 }
 
-function renderMentorScreen(): void {
+function renderMentorScreen(
+  profileOverrides: Pick<RenderScreenOptions, 'profile' | 'profiles'> = {},
+): void {
   const rendered = renderScreen(<MentorScreen />, {
     routes: {
       [`/visibility/reports/${PERSON_ID}/shared-record`]: SHARED_RECORD,
     },
+    ...profileOverrides,
   });
   cleanupRender = rendered.cleanup;
 }
@@ -425,5 +432,65 @@ describe('MentorScreen', () => {
 
     screen.getByText('Session wrapped');
     screen.getByText('You chose the next step.');
+  });
+
+  // WI-1393: the V2 shell previously had zero forward navigation to
+  // /(app)/link/new — this proves the cold-start empty-state anchor (A1)
+  // actually reaches it with a supporteePersonId, so the missing-param
+  // ErrorFallback on that screen is never hit from this trigger.
+  it('[WI-1393] reaches /(app)/link/new with supporteePersonId via the empty-state picker when an eligible managed person exists', () => {
+    mockScopeContext = {
+      activeScope: { kind: 'supporter-hub' },
+      availableScopes: [],
+      setActiveScope: jest.fn(),
+    };
+
+    renderMentorScreen({
+      profile: NAMED_PROFILES.guardian,
+      profiles: [NAMED_PROFILES.guardian, NAMED_PROFILES.linkedChild],
+    });
+
+    fireEvent.press(screen.getByTestId('support-hub-mentor-empty-add'));
+    fireEvent.press(
+      screen.getByTestId(
+        `support-person-picker-option-${NAMED_PROFILES.linkedChild.id}`,
+      ),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/link/new',
+      params: {
+        supporteePersonId: NAMED_PROFILES.linkedChild.id,
+        supporteeName: NAMED_PROFILES.linkedChild.displayName,
+        relation: 'parent',
+      },
+    });
+  });
+
+  // WI-1393 AC2: zero eligible managed persons must degrade to add-a-child,
+  // never a param-less push to /(app)/link/new.
+  it('[WI-1393] degrades to add-a-child when there are zero eligible managed persons', () => {
+    mockScopeContext = {
+      activeScope: { kind: 'supporter-hub' },
+      availableScopes: [],
+      setActiveScope: jest.fn(),
+    };
+
+    renderMentorScreen({
+      profile: NAMED_PROFILES.guardian,
+      profiles: [NAMED_PROFILES.guardian],
+    });
+
+    fireEvent.press(screen.getByTestId('support-hub-mentor-empty-add'));
+    screen.getByTestId('support-person-picker-empty');
+    fireEvent.press(screen.getByTestId('support-person-picker-add-child'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
+    expect(mockPush).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/(app)/link/new' }),
+    );
   });
 });

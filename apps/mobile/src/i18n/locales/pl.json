@@ -4397,7 +4397,8 @@
         "mastery": "Opanowanie",
         "effort": "Wysiłek",
         "observable_engagement": "Zaangażowanie"
-      }
+      },
+      "addSupporterLabel": "Zacznij wspierać"
     },
     "subjects": {
       "title": "Przedmioty",
@@ -4413,7 +4414,8 @@
       "bookCount_many": "{{count}} książek",
       "bookCount_other": "{{count}} książek",
       "errorTitle": "Nie udało się wczytać przedmiotów",
-      "errorMessage": "Spróbuj ponownie za chwilę."
+      "errorMessage": "Spróbuj ponownie za chwilę.",
+      "addSupporterLabel": "Zacznij wspierać"
     },
     "journal": {
       "title": "Dziennik",
@@ -4422,6 +4424,15 @@
       "personPlaceholderTitle": "Nie ma jeszcze aktualizacji do udostępnienia",
       "emptyMessage": "Gdy {{name}} ukończy sesję lub raport, udostępnione Tobie aktualizacje pojawią się tutaj.",
       "personPlaceholderMessage": "Prywatne czaty, notatki i pamięć mentora nie są tutaj pokazywane."
+    },
+    "picker": {
+      "title": "Wybierz ucznia",
+      "subtitle": "Wybierz, kogo chcesz zacząć wspierać.",
+      "optionHint": "Zacznij wspierać {{name}}",
+      "emptyTitle": "Brak dostępnych uczniów",
+      "emptyDescription": "Najpierw dodaj dziecko do swojego konta, a potem wróć tutaj, aby zacząć je wspierać.",
+      "addChildAction": "Dodaj dziecko",
+      "closeLabel": "Zamknij"
     }
   },
   "visibility": {
