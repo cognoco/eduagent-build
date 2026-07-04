@@ -61,7 +61,6 @@ export type {
   ProfileQuotaUsageSnapshot,
   ProfileQuotaRole,
 } from './billing/quota-provision';
-export { provisionProfileQuotaUsage } from './billing/quota-provision';
 export { reconcileQuotaStateForEffectiveTier } from './billing/quota-reconcile';
 
 // ---------------------------------------------------------------------------

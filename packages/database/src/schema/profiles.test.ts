@@ -8,7 +8,7 @@
 // before reaching the repository call sites.
 // ---------------------------------------------------------------------------
 
-import { pendingNotices, profiles, accounts } from './profiles.js';
+import { pendingNotices } from './profiles.js';
 
 describe('pendingNotices schema (BUG-224)', () => {
   it('exposes ownerProfileId so the scoped helper can inject the filter', () => {
@@ -27,24 +27,11 @@ describe('pendingNotices schema (BUG-224)', () => {
   });
 });
 
-describe('profiles + accounts schema shape', () => {
-  it('profiles.id and accountId are present', () => {
-    expect(profiles).toHaveProperty('id');
-    expect(profiles).toHaveProperty('accountId');
-  });
-
-  // [BUG-223 / P2-MED] accounts has NO profileId column and NO RLS in the
-  // committed migrations — see the inspection note in
-  // packages/database/src/schema/profiles.ts. This test simply pins the
-  // column shape so a future "fix" that adds profileId (which would not
-  // make sense — accounts own profiles, not the other way around) fails
-  // here loudly instead of breaking the parent-chain joins downstream.
-  it('accounts has no profileId column (account → profile is 1→N)', () => {
-    expect(accounts).toHaveProperty('id');
-    expect(accounts).not.toHaveProperty('profileId');
-  });
-});
-
+// [WI-1139] The legacy `profiles` + `accounts` schema-shape tests were removed
+// with the table definitions themselves (accounts/profiles/familyLinks/
+// consentStates/subscriptions removal). The v2 replacements (person,
+// organization, membership) get their own schema-shape coverage.
+//
 // [WI-569] The T1 organizations/memberships shape tests were removed with the
 // T1 table definitions (MMT-ADR-0012 baseline reset). The singular
 // organization/membership replacements get schema + tests in WI-570.

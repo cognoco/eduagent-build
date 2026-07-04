@@ -8,11 +8,9 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { createScopedRepository } from './repository.js';
 import {
-  profiles,
   subjects,
   learningSessions,
   retentionCards,
-  consentStates,
   assessments,
   xpLedger,
   sessionSummaries,
@@ -139,7 +137,6 @@ describe('Profile Isolation (R-005)', () => {
       { name: 'assessments', table: assessments, hasFindMany: true },
       { name: 'xpLedger', table: xpLedger, hasFindMany: true },
       { name: 'bookmarks', table: bookmarks, hasFindMany: true },
-      { name: 'consentStates', table: consentStates, hasFindMany: true },
       { name: 'sessionSummaries', table: sessionSummaries, hasFindMany: false },
       {
         name: 'notificationPreferences',
@@ -242,34 +239,6 @@ describe('Profile Isolation (R-005)', () => {
       // Must compose: profileId AND extra condition
       expect(findMany).toHaveBeenCalledWith({
         where: and(eq(subjects.profileId, CHILD_PROFILE_ID), extraFilter),
-      });
-    });
-  });
-
-  describe('getProfile isolation', () => {
-    it('getProfile returns only the owning profile', async () => {
-      const { db, findFirst } = createTrackingMockDb();
-      const childRepo = createScopedRepository(db, CHILD_PROFILE_ID);
-
-      await childRepo.getProfile();
-
-      expect(findFirst).toHaveBeenCalledWith({
-        where: eq(profiles.id, CHILD_PROFILE_ID),
-      });
-    });
-
-    it('parent getProfile does not leak child profile data', async () => {
-      const { db, findFirst } = createTrackingMockDb();
-      const parentRepo = createScopedRepository(db, PARENT_PROFILE_ID);
-
-      await parentRepo.getProfile();
-
-      expect(findFirst).toHaveBeenCalledWith({
-        where: eq(profiles.id, PARENT_PROFILE_ID),
-      });
-
-      expect(findFirst).not.toHaveBeenCalledWith({
-        where: eq(profiles.id, CHILD_PROFILE_ID),
       });
     });
   });

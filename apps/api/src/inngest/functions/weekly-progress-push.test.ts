@@ -175,20 +175,6 @@ jest.mock(
   }),
 );
 
-const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
-const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
-  .fn()
-  .mockResolvedValue([]);
-jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: drives self-report eligibility deterministically — used to inject "PARENT_ID is solo-eligible" into the cron dispatch branch ("queues eligible self-report profiles") without seeding the full session/activity chain that the eligibility query traverses. Integration sibling exercises the real eligibility SQL against a real DB. */,
-  () => ({
-    listEligibleSelfReportProfileIds: (...args: unknown[]) =>
-      mockListEligibleSelfReportProfileIds(...args),
-    listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
-      mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
-  }),
-);
-
 // WI-867 flag-collapse: the cron's parent-discovery + self-report-eligibility
 // reads moved from the flag-gated v1 services to the now-unconditional v2
 // services (weekly-progress-push.ts:289/160/371). Each v2 function below is a
@@ -439,8 +425,6 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ sent: true });
   mockGetRecentNotificationCount.mockResolvedValue(0);
   mockLogNotification.mockResolvedValue(undefined);
-  mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
-  mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
   // WI-867: v2 SELECT-shaped discovery functions default to empty; the 5
   // flag-collapse tests override per-case to the IDs their fanout asserts.
   mockGetAllActiveGuardianPersonIds.mockResolvedValue([]);
@@ -952,9 +936,6 @@ describe('weekly progress parent eligibility', () => {
     mockListEligibleSelfReportPersonIdsAtLocalHour9V2.mockResolvedValue([
       PARENT_ID,
     ]);
-    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
-      PARENT_ID,
-    ]);
 
     const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (
@@ -1357,7 +1338,6 @@ describe('weekly progress generate practice summary', () => {
     // WI-867: persistWeeklySelfReportForProfile re-checks eligibility via the
     // v2 listEligibleSelfReportPersonIdsV2 (SELECT, mocked).
     mockListEligibleSelfReportPersonIdsV2.mockResolvedValue([PARENT_ID]);
-    mockListEligibleSelfReportProfileIds.mockResolvedValue([PARENT_ID]);
     mockGetLatestSnapshotOnOrBefore
       .mockResolvedValueOnce({
         snapshotDate: '2026-05-17',

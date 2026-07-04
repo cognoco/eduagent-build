@@ -3,7 +3,7 @@
 // Used by all billing sub-modules to avoid circular imports.
 // ---------------------------------------------------------------------------
 
-import { subscriptions, quotaPools } from '@eduagent/database';
+import { quotaPools } from '@eduagent/database';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
@@ -81,30 +81,10 @@ export interface StripeCustomerCreator {
 // Shared mappers — Drizzle Date -> API ISO string
 // ---------------------------------------------------------------------------
 
-export function mapSubscriptionRow(
-  row: typeof subscriptions.$inferSelect,
-): SubscriptionRow {
-  return {
-    id: row.id,
-    accountId: row.accountId,
-    stripeCustomerId: row.stripeCustomerId,
-    stripeSubscriptionId: row.stripeSubscriptionId,
-    tier: row.tier,
-    status: row.status,
-    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
-    currentPeriodStart: row.currentPeriodStart?.toISOString() ?? null,
-    currentPeriodEnd: row.currentPeriodEnd?.toISOString() ?? null,
-    cancelledAt: row.cancelledAt?.toISOString() ?? null,
-    lastStripeEventTimestamp:
-      row.lastStripeEventTimestamp?.toISOString() ?? null,
-    lastStripeEventId: row.lastStripeEventId,
-    revenuecatOriginalAppUserId: row.revenuecatOriginalAppUserId,
-    lastRevenuecatEventId: row.lastRevenuecatEventId,
-    lastRevenuecatEventTimestampMs: row.lastRevenuecatEventTimestampMs,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
+// [WI-1139] mapSubscriptionRow (mapped the legacy `subscriptions` table row)
+// removed — dead, no callers. The `SubscriptionRow`/`AppliedSubscriptionRow`
+// types above stay: they are the live shared contract every billing-v2
+// mapper (subscription-core-v2.ts's mapSubscriptionRowV2, etc.) produces.
 
 export function mapQuotaPoolRow(
   row: typeof quotaPools.$inferSelect,

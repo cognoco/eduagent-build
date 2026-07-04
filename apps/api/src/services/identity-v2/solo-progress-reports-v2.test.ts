@@ -1,7 +1,20 @@
-import { listEligibleSelfReportPersonIdsV2 } from './solo-progress-reports-v2';
+import {
+  listEligibleSelfReportPersonIdsV2,
+  isLocalHour9ForTimezone,
+} from './solo-progress-reports-v2';
 import type { Database } from '@eduagent/database';
 import * as guardianship from './guardianship';
 import * as consentStatusV2 from './consent-status-v2';
+
+// [WI-1139] Moved from the deleted legacy `services/solo-progress-reports.test.ts`
+// — the helper was inlined into this v2 module.
+describe('isLocalHour9ForTimezone', () => {
+  it('falls back to UTC hour when timezone is missing or invalid', () => {
+    const nineUtc = new Date('2026-05-11T09:00:00.000Z');
+    expect(isLocalHour9ForTimezone(null, nineUtc)).toBe(true);
+    expect(isLocalHour9ForTimezone('Not/AZone', nineUtc)).toBe(true);
+  });
+});
 
 // [WI-961] listEligibleSelfReportPersonIdsV2 — bounded parallel fan-out (batch=25).
 // Proves correctness + parallelism (2 owners < batch size → both run in one batch).

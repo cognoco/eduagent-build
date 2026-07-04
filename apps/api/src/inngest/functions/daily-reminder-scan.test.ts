@@ -27,7 +27,7 @@ jest.mock('../client', () => {
   return { ...actual, inngest: mockInngestTransport.inngest };
 });
 
-import { person, profiles, consentStates } from '@eduagent/database';
+import { person } from '@eduagent/database';
 
 import { dailyReminderScan } from './daily-reminder-scan';
 
@@ -409,8 +409,11 @@ describe('[BREAK] daily-reminder-scan fan-out event shape', () => {
 // WI-867): SELECT … FROM person (person × membership × organization +
 // consentGateSatisfiedSql; no consentStates subquery). The tests below assert
 // that `person` is always the query root regardless of flag state.
-// The DB module is NOT mocked here, so `person` / `profiles` / `consentStates`
-// are the real Drizzle table objects the source passes to `.from(...)`.
+// The DB module is NOT mocked here, so `person` is the real Drizzle table
+// object the source passes to `.from(...)`. [WI-1139] The legacy `profiles`/
+// `consentStates` table defs were removed, so the "not toHaveBeenCalledWith"
+// counter-assertions (there is nothing left to accidentally query) were
+// removed with them.
 // ---------------------------------------------------------------------------
 
 function buildChainableDb(
@@ -465,8 +468,6 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
       await handler({ event: { id: 'evt-v2-on' }, step });
 
       expect(db.builder.from).toHaveBeenCalledWith(person);
-      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
-      expect(db.builder.from).not.toHaveBeenCalledWith(consentStates);
     } finally {
       restoreFlag(prev);
     }
@@ -486,7 +487,6 @@ describe('[WI-777] dailyReminderScan identity-v2 wiring', () => {
 
       // Flag is collapsed; source always uses person even when env var is absent.
       expect(db.builder.from).toHaveBeenCalledWith(person);
-      expect(db.builder.from).not.toHaveBeenCalledWith(profiles);
     } finally {
       restoreFlag(prev);
     }

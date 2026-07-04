@@ -22,7 +22,6 @@ import {
   membership,
   person,
   type Database,
-  type profiles,
 } from '@eduagent/database';
 import type {
   ConsentStatus,
@@ -666,6 +665,32 @@ export async function updateProfileV2(
 // ---------------------------------------------------------------------------
 
 /**
+ * [WI-1139] Reconstructed shape of the now-removed legacy `profiles` table row
+ * (`profiles.$inferSelect`). loadProfileRowByIdV2 preserves this byte-identical
+ * return shape so downstream consumers (session-cache.ts's CachedProfileRow)
+ * cannot tell which store answered.
+ */
+export interface LegacyProfileRow {
+  id: string;
+  accountId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  birthYear: number;
+  birthMonth: number | null;
+  birthDay: number | null;
+  birthYearSetBy: string | null;
+  location: ProfileMeta['location'];
+  isOwner: boolean;
+  hasPremiumLlm: boolean;
+  defaultAppContext: string | null;
+  conversationLanguage: string;
+  pronouns: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  archivedAt: Date | null;
+}
+
+/**
  * v2 twin of `loadProfileRowById` — returns the person row reshaped as a
  * byte-identical `profiles.$inferSelect`, or null when the person does not exist
  * / is archived. Self-keyed on profileId (person.id = profiles.id); no org
@@ -674,7 +699,7 @@ export async function updateProfileV2(
 export async function loadProfileRowByIdV2(
   db: Database,
   profileId: string,
-): Promise<typeof profiles.$inferSelect | null> {
+): Promise<LegacyProfileRow | null> {
   const rows = await db
     .select({
       id: person.id,

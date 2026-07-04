@@ -5,6 +5,105 @@ and how to recover it. Append newest-first.
 
 ---
 
+## WI-1139 — legacy schema defs + dead prod/test chain (2026-07-04)
+
+Deleted the 5 legacy identity/billing Drizzle table defs from
+`packages/database/src/schema/` — `accounts`, `profiles`, `familyLinks`,
+`consentStates` (profiles.ts) and `subscriptions` (billing.ts) — plus their
+now-orphaned enums (`locationTypeEnum`, `consentTypeEnum`, `consentStatusEnum`,
+`subscriptionStatusEnum`, `subscriptionTierEnum`). This is a **definition-only**
+removal — the physical Postgres tables/columns/FKs are untouched (physical drop
+is WI-1306/M2a); every v2-store caller already reads `person`/`organization`/
+`membership`/`subscription` instead.
+
+Ran `tsc --build` after the schema-def delete and treated every resulting error
+as authoritative — a large prior dead-sweep (WI-1364/WI-1398) had already removed
+most of the legacy prod chain, so the remaining tsc-surfaced breakage was small:
+
+- **`apps/api/src/services/billing/access.ts`** — whole-file delete.
+  `getEffectiveAccessForSubscription` read the legacy `subscriptions` table via
+  `findSubscriptionById__unscoped`; its only caller chain
+  (`billing/family.ts`'s `canAddProfile` ← `services/profile.ts`'s
+  `createProfileWithLimitCheck`) no longer exists in either file.
+- **`packages/database/src/account-repository.ts`** — deleted
+  `createAccountRepository` + its `subscriptions` sub-namespace and
+  `findSubscriptionById__unscoped` (zero remaining callers after `access.ts`'s
+  deletion).
+- **`packages/database/src/repository.ts`** — deleted the scoped-repository's
+  top-level `getProfile()` method (read the legacy `profiles` table by id; zero
+  production callers, only unit-test coverage).
+- **`packages/database/src/repository.profile.ts`** — deleted the
+  `consentStates` namespace (`findMany`/`findFirst` over the legacy
+  `consent_states` table; zero production callers).
+- **`apps/api/src/services/billing/quota-provision.ts`** — deleted
+  `provisionProfileQuotaUsage`; its only claimed caller
+  (`services/profile.ts`'s `createProfileWithLimitCheck`) was already gone.
+  Re-exports in `services/billing.ts` and `services/billing/index.ts` updated
+  to match.
+- **`apps/api/src/services/solo-progress-reports.ts`** — whole-file delete.
+  Its only remaining export, `isLocalHour9ForTimezone`, was inlined into
+  `services/identity-v2/solo-progress-reports-v2.ts` (its sole caller); the
+  matching unit test moved into `solo-progress-reports-v2.test.ts`.
+- **`packages/database/src/profile-isolation.integration.test.ts`** — whole-file
+  delete. The suite's own header already documented it as "meaningless once
+  accounts/profiles are dropped" and self-gated via a runtime `to_regclass`
+  check; with the Drizzle defs gone it can no longer compile, and it was not
+  wired into any CI target.
+- **`apps/api/src/services/identity-v2/profile-v2.ts`** /
+  **`services/session/session-cache.ts`** — `loadProfileRowByIdV2` returned
+  `typeof profiles.$inferSelect | null`; replaced with an explicit
+  `LegacyProfileRow` interface reconstructing the same byte-identical shape
+  (session-cache's `CachedProfileRow` now derives via
+  `Awaited<ReturnType<typeof loadProfileRowByIdV2>>`).
+- **`apps/api/src/services/billing/types.ts`** — deleted the dead
+  `mapSubscriptionRow` mapper (zero callers); kept `SubscriptionRow`/
+  `AppliedSubscriptionRow`, which are the live shared contract every
+  billing-v2 mapper produces.
+- **Test-seed / test-util raw-SQL conversion (behavior-preserving, NOT a
+  deletion):** `apps/api/src/test-utils/legacy-identity-anchors.ts`'s four
+  anchor helpers (`ensureLegacyProfileAnchorForTest`,
+  `ensureLegacySubscriptionAnchorForTest`, `deleteLegacyAccountsForTest`,
+  `legacyIdentityTableExistsForTest`) became permanent no-ops — used across
+  ~27 integration test files but with no Drizzle-typed table to write to
+  anymore. `apps/api/src/services/test-seed.ts`'s three legacy-parent writers
+  (`writeLegacyAccountIfPresent`, `writeLegacyProfileIfPresent`,
+  `insertSubscriptionWithLegacy`) instead switched from typed
+  `db.insert(table)` calls to raw parameterized SQL (`db.execute(sql\`INSERT
+  INTO accounts …\`)`) — **not** made no-op, because per-file comments confirm
+  seeded children (`subjects`, `quota_pools`, …) still FK the legacy parents on
+  a still-legacy-chain DB (e.g. CI, pre-WI-1306/M2a), so silently dropping
+  these writes risked breaking integration-test FK constraints. The
+  self-inerting `tableExists()` runtime gate and all call sites are unchanged.
+- **Test fixes:** `packages/database/src/schema/profiles.test.ts` (dropped the
+  `profiles + accounts schema shape` describe block), `repository.test.ts` /
+  `profile-isolation.test.ts` (dropped `getProfile`/`consentStates` coverage),
+  `profile-scoped-tables.test.ts` (dropped `family_links` from the expected
+  scanned-table array), `daily-reminder-scan.test.ts` /
+  `review-due-scan.test.ts` (dropped now-meaningless
+  `not.toHaveBeenCalledWith(profiles/consentStates)` counter-assertions),
+  `weekly-progress-push.test.ts` (GC6 boy-scout: removed a fully vestigial
+  `jest.mock('../../services/solo-progress-reports', …)` block — the mock
+  target was already unimported by production code, superseded by the
+  `-V2` mock of the same file, and only broke to a hard "Cannot find module"
+  once the file itself was deleted).
+
+Verification: `tsc --build` clean (only pre-existing, unrelated `TS7006`/
+mobile-`TS6305` noise remains — confirmed identical against `origin/main`).
+`@eduagent/database` unit suite: 27/27 suites, 283/283 tests green. Full
+related-test sweep (`--findRelatedTests` across every changed file, including
+`weekly-progress-push.test.ts`): 129/129 suites, 3011/3011 tests green.
+
+**Recovery:** annotated tag `retired/wi-1139-legacy-schema-and-dead-chain`
+(force-updated onto `68be453fb` — the correct current-main base for this REDO;
+a same-named tag from a discarded prior attempt on a stale ~22-commits-behind
+base was replaced). Retrieve any individual file with:
+
+```
+git show retired/wi-1139-legacy-schema-and-dead-chain:packages/database/src/schema/profiles.ts
+```
+
+---
+
 ## WI-1398 — identity-graph.integration.test.ts legacy dual-write assertions (2026-07-04)
 
 Retired the three legacy-side assertion blocks in the `creates the full graph in

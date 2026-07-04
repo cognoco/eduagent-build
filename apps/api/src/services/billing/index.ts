@@ -33,7 +33,6 @@ export type {
   ProfileQuotaUsageSnapshot,
   ProfileQuotaRole,
 } from './quota-provision';
-export { provisionProfileQuotaUsage } from './quota-provision';
 export { reconcileQuotaStateForEffectiveTier } from './quota-reconcile';
 
 // Top-up credit management + mid-cycle tier-change pricing/metric

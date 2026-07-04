@@ -8,10 +8,11 @@
 // (billing-v2/dispatch.ts), which always selects the V2 handler bundle. Use
 // the `V2` twins below (findSubscriptionByOrganizationId__unscoped etc.).
 //
-// createAccountRepository / findSubscriptionById__unscoped are KEPT — they
-// are still transitively reachable from services/account.ts's
-// findOrCreateAccount and services/profile.ts's createProfileWithLimitCheck
-// (both out of WI-1239's scope; tracked as follow-up hygiene / WI-1254).
+// [WI-1139] createAccountRepository and findSubscriptionById__unscoped
+// (and the legacy `subscriptions` table they read) removed too — their last
+// callers (services/account.ts's findOrCreateAccount, services/profile.ts's
+// createProfileWithLimitCheck, billing/access.ts) were removed by
+// WI-1364/WI-1398/WI-1139.
 //
 // Remaining standalone helpers are used when only a subscriptionId or other
 // key is available — callers MUST verify ownership before returning data to
@@ -27,36 +28,9 @@
 //   - All INSERT/UPDATE/DELETE writes (scoping is on reads).
 // ---------------------------------------------------------------------------
 
-import { eq, and, type SQL } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { Database } from './client';
-import {
-  quotaPools,
-  topUpCredits,
-  subscription,
-  subscriptions,
-} from './schema/index';
-
-/**
- * Creates an account-scoped repository for billing table reads.
- * Prepares for future `app.current_account_id` RLS policy.
- */
-export function createAccountRepository(db: Database, accountId: string) {
-  return {
-    accountId,
-    db,
-
-    subscriptions: {
-      async findFirst(extraWhere?: SQL) {
-        const filter = eq(subscriptions.accountId, accountId);
-        return db.query.subscriptions.findFirst({
-          where: extraWhere ? and(filter, extraWhere) : filter,
-        });
-      },
-    },
-  };
-}
-
-export type AccountRepository = ReturnType<typeof createAccountRepository>;
+import { quotaPools, topUpCredits, subscription } from './schema/index';
 
 // ---------------------------------------------------------------------------
 // Standalone helpers — used when only subscriptionId or other key is available
@@ -71,21 +45,6 @@ export type AccountRepository = ReturnType<typeof createAccountRepository>;
 // The `__unscoped` suffix is a deliberate signal to reviewers. If you find
 // yourself calling these from a user-facing route, stop.
 // ---------------------------------------------------------------------------
-
-/**
- * Find a subscription by its primary key.
- *
- * SECURITY: caller MUST verify ownership before returning data to a client;
- * intended for webhook handlers that already authenticate by external event ID.
- */
-export async function findSubscriptionById__unscoped(
-  db: Database,
-  subscriptionId: string,
-) {
-  return db.query.subscriptions.findFirst({
-    where: eq(subscriptions.id, subscriptionId),
-  });
-}
 
 /**
  * Find the quota pool for a subscription.
