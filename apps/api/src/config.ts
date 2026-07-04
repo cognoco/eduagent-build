@@ -188,6 +188,17 @@ const envSchema = z.object({
   // fail-open, so the flag only controls whether the calibration dispatch fires.
   JUDGE_FRAMEWORK_ENABLED: z.enum(['true', 'false']).default('false'),
 
+  // Suitability-judge ENFORCING output gate for minors (MMT-ADR-0016 §3
+  // phase-5, WI-1365). Default-OFF and lands INERT: while 'false', the exchange
+  // path runs NO synchronous enforcement judge — zero behavior change, no added
+  // latency/cost. When 'true', a minor's reply is judged synchronously and a
+  // verdict==='violation' (on a non-allowlisted category) is blocked-and-replaced
+  // via the sourceReplacement rail; a 'concern' never blocks; an unavailable
+  // judge fails OPEN with a structured operator alarm. MUST NOT be flipped on
+  // until the calibration-gated threshold is harvested from real minor-traffic
+  // judge.verdict data — pre-launch we have none, so it stays off.
+  JUDGE_ENFORCEMENT_ENABLED: z.enum(['true', 'false']).default('false'),
+
   // Challenge Round grader (MMT-ADR-0016 §2 / plan 2026-06-26). Sources
   // challenge_round_evaluation from a dedicated judge call instead of the
   // inline tutor envelope (gpt-oss silently drops the signal). Default-ON as
@@ -369,6 +380,18 @@ export function isReviewContinuityOpenerEnabled(
  * a missing binding never accidentally turns the judge on.
  */
 export function isJudgeFrameworkEnabled(value: string | undefined): boolean {
+  return value === 'true';
+}
+
+/**
+ * Suitability-judge ENFORCING output gate (MMT-ADR-0016 §3 phase-5, WI-1365).
+ * Read at the exchange route boundary and threaded into
+ * processMessage/streamMessage → processExchange as
+ * `options.judgeEnforcementEnabled`; gates the synchronous minor enforcement
+ * judge. Default-closed: undefined / anything other than 'true' runs NO
+ * enforcement, so a missing binding never accidentally turns blocking on.
+ */
+export function isJudgeEnforcementEnabled(value: string | undefined): boolean {
   return value === 'true';
 }
 

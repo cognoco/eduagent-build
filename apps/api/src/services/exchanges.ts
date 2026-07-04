@@ -45,7 +45,15 @@ import {
   applyMinorPiiEchoGate,
   MINOR_PII_ECHO_GATE_MODEL,
 } from './minor-pii-echo-gate';
-import { computeAgeBracketFromDate, type PiiKind } from '@eduagent/schemas';
+import {
+  computeAgeBracketFromDate,
+  type JudgeFlagCategory,
+  type PiiKind,
+} from '@eduagent/schemas';
+import {
+  runSuitabilityEnforcement,
+  SUITABILITY_GATE_MODEL,
+} from './suitability-gate';
 import { getOcrProvider } from './ocr';
 import {
   GENERAL_KNOWLEDGE_SOURCE_ID,
@@ -266,6 +274,102 @@ export async function emitMinorPiiEchoRedactedEvent(context: {
         },
       }),
     'safety.minor_pii_echo_redacted',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1365] Structured safety event when the suitability-judge ENFORCING output
+ * gate blocks a minor reply (judge overall === 'violation' on a non-allowlisted
+ * category, and the server replaced it with the safe refusal via the
+ * sourceReplacement rail). Silent recovery is banned on safety paths — this is
+ * the required escalation signal (logger.warn + a queryable Inngest event), NOT
+ * a bare console.warn. METADATA ONLY — never the learner message or the blocked
+ * reply. Carries the verdict's coarse flag categories for fire-rate/false-positive
+ * monitoring (never the rationale text, which can quote the reply).
+ */
+export async function emitSuitabilityBlockedEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+  flags: JudgeFlagCategory[];
+}): Promise<void> {
+  logger.warn('safety.suitability_blocked', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+    flags: context.flags,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety marker (WI-1365). The
+        // learner-facing response (safe refusal) already replaced the blocked
+        // reply server-side; this event exists so ops can query
+        // "suitability blocks per week" and monitor the enforcing gate's fire
+        // rate + false-positive risk. No downstream handler is required.
+        name: 'app/safety.suitability_blocked',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: SUITABILITY_GATE_MODEL,
+          tutorModel: context.model,
+          flags: context.flags,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.suitability_blocked',
+    { sessionId: context.sessionId, profileId: context.profileId },
+  );
+}
+
+/**
+ * [WI-1365] Structured operator ALARM when the suitability-judge enforcing gate
+ * could not obtain a verdict (route error / no JSON / invalid schema, or an
+ * unknown tutor vendor). Per the fail-OPEN-with-alarm posture (MMT-ADR-0016 §3
+ * phase-5): the reply PASSED unchanged (can't-judge is not unsafe), but a
+ * degraded enforcement judge on the minor path must never be silent — this is
+ * the required escalation (logger.warn + queryable Inngest event), NOT a bare
+ * console.warn (the silent-recovery ban on safety paths). METADATA ONLY.
+ */
+export async function emitSuitabilityJudgeUnavailableEvent(context: {
+  sessionId?: string;
+  profileId?: string;
+  flow: string;
+  provider?: string;
+  model?: string;
+}): Promise<void> {
+  logger.warn('safety.suitability_judge_unavailable', {
+    flow: context.flow,
+    session_id: context.sessionId,
+    profile_id: context.profileId,
+    provider: context.provider,
+    model: context.model,
+  });
+  await safeSend(
+    () =>
+      inngest.send({
+        // orphan-allow: observability-only safety alarm (WI-1365). The reply
+        // already passed (fail open); this event lets ops alert on enforcement
+        // judge degradation on the minor path. No downstream handler required.
+        name: 'app/safety.suitability_judge_unavailable',
+        data: {
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: context.flow,
+          provider: context.provider,
+          model: SUITABILITY_GATE_MODEL,
+          tutorModel: context.model,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'safety.suitability_judge_unavailable',
     { sessionId: context.sessionId, profileId: context.profileId },
   );
 }
@@ -1652,6 +1756,10 @@ export async function processExchange(
   context: ExchangeContext,
   userMessage: string,
   imageData?: ImageData,
+  options?: {
+    /** [WI-1365] `JUDGE_ENFORCEMENT_ENABLED` — gates the minor enforcement judge. */
+    judgeEnforcementEnabled?: boolean;
+  },
 ): Promise<ExchangeResult> {
   // [Safety tripwire, 2026-06-06] Deterministic floor for the catastrophic
   // categories (self-harm method-seeking, sexual content involving a minor).
@@ -1826,7 +1934,46 @@ export async function processExchange(
       redactedCount: piiEchoGate.echoedTerms.length,
     });
   }
-  const gatedResponse = piiEchoGate.response;
+  // [WI-1365] Suitability-judge ENFORCING output gate (fail-closed on a
+  // 'violation' verdict; fail-open-with-alarm on judge unavailability). Runs
+  // LAST — the final word on the reply, over the already deterministically-gated
+  // text. Inert unless JUDGE_ENFORCEMENT_ENABLED is on AND the learner is a
+  // minor (runSuitabilityEnforcement never calls the judge otherwise, so
+  // latency/cost are unaffected when off). Conservative bracket: an unknown-age
+  // learner fail-closed to minor but reading 'adult' by year-only math is framed
+  // to the stricter minor rubric.
+  const enforcementBracket =
+    isMinorLearner && ageBracket === 'adult' ? 'adolescent' : ageBracket;
+  const suitability = await runSuitabilityEnforcement({
+    enabled: options?.judgeEnforcementEnabled === true,
+    isMinor: isMinorLearner,
+    reply: piiEchoGate.response,
+    precedingLearnerMessage: userMessage,
+    ageBracket: enforcementBracket,
+    tutorVendor: result.provider,
+    conversationLanguage: context.conversationLanguage,
+    sessionId: context.sessionId,
+  });
+  if (suitability.blocked) {
+    await emitSuitabilityBlockedEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+      flags: suitability.blockedFlags,
+    });
+  }
+  if (suitability.unavailable) {
+    await emitSuitabilityJudgeUnavailableEvent({
+      sessionId: context.sessionId,
+      profileId: context.profileId,
+      flow: 'exchange.process',
+      provider: result.provider,
+      model: result.model,
+    });
+  }
+  const gatedResponse = suitability.response;
 
   return {
     response: gatedResponse,

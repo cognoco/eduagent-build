@@ -61,6 +61,8 @@ import {
   collectLearnerText,
   emitDangerousProcedureBlockedEvent,
   emitMinorPiiEchoRedactedEvent,
+  emitSuitabilityBlockedEvent,
+  emitSuitabilityJudgeUnavailableEvent,
   inferObviousReliableSourceForAudit,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -69,6 +71,7 @@ import {
 } from '../exchanges';
 import { applyDangerousProcedureGate } from '../dangerous-procedure-gate';
 import { applyMinorPiiEchoGate } from '../minor-pii-echo-gate';
+import { runSuitabilityEnforcement } from '../suitability-gate';
 import type { ExchangeContext, ReviewCallback } from '../exchange-types';
 import { getReviewCallbackContext } from '../review-callback';
 import {
@@ -3310,6 +3313,7 @@ export async function processMessage(
     challengeRoundGraderEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
+    judgeEnforcementEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -3365,7 +3369,9 @@ export async function processMessage(
       : undefined;
   let result: Awaited<ReturnType<typeof processExchange>>;
   try {
-    result = await processExchange(context, input.message, imageData);
+    result = await processExchange(context, input.message, imageData, {
+      judgeEnforcementEnabled: options?.judgeEnforcementEnabled,
+    });
   } catch (cause) {
     const err = new LlmStreamError('processExchange threw', cause);
     if (options?.clientId) {
@@ -3622,6 +3628,7 @@ export async function streamMessage(
     challengeRoundGraderEnabled?: boolean;
     reviewCallbackOpenerEnabled?: boolean;
     judgeFrameworkEnabled?: boolean;
+    judgeEnforcementEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -3869,7 +3876,54 @@ export async function streamMessage(
           redactedCount: piiEchoGate.echoedTerms.length,
         });
       }
-      const gatedResponse = piiEchoGate.response;
+      // [WI-1365] Suitability-judge ENFORCING output gate (fail-closed on a
+      // 'violation' verdict; fail-open-with-alarm on judge unavailability). Runs
+      // LAST — the final word — over the already deterministically-gated text,
+      // and rides the same `sourceReplacement` rail so the client replaces the
+      // tokens it already streamed. Inert unless JUDGE_ENFORCEMENT_ENABLED is on
+      // AND the learner is a minor (the judge is never called otherwise, so
+      // first-token latency is unaffected). Conservative minor bracket for an
+      // unknown-age learner fail-closed to minor but reading 'adult' by
+      // year-only math.
+      const rawBracket: AgeBracket = Number.isFinite(context.birthYear)
+        ? computeAgeBracketFromDate(
+            context.birthYear,
+            context.birthMonth,
+            context.birthDay,
+          )
+        : 'adolescent';
+      const enforcementBracket: AgeBracket =
+        isMinorLearner && rawBracket === 'adult' ? 'adolescent' : rawBracket;
+      const suitability = await runSuitabilityEnforcement({
+        enabled: options?.judgeEnforcementEnabled === true,
+        isMinor: isMinorLearner,
+        reply: piiEchoGate.response,
+        precedingLearnerMessage: input.message,
+        ageBracket: enforcementBracket,
+        tutorVendor: result.provider,
+        conversationLanguage: context.conversationLanguage,
+        sessionId: context.sessionId,
+      });
+      if (suitability.blocked) {
+        await emitSuitabilityBlockedEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          model: result.model,
+          flags: suitability.blockedFlags,
+        });
+      }
+      if (suitability.unavailable) {
+        await emitSuitabilityJudgeUnavailableEvent({
+          sessionId: context.sessionId,
+          profileId: context.profileId,
+          flow: 'session-exchange.stream',
+          provider: result.provider,
+          model: result.model,
+        });
+      }
+      const gatedResponse = suitability.response;
       const sourceReplacement =
         gatedResponse !== parsed.cleanResponse ? gatedResponse : undefined;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(

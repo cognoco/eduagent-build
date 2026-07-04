@@ -71,3 +71,28 @@ This implementation advances open gate **H4** by adding the **first tier/age-bli
 ### Cutover dependency
 
 The V2 cutover (`LLM_ROUTING_V2_ENABLED`) **must not flip on for minor traffic until `CHALLENGE_ROUND_GRADER_ENABLED=true`** is also set and validated on staging. Without the grader, mastery silently never verifies for any learner on the V2 tutor path — the flag-off behavior is fail-safe (empty evaluation → no mastery, no error), but it is a silent regression, not acceptable at cutover.
+
+## Amendment (2026-07-04) — §3 phase-5 gating mode: violation-only enforcing minor output gate + fail-open-with-alarm
+
+**Design:** WI-1350 (Option A) · **Impl:** WI-1365 · **Operator ruling:** se-030 (verdict-threshold + unavailability forks, both coupled) · **ADR:** this document (§3 phase-5) · **Canon:** `docs/architecture.md` → "Policy-engine spine, router/vetting, safety & judge"
+
+### What changed
+
+The judge's **gating mode** — deferred as "phase-5 work, NOT resolved here" (`judge-profile.ts`) and named as the ADR-scoped open item in §2 / "What this ADR does not decide" — is now **decided for minors**. The suitability judge (`runSuitabilityJudge`, previously async / calibration-only / fail-OPEN, phase-4 increment-1) gains a **synchronous, fail-CLOSED-on-verdict ENFORCING output gate** for under-18 traffic. It backstops the router content-category refusals (harassment / hate / adult-sexual / civic — `router.ts`) that had **no deterministic backstop** (the increment-1 Gap B / Path X in §Consequences): the input tripwire covers only self-harm-method + sexual-minor, and the WI-1154 dangerous-procedure gate covers only operational how-to.
+
+The mechanism reuses the **proven WI-1154 synchronous output-gate seam** — the parsed reply post-envelope, minor-scoped (`computeAgeBracketFromDate`, fail-closed on unknown age), block-and-replace over the existing `sourceReplacement` retract rail — not a new path. New `applySuitabilityGate` / `runSuitabilityEnforcement` (`services/suitability-gate.ts`) are shaped after `applyDangerousProcedureGate`; a new `emitSuitabilityBlockedEvent` mirrors `emitDangerousProcedureBlockedEvent`.
+
+### The ruled gating mode (operator ruling se-030)
+
+- **Block ONLY on `overall === 'violation'`.** A `concern` NEVER blocks — it is observe/telemetry only. (Fork 1: violation-only \[ruled] vs also-concern.)
+- **Category allowlist — NEVER block `over_blocking` / `topic_drift`.** Over-blocking is a hard failure equal to under-blocking (§1); an enforcing LLM judge would otherwise **become the over-blocker its own `over_blocking` flag detects**. A `violation` whose flags are exclusively allowlisted categories passes.
+- **Availability: fail-OPEN-with-alarm.** A judge that cannot render a verdict (route error / no JSON / invalid schema → `runSuitabilityJudge` returns null; or an unknown tutor vendor) **fails OPEN** — the reply passes unchanged — AND raises a structured operator alarm (`emitSuitabilityJudgeUnavailableEvent`; the silent-recovery ban on safety paths forbids a bare `console.warn`). Can't-judge is not evidence the reply is unsafe. **Fail-CLOSED is reserved for a concrete `violation`.** (Fork 2: fail-open-with-alarm \[ruled] vs fail-closed availability-cliff.)
+- **Minor-only.** The gate is scoped to under-18; adults are never judged by it.
+
+### Lands INERT behind a flag — no live threshold pre-launch
+
+The whole mechanism is behind a new `JUDGE_ENFORCEMENT_ENABLED` flag, **default OFF**, and lands **inert** (the judge is never called when off or for adults, so first-token latency and per-turn cost are unaffected on the non-enforced paths). It **must not be flipped on** until the **calibration-gated enforcement threshold** is harvested from **real minor-traffic `judge.verdict` data** (the phase-4 calibration metric). Pre-launch we have no such data, so the flag stays off and **no live threshold is set**. This is the async→sync move the §2 judge role always implied, now scoped to the minor enforcement mode; the phase-4 calibration dispatch (`JUDGE_FRAMEWORK_ENABLED`) is unchanged and independent.
+
+### Latency / cost
+
+Enforcement is **+1 synchronous LLM round-trip per minor turn** when enabled (un-droppable — a blocking gate needs a verdict before it can block). Option A keeps **first-token latency intact** (the judge runs post-stream, over the already-streamed reply, and rides the `sourceReplacement` rail to retract/replace). Options B (regenerate-once-then-block, 2–3× latency/cost) and C (buffer-before-stream, first-token regression) were rejected for v1 (WI-1350).
