@@ -1,3 +1,22 @@
+## UPDATE — post-compaction re-arm (~19:3xZ, LATEST — read this first, supersedes older blocks)
+
+**Session compacted + torn down.** On resume: all Monitor tasks reaped from TaskList, BUT the pre-compaction bash watcher procs survived as **orphans** (Windows: teardown doesn't reap detached child bash) — the stale stage-watch `b3ygrzrqt` fired a replay event. Stopped ALL 5 old IDs (`b3ygrzrqt`, `bo8ksklze`, `bi9l5spyc`, `bqv5gfhs5`, `bxnagq2b1`) and re-armed fresh. **On next resume, TaskStop these NEW ids if they orphan.**
+
+**Fresh monitor set (sole coverage):** outbox SE `bctrrbaok`, MX `be58bkdh8`, LR `bfidwsa7s`; PM watcher `bml1pts4h`; WS-39 stage `baw7fonnq`. Backstop #1900 CI one-shot (bg bash) `bm6jugpow`. `ws-row-watch.state.json` NOT touched (preserved per protocol).
+
+**Merge/PR state (verified against origin):**
+- **#1907 (WI-1393, mobile-ux-nav)** — **MERGED**. origin/main tip = squash `077caef4d4e1221900b443b2f1c4c3986a5b147f`. MX alive (MX-51), now running `/cosmo:execute complete --fixed-in 077caef4d`. Publish-blocker landed. My local main still at `a284c725d` (behind by this merge — sync when convenient).
+- **#1900 (WI-1505, launch-readiness)** — flaky-confirmation re-run **IN PROGRESS** (7/9 green, top-level `main` workflow IN_PROGRESS). Guardrail live: GREEN→merge; RED-AGAIN→STOP+check session/index.test.tsx on main independently, no 2nd re-run. LR owns; `bm6jugpow` backstops.
+- **#1894 (WI-1504)** — MERGED earlier (`19739dd4`); Stage→Reviewing via complete.
+
+**safety-eval (WS-31) — DOWN.** No WI-1376/1358/1351/1365 worktrees on disk; se-056 binding dispatch-go undrained; 4 unanswered pings (se-056/057/058/059). **NEEDS OPERATOR RESPAWN.** On respawn: drain se-054..059, **se-inbox-056 = authoritative binding go** → FIRE 4-build wave (WI-1376+1358+1351+1365 parallel; WI-1377 after 1376; red-green-revert each; WI-1365=MMT-ADR-0016 §3+canon+code lockstep; WI-1358=DPIA lockstep; each stops at Gate-1).
+
+**Last inbox sent this loop:** SE `se-inbox-059`, MX `muxnav-inbox-059` (ack), LR `lr-inbox-063`.
+
+**Open/next:** (1) OPERATOR respawn safety-eval → fires wave. (2) #1900 re-run result → merge or root-cause. (3) MX WI-1393 complete → Reviewing. (4) WI-1504/1505 close on code deliverable; WI-1588 = launch-blocking end-to-end verification gate (captured, WS-39). (5) MEMORY.md compaction still deferred (~4KB headroom).
+
+---
+
 # ORION Resume Checkpoint — 2026-07-04 ~11:05Z
 
 **Role:** ORION = orchestrator of WS-31 (Safety&Eval), WS-33 (Mobile UX&Nav), WS-34 (Platform Hardening, parked), WS-39 (Launch Readiness). Ramtop owns 11 containment lanes — NEVER touch. On `main` (orchestrator); shepherds work in worktrees.
