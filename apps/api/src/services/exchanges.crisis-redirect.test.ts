@@ -228,10 +228,14 @@ describe('emitCrisisRedirectEvent — operator alarm + telemetry hardening (WI-1
       model: 'gemini-2.5-flash',
     });
 
-    // Alarm `extra` is a closed metadata key-set — pointers only. Adding
-    // disclosure text / learner message here is a privacy regression.
+    // Alarm `extra` AND `tags` are closed metadata key-sets — pointers only.
+    // Adding disclosure text / learner message to either is a privacy
+    // regression; lock both key-sets symmetrically.
     expect(Object.keys(alarmExtras).sort()).toEqual(
       ['eventId', 'model', 'provider', 'sessionId', 'timestamp'].sort(),
+    );
+    expect(Object.keys(alarmTags).sort()).toEqual(
+      ['flow', 'profileId', 'surface'].sort(),
     );
 
     // Belt-and-braces: the disclosure string appears in NO sink — not the
