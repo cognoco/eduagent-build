@@ -3,11 +3,8 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, inArray, or } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import {
-  accounts,
-  profiles,
-  consentStates,
   subjects,
   curricula,
   curriculumTopics,
@@ -24,17 +21,12 @@ import {
   teachingPreferences,
   parkingLotItems,
   needsDeepeningTopics,
-  familyLinks,
   learningProfiles,
-  subscriptions,
-  quotaPools,
-  topUpCredits,
   mentorActivityLedger,
   type Database,
 } from '@eduagent/database';
 import {
   dataExportAssessmentRowSchema,
-  dataExportSubscriptionRowSchema,
   dataExportSubjectRowSchema,
   dataExportCurriculumRowSchema,
   dataExportCurriculumTopicRowSchema,
@@ -49,13 +41,10 @@ import {
   dataExportTeachingPreferenceRowSchema,
   dataExportParkingLotItemRowSchema,
   dataExportSessionEmbeddingRowSchema,
-  dataExportQuotaPoolRowSchema,
-  dataExportTopUpCreditRowSchema,
   dataExportNeedsDeepeningTopicRowSchema,
-  dataExportFamilyLinkRowSchema,
   dataExportMentorActivityLedgerRowSchema,
 } from '@eduagent/schemas';
-import type { DataExport, ConsentStatus, Profile } from '@eduagent/schemas';
+import type { DataExport } from '@eduagent/schemas';
 import { projectAiResponseContent } from './llm/project-response';
 
 /**
@@ -210,65 +199,18 @@ function projectSessionEmbeddingContent(content: string): string {
 export async function generateExport(
   db: Database,
   accountId: string,
-  // [WI-809] When the v2 export twin (export-v2.ts) calls this for the
-  // learning-data half, it supplies the org's profileIds (= person ids) so we
-  // skip the legacy identity tables dropped at the cutover (accounts / profiles
-  // / consent_states / family_links). [WI-805] The legacy `subscriptions`
-  // billing chain is ALSO skipped on this path (it is dropped by 0119) — the v2
-  // caller overrides subscriptions / quotaPools / topUpCredits from the v2
-  // `subscription` chain. The identity + billing sections of the returned
-  // DataExport are then empty placeholders the v2 caller overrides; only the
-  // learning-data arrays it spreads are consumed. Omitting opts (every flag-off
-  // caller) is byte-identical to the pre-WI-809 behavior.
+  // [WI-1364] `accountId` is retained for caller-shape stability — the sole
+  // caller (identity-v2/export-v2.ts) passes the org id positionally — but is
+  // UNUSED post-gut. The legacy identity/billing reads that consumed it
+  // (accounts / profiles / consent_states / family_links / subscriptions) were
+  // dead code: every production call supplies `learningOnlyProfileIds`, which
+  // short-circuited all of them, so those `else` branches were removed (WI-1364
+  // dead-sweep). This function now produces only the learning-data half keyed on
+  // `learningOnlyProfileIds`; the identity + billing sections are empty
+  // placeholders the v2 caller (export-v2) overrides.
   opts?: { learningOnlyProfileIds?: string[] },
 ): Promise<DataExport> {
-  const learningOnly = opts?.learningOnlyProfileIds;
-
-  const account = learningOnly
-    ? null
-    : await db.query.accounts.findFirst({
-        where: eq(accounts.id, accountId),
-      });
-
-  if (!learningOnly && !account) {
-    throw new Error(`Account not found: ${accountId}`);
-  }
-
-  const profileRows = learningOnly
-    ? []
-    : await db.query.profiles.findMany({
-        where: eq(profiles.accountId, accountId),
-      });
-
-  const profileIds = learningOnly ?? profileRows.map((p) => p.id);
-
-  const consentRows =
-    !learningOnly && profileIds.length > 0
-      ? await db.query.consentStates.findMany({
-          where: inArray(consentStates.profileId, profileIds),
-        })
-      : [];
-
-  // Build a map of profileId → most-recent consent status for profile export
-  const latestConsentByProfileId = new Map<
-    string,
-    { status: string; requestedAt: Date }
-  >();
-  for (const row of consentRows) {
-    const existing = latestConsentByProfileId.get(row.profileId);
-    if (!existing || row.requestedAt > existing.requestedAt) {
-      latestConsentByProfileId.set(row.profileId, {
-        status: row.status,
-        requestedAt: row.requestedAt,
-      });
-    }
-  }
-  const consentStatusByProfileId = new Map<string, ConsentStatus>(
-    [...latestConsentByProfileId.entries()].map(([pid, { status }]) => [
-      pid,
-      status as ConsentStatus,
-    ]),
-  );
+  const profileIds = opts?.learningOnlyProfileIds ?? [];
 
   // --- GDPR Article 15: query all profile-scoped personal data ---
   const subjectRows =
@@ -390,58 +332,10 @@ export async function generateExport(
         })
       : [];
 
-  const familyLinkRows =
-    !learningOnly && profileIds.length > 0
-      ? await db.query.familyLinks.findMany({
-          where: or(
-            inArray(familyLinks.parentProfileId, profileIds),
-            inArray(familyLinks.childProfileId, profileIds),
-          ),
-        })
-      : [];
-
-  const linkCreatedAtByChildId = new Map(
-    familyLinkRows.map((link) => [link.childProfileId, link.createdAt]),
-  );
-  const linkedParentIds = new Set(
-    familyLinkRows.map((link) => link.parentProfileId),
-  );
-  const linkedChildIds = new Set(
-    familyLinkRows.map((link) => link.childProfileId),
-  );
-
   const learningProfileRows =
     profileIds.length > 0
       ? await db.query.learningProfiles.findMany({
           where: inArray(learningProfiles.profileId, profileIds),
-        })
-      : [];
-
-  // [WI-805] Billing is part of the learning-only skip too: the v2 export twin
-  // overrides subscriptions / quotaPools / topUpCredits from the v2
-  // `subscription` chain, so the legacy `subscriptions` read must NOT run on the
-  // learning-only path — post-0119-drop it would 500 (`relation "subscriptions"
-  // does not exist`). subscriptionIds = [] then cascades quotaPools /
-  // topUpCredits to [] via their existing length guards below.
-  const subscriptionRows = learningOnly
-    ? []
-    : await db.query.subscriptions.findMany({
-        where: eq(subscriptions.accountId, accountId),
-      });
-
-  const subscriptionIds = subscriptionRows.map((s) => s.id);
-
-  const quotaPoolRows =
-    subscriptionIds.length > 0
-      ? await db.query.quotaPools.findMany({
-          where: inArray(quotaPools.subscriptionId, subscriptionIds),
-        })
-      : [];
-
-  const topUpCreditRows =
-    subscriptionIds.length > 0
-      ? await db.query.topUpCredits.findMany({
-          where: inArray(topUpCredits.subscriptionId, subscriptionIds),
         })
       : [];
 
@@ -455,48 +349,13 @@ export async function generateExport(
       : [];
 
   return {
-    // [WI-809] account is null only on the learning-only v2 path, where the v2
-    // caller overrides this section; a placeholder keeps the shape valid.
-    account: account
-      ? {
-          email: account.email,
-          createdAt: account.createdAt.toISOString(),
-        }
-      : { email: '', createdAt: new Date(0).toISOString() },
-    profiles: profileRows.map((row) => ({
-      id: row.id,
-      displayName: row.displayName,
-      avatarUrl: row.avatarUrl ?? null,
-      birthYear: row.birthYear,
-      location: row.location ?? null,
-      isOwner: row.isOwner,
-      hasPremiumLlm: row.hasPremiumLlm,
-      defaultAppContext:
-        (row.defaultAppContext as Profile['defaultAppContext']) ?? null,
-      hasFamilyLinks: row.isOwner
-        ? linkedParentIds.has(row.id)
-        : linkedChildIds.has(row.id),
-      // BKT-C.1 — include the new personalization dimensions in the GDPR
-      // export. The CHECK constraint on conversation_language guarantees the
-      // value is one of the 8 codes; cast narrows Drizzle's `string` to the
-      // schema enum.
-      conversationLanguage:
-        row.conversationLanguage as Profile['conversationLanguage'],
-      pronouns: row.pronouns ?? null,
-      consentStatus: consentStatusByProfileId.get(row.id) ?? null,
-      linkCreatedAt: linkCreatedAtByChildId.get(row.id)?.toISOString() ?? null,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    })),
-    consentStates: consentRows.map((row) => ({
-      id: row.id,
-      profileId: row.profileId,
-      consentType: row.consentType,
-      status: row.status,
-      parentEmail: row.parentEmail ?? null,
-      requestedAt: row.requestedAt.toISOString(),
-      respondedAt: row.respondedAt?.toISOString() ?? null,
-    })),
+    // [WI-1364] identity/billing placeholders — the sole caller (export-v2)
+    // overrides account / profiles / consentStates / familyLinks / subscriptions
+    // / quotaPools / topUpCredits from the v2 chain; only the learning-data
+    // arrays below are consumed.
+    account: { email: '', createdAt: new Date(0).toISOString() },
+    profiles: [],
+    consentStates: [],
     // [BUG-413] Apply serializeDates to every row so Date objects from the
     // Drizzle / neon-serverless driver are converted to ISO strings before
     // they reach the export payload.  Without this, rows passed as
@@ -566,21 +425,13 @@ export async function generateExport(
         content: projectSessionEmbeddingContent(serialized['content']),
       });
     }),
-    subscriptions: subscriptionRows.map((row) =>
-      dataExportSubscriptionRowSchema.parse(serializeDates(row)),
-    ),
-    quotaPools: quotaPoolRows.map((row) =>
-      dataExportQuotaPoolRowSchema.parse(serializeDates(row)),
-    ),
-    topUpCredits: topUpCreditRows.map((row) =>
-      dataExportTopUpCreditRowSchema.parse(serializeDates(row)),
-    ),
+    subscriptions: [],
+    quotaPools: [],
+    topUpCredits: [],
     needsDeepeningTopics: needsDeepeningTopicRows.map((row) =>
       dataExportNeedsDeepeningTopicRowSchema.parse(serializeDates(row)),
     ),
-    familyLinks: familyLinkRows.map((row) =>
-      dataExportFamilyLinkRowSchema.parse(serializeDates(row)),
-    ),
+    familyLinks: [],
     learningProfiles: learningProfileRows.map((row) => ({
       ...row,
       consentPromptDismissedAt:

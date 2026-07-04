@@ -52,7 +52,47 @@ git show retired/wi-1364-dead-legacy-readers:<path>
 ### NOT swept (out of scope, surfaced for follow-up)
 
 - `services/export.ts` `generateExport` — **live** (unconditionally called by
-  `identity-v2/export-v2.ts` with `learningOnlyProfileIds`). Untouched.
+  `identity-v2/export-v2.ts` with `learningOnlyProfileIds`). ~~Untouched.~~
+  **GUTTED to live-only surface (Gate-2 rework, 2026-07-04) — see below.**
+
+### `services/export.ts` gutted to live-only surface (Gate-2 rework, 2026-07-04)
+
+The initial WI-1364 AC placed `export.ts` in bucket (b) ("gut to live-only") but
+it was wrongly excluded wholesale on "generateExport is live" — conflating a live
+*function* with a live *legacy surface*. `generateExport` still imported the 5
+legacy defs (`accounts` / `profiles` / `consent_states` / `family_links` /
+`subscriptions`) and read them in the `else` branch of each
+`learningOnly ? <skip> : <legacy read>` ternary. Those `else` branches were
+**dead**: `generateExport`'s sole caller (`export-v2.ts`) ALWAYS passes
+`learningOnlyProfileIds`, which short-circuited every legacy read; no production
+call omits it. Gutted (not deleted — the learning-data half is live):
+
+- Removed the dead legacy-read `else` branches (accounts / profiles /
+  consent_states / family_links / subscriptions) + the maps/cascades that only
+  served them (consent-status map, family-link maps, subscription→quota/top-up
+  cascade). Kept the learning-data reads and the empty-placeholder identity /
+  billing return sections that `export-v2` overrides.
+- **Cascade note:** the `quotaPools` / `topUpCredits` reads (and their imports)
+  were removed too — not as new scope, but because they were gated on
+  `subscriptionIds` (from the removed `subscriptions` read), so they became
+  unconditionally `[]`. The empty-placeholder `quotaPools: []` / `topUpCredits: []`
+  returns are kept; `export-v2` reads them from the v2 subscription chain.
+- **Result: `export.ts` imports ZERO legacy defs** (grep-clean) — WI-1139's
+  "no code imports legacy defs" precondition is now met for those 5 tables via
+  this file. `accountId` is retained in the signature for caller-shape stability
+  (unused post-gut; commented).
+- **Byte-identical guaranteed:** `export-v2` does `{ ...legacy, <overrides> }` and
+  overrides all 7 identity/billing keys, so only the learning-data arrays +
+  `exportedAt` flow through from `generateExport`.
+- `export.test.ts`: retired the identity/billing-assertion tests (they asserted
+  the removed reads); converted the learning-data / Date-serialisation / envelope
+  tests to pass `learningOnlyProfileIds`; kept the `serializeDates` unit tests;
+  trimmed the surviving `[WI-809]` branch test to pin OUTPUT (dropped the now
+  vacuous `.not.toHaveBeenCalled()` lines) and retired its non-vacuous pair.
+- **Validated:** tsc clean; `jest --findRelatedTests export.ts` 948 pass; full
+  `*.guard.test.ts` glob 211 pass; both `export*.integration.test.ts` GREEN on a
+  scratch Postgres (pg17 + pgvector, full `drizzle-kit migrate`) incl. the
+  `generateExportV2` full-export byte-identical test (`IDENTITY_POST_DROP=1`).
 
 ### Residual legacy-def readers — CLEARED (completeness follow-up, 2026-07-03)
 
