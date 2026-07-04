@@ -3,11 +3,9 @@ import {
   assessments,
   consentGrant,
   consentRequest,
-  consentStates,
   curricula,
   curriculumBooks,
   curriculumTopics,
-  familyLinks,
   generateUUIDv7,
   guardianship,
   learningSessions,
@@ -250,23 +248,13 @@ export async function seedDirectChildProfileForTest(input: {
   const childId = input.profileId ?? generateUUIDv7();
   const location = input.location ?? 'EU';
 
-  // [WI-1128] Legacy `profiles` may already be dropped (post-M-DROP). Gate on
-  // table existence so this seed stays a no-op there instead of hard-failing
-  // on "relation does not exist" — the v2 dual-seed below is the real anchor.
-  if (await legacyIdentityTableExistsForTest(db, 'profiles')) {
-    await db
-      .insert(profiles)
-      .values({
-        id: childId,
-        accountId: input.accountId,
-        displayName: input.displayName,
-        birthYear: input.birthYear,
-        location,
-        isOwner: false,
-      })
-      .onConflictDoNothing();
-  }
-
+  // [WI-1524] Legacy `profiles` insert dropped — createIdentityGraph's legacy
+  // accounts/profiles dual-write is gone (WI-1398), so this seed's legacy
+  // `accounts` parent no longer exists and the insert FK-violates
+  // (profiles_account_id_accounts_id_fk) whenever the table is present. The
+  // v2 dual-seed below is the sole, real anchor now (was already seeded
+  // unconditionally alongside).
+  //
   // [WI-1145] Dual-seed the v2 graph UNCONDITIONALLY alongside legacy. The
   // product reads v2 unconditionally post-WI-867-collapse, and the flag-on lane
   // reads v2 pre-collapse, so a flag-gated v2 seed leaves the v2 store empty on
@@ -301,18 +289,12 @@ export async function seedFamilyLinkForTest(input: {
   await ensureV2ProfileAnchorForTest(db, { profileId: input.parentProfileId });
   await ensureV2ProfileAnchorForTest(db, { profileId: input.childProfileId });
 
-  // [WI-1128] Legacy `family_links` may already be dropped (post-M-DROP);
-  // gate on table existence — the v2 guardianship edge below is the real anchor.
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db
-      .insert(familyLinks)
-      .values({
-        parentProfileId: input.parentProfileId,
-        childProfileId: input.childProfileId,
-      })
-      .onConflictDoNothing();
-  }
-
+  // [WI-1524] Legacy `family_links` insert dropped — its `profiles` parent
+  // rows no longer exist post-WI-1398 dual-write removal, so the insert
+  // FK-violates (family_links_parent_profile_id_profiles_id_fk) whenever the
+  // table is present. The v2 guardianship edge below is the sole, real
+  // anchor now.
+  //
   // [WI-1145] Dual-seed the v2 guardianship edge unconditionally — the product's
   // validateGuardianshipEdgeV2 reads it on the post-collapse main lane (flag-off),
   // where a flag-gated seed would leave it empty → ForbiddenError.
@@ -335,29 +317,13 @@ export async function setProfileConsentStatusForTest(input: {
 }): Promise<void> {
   const db = createIntegrationDb();
   const consentType = input.consentType ?? 'GDPR';
-  const respondedAt =
-    input.status === 'CONSENTED' || input.status === 'WITHDRAWN'
-      ? new Date()
-      : null;
 
-  // [WI-1128] Legacy `consent_states` may already be dropped (post-M-DROP);
-  // gate on table existence — the v2 consent_request/consent_grant rows below
-  // are the real anchor.
-  if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-    await db
-      .delete(consentStates)
-      .where(eq(consentStates.profileId, input.profileId));
-    await db.insert(consentStates).values({
-      profileId: input.profileId,
-      consentType,
-      status: input.status,
-      parentEmail: input.parentEmail ?? null,
-      consentToken: `integration-consent-${input.profileId}-${input.status}`,
-      respondedAt,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    });
-  }
-
+  // [WI-1524] Legacy `consent_states` insert dropped — its `profiles` parent
+  // row no longer exists post-WI-1398 dual-write removal, so the insert
+  // FK-violates (consent_states_profile_id_profiles_id_fk) whenever the
+  // table is present. The v2 consent_request/consent_grant rows below are
+  // the sole, real anchor now.
+  //
   // [WI-1145] Seed the v2 consent rows unconditionally alongside legacy
   // consentStates — the product resolves consent via consent_request/grant on
   // the post-collapse main lane (flag-off), so a flag-gated seed leaves the v2
@@ -665,20 +631,11 @@ export async function seedConsentRequest(input: {
   const expiresAt =
     input.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // [WI-1128] Legacy `consent_states` may already be dropped (post-M-DROP);
-  // gate on table existence — the v2 consent rows below are the real anchor.
-  if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-    await db.insert(consentStates).values({
-      profileId: input.profileId,
-      consentType,
-      status,
-      parentEmail,
-      consentToken: input.token,
-      respondedAt: input.respondedAt ?? null,
-      expiresAt,
-    });
-  }
-
+  // [WI-1524] Legacy `consent_states` insert dropped — its `profiles` parent
+  // row no longer exists post-WI-1398 dual-write removal, so the insert
+  // FK-violates (consent_states_profile_id_profiles_id_fk) whenever the
+  // table is present. The v2 consent rows below are the sole, real anchor now.
+  //
   // [WI-1145] Seed the v2 consent rows unconditionally; resolve org via the
   // shared membership-first resolver (legacy `profiles` may be empty for a
   // route-created person post-collapse).

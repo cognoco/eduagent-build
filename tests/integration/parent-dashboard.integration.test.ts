@@ -19,11 +19,9 @@
 
 import {
   consentGrant,
-  familyLinks,
   guardianship,
   learningSessions,
   membership,
-  consentStates,
 } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 
@@ -39,7 +37,6 @@ import {
   seedFamilyLinkForTest,
   seedSubject as seedSubjectForTest,
 } from './route-fixtures';
-import { legacyIdentityTableExistsForTest } from '../../apps/api/src/test-utils/legacy-identity-anchors';
 import { buildAuthHeaders } from './test-keys';
 
 import { app } from '../../apps/api/src/index';
@@ -116,13 +113,13 @@ async function seedFamilyLink(
   childProfileId: string,
 ): Promise<void> {
   const db = createIntegrationDb();
-  if (await legacyIdentityTableExistsForTest(db, 'family_links')) {
-    await db
-      .insert(familyLinks)
-      .values({ parentProfileId, childProfileId })
-      .onConflictDoNothing();
-  }
 
+  // [WI-1524] Legacy `family_links` insert dropped — its `profiles` parent
+  // rows no longer exist post-WI-1398 dual-write removal, so the insert
+  // FK-violates (family_links_parent_profile_id_profiles_id_fk) whenever the
+  // table is present. The v2 guardianship edge below is the sole, real
+  // anchor now.
+  //
   // [WI-1145] Seed the v2 guardianship edge + child cross-org membership
   // unconditionally. This file creates profiles through routes, but the
   // flag-off main lane may only have the legacy profile rows, so repair the v2
@@ -736,25 +733,17 @@ describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', 
     await seedFamilyLink(parentProfileId, childProfileId);
 
     const db = createIntegrationDb();
-    if (await legacyIdentityTableExistsForTest(db, 'consent_states')) {
-      await db
-        .delete(consentStates)
-        .where(eq(consentStates.profileId, childProfileId));
-      await db.insert(consentStates).values({
-        profileId: childProfileId,
-        consentType: 'GDPR',
-        status: 'WITHDRAWN',
-        parentEmail: PARENT_EMAIL,
-        consentToken: `test-consent-${childProfileId}`,
-        respondedAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
-    }
 
-    // [WI-1145] Seed the v2 consentGrant (withdrawn) unconditionally alongside the
-    // legacy consentStates above — the collapsed dashboard consent read resolves via
-    // consent_grant on the flag-off main lane, empty when gated. Child membership
-    // exists (route-created + cross-org membership seeded in seedFamilyLink).
+    // [WI-1524] Legacy `consent_states` insert dropped — its `profiles`
+    // parent row no longer exists post-WI-1398 dual-write removal, so the
+    // insert FK-violates (consent_states_profile_id_profiles_id_fk) whenever
+    // the table is present. The v2 consentGrant below is the sole, real
+    // anchor now.
+    //
+    // [WI-1145] Seed the v2 consentGrant (withdrawn) unconditionally — the
+    // collapsed dashboard consent read resolves via consent_grant on the
+    // flag-off main lane. Child membership exists (route-created +
+    // cross-org membership seeded in seedFamilyLink).
     const childMemberships = await db.query.membership.findMany({
       where: eq(membership.personId, childProfileId),
       columns: { organizationId: true },
