@@ -165,6 +165,11 @@ Ref: `docs/superpowers/plans/2026-04-19-pre-launch-ux-fixes.md`
   - Verify `SENTRY_DSN` is set in Doppler `prd`
   - Confirm error events flow to Sentry after a test error
 
+- [ ] **LAUNCH-BLOCKING: end-to-end deploy-time verification of activation instrumentation + LLM kill-switch** (tracked as **WI-1588**)
+  - Verify activation instrumentation (WI-1504) + LLM kill-switch (WI-1505) end-to-end against a **real migrated Neon DB + KV binding** in a staging/prod-profile build: real `activation_events` rows land; the kill-switch actually flips learner-facing LLM traffic.
+  - Sequenced **after** migration-apply (deploy step) + WI-1570 (mobile client dispatch of the six client-observed event types) + ideally WI-1503 dogfood. Public launch cannot proceed without it — activation telemetry is DPIA-adjacent.
+  - **Why a separate gate (re-scope pattern — reusable):** an acceptance criterion that can only be evaluated against a real deployed runtime (migration applied to a remote DB, live KV, an installed build) is *not* satisfiable at code-merge time. Such an AC is **re-sequenced** out of the code-merge close-gate into a dedicated launch-blocking verification WI — the verification is **preserved and tracked, never dropped**. This is legitimate re-sequencing (moving a gate to where it can actually run), NOT gate-loosening-to-pass. Applies **only** to ACs that are genuinely deploy/external-runtime-gated; each re-scoped AC must be (a) genuinely downstream-gated, (b) landed in a launch-blocking gate, (c) named explicitly. (Established by ORION ruling 2026-07-04 for WI-1504 AC5 + WI-1505 staging-rehearsal AC → WI-1588.)
+
 - [ ] **Seed the LLM eval signal baseline** (do this LAST, once prompts are frozen)
   - The drift guard at `apps/api/eval-llm/baseline.json` is currently an empty stub (`"flows": {}`) — inert until seeded. Seeding earlier is wasted effort: any intentional prompt change re-seeds it, so it's only meaningful once prompt tuning has stopped.
   - Run once locally (needs live LLM keys via Doppler; only `exchanges` + `probes` emit envelope metrics, so scope to them and raise the call cap above the default 20):
