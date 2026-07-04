@@ -31,6 +31,7 @@ import {
 } from './exchange-prompts';
 import { stripPhoneticHints } from './llm/sanitize';
 import { safeSend } from './safe-non-core';
+import { captureMessage } from './sentry';
 import { inngest } from '../inngest/client';
 import {
   detectCatastrophicSafetyTrigger,
@@ -65,19 +66,27 @@ export {
 const logger = createLogger();
 
 /**
- * [H2/H7 — 2026-06-05 safety audit] Structured safety event when the
- * crisis-redirect rule fires (learner expressed distress / self-harm
- * ideation / bullying / abuse and the model redirected to a trusted
- * adult/helpline).
+ * [H2/H7 — 2026-06-05 safety audit; hardened WI-1358 under ruling se-032]
+ * Server-side telemetry for the crisis-redirect rule firing (learner expressed
+ * distress / self-harm ideation / bullying / abuse and the model redirected to
+ * a trusted adult / helpline — the learner-facing reply is authored by WI-1359
+ * and is NEVER touched here).
  *
- * Before this, the redirect fired with zero logging — "how many learners
- * mentioned self-harm last month?" was unanswerable (a silent-recovery
- * violation on the highest-stakes path in the app, and a DPIA-visible gap).
+ * §6(b) RULING (se-032, Option (c) + telemetry carve-out): the server takes
+ * **no guardian-notification action on crisis_redirect, ever** — guardian-notify
+ * is ruled OUT on the merits (guardian-is-the-abuser failure mode). No T&S queue
+ * at MVP; no mandatory-reporting integration (deferred to post-launch legal
+ * review). What the server DOES do is the telemetry carve-out below — a reliable
+ * log of every firing PLUS a structured operator alarm — so this highest-stakes
+ * path is never silent (silent recovery is banned on safety paths). See the
+ * safety-guards register (`docs/registers/safety-guards/master.md`) and the DPIA
+ * (`docs/compliance/edpb_dpia_filled_2026_v1.md`).
  *
- * Deliberately logs METADATA ONLY — never the learner's message or the
- * model's reply. §6 ruling (2026-06-05): internal logging only, no guardian
- * notification; the structured event is the prerequisite for any future
- * notification design.
+ * CRITICAL PRIVACY CONSTRAINT: every sink here carries METADATA ONLY — a
+ * correlation `eventId` + profileId-scoped pointers (session id, flow, provider,
+ * model). NEVER the learner's disclosure text or any raw minor PII. Shipping the
+ * disclosure into Sentry/Inngest (third-party US event stores) would re-leak the
+ * very sensitive content this path exists to handle safely.
  */
 export async function emitCrisisRedirectEvent(context: {
   sessionId?: string;
@@ -86,30 +95,75 @@ export async function emitCrisisRedirectEvent(context: {
   provider?: string;
   model?: string;
 }): Promise<void> {
+  // Correlation id ties the reliable log line, the operator alarm, and the
+  // queryable telemetry event together WITHOUT carrying any disclosure content.
+  const eventId = crypto.randomUUID();
+  const timestamp = new Date().toISOString();
+
+  // (1) Reliable server-side log of EVERY firing. Metadata only.
   logger.warn('safety.crisis_redirect_fired', {
+    event_id: eventId,
     flow: context.flow,
     session_id: context.sessionId,
     profile_id: context.profileId,
     provider: context.provider,
     model: context.model,
   });
+
+  // (2) Structured operator ALARM (the telemetry carve-out's teeth). A queryable
+  // Sentry message at 'warning' level surfaces in the operator console with
+  // alerting + 24h volume checks — a real operator-facing alarm, not a silent
+  // fire-and-forget event with no handler. captureMessage is a synchronous SDK
+  // call (graceful no-op when no DSN). It is guarded so a Sentry-SDK throw can
+  // never abort this highest-stakes path or block the (3) Inngest telemetry
+  // publish below — the three sinks are independent. A guard failure is
+  // escalated via logger.error (not swallowed silently — safety-path rule).
+  // Metadata + profileId-scoped pointers ONLY — no disclosure content.
+  try {
+    captureMessage('safety.crisis_redirect_fired', {
+      level: 'warning',
+      profileId: context.profileId,
+      tags: { surface: 'safety.crisis_redirect', flow: context.flow },
+      extra: {
+        eventId,
+        sessionId: context.sessionId,
+        provider: context.provider,
+        model: context.model,
+        timestamp,
+      },
+    });
+  } catch (alarmErr) {
+    logger.error('safety.crisis_redirect_alarm_failed', {
+      event_id: eventId,
+      flow: context.flow,
+      session_id: context.sessionId,
+      profile_id: context.profileId,
+      error: alarmErr instanceof Error ? alarmErr.message : String(alarmErr),
+    });
+  }
+
+  // (3) Queryable telemetry event for ops dashboards ("crisis redirects per
+  // week"). Pure observability → safeSend (failure captured in Sentry, never
+  // throws, never breaks the learner-facing reply). No downstream handler is
+  // wired: the server takes NO guardian-facing action on this event (§6(b)
+  // ruling se-032). Metadata only.
   await safeSend(
     () =>
       inngest.send({
-        // orphan-allow: observability-only marker (H2/H7, 2026-06-05 safety
-        // audit). The user-facing response (empathize + helpline redirect)
-        // already happened in the LLM reply; this event exists so ops can
-        // query "crisis redirects per week" in the dashboard and so RR-12's
-        // monitoring guardrail has a signal. No downstream handler is needed
-        // or intended until the §6(b) guardian-notification design is ruled.
+        // orphan-allow: observability-only marker (H2/H7 2026-06-05 audit;
+        // WI-1358 se-032). The learner-facing response (empathise + helpline
+        // redirect) already happened in the LLM reply. This event is telemetry
+        // for ops dashboards — NOT a guardian-notification trigger, which is
+        // ruled out on the merits. No downstream handler is wired or intended.
         name: 'app/safety.crisis_redirect_fired',
         data: {
+          eventId,
           sessionId: context.sessionId,
           profileId: context.profileId,
           flow: context.flow,
           provider: context.provider,
           model: context.model,
-          timestamp: new Date().toISOString(),
+          timestamp,
         },
       }),
     'safety.crisis_redirect_fired',

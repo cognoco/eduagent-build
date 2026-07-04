@@ -22,12 +22,13 @@ site as either **acceptable as prompt-only** or **needs a server-side gate**,
 and named the follow-up Work Items for the latter two.
 This register transcribes and verifies the four rows with a settled,
 citable outcome (two gated, two justified-prompt-only) so that outcome is
-discoverable from the repo, not only from the Cosmo page. **This register
-does not yet reproduce the remaining four WI-1285 inventory sites** (crisis
-redirect, "not a crisis" carve-out, anti-fabrication, and one further site);
-add them as new rows + trail records in a follow-up pass that transcribes
-the full WI-1285 table, rather than leaving this register implying they
-were reviewed here.
+discoverable from the repo, not only from the Cosmo page. The **crisis-redirect**
+site (row 5) was subsequently ruled and hardened under WI-1358 (se-032) and is
+reproduced here. **This register does not yet reproduce the remaining three
+WI-1285 inventory sites** ("not a crisis" carve-out, anti-fabrication, and one
+further site); add them as new rows + trail records in a follow-up pass that
+transcribes the full WI-1285 table, rather than leaving this register implying
+they were reviewed here.
 
 ## Ledger
 
@@ -37,6 +38,7 @@ were reviewed here.
 | 2 | Minor-PII echo-back suppression | **server-side gate** — `services/minor-pii-echo-gate.ts` (`extractVolunteeredPiiMatches` + reply scrub) | A drifted/weak/jailbroken model could echo a minor's volunteered PII (name, school, email, phone, handle, address) straight into the persisted `ai_response.content` — a GDPR-K data-protection incident, not just a UX miss. Narrow echo-back scope: strips only the concrete PII values the learner volunteered, so curriculum content (a school in a history lesson) is untouched. | `apps/api/src/services/exchange-prompts.ts:692-694` | Rule pre-existing prompt-only; gate landed **WI-1348**; classified in **WI-1285** audit as a site that needed (and got) a gate |
 | 3 | Jailbreak / system-prompt exfiltration / roleplay refusal | **prompt-only** (justified — no gate) | The system prompt holds no secrets to leak (it is entirely non-confidential pedagogy/safety instruction), so an exfiltration "win" discloses nothing sensitive. Deterministic detection of "is this a jailbreak attempt" is high-false-positive / low-value against natural roleplay requests in a tutoring context (many legitimate lessons ask the model to "be" a historical figure or a character in a story). The cost of a miss is low; the cost of a false-positive gate (refusing legitimate roleplay pedagogy) is real. | `apps/api/src/services/exchange-prompts.ts:695` | Classified in **WI-1285** audit as acceptable prompt-only (inventory item #6); recorded by **WI-1353** |
 | 4 | Slur-explanation-without-repetition | **prompt-only** (justified — no gate) | Low stakes: the failure mode is the model explaining a slur's meaning without perfectly avoiding repeating the word, not a safety or data-protection harm. Answering the learner's question first (before any "tell a trusted adult" suggestion) is the correct UX and is easy for a deterministic gate to break by over-triggering on ordinary vocabulary questions ("what does the word idiot mean") that are not remotely this case. | `apps/api/src/services/exchange-prompts.ts:689-691` | Classified in **WI-1285** audit as acceptable prompt-only (inventory item #7); recorded by **WI-1353** |
+| 5 | Crisis-redirect on disclosed distress / self-harm / abuse | **prompt-only reply + server-side telemetry alarm** (no guardian action) | The learner-facing reply (empathise + trusted-adult/helpline redirect, **never the guardian**) is authored by the LLM per the SAFETY block and the narrow abuse-disclosure tripwire (WI-1359); it is left prompt-only because a deterministic "is this a crisis" classifier is high-false-positive and the correct response is de-escalatory resources, not a gate. The **server-side action** is a telemetry carve-out (WI-1358, ruling se-032): `emitCrisisRedirectEvent` emits a reliable log + a **structured Sentry operator alarm** (metadata-only — correlation event-id + profileId-scoped pointers, **never** the disclosure text or raw minor PII) + a queryable Inngest telemetry event via `safeSend`. **No guardian-notification action, ever** — ruled out on the merits (guardian-is-the-abuser failure mode); no T&S queue at MVP; **mandatory-reporting integration deferred pending legal counsel**. DPIA: `docs/compliance/edpb_dpia_filled_2026_v1.md` §2.3.d. | `apps/api/src/services/exchanges.ts` (`emitCrisisRedirectEvent`); reply rule `apps/api/src/services/exchange-prompts.ts` SAFETY block | Crisis-redirect site from **WI-1285** inventory; server-side action ruled + built under **WI-1358** (se-032); learner-facing tripwire **WI-1359** |
 
 ## How to add a row
 
