@@ -22,12 +22,10 @@ import { zValidator } from '@hono/zod-validator';
 import {
   activationEventIngestRequestSchema,
   activationEventIngestResponseSchema,
-  ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
-import { apiError } from '../errors';
 import { safeWrite } from '../services/safe-non-core';
 import {
   recordActivationEvent,
@@ -47,33 +45,16 @@ type ActivationEventsRouteEnv = {
   };
 };
 
-// Client-driven only — the server-owned touchpoints (signup_completed,
-// first_subject_or_lesson_started, first_session_started,
-// first_session_completed) are never accepted from the client.
-const CLIENT_DRIVEN_EVENT_TYPES = new Set([
-  'app_opened',
-  'signup_started',
-  'onboarding_completed',
-  'review_card_seen',
-  'review_card_tapped',
-  'day2_return',
-]);
-
 export const activationEventsRoutes = new Hono<ActivationEventsRouteEnv>().post(
   '/activation-events',
+  // `clientActivationEventTypeSchema` (via the request schema) rejects the four
+  // server-owned event types at the Zod trust boundary with HTTP 400 — a
+  // client cannot forge a server-owned funnel event. No handler-level guard is
+  // needed.
   zValidator('json', activationEventIngestRequestSchema),
   async (c) => {
     const db = c.get('db');
     const input = c.req.valid('json');
-
-    if (!CLIENT_DRIVEN_EVENT_TYPES.has(input.eventType)) {
-      return apiError(
-        c,
-        422,
-        ERROR_CODES.VALIDATION_ERROR,
-        `eventType '${input.eventType}' is recorded server-side and cannot be reported via this route.`,
-      );
-    }
 
     const profileId = c.get('profileId') ?? null;
     const profileMeta = c.get('profileMeta');

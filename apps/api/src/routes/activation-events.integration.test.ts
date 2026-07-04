@@ -8,7 +8,8 @@
  * Covers:
  *   - the client-driven ingest route, pre-account (profileId null) and
  *     post-account (profileId set)
- *   - rejection of server-owned event types via the ingest route (422)
+ *   - rejection of server-owned event types at the Zod boundary (HTTP 400) —
+ *     a client cannot forge a server-owned funnel event
  *   - occurrenceId-based dedupe
  *   - the signup_completed server touchpoint fired from POST /v1/profiles
  */
@@ -110,34 +111,46 @@ describe('Integration: POST /v1/activation-events', () => {
     await cleanupAnonymousId(anonymousId);
   });
 
-  it('rejects a server-owned eventType (422)', async () => {
-    const anonymousId = `anon-${AUTH_USER_ID}-rejected`;
-    await cleanupAnonymousId(anonymousId);
+  // RED-GREEN forgery guard: a client POSTing a server-owned eventType must be
+  // rejected at the Zod boundary (HTTP 400) — NOT recorded. Widening
+  // activationEventIngestRequestSchema.eventType back to the full
+  // activationEventTypeSchema makes these assertions fail.
+  it.each([
+    'signup_completed',
+    'first_subject_or_lesson_started',
+    'first_session_started',
+    'first_session_completed',
+  ])(
+    'rejects server-owned eventType %s at the schema boundary (400)',
+    async (eventType) => {
+      const anonymousId = `anon-${AUTH_USER_ID}-rejected-${eventType}`;
+      await cleanupAnonymousId(anonymousId);
 
-    const res = await app.request(
-      '/v1/activation-events',
-      {
-        method: 'POST',
-        headers: {
-          ...buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
-          'Content-Type': 'application/json',
+      const res = await app.request(
+        '/v1/activation-events',
+        {
+          method: 'POST',
+          headers: {
+            ...buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            eventType,
+            anonymousId,
+          }),
         },
-        body: JSON.stringify({
-          eventType: 'first_session_completed',
-          anonymousId,
-        }),
-      },
-      TEST_ENV,
-    );
+        TEST_ENV,
+      );
 
-    expect(res.status).toBe(422);
+      expect(res.status).toBe(400);
 
-    const rows = await db
-      .select()
-      .from(activationEvents)
-      .where(eq(activationEvents.anonymousId, anonymousId));
-    expect(rows).toHaveLength(0);
-  });
+      const rows = await db
+        .select()
+        .from(activationEvents)
+        .where(eq(activationEvents.anonymousId, anonymousId));
+      expect(rows).toHaveLength(0);
+    },
+  );
 
   it('dedupes repeated review_card_seen calls by occurrenceId, but records distinct cards', async () => {
     const anonymousId = `anon-${AUTH_USER_ID}-cards`;
